@@ -13,7 +13,8 @@ import ClientAssigner from './components/ClientAssigner'
 import WeekPlanner from '../workout/components/planning/WeekPlanner'
 import WorkoutService from '../../services/WorkoutService'
 import ClientPlanManagerModal from './components/ClientPlanManagerModal'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays } from 'lucide-react'
+import CardioPlanModal from './components/CardioPlanModal'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -37,6 +38,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showAgenda, setShowAgenda] = useState(false)
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
   const [showPlanManager, setShowPlanManager] = useState(false)
+  const [showCardio, setShowCardio] = useState(false)
   const [saving, setSaving] = useState(false)
   const [templates, setTemplates] = useState([])
   const [dayTemplates, setDayTemplates] = useState([])
@@ -258,17 +260,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setShowExerciseSelector(false)
   }
 
-  // Cardio-item toevoegen aan een dag. Rijdt mee in dezelfde exercises-array
-  // als een gewoon item, maar met type:'cardio' + eigen velden (duur/afstand/
-  // intensiteit). Coach verfijnt de waarden inline in de kaart.
-  const addCardioToDay = (dayId) => {
-    const newItem = {
-      id: Date.now(), type: 'cardio', name: 'Hardlopen',
-      duration: '20 min', distance: '', intensity: 'Matig', notes: '',
-    }
-    setWorkoutPlan(prev => ({ ...prev, days: prev.days.map(d => d.id === dayId ? { ...d, exercises: [...d.exercises, newItem] } : d) }))
-    setActiveDay(dayId)
-  }
+  // Cardio zit niet meer ín een trainingsdag maar los bij de klant (zie
+  // CardioPlanModal). buildWeekStructure schrijft bestaande cardio-items nog
+  // wel weg, zodat oudere schema's die ze al hebben niet stilletjes leeglopen.
 
   const updateExercise = (dayId, exerciseId, updates) => {
     setWorkoutPlan(prev => ({ ...prev, days: prev.days.map(d => d.id === dayId ? { ...d, exercises: d.exercises.map(ex => ex.id === exerciseId ? { ...ex, ...updates } : ex) } : d) }))
@@ -680,6 +674,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             style={zijKnop({ opacity: (!effectiveClient || !selectedSchemaId) ? 0.35 : 1, cursor: (!effectiveClient || !selectedSchemaId) ? 'not-allowed' : 'pointer' })}>
             <CalendarDays size={14} /> Trainingsweek
           </button>
+          {/* Cardio hangt aan de klant, niet aan het schema: wandelen of
+              fietsen wil je juist op de dagen dat er geen training staat. */}
+          <button onClick={() => setShowCardio(true)}
+            disabled={!effectiveClient}
+            title={!effectiveClient ? 'Kies eerst een klant' : 'Cardio voor deze klant'}
+            style={zijKnop({ opacity: effectiveClient ? 1 : 0.35, cursor: effectiveClient ? 'pointer' : 'not-allowed' })}>
+            <Heart size={14} /> Cardio
+          </button>
           <button onClick={() => setShowTemplateManager(true)} style={zijKnop()}>
             <FileText size={14} /> Templates
           </button>
@@ -721,7 +723,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             onDuplicate={() => duplicateDay(actieveDag.id)}
             onSaveTemplate={() => saveDayAsTemplate(actieveDag)}
             onAddExercise={() => { setActiveDay(actieveDag.id); setShowExerciseSelector(true) }}
-            onAddCardio={() => addCardioToDay(actieveDag.id)}
             onUpdateExercise={(exerciseId, updates) => updateExercise(actieveDag.id, exerciseId, updates)}
             onDeleteExercise={(exerciseId) => deleteExercise(actieveDag.id, exerciseId)}
             isMobile={isMobile} db={db} client={effectiveClient}
@@ -764,6 +765,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           // dat alles bewaard is; sluiten doe je met het kruisje.
           onClose={() => setShowAgenda(false)}
         />
+      )}
+
+      {showCardio && effectiveClient && (
+        <CardioPlanModal client={effectiveClient} db={db} isMobile={isMobile} onClose={() => setShowCardio(false)} />
       )}
 
       {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={effectiveClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}

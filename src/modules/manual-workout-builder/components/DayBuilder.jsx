@@ -6,7 +6,7 @@ import BuilderExerciseCard from './BuilderExerciseCard'
 
 export default function DayBuilder({
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate, onSaveTemplate,
-  onAddExercise, onAddCardio, onUpdateExercise, onDeleteExercise, isMobile, db, client
+  onAddExercise, onUpdateExercise, onDeleteExercise, isMobile, db, client
 }) {
   const [editingName, setEditingName] = useState(false)
   const [editingFocus, setEditingFocus] = useState(false)
@@ -209,12 +209,7 @@ export default function DayBuilder({
               onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}>
               <Plus size={16} color="#FFD700" />Oefening
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onAddCardio && onAddCardio() }}
-              style={{ flex: 1, padding: '0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '42px' }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}>
-              <Heart size={15} color="#f87171" />Cardio
-            </button>
+            {/* Cardio-knop weg: cardio staat los van het schema (zijbalk → Cardio) */}
           </div>
         </>
       )}
