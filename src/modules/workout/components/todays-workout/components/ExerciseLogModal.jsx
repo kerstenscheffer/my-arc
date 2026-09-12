@@ -77,6 +77,10 @@ function AdjustBtn({ label, onClick, isMobile, positive, half }) {
   )
 }
 
+// De kolommen van de set-tabel: setnummer, vandaag, vorige keer, verschil.
+// Op één plek, zodat de koprij en de rijen niet uit de pas lopen.
+const KOLOMMEN = '3.2rem 1fr 1fr 4.2rem'
+
 // ========== SET INPUT WIZARD ==========
 // `snel` = met de rusttimer aan: alleen kilo's en reps, dan klaar. Partials
 // en dropsets blijven bestaan, maar niet als vier schermen tussen elke set
@@ -198,22 +202,22 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
           Stond met een groen vinkje in een vakje en het gewicht in goud —
           drie accenten voor een regel die alleen hoeft te zeggen wat je deed. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '0.6rem',
-        padding: isMobile ? '0.5rem 1rem' : '0.55rem 1.25rem',
+        display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem',
+        alignItems: 'center',
+        padding: isMobile ? '0.42rem 1rem' : '0.48rem 1.25rem',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <span style={{
-          width: '2.9em', flexShrink: 0,
           fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-          textTransform: 'uppercase', letterSpacing: '0.04em',
+          textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap',
         }}>
           Set {index + 1}
         </span>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ minWidth: 0 }}>
           <div style={{
             fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff',
-            fontVariantNumeric: 'tabular-nums',
+            fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
           }}>
             {set.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
             <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
@@ -229,26 +233,36 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
           )}
         </div>
 
-        {delta && (
-          <span style={{
-            flexShrink: 0, fontSize: '0.72rem', fontWeight: 900,
-            color: delta.op === null ? 'rgba(255,255,255,0.28)' : delta.op ? '#10b981' : 'rgba(255,255,255,0.42)',
-            whiteSpace: 'nowrap',
-          }}>
-            {delta.tekst}
-          </span>
-        )}
-
-        <button onClick={() => setShowMenu(!showMenu)} aria-label="Meer" style={{
-          width: 30, height: 30, flexShrink: 0,
-          background: showMenu ? 'rgba(255,255,255,0.08)' : 'transparent',
-          border: 'none', borderRadius: 8,
-          color: showMenu ? '#fff' : 'rgba(255,255,255,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        <span style={{
+          fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)',
+          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
         }}>
-          <MoreVertical size={15} />
-        </button>
+          {vorige
+            ? <>{vorige.weight}<span style={{ fontSize: '0.8em' }}>kg</span> × {vorige.reps}</>
+            : <span style={{ color: 'rgba(255,255,255,0.18)' }}>—</span>}
+        </span>
+
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2 }}>
+          {delta && (
+            <span style={{
+              fontSize: '0.7rem', fontWeight: 900,
+              color: delta.op === null ? 'rgba(255,255,255,0.28)' : delta.op ? '#10b981' : 'rgba(255,255,255,0.42)',
+              whiteSpace: 'nowrap',
+            }}>
+              {delta.tekst}
+            </span>
+          )}
+          <button onClick={() => setShowMenu(!showMenu)} aria-label="Meer" style={{
+            width: 26, height: 26, flexShrink: 0,
+            background: showMenu ? 'rgba(255,255,255,0.08)' : 'transparent',
+            border: 'none', borderRadius: 7,
+            color: showMenu ? '#fff' : 'rgba(255,255,255,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <MoreVertical size={14} />
+          </button>
+        </span>
       </div>
 
       {showMenu && (
@@ -270,8 +284,9 @@ function LegeSetRow({ index, vorige, onClick, isMobile }) {
     <button
       onClick={onClick}
       style={{
-        display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%',
-        padding: isMobile ? '0.5rem 1rem' : '0.55rem 1.25rem',
+        display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem',
+        alignItems: 'center', width: '100%',
+        padding: isMobile ? '0.42rem 1rem' : '0.48rem 1.25rem',
         background: 'transparent', border: 'none',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
@@ -279,28 +294,26 @@ function LegeSetRow({ index, vorige, onClick, isMobile }) {
       }}
     >
       <span style={{
-        width: '2.9em', flexShrink: 0,
         fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)',
-        textTransform: 'uppercase', letterSpacing: '0.04em',
+        textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap',
       }}>
         Set {index + 1}
       </span>
       <span style={{
-        flex: 1, minWidth: 0,
         fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900,
         color: 'rgba(255,255,255,0.22)',
       }}>
         —
       </span>
-      {vorige && (
-        <span style={{
-          flexShrink: 0, fontSize: '0.74rem', fontWeight: 800,
-          color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
-        }}>
-          vorige {vorige.weight}<span style={{ fontSize: '0.85em' }}>kg</span> × {vorige.reps}
-        </span>
-      )}
-      <span style={{ width: 30, flexShrink: 0 }} />
+      <span style={{
+        fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)',
+        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+      }}>
+        {vorige
+          ? <>{vorige.weight}<span style={{ fontSize: '0.8em' }}>kg</span> × {vorige.reps}</>
+          : <span style={{ color: 'rgba(255,255,255,0.18)' }}>—</span>}
+      </span>
+      <span />
     </button>
   )
 }
@@ -800,42 +813,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
 
             {/* Historie hoort bij de cijfers: het is dezelfde oefening, alleen
                 van vorige keren. Stond tussen de notitie-knoppen onderaan. */}
-            {/* Vorige sessie hoort bij de cijfers erboven: het is dezelfde
-                oefening van vorige keer. Stond onder de foto, los van de rest. */}
-            {previousPerformance?.sets?.length > 0 && (
-              <div style={{ marginTop: '0.45rem' }}>
-                <div style={{
-                  fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
-                  textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.15rem',
-                }}>
-                  Vorige sessie
-                  {previousPerformance.date && (
-                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>
-                      {' · '}{new Date(previousPerformance.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                    </span>
-                  )}
-                </div>
-                {/* Alles op één regel: "Set 1: 5kg × 9   Set 2: 5kg × 8". Het
-                    label naast het getal in plaats van erboven, dan is het
-                    één regel in plaats van twee. */}
-                <div style={{
-                  display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
-                  gap: isMobile ? '0.1rem 0.85rem' : '0.1rem 1.1rem',
-                  fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900,
-                  color: '#fff', fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {previousPerformance.sets.map((x, i) => (
-                    <span key={i} style={{ whiteSpace: 'nowrap' }}>
-                      <span style={{ fontSize: '0.72em', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>Set {i + 1}: </span>
-                      {x.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
-                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.14em' }}>×</span>
-                      {x.reps}
-                      {x.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{x.partials}p</span>}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.09)' }} />
@@ -880,8 +857,28 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 sessie: daar kijk je naar terwijl je bezig bent. De knop om
                 te loggen staat eronder, en wat je af en toe opzoekt weer
                 daaronder. */}
-            {/* Alle sets die op het programma staan meteen in beeld: de gelogde
-                bovenaan, de rest als lege regel met wat je vorige keer deed. */}
+            {/* Tabel: links het setnummer, dan wat je vandaag deed en wat je
+                vorige keer deed op precies dezelfde set. De datum staat als
+                kolomkop, zodat het losse "vorige sessie"-blok in de kop weg
+                kon — dezelfde cijfers stonden er twee keer. */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem',
+              alignItems: 'center',
+              padding: isMobile ? '0.55rem 1rem 0.35rem' : '0.65rem 1.25rem 0.4rem',
+              fontSize: '0.62rem', fontWeight: 900,
+              textTransform: 'uppercase', letterSpacing: '0.07em',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <span />
+              <span style={{ color: '#FFD700' }}>Vandaag</span>
+              <span style={{ color: 'rgba(255,215,0,0.55)' }}>
+                {previousPerformance?.date
+                  ? new Date(`${String(previousPerformance.date).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+                  : 'vorige'}
+              </span>
+              <span />
+            </div>
+
             {Array.from({ length: Math.max(loggedSets.length, geplandeSets) }, (_, i) => {
               const set = loggedSets[i]
               const vorige = previousPerformance?.sets?.[i] || null
