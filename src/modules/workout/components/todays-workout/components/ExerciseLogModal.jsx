@@ -843,7 +843,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                     // Geen kader: de schuifknop is zelf al een vorm, en een
                     // doos eromheen maakt er een tweede knop van naast de knop
                     // die je wél indrukt.
-                    flexShrink: 0, width: isMobile ? 96 : 118, minHeight: 52,
+                    flexShrink: 0, width: isMobile ? 108 : 130, minHeight: 52,
                     background: 'transparent', border: 'none', padding: 0,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
                     cursor: 'pointer', fontFamily: 'inherit',
@@ -851,7 +851,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                   }}
                 >
                   <span style={{
-                    fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.05em',
+                    fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.05em',
                     textTransform: 'uppercase', whiteSpace: 'nowrap',
                     color: rustTimerAan ? '#fff' : 'rgba(255,255,255,0.5)',
                   }}>
@@ -859,7 +859,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                   </span>
                   <span style={{
                     position: 'relative', display: 'block',
-                    width: 40, height: 22, borderRadius: 999, flexShrink: 0,
+                    width: 54, height: 30, borderRadius: 999, flexShrink: 0,
                     background: rustTimerAan ? '#fff' : 'rgba(255,255,255,0.12)',
                     border: `1px solid ${rustTimerAan ? '#fff' : 'rgba(255,255,255,0.2)'}`,
                     transition: 'background 0.18s ease',
@@ -867,13 +867,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                     {/* Het klokje ís het bolletje: zegt meteen waar de knop
                         over gaat, ook als je het label niet leest. */}
                     <span style={{
-                      position: 'absolute', top: 2, left: rustTimerAan ? 20 : 2,
-                      width: 16, height: 16, borderRadius: '50%',
+                      position: 'absolute', top: 3, left: rustTimerAan ? 27 : 3,
+                      width: 22, height: 22, borderRadius: '50%',
                       background: rustTimerAan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       transition: 'left 0.18s cubic-bezier(0.4,0,0.2,1), background 0.18s ease',
                     }}>
-                      <Timer size={11} strokeWidth={2.8} color={rustTimerAan ? '#fff' : '#0a0a0a'} />
+                      <Timer size={14} strokeWidth={2.6} color={rustTimerAan ? '#fff' : '#0a0a0a'} />
                     </span>
                   </span>
                 </button>
