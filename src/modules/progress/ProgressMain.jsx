@@ -16,119 +16,54 @@ import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
 import { useChallenge } from '../../hooks/useChallenge'
 
-// Dag-banner content (datum + dagelijkse tip) — selectie is deterministisch per
-// dag-van-het-jaar zodat'ie consistent is binnen een dag.
-const TRACKING_TIPS = [
-  'Wegen op een vast moment werkt beter dan elke dag op een ander tijdstip.',
-  'Eén bad-meting is een datapunt, geen trend. Kijk naar de week-lijn.',
-  'Foto naast cijfer — wat de weegschaal niet ziet, ziet de spiegel wel.',
-  'Vloeistof-balans schommelt 1–2 kg per dag. Vertrouw je 7-daags gemiddelde.',
-  'Maandag is geen heilige weeg-dag. Vrijdag werkt voor sommigen beter.',
-  'Een plateau is data, geen falen. Kijk naar omtrek en spiegel.',
-  'Vandaag ook? Klein moment, lange-termijn voordeel.',
-  'Trots op gisteren? Houd vandaag dezelfde lijn vast.',
-  'Even checken: was je laatste foto al meer dan 2 weken geleden?',
-  'Sleep + stress beïnvloeden je gewicht ~1 kg. Zie het in context.',
-]
-const pickTrackingTip = () => {
-  const start = new Date(new Date().getFullYear(), 0, 0)
-  const diff = Date.now() - start.getTime()
-  const dayOfYear = Math.floor(diff / 86400000)
-  return TRACKING_TIPS[dayOfYear % TRACKING_TIPS.length]
-}
-
-const getDutchDate = () => {
-  const d = new Date()
-  const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
-  const months = ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
-                  'juli', 'augustus', 'september', 'oktober', 'november', 'december']
-  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
-}
-
-// Tracking-header — sticky met grote gouden DAG-naam + datum-pill ernaast.
-function TrackingHeader({ client, isMobile }) {
-  const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
-  const months = ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
-                  'juli', 'augustus', 'september', 'oktober', 'november', 'december']
-  const today = new Date()
-  const dayName = days[today.getDay()]
-  const dateLabel = `${today.getDate()} ${months[today.getMonth()]}`
-
-  return (
-    <div style={{
-      position: 'sticky', top: 0, zIndex: 50,
-      background: 'rgba(10,10,10,0.92)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      paddingTop: 'env(safe-area-inset-top, 0)',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
-    }}>
-      <div style={{
-        padding: isMobile ? '0.85rem 1rem' : '1rem 1.5rem',
-        textAlign: 'center',
-      }}>
-        <div style={{
-          fontSize: isMobile ? '1.2rem' : '1.35rem',
-          fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em',
-          lineHeight: 1.1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        }}>
-          {dayName}
-          <span style={{
-            fontSize: '0.62rem', fontWeight: 800,
-            color: 'rgba(0,0,0,0.85)', background: '#FFD700',
-            padding: '2px 7px', borderRadius: 4,
-            letterSpacing: '0.04em', textTransform: 'uppercase',
-          }}>
-            {dateLabel}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // Coach-tip bovenaan de tracking pagina — foto links, vaste boodschap rechts.
 // Vervangt de rotating daily-tip: deze tekst is een vast reminder over week-
 // gemiddeldes ipv dagelijkse schommelingen.
-const COACH_PHOTO_URL = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746cbde003.jpg'
+// Dezelfde foto als de andere meldingen, lokaal in plaats van een gratis
+// image-host.
+const COACH_PHOTO_URL = '/coach-compliment.jpg'
 const COACH_TRACKING_MESSAGE = 'Het is normaal dat je gewicht schommelt en hoeft niks te betekenen. We focussen op jouw week gemiddelde en sturen vanuit daar bij.'
 
 function TrackingTipBlock({ isMobile }) {
   return (
-    <div style={{
-      padding: isMobile ? '1rem 1rem 0' : '1.25rem 1.5rem 0',
-    }}>
+    <div style={{ padding: isMobile ? '0.9rem 1rem 0' : '1.25rem 1.5rem 0' }}>
+      {/* Zelfde vorm als de check-in melding: foto rechts, naar links weg in
+          het zwart, tekst in bold wit eroverheen. */}
       <div style={{
-        display: 'flex', gap: isMobile ? 12 : 14,
-        alignItems: 'flex-start',
+        position: 'relative',
+        minHeight: isMobile ? 116 : 130,
+        borderRadius: 14,
+        overflow: 'hidden',
+        background: '#0a0a0a',
+        border: '1px solid rgba(255,255,255,0.12)',
       }}>
-        <img
-          src={COACH_PHOTO_URL}
-          alt="Coach"
-          style={{
-            width: isMobile ? 48 : 56,
-            height: isMobile ? 48 : 56,
-            borderRadius: '50%',
-            objectFit: 'cover',
-            border: '2px solid rgba(255,215,0,0.45)',
-            flexShrink: 0,
-            boxShadow: '0 4px 12px rgba(255,215,0,0.18)',
-          }}
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          position: 'absolute', top: 0, right: 0, bottom: 0, width: '30%',
+          backgroundImage: `url(${COACH_PHOTO_URL})`,
+          backgroundSize: 'cover', backgroundPosition: 'center 30%',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 56%, rgba(10,10,10,0.85) 70%, rgba(10,10,10,0.4) 86%, rgba(10,10,10,0) 100%)',
+        }} />
+        <div style={{
+          position: 'relative',
+          width: '76%',
+          padding: isMobile ? '0.8rem 0.5rem 0.85rem 0.9rem' : '1rem 0.6rem 1rem 1.15rem',
+        }}>
           <div style={{
-            fontSize: isMobile ? '0.62rem' : '0.68rem',
-            fontWeight: 800, color: '#FFD700',
+            fontSize: isMobile ? '0.6rem' : '0.65rem',
+            fontWeight: 800, color: 'rgba(255,255,255,0.4)',
             textTransform: 'uppercase', letterSpacing: '0.1em',
-            marginBottom: 4,
+            marginBottom: 5,
           }}>
-            Bericht van Kersten
+            Van Kersten
           </div>
           <div style={{
-            fontSize: isMobile ? '0.85rem' : '0.92rem',
-            color: 'rgba(255,255,255,0.85)',
-            fontWeight: 500, lineHeight: 1.5,
+            fontSize: isMobile ? '0.88rem' : '0.95rem',
+            fontWeight: 900, color: '#fff',
+            lineHeight: 1.35, letterSpacing: '-0.015em',
+            textShadow: '0 2px 10px rgba(0,0,0,0.8)',
           }}>
             {COACH_TRACKING_MESSAGE}
           </div>
@@ -291,7 +226,6 @@ export default function ProgressMain({ db, client }) {
       {/* ═══ ZONE 0: DAG-BANNER ═══ */}
       {!photosOpen && (
         <>
-          <TrackingHeader client={client} isMobile={isMobile} />
           <TrackingTipBlock isMobile={isMobile} />
         </>
       )}
