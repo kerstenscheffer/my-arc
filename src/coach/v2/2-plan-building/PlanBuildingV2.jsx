@@ -7,7 +7,6 @@ import { useState } from 'react'
 // Import bestaande builders (mapping) - CORRECTE PATHS
 import AIGenerator from '../../../components/AIGenerator'
 import CoachMealPlannerDashboard from '../../pages/CoachMealPlannerDashboard'
-import ChallengeBuilder from '../../../modules/challenges/ChallengeBuilder'
 import CoachVideoTab from '../../../modules/videos/CoachVideoTab'
 
 // Icons
@@ -65,7 +64,11 @@ export default function PlanBuildingV2({
       icon: Trophy,
       color: '#f59e0b',
       description: 'Ontwerp 30-dagen challenges',
-      component: ChallengeBuilder // Bestaande
+      // De oude ChallengeBuilder is weg (modules/challenges is opgeruimd: dood
+      // hout dat op lege tabellen werkte). Deze v2-hub staat uit
+      // (useV2CoachHub = false in App.jsx) maar compileert wel mee, dus de
+      // import moest hoe dan ook weg.
+      component: null
     },
     {
       id: 'video',
@@ -306,13 +309,12 @@ export default function PlanBuildingV2({
         )}
         
         {activeBuilder === 'challenge' && (
-          <ChallengeBuilder
-            db={db}
-            onSave={(challenge) => {
-              console.log('Challenge created:', challenge)
-              refreshData()
-            }}
-          />
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
+            <p>Challenge Creator is verwijderd.</p>
+            <p style={{ fontSize: '0.8rem' }}>
+              De challenge-monitor staat in CoachHub onder Clients.
+            </p>
+          </div>
         )}
         
         {activeBuilder === 'video' && (
