@@ -54,9 +54,13 @@ export default function MealCard({
   geselecteerd = false,
   // Knopje rechtsboven op de kaart (de ster in het wisselvenster).
   hoekKnop = null,
+  // Vaste waarde helemaal rechts op de kaart, verticaal in het midden — bv.
+  // het aantal gram bij een ingrediënt.
+  rechts = null,
 }) {
   const photoSize = isMobile ? 78 : 90
-  const moment = momentLabel || getMealTypeLabel(meal)
+  // Een lege string betekent bewust geen label op de foto (ingrediënten).
+  const moment = momentLabel === '' ? '' : (momentLabel || getMealTypeLabel(meal))
   const tijd = tijdLabel || (typeof meal.timing === 'string' && /^\d{1,2}:\d{2}/.test(meal.timing) ? meal.timing : null)
   return (
     <div style={{
@@ -99,7 +103,7 @@ export default function MealCard({
             padding: isMobile ? '0 5px 5px' : '0 6px 6px',
             pointerEvents: 'none',
           }}>
-            <div style={{
+            {moment && <div style={{
               fontSize: isMobile ? '0.6rem' : '0.66rem',
               fontWeight: 900, color: '#fff',
               letterSpacing: '-0.01em', lineHeight: 1.1,
@@ -107,7 +111,7 @@ export default function MealCard({
               textShadow: '0 1px 6px rgba(0,0,0,0.9)',
             }}>
               {moment}
-            </div>
+            </div>}
             {tijd && (
               <div style={{
                 fontSize: isMobile ? '0.55rem' : '0.6rem',
@@ -221,6 +225,18 @@ export default function MealCard({
         ))}
       </div>
         </div>
+
+        {rechts && (
+          <div style={{
+            flexShrink: 0, alignSelf: 'center',
+            padding: isMobile ? '0 0.8rem 0 0.4rem' : '0 1rem 0 0.5rem',
+            fontSize: isMobile ? '0.9rem' : '0.95rem',
+            fontWeight: 900, color: '#fff', letterSpacing: '-0.015em',
+            whiteSpace: 'nowrap',
+          }}>
+            {rechts}
+          </div>
+        )}
       </div>
     </div>
   )

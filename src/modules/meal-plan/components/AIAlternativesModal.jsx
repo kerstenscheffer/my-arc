@@ -691,7 +691,8 @@ export default function AIAlternativesModal({
                       calories: ing.calories, protein: ing.protein,
                       carbs: ing.carbs, fat: ing.fat,
                     }}
-                    momentLabel={`${ing.amount}${ing.unit === 'gram' ? 'g' : ` ${ing.unit || ''}`}`}
+                    momentLabel=""
+                    rechts={`${ing.amount}${ing.unit === 'gram' ? 'g' : ` ${ing.unit || ''}`}`}
                     isMobile={isMobile}
                     acties={[]}
                   />
