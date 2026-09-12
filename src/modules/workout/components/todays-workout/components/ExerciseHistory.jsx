@@ -162,7 +162,15 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
     // Hoeveel set-kolommen de tabel krijgt. Vier is genoeg; wie er meer doet
     // ziet de rest achter een plusje.
     const maxKolommen = Math.min(4, Math.max(...sessies.map(s => s.sets.length), 1))
-    const kolommen = `52px repeat(${maxKolommen}, minmax(0, 1fr)) 62px`
+    const kolommen = `56px repeat(${maxKolommen}, minmax(0, 1fr)) 66px`
+
+    // Verticale lijnen tussen de kolommen. Via een linkerrand op elke cel
+    // behalve de eerste, met de gap op nul — dan lopen de lijnen door de kop
+    // en alle rijen op precies dezelfde plek.
+    const cel = (k) => ({
+      padding: '0 0.45rem',
+      borderLeft: k === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)',
+    })
 
     // Balkjes op volume (kg × reps opgeteld) en niet op het gewicht: bij
     // bankdrukken staat 80kg twintig sessies lang stil en werd de grafiek een
@@ -243,16 +251,16 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                 laatste kolom vergelijkt set 1 met set 1 van de vorige keer. */}
             <div style={{
               display: 'grid', gridTemplateColumns: kolommen,
-              gap: '0 0.5rem', alignItems: 'center', paddingBottom: '0.35rem',
+              gap: 0, alignItems: 'center', paddingBottom: '0.35rem',
               fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)',
               textTransform: 'uppercase', letterSpacing: '0.07em',
               borderBottom: '1px solid rgba(255,255,255,0.1)',
             }}>
-              <span>Datum</span>
+              <span style={cel(0)}>Datum</span>
               {Array.from({ length: maxKolommen }, (_, k) => (
-                <span key={k}>Set {k + 1}</span>
+                <span key={k} style={cel(k + 1)}>Set {k + 1}</span>
               ))}
-              <span style={{ textAlign: 'right', letterSpacing: '0.04em' }}>Set 1 +/-</span>
+              <span style={{ ...cel(maxKolommen + 1), textAlign: 'right', letterSpacing: '0.04em' }}>Set 1 +/-</span>
             </div>
 
             <div>
@@ -274,10 +282,10 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                     )}
                     <div style={{
                       display: 'grid', gridTemplateColumns: kolommen,
-                      gap: '0 0.5rem', alignItems: 'baseline', padding: '0.32rem 0',
+                      gap: 0, alignItems: 'stretch', padding: '0.32rem 0',
                       borderTop: nieuweMaand ? 'none' : '1px solid rgba(255,255,255,0.06)',
                     }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>
+                      <span style={{ ...cel(0), fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>
                         {formatDate(s.dag)}
                       </span>
 
@@ -286,9 +294,10 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                         // Laatste kolom draagt ook de sets die niet meer passen:
                         // "5×8 +2" is duidelijker dan ze stilzwijgend weglaten.
                         const rest = k === maxKolommen - 1 ? s.sets.length - maxKolommen : 0
-                        if (!set) return <span key={k} style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.8rem' }}>–</span>
+                        if (!set) return <span key={k} style={{ ...cel(k + 1), color: 'rgba(255,255,255,0.15)', fontSize: '0.8rem' }}>–</span>
                         return (
                           <span key={k} style={{
+                            ...cel(k + 1),
                             fontSize: '0.85rem', fontWeight: 900, color: '#fff',
                             fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
                           }}>
@@ -303,6 +312,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                       })}
 
                       <span style={{
+                        ...cel(maxKolommen + 1),
                         textAlign: 'right', fontSize: '0.72rem', fontWeight: 900,
                         color: !v ? 'rgba(255,255,255,0.15)' : v.op === null ? 'rgba(255,255,255,0.28)' : v.op ? '#10b981' : 'rgba(255,255,255,0.45)',
                         whiteSpace: 'nowrap',
