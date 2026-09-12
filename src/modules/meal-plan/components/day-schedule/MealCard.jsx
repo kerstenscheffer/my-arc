@@ -1,15 +1,14 @@
 // src/modules/meal-plan/components/day-schedule/MealCard.jsx
 //
-// v6 — terug naar de compacte foto linksboven + info ernaast, en de
-// actie-rij sluit edge-to-edge aan onderaan de kaart. Geen border, geen
-// achtergrond op het paneel — alleen een dun lijntje boven en verticale
-// lijntjes tussen Info / Wissel / Afronden (Koolh/Vet-stijl).
+// v7 — foto over de volle hoogte links, met het moment ("Ontbijt") en de tijd
+// eroverheen op een donkere foto. Rechts van de foto de naam, de macro's en
+// daaronder de knoppen; die zijn kleiner dan voorheen, want ze staan nu naast
+// de foto en niet meer over de hele breedte eronder.
 
 import React from 'react'
 import { Check, Info, RefreshCw } from 'lucide-react'
 import { foodImageFallback } from '../../foodImageFallback'
 
-const GOLD = '#FFD700'
 const DIVIDER = 'rgba(255,255,255,0.06)'
 
 // Foto: eigen image_url indien aanwezig, anders een titel-gebaseerde fallback
@@ -41,7 +40,8 @@ const getMealTypeLabel = (meal) => {
 export default function MealCard({
   meal, isChecked, isMobile, onCheck, onInfo, onAlternatives,
 }) {
-  const photoSize = isMobile ? 70 : 80
+  const photoSize = isMobile ? 78 : 90
+  const heeftTijd = typeof meal.timing === 'string' && /^\d{1,2}:\d{2}/.test(meal.timing)
   return (
     <div style={{
       margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
@@ -59,15 +59,46 @@ export default function MealCard({
         <div
           onClick={onCheck}
           style={{
-            width: photoSize, height: photoSize,
+            width: photoSize, alignSelf: 'stretch',
             flexShrink: 0,
             background: `url(${getMealImage(meal)}) center/cover`,
-            position: 'relative',
+            position: 'relative', overflow: 'hidden',
             cursor: 'pointer',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
           }}
         >
+          {/* Donkerder, zodat het moment en de tijd erop leesbaar zijn zonder
+              dat je van elke foto de belichting hoeft te vertrouwen. */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.8) 100%)',
+          }} />
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            padding: isMobile ? '0 5px 5px' : '0 6px 6px',
+            pointerEvents: 'none',
+          }}>
+            <div style={{
+              fontSize: isMobile ? '0.6rem' : '0.66rem',
+              fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.01em', lineHeight: 1.1,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+            }}>
+              {getMealTypeLabel(meal)}
+            </div>
+            {heeftTijd && (
+              <div style={{
+                fontSize: isMobile ? '0.55rem' : '0.6rem',
+                fontWeight: 800, color: 'rgba(255,255,255,0.75)',
+                lineHeight: 1.2, marginTop: 1,
+                textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+              }}>
+                {meal.timing}
+              </div>
+            )}
+          </div>
           {isChecked && (
             <div style={{
               position: 'absolute', inset: 0,
@@ -79,39 +110,12 @@ export default function MealCard({
           )}
         </div>
 
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{
           flex: 1, minWidth: 0,
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          padding: isMobile ? '0.45rem 0.7rem 0.4rem' : '0.55rem 0.95rem 0.5rem',
+          padding: isMobile ? '0.45rem 0.7rem 0.35rem' : '0.55rem 0.95rem 0.45rem',
         }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            marginBottom: 4,
-          }}>
-            <div style={{
-              fontSize: isMobile ? '0.55rem' : '0.6rem',
-              fontWeight: 800,
-              color: GOLD,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              lineHeight: 1,
-              opacity: 0.85,
-            }}>
-              {getMealTypeLabel(meal)}
-            </div>
-            {meal.timing && typeof meal.timing === 'string' && /^\d{1,2}:\d{2}/.test(meal.timing) && (
-              <div style={{
-                fontSize: isMobile ? '0.52rem' : '0.56rem',
-                fontWeight: 700,
-                color: 'rgba(255,255,255,0.35)',
-                letterSpacing: '0.03em',
-                lineHeight: 1,
-              }}>
-                {meal.timing}
-              </div>
-            )}
-          </div>
-
           <div style={{
             fontSize: isMobile ? '0.9rem' : '0.98rem',
             fontWeight: 800,
@@ -160,37 +164,36 @@ export default function MealCard({
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Actie-rij — sluit edge-to-edge aan de zijkanten van de kaart.
-          Geen border, geen eigen achtergrond — alleen een dun bovenlijntje
-          dat 'm scheidt van de info, en verticale lijntjes tussen de cellen
-          (Koolh/Vet-stijl). */}
+      {/* Actie-rij — naast de foto in plaats van over de volle breedte
+          eronder, en daardoor compacter. */}
       <div style={{
         display: 'flex',
         borderTop: `1px solid ${DIVIDER}`,
       }}>
         <ActionCell
-          icon={<Info size={isMobile ? 12 : 13} />}
+          icon={<Info size={isMobile ? 11 : 12} />}
           label="Info"
           onClick={(e) => { e.stopPropagation(); onInfo?.() }}
           isMobile={isMobile}
         />
         <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
         <ActionCell
-          icon={<RefreshCw size={isMobile ? 12 : 13} />}
+          icon={<RefreshCw size={isMobile ? 11 : 12} />}
           label="Wissel"
           onClick={(e) => { e.stopPropagation(); onAlternatives?.() }}
           isMobile={isMobile}
         />
         <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
         <ActionCell
-          icon={<Check size={isMobile ? 12 : 13} strokeWidth={2.6} />}
+          icon={<Check size={isMobile ? 11 : 12} strokeWidth={2.6} />}
           label={isChecked ? 'Gelogd' : 'Afronden'}
           onClick={(e) => { e.stopPropagation(); onCheck?.() }}
           isMobile={isMobile}
           checked={isChecked}
         />
+      </div>
+        </div>
       </div>
     </div>
   )
@@ -204,17 +207,17 @@ function ActionCell({ icon, label, onClick, isMobile, checked }) {
       style={{
         flex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 5,
-        padding: isMobile ? '0.42rem 0.3rem' : '0.5rem 0.4rem',
+        gap: 4,
+        padding: isMobile ? '0.25rem 0.3rem' : '0.3rem 0.4rem',
         background: 'transparent',
         border: 'none',
         color,
-        fontSize: isMobile ? '0.68rem' : '0.72rem',
+        fontSize: isMobile ? '0.6rem' : '0.65rem',
         fontWeight: 700,
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        minHeight: 32,
+        minHeight: 24,
         letterSpacing: '-0.005em',
       }}
     >
