@@ -23,6 +23,10 @@ export default function CoachChallengeHub({ db, clients }) {
   // Soort en startdatum stonden hard op '8week' en vandaag. De 6-weken
   // 80/20-challenge was daarmee niet toe te wijzen, en een challenge die
   // maandag begint moest je achteraf in de database rechtzetten.
+  // Terugkoppeling in het scherm zelf. alert() bevriest het tabblad tot
+  // iemand klikt; bij een lijst waar je meerdere mensen achter elkaar
+  // toewijst is dat een klik per persoon voor niets.
+  const [melding, setMelding] = useState(null)
   const [soort, setSoort] = useState(SOORTEN[0].key)
   const [startDatum, setStartDatum] = useState(() => new Date().toISOString().split('T')[0])
   
@@ -69,6 +73,7 @@ export default function CoachChallengeHub({ db, clients }) {
   }
 
   async function assignChallenge(clientId) {
+    setMelding(null)
     setAssignLoading(true)
     try {
       const { data: existing } = await db.supabase
@@ -79,7 +84,7 @@ export default function CoachChallengeHub({ db, clients }) {
         .maybeSingle()
 
       if (existing) {
-        alert('Client already in active challenge!')
+        setMelding({ soort: 'fout', tekst: 'Die klant doet al mee aan een lopende challenge.' })
         return
       }
 
@@ -106,11 +111,11 @@ export default function CoachChallengeHub({ db, clients }) {
 
       setAssignedClients([...assignedClients, clientId])
       loadChallengeClients()
-      alert('Challenge assigned successfully!')
+      setMelding({ soort: 'goed', tekst: 'Toegewezen.' })
       
     } catch (error) {
       console.error('Error assigning challenge:', error)
-      alert('Error assigning challenge')
+      setMelding({ soort: 'fout', tekst: `Toewijzen mislukt — ${error.message}` })
     }
     setAssignLoading(false)
   }
@@ -132,17 +137,17 @@ export default function CoachChallengeHub({ db, clients }) {
 
       if (error) throw error
       if (!gewijzigd || gewijzigd.length === 0) {
-        alert('Niet verwijderd — de deelname is niet aangepast. Waarschijnlijk staat hij al uit of mag je hem niet wijzigen.')
+        setMelding({ soort: 'fout', tekst: 'Niet verwijderd — er is niets aangepast. Waarschijnlijk staat de deelname al uit, of mag je hem niet wijzigen.' })
         return
       }
 
       setAssignedClients(assignedClients.filter(id => id !== clientId))
       loadChallengeClients()
-      alert('Challenge removed')
+      setMelding({ soort: 'goed', tekst: 'Deelname beëindigd.' })
       
     } catch (error) {
       console.error('Error removing challenge:', error)
-      alert('Error removing challenge')
+      setMelding({ soort: 'fout', tekst: `Verwijderen mislukt — ${error.message}` })
     }
     setAssignLoading(false)
   }
@@ -363,6 +368,18 @@ export default function CoachChallengeHub({ db, clients }) {
             <Users size={20} color="#dc2626" />
             Available Clients
           </h3>
+
+          {melding && (
+            <div style={{
+              marginBottom: '1rem', padding: '0.65rem 0.85rem', borderRadius: 10,
+              fontSize: '0.85rem', fontWeight: 700,
+              background: melding.soort === 'goed' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+              border: `1px solid ${melding.soort === 'goed' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              color: melding.soort === 'goed' ? '#10b981' : '#ef4444',
+            }}>
+              {melding.tekst}
+            </div>
+          )}
 
           {/* Wat je toewijst, vóór de knoppen: de looptijd verschilt per soort
               en de einddatum volgt eruit. */}

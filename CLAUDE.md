@@ -214,8 +214,8 @@ State-based view switcher (no hash routing here). Bottom nav on mobile, side nav
 | nutrition-intake | `NutritionIntakePage.jsx` | **(active /nutritionintake)** intake form |
 | public-intake | `PublicIntakePage.jsx` | **(active /myintake)** intake form |
 | resource-hub | `HubRouter.jsx` | **(active /hub*)** resource pages |
-| assign-challenge | `AssignChallenge.jsx` | challenge assignment — likely indirect use |
-| challenges | `ChallengeClientView.jsx` | client challenge view — likely indirect use |
+| challenge-monitor | `ChallengeDeelnemers.jsx`, `ChallengeBanner.jsx`, `challengeEisen.js` | **(active CoachHub + ClientHome)** challenge-stand; alle tellers via de RPC `get_challenge_stand` (definitie in `challenge-stand.sql`), drempels in `challengeEisen.js` |
+| assign-challenge | `AssignChallenge.jsx` | ❌ wees — niets importeert het (12 sep 2026 nagelopen) |
 | client-intelligence | `ClientIntelligenceService.js` | service — used inside ClientInfoTab |
 | client-journey | `ClientJourneyTimeline.jsx` | timeline component — likely indirect |
 | client-management | `ClientManagementCore.jsx` | management interface — likely indirect |

@@ -8,6 +8,7 @@ import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
 import CoachVideoFeedback from '../video-feedback/CoachVideoFeedback'
 import AddClientModal from './components/AddClientModal'
+import { naloopGrens } from '../challenge-monitor/challengeEisen'
 
 export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onNavigateTab, onOpenMealPanel, onOpenWorkoutPanel }) {
   const isMobile = window.innerWidth <= 768
@@ -16,6 +17,10 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [urgencyFilter, setUrgencyFilter] = useState('all')
+  // Challenge-deelnemers. Aparte lijst in plaats van een veld op de klant:
+  // een deelname loopt van datum tot datum en zegt niets over de klant zelf.
+  const [challengeIds, setChallengeIds] = useState(() => new Set())
+  const [challengeFilter, setChallengeFilter] = useState('all')
   const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
   const [showAddClient, setShowAddClient] = useState(false)
@@ -36,6 +41,22 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   const service = serviceRef.current
 
   useEffect(() => { loadData() }, [])
+
+  // Wie doet er mee aan een lopende challenge. Eén kleine query, los van de
+  // zware klantenlaadbeurt, zodat de lijst er niet op hoeft te wachten.
+  useEffect(() => {
+    let afgebroken = false
+    db.supabase
+      .from('challenge_assignments')
+      .select('client_id')
+      .eq('is_active', true)
+      .gte('end_date', naloopGrens())
+      .then(
+        r => { if (!afgebroken) setChallengeIds(new Set((r.data || []).map(a => a.client_id))) },
+        e => console.error('Challenge-deelnemers laden mislukt:', e)
+      )
+    return () => { afgebroken = true }
+  }, [])
 
   const computeStats = (sorted) => {
     const activeClients = sorted.filter(c => c.status === 'active')
@@ -195,6 +216,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
 
   const filteredClients = clientsWithData.filter(client => {
     if (statusFilter !== 'all' && client.status !== statusFilter) return false
+    if (challengeFilter === 'challenge' && !challengeIds.has(client.id)) return false
     if (searchQuery && !`${client.first_name} ${client.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())) return false
     if (urgencyFilter !== 'all' && client.status === 'active') {
       const ws = client.weightData?.weightStatus || 'unknown'
@@ -288,6 +310,19 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             <option value="urgent" style={optieStijl}>Urgent · {stats.urgent}</option>
             <option value="warning" style={optieStijl}>Aandacht · {stats.warning}</option>
             <option value="ok" style={optieStijl}>Op schema · {stats.ok}</option>
+          </select>
+        )}
+
+        {/* Alleen tonen als er ook echt een challenge loopt: een dropdown met
+            één zinnige optie is ruis. */}
+        {challengeIds.size > 0 && (
+          <select
+            value={challengeFilter}
+            onChange={e => setChallengeFilter(e.target.value)}
+            style={selectStijl}
+          >
+            <option value="all" style={optieStijl}>Iedereen</option>
+            <option value="challenge" style={optieStijl}>Challenge · {challengeIds.size}</option>
           </select>
         )}
 
@@ -395,7 +430,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             </div>
           )}
 
-          {(statusFilter !== 'active' || urgencyFilter !== 'all' || searchQuery) && (
+          {(statusFilter !== 'active' || urgencyFilter !== 'all' || challengeFilter !== 'all' || searchQuery) && (
             <div style={{ padding: isMobile ? '0.375rem 1rem' : '0.375rem 2rem', fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               {filteredClients.length} van {stats.total}{searchQuery && ` · "${searchQuery}"`}
             </div>
