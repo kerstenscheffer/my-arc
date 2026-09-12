@@ -779,18 +779,30 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             {/* Twee knoppen tijdens het afspelen: terug naar de foto, of het
                 hele scherm dicht. Eén kruisje deed allebei en dan weet je niet
                 wat er gebeurt als je 'm indrukt. */}
-            <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 8 }}>
-              {toonVideo && (
-                <button onClick={() => setToonVideo(false)} aria-label="Video verkleinen" title="Terug naar de foto" style={{
-                  width: 40, height: 40, borderRadius: 12,
-                  background: 'rgba(10,10,10,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            {/* Verkleinen staat rechtsonder in het beeld en niet bovenin: daar
+                zit de eigen knoppenrij van YouTube, en twee pijltjes naast
+                elkaar die het tegenovergestelde doen leest niet. */}
+            {toonVideo && (
+              <button
+                onClick={() => setToonVideo(false)}
+                aria-label="Video verkleinen"
+                title="Terug naar de foto"
+                style={{
+                  position: 'absolute', bottom: 12, right: 12,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  height: 38, padding: '0 0.75rem', borderRadius: 12,
+                  background: '#fff', border: '1px solid #fff', color: '#0a0a0a',
+                  fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
+                  cursor: 'pointer', boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>
-                  <Minimize2 size={17} strokeWidth={2.4} />
-                </button>
-              )}
+                }}
+              >
+                <Minimize2 size={15} strokeWidth={2.8} />
+                Verklein
+              </button>
+            )}
+
+            <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 8 }}>
               <button onClick={onClose} aria-label="Sluit" title="Oefening sluiten" style={{
                 width: 40, height: 40, borderRadius: 12,
                 background: 'rgba(10,10,10,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
