@@ -531,7 +531,9 @@ export default function AIAlternativesModal({
 // Een suggestie in het wisselvenster: dezelfde kaart als in de dagplanning,
 // zodat je niet naar twee soorten maaltijdregels zit te kijken. Op de foto
 // staat het verschil met de huidige maaltijd: kcal op de eerste regel, eiwit
-// eronder. Dat zijn de twee waarop je een maaltijd inruilt.
+// eronder. Dat zijn de twee waarop je een maaltijd inruilt. Geen "Eigen"-label
+// meer voor eigen maaltijden: dat duwde het kcal-verschil van de foto af, en
+// die staan al onder hun eigen filter.
 function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
   const teken = (n) => `${n > 0 ? '+' : ''}${n}`
   const kcalOp = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
@@ -548,7 +550,7 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
         calories: meal.calories, protein: meal.protein,
         carbs: meal.carbs, fat: meal.fat,
       }}
-      momentLabel={meal._isCustom ? `Eigen · ${kcalLabel}` : kcalLabel}
+      momentLabel={kcalLabel}
       tijdLabel={eiwitLabel}
       isMobile={isMobile}
       geselecteerd={isSelected}
