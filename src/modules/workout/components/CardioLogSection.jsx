@@ -48,6 +48,10 @@ export default function CardioLogSection({ client, db, isMobile }) {
 
   const resetForm = () => { setType(''); setDuration(''); setDistance(''); setSteps(''); setNotes(''); setError(null) }
 
+  // Snel stappen loggen: opent de modal met Wandelen voorgeselecteerd zodat
+  // het stappen-veld meteen zichtbaar is.
+  const openVoorStappen = () => { resetForm(); setType('Wandelen'); setShowModal(true) }
+
   // Loggen vanaf een plan-regel: de velden staan al goed, je hoeft alleen te
   // bevestigen of bij te stellen.
   const openVoorPlan = (item) => {
@@ -128,15 +132,26 @@ export default function CardioLogSection({ client, db, isMobile }) {
           <Footprints size={m ? 14 : 16} color="rgba(255,255,255,0.45)" />
           <span style={{ fontSize: m ? '0.62rem' : '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Deze week</span>
         </div>
-        <button onClick={() => { resetForm(); setShowModal(true) }} style={{
-          display: 'flex', alignItems: 'center', gap: '0.3rem',
-          padding: m ? '0.4rem 0.7rem' : '0.5rem 0.85rem',
-          background: '#fff', border: 'none', borderRadius: 8, color: '#0a0a0a',
-          fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 900, cursor: 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit',
-        }}>
-          <Plus size={14} strokeWidth={2.8} /> Loggen
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button onClick={openVoorStappen} style={{
+            display: 'flex', alignItems: 'center', gap: '0.3rem',
+            padding: m ? '0.4rem 0.7rem' : '0.5rem 0.85rem',
+            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 8, color: '#fff',
+            fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 900, cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit',
+          }}>
+            <Footprints size={13} strokeWidth={2.5} /> Stappen
+          </button>
+          <button onClick={() => { resetForm(); setShowModal(true) }} style={{
+            display: 'flex', alignItems: 'center', gap: '0.3rem',
+            padding: m ? '0.4rem 0.7rem' : '0.5rem 0.85rem',
+            background: '#fff', border: 'none', borderRadius: 8, color: '#0a0a0a',
+            fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 900, cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit',
+          }}>
+            <Plus size={14} strokeWidth={2.8} /> Loggen
+          </button>
+        </div>
       </div>
 
       {loading ? (
