@@ -412,25 +412,30 @@ export default function SixWeekChallengeCheckout() {
         {/* ══ SCHERM 5: OFFER — ongewijzigd ══ */}
         <section ref={offerRef} style={{ ...screen, textAlign: 'center' }}>
           <div style={{ maxWidth: 520, width: '100%' }}>
-            {/* Prijs — eenmalig €497 */}
+            {/* Kop boven de prijs — dit is waar het aanbod om draait. */}
+            <div style={{
+              fontSize: isMobile ? '1.5rem' : '1.9rem', fontWeight: 900, color: '#fff',
+              lineHeight: 1.15, letterSpacing: '-0.02em',
+              marginBottom: isMobile ? '0.5rem' : '0.6rem',
+            }}>
+              Win Your Money Back
+            </div>
+            <p style={{
+              margin: `0 auto ${isMobile ? '1.5rem' : '1.85rem'}`,
+              maxWidth: 420,
+              fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 600,
+              color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
+            }}>
+              Haal je doel, of voer je acties uit en krijg je investering terug.
+            </p>
+
+            {/* Prijs — eenmalig €297 */}
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
               <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€297</span>
             </div>
             <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
               Eenmalig · <span style={{ color: '#fff', fontWeight: 800 }}>6 weken challenge</span>
             </div>
-
-            {/* Win your money back — de kern van dit aanbod, zelfde opmaak als
-                de garantie-regel op de 16-weken checkout. */}
-            <p style={{
-              margin: isMobile ? '1.5rem auto 0' : '1.75rem auto 0',
-              maxWidth: 480, textAlign: 'center',
-              fontSize: isMobile ? '0.9rem' : '1.05rem',
-              fontWeight: 700, color: '#fff', lineHeight: 1.4, letterSpacing: '-0.01em',
-            }}>
-              Doe je acties?{' '}
-              <span style={{ color: GOLD }}>Je krijgt je €297 terug.</span>
-            </p>
 
             {/* De zes voorwaarden onder elkaar als tabel: elke regel een dun
                 lijntje eronder, actie links en de toelichting rechts. Stond
