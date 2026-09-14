@@ -413,15 +413,21 @@ export default function SixWeekChallengeCheckout() {
         <section ref={offerRef} style={{ ...screen, textAlign: 'center', padding: 0, justifyContent: 'flex-start' }}>
           {/* Foto bovenaan die onderin dood loopt in het zwart; de kop valt er
               net overheen. Zelfde truc als de koppen in de app. */}
+          {/* Het vak heeft dezelfde verhouding als de foto (1200x600, dus 2:1),
+              want anders sneed cover er op desktop meer dan de helft af: een
+              venster van 1440 breed en 300 hoog is 4,8:1. Op desktop begrenzen
+              we de breedte, zodat de hoogte binnen het scherm blijft. */}
           <div style={{
             position: 'relative', width: '100%',
-            height: isMobile ? 220 : 300,
+            maxWidth: isMobile ? '100%' : 760,
+            margin: '0 auto',
+            aspectRatio: '2 / 1',
             flexShrink: 0,
           }}>
             <div style={{
               position: 'absolute', inset: 0,
               backgroundImage: 'url(/6week-offer-hero.jpg)',
-              backgroundSize: 'cover', backgroundPosition: 'center 30%',
+              backgroundSize: 'cover', backgroundPosition: 'center',
             }} />
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
