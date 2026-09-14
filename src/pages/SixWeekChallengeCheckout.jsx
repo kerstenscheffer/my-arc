@@ -23,9 +23,10 @@ const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
 const BG = '#0a0a0a'
 
-// Hero(0) + offer(1) + formulier(2). De pijlers en de voorwaarden zitten achter
-// een knop op het offer-scherm, zodat de pagina kort blijft.
-const SECTION_COUNT = 3
+// Offer(0) + formulier(1). Het hero-scherm is weg: je komt hier met een
+// beslissing in je hoofd, dus je begint bij het aanbod. Trustpilot en de
+// transformaties staan verderop, bij de reviews onder het formulier.
+const SECTION_COUNT = 2
 
 const REVIEWS = [
   { name: 'Hessel', date: 'dec 2025', text: 'Kersten begreep het meteen! Na een uitgebreide 0-meting kreeg ik een plan op maat. Van 79,8 naar 74,4 in 8 weken. Als jij je aan het plan houdt geeft Kersten altijd de volle 100%!' },
@@ -112,8 +113,6 @@ export default function SixWeekChallengeCheckout() {
   const containerRef = useRef(null)
   const offerRef = useRef(null)
   const formRef = useRef(null)
-  // Zwevende "Investering"-knop: zichtbaar tot je de offer-sectie bereikt.
-  const [showInvestBtn, setShowInvestBtn] = useState(true)
   // Wat er onder de twee knoppen openklapt: 'methode', 'voorwaarden' of niets.
   const [open, setOpen] = useState(null)
 
@@ -122,18 +121,6 @@ export default function SixWeekChallengeCheckout() {
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
-  }, [])
-
-  useEffect(() => {
-    const target = offerRef.current
-    const root = containerRef.current
-    if (!target || !root) return
-    const obs = new IntersectionObserver(
-      ([entry]) => setShowInvestBtn(!entry.isIntersecting),
-      { root, threshold: 0.15 }
-    )
-    obs.observe(target)
-    return () => obs.disconnect()
   }, [])
 
   // Actieve sectie bijhouden voor de nav-dots.
@@ -155,7 +142,6 @@ export default function SixWeekChallengeCheckout() {
     return () => observer.disconnect()
   }, [])
 
-  const scrollToOffer = () => offerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   // Basis voor elke sectie: één scherm hoog, inhoud verticaal gecentreerd.
@@ -249,58 +235,7 @@ export default function SixWeekChallengeCheckout() {
         }}
       >
 
-        {/* ══ SCHERM 1: HERO ══ */}
-        <section style={{ ...screen, padding: isMobile ? '3rem 0' : '4.5rem 0' }}>
-          <img
-            src="/ma-logo-header.png"
-            alt="MY ARC"
-            style={{
-              width: isMobile ? 104 : 132, height: 'auto',
-              marginBottom: isMobile ? '1rem' : '1.25rem',
-              flexShrink: 0,
-            }}
-          />
-
-          <div style={{
-            textAlign: 'center',
-            padding: `0 ${isMobile ? '1rem' : '2rem'}`,
-            maxWidth: '900px',
-            marginBottom: isMobile ? '1.5rem' : '1.75rem',
-          }}>
-            <h1 style={{
-              fontWeight: 900, lineHeight: 1.1, margin: 0,
-              letterSpacing: '-0.02em', color: '#fff',
-              fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
-            }}>
-              6 Weken<br />In Shape Challenge
-            </h1>
-          </div>
-
-          {/* Transformaties — onder de titel, bewust klein (titel domineert) */}
-          <div style={{ width: isMobile ? '70%' : '100%', maxWidth: isMobile ? '100%' : 532, margin: '0 auto' }}>
-            <div style={{ display: 'flex', gap: isMobile ? '0.4rem' : '0.65rem' }}>
-              {TRANSFORMATIONS.map((t) => (
-                <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <div style={{ borderRadius: '9px', overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
-                    <img
-                      src={t.src}
-                      alt={t.caption}
-                      onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                      style={{ width: '100%', height: 'auto', display: 'block' }}
-                    />
-                  </div>
-                  <p style={{ margin: 0, fontSize: isMobile ? '0.5rem' : '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', lineHeight: 1.25, textAlign: 'center' }}>
-                    {t.caption}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <TrustpilotBadge style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }} />
-        </section>
-
-        {/* ══ SCHERM 5: OFFER ══ */}
+        {/* ══ SCHERM 1: OFFER ══ */}
         <section ref={offerRef} style={{ ...screen, textAlign: 'center', padding: 0, justifyContent: 'flex-start' }}>
           {/* Foto bovenaan die onderin dood loopt in het zwart; de kop valt er
               net overheen. Zelfde truc als de koppen in de app. */}
@@ -531,7 +466,7 @@ export default function SixWeekChallengeCheckout() {
           </div>
         </section>
 
-        {/* ══ SCHERM 6: FORMULIER + REVIEWS ══ */}
+        {/* ══ SCHERM 2: FORMULIER + REVIEWS ══ */}
         <section ref={formRef} style={{ ...screen, justifyContent: 'center' }}>
           <div style={{ maxWidth: 520, width: '100%' }}>
             <div style={{
@@ -615,9 +550,27 @@ export default function SixWeekChallengeCheckout() {
               </div>
             </div>
 
-            {/* ══ Reviews — samen met het formulier op dit scherm ══ */}
+            {/* ══ Transformaties + reviews — onderaan, na het formulier ══ */}
             <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>
-              <TrustpilotBadge style={{ marginBottom: isMobile ? '0.85rem' : '1rem' }} />
+              <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', maxWidth: 420, margin: '0 auto' }}>
+                {TRANSFORMATIONS.map((t) => (
+                  <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ borderRadius: 9, overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
+                      <img
+                        src={t.src}
+                        alt={t.caption}
+                        onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                        style={{ width: '100%', height: 'auto', display: 'block' }}
+                      />
+                    </div>
+                    <p style={{ margin: 0, fontSize: isMobile ? '0.5rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.25, textAlign: 'center' }}>
+                      {t.caption}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <TrustpilotBadge style={{ margin: isMobile ? '1rem 0' : '1.25rem 0' }} />
 
               <div
                 ref={scrollRef}
@@ -707,24 +660,6 @@ export default function SixWeekChallengeCheckout() {
           />
         ))}
       </div>
-
-      {/* ══ Zwevende "Investering"-knop — ongewijzigd ══ */}
-      {showInvestBtn && (
-        <button onClick={scrollToOffer} style={{
-          position: 'fixed', bottom: isMobile ? 18 : 26, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 50, display: 'flex', alignItems: 'center', gap: '0.4rem',
-          padding: isMobile ? '0.75rem 1.4rem' : '0.85rem 1.7rem', borderRadius: 999,
-          border: '1.5px solid rgba(255,255,255,0.85)',
-          background: 'rgba(255,255,255,0.1)', color: '#fff',
-          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-          fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 900, cursor: 'pointer',
-          boxShadow: '0 6px 24px rgba(0,0,0,0.35)', letterSpacing: '0.01em',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          fontFamily: "'DM Sans', -apple-system, sans-serif",
-        }}>
-          Investering hier <ChevronDown size={16} strokeWidth={3} />
-        </button>
-      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
