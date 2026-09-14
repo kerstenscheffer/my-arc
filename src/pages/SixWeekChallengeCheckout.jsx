@@ -7,7 +7,7 @@
 // Stripe: /api/create-checkout-session (one-time), plan '6-week-challenge'.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks, Target, CheckCircle2 } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 297
@@ -409,12 +409,13 @@ export default function SixWeekChallengeCheckout() {
                 vakken meer maar een icoon met het woord eronder; het scherm
                 oogde te druk met alles in een container. */}
             <div style={{
-              display: 'flex', gap: isMobile ? '2.5rem' : '3.5rem',
+              display: 'flex', gap: isMobile ? '1.6rem' : '2.75rem',
               justifyContent: 'center',
             }}>
               {[
                 { id: 'methode', label: 'De methode', Icon: Compass },
                 { id: 'voorwaarden', label: 'De voorwaarden', Icon: ListChecks },
+                { id: 'waarom', label: 'Waarom doe ik dit?', Icon: HelpCircle },
               ].map((k) => {
                 const aan = open === k.id
                 return (
@@ -426,8 +427,8 @@ export default function SixWeekChallengeCheckout() {
                       gap: isMobile ? 7 : 9,
                       padding: 0, border: 'none', background: 'transparent',
                       color: '#fff', opacity: aan ? 1 : 0.75,
-                      fontSize: isMobile ? '0.8rem' : '0.88rem', fontWeight: 900,
-                      letterSpacing: '-0.01em',
+                      fontSize: isMobile ? '0.72rem' : '0.85rem', fontWeight: 900,
+                      letterSpacing: '-0.01em', whiteSpace: 'nowrap',
                       fontFamily: 'inherit', cursor: 'pointer',
                       transition: 'opacity 0.15s ease',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -743,6 +744,55 @@ export default function SixWeekChallengeCheckout() {
           Wijkt een van de voorwaarden af van wat je met je coach hebt besproken? Dan
           stellen we die mondeling op. Het belangrijkste is dat het voor jou werkt.
         </p>
+      </Blad>
+
+      {/* Waarom doe ik dit — foto rechts, twee redenen links. */}
+      <Blad open={open === 'waarom'} titel="Waarom doe ik dit?" onClose={() => setOpen(null)} isMobile={isMobile}>
+        <div style={{
+          position: 'relative',
+          margin: isMobile ? '-0.9rem -1.15rem 0' : '-1rem -1.35rem 0',
+          minHeight: isMobile ? 250 : 290,
+          display: 'flex', alignItems: 'center',
+        }}>
+          <div style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0, width: '46%',
+            backgroundImage: 'url(/waarom-kersten.jpg)',
+            backgroundSize: 'cover', backgroundPosition: 'center top',
+          }} />
+          {/* Fade naar links, zodat de tekst over de foto heen kan lopen. */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(270deg, rgba(10,10,10,0.15) 0%, rgba(10,10,10,0.45) 18%, rgba(10,10,10,0.88) 38%, #0a0a0a 54%)',
+          }} />
+          <div style={{
+            position: 'relative', zIndex: 1, width: '100%',
+            paddingLeft: isMobile ? '1.15rem' : '1.35rem',
+            paddingRight: isMobile ? '40%' : '42%',
+            paddingTop: isMobile ? '1.1rem' : '1.35rem',
+            paddingBottom: isMobile ? '1.1rem' : '1.35rem',
+          }}>
+            {[
+              'Om je vertrouwen te winnen dat mijn aanpak voor jou werkt, en je naar je lange termijn doel te begeleiden.',
+              'Om meer mannen in shape te helpen komen.',
+            ].map((tekst, i) => (
+              <div key={i} style={{
+                display: 'flex', gap: '0.6rem', alignItems: 'baseline',
+                padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+                borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+              }}>
+                <span style={{
+                  flexShrink: 0,
+                  fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: GOLD,
+                }}>{i + 1}.</span>
+                <span style={{
+                  fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, letterSpacing: '-0.01em',
+                  textShadow: '0 1px 8px rgba(0,0,0,0.9)',
+                }}>{tekst}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </Blad>
 
       <style>{`
