@@ -292,6 +292,9 @@ export default function SixWeekChallengeCheckout() {
           email: email.trim(),
           name: name.trim(),
           phone: phone.trim(),
+          // Na betaling meteen door naar de intake, niet naar /success.
+          successPath: '/myintake',
+          cancelPath: '/6week-checkout',
         }),
       })
       const data = await res.json()
