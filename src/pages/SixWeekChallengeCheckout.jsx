@@ -440,8 +440,14 @@ export default function SixWeekChallengeCheckout() {
             <div style={{
               margin: isMobile ? '1.6rem auto 0' : '2rem auto 0',
               maxWidth: 480, width: '100%',
-              borderTop: '1px solid rgba(255,255,255,0.08)',
             }}>
+              <div style={{
+                fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
+                letterSpacing: '0.15em', color: 'rgba(255,255,255,0.4)',
+                marginBottom: isMobile ? '0.6rem' : '0.75rem', textAlign: 'center',
+              }}>
+                DE VOORWAARDEN
+              </div>
               {[
                 { kop: '3 workouts per week', sub: '45 minuten' },
                 { kop: '80% van je voedingsplan', sub: 'macrodoelen of plan gevolgd' },
@@ -449,11 +455,12 @@ export default function SixWeekChallengeCheckout() {
                 { kop: 'Elke week je check-in', sub: 'in de app' },
                 { kop: '4 calls', sub: 'met je coach' },
                 { kop: "3 progressiefoto's", sub: 'begin, midden, eind' },
-              ].map((r) => (
+              ].map((r, i) => (
                 <div key={r.kop} style={{
                   display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
                   gap: '1rem',
                   padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+                  borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
                   textAlign: 'left',
                 }}>
