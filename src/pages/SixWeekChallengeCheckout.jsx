@@ -772,7 +772,7 @@ export default function SixWeekChallengeCheckout() {
             paddingBottom: isMobile ? '1.1rem' : '1.35rem',
           }}>
             {[
-              'Om je vertrouwen te winnen dat mijn aanpak voor jou werkt, en je naar je lange termijn doel te begeleiden.',
+              'Ik wil je met een korte termijn doel laten zien dat mijn aanpak voor jou werkt, om je vervolgens met vol vertrouwen naar je uiteindelijke doel te begeleiden.',
               'Om meer mannen in shape te helpen komen.',
             ].map((tekst, i) => (
               <div key={i} style={{
