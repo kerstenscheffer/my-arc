@@ -443,7 +443,7 @@ export default function SixWeekChallengeCheckout() {
             }}>
               <div style={{
                 fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
-                letterSpacing: '0.15em', color: 'rgba(255,255,255,0.4)',
+                letterSpacing: '0.15em', color: GOLD,
                 marginBottom: isMobile ? '0.6rem' : '0.75rem', textAlign: 'center',
               }}>
                 DE VOORWAARDEN
@@ -465,15 +465,15 @@ export default function SixWeekChallengeCheckout() {
                   textAlign: 'left',
                 }}>
                   <span style={{
-                    fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
-                    color: '#fff', lineHeight: 1.25, letterSpacing: '-0.01em',
+                    fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.88)', lineHeight: 1.25, letterSpacing: '-0.01em',
                   }}>
                     {r.kop}
                   </span>
                   <span style={{
                     flexShrink: 0, textAlign: 'right',
-                    fontSize: isMobile ? '0.75rem' : '0.82rem', fontWeight: 600,
-                    color: 'rgba(255,255,255,0.45)', lineHeight: 1.3,
+                    fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 600,
+                    color: 'rgba(255,255,255,0.38)', lineHeight: 1.3,
                   }}>
                     {r.sub}
                   </span>
@@ -484,8 +484,8 @@ export default function SixWeekChallengeCheckout() {
             <p style={{
               margin: isMobile ? '1.4rem auto 0' : '1.6rem auto 0',
               maxWidth: 480, textAlign: 'center',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: 700, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5,
+              fontSize: isMobile ? '0.78rem' : '0.83rem',
+              fontWeight: 600, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5,
             }}>
               Wijkt een van de voorwaarden af van wat je met je coach hebt besproken? Dan
               stellen we die mondeling op. Het belangrijkste is dat het voor jou werkt.
@@ -499,7 +499,7 @@ export default function SixWeekChallengeCheckout() {
             }}>
               <div style={{
                 fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
-                letterSpacing: '0.15em', color: 'rgba(255,255,255,0.4)',
+                letterSpacing: '0.15em', color: GOLD,
                 marginBottom: isMobile ? '0.6rem' : '0.75rem', textAlign: 'center',
               }}>
                 DE GARANTIE
@@ -516,12 +516,12 @@ export default function SixWeekChallengeCheckout() {
                 }}>
                   <span style={{
                     flexShrink: 0,
-                    fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
-                    color: 'rgba(255,255,255,0.45)',
+                    fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900,
+                    color: GOLD,
                   }}>{i + 1}.</span>
                   <span style={{
-                    fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 800,
-                    color: '#fff', lineHeight: 1.35, letterSpacing: '-0.01em',
+                    fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
                   }}>{tekst}</span>
                 </div>
               ))}
