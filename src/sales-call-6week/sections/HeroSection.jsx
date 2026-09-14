@@ -1,7 +1,7 @@
 // src/sales-call-6week/sections/HeroSection.jsx
-// Hero van de 6-weken challenge — zelfde opbouw als de 16-weken hero (logo,
-// titel, twee transformaties, Trustpilot), met een ondertitel eronder omdat
-// het aanbod hier meer uitleg nodig heeft.
+// Hero van de 6-weken challenge — zelfde opbouw als de 16-weken hero: logo,
+// titel, twee transformaties, Trustpilot. Geen ondertitel; de titel staat
+// alleen, net als op de 16-weken pagina.
 
 const TP_GREEN = '#00B67A'
 
@@ -52,20 +52,8 @@ export default function HeroSection({ isMobile }) {
           color: '#fff',
           fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
         }}>
-          Gratis 6 Weken 80/20<br />In Shape Challenge
+          Gratis 6 Weken<br />In Shape Challenge
         </h1>
-        <p style={{
-          margin: `${isMobile ? '0.85rem' : '1.1rem'} auto 0`,
-          maxWidth: '640px',
-          fontSize: isMobile ? '0.95rem' : '1.1rem',
-          fontWeight: '600',
-          color: 'rgba(255,255,255,0.7)',
-          lineHeight: 1.45,
-        }}>
-          In 6 weken zichtbaar strakker, sterker, fitter en energieker. Met 3 trainingen
-          per week en lekker blijven eten, ook met je gezin. Voor de drukke man die al
-          traint, maar z'n vet er eindelijk af wil.
-        </p>
       </div>
 
       <div style={{ width: isMobile ? '70%' : '100%', maxWidth: isMobile ? '100%' : '532px', margin: '0 auto' }}>
