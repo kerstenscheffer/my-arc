@@ -360,6 +360,17 @@ export default function SixWeekChallengeCheckout() {
             padding: isMobile ? `0 1.25rem 3.5rem` : `0 2rem 5rem`,
             position: 'relative', zIndex: 2,
           }}>
+            {/* Logo boven de kop, zoals op de salespagina's. */}
+            <img
+              src="/ma-logo-header.png"
+              alt="MY ARC"
+              style={{
+                width: isMobile ? 96 : 120, height: 'auto', display: 'block',
+                margin: `0 auto ${isMobile ? '0.9rem' : '1.15rem'}`,
+                filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.85))',
+              }}
+            />
+
             {/* Kop boven de prijs — dit is waar het aanbod om draait. */}
             <div style={{
               fontSize: isMobile ? '1.6rem' : '2.1rem', fontWeight: 900, color: '#fff',
