@@ -443,8 +443,8 @@ export default function SixWeekChallengeCheckout() {
             }}>
               {[
                 { kop: '3 workouts per week', sub: '45 minuten' },
-                { kop: '80% van je voedingsplan', sub: 'staat al klaar' },
-                { kop: '4x per week wegen', sub: 'we sturen op het weekgemiddelde' },
+                { kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of het plan gevolgd' },
+                { kop: '3x per week wegen', sub: 'we sturen op het weekgemiddelde' },
                 { kop: 'Elke week je check-in', sub: 'in de app' },
                 { kop: '4 calls', sub: 'met je coach' },
                 { kop: "3 progressiefoto's", sub: 'begin, midden, eind' },
@@ -462,6 +462,16 @@ export default function SixWeekChallengeCheckout() {
 
             <p style={{
               margin: isMobile ? '1.4rem auto 0' : '1.6rem auto 0',
+              maxWidth: 480, textAlign: 'center',
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              fontWeight: 700, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5,
+            }}>
+              Wijkt een van de voorwaarden af van wat je met je coach hebt besproken? Dan
+              stellen we die mondeling op. Het belangrijkste is dat het voor jou werkt.
+            </p>
+
+            <p style={{
+              margin: isMobile ? '0.9rem auto 0' : '1rem auto 0',
               maxWidth: 480, textAlign: 'center',
               fontSize: isMobile ? '0.8rem' : '0.85rem',
               fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5,
