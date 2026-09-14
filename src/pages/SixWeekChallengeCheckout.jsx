@@ -7,7 +7,7 @@
 // Stripe: /api/create-checkout-session (one-time), plan '6-week-challenge'.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown, Dumbbell, Utensils, Scale, ClipboardCheck, Camera } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 297
@@ -677,45 +677,58 @@ export default function SixWeekChallengeCheckout() {
         ))}
       </Blad>
 
-      {/* De voorwaarden — per actie een icoon, zodat het blad niet zes keer
-          dezelfde tekstregel is. Geen foto's: de beschikbare beelden zijn
-          brede app-mockups op wit, en voor "4 calls" en "3 progressiefoto's"
-          bestaat er geen. */}
+      {/* De voorwaarden — per actie een balk met de foto links, een zwarte
+          fade naar rechts, de kop half over die fade heen en de toelichting
+          in grijs helemaal rechts. */}
       <Blad open={open === 'voorwaarden'} titel="De voorwaarden" onClose={() => setOpen(null)} isMobile={isMobile}>
         {[
-          { Icon: Dumbbell,       kop: '3 workouts per week',     sub: 'van 45 minuten, thuis of in de gym' },
-          { Icon: Utensils,       kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of het plan gevolgd' },
-          { Icon: Scale,          kop: '3x per week wegen',       sub: 'we sturen op het weekgemiddelde' },
-          { Icon: ClipboardCheck, kop: 'Elke week je check-in',   sub: 'invullen in de app' },
-          { Icon: Phone,          kop: '4 calls',                 sub: 'verspreid over de zes weken' },
-          { Icon: Camera,         kop: "3 progressiefoto's",      sub: 'begin, midden, eind' },
-        ].map((r, i) => (
+          { foto: '/voorwaarden/workouts.jpg', kop: '3 workouts per week',     sub: 'van 45 minuten' },
+          { foto: '/voorwaarden/voeding.jpg',  kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of plan gevolgd' },
+          { foto: '/voorwaarden/wegen.jpg',    kop: '3x per week wegen',       sub: 'we sturen op het weekgemiddelde' },
+          { foto: '/voorwaarden/checkin.jpg',  kop: 'Elke week je check-in',   sub: 'invullen in de app' },
+          { foto: '/voorwaarden/calls.jpg',    kop: '4 calls',                 sub: 'verspreid over de zes weken' },
+          { foto: '/voorwaarden/fotos.jpg',    kop: "3 progressiefoto's",      sub: 'begin, midden, eind' },
+        ].map((r) => (
           <div key={r.kop} style={{
-            display: 'flex', alignItems: 'center', gap: isMobile ? '0.8rem' : '0.95rem',
-            padding: isMobile ? '0.8rem 0' : '0.9rem 0',
-            borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)',
+            position: 'relative',
+            marginBottom: isMobile ? 8 : 10,
+            minHeight: isMobile ? 78 : 92,
+            borderRadius: 12,
+            overflow: 'hidden',
+            border: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center',
           }}>
             <div style={{
-              flexShrink: 0,
-              width: isMobile ? 40 : 44, height: isMobile ? 40 : 44,
-              borderRadius: 12,
-              background: 'rgba(255,186,9,0.1)',
-              border: '1px solid rgba(255,186,9,0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: GOLD,
+              position: 'absolute', left: 0, top: 0, bottom: 0, width: '60%',
+              backgroundImage: `url(${r.foto})`,
+              backgroundSize: 'cover', backgroundPosition: 'center',
+            }} />
+            {/* De fade begint al vroeg, zodat de kop leesbaar over de foto valt. */}
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              background: 'linear-gradient(90deg, rgba(10,10,10,0.15) 0%, rgba(10,10,10,0.4) 20%, rgba(10,10,10,0.86) 44%, #0a0a0a 62%)',
+            }} />
+            <div style={{
+              position: 'relative', zIndex: 1,
+              display: 'flex', alignItems: 'center',
+              gap: isMobile ? '0.5rem' : '0.9rem',
+              width: '100%',
+              paddingLeft: isMobile ? '30%' : '34%',
+              paddingRight: isMobile ? '0.75rem' : '1.1rem',
             }}>
-              <r.Icon size={isMobile ? 19 : 21} strokeWidth={2.2} />
-            </div>
-            <div style={{ minWidth: 0 }}>
               <div style={{
-                fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
-                color: '#fff', lineHeight: 1.2, letterSpacing: '-0.015em',
+                flex: 1, minWidth: 0,
+                fontSize: isMobile ? '0.88rem' : '1.05rem', fontWeight: 900,
+                color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
+                textShadow: '0 1px 8px rgba(0,0,0,0.9)',
               }}>
                 {r.kop}
               </div>
               <div style={{
-                fontSize: isMobile ? '0.78rem' : '0.83rem', fontWeight: 600,
-                color: 'rgba(255,255,255,0.45)', lineHeight: 1.35, marginTop: 2,
+                flexShrink: 0, maxWidth: isMobile ? '40%' : '38%',
+                textAlign: 'right',
+                fontSize: isMobile ? '0.64rem' : '0.78rem', fontWeight: 600,
+                color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
               }}>
                 {r.sub}
               </div>
