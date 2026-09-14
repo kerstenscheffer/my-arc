@@ -59,6 +59,22 @@ const kwartaalStart = (d) => {
 }
 const kwartaalNr = (d) => Math.floor(d.getMonth() / 3) + 1
 
+// Het venster van i periodes terug. Voor maanden, kwartalen en jaren kan dat
+// niet met een vaste lengte: augustus heeft 31 dagen en februari 28, dus
+// steeds hetzelfde aantal dagen aftrekken laat de kolommen wegdrijven.
+const vensterTerug = (mode, start, end, i) => {
+  const kopie = (d) => new Date(d.getTime())
+  if (mode === 'month' || mode === 'quarter' || mode === 'year') {
+    const stap = mode === 'month' ? 1 : mode === 'quarter' ? 3 : 12
+    const s2 = kopie(start); s2.setMonth(s2.getMonth() - stap * i)
+    const e2 = kopie(start); e2.setMonth(e2.getMonth() - stap * (i - 1))
+    return { start: s2, end: e2 }
+  }
+  // Dag, week en eigen periode hebben wél een vaste lengte.
+  const lengte = end - start
+  return { start: new Date(start.getTime() - lengte * i), end: new Date(start.getTime() - lengte * (i - 1)) }
+}
+
 const sundayOf = (mondayDate) => {
   const d = new Date(mondayDate)
   d.setDate(d.getDate() + 6)
@@ -472,15 +488,13 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     if (!isOpen || weergave !== 'tabel') return
     if (!leadService || !coachId) return
     let cancelled = false
-    const lengte = end - start
     const nodig = []
     for (let i = 1; i <= aantalTerug; i++) if (!historie[i]) nodig.push(i)
     if (!nodig.length) return
 
     setHistorieBezig(true)
     Promise.all(nodig.map(async (i) => {
-      const vStart = new Date(start.getTime() - lengte * i)
-      const vEnd = new Date(start.getTime() - lengte * (i - 1))
+      const { start: vStart, end: vEnd } = vensterTerug(periodMode, start, end, i)
       const [a, f, rxn, geld] = await Promise.all([
         leadService.getRangeActivity(coachId, vStart.toISOString(), vEnd.toISOString()),
         leadService.getRangeFunnelStats(coachId, vStart.toISOString(), vEnd.toISOString()),
@@ -551,6 +565,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // Wat er in de kop staat. Stond als drie geneste ternary's op vier plekken;
   // met zes periodesoorten wordt dat onleesbaar, dus één keer hier.
   const periodeWoord = { day: 'dag', week: 'week', month: 'maand', quarter: 'kwartaal', year: 'jaar', custom: 'periode' }[periodMode]
+  const periodeMeervoud = { day: 'dagen', week: 'weken', month: 'maanden', quarter: 'kwartalen', year: 'jaren', custom: 'periodes' }[periodMode]
   const dagKort = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   const laatsteDag = new Date(end.getTime() - 864e5)   // end is exclusief
   const periodeTitel = (() => {
@@ -1048,10 +1063,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       .sort((a2, b2) => a2 - b2)
                       .map(i => ({
                         id: i,
-                        label: periodeKop(historie[i].start, periodMode),
+                        ...periodeKop(historie[i].start, historie[i].end, periodMode),
                         map: Object.fromEntries(kerncijfers(historie[i]).map(r => [r.key, r.waarde])),
                       }))}
                     bezig={historieBezig}
+                    nuKop={periodeKop(start, end, periodMode)}
                   />
 
                   {/* Verder terug kijken: zes periodes per klik erbij. */}
@@ -1069,7 +1085,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    {historieBezig ? 'Laden…' : `Verder terug (nu ${Object.keys(historie).length} ${periodeWoord}en)`}
+                    {historieBezig ? 'Laden…' : `Verder terug (nu ${Object.keys(historie).length} ${periodeMeervoud})`}
                   </button>
                 </>
               ) : (
@@ -2121,15 +2137,19 @@ const callDatum = (v) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
-// Korte kop per periode-kolom: de vorm hangt af van wat je bekijkt.
-function periodeKop(d, mode) {
-  if (!d) return ''
-  if (mode === 'day')   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-  if (mode === 'month') return d.toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })
-  if (mode === 'year')  return String(d.getFullYear())
-  if (mode === 'quarter') return `Q${Math.floor(d.getMonth() / 3) + 1} '${String(d.getFullYear()).slice(2)}`
-  // week en eigen periode: de begindatum zegt het meest.
-  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+// Kop per periode-kolom: bovenaan wat het is (weeknummer, maand, kwartaal),
+// eronder van wanneer tot wanneer.
+function periodeKop(start, end, mode) {
+  if (!start) return { label: '', sub: '' }
+  const laatste = new Date(end.getTime() - 864e5)   // end is exclusief
+  const dag = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  const bereik = `${dag(start)} – ${dag(laatste)}`
+  if (mode === 'day')     return { label: start.toLocaleDateString('nl-NL', { weekday: 'short' }), sub: dag(start) }
+  if (mode === 'month')   return { label: start.toLocaleDateString('nl-NL', { month: 'short' }), sub: String(start.getFullYear()) }
+  if (mode === 'year')    return { label: String(start.getFullYear()), sub: '' }
+  if (mode === 'quarter') return { label: `Q${kwartaalNr(start)} ${start.getFullYear()}`, sub: bereik }
+  if (mode === 'week')    return { label: `wk ${isoWeek(start)}`, sub: bereik }
+  return { label: bereik, sub: '' }
 }
 
 // Alle cijfers van één periode als platte lijst — zo kun je twee periodes
@@ -2176,7 +2196,7 @@ function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
 // kolom (de stat-naam) en de kolom "Nu" blijven staan; de geschiedenis scrolt
 // horizontaal weg. Elke oudere kolom wordt vergeleken met NU: groen als het nu
 // beter is dan toen, rood als het slechter is.
-function StatTabel({ rijen, kolommen, bezig }) {
+function StatTabel({ rijen, kolommen, bezig, nuKop }) {
   const toon = (r, v) => {
     if (v == null) return '—'
     if (r.soort === 'euro') return '€' + Number(v).toLocaleString('nl-NL')
@@ -2198,7 +2218,7 @@ function StatTabel({ rijen, kolommen, bezig }) {
     position: 'sticky', left: links, zIndex: 1, background: '#0a0a0a',
   })
   const NAAM_B = 132
-  const NU_B = 62
+  const NU_B = 74
 
   if (!rijen.length) {
     return <div style={{ padding: '0.6rem 0 1rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>Geen stats geselecteerd.</div>
@@ -2210,9 +2230,23 @@ function StatTabel({ rijen, kolommen, bezig }) {
         <thead>
           <tr>
             <th style={{ ...kop, ...plak(0), width: NAAM_B, minWidth: NAAM_B, textAlign: 'left' }}>Stat</th>
-            <th style={{ ...kop, ...plak(NAAM_B), width: NU_B, minWidth: NU_B, textAlign: 'right', color: '#fff' }}>Nu</th>
+            <th style={{ ...kop, ...plak(NAAM_B), width: NU_B, minWidth: NU_B, textAlign: 'right', color: '#fff' }}>
+              <div>{nuKop?.label || 'Nu'}</div>
+              {nuKop?.sub && (
+                <div style={{ fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: 0, textTransform: 'none', marginTop: 2 }}>
+                  {nuKop.sub}
+                </div>
+              )}
+            </th>
             {kolommen.map(k => (
-              <th key={k.id} style={{ ...kop, textAlign: 'right', minWidth: 64, paddingLeft: 12 }}>{k.label}</th>
+              <th key={k.id} style={{ ...kop, textAlign: 'right', minWidth: 74, paddingLeft: 12 }}>
+                <div>{k.label}</div>
+                {k.sub && (
+                  <div style={{ fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: 0, textTransform: 'none', marginTop: 2 }}>
+                    {k.sub}
+                  </div>
+                )}
+              </th>
             ))}
             {bezig && <th style={{ ...kop, textAlign: 'right', paddingLeft: 12 }}>…</th>}
           </tr>
