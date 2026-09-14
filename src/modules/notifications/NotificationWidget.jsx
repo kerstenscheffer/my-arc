@@ -16,7 +16,6 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   const [autoHideTimer, setAutoHideTimer] = useState(null);
 
   // Coach info
-  const coachAvatar = 'https://kajabi-storefronts-production.kajabi-cdn.com/kajabi-storefronts-production//sites/2148693122/images/170b127d-0cd9-41bf-9ddf-a83c82dcba2e.jpeg';
   const coachName = 'Coach Kersten';
 
   useEffect(() => {
@@ -227,7 +226,9 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
         )}
       </button>}
 
-      {/* Notification Panel — gouden styling */}
+      {/* Notification Panel — zelfde taal als de check-in-melding: foto,
+          zwarte fade, bold witte tekst. Was een gouden kader met gouden
+          strepen en gekleurde kaarten. */}
       {isExpanded && (
         <div style={{
           position: 'fixed',
@@ -238,110 +239,74 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
           maxHeight: '60vh',
           background: '#0a0a0a',
           borderRadius: 18,
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,215,0,0.08)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.75)',
           zIndex: 999,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255,215,0,0.22)',
+          border: '1px solid rgba(255,255,255,0.12)',
           animation: 'slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}>
-          {/* Gouden accent-strip bovenaan */}
+          {/* Kop: coachfoto rechts, fade naar links, tekst eroverheen. */}
           <div style={{
-            height: 2,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.7) 50%, transparent 100%)',
-          }} />
-
-          {/* Header — goud */}
-          <div style={{
-            padding: isMobile ? '1rem 1.1rem' : '1.15rem 1.3rem',
-            background: 'rgba(255,215,0,0.04)',
-            borderBottom: '1px solid rgba(255,215,0,0.18)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
+            position: 'relative',
+            minHeight: isMobile ? 84 : 94,
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            flexShrink: 0,
           }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.7rem',
-              minWidth: 0, flex: 1,
+              position: 'absolute', top: 0, right: 0, bottom: 0, width: '34%',
+              backgroundImage: 'url(/coach-compliment.jpg)',
+              backgroundSize: 'cover', backgroundPosition: 'center 30%',
+            }} />
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 52%, rgba(10,10,10,0.85) 68%, rgba(10,10,10,0.4) 86%, rgba(10,10,10,0) 100%)',
+            }} />
+            <div style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', flexDirection: 'column', justifyContent: 'center',
+              gap: 3,
+              padding: isMobile ? '0 0.9rem' : '0 1.1rem',
             }}>
-              <img
-                src={coachAvatar}
-                alt={coachName}
-                style={{
-                  width: isMobile ? 38 : 42,
-                  height: isMobile ? 38 : 42,
-                  borderRadius: '50%',
-                  border: '2px solid rgba(255,215,0,0.45)',
-                  objectFit: 'cover',
-                  flexShrink: 0,
-                  boxShadow: '0 4px 12px rgba(255,215,0,0.2)',
-                }}
-              />
-              <div style={{ minWidth: 0 }}>
-                <div style={{
-                  fontSize: '0.58rem', fontWeight: 800, color: '#FFD700',
-                  textTransform: 'uppercase', letterSpacing: '0.12em',
-                  opacity: 0.85, marginBottom: 2,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}>
-                  <Bell size={10} strokeWidth={2.6} /> Meldingen
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '1rem' : '1.1rem',
-                  fontWeight: 900, color: '#fff',
-                  letterSpacing: '-0.02em',
-                  lineHeight: 1.1,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {coachName}
-                </div>
-                <div style={{
-                  fontSize: '0.7rem', fontWeight: 700,
-                  color: 'rgba(255,255,255,0.5)',
-                  marginTop: 1,
-                }}>
-                  {notifications.filter(n => n.status === 'active').length} actie{notifications.filter(n => n.status === 'active').length === 1 ? '' : 'f'}
-                </div>
+              <div style={{
+                fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900,
+                color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.1,
+                display: 'flex', alignItems: 'center', gap: 6,
+                textShadow: '0 2px 10px rgba(0,0,0,0.85)',
+              }}>
+                <Bell size={isMobile ? 15 : 17} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+                {coachName}
+              </div>
+              <div style={{
+                fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800,
+                color: 'rgba(255,255,255,0.6)', lineHeight: 1.3,
+                textShadow: '0 2px 8px rgba(0,0,0,0.85)',
+              }}>
+                {notifications.filter(n => n.status === 'active').length} actie{notifications.filter(n => n.status === 'active').length === 1 ? '' : 'f'}
               </div>
             </div>
             <button
               onClick={() => setIsExpanded(false)}
               aria-label="Sluiten"
               style={{
-                width: 34, height: 34,
-                borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.08)',
-                background: 'rgba(255,255,255,0.04)',
-                color: 'rgba(255,255,255,0.7)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(239,68,68,0.12)';
-                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)';
-                e.currentTarget.style.color = '#fff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+                position: 'absolute', top: 6, right: 7,
+                width: 26, height: 26, padding: 0,
+                borderRadius: 8, border: 'none',
+                background: 'rgba(0,0,0,0.45)',
+                color: '#fff', opacity: 0.85,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <X size={15} strokeWidth={2.4} />
+              <X size={14} strokeWidth={2.8} />
             </button>
           </div>
 
-          {/* Auto-hide timer indicator — goud */}
+          {/* Auto-hide timer indicator */}
           <div style={{
             height: 2,
             background: 'rgba(255,255,255,0.04)',
@@ -354,7 +319,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
               left: 0,
               height: '100%',
               width: '100%',
-              background: 'linear-gradient(90deg, rgba(255,215,0,0.7) 0%, rgba(212,175,55,0.5) 100%)',
+              background: 'linear-gradient(90deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.2) 100%)',
               animation: 'timerShrink 10s linear',
               transformOrigin: 'left'
             }} />
@@ -407,8 +372,8 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                       paddingLeft: isMobile ? '1.05rem' : '1.2rem',
                       borderRadius: 12,
                       background: 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${pc}30`,
-                      borderLeft: `3px solid ${pc}`,
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderLeft: `3px solid ${isActive ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.2)'}`,
                       cursor: isActive ? 'pointer' : 'default',
                       transition: 'all 0.2s ease',
                       opacity: notification.status === 'read' ? 0.55 : 1,
@@ -419,14 +384,14 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                       if (isActive && !isMobile) {
                         e.currentTarget.style.transform = 'translateX(-2px)';
                         e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                        e.currentTarget.style.borderColor = `${pc}60`;
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isMobile) {
                         e.currentTarget.style.transform = 'translateX(0)';
                         e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-                        e.currentTarget.style.borderColor = `${pc}30`;
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
                       }
                     }}
                   >
@@ -439,14 +404,13 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                         width: isMobile ? 36 : 40,
                         height: isMobile ? 36 : 40,
                         borderRadius: '50%',
-                        background: `linear-gradient(135deg, ${pc}22 0%, ${pc}0a 100%)`,
-                        border: `1px solid ${pc}55`,
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.14)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
-                        color: pc,
-                        boxShadow: isActive ? `0 0 12px ${pc}30` : 'none',
+                        color: '#fff',
                       }}>
                         {getIcon(notification.type)}
                       </div>
@@ -498,11 +462,11 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                             <span style={{
                               padding: '0.15rem 0.55rem',
                               borderRadius: 6,
-                              background: 'rgba(255,215,0,0.1)',
-                              color: '#FFD700',
+                              background: 'rgba(255,255,255,0.07)',
+                              color: 'rgba(255,255,255,0.8)',
                               fontSize: '0.62rem',
                               fontWeight: 800,
-                              border: '1px solid rgba(255,215,0,0.3)',
+                              border: '1px solid rgba(255,255,255,0.16)',
                               textTransform: 'uppercase', letterSpacing: '0.06em',
                             }}>
                               AI Insight
