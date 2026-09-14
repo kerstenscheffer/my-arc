@@ -48,10 +48,10 @@ const PILAREN = [
   {
     category: 'Voeding',
     title: 'Weet Wat Je Eet Systeem',
-    subtitle: 'Een aanpak die bij jou past — ook op verjaardagen, feestjes en vakanties.',
+    subtitle: 'Een aanpak die bij jou past. Ook op verjaardagen, feestjes en vakanties.',
     bullets: [
       { label: 'Weten wat je eet', text: 'vaste structuur in de app, zonder rekenen' },
-      { label: 'Flexibel', text: 'meedoen met etentjes, een biertje, vakantie — inbouwen, niet wegstrepen' },
+      { label: 'Flexibel', text: 'etentjes, een biertje, vakantie: inbouwen in plaats van wegstrepen' },
     ],
     images: ['/sales-screenshots/eten.png', '/sales-screenshots/meedoen.png'],
   },
@@ -68,12 +68,12 @@ const PILAREN = [
   {
     category: 'Begeleiding',
     title: 'Coach In Jouw Corner',
-    subtitle: 'Ik kijk meerdere keren per week met je mee — we zien allebei dat het werkt.',
+    subtitle: 'Ik kijk meerdere keren per week met je mee. We zien allebei dat het werkt.',
     bullets: [
       { label: 'Wekelijkse check-in call', text: 'toegang tot mijn agenda' },
       { label: 'Snel bereikbaar', text: 'via de app' },
-      { label: 'Ik kijk mee', text: "gewicht, kracht en foto's — progressie zwart-op-wit" },
-      { label: 'Accountability', text: 'je hoeft het niet alleen te doen — ik hou je scherp en op koers' },
+      { label: 'Ik kijk mee', text: "gewicht, kracht en foto's, progressie zwart-op-wit" },
+      { label: 'Accountability', text: 'je hoeft het niet alleen te doen, ik hou je scherp en op koers' },
     ],
     images: ['/sales-screenshots/coach.png', '/sales-screenshots/tracking.png'],
   },
@@ -257,7 +257,7 @@ export default function SixWeekChallengeCheckout() {
             }} />
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
-              background: `linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0) 35%, rgba(10,10,10,0.8) 75%, ${BG} 100%)`,
+              background: `linear-gradient(180deg, rgba(10,10,10,0.3) 0%, rgba(10,10,10,0.1) 18%, rgba(10,10,10,0.55) 42%, rgba(10,10,10,0.88) 68%, ${BG} 92%)`,
             }} />
           </div>
 
@@ -283,7 +283,7 @@ export default function SixWeekChallengeCheckout() {
               fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 600,
               color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
             }}>
-              <span style={{ color: GOLD, fontWeight: 900 }}>Win Your Money Back</span> — haal je doel,
+              <span style={{ color: GOLD, fontWeight: 900 }}>Win Your Money Back.</span> Haal je doel,
               of voer je acties uit en krijg je investering terug.
             </p>
 
