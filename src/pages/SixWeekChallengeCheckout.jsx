@@ -79,6 +79,69 @@ const PILAREN = [
   },
 ]
 
+// ── Blad dat vanaf de onderkant openschuift ──────────────────────────────────
+// Zelfde vorm als het blad in het log-scherm van de app: de pagina erachter
+// vervaagt, het blad komt van onderen omhoog en groeit mee met zijn inhoud tot
+// 80% van het scherm. Bewust lokaal en niet geïmporteerd uit de app-modules:
+// dit is een publieke verkooppagina die op zichzelf moet staan.
+function Blad({ open, titel, onClose, isMobile, children }) {
+  if (!open) return null
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(0,0,0,0.82)',
+        backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        animation: 'bladWaas 0.2s ease',
+      }}
+    >
+      <div style={{
+        width: '100%', maxWidth: 520,
+        background: BG,
+        borderRadius: '18px 18px 0 0',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderBottom: 'none',
+        maxHeight: '80vh',
+        display: 'flex', flexDirection: 'column',
+        animation: 'bladOmhoog 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: isMobile ? '1rem 1.15rem' : '1.1rem 1.35rem',
+          borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0,
+        }}>
+          <span style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+            {titel}
+          </span>
+          <button
+            onClick={onClose}
+            aria-label="Sluit"
+            style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              fontSize: '1rem', fontWeight: 700, fontFamily: 'inherit', lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        <div style={{
+          flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          padding: isMobile ? '0.9rem 1.15rem' : '1rem 1.35rem',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)',
+          textAlign: 'left',
+        }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Trustpilot-badge — identiek aan /16week ──────────────────────────────────
 function TrustpilotBadge({ size = 'sm', style }) {
   const fs = size === 'lg' ? '0.7rem' : '0.65rem'
@@ -331,90 +394,6 @@ export default function SixWeekChallengeCheckout() {
               })}
             </div>
 
-            {/* De methode — de drie pijlers, kort. */}
-            {open === 'methode' && (
-              <div style={{
-                margin: isMobile ? '1.1rem auto 0' : '1.3rem auto 0',
-                maxWidth: 480, width: '100%', textAlign: 'left',
-              }}>
-                {PILAREN.map((p, i) => (
-                  <div key={p.title} style={{
-                    padding: isMobile ? '0.85rem 0' : '1rem 0',
-                    borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                    borderBottom: '1px solid rgba(255,255,255,0.08)',
-                  }}>
-                    <div style={{
-                      fontSize: isMobile ? '0.6rem' : '0.63rem', fontWeight: 800,
-                      letterSpacing: '0.14em', color: GOLD, marginBottom: 4,
-                    }}>
-                      PIJLER {i + 1}: {p.category.toUpperCase()}
-                    </div>
-                    <div style={{
-                      fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff',
-                      letterSpacing: '-0.015em', marginBottom: 4,
-                    }}>
-                      {p.title}
-                    </div>
-                    <div style={{
-                      fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 600,
-                      color: 'rgba(255,255,255,0.5)', lineHeight: 1.45,
-                    }}>
-                      {p.subtitle}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* De voorwaarden — de zes acties als tabel. */}
-            {open === 'voorwaarden' && (
-              <div style={{
-                margin: isMobile ? '1.1rem auto 0' : '1.3rem auto 0',
-                maxWidth: 480, width: '100%',
-              }}>
-                {[
-                  { kop: '3 workouts per week', sub: '45 minuten' },
-                  { kop: '80% van je voedingsplan', sub: 'macrodoelen of plan gevolgd' },
-                  { kop: '3x per week wegen', sub: 'we sturen op het weekgemiddelde' },
-                  { kop: 'Elke week je check-in', sub: 'in de app' },
-                  { kop: '4 calls', sub: 'met je coach' },
-                  { kop: "3 progressiefoto's", sub: 'begin, midden, eind' },
-                ].map((r, i) => (
-                  <div key={r.kop} style={{
-                    display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-                    gap: '1rem',
-                    padding: isMobile ? '0.7rem 0' : '0.8rem 0',
-                    borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                    borderBottom: '1px solid rgba(255,255,255,0.08)',
-                    textAlign: 'left',
-                  }}>
-                    <span style={{
-                      fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 700,
-                      color: 'rgba(255,255,255,0.88)', lineHeight: 1.25, letterSpacing: '-0.01em',
-                    }}>
-                      {r.kop}
-                    </span>
-                    <span style={{
-                      flexShrink: 0, textAlign: 'right',
-                      fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 600,
-                      color: 'rgba(255,255,255,0.38)', lineHeight: 1.3,
-                    }}>
-                      {r.sub}
-                    </span>
-                  </div>
-                ))}
-                <p style={{
-                  margin: isMobile ? '0.9rem 0 0' : '1rem 0 0',
-                  textAlign: 'left',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  fontWeight: 600, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5,
-                }}>
-                  Wijkt een van de voorwaarden af van wat je met je coach hebt besproken? Dan
-                  stellen we die mondeling op. Het belangrijkste is dat het voor jou werkt.
-                </p>
-              </div>
-            )}
-
             {/* De twee garanties genummerd onder elkaar. */}
             <div style={{
               margin: isMobile ? '1.5rem auto 0' : '1.85rem auto 0',
@@ -661,8 +640,90 @@ export default function SixWeekChallengeCheckout() {
         ))}
       </div>
 
+      {/* De methode — de drie pijlers, kort. */}
+      <Blad open={open === 'methode'} titel="De methode" onClose={() => setOpen(null)} isMobile={isMobile}>
+        {PILAREN.map((p, i) => (
+          <div key={p.title} style={{
+            padding: isMobile ? '0.85rem 0' : '1rem 0',
+            borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <div style={{
+              fontSize: isMobile ? '0.6rem' : '0.63rem', fontWeight: 800,
+              letterSpacing: '0.14em', color: GOLD, marginBottom: 4,
+            }}>
+              PIJLER {i + 1}: {p.category.toUpperCase()}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.015em', marginBottom: 4,
+            }}>
+              {p.title}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 600,
+              color: 'rgba(255,255,255,0.55)', lineHeight: 1.45, marginBottom: 8,
+            }}>
+              {p.subtitle}
+            </div>
+            {p.bullets.map((b, j) => (
+              <div key={j} style={{
+                fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 600,
+                color: 'rgba(255,255,255,0.6)', lineHeight: 1.5,
+              }}>
+                <span style={{ color: '#fff', fontWeight: 800 }}>{b.label}:</span> {b.text}
+              </div>
+            ))}
+          </div>
+        ))}
+      </Blad>
+
+      {/* De voorwaarden — de zes acties als tabel. */}
+      <Blad open={open === 'voorwaarden'} titel="De voorwaarden" onClose={() => setOpen(null)} isMobile={isMobile}>
+        {[
+          { kop: '3 workouts per week', sub: '45 minuten' },
+          { kop: '80% van je voedingsplan', sub: 'macrodoelen of plan gevolgd' },
+          { kop: '3x per week wegen', sub: 'we sturen op het weekgemiddelde' },
+          { kop: 'Elke week je check-in', sub: 'in de app' },
+          { kop: '4 calls', sub: 'met je coach' },
+          { kop: "3 progressiefoto's", sub: 'begin, midden, eind' },
+        ].map((r, i) => (
+          <div key={r.kop} style={{
+            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+            gap: '1rem',
+            padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+            borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <span style={{
+              fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 700,
+              color: 'rgba(255,255,255,0.9)', lineHeight: 1.25, letterSpacing: '-0.01em',
+            }}>
+              {r.kop}
+            </span>
+            <span style={{
+              flexShrink: 0, textAlign: 'right',
+              fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 600,
+              color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
+            }}>
+              {r.sub}
+            </span>
+          </div>
+        ))}
+        <p style={{
+          margin: isMobile ? '1rem 0 0' : '1.15rem 0 0',
+          fontSize: isMobile ? '0.78rem' : '0.83rem',
+          fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5,
+        }}>
+          Wijkt een van de voorwaarden af van wat je met je coach hebt besproken? Dan
+          stellen we die mondeling op. Het belangrijkste is dat het voor jou werkt.
+        </p>
+      </Blad>
+
       <style>{`
+        /* @import moet als eerste regel staan, anders negeert de browser 'm
+           en valt het lettertype terug op de systeemfont. */
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+        @keyframes bladWaas { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes bladOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
         body { overflow: hidden; }
         ::-webkit-scrollbar { display: none; }
       `}</style>
