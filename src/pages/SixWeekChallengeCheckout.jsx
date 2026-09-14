@@ -7,7 +7,7 @@
 // Stripe: /api/create-checkout-session (one-time), plan '6-week-challenge'.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, Wallet } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 297
@@ -461,7 +461,7 @@ export default function SixWeekChallengeCheckout() {
               </div>
               {[
                 { Icon: Clock, tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
-                { Icon: BadgeEuro, tekst: 'Vind je tijdens de 6 weken dat je geen €297 aan coaching waarde krijgt? Geld terug.' },
+                { Icon: Wallet, tekst: 'Vind je tijdens de 6 weken dat je geen €297 aan coaching waarde krijgt? Geld terug.' },
               ].map((r, i) => (
                 <div key={r.tekst} style={{
                   display: 'flex', gap: '0.7rem',
