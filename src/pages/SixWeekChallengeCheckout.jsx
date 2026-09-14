@@ -44,40 +44,60 @@ const TRANSFORMATIONS = [
 ]
 
 // De 3 pijlers — copy gelijk aan /16week (OfferPilarenSection).
-const PILAREN = [
-  {
-    category: 'Voeding',
-    title: 'Weet Wat Je Eet Systeem',
-    subtitle: 'Een aanpak die bij jou past. Ook op verjaardagen, feestjes en vakanties.',
-    bullets: [
-      { label: 'Weten wat je eet', text: 'vaste structuur in de app, zonder rekenen' },
-      { label: 'Flexibel', text: 'etentjes, een biertje, vakantie: inbouwen in plaats van wegstrepen' },
-    ],
-    images: ['/sales-screenshots/eten.png', '/sales-screenshots/meedoen.png'],
-  },
-  {
-    category: 'Training',
-    title: 'Elke Training Telt Methode',
-    subtitle: 'Schema op maat, uitleg per oefening, feedback op jouw uitvoering.',
-    bullets: [
-      { label: 'Effectief', text: 'workouts onder een uur, thuis of in de gym' },
-      { label: 'Begeleiding', text: "uitlegvideo's + persoonlijke bijsturing" },
-    ],
-    images: ['/sales-screenshots/trainen.png'],
-  },
-  {
-    category: 'Begeleiding',
-    title: 'Coach In Jouw Corner',
-    subtitle: 'Ik kijk meerdere keren per week met je mee. We zien allebei dat het werkt.',
-    bullets: [
-      { label: 'Wekelijkse check-in call', text: 'toegang tot mijn agenda' },
-      { label: 'Snel bereikbaar', text: 'via de app' },
-      { label: 'Ik kijk mee', text: "gewicht, kracht en foto's, progressie zwart-op-wit" },
-      { label: 'Accountability', text: 'je hoeft het niet alleen te doen, ik hou je scherp en op koers' },
-    ],
-    images: ['/sales-screenshots/coach.png', '/sales-screenshots/tracking.png'],
-  },
-]
+// ── Stroken in een blad: foto tegen de linkerrand, fade naar rechts ─────────
+//
+// Foto links (zo'n 20% zichtbaar), de kop half over de fade en de toelichting
+// in grijs helemaal rechts. Een lijn scheidt de stroken. De negatieve marge
+// haalt de padding van het blad weg, zodat de foto's de rand raken.
+function Stroken({ items, isMobile }) {
+  return (
+    <div style={{ margin: isMobile ? '-0.9rem -1.15rem 0' : '-1rem -1.35rem 0' }}>
+      {items.map((r) => (
+        <div key={r.kop} style={{
+          position: 'relative',
+          minHeight: isMobile ? 58 : 68,
+          display: 'flex', alignItems: 'center',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: '30%',
+            backgroundImage: `url(${r.foto})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(90deg, rgba(10,10,10,0.4) 0%, rgba(10,10,10,0.5) 10%, rgba(10,10,10,0.85) 21%, #0a0a0a 32%)',
+          }} />
+          <div style={{
+            position: 'relative', zIndex: 1,
+            display: 'flex', alignItems: 'center',
+            gap: isMobile ? '0.5rem' : '0.9rem',
+            width: '100%',
+            paddingLeft: isMobile ? '20%' : '21%',
+            paddingRight: isMobile ? '1.15rem' : '1.35rem',
+          }}>
+            <div style={{
+              flex: 1, minWidth: 0,
+              fontSize: isMobile ? '0.86rem' : '1rem', fontWeight: 900,
+              color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
+              textShadow: '0 1px 8px rgba(0,0,0,0.9)',
+            }}>
+              {r.kop}
+            </div>
+            <div style={{
+              flexShrink: 0, maxWidth: isMobile ? '46%' : '42%',
+              textAlign: 'right',
+              fontSize: isMobile ? '0.66rem' : '0.76rem', fontWeight: 600,
+              color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
+            }}>
+              {r.sub}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 // ── Blad dat vanaf de onderkant openschuift ──────────────────────────────────
 // Zelfde vorm als het blad in het log-scherm van de app: de pagina erachter
@@ -640,103 +660,26 @@ export default function SixWeekChallengeCheckout() {
         ))}
       </div>
 
-      {/* De methode — de drie pijlers, kort. */}
+      {/* De methode — drie stroken, verder geen tekst. */}
       <Blad open={open === 'methode'} titel="De methode" onClose={() => setOpen(null)} isMobile={isMobile}>
-        {PILAREN.map((p, i) => (
-          <div key={p.title} style={{
-            padding: isMobile ? '0.85rem 0' : '1rem 0',
-            borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)',
-          }}>
-            <div style={{
-              fontSize: isMobile ? '0.6rem' : '0.63rem', fontWeight: 800,
-              letterSpacing: '0.14em', color: GOLD, marginBottom: 4,
-            }}>
-              PIJLER {i + 1}: {p.category.toUpperCase()}
-            </div>
-            <div style={{
-              fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff',
-              letterSpacing: '-0.015em', marginBottom: 4,
-            }}>
-              {p.title}
-            </div>
-            <div style={{
-              fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 600,
-              color: 'rgba(255,255,255,0.55)', lineHeight: 1.45, marginBottom: 8,
-            }}>
-              {p.subtitle}
-            </div>
-            {p.bullets.map((b, j) => (
-              <div key={j} style={{
-                fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 600,
-                color: 'rgba(255,255,255,0.6)', lineHeight: 1.5,
-              }}>
-                <span style={{ color: '#fff', fontWeight: 800 }}>{b.label}:</span> {b.text}
-              </div>
-            ))}
-          </div>
-        ))}
+        <Stroken isMobile={isMobile} items={[
+          { foto: '/methode/voeding.jpg',     kop: 'Weet wat je eet',      sub: 'structuur in de app, zonder rekenen' },
+          { foto: '/methode/training.jpg',    kop: 'Elke training telt',   sub: 'schema op maat, onder het uur' },
+          { foto: '/methode/begeleiding.jpg', kop: 'Coach in jouw corner', sub: 'wekelijkse call, ik kijk mee' },
+        ]} />
       </Blad>
 
-      {/* De voorwaarden — per actie een strook over de volle breedte van het
-          blad: foto tegen de linkerrand (zo'n 20% zichtbaar), zwarte fade naar
-          rechts, de kop half over die fade en de toelichting in grijs helemaal
-          rechts. Een lijn scheidt de stroken. Beelden zijn Unsplash-stock,
-          opgeslagen in public/voorwaarden/. */}
+      {/* De voorwaarden — dezelfde stroken, plus de regel dat een coach ze
+          mondeling mag bijstellen. */}
       <Blad open={open === 'voorwaarden'} titel="De voorwaarden" onClose={() => setOpen(null)} isMobile={isMobile}>
-        {/* Negatieve marge: het blad heeft padding, de stroken moeten juist
-            tegen de randen aan. */}
-        <div style={{ margin: isMobile ? '-0.9rem -1.15rem 0' : '-1rem -1.35rem 0' }}>
-          {[
-            { foto: '/voorwaarden/workouts.jpg', kop: '3 workouts per week',     sub: 'van 45 minuten' },
-            { foto: '/voorwaarden/voeding.jpg',  kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of plan gevolgd' },
-            { foto: '/voorwaarden/wegen.jpg',    kop: '3x per week wegen',       sub: 'we sturen op het weekgemiddelde' },
-            { foto: '/voorwaarden/checkin.jpg',  kop: 'Elke week je check-in',   sub: 'invullen in de app' },
-            { foto: '/voorwaarden/calls.jpg',    kop: '4 calls',                 sub: 'verspreid over de zes weken' },
-            { foto: '/voorwaarden/fotos.jpg',    kop: "3 progressiefoto's",      sub: 'begin, midden, eind' },
-          ].map((r) => (
-            <div key={r.kop} style={{
-              position: 'relative',
-              minHeight: isMobile ? 58 : 68,
-              display: 'flex', alignItems: 'center',
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
-            }}>
-              <div style={{
-                position: 'absolute', left: 0, top: 0, bottom: 0, width: '30%',
-                backgroundImage: `url(${r.foto})`,
-                backgroundSize: 'cover', backgroundPosition: 'center',
-              }} />
-              <div style={{
-                position: 'absolute', inset: 0, pointerEvents: 'none',
-                background: 'linear-gradient(90deg, rgba(10,10,10,0.4) 0%, rgba(10,10,10,0.5) 10%, rgba(10,10,10,0.85) 21%, #0a0a0a 32%)',
-              }} />
-              <div style={{
-                position: 'relative', zIndex: 1,
-                display: 'flex', alignItems: 'center',
-                gap: isMobile ? '0.5rem' : '0.9rem',
-                width: '100%',
-                paddingLeft: isMobile ? '20%' : '21%',
-                paddingRight: isMobile ? '1.15rem' : '1.35rem',
-              }}>
-                <div style={{
-                  flex: 1, minWidth: 0,
-                  fontSize: isMobile ? '0.86rem' : '1rem', fontWeight: 900,
-                  color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
-                  textShadow: '0 1px 8px rgba(0,0,0,0.9)',
-                }}>
-                  {r.kop}
-                </div>
-                <div style={{
-                  flexShrink: 0, maxWidth: isMobile ? '46%' : '42%',
-                  textAlign: 'right',
-                  fontSize: isMobile ? '0.66rem' : '0.76rem', fontWeight: 600,
-                  color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
-                }}>
-                  {r.sub}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <Stroken isMobile={isMobile} items={[
+          { foto: '/voorwaarden/workouts.jpg', kop: '3 workouts per week',     sub: 'van 45 minuten' },
+          { foto: '/voorwaarden/voeding.jpg',  kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of plan gevolgd' },
+          { foto: '/voorwaarden/wegen.jpg',    kop: '3x per week wegen',       sub: 'we sturen op het weekgemiddelde' },
+          { foto: '/voorwaarden/checkin.jpg',  kop: 'Elke week je check-in',   sub: 'invullen in de app' },
+          { foto: '/voorwaarden/calls.jpg',    kop: '4 calls',                 sub: 'verspreid over de zes weken' },
+          { foto: '/voorwaarden/fotos.jpg',    kop: "3 progressiefoto's",      sub: 'begin, midden, eind' },
+        ]} />
         <p style={{
           margin: isMobile ? '1rem 0 0' : '1.15rem 0 0',
           fontSize: isMobile ? '0.78rem' : '0.83rem',
