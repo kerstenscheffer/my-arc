@@ -23,8 +23,9 @@ const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
 const BG = '#0a0a0a'
 
-// Hero(0) + 3 pijlers(1-3) + offer(4) + formulier(5).
-const SECTION_COUNT = 6
+// Hero(0) + offer(1) + formulier(2). De pijlers en de voorwaarden zitten achter
+// een knop op het offer-scherm, zodat de pagina kort blijft.
+const SECTION_COUNT = 3
 
 const REVIEWS = [
   { name: 'Hessel', date: 'dec 2025', text: 'Kersten begreep het meteen! Na een uitgebreide 0-meting kreeg ik een plan op maat. Van 79,8 naar 74,4 in 8 weken. Als jij je aan het plan houdt geeft Kersten altijd de volle 100%!' },
@@ -99,113 +100,6 @@ function TrustpilotBadge({ size = 'sm', style }) {
   )
 }
 
-// ── Pijler-scherm — één pijler per volledig scherm (zoals /16week) ───────────
-function PijlerSection({ isMobile, index }) {
-  const p = PILAREN[index]
-  // Om en om links/rechts op desktop voor ritme tussen de schermen.
-  const imgFirst = index % 2 === 0
-
-  return (
-    <section style={{
-      scrollSnapAlign: 'start',
-      minHeight: isMobile ? '100dvh' : '100vh',
-      background: BG,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: isMobile ? '4rem 1.25rem' : '5.5rem 2rem',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      {/* Subtiele gouden glow */}
-      <div style={{
-        position: 'absolute', top: '50%', left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '600px', height: '600px',
-        background: 'radial-gradient(circle, rgba(255,186,9,0.04) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* Accentlijn bovenaan */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
-        background: `linear-gradient(90deg, transparent, ${GOLD}30, transparent)`,
-      }} />
-
-      <div style={{ maxWidth: '960px', width: '100%', position: 'relative', zIndex: 2 }}>
-        {/* Methode-eyebrow — continuïteit tussen de 3 pijler-schermen */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '2.25rem' }}>
-          <span style={{
-            fontSize: isMobile ? '0.55rem' : '0.58rem', fontWeight: 800, letterSpacing: '0.15em',
-            color: 'rgba(255,255,255,0.5)',
-          }}>MY ARC-METHODE · {index + 1}/{PILAREN.length}</span>
-        </div>
-
-        <div style={{
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : (imgFirst ? 'row-reverse' : 'row'),
-          alignItems: 'center',
-          gap: isMobile ? '1.75rem' : '3rem',
-        }}>
-          {/* Beeld-kolom */}
-          <div style={{
-            flex: isMobile ? 'none' : '0 0 42%',
-            maxWidth: isMobile ? '72%' : '42%',
-            width: isMobile ? '72%' : undefined,
-            margin: isMobile ? '0 auto' : undefined,
-            display: 'flex',
-            gap: isMobile ? '0.5rem' : '0.65rem',
-            alignItems: 'center', justifyContent: 'center',
-          }}>
-            {p.images.map((src) => (
-              <div key={src} style={{ flex: 1, minWidth: 0, borderRadius: '14px', overflow: 'hidden', filter: 'drop-shadow(0 12px 26px rgba(0,0,0,0.55))' }}>
-                <img
-                  src={src}
-                  alt={p.title}
-                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                  style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Tekst-kolom */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{
-              fontSize: isMobile ? '1.55rem' : '2.35rem',
-              fontWeight: 900, color: '#fff', margin: `0 0 ${isMobile ? '0.6rem' : '0.75rem'}`,
-              lineHeight: 1.12, letterSpacing: '-0.02em',
-            }}>
-              <span style={{ display: 'block', fontSize: isMobile ? '0.75rem' : '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '0.04em', marginBottom: '0.25rem' }}>
-                PIJLER {index + 1}: {p.category.toUpperCase()}
-              </span>
-              {p.title}
-            </h3>
-
-            <p style={{
-              margin: `0 0 ${isMobile ? '0.85rem' : '1.1rem'}`,
-              fontSize: isMobile ? '0.95rem' : '1.1rem',
-              fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
-            }}>{p.subtitle}</p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.55rem' : '0.65rem' }}>
-              {p.bullets.map((b, j) => (
-                <div key={j} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
-                  <span style={{ flexShrink: 0, marginTop: isMobile ? 7 : 8, width: 6, height: 6, borderRadius: '50%', background: GOLD }} />
-                  <p style={{ margin: 0, fontSize: isMobile ? '0.9rem' : '1rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, fontWeight: 500 }}>
-                    <span style={{ color: '#fff', fontWeight: 800 }}>{b.label}:</span> {b.text}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 export default function SixWeekChallengeCheckout() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -220,6 +114,8 @@ export default function SixWeekChallengeCheckout() {
   const formRef = useRef(null)
   // Zwevende "Investering"-knop: zichtbaar tot je de offer-sectie bereikt.
   const [showInvestBtn, setShowInvestBtn] = useState(true)
+  // Wat er onder de twee knoppen openklapt: 'methode', 'voorwaarden' of niets.
+  const [open, setOpen] = useState(null)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768)
@@ -404,11 +300,6 @@ export default function SixWeekChallengeCheckout() {
           <TrustpilotBadge style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }} />
         </section>
 
-        {/* ══ SCHERM 2-4: DE 3 PIJLERS ══ */}
-        <PijlerSection isMobile={isMobile} index={0} />
-        <PijlerSection isMobile={isMobile} index={1} />
-        <PijlerSection isMobile={isMobile} index={2} />
-
         {/* ══ SCHERM 5: OFFER ══ */}
         <section ref={offerRef} style={{ ...screen, textAlign: 'center', padding: 0, justifyContent: 'flex-start' }}>
           {/* Foto bovenaan die onderin dood loopt in het zwart; de kop valt er
@@ -449,7 +340,7 @@ export default function SixWeekChallengeCheckout() {
               marginBottom: isMobile ? '0.5rem' : '0.6rem',
               textShadow: '0 2px 14px rgba(0,0,0,0.85)',
             }}>
-              Win Your Money Back
+              6 Weken In Shape Challenge
             </div>
             <p style={{
               margin: `0 auto ${isMobile ? '1.5rem' : '1.85rem'}`,
@@ -457,75 +348,141 @@ export default function SixWeekChallengeCheckout() {
               fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 600,
               color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
             }}>
-              Haal je doel, of voer je acties uit en krijg je investering terug.
+              <span style={{ color: GOLD, fontWeight: 900 }}>Win Your Money Back</span> — haal je doel,
+              of voer je acties uit en krijg je investering terug.
             </p>
 
             {/* Prijs — eenmalig €297 */}
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
               <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€297</span>
             </div>
-            {/* De zes voorwaarden onder elkaar als tabel: elke regel een dun
-                lijntje eronder, actie links en de toelichting rechts. Stond
-                eerder in twee kolommen, wat op een checkout te veel oogsprongen
-                vraagt. */}
+            {/* Twee knoppen onder de prijs: de methode en de voorwaarden.
+                Allebei klappen ze eronder open. Stonden eerder als drie losse
+                schermen en een lange tabel in de pagina; dan scrol je langs
+                alles voordat je bij het formulier bent. */}
             <div style={{
-              margin: isMobile ? '1.6rem auto 0' : '2rem auto 0',
-              maxWidth: 480, width: '100%',
+              display: 'flex', gap: 8,
+              margin: isMobile ? '1.5rem auto 0' : '1.85rem auto 0',
+              maxWidth: 480,
             }}>
-              <div style={{
-                fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
-                letterSpacing: '0.15em', color: GOLD,
-                marginBottom: isMobile ? '0.6rem' : '0.75rem', textAlign: 'center',
-              }}>
-                DE VOORWAARDEN
-              </div>
               {[
-                { kop: '3 workouts per week', sub: '45 minuten' },
-                { kop: '80% van je voedingsplan', sub: 'macrodoelen of plan gevolgd' },
-                { kop: '3x per week wegen', sub: 'we sturen op het weekgemiddelde' },
-                { kop: 'Elke week je check-in', sub: 'in de app' },
-                { kop: '4 calls', sub: 'met je coach' },
-                { kop: "3 progressiefoto's", sub: 'begin, midden, eind' },
-              ].map((r, i) => (
-                <div key={r.kop} style={{
-                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-                  gap: '1rem',
-                  padding: isMobile ? '0.7rem 0' : '0.8rem 0',
-                  borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)',
-                  textAlign: 'left',
-                }}>
-                  <span style={{
-                    fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 700,
-                    color: 'rgba(255,255,255,0.88)', lineHeight: 1.25, letterSpacing: '-0.01em',
-                  }}>
-                    {r.kop}
-                  </span>
-                  <span style={{
-                    flexShrink: 0, textAlign: 'right',
-                    fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 600,
-                    color: 'rgba(255,255,255,0.38)', lineHeight: 1.3,
-                  }}>
-                    {r.sub}
-                  </span>
-                </div>
-              ))}
+                { id: 'methode', label: 'De methode' },
+                { id: 'voorwaarden', label: 'De voorwaarden' },
+              ].map((k) => {
+                const aan = open === k.id
+                return (
+                  <button
+                    key={k.id}
+                    onClick={() => setOpen(aan ? null : k.id)}
+                    style={{
+                      flex: 1, minHeight: 46,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      borderRadius: 12,
+                      border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.25)'}`,
+                      background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      color: '#fff',
+                      fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900,
+                      fontFamily: 'inherit', cursor: 'pointer',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    {k.label}
+                    <ChevronDown
+                      size={15} strokeWidth={3}
+                      style={{ transform: aan ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}
+                    />
+                  </button>
+                )
+              })}
             </div>
 
-            <p style={{
-              margin: isMobile ? '1.4rem auto 0' : '1.6rem auto 0',
-              maxWidth: 480, textAlign: 'center',
-              fontSize: isMobile ? '0.78rem' : '0.83rem',
-              fontWeight: 600, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5,
-            }}>
-              Wijkt een van de voorwaarden af van wat je met je coach hebt besproken? Dan
-              stellen we die mondeling op. Het belangrijkste is dat het voor jou werkt.
-            </p>
+            {/* De methode — de drie pijlers, kort. */}
+            {open === 'methode' && (
+              <div style={{
+                margin: isMobile ? '1.1rem auto 0' : '1.3rem auto 0',
+                maxWidth: 480, width: '100%', textAlign: 'left',
+              }}>
+                {PILAREN.map((p, i) => (
+                  <div key={p.title} style={{
+                    padding: isMobile ? '0.85rem 0' : '1rem 0',
+                    borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    <div style={{
+                      fontSize: isMobile ? '0.6rem' : '0.63rem', fontWeight: 800,
+                      letterSpacing: '0.14em', color: GOLD, marginBottom: 4,
+                    }}>
+                      PIJLER {i + 1}: {p.category.toUpperCase()}
+                    </div>
+                    <div style={{
+                      fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff',
+                      letterSpacing: '-0.015em', marginBottom: 4,
+                    }}>
+                      {p.title}
+                    </div>
+                    <div style={{
+                      fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 600,
+                      color: 'rgba(255,255,255,0.5)', lineHeight: 1.45,
+                    }}>
+                      {p.subtitle}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {/* De twee garanties genummerd onder elkaar, in dezelfde vorm als
-                de voorwaarden erboven. */}
+            {/* De voorwaarden — de zes acties als tabel. */}
+            {open === 'voorwaarden' && (
+              <div style={{
+                margin: isMobile ? '1.1rem auto 0' : '1.3rem auto 0',
+                maxWidth: 480, width: '100%',
+              }}>
+                {[
+                  { kop: '3 workouts per week', sub: '45 minuten' },
+                  { kop: '80% van je voedingsplan', sub: 'macrodoelen of plan gevolgd' },
+                  { kop: '3x per week wegen', sub: 'we sturen op het weekgemiddelde' },
+                  { kop: 'Elke week je check-in', sub: 'in de app' },
+                  { kop: '4 calls', sub: 'met je coach' },
+                  { kop: "3 progressiefoto's", sub: 'begin, midden, eind' },
+                ].map((r, i) => (
+                  <div key={r.kop} style={{
+                    display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                    gap: '1rem',
+                    padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+                    borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    textAlign: 'left',
+                  }}>
+                    <span style={{
+                      fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 700,
+                      color: 'rgba(255,255,255,0.88)', lineHeight: 1.25, letterSpacing: '-0.01em',
+                    }}>
+                      {r.kop}
+                    </span>
+                    <span style={{
+                      flexShrink: 0, textAlign: 'right',
+                      fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 600,
+                      color: 'rgba(255,255,255,0.38)', lineHeight: 1.3,
+                    }}>
+                      {r.sub}
+                    </span>
+                  </div>
+                ))}
+                <p style={{
+                  margin: isMobile ? '0.9rem 0 0' : '1rem 0 0',
+                  textAlign: 'left',
+                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                  fontWeight: 600, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5,
+                }}>
+                  Wijkt een van de voorwaarden af van wat je met je coach hebt besproken? Dan
+                  stellen we die mondeling op. Het belangrijkste is dat het voor jou werkt.
+                </p>
+              </div>
+            )}
+
+            {/* De twee garanties genummerd onder elkaar. */}
             <div style={{
-              margin: isMobile ? '1.6rem auto 0' : '2rem auto 0',
+              margin: isMobile ? '1.5rem auto 0' : '1.85rem auto 0',
               maxWidth: 480, width: '100%', textAlign: 'left',
             }}>
               <div style={{
