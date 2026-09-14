@@ -255,7 +255,7 @@ export default function ProgressMain({ db, client }) {
 
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
       {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '1rem' : '1.25rem' }}>
+        <div style={{ marginTop: isMobile ? '3rem' : '3.5rem' }}>
           <WeightStatsGrid
             stats={weightStats}
             client={client}

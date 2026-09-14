@@ -406,7 +406,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
 
       {/* ═══ GRAFIEK — met een tijdfilter erboven ═══ */}
       {chartData.length > 0 && (
-        <div style={{ margin: isMobile ? '1rem 0.5rem 0' : '1.25rem 0.75rem 0' }}>
+        <div style={{ margin: isMobile ? '3rem 0.5rem 0' : '3.5rem 0.75rem 0' }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             gap: 8, padding: isMobile ? '0 0.4rem 0.6rem' : '0 0.5rem 0.7rem',

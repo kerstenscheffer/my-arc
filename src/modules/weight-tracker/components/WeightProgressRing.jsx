@@ -188,8 +188,6 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
-            borderTop: '1px solid rgba(255,255,255,0.06)',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
           }}
         >
           <div style={{ flexShrink: 0, width: `${spacerW}px` }} />
@@ -278,8 +276,9 @@ export default function WeightProgressRing({
 
   return (
     <div style={{
-      borderTop: '1px solid rgba(255,255,255,0.06)',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      // Geen randen meer om de slider: die sneden het blok los van de rest
+      // terwijl de zwarte ruimte het werk al doet.
+      marginTop: isMobile ? '2rem' : '2.5rem',
       width: '100%',
       maxWidth: '100%',
       boxSizing: 'border-box',
@@ -329,7 +328,6 @@ export default function WeightProgressRing({
         marginTop: showSavedState ? '0.875rem' : '0.75rem',
         marginLeft: isMobile ? '-1rem' : '-1.5rem',
         marginRight: isMobile ? '-1rem' : '-1.5rem',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
       }}>
 
         {/* INITIAL SAVE — single flush button */}
