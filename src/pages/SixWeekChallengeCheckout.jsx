@@ -371,17 +371,15 @@ export default function SixWeekChallengeCheckout() {
               of voer je acties uit en krijg je investering terug.
             </p>
 
-            {/* Prijs — eenmalig €297 */}
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
-              <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€297</span>
-            </div>
-            {/* Twee knoppen onder de prijs: de methode en de voorwaarden.
+            {/* Twee knoppen: de methode en de voorwaarden. De prijs stond
+                hierboven als los blok; dat maakte het scherm druk, dus die
+                staat nu in de knop naar het formulier.
                 Allebei klappen ze eronder open. Stonden eerder als drie losse
                 schermen en een lange tabel in de pagina; dan scrol je langs
                 alles voordat je bij het formulier bent. */}
             <div style={{
               display: 'flex', gap: 8,
-              margin: isMobile ? '1.5rem auto 0' : '1.85rem auto 0',
+              margin: '0 auto',
               maxWidth: 480,
             }}>
               {[
@@ -417,7 +415,7 @@ export default function SixWeekChallengeCheckout() {
 
             {/* De twee garanties genummerd onder elkaar. */}
             <div style={{
-              margin: isMobile ? '1.5rem auto 0' : '1.85rem auto 0',
+              margin: '0 auto',
               maxWidth: 480, width: '100%', textAlign: 'left',
             }}>
               <div style={{
@@ -461,7 +459,7 @@ export default function SixWeekChallengeCheckout() {
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               fontFamily: 'inherit',
             }}>
-              Ik wil starten <ChevronDown size={16} strokeWidth={3} />
+              Maak investering · €{PRICE} <ChevronDown size={16} strokeWidth={3} />
             </button>
           </div>
         </section>
