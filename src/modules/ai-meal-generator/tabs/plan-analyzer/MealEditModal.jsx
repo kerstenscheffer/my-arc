@@ -5,7 +5,6 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, Plus, Trash2, Save, Copy, Zap, ChefHat } from 'lucide-react'
-import { resolveFoodImage } from '../../../meal-plan/foodImageFallback'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -297,7 +296,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
 
                 {ingredients.map((ing, idx) => (
                   <div key={`${ing.ingredient_id}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: m?'0.4rem 0.75rem':'0.45rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: idx%2===0?'transparent':'rgba(255,255,255,0.015)' }}>
-                    <div style={{ width: m?30:34, height: m?30:34, flexShrink: 0, borderRadius: 6, background: `url(${resolveFoodImage(ing, { size: 80 })}) center/cover`, border: '1px solid rgba(255,255,255,0.08)' }} />
+                    <div style={{ width: m?30:34, height: m?30:34, flexShrink: 0, borderRadius: 6, background: ing.image_url ? `url(${ing.image_url}) center/cover` : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: m?'0.78rem':'0.82rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>{ing.name}</div>
                       <div style={{ fontSize: m?'0.58rem':'0.6rem', color: 'rgba(255,255,255,0.4)', marginTop: 1, fontWeight: 600 }}>{Math.round(ing.cal)}/100g · {Math.round(ing.prot)}E · {Math.round(ing.carbs)}K · {Math.round(ing.fat)}V</div>

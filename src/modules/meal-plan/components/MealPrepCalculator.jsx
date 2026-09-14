@@ -6,7 +6,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Search, Plus, Trash2, Check, Image as ImageIcon } from 'lucide-react'
-import { resolveFoodImage } from '../foodImageFallback'
 
 const GOLD = '#FFD700'
 const r = (n) => Math.round((Number(n) || 0) * 10) / 10
@@ -164,7 +163,7 @@ export default function MealPrepCalculator({ client, db, onClose, onSaved }) {
   )
   const IngThumb = ({ ing }) => (
     <div style={{ width: 36, height: 36, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <img src={resolveFoodImage(ing)} alt={ing.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
+      {ing.image_url && <img src={ing.image_url} alt={ing.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />}
     </div>
   )
   const MacroPill = ({ label, val, unit = 'g', big }) => (

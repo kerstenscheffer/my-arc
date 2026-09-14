@@ -5,7 +5,6 @@ import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Imag
 import MealPrepCalculator from '../MealPrepCalculator'
 import MealCard from '../day-schedule/MealCard'
 import Keuze from '../Keuze'
-import { foodImageFallback } from '../../foodImageFallback'
 
 
 // Vaste secties waarin de klant z'n eigen maaltijden indeelt. Vast door ons
@@ -626,7 +625,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
             key={`${ing.name}-${idx}`}
             meal={{
               name: ing.name,
-              image_url: ing.image_url || foodImageFallback(ing.name, null, 200),
+              image_url: ing.image_url || null,
               calories: ing.calories, protein: ing.protein,
               carbs: ing.carbs, fat: ing.fat,
             }}

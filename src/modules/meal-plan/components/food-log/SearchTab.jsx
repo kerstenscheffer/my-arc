@@ -7,7 +7,6 @@ import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
 import { Search, Loader, X, ChevronRight, Plus, Star } from 'lucide-react'
 import FatSecretService from './FatSecretService'
-import { foodImageFallback } from '../../foodImageFallback'
 
 // Relevance score: lower = better.
 // 0  exact match
@@ -474,7 +473,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
               key={`${item.source}-${item.id}-${idx}`}
               meal={{
                 name: item.name,
-                image_url: item.image_url || foodImageFallback(item.name || item.product_name, null, 200),
+                image_url: item.image_url || null,
                 calories: item.calories, protein: item.protein,
                 carbs: item.carbs, fat: item.fat,
               }}
@@ -540,7 +539,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
                         key={f.id}
                         meal={{
                           name: f.naam,
-                          image_url: f.image_url || foodImageFallback(f.naam, null, 200),
+                          image_url: f.image_url || null,
                           calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat,
                         }}
                         momentLabel="Favoriet"

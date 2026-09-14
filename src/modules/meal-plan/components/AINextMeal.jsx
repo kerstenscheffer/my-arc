@@ -3,7 +3,6 @@
 // Props IDENTIEK: { nextMeal, todayMeals, onOpenInfo, onOpenAlternatives, onFinishMeal, onOpenDaySchedule, db }
 import React, { useState, useEffect } from 'react'
 import { Info, RefreshCw, Check, Apple } from 'lucide-react'
-import { foodImageFallback } from '../foodImageFallback'
 
 export default function AINextMeal({ 
   nextMeal,
@@ -22,10 +21,7 @@ export default function AINextMeal({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
   
-  const getMealImage = (meal) => {
-    if (meal?.image_url) return meal.image_url
-    return foodImageFallback(meal?.name || meal?.title, meal?.slot || meal?.timeSlot, 800)
-  }
+  const getMealImage = (meal) => meal?.image_url && meal.image_url.trim() !== '' ? meal.image_url : null
   
   const getLastMeal = () => {
     if (!todayMeals || todayMeals.length === 0) return null
@@ -59,7 +55,7 @@ export default function AINextMeal({
           <div style={{
             position: 'absolute',
             inset: 0,
-            backgroundImage: `url(${getMealImage(lastMeal)})`,
+            backgroundImage: getMealImage(lastMeal) ? `url(${getMealImage(lastMeal)})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             opacity: 0.15,
@@ -227,7 +223,7 @@ export default function AINextMeal({
         <div style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: `url(${getMealImage(nextMeal)})`,
+          backgroundImage: getMealImage(nextMeal) ? `url(${getMealImage(nextMeal)})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           zIndex: 1

@@ -4,7 +4,6 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
-import { foodImageFallback } from '../../foodImageFallback'
 import { Check } from 'lucide-react'
 import { findPortionConfig } from './portionPresets'
 
@@ -705,7 +704,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
                   key={i}
                   meal={{
                     name: ing.name,
-                    image_url: ing.image_url || foodImageFallback(ing.name, null, 200),
+                    image_url: ing.image_url || null,
                     calories: Math.round((ing.calories || 0) * deel),
                     protein: Math.round((ing.protein || 0) * deel),
                     carbs: Math.round((ing.carbs || 0) * deel),

@@ -3,7 +3,6 @@
 //          from ai_ingredients lookup so old/legacy logs show thumbnails too.
 import React, { useState, useEffect } from 'react'
 import { Plus, Copy, ChevronRight, UtensilsCrossed } from 'lucide-react'
-import { foodImageFallback } from '../../foodImageFallback'
 
 // Bulk-resolve missing meal photos by querying multiple image sources.
 // Order of preference: ai_meals (curated) → ai_ingredients (popular) →
@@ -324,7 +323,7 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
             {/* ✅ IMAGE: zelfde patroon als SearchTab ResultIcon */}
             <div style={{
               width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-              background: `url(${meal.image_url || foodImageFallback(meal.meal_name, null, 100)}) center/cover, #1a1a1a`,
+              background: meal.image_url ? `url(${meal.image_url}) center/cover, #1a1a1a` : '#1a1a1a',
               border: '1px solid rgba(255, 255, 255, 0.06)'
             }} />
 

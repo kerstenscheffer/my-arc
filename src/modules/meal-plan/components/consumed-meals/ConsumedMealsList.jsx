@@ -5,13 +5,8 @@
 import React from 'react'
 import { Loader, Coffee } from 'lucide-react'
 import ConsumedMealCard from './ConsumedMealCard'
-import { foodImageFallback } from '../../foodImageFallback'
 
-// Foto: eigen image_url, anders een titel-gebaseerde fallback (kwark -> zuivel).
-const getMealImage = (meal) => {
-  if (meal?.image_url) return meal.image_url
-  return foodImageFallback(meal?.name || meal?.title || meal?.product_name, meal?.meal_type, 100)
-}
+const getMealImage = (meal) => meal?.image_url || null
 
 export default function ConsumedMealsList({
   meals,

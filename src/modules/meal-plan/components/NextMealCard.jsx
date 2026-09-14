@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { Clock, ChevronRight, Utensils, RefreshCw, Eye, Timer, Sparkles, Flame, TrendingUp } from 'lucide-react'
-import { foodImageFallback } from '../foodImageFallback'
 
 export default function NextMealCard({ nextMeal, meals, checkedMeals, onMealClick, onSwapMeal }) {
   const isMobile = window.innerWidth <= 768
@@ -147,7 +146,7 @@ export default function NextMealCard({ nextMeal, meals, checkedMeals, onMealClic
         <div style={{
           height: isMobile ? '220px' : '260px',
           position: 'relative',
-          background: `url(${nextMeal.image_url || foodImageFallback(nextMeal.name || nextMeal.title, nextMeal.slot, 800)}) center/cover`,
+          background: nextMeal.image_url ? `url(${nextMeal.image_url}) center/cover` : '#111',
           display: 'flex',
           alignItems: 'flex-end'
         }}>

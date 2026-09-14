@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from 'react'
 import MealCard from './day-schedule/MealCard'
 import Keuze from './Keuze'
-import { foodImageFallback } from '../foodImageFallback'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
@@ -696,7 +695,7 @@ export default function AIAlternativesModal({
                     key={`${ing.name}-${i}`}
                     meal={{
                       name: ing.name,
-                      image_url: foodImageFallback(ing.name, null, 200),
+                      image_url: ing.image_url || null,
                       calories: ing.calories, protein: ing.protein,
                       carbs: ing.carbs, fat: ing.fat,
                     }}

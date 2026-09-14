@@ -5,7 +5,6 @@ import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCi
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
 import ClientMealEditModal from './ClientMealEditModal'
 import MealCard from './day-schedule/MealCard'
-import { foodImageFallback } from '../foodImageFallback'
 import MealPrepModal from './MealPrepModal'
 
 export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, onSaved }) {
@@ -231,7 +230,7 @@ function InfoTab({ meal, ingredients, loading, calcMacros, isMobile }) {
                   key={idx}
                   meal={{
                     name: ing.name,
-                    image_url: ing.image_url || foodImageFallback(ing.name, null, 200),
+                    image_url: ing.image_url || null,
                     calories: macros.calories, protein: macros.protein,
                     carbs: macros.carbs, fat: macros.fat,
                   }}
