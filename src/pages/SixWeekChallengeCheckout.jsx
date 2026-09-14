@@ -773,7 +773,7 @@ export default function SixWeekChallengeCheckout() {
           }}>
             {[
               'Ik wil je met een korte termijn doel laten zien dat mijn aanpak voor jou werkt, om je vervolgens met vol vertrouwen naar je uiteindelijke doel te begeleiden.',
-              'Om meer mannen in shape te helpen komen.',
+              'Om de drempel naar coaching voor mannen laag te maken, zodat ze instappen en inzien hoe het alles voor hen kan veranderen.',
             ].map((tekst, i) => (
               <div key={i} style={{
                 display: 'flex', gap: '0.6rem', alignItems: 'baseline',
