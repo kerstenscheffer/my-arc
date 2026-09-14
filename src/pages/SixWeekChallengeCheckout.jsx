@@ -677,7 +677,7 @@ export default function SixWeekChallengeCheckout() {
         ))}
       </Blad>
 
-      {/* De voorwaarden — per actie een balk met de foto links (zo'n 30% van
+      {/* De voorwaarden — per actie een balk met de foto links (zo'n 20% van
           de breedte), een zwarte fade naar rechts, de kop half over die fade
           heen en de toelichting in grijs helemaal rechts. Beelden zijn
           Unsplash-stock, opgeslagen in public/voorwaarden/. */}
@@ -692,34 +692,34 @@ export default function SixWeekChallengeCheckout() {
         ].map((r) => (
           <div key={r.kop} style={{
             position: 'relative',
-            marginBottom: isMobile ? 8 : 10,
-            minHeight: isMobile ? 78 : 92,
+            marginBottom: isMobile ? 6 : 7,
+            minHeight: isMobile ? 58 : 68,
             borderRadius: 12,
             overflow: 'hidden',
             border: '1px solid rgba(255,255,255,0.06)',
             display: 'flex', alignItems: 'center',
           }}>
             <div style={{
-              position: 'absolute', left: 0, top: 0, bottom: 0, width: '42%',
+              position: 'absolute', left: 0, top: 0, bottom: 0, width: '30%',
               backgroundImage: `url(${r.foto})`,
               backgroundSize: 'cover', backgroundPosition: 'center',
             }} />
             {/* De fade begint al vroeg, zodat de kop leesbaar over de foto valt. */}
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
-              background: 'linear-gradient(90deg, rgba(10,10,10,0.1) 0%, rgba(10,10,10,0.25) 14%, rgba(10,10,10,0.8) 30%, #0a0a0a 44%)',
+              background: 'linear-gradient(90deg, rgba(10,10,10,0.4) 0%, rgba(10,10,10,0.5) 10%, rgba(10,10,10,0.85) 21%, #0a0a0a 32%)',
             }} />
             <div style={{
               position: 'relative', zIndex: 1,
               display: 'flex', alignItems: 'center',
               gap: isMobile ? '0.5rem' : '0.9rem',
               width: '100%',
-              paddingLeft: isMobile ? '25%' : '27%',
+              paddingLeft: isMobile ? '20%' : '21%',
               paddingRight: isMobile ? '0.75rem' : '1.1rem',
             }}>
               <div style={{
                 flex: 1, minWidth: 0,
-                fontSize: isMobile ? '0.92rem' : '1.1rem', fontWeight: 900,
+                fontSize: isMobile ? '0.86rem' : '1rem', fontWeight: 900,
                 color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
                 textShadow: '0 1px 8px rgba(0,0,0,0.9)',
               }}>
@@ -728,7 +728,7 @@ export default function SixWeekChallengeCheckout() {
               <div style={{
                 flexShrink: 0, maxWidth: isMobile ? '46%' : '42%',
                 textAlign: 'right',
-                fontSize: isMobile ? '0.68rem' : '0.8rem', fontWeight: 600,
+                fontSize: isMobile ? '0.66rem' : '0.76rem', fontWeight: 600,
                 color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
               }}>
                 {r.sub}
