@@ -677,9 +677,10 @@ export default function SixWeekChallengeCheckout() {
         ))}
       </Blad>
 
-      {/* De voorwaarden — per actie een balk met de foto links, een zwarte
-          fade naar rechts, de kop half over die fade heen en de toelichting
-          in grijs helemaal rechts. */}
+      {/* De voorwaarden — per actie een balk met de foto links (zo'n 30% van
+          de breedte), een zwarte fade naar rechts, de kop half over die fade
+          heen en de toelichting in grijs helemaal rechts. Beelden zijn
+          Unsplash-stock, opgeslagen in public/voorwaarden/. */}
       <Blad open={open === 'voorwaarden'} titel="De voorwaarden" onClose={() => setOpen(null)} isMobile={isMobile}>
         {[
           { foto: '/voorwaarden/workouts.jpg', kop: '3 workouts per week',     sub: 'van 45 minuten' },
@@ -699,35 +700,35 @@ export default function SixWeekChallengeCheckout() {
             display: 'flex', alignItems: 'center',
           }}>
             <div style={{
-              position: 'absolute', left: 0, top: 0, bottom: 0, width: '60%',
+              position: 'absolute', left: 0, top: 0, bottom: 0, width: '42%',
               backgroundImage: `url(${r.foto})`,
               backgroundSize: 'cover', backgroundPosition: 'center',
             }} />
             {/* De fade begint al vroeg, zodat de kop leesbaar over de foto valt. */}
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
-              background: 'linear-gradient(90deg, rgba(10,10,10,0.15) 0%, rgba(10,10,10,0.4) 20%, rgba(10,10,10,0.86) 44%, #0a0a0a 62%)',
+              background: 'linear-gradient(90deg, rgba(10,10,10,0.1) 0%, rgba(10,10,10,0.25) 14%, rgba(10,10,10,0.8) 30%, #0a0a0a 44%)',
             }} />
             <div style={{
               position: 'relative', zIndex: 1,
               display: 'flex', alignItems: 'center',
               gap: isMobile ? '0.5rem' : '0.9rem',
               width: '100%',
-              paddingLeft: isMobile ? '30%' : '34%',
+              paddingLeft: isMobile ? '25%' : '27%',
               paddingRight: isMobile ? '0.75rem' : '1.1rem',
             }}>
               <div style={{
                 flex: 1, minWidth: 0,
-                fontSize: isMobile ? '0.88rem' : '1.05rem', fontWeight: 900,
+                fontSize: isMobile ? '0.92rem' : '1.1rem', fontWeight: 900,
                 color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
                 textShadow: '0 1px 8px rgba(0,0,0,0.9)',
               }}>
                 {r.kop}
               </div>
               <div style={{
-                flexShrink: 0, maxWidth: isMobile ? '40%' : '38%',
+                flexShrink: 0, maxWidth: isMobile ? '46%' : '42%',
                 textAlign: 'right',
-                fontSize: isMobile ? '0.64rem' : '0.78rem', fontWeight: 600,
+                fontSize: isMobile ? '0.68rem' : '0.8rem', fontWeight: 600,
                 color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
               }}>
                 {r.sub}
