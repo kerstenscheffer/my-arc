@@ -7,7 +7,7 @@
 // Stripe: /api/create-checkout-session (one-time), plan '6-week-challenge'.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 297
@@ -403,20 +403,16 @@ export default function SixWeekChallengeCheckout() {
               ))}
             </div>
 
-            {/* Twee knoppen: de methode en de voorwaarden. De prijs stond
-                hierboven als los blok; dat maakte het scherm druk, dus die
-                staat nu in de knop naar het formulier.
-                Allebei klappen ze eronder open. Stonden eerder als drie losse
-                schermen en een lange tabel in de pagina; dan scrol je langs
-                alles voordat je bij het formulier bent. */}
+            {/* Twee knoppen: de methode en de voorwaarden. Geen omlijnde
+                vakken meer maar een icoon met het woord eronder; het scherm
+                oogde te druk met alles in een container. */}
             <div style={{
-              display: 'flex', gap: 8,
-              margin: '0 auto',
-              maxWidth: 480,
+              display: 'flex', gap: isMobile ? '2.5rem' : '3.5rem',
+              justifyContent: 'center',
             }}>
               {[
-                { id: 'methode', label: 'De methode' },
-                { id: 'voorwaarden', label: 'De voorwaarden' },
+                { id: 'methode', label: 'De methode', Icon: Compass },
+                { id: 'voorwaarden', label: 'De voorwaarden', Icon: ListChecks },
               ].map((k) => {
                 const aan = open === k.id
                 return (
@@ -424,22 +420,19 @@ export default function SixWeekChallengeCheckout() {
                     key={k.id}
                     onClick={() => setOpen(aan ? null : k.id)}
                     style={{
-                      flex: 1, minHeight: 46,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      borderRadius: 12,
-                      border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.25)'}`,
-                      background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      color: '#fff',
-                      fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: isMobile ? 7 : 9,
+                      padding: 0, border: 'none', background: 'transparent',
+                      color: '#fff', opacity: aan ? 1 : 0.75,
+                      fontSize: isMobile ? '0.8rem' : '0.88rem', fontWeight: 900,
+                      letterSpacing: '-0.01em',
                       fontFamily: 'inherit', cursor: 'pointer',
+                      transition: 'opacity 0.15s ease',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
+                    <k.Icon size={isMobile ? 26 : 30} strokeWidth={2.4} />
                     {k.label}
-                    <ChevronDown
-                      size={15} strokeWidth={3}
-                      style={{ transform: aan ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}
-                    />
                   </button>
                 )
               })}
