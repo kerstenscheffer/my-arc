@@ -677,69 +677,68 @@ export default function SixWeekChallengeCheckout() {
         ))}
       </Blad>
 
-      {/* De voorwaarden — per actie een balk met de foto links (zo'n 20% van
-          de breedte), een zwarte fade naar rechts, de kop half over die fade
-          heen en de toelichting in grijs helemaal rechts. Beelden zijn
-          Unsplash-stock, opgeslagen in public/voorwaarden/. */}
+      {/* De voorwaarden — per actie een strook over de volle breedte van het
+          blad: foto tegen de linkerrand (zo'n 20% zichtbaar), zwarte fade naar
+          rechts, de kop half over die fade en de toelichting in grijs helemaal
+          rechts. Een lijn scheidt de stroken. Beelden zijn Unsplash-stock,
+          opgeslagen in public/voorwaarden/. */}
       <Blad open={open === 'voorwaarden'} titel="De voorwaarden" onClose={() => setOpen(null)} isMobile={isMobile}>
-        {[
-          { foto: '/voorwaarden/workouts.jpg', kop: '3 workouts per week',     sub: 'van 45 minuten' },
-          { foto: '/voorwaarden/voeding.jpg',  kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of plan gevolgd' },
-          { foto: '/voorwaarden/wegen.jpg',    kop: '3x per week wegen',       sub: 'we sturen op het weekgemiddelde' },
-          { foto: '/voorwaarden/checkin.jpg',  kop: 'Elke week je check-in',   sub: 'invullen in de app' },
-          { foto: '/voorwaarden/calls.jpg',    kop: '4 calls',                 sub: 'verspreid over de zes weken' },
-          { foto: '/voorwaarden/fotos.jpg',    kop: "3 progressiefoto's",      sub: 'begin, midden, eind' },
-        ].map((r) => (
-          <div key={r.kop} style={{
-            position: 'relative',
-            marginBottom: isMobile ? 6 : 7,
-            minHeight: isMobile ? 58 : 68,
-            borderRadius: 12,
-            overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', alignItems: 'center',
-          }}>
-            <div style={{
-              position: 'absolute', left: 0, top: 0, bottom: 0, width: '30%',
-              backgroundImage: `url(${r.foto})`,
-              backgroundSize: 'cover', backgroundPosition: 'center',
-            }} />
-            {/* De fade begint al vroeg, zodat de kop leesbaar over de foto valt. */}
-            <div style={{
-              position: 'absolute', inset: 0, pointerEvents: 'none',
-              background: 'linear-gradient(90deg, rgba(10,10,10,0.4) 0%, rgba(10,10,10,0.5) 10%, rgba(10,10,10,0.85) 21%, #0a0a0a 32%)',
-            }} />
-            <div style={{
-              position: 'relative', zIndex: 1,
+        {/* Negatieve marge: het blad heeft padding, de stroken moeten juist
+            tegen de randen aan. */}
+        <div style={{ margin: isMobile ? '-0.9rem -1.15rem 0' : '-1rem -1.35rem 0' }}>
+          {[
+            { foto: '/voorwaarden/workouts.jpg', kop: '3 workouts per week',     sub: 'van 45 minuten' },
+            { foto: '/voorwaarden/voeding.jpg',  kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of plan gevolgd' },
+            { foto: '/voorwaarden/wegen.jpg',    kop: '3x per week wegen',       sub: 'we sturen op het weekgemiddelde' },
+            { foto: '/voorwaarden/checkin.jpg',  kop: 'Elke week je check-in',   sub: 'invullen in de app' },
+            { foto: '/voorwaarden/calls.jpg',    kop: '4 calls',                 sub: 'verspreid over de zes weken' },
+            { foto: '/voorwaarden/fotos.jpg',    kop: "3 progressiefoto's",      sub: 'begin, midden, eind' },
+          ].map((r) => (
+            <div key={r.kop} style={{
+              position: 'relative',
+              minHeight: isMobile ? 58 : 68,
               display: 'flex', alignItems: 'center',
-              gap: isMobile ? '0.5rem' : '0.9rem',
-              width: '100%',
-              paddingLeft: isMobile ? '20%' : '21%',
-              paddingRight: isMobile ? '0.75rem' : '1.1rem',
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
             }}>
               <div style={{
-                flex: 1, minWidth: 0,
-                fontSize: isMobile ? '0.86rem' : '1rem', fontWeight: 900,
-                color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
-                textShadow: '0 1px 8px rgba(0,0,0,0.9)',
-              }}>
-                {r.kop}
-              </div>
+                position: 'absolute', left: 0, top: 0, bottom: 0, width: '30%',
+                backgroundImage: `url(${r.foto})`,
+                backgroundSize: 'cover', backgroundPosition: 'center',
+              }} />
               <div style={{
-                flexShrink: 0, maxWidth: isMobile ? '46%' : '42%',
-                textAlign: 'right',
-                fontSize: isMobile ? '0.66rem' : '0.76rem', fontWeight: 600,
-                color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+                background: 'linear-gradient(90deg, rgba(10,10,10,0.4) 0%, rgba(10,10,10,0.5) 10%, rgba(10,10,10,0.85) 21%, #0a0a0a 32%)',
+              }} />
+              <div style={{
+                position: 'relative', zIndex: 1,
+                display: 'flex', alignItems: 'center',
+                gap: isMobile ? '0.5rem' : '0.9rem',
+                width: '100%',
+                paddingLeft: isMobile ? '20%' : '21%',
+                paddingRight: isMobile ? '1.15rem' : '1.35rem',
               }}>
-                {r.sub}
+                <div style={{
+                  flex: 1, minWidth: 0,
+                  fontSize: isMobile ? '0.86rem' : '1rem', fontWeight: 900,
+                  color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
+                  textShadow: '0 1px 8px rgba(0,0,0,0.9)',
+                }}>
+                  {r.kop}
+                </div>
+                <div style={{
+                  flexShrink: 0, maxWidth: isMobile ? '46%' : '42%',
+                  textAlign: 'right',
+                  fontSize: isMobile ? '0.66rem' : '0.76rem', fontWeight: 600,
+                  color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
+                }}>
+                  {r.sub}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
         <p style={{
-          margin: isMobile ? '1.1rem 0 0' : '1.25rem 0 0',
-          paddingTop: isMobile ? '1rem' : '1.15rem',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
+          margin: isMobile ? '1rem 0 0' : '1.15rem 0 0',
           fontSize: isMobile ? '0.78rem' : '0.83rem',
           fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5,
         }}>
