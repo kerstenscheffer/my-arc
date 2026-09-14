@@ -457,7 +457,7 @@ export default function SixWeekChallengeCheckout() {
                 letterSpacing: '0.15em', color: GOLD,
                 marginBottom: isMobile ? '0.6rem' : '0.75rem', textAlign: 'center',
               }}>
-                DE GARANTIE
+                EXTRA GARANTIES
               </div>
               {[
                 { Icon: Clock, tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
