@@ -14,7 +14,11 @@ const PRICE = 297
 
 // Stripe Price ID van dit traject — de checkout rekent hiermee af, niet met
 // PRICE hierboven (die is alleen nog de weergegeven prijs op de pagina).
-const STRIPE_PRICE_ID = 'price_1UFXN7J3V4uXn1Oka5UQZ79k'
+// Eenmalige prijs. Het eerste id dat we kregen was een maandabonnement van
+// €297; die combinatie weigert Stripe in 'payment'-mode ("You specified
+// `payment` mode but passed a recurring price"), waardoor elke afrekening
+// stukliep. Dit id hoort bij hetzelfde product, maar dan one_time.
+const STRIPE_PRICE_ID = 'price_1UFdw6J3V4uXn1OkvJicc73b'
 
 // Same Stripe publishable key as the other checkouts.
 const STRIPE_PK = 'pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54'
