@@ -3,7 +3,7 @@
 // over Mon–Sun, with arrow buttons to step backward/forward through
 // previous weeks. Mounts via portal so it sits above the kanban board.
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
@@ -11,6 +11,7 @@ import {
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
   RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, Wallet, PhoneOff, XCircle, Check, Ban,
+  Table as TableIcon,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import CallProposalsModal from './CallProposalsModal'
@@ -117,6 +118,12 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // Wat er in deze periode aan geld binnenkwam, naast de verkochte
   // orderwaarde. Zie getRangeCashCollected voor het verschil.
   const [cash, setCash] = useState(null)
+  // 'tegels' = de bestaande rijen met iconen, 'tabel' = alles onder elkaar met
+  // de vorige periode ernaast (zelfde idee als de historie in de oefening-log).
+  const [weergave, setWeergave] = useState('tegels')
+  // Cijfers van de vorige, even lange periode. Alleen geladen in tabelweergave.
+  const [vorige, setVorige] = useState(null)
+  const [vorigeBezig, setVorigeBezig] = useState(false)
   // Bump om de stats opnieuw te laden na het terugdraaien van een verplaatsing.
   const [reloadKey, setReloadKey] = useState(0)
   const [revertingId, setRevertingId] = useState(null)
@@ -394,6 +401,35 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, leadService, coachId, periodMode, +start, +end, reloadKey])
+
+  // Vorige periode: even lang venster, direct ervoor. Alleen in tabelweergave,
+  // want het zijn vier extra queries die je in de tegels toch niet ziet.
+  useEffect(() => {
+    if (!isOpen || weergave !== 'tabel') return
+    if (!leadService || !coachId) return
+    let cancelled = false
+    const lengte = end - start
+    const vStart = new Date(start.getTime() - lengte)
+    const vEnd = new Date(start)
+    setVorigeBezig(true)
+    Promise.all([
+      leadService.getRangeActivity(coachId, vStart.toISOString(), vEnd.toISOString()),
+      leadService.getRangeFunnelStats(coachId, vStart.toISOString(), vEnd.toISOString()),
+      leadService.getRangeReactionStats
+        ? leadService.getRangeReactionStats(coachId, vStart.toISOString(), vEnd.toISOString())
+        : Promise.resolve(null),
+      leadService.getRangeCashCollected
+        ? leadService.getRangeCashCollected(coachId, vStart.toISOString(), vEnd.toISOString())
+        : Promise.resolve(null),
+    ])
+      .then(([a, f, rxn, geld]) => {
+        if (!cancelled) setVorige({ activity: a, funnel: f, reactionStats: rxn, cash: geld, start: vStart, end: vEnd })
+      })
+      .catch(() => { if (!cancelled) setVorige(null) })
+      .finally(() => { if (!cancelled) setVorigeBezig(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, weergave, leadService, coachId, periodMode, +start, +end, reloadKey])
 
   // Campagne-breakdown is all-time → alleen laden bij openen / reload, niet bij
   // periode-navigatie (scheelt onnodige queries).
@@ -748,23 +784,79 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
           {!loading && activity && (
             <>
-              {/* Aantallen — strakke rij zoals de stats-bar (klik funnel-stap
-                  voor de drill-down met terugdraaien/verwijderen). */}
-              <SectionTitle icon={<BarChart3 size={13} color={GOLD} />} title="Aantallen" />
-              <StatFlow items={countItems} activeStage={drillStage} onToggle={(st) => setDrillStage(prev => prev === st ? null : st)} />
-              {drillStage && (
-                <DrillPanel
-                  leads={funnel?.[drillStage]?.leads}
-                  accent={STAGE_ACCENT[drillStage]}
-                  reasons={drillStage === 'callRejected' ? funnel?.callRejected?.reasons : drillStage === 'saleLost' ? funnel?.saleLost?.reasons : null}
-                  onRevert={handleRevertMovement} revertingId={revertingId}
-                  onDelete={handleDeleteMovement} deletingId={deletingId}
-                />
-              )}
+              {/* Schakelaar tussen de tegels en een tabel met de vorige
+                  periode ernaast. */}
+              <div style={{
+                position: 'relative', display: 'flex',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                borderRadius: 999, padding: 3, marginBottom: '0.7rem',
+              }}>
+                <div style={{
+                  position: 'absolute', top: 3, bottom: 3,
+                  left: weergave === 'tabel' ? 'calc(50% + 1.5px)' : 3,
+                  width: 'calc(50% - 4.5px)',
+                  background: '#fff', borderRadius: 999,
+                  transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                }} />
+                {[
+                  { id: 'tegels', label: 'Tegels', Icon: BarChart3 },
+                  { id: 'tabel', label: 'Tabel', Icon: TableIcon },
+                ].map(k => {
+                  const aan = weergave === k.id
+                  return (
+                    <button
+                      key={k.id}
+                      onClick={() => setWeergave(k.id)}
+                      style={{
+                        position: 'relative', zIndex: 1, flex: 1, minHeight: 32,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        background: 'transparent', border: 'none', borderRadius: 999,
+                        color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                        fontSize: '0.72rem', fontWeight: aan ? 900 : 800,
+                        fontFamily: 'inherit', cursor: 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <k.Icon size={13} strokeWidth={2.6} />
+                      {k.label}
+                    </button>
+                  )
+                })}
+              </div>
 
-              {/* Percentages — tweede strakke rij. */}
-              <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
-              <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
+              {weergave === 'tabel' ? (
+                <>
+                  <SectionTitle icon={<TableIcon size={13} color={GOLD} />} title={`Alles op een rij · t.o.v. vorige ${periodeWoord}`} />
+                  <StatTabel
+                    nu={kerncijfers({ activity, funnel, reactionStats, cash })}
+                    vorig={vorige ? kerncijfers(vorige) : null}
+                    bezig={vorigeBezig}
+                    periodeLabel="Nu"
+                    vorigLabel={`Vorige ${periodeWoord}`}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Aantallen — strakke rij zoals de stats-bar (klik funnel-stap
+                      voor de drill-down met terugdraaien/verwijderen). */}
+                  <SectionTitle icon={<BarChart3 size={13} color={GOLD} />} title="Aantallen" />
+                  <StatFlow items={countItems} activeStage={drillStage} onToggle={(st) => setDrillStage(prev => prev === st ? null : st)} />
+                  {drillStage && (
+                    <DrillPanel
+                      leads={funnel?.[drillStage]?.leads}
+                      accent={STAGE_ACCENT[drillStage]}
+                      reasons={drillStage === 'callRejected' ? funnel?.callRejected?.reasons : drillStage === 'saleLost' ? funnel?.saleLost?.reasons : null}
+                      onRevert={handleRevertMovement} revertingId={revertingId}
+                      onDelete={handleDeleteMovement} deletingId={deletingId}
+                    />
+                  )}
+
+                  {/* Percentages — tweede strakke rij. */}
+                  <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
+                  <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
+                </>
+              )}
 
               {/* Man/vrouw-verdeling — ring over alle leads (niet periode-gebonden). */}
               {gender && gender.known > 0 && (
@@ -1791,6 +1883,98 @@ const callDatum = (v) => {
   if (!v) return ''
   const d = new Date(`${String(v).slice(0, 10)}T00:00:00`)
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+// Alle cijfers van één periode als platte lijst — zo kun je twee periodes
+// naast elkaar zetten zonder de tegel-berekening te dupliceren.
+// `soort`: 'aantal' | 'euro' | 'procent'. `omgekeerd` = lager is beter.
+function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
+  const n = (v) => Number(v) || 0
+  const nieuw = n(reactionStats?.newLeads)
+  const reacties = n(reactionStats?.reactionEventsInWindow ?? reactionStats?.reactionsInWindow ?? reactionStats?.reactedLeads)
+  const voorgesteld = n(funnel?.callProposed?.count)
+  const ingepland = n(funnel?.callScheduled?.count)
+  const gepland = n(funnel?.callBooked?.count)
+  const gevoerd = n(funnel?.callHeld?.count)
+  const sales = n(funnel?.sale?.count)
+  const noShows = n(funnel?.noShow?.count)
+  const afgehandeld = gevoerd + noShows
+  const deel = (a, b) => (b > 0 ? Math.round((a / b) * 100) : null)
+
+  return [
+    { key: 'nieuw',        label: 'Nieuwe leads',  waarde: nieuw,                          soort: 'aantal' },
+    { key: 'followups',    label: 'Follow-ups',    waarde: n(activity?.followUps),         soort: 'aantal' },
+    { key: 'reacties',     label: 'Reacties',      waarde: reacties,                       soort: 'aantal' },
+    { key: 'voorgesteld',  label: 'Voorgesteld',   waarde: voorgesteld,                    soort: 'aantal' },
+    { key: 'ingepland',    label: 'Ingepland',     waarde: ingepland,                      soort: 'aantal' },
+    { key: 'gepland',      label: 'Calls gepland', waarde: gepland,                        soort: 'aantal' },
+    { key: 'gevoerd',      label: 'Call gevoerd',  waarde: gevoerd,                        soort: 'aantal' },
+    { key: 'sales',        label: 'Sales',         waarde: sales,                          soort: 'aantal' },
+    { key: 'omzet',        label: 'Orderwaarde',   waarde: Math.round(n(funnel?.sale?.omzet)), soort: 'euro' },
+    { key: 'binnen',       label: 'Binnengekomen', waarde: Math.round(n(cash?.bedrag)),    soort: 'euro' },
+    { key: 'noshows',      label: 'No-shows',      waarde: noShows,                        soort: 'aantal', omgekeerd: true },
+    { key: 'afgewezen',    label: 'Afgewezen',     waarde: n(funnel?.callRejected?.count), soort: 'aantal', omgekeerd: true },
+    { key: 'saleverloren', label: 'Sale verloren', waarde: n(funnel?.saleLost?.count),     soort: 'aantal', omgekeerd: true },
+    { key: 'nietgeschikt', label: 'Niet geschikt', waarde: n(funnel?.notSuitable?.count),  soort: 'aantal', omgekeerd: true },
+    { key: 'reactiepct',   label: 'Reactie %',        waarde: deel(n(reactionStats?.reactedLeads), nieuw), soort: 'procent' },
+    { key: 'naarvoorstel', label: 'Reactie→voorstel', waarde: deel(voorgesteld, reacties),   soort: 'procent' },
+    { key: 'naaringepland',label: 'Voorstel→ingepland', waarde: deel(ingepland, voorgesteld), soort: 'procent' },
+    { key: 'naarshow',     label: 'Ingepland→show-up',  waarde: deel(gevoerd, gepland),      soort: 'procent' },
+    { key: 'close',        label: 'Show→close',       waarde: deel(sales, gevoerd),          soort: 'procent' },
+    { key: 'noshowpct',    label: 'No-show %',        waarde: deel(noShows, afgehandeld),    soort: 'procent', omgekeerd: true },
+  ]
+}
+
+// Tabelweergave: elke stat op een regel, met de vorige even lange periode
+// ernaast en het verschil erachter.
+function StatTabel({ nu, vorig, bezig, periodeLabel, vorigLabel }) {
+  const vorigMap = Object.fromEntries((vorig || []).map(r => [r.key, r.waarde]))
+  const toon = (r, v) => {
+    if (v == null) return '—'
+    if (r.soort === 'euro') return '€' + Number(v).toLocaleString('nl-NL')
+    if (r.soort === 'procent') return `${v}%`
+    return String(v)
+  }
+  const kop = {
+    fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+    textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0 0 6px',
+  }
+  return (
+    <div style={{ margin: '0 0 0.8rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '0 10px', alignItems: 'center' }}>
+        <div style={kop}>Stat</div>
+        <div style={{ ...kop, textAlign: 'right' }}>{periodeLabel}</div>
+        <div style={{ ...kop, textAlign: 'right' }}>{vorigLabel}</div>
+        <div style={{ ...kop, textAlign: 'right' }}>Verschil</div>
+        {nu.map((r) => {
+          const v = vorig ? (vorigMap[r.key] ?? null) : null
+          const heeftBeide = r.waarde != null && v != null
+          const delta = heeftBeide ? r.waarde - v : null
+          const beter = delta == null || delta === 0 ? null : (r.omgekeerd ? delta < 0 : delta > 0)
+          const kleur = beter == null ? 'rgba(255,255,255,0.35)' : (beter ? '#10b981' : '#ef4444')
+          const cel = {
+            fontSize: '0.72rem', fontWeight: 800, textAlign: 'right',
+            padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.05)',
+            fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+          }
+          return (
+            <React.Fragment key={r.key}>
+              <div style={{ ...cel, textAlign: 'left', color: 'rgba(255,255,255,0.65)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {r.label}
+              </div>
+              <div style={{ ...cel, color: '#fff' }}>{toon(r, r.waarde)}</div>
+              <div style={{ ...cel, color: 'rgba(255,255,255,0.45)' }}>
+                {bezig && !vorig ? '…' : toon(r, v)}
+              </div>
+              <div style={{ ...cel, color: kleur }}>
+                {delta == null ? '—' : delta === 0 ? '0' : `${delta > 0 ? '+' : '-'}${toon(r, Math.abs(delta))}`}
+              </div>
+            </React.Fragment>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function DrillPanel({ leads, accent = '#FFD700', reasons = null, onRevert, revertingId, onDelete, deletingId }) {
