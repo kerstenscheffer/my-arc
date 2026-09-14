@@ -432,30 +432,43 @@ export default function SixWeekChallengeCheckout() {
               <span style={{ color: GOLD }}>Je krijgt je €297 terug.</span>
             </p>
 
-            {/* De voorwaarden en de garanties in korte losse regels, zoals op
-                /6weekchallenge — geen streepjes, geen bolletjes. */}
+            {/* De zes voorwaarden onder elkaar als tabel: elke regel een dun
+                lijntje eronder, actie links en de toelichting rechts. Stond
+                eerder in twee kolommen, wat op een checkout te veel oogsprongen
+                vraagt. */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-              gap: isMobile ? '0.9rem' : '1rem 2rem',
-              margin: isMobile ? '1.5rem auto 0' : '1.75rem auto 0',
-              maxWidth: 480, textAlign: 'left',
+              margin: isMobile ? '1.6rem auto 0' : '2rem auto 0',
+              maxWidth: 480, width: '100%',
+              borderTop: '1px solid rgba(255,255,255,0.08)',
             }}>
               {[
                 { kop: '3 workouts per week', sub: '45 minuten' },
-                { kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of het plan gevolgd' },
+                { kop: '80% van je voedingsplan', sub: 'macrodoelen of plan gevolgd' },
                 { kop: '3x per week wegen', sub: 'we sturen op het weekgemiddelde' },
                 { kop: 'Elke week je check-in', sub: 'in de app' },
                 { kop: '4 calls', sub: 'met je coach' },
                 { kop: "3 progressiefoto's", sub: 'begin, midden, eind' },
               ].map((r) => (
-                <div key={r.kop}>
-                  <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff', lineHeight: 1.2 }}>
+                <div key={r.kop} style={{
+                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                  gap: '1rem',
+                  padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  textAlign: 'left',
+                }}>
+                  <span style={{
+                    fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                    color: '#fff', lineHeight: 1.25, letterSpacing: '-0.01em',
+                  }}>
                     {r.kop}
-                  </div>
-                  <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                  </span>
+                  <span style={{
+                    flexShrink: 0, textAlign: 'right',
+                    fontSize: isMobile ? '0.75rem' : '0.82rem', fontWeight: 600,
+                    color: 'rgba(255,255,255,0.45)', lineHeight: 1.3,
+                  }}>
                     {r.sub}
-                  </div>
+                  </span>
                 </div>
               ))}
             </div>
