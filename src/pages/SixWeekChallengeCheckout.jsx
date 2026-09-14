@@ -438,19 +438,6 @@ export default function SixWeekChallengeCheckout() {
               })}
             </div>
 
-            {/* Knop naar het formulier (afrekenen) */}
-            <button onClick={scrollToForm} style={{
-              marginTop: isMobile ? '2.75rem' : '3.25rem',
-              display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-              padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem', borderRadius: 999, border: 'none',
-              background: '#fff', color: '#000',
-              fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(255,255,255,0.15)', letterSpacing: '0.01em',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              fontFamily: 'inherit',
-            }}>
-              Maak investering · €{PRICE} <ChevronDown size={16} strokeWidth={3} />
-            </button>
           </div>
         </section>
 
@@ -663,6 +650,34 @@ export default function SixWeekChallengeCheckout() {
         </section>
 
       </div>
+
+      {/* Zwevende knop naar het formulier: staat onderaan het scherm in
+          plaats van in de tekst, en verdwijnt zodra je bij het formulier bent
+          of een blad opent. */}
+      <button
+        onClick={scrollToForm}
+        style={{
+          position: 'fixed',
+          left: '50%',
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '1.25rem' : '1.75rem'})`,
+          transform: 'translateX(-50%)',
+          zIndex: 90,
+          opacity: current === 0 && !open ? 1 : 0,
+          pointerEvents: current === 0 && !open ? 'auto' : 'none',
+          transition: 'opacity 0.25s ease',
+          display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+          padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem',
+          borderRadius: 999, border: 'none',
+          background: '#fff', color: '#000',
+          fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 24px rgba(255,255,255,0.12)',
+          letterSpacing: '0.01em', whiteSpace: 'nowrap',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          fontFamily: 'inherit',
+        }}
+      >
+        Maak investering · €{PRICE} <ChevronDown size={16} strokeWidth={3} />
+      </button>
 
       {/* ══ Nav-dots — zoals /16week ══ */}
       <div style={{
