@@ -7,7 +7,7 @@
 // Stripe: /api/create-checkout-session (one-time), plan '6-week-challenge'.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks, Target, CheckCircle2 } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 297
@@ -369,10 +369,11 @@ export default function SixWeekChallengeCheckout() {
             }}>
               6 Weken In Shape Challenge
             </div>
-            {/* De twee regels van de challenge, genummerd zoals de garantie. */}
+            {/* De twee regels van de challenge: een icoon in plaats van een
+                cijfer, en gecentreerd in plaats van links uitgelijnd. */}
             <div style={{
               margin: `0 auto ${isMobile ? '2.5rem' : '3rem'}`,
-              maxWidth: 440, width: '100%', textAlign: 'left',
+              maxWidth: 440, width: '100%',
             }}>
               <div style={{
                 fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
@@ -382,23 +383,24 @@ export default function SixWeekChallengeCheckout() {
                 Win Your Money Back regels:
               </div>
               {[
-                'Haal afgesproken resultaat.',
-                'Of voer afgesproken acties uit, en krijg je investering terug.',
-              ].map((tekst, i) => (
-                <div key={i} style={{
-                  display: 'flex', gap: '0.7rem', alignItems: 'baseline',
-                  padding: isMobile ? '0.6rem 0' : '0.7rem 0',
+                { Icon: Target, tekst: 'Haal afgesproken doel.' },
+                { Icon: CheckCircle2, tekst: 'Of voer afgesproken acties uit, en krijg je investering terug.' },
+              ].map((r, i) => (
+                <div key={r.tekst} style={{
+                  display: 'flex', gap: '0.6rem',
+                  alignItems: 'center', justifyContent: 'center', textAlign: 'left',
+                  padding: isMobile ? '0.7rem 0' : '0.8rem 0',
                   borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
                 }}>
-                  <span style={{
-                    flexShrink: 0,
-                    fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: GOLD,
-                  }}>{i + 1}.</span>
+                  <r.Icon
+                    size={isMobile ? 18 : 20} strokeWidth={2.4}
+                    style={{ flexShrink: 0, color: GOLD }}
+                  />
                   <span style={{
                     fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
                     color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
-                  }}>{tekst}</span>
+                  }}>{r.tekst}</span>
                 </div>
               ))}
             </div>
