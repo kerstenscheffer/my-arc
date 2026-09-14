@@ -433,10 +433,6 @@ export default function SixWeekChallengeCheckout() {
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
               <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€297</span>
             </div>
-            <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
-              Eenmalig · <span style={{ color: '#fff', fontWeight: 800 }}>6 weken challenge</span>
-            </div>
-
             {/* De zes voorwaarden onder elkaar als tabel: elke regel een dun
                 lijntje eronder, actie links en de toelichting rechts. Stond
                 eerder in twee kolommen, wat op een checkout te veel oogsprongen
@@ -488,14 +484,41 @@ export default function SixWeekChallengeCheckout() {
               stellen we die mondeling op. Het belangrijkste is dat het voor jou werkt.
             </p>
 
-            <p style={{
-              margin: isMobile ? '0.9rem auto 0' : '1rem auto 0',
-              maxWidth: 480, textAlign: 'center',
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5,
+            {/* De twee garanties genummerd onder elkaar, in dezelfde vorm als
+                de voorwaarden erboven. */}
+            <div style={{
+              margin: isMobile ? '1.6rem auto 0' : '2rem auto 0',
+              maxWidth: 480, width: '100%', textAlign: 'left',
             }}>
-              Binnen 7 dagen niet tevreden: geld terug. Na 6 weken niet de €297 waard: geld terug.
-            </p>
+              <div style={{
+                fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
+                letterSpacing: '0.15em', color: 'rgba(255,255,255,0.4)',
+                marginBottom: isMobile ? '0.6rem' : '0.75rem', textAlign: 'center',
+              }}>
+                DE GARANTIE
+              </div>
+              {[
+                'Binnen 7 dagen niet tevreden? Geld terug.',
+                'Vind je tijdens de 6 weken dat je geen €297 aan coaching waarde krijgt? Geld terug.',
+              ].map((tekst, i) => (
+                <div key={i} style={{
+                  display: 'flex', gap: '0.7rem', alignItems: 'baseline',
+                  padding: isMobile ? '0.65rem 0' : '0.75rem 0',
+                  borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  <span style={{
+                    flexShrink: 0,
+                    fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                    color: 'rgba(255,255,255,0.45)',
+                  }}>{i + 1}.</span>
+                  <span style={{
+                    fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 800,
+                    color: '#fff', lineHeight: 1.35, letterSpacing: '-0.01em',
+                  }}>{tekst}</span>
+                </div>
+              ))}
+            </div>
 
             {/* Knop naar het formulier (afrekenen) */}
             <button onClick={scrollToForm} style={{
