@@ -372,7 +372,7 @@ export default function SixWeekChallengeCheckout() {
             {/* De twee regels van de challenge: een icoon in plaats van een
                 cijfer, en gecentreerd in plaats van links uitgelijnd. */}
             <div style={{
-              margin: `0 auto ${isMobile ? '2.5rem' : '3rem'}`,
+              margin: `0 auto ${isMobile ? '4rem' : '5rem'}`,
               maxWidth: 440, width: '100%',
             }}>
               <div style={{
@@ -409,7 +409,7 @@ export default function SixWeekChallengeCheckout() {
                 vakken meer maar een icoon met het woord eronder; het scherm
                 oogde te druk met alles in een container. */}
             <div style={{
-              display: 'flex', gap: isMobile ? '1.6rem' : '2.75rem',
+              display: 'flex', gap: isMobile ? '1.1rem' : '3rem',
               justifyContent: 'center',
             }}>
               {[
@@ -424,17 +424,17 @@ export default function SixWeekChallengeCheckout() {
                     onClick={() => setOpen(aan ? null : k.id)}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      gap: isMobile ? 7 : 9,
+                      gap: isMobile ? 9 : 11,
                       padding: 0, border: 'none', background: 'transparent',
                       color: '#fff', opacity: aan ? 1 : 0.75,
-                      fontSize: isMobile ? '0.72rem' : '0.85rem', fontWeight: 900,
+                      fontSize: isMobile ? '0.75rem' : '0.95rem', fontWeight: 900,
                       letterSpacing: '-0.01em', whiteSpace: 'nowrap',
                       fontFamily: 'inherit', cursor: 'pointer',
                       transition: 'opacity 0.15s ease',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <k.Icon size={isMobile ? 26 : 30} strokeWidth={2.4} />
+                    <k.Icon size={isMobile ? 32 : 38} strokeWidth={2.4} />
                     {k.label}
                   </button>
                 )
