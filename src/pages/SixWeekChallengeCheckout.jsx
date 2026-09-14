@@ -7,7 +7,7 @@
 // Stripe: /api/create-checkout-session (one-time), plan '6-week-challenge'.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 297
@@ -447,7 +447,7 @@ export default function SixWeekChallengeCheckout() {
         {/* ══ SCHERM 2: FORMULIER + REVIEWS ══ */}
         <section ref={formRef} style={{ ...screen, justifyContent: 'center' }}>
           <div style={{ maxWidth: 520, width: '100%' }}>
-            {/* De twee garanties genummerd onder elkaar. */}
+            {/* De twee garanties onder elkaar, met een icoon ervoor. */}
             <div style={{
               margin: isMobile ? '0 auto 1.75rem' : '0 auto 2.25rem',
               maxWidth: 480, width: '100%', textAlign: 'left',
@@ -460,24 +460,24 @@ export default function SixWeekChallengeCheckout() {
                 DE GARANTIE
               </div>
               {[
-                'Binnen 7 dagen niet tevreden? Geld terug.',
-                'Vind je tijdens de 6 weken dat je geen €297 aan coaching waarde krijgt? Geld terug.',
-              ].map((tekst, i) => (
-                <div key={i} style={{
-                  display: 'flex', gap: '0.7rem', alignItems: 'baseline',
-                  padding: isMobile ? '0.65rem 0' : '0.75rem 0',
+                { Icon: Clock, tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
+                { Icon: BadgeEuro, tekst: 'Vind je tijdens de 6 weken dat je geen €297 aan coaching waarde krijgt? Geld terug.' },
+              ].map((r, i) => (
+                <div key={r.tekst} style={{
+                  display: 'flex', gap: '0.7rem', alignItems: 'center',
+                  padding: isMobile ? '0.7rem 0' : '0.8rem 0',
                   borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
                 }}>
-                  <span style={{
-                    flexShrink: 0,
-                    fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900,
-                    color: GOLD,
-                  }}>{i + 1}.</span>
+                  {/* Zelfde stijl als de drie knoppen: bold en wit. */}
+                  <r.Icon
+                    size={isMobile ? 20 : 22} strokeWidth={2.4}
+                    style={{ flexShrink: 0, color: '#fff' }}
+                  />
                   <span style={{
                     fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
                     color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
-                  }}>{tekst}</span>
+                  }}>{r.tekst}</span>
                 </div>
               ))}
             </div>
