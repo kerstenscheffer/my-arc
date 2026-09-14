@@ -49,13 +49,13 @@ const TRANSFORMATIONS = [
 // Foto links (zo'n 20% zichtbaar), de kop half over de fade en de toelichting
 // in grijs helemaal rechts. Een lijn scheidt de stroken. De negatieve marge
 // haalt de padding van het blad weg, zodat de foto's de rand raken.
-function Stroken({ items, isMobile }) {
+function Stroken({ items, isMobile, genummerd = false, hoog = false }) {
   return (
     <div style={{ margin: isMobile ? '-0.9rem -1.15rem 0' : '-1rem -1.35rem 0' }}>
-      {items.map((r) => (
+      {items.map((r, i) => (
         <div key={r.kop} style={{
           position: 'relative',
-          minHeight: isMobile ? 58 : 68,
+          minHeight: hoog ? (isMobile ? 76 : 88) : (isMobile ? 58 : 68),
           display: 'flex', alignItems: 'center',
           borderBottom: '1px solid rgba(255,255,255,0.1)',
         }}>
@@ -82,10 +82,11 @@ function Stroken({ items, isMobile }) {
               color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
               textShadow: '0 1px 8px rgba(0,0,0,0.9)',
             }}>
+              {genummerd && <span style={{ color: GOLD }}>{i + 1}. </span>}
               {r.kop}
             </div>
             <div style={{
-              flexShrink: 0, maxWidth: isMobile ? '46%' : '42%',
+              flexShrink: 0, maxWidth: isMobile ? '48%' : '46%',
               textAlign: 'right',
               fontSize: isMobile ? '0.66rem' : '0.76rem', fontWeight: 600,
               color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
@@ -662,10 +663,10 @@ export default function SixWeekChallengeCheckout() {
 
       {/* De methode — drie stroken, verder geen tekst. */}
       <Blad open={open === 'methode'} titel="De methode" onClose={() => setOpen(null)} isMobile={isMobile}>
-        <Stroken isMobile={isMobile} items={[
-          { foto: '/methode/voeding.jpg',     kop: 'Weet wat je eet',      sub: 'structuur in de app, zonder rekenen' },
-          { foto: '/methode/training.jpg',    kop: 'Elke training telt',   sub: 'schema op maat, onder het uur' },
-          { foto: '/methode/begeleiding.jpg', kop: 'Coach in jouw corner', sub: 'wekelijkse call, ik kijk mee' },
+        <Stroken isMobile={isMobile} genummerd hoog items={[
+          { foto: '/methode/voeding.jpg',     kop: 'Weet wat je eet',      sub: 'vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.' },
+          { foto: '/methode/training.jpg',    kop: 'Elke training telt',   sub: "schema op maat, uitlegvideo's per oefening, onder het uur." },
+          { foto: '/methode/begeleiding.jpg', kop: 'Coach in jouw corner', sub: 'wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.' },
         ]} />
       </Blad>
 
