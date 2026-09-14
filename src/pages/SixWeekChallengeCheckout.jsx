@@ -7,7 +7,7 @@
 // Stripe: /api/create-checkout-session (one-time), plan '6-week-challenge'.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown, Dumbbell, Utensils, Scale, ClipboardCheck, Camera } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 297
@@ -677,39 +677,55 @@ export default function SixWeekChallengeCheckout() {
         ))}
       </Blad>
 
-      {/* De voorwaarden — de zes acties als tabel. */}
+      {/* De voorwaarden — per actie een icoon, zodat het blad niet zes keer
+          dezelfde tekstregel is. Geen foto's: de beschikbare beelden zijn
+          brede app-mockups op wit, en voor "4 calls" en "3 progressiefoto's"
+          bestaat er geen. */}
       <Blad open={open === 'voorwaarden'} titel="De voorwaarden" onClose={() => setOpen(null)} isMobile={isMobile}>
         {[
-          { kop: '3 workouts per week', sub: '45 minuten' },
-          { kop: '80% van je voedingsplan', sub: 'macrodoelen of plan gevolgd' },
-          { kop: '3x per week wegen', sub: 'we sturen op het weekgemiddelde' },
-          { kop: 'Elke week je check-in', sub: 'in de app' },
-          { kop: '4 calls', sub: 'met je coach' },
-          { kop: "3 progressiefoto's", sub: 'begin, midden, eind' },
+          { Icon: Dumbbell,       kop: '3 workouts per week',     sub: 'van 45 minuten, thuis of in de gym' },
+          { Icon: Utensils,       kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of het plan gevolgd' },
+          { Icon: Scale,          kop: '3x per week wegen',       sub: 'we sturen op het weekgemiddelde' },
+          { Icon: ClipboardCheck, kop: 'Elke week je check-in',   sub: 'invullen in de app' },
+          { Icon: Phone,          kop: '4 calls',                 sub: 'verspreid over de zes weken' },
+          { Icon: Camera,         kop: "3 progressiefoto's",      sub: 'begin, midden, eind' },
         ].map((r, i) => (
           <div key={r.kop} style={{
-            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-            gap: '1rem',
-            padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+            display: 'flex', alignItems: 'center', gap: isMobile ? '0.8rem' : '0.95rem',
+            padding: isMobile ? '0.8rem 0' : '0.9rem 0',
             borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)',
           }}>
-            <span style={{
-              fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 700,
-              color: 'rgba(255,255,255,0.9)', lineHeight: 1.25, letterSpacing: '-0.01em',
+            <div style={{
+              flexShrink: 0,
+              width: isMobile ? 40 : 44, height: isMobile ? 40 : 44,
+              borderRadius: 12,
+              background: 'rgba(255,186,9,0.1)',
+              border: '1px solid rgba(255,186,9,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: GOLD,
             }}>
-              {r.kop}
-            </span>
-            <span style={{
-              flexShrink: 0, textAlign: 'right',
-              fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 600,
-              color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
-            }}>
-              {r.sub}
-            </span>
+              <r.Icon size={isMobile ? 19 : 21} strokeWidth={2.2} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                color: '#fff', lineHeight: 1.2, letterSpacing: '-0.015em',
+              }}>
+                {r.kop}
+              </div>
+              <div style={{
+                fontSize: isMobile ? '0.78rem' : '0.83rem', fontWeight: 600,
+                color: 'rgba(255,255,255,0.45)', lineHeight: 1.35, marginTop: 2,
+              }}>
+                {r.sub}
+              </div>
+            </div>
           </div>
         ))}
         <p style={{
-          margin: isMobile ? '1rem 0 0' : '1.15rem 0 0',
+          margin: isMobile ? '1.1rem 0 0' : '1.25rem 0 0',
+          paddingTop: isMobile ? '1rem' : '1.15rem',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
           fontSize: isMobile ? '0.78rem' : '0.83rem',
           fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5,
         }}>
