@@ -43,6 +43,13 @@ const TRANSFORMATIONS = [
   { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
+// De slider draait reviews en transformatiefoto's door elkaar, zodat de
+// foto's meeschuiven in plaats van er als los blok boven te staan.
+const SLIDES = REVIEWS.flatMap((review, i) => {
+  const foto = i === 1 ? TRANSFORMATIONS[0] : i === 3 ? TRANSFORMATIONS[1] : null
+  return foto ? [{ soort: 'review', ...review }, { soort: 'foto', ...foto }] : [{ soort: 'review', ...review }]
+})
+
 // De 3 pijlers — copy gelijk aan /16week (OfferPilarenSection).
 // ── Stroken in een blad: foto tegen de linkerrand, fade naar rechts ─────────
 //
@@ -301,7 +308,7 @@ export default function SixWeekChallengeCheckout() {
     }
   }
 
-  const doubledReviews = [...REVIEWS, ...REVIEWS]
+  const doubledSlides = [...SLIDES, ...SLIDES]
 
   return (
     <div style={{ background: BG }}>
@@ -362,7 +369,7 @@ export default function SixWeekChallengeCheckout() {
               6 Weken In Shape Challenge
             </div>
             <p style={{
-              margin: `0 auto ${isMobile ? '1.5rem' : '1.85rem'}`,
+              margin: `0 auto ${isMobile ? '2.5rem' : '3rem'}`,
               maxWidth: 420,
               fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 600,
               color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
@@ -413,9 +420,28 @@ export default function SixWeekChallengeCheckout() {
               })}
             </div>
 
+            {/* Knop naar het formulier (afrekenen) */}
+            <button onClick={scrollToForm} style={{
+              marginTop: isMobile ? '2.75rem' : '3.25rem',
+              display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+              padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem', borderRadius: 999, border: 'none',
+              background: '#fff', color: '#000',
+              fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(255,255,255,0.15)', letterSpacing: '0.01em',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              fontFamily: 'inherit',
+            }}>
+              Maak investering · €{PRICE} <ChevronDown size={16} strokeWidth={3} />
+            </button>
+          </div>
+        </section>
+
+        {/* ══ SCHERM 2: FORMULIER + REVIEWS ══ */}
+        <section ref={formRef} style={{ ...screen, justifyContent: 'center' }}>
+          <div style={{ maxWidth: 520, width: '100%' }}>
             {/* De twee garanties genummerd onder elkaar. */}
             <div style={{
-              margin: '0 auto',
+              margin: isMobile ? '0 auto 1.75rem' : '0 auto 2.25rem',
               maxWidth: 480, width: '100%', textAlign: 'left',
             }}>
               <div style={{
@@ -448,25 +474,6 @@ export default function SixWeekChallengeCheckout() {
               ))}
             </div>
 
-            {/* Knop naar het formulier (afrekenen) */}
-            <button onClick={scrollToForm} style={{
-              marginTop: isMobile ? '1.85rem' : '2.25rem',
-              display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-              padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem', borderRadius: 999, border: 'none',
-              background: '#fff', color: '#000',
-              fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(255,255,255,0.15)', letterSpacing: '0.01em',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              fontFamily: 'inherit',
-            }}>
-              Maak investering · €{PRICE} <ChevronDown size={16} strokeWidth={3} />
-            </button>
-          </div>
-        </section>
-
-        {/* ══ SCHERM 2: FORMULIER + REVIEWS ══ */}
-        <section ref={formRef} style={{ ...screen, justifyContent: 'center' }}>
-          <div style={{ maxWidth: 520, width: '100%' }}>
             <div style={{
               borderRadius: isMobile ? 16 : 18,
               border: '1px solid rgba(255,255,255,0.08)',
@@ -548,26 +555,8 @@ export default function SixWeekChallengeCheckout() {
               </div>
             </div>
 
-            {/* ══ Transformaties + reviews — onderaan, na het formulier ══ */}
+            {/* ══ Reviews en transformaties — onderaan, na het formulier ══ */}
             <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>
-              <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', maxWidth: 420, margin: '0 auto' }}>
-                {TRANSFORMATIONS.map((t) => (
-                  <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                    <div style={{ borderRadius: 9, overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
-                      <img
-                        src={t.src}
-                        alt={t.caption}
-                        onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                        style={{ width: '100%', height: 'auto', display: 'block' }}
-                      />
-                    </div>
-                    <p style={{ margin: 0, fontSize: isMobile ? '0.5rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.25, textAlign: 'center' }}>
-                      {t.caption}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
               <TrustpilotBadge style={{ margin: isMobile ? '1rem 0' : '1.25rem 0' }} />
 
               <div
@@ -581,41 +570,73 @@ export default function SixWeekChallengeCheckout() {
                   paddingRight: isMobile ? '1.25rem' : '2rem',
                 }}
               >
-                {doubledReviews.map((review, idx) => (
+                {doubledSlides.map((slide, idx) => (
                   <div key={idx} style={{
                     minWidth: isMobile ? 240 : 280, maxWidth: isMobile ? 240 : 280,
-                    padding: isMobile ? '0.85rem 1rem' : '1rem 1.15rem',
+                    padding: slide.soort === 'foto'
+                      ? (isMobile ? '0.6rem' : '0.7rem')
+                      : (isMobile ? '0.85rem 1rem' : '1rem 1.15rem'),
                     borderRadius: 12,
                     border: '1px solid rgba(255,255,255,0.06)',
                     background: 'rgba(255,255,255,0.02)',
                     flexShrink: 0,
+                    display: 'flex', flexDirection: 'column',
                   }}>
-                    <div style={{ display: 'flex', gap: 2, marginBottom: '0.5rem' }}>
-                      {[1,2,3,4,5].map(s => (
-                        <Star key={s} size={11} fill={TP_GREEN} color={TP_GREEN} strokeWidth={0} />
-                      ))}
-                    </div>
-                    <p style={{
-                      fontSize: isMobile ? '0.7rem' : '0.75rem',
-                      color: 'rgba(255,255,255,0.45)', fontWeight: 500,
-                      lineHeight: 1.5, marginBottom: '0.6rem',
-                      display: '-webkit-box', WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                    }}>{review.text}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <div style={{
-                          width: 24, height: 24, borderRadius: '50%',
-                          background: '#fff', border: `1px solid ${TP_GREEN}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.6rem', fontWeight: 800, color: TP_GREEN,
-                        }}>{review.name.charAt(0)}</div>
-                        <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
-                          {review.name}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>{review.date}</span>
-                    </div>
+                    {slide.soort === 'foto' ? (
+                      <>
+                        {/* Contain en een maximum: de before/after-collage mag
+                            niet bijgesneden worden, maar ook de slider niet
+                            drie keer zo hoog maken als een review. */}
+                        <div style={{ borderRadius: 9, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+                          <img
+                            src={slide.src}
+                            alt={slide.caption}
+                            draggable={false}
+                            onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                            style={{
+                              maxWidth: '100%', maxHeight: isMobile ? 170 : 195,
+                              width: 'auto', height: 'auto', display: 'block',
+                            }}
+                          />
+                        </div>
+                        <p style={{
+                          margin: '0.5rem 0 0',
+                          fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 700,
+                          color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, textAlign: 'center',
+                        }}>
+                          {slide.caption}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', gap: 2, marginBottom: '0.5rem' }}>
+                          {[1,2,3,4,5].map(ster => (
+                            <Star key={ster} size={11} fill={TP_GREEN} color={TP_GREEN} strokeWidth={0} />
+                          ))}
+                        </div>
+                        <p style={{
+                          fontSize: isMobile ? '0.7rem' : '0.75rem',
+                          color: 'rgba(255,255,255,0.45)', fontWeight: 500,
+                          lineHeight: 1.5, marginBottom: '0.6rem',
+                          display: '-webkit-box', WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                        }}>{slide.text}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <div style={{
+                              width: 24, height: 24, borderRadius: '50%',
+                              background: '#fff', border: `1px solid ${TP_GREEN}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.6rem', fontWeight: 800, color: TP_GREEN,
+                            }}>{slide.name.charAt(0)}</div>
+                            <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                              {slide.name}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>{slide.date}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
