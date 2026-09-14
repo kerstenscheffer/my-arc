@@ -11,7 +11,7 @@ import {
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
   RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, Wallet, PhoneOff, XCircle, Check, Ban,
-  Table as TableIcon,
+  Table as TableIcon, Filter,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import CallProposalsModal from './CallProposalsModal'
@@ -121,6 +121,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // 'tegels' = de bestaande rijen met iconen, 'tabel' = alles onder elkaar met
   // de vorige periode ernaast (zelfde idee als de historie in de oefening-log).
   const [weergave, setWeergave] = useState('tegels')
+  // Opgeslagen stat-selecties. Gedeeld met het team, dus Marcel ziet dezelfde
+  // presets. keuze = null betekent alles tonen.
+  const [presets, setPresets] = useState([])
+  const [presetId, setPresetId] = useState(null)
+  const [keuze, setKeuze] = useState(null)
+  const [kiezerOpen, setKiezerOpen] = useState(false)
+  const [presetNaam, setPresetNaam] = useState('')
+  const [presetBezig, setPresetBezig] = useState(false)
   // Cijfers van de vorige, even lange periode. Alleen geladen in tabelweergave.
   const [vorige, setVorige] = useState(null)
   const [vorigeBezig, setVorigeBezig] = useState(false)
@@ -401,6 +409,59 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, leadService, coachId, periodMode, +start, +end, reloadKey])
+
+  // Presets laden zodra de tabel voor het eerst opengaat, en de laatst
+  // gekozen preset terugzetten (die keuze is wel persoonlijk).
+  useEffect(() => {
+    if (!isOpen || weergave !== 'tabel' || !leadService?.getStatPresets) return
+    let cancelled = false
+    leadService.getStatPresets().then(lijst => {
+      if (cancelled) return
+      setPresets(lijst)
+      let laatste = null
+      try { laatste = localStorage.getItem('myarc_stat_preset') } catch { /* geen opslag */ }
+      const gevonden = lijst.find(p2 => p2.id === laatste)
+      if (gevonden) { setPresetId(gevonden.id); setKeuze(gevonden.keys); setPresetNaam(gevonden.naam) }
+    })
+    return () => { cancelled = true }
+  }, [isOpen, weergave, leadService])
+
+  const kiesPreset = (p2) => {
+    setPresetId(p2?.id || null)
+    setKeuze(p2 ? p2.keys : null)
+    setPresetNaam(p2?.naam || '')
+    try {
+      if (p2?.id) localStorage.setItem('myarc_stat_preset', p2.id)
+      else localStorage.removeItem('myarc_stat_preset')
+    } catch { /* geen opslag */ }
+  }
+
+  const bewaarPreset = async (alsNieuw = false) => {
+    if (!leadService?.saveStatPreset) return
+    setPresetBezig(true)
+    const res = await leadService.saveStatPreset({
+      id: alsNieuw ? null : presetId,
+      naam: presetNaam,
+      keys: keuze || kerncijfers({}).map(r => r.key),
+    })
+    if (res?.ok) {
+      const lijst = await leadService.getStatPresets()
+      setPresets(lijst)
+      const bewaard = lijst.find(p2 => p2.id === res.id)
+      if (bewaard) kiesPreset(bewaard)
+    }
+    setPresetBezig(false)
+  }
+
+  const wisPreset = async () => {
+    if (!presetId || !leadService?.deleteStatPreset) return
+    setPresetBezig(true)
+    await leadService.deleteStatPreset(presetId)
+    const lijst = await leadService.getStatPresets()
+    setPresets(lijst)
+    kiesPreset(null)
+    setPresetBezig(false)
+  }
 
   // Vorige periode: even lang venster, direct ervoor. Alleen in tabelweergave,
   // want het zijn vier extra queries die je in de tegels toch niet ziet.
@@ -828,8 +889,144 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               {weergave === 'tabel' ? (
                 <>
                   <SectionTitle icon={<TableIcon size={13} color={GOLD} />} title={`Alles op een rij · t.o.v. vorige ${periodeWoord}`} />
+
+                  {/* Presets: klik er een aan om alleen die stats te zien. De
+                      lijst is gedeeld, dus Marcel ziet dezelfde. */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: '0.6rem', alignItems: 'center' }}>
+                    {[{ id: null, naam: 'Alles' }, ...presets].map(p2 => {
+                      const aan = (p2.id || null) === presetId
+                      return (
+                        <button
+                          key={p2.id || 'alles'}
+                          onClick={() => kiesPreset(p2.id ? p2 : null)}
+                          style={{
+                            fontSize: '0.66rem', fontWeight: 800,
+                            padding: '4px 10px', borderRadius: 999,
+                            background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                            color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.65)',
+                            cursor: 'pointer', fontFamily: 'inherit',
+                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          }}
+                        >
+                          {p2.naam}
+                        </button>
+                      )
+                    })}
+                    <button
+                      onClick={() => setKiezerOpen(v => !v)}
+                      style={{
+                        marginLeft: 'auto',
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        fontSize: '0.66rem', fontWeight: 800,
+                        padding: '4px 10px', borderRadius: 999,
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.75)',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <Filter size={11} strokeWidth={2.6} />
+                      Stats kiezen
+                      <ChevronDown size={11} strokeWidth={2.8} style={{ transform: kiezerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                    </button>
+                  </div>
+
+                  {kiezerOpen && (
+                    <div style={{
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 10, padding: '0.6rem 0.7rem', marginBottom: '0.7rem',
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '2px 10px' }}>
+                        {kerncijfers({}).map(r => {
+                          const aan = !keuze || keuze.includes(r.key)
+                          return (
+                            <button
+                              key={r.key}
+                              onClick={() => {
+                                const basis = keuze || kerncijfers({}).map(x => x.key)
+                                const nieuweKeuze = aan ? basis.filter(k => k !== r.key) : [...basis, r.key]
+                                setKeuze(nieuweKeuze)
+                              }}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 7,
+                                padding: '5px 2px', background: 'transparent', border: 'none',
+                                color: aan ? '#fff' : 'rgba(255,255,255,0.4)',
+                                fontSize: '0.7rem', fontWeight: 700, textAlign: 'left',
+                                cursor: 'pointer', fontFamily: 'inherit',
+                                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                              }}
+                            >
+                              <span style={{
+                                width: 14, height: 14, borderRadius: 4, flexShrink: 0,
+                                background: aan ? '#fff' : 'transparent',
+                                border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.25)'}`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {aan && <Check size={10} strokeWidth={3.5} color="#0a0a0a" />}
+                              </span>
+                              {r.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 6, marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.07)', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button
+                          onClick={() => setKeuze(null)}
+                          style={{ fontSize: '0.63rem', fontWeight: 800, padding: '4px 9px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.65)', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          Alles aan
+                        </button>
+                        <button
+                          onClick={() => setKeuze([])}
+                          style={{ fontSize: '0.63rem', fontWeight: 800, padding: '4px 9px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.65)', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          Alles uit
+                        </button>
+                        <input
+                          value={presetNaam}
+                          onChange={(e) => setPresetNaam(e.target.value)}
+                          placeholder="Naam van de preset"
+                          style={{
+                            flex: 1, minWidth: 120, padding: '5px 9px', borderRadius: 7,
+                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+                            color: '#fff', fontSize: '0.66rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none',
+                          }}
+                        />
+                        {presetId && (
+                          <button
+                            onClick={() => bewaarPreset(false)}
+                            disabled={presetBezig}
+                            style={{ fontSize: '0.63rem', fontWeight: 900, padding: '5px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: presetBezig ? 'wait' : 'pointer', fontFamily: 'inherit' }}
+                          >
+                            Bijwerken
+                          </button>
+                        )}
+                        <button
+                          onClick={() => bewaarPreset(true)}
+                          disabled={presetBezig || !presetNaam.trim()}
+                          style={{ fontSize: '0.63rem', fontWeight: 900, padding: '5px 10px', borderRadius: 7, background: presetNaam.trim() ? '#fff' : 'rgba(255,255,255,0.15)', border: 'none', color: presetNaam.trim() ? '#0a0a0a' : 'rgba(255,255,255,0.4)', cursor: presetBezig ? 'wait' : 'pointer', fontFamily: 'inherit' }}
+                        >
+                          Opslaan als nieuw
+                        </button>
+                        {presetId && (
+                          <button
+                            onClick={wisPreset}
+                            disabled={presetBezig}
+                            style={{ fontSize: '0.63rem', fontWeight: 800, padding: '5px 10px', borderRadius: 7, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', cursor: presetBezig ? 'wait' : 'pointer', fontFamily: 'inherit' }}
+                          >
+                            Verwijderen
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <StatTabel
-                    nu={kerncijfers({ activity, funnel, reactionStats, cash })}
+                    nu={kerncijfers({ activity, funnel, reactionStats, cash }).filter(r => !keuze || keuze.includes(r.key))}
                     vorig={vorige ? kerncijfers(vorige) : null}
                     bezig={vorigeBezig}
                     periodeLabel="Nu"

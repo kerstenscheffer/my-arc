@@ -2528,6 +2528,40 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
    * nergens afgevinkt. "Binnengekomen" betekent hier dus: de afgesproken
    * betaaldatum is verstreken.
    */
+  // ── Opgeslagen stat-selecties (tabelweergave) ──────────────────────────────
+  // Gedeeld tussen coach en teamlid: iedereen ziet dezelfde presets, zodat
+  // Kersten en Marcel naar hetzelfde rijtje cijfers kijken.
+  async getStatPresets() {
+    const { data, error } = await this.db.supabase
+      .from('stat_presets')
+      .select('id, naam, keys, created_at')
+      .order('created_at', { ascending: true })
+    if (error) { console.warn('Presets laden mislukt:', error.message); return [] }
+    return (data || []).map(r => ({ ...r, keys: Array.isArray(r.keys) ? r.keys : [] }))
+  }
+
+  async saveStatPreset({ id = null, naam, keys, userId = null }) {
+    const rij = { naam: String(naam || '').trim().slice(0, 60), keys, updated_at: new Date().toISOString() }
+    if (!rij.naam) return { ok: false, error: 'Geef de preset een naam' }
+    if (id) {
+      const { error } = await this.db.supabase.from('stat_presets').update(rij).eq('id', id)
+      if (error) return { ok: false, error: error.message }
+      return { ok: true, id }
+    }
+    const { data, error } = await this.db.supabase
+      .from('stat_presets')
+      .insert({ ...rij, created_by: userId })
+      .select('id')
+      .single()
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, id: data?.id }
+  }
+
+  async deleteStatPreset(id) {
+    const { error } = await this.db.supabase.from('stat_presets').delete().eq('id', id)
+    return { ok: !error, error: error?.message }
+  }
+
   async getRangeCashCollected(coachId, startISO, endISO) {
     try {
       const dag = (iso) => new Date(iso).toISOString().split('T')[0]
