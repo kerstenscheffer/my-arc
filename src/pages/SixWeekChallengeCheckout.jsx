@@ -380,11 +380,11 @@ export default function SixWeekChallengeCheckout() {
                 color: GOLD, letterSpacing: '-0.015em', textAlign: 'center',
                 marginBottom: isMobile ? '0.75rem' : '0.9rem',
               }}>
-                Win Your Money Back regels:
+                Geld terug voorwaarden:
               </div>
               {[
                 { Icon: Target, tekst: 'Haal afgesproken doel.' },
-                { Icon: CheckCircle2, tekst: 'Of voer afgesproken acties uit, en krijg je investering terug.' },
+                { Icon: CheckCircle2, tekst: 'Of voer afgesproken acties uit.' },
               ].map((r, i) => (
                 <div key={r.tekst} style={{
                   display: 'flex', gap: '0.6rem',
