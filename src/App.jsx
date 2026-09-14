@@ -40,6 +40,7 @@ import GiveawayPage from './lead-magnet/7secretsfunnel/GiveawayPage'
 import SalesCallPage from './sales-call/SalesCallPage'
 import SalesCall16WeekPage from './sales-call-16week/SalesCall16WeekPage'
 import SixWeekChallengePage from './sales-call-6week/SixWeekChallengePage'
+import SixWeekChallengeCheckout from './pages/SixWeekChallengeCheckout'
 import BackInShapePage from './sales-call/BackInShapePage'
 import VSLLandingPage from './sales-call-vsl/VSLLandingPage'
 import SalesCallVSLPage from './sales-call-vsl/SalesCallVSLPage'
@@ -261,6 +262,12 @@ function App() {
   // met of zonder streepje werkt.
   if (currentPath === '/16-week-checkout' || currentPath === '/16week-checkout') {
     return <SixteenWeekCheckout />
+  }
+
+  // 6-weken challenge checkout — eenmalig €297, win your money back. Beide
+  // schrijfwijzen, zodat een gedeelde link met of zonder streepje werkt.
+  if (currentPath === '/6-week-checkout' || currentPath === '/6week-checkout') {
+    return <SixWeekChallengeCheckout />
   }
 
   // 16-weken checkout, maandelijks — €125/mnd abonnement.
