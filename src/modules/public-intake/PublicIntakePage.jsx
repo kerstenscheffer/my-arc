@@ -177,6 +177,17 @@ function MotivationReminder({ personalData, isMobile }) {
 // upsert-fout: bv. `avoided_exercises` is een TEXT-kolom maar het formulier
 // leverde een array → de hele upsert faalde zonder error-check, waardoor alle
 // training-data verloren ging.
+// training_time is in de database een `time`-kolom. De weekplanner heeft een
+// knop "Weet ik nog niet" die de sentinel 'onbekend' meegeeft; die stond
+// zonder controle in de payload en liet Postgres de HELE upsert weigeren
+// ("invalid input syntax for type time"). Gevolg: die klant kreeg bij elke
+// autosave en bij afronden "Opslaan mislukt". Alles wat geen HH:MM is gaat
+// hier naar null.
+const tijdOfNull = (v) => {
+  const s = String(v ?? '').trim()
+  return /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(s) ? s : null
+}
+
 function buildWorkoutPrefs(data = {}, personalData = {}) {
   const toInt = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null }
   const toText = (v) => {
@@ -201,7 +212,7 @@ function buildWorkoutPrefs(data = {}, personalData = {}) {
     default_time_per_session: toInt(data.time_per_session),
     default_equipment: toArr(data.equipment),              // text[]
     default_primary_goal: toText(personalData?.primary_goal),
-    training_time: (data.training_time || personalData?.training_time || null) || null, // time HH:MM
+    training_time: tijdOfNull(data.training_time) || tijdOfNull(personalData?.training_time), // time HH:MM
     split_preferences: { preferred: data.split_preference || null, focus: data.training_focus || null }, // jsonb
     emphasize_stretch: data.emphasize_stretch ?? false,
     prioritize_compounds: data.prioritize_compounds ?? false,
@@ -444,12 +455,12 @@ export default function PublicIntakePage() {
       }
 
       // training_time direct opslaan in user_workout_preferences (niet-blokkerend)
-      if (data.training_time) {
+      if (tijdOfNull(data.training_time)) {
         const userId = existingClient.auth_user_id || clientId
         try {
           await supabase.from('user_workout_preferences').upsert({
             user_id: userId,
-            training_time: data.training_time,
+            training_time: tijdOfNull(data.training_time),
             default_days_per_week: data.preferred_training_days?.length || null,
           }, { onConflict: 'user_id' })
           console.log('✅ training_time opgeslagen:', data.training_time)

@@ -194,6 +194,13 @@ export default async function handler(req, res) {
       const safeFields = Object.fromEntries(
         Object.entries(fields).filter(([k]) => ALLOWED_UPDATE_FIELDS.has(k))
       );
+      // clients.training_time is een `time`-kolom. Komt er iets anders binnen
+      // dan HH:MM (de intake stuurde 'onbekend' bij "Weet ik nog niet"), dan
+      // weigert Postgres de hele update. Liever leeg dan alles kwijt.
+      if ('training_time' in safeFields) {
+        const t = String(safeFields.training_time ?? '').trim();
+        safeFields.training_time = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(t) ? t : null;
+      }
       if (Object.keys(safeFields).length === 0) {
         return res.status(400).json({ error: 'no allowed fields in update' });
       }
