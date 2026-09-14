@@ -2540,6 +2540,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         p_tot: tot.toISOString().split('T')[0],
       })
       if (error) throw error
+      // komt_nog is in de RPC strikt toekomstig: een betaling met de datum van
+      // vandaag (zoals een sale die je vandaag vooruitbetaald sluit) telt dus
+      // mee in Binnengekomen, niet in Verwacht.
       const regels = (data || []).filter(r => !r.komt_nog)
       return {
         bedrag: regels.reduce((som, r) => som + (Number(r.bedrag) || 0), 0),
