@@ -993,7 +993,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             <div style={{
               display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem',
               alignItems: 'center',
-              padding: isMobile ? '0.55rem 1rem 0.35rem' : '0.65rem 1.25rem 0.4rem',
+              // Lucht boven de tabel, zodat hij niet tegen materiaal en
+              // instellingen aan plakt.
+              padding: isMobile ? '1.5rem 1rem 0.35rem' : '1.7rem 1.25rem 0.4rem',
               fontSize: '0.62rem', fontWeight: 900,
               textTransform: 'uppercase', letterSpacing: '0.07em',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
@@ -1046,7 +1048,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             {!rust && (
               <div style={{
                 display: 'flex', gap: '0.5rem',
-                padding: isMobile ? '0.65rem 1rem 0.8rem' : '0.75rem 1.25rem 0.9rem',
+                // En lucht tussen de tabel en de logknop.
+                padding: isMobile ? '1.4rem 1rem 0.8rem' : '1.6rem 1.25rem 0.9rem',
               }}>
                 <button
                   onClick={() => { setEditingIndex(null); setShowWizard(true) }}
