@@ -409,14 +409,39 @@ export default function SixWeekChallengeCheckout() {
         <PijlerSection isMobile={isMobile} index={1} />
         <PijlerSection isMobile={isMobile} index={2} />
 
-        {/* ══ SCHERM 5: OFFER — ongewijzigd ══ */}
-        <section ref={offerRef} style={{ ...screen, textAlign: 'center' }}>
-          <div style={{ maxWidth: 520, width: '100%' }}>
+        {/* ══ SCHERM 5: OFFER ══ */}
+        <section ref={offerRef} style={{ ...screen, textAlign: 'center', padding: 0, justifyContent: 'flex-start' }}>
+          {/* Foto bovenaan die onderin dood loopt in het zwart; de kop valt er
+              net overheen. Zelfde truc als de koppen in de app. */}
+          <div style={{
+            position: 'relative', width: '100%',
+            height: isMobile ? 220 : 300,
+            flexShrink: 0,
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: 'url(/6week-offer-hero.jpg)',
+              backgroundSize: 'cover', backgroundPosition: 'center 30%',
+            }} />
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              background: `linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0) 35%, rgba(10,10,10,0.8) 75%, ${BG} 100%)`,
+            }} />
+          </div>
+
+          <div style={{
+            maxWidth: 520, width: '100%',
+            // Negatieve marge: de kop schuift over de onderkant van de foto.
+            marginTop: isMobile ? -46 : -60,
+            padding: isMobile ? `0 1.25rem 3.5rem` : `0 2rem 5rem`,
+            position: 'relative', zIndex: 2,
+          }}>
             {/* Kop boven de prijs — dit is waar het aanbod om draait. */}
             <div style={{
-              fontSize: isMobile ? '1.5rem' : '1.9rem', fontWeight: 900, color: '#fff',
-              lineHeight: 1.15, letterSpacing: '-0.02em',
+              fontSize: isMobile ? '1.6rem' : '2.1rem', fontWeight: 900, color: '#fff',
+              lineHeight: 1.15, letterSpacing: '-0.025em',
               marginBottom: isMobile ? '0.5rem' : '0.6rem',
+              textShadow: '0 2px 14px rgba(0,0,0,0.85)',
             }}>
               Win Your Money Back
             </div>
