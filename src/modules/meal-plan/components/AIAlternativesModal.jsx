@@ -71,6 +71,8 @@ export default function AIAlternativesModal({
     if (v.includes('breakfast') || v.includes('ontbijt')) return 'breakfast'
     if (v.includes('lunch')) return 'lunch'
     if (v.includes('dinner') || v.includes('diner')) return 'dinner'
+    if (v.includes('pre')) return 'pre_workout'
+    if (v.includes('post')) return 'post_workout'
     return 'snack'
   })()
 
