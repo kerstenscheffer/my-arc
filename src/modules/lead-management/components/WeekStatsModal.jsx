@@ -524,7 +524,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const noShowRate = handledCalls > 0 ? Math.round((totalNoShows / handledCalls) * 100) : null
   const closeRate = callsHeld > 0 ? Math.round((totalSales / callsHeld) * 100) : null
   const pct1 = (v) => (v == null ? '—' : `${v}%`)
-  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316', saleLost: '#ef4444', notSuitable: '#64748b' }
+  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', callBooked: '#6366f1', callHeld: '#10b981', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316', saleLost: '#ef4444', notSuitable: '#64748b' }
   const frac = (a, b) => `${a} van ${b}`
   const countItems = [
     { label: 'Nieuwe leads', value: newLeadsInPeriod,          Icon: UserPlus,      color: '#3b82f6', info: 'Nieuwe leads die in deze periode zijn binnengekomen (op aanmaakdatum).' },
@@ -532,8 +532,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'Reacties',     value: kpiValues.reacties,        Icon: MessageCircle, color: '#10b981', info: 'Aantal keer dat een lead reageerde (elke reactie-klik telt).' },
     { label: 'Voorgesteld',  value: totalCallProposed,         Icon: PhoneCall,     color: '#a855f7', stage: 'callProposed', info: 'Leads die je een call hebt voorgesteld (naar de "Call voorgesteld"-kolom verplaatst). Klik voor de lijst.' },
     { label: 'Ingepland',    value: totalCalls,                Icon: CalendarCheck, color: '#06b6d4', stage: 'callScheduled', info: 'Leads die je IN deze periode naar "Sales Call" verplaatste — geteld op de dag dat je inplande, dus de call zelf kan later vallen. Klik voor de lijst.' },
-    { label: 'Calls gepland', value: funnel?.callBooked?.count ?? 0, Icon: Calendar, color: '#6366f1', info: 'Het totaal aantal calls dat VOOR deze periode staat: elke call waarvan de call-datum erin valt, of die nu gevoerd is, no-show of nog open. Dit is je week-agenda.' },
-    { label: 'Call gevoerd', value: funnel?.callHeld?.count ?? 0, Icon: Phone,      color: '#10b981', info: 'Ingeplande calls die je écht hebt gevoerd (afgehandeld als sale of sale verloren), geteld op de call-datum.' },
+    { label: 'Calls gepland', value: funnel?.callBooked?.count ?? 0, Icon: Calendar, color: '#6366f1', stage: 'callBooked', info: 'Het totaal aantal calls dat VOOR deze periode staat: elke call waarvan de call-datum erin valt, of die nu gevoerd is, no-show of nog open. Dit is je week-agenda. Klik voor de lijst.' },
+    { label: 'Call gevoerd', value: funnel?.callHeld?.count ?? 0, Icon: Phone,      color: '#10b981', stage: 'callHeld', info: 'Ingeplande calls die je écht hebt gevoerd (afgehandeld als sale of sale verloren), geteld op de call-datum. Klik voor de lijst.' },
     { label: 'Sales',        value: totalSales,                Icon: Trophy,        color: '#FFD700', stage: 'sale', info: 'Gewonnen deals (naar een "Sale"-kolom verplaatst). Klik voor de lijst.' },
     { label: 'Orderwaarde',  value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#FFD700', info: 'Wat je deze periode hebt verkocht: de volledige orderwaarde van elke sale, geteld op de dag van de sale. Bij termijnen of een reservering staat hier de hele deal, ook al komt het geld later.' },
     { label: 'Binnengekomen', value: cash ? '€' + Math.round(cash.bedrag).toLocaleString('nl-NL') : '—', Icon: Wallet, color: '#22c55e', info: 'Wat er deze periode aan geld binnenkwam: aanbetalingen, restbetalingen en maandtermijnen waarvan de betaaldatum is verstreken. Let op — dit is het betaalschema, niet een bevestigde incasso. Er is geen koppeling met de bank, dus het zegt dat de afgesproken datum geweest is.' + (cash?.verwacht ? ` Er staat nog €${Math.round(cash.verwacht).toLocaleString('nl-NL')} open in deze periode.` : '') },
@@ -1786,6 +1786,13 @@ function StatFlow({ items, activeStage, onToggle }) {
 
 // Drill-down lijst onder de aantallen-rij: leads van een funnel-stap, met
 // terugdraaien/verwijderen (zelfde acties als voorheen in de StatCard).
+// Call-datum is een kale date-kolom, dus geen tijd tonen.
+const callDatum = (v) => {
+  if (!v) return ''
+  const d = new Date(`${String(v).slice(0, 10)}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
 function DrillPanel({ leads, accent = '#FFD700', reasons = null, onRevert, revertingId, onDelete, deletingId }) {
   const [confirmId, setConfirmId] = useState(null)
   const items = Array.isArray(leads) ? leads : []
@@ -1814,9 +1821,18 @@ function DrillPanel({ leads, accent = '#FFD700', reasons = null, onRevert, rever
           <div key={d.id || i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingBottom: 5, borderBottom: i < items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#fff' }}>{d.name}</div>
-              <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>{d.from} <span style={{ color: accent }}>→</span> {d.to}</div>
+              {/* Call-lijsten (gepland / gevoerd) zijn geen verplaatsingen: die
+                  hebben geen van/naar en geen wie, alleen een call-datum. */}
+              {(d.from || d.to) && (
+                <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>{d.from} <span style={{ color: accent }}>→</span> {d.to}</div>
+              )}
               {d.reason && <div style={{ fontSize: '0.58rem', fontWeight: 700, color: accent }}>Reden: {d.reason}</div>}
-              <div style={{ fontSize: '0.58rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>{d.time} · door <span style={{ color: 'rgba(255,255,255,0.6)' }}>{d.by || 'Onbekend'}</span></div>
+              {(d.time || d.at || d.by) && (
+                <div style={{ fontSize: '0.58rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>
+                  {d.time || callDatum(d.at)}
+                  {d.time && <> · door <span style={{ color: 'rgba(255,255,255,0.6)' }}>{d.by || 'Onbekend'}</span></>}
+                </div>
+              )}
             </div>
             {canAct && (confirming ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
