@@ -478,6 +478,7 @@ export default function SixWeekChallengeCheckout() {
                   <span style={{
                     fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
                     color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
+                    textAlign: 'center',
                   }}>{r.tekst}</span>
                 </div>
               ))}
