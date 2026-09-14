@@ -129,9 +129,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [kiezerOpen, setKiezerOpen] = useState(false)
   const [presetNaam, setPresetNaam] = useState('')
   const [presetBezig, setPresetBezig] = useState(false)
-  // Cijfers van de vorige, even lange periode. Alleen geladen in tabelweergave.
-  const [vorige, setVorige] = useState(null)
-  const [vorigeBezig, setVorigeBezig] = useState(false)
+  // Cijfers van eerdere, even lange periodes (index 1 = de vorige, 2 =
+  // daarvoor, enz.). Alleen geladen in tabelweergave.
+  const [historie, setHistorie] = useState({})
+  const [historieBezig, setHistorieBezig] = useState(false)
+  const [aantalTerug, setAantalTerug] = useState(6)
   // Bump om de stats opnieuw te laden na het terugdraaien van een verplaatsing.
   const [reloadKey, setReloadKey] = useState(0)
   const [revertingId, setRevertingId] = useState(null)
@@ -463,34 +465,48 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     setPresetBezig(false)
   }
 
-  // Vorige periode: even lang venster, direct ervoor. Alleen in tabelweergave,
-  // want het zijn vier extra queries die je in de tegels toch niet ziet.
+  // Eerdere periodes: even lange vensters, steeds een stap verder terug. We
+  // laden ze pas in tabelweergave en alleen die er nog niet zijn, want het zijn
+  // vier queries per periode.
   useEffect(() => {
     if (!isOpen || weergave !== 'tabel') return
     if (!leadService || !coachId) return
     let cancelled = false
     const lengte = end - start
-    const vStart = new Date(start.getTime() - lengte)
-    const vEnd = new Date(start)
-    setVorigeBezig(true)
-    Promise.all([
-      leadService.getRangeActivity(coachId, vStart.toISOString(), vEnd.toISOString()),
-      leadService.getRangeFunnelStats(coachId, vStart.toISOString(), vEnd.toISOString()),
-      leadService.getRangeReactionStats
-        ? leadService.getRangeReactionStats(coachId, vStart.toISOString(), vEnd.toISOString())
-        : Promise.resolve(null),
-      leadService.getRangeCashCollected
-        ? leadService.getRangeCashCollected(coachId, vStart.toISOString(), vEnd.toISOString())
-        : Promise.resolve(null),
-    ])
-      .then(([a, f, rxn, geld]) => {
-        if (!cancelled) setVorige({ activity: a, funnel: f, reactionStats: rxn, cash: geld, start: vStart, end: vEnd })
-      })
-      .catch(() => { if (!cancelled) setVorige(null) })
-      .finally(() => { if (!cancelled) setVorigeBezig(false) })
+    const nodig = []
+    for (let i = 1; i <= aantalTerug; i++) if (!historie[i]) nodig.push(i)
+    if (!nodig.length) return
+
+    setHistorieBezig(true)
+    Promise.all(nodig.map(async (i) => {
+      const vStart = new Date(start.getTime() - lengte * i)
+      const vEnd = new Date(start.getTime() - lengte * (i - 1))
+      const [a, f, rxn, geld] = await Promise.all([
+        leadService.getRangeActivity(coachId, vStart.toISOString(), vEnd.toISOString()),
+        leadService.getRangeFunnelStats(coachId, vStart.toISOString(), vEnd.toISOString()),
+        leadService.getRangeReactionStats
+          ? leadService.getRangeReactionStats(coachId, vStart.toISOString(), vEnd.toISOString())
+          : Promise.resolve(null),
+        leadService.getRangeCashCollected
+          ? leadService.getRangeCashCollected(coachId, vStart.toISOString(), vEnd.toISOString())
+          : Promise.resolve(null),
+      ])
+      return [i, { activity: a, funnel: f, reactionStats: rxn, cash: geld, start: vStart, end: vEnd }]
+    }))
+      .then(paren => { if (!cancelled) setHistorie(h => ({ ...h, ...Object.fromEntries(paren) })) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setHistorieBezig(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, weergave, leadService, coachId, periodMode, +start, +end, reloadKey])
+  }, [isOpen, weergave, leadService, coachId, periodMode, +start, +end, reloadKey, aantalTerug])
+
+  // Van periode wisselen of herladen? Dan is de opgeslagen historie niet meer
+  // van deze periode.
+  useEffect(() => {
+    setHistorie({})
+    setAantalTerug(6)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodMode, +start, +end, reloadKey])
 
   // Campagne-breakdown is all-time → alleen laden bij openen / reload, niet bij
   // periode-navigatie (scheelt onnodige queries).
@@ -888,7 +904,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
               {weergave === 'tabel' ? (
                 <>
-                  <SectionTitle icon={<TableIcon size={13} color={GOLD} />} title={`Alles op een rij · t.o.v. vorige ${periodeWoord}`} />
+                  <SectionTitle icon={<TableIcon size={13} color={GOLD} />} title={`Alles op een rij · elke ${periodeWoord} vergeleken met nu`} />
 
                   {/* Presets: klik er een aan om alleen die stats te zien. De
                       lijst is gedeeld, dus Marcel ziet dezelfde. */}
@@ -1026,12 +1042,35 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   )}
 
                   <StatTabel
-                    nu={kerncijfers({ activity, funnel, reactionStats, cash }).filter(r => !keuze || keuze.includes(r.key))}
-                    vorig={vorige ? kerncijfers(vorige) : null}
-                    bezig={vorigeBezig}
-                    periodeLabel="Nu"
-                    vorigLabel={`Vorige ${periodeWoord}`}
+                    rijen={kerncijfers({ activity, funnel, reactionStats, cash }).filter(r => !keuze || keuze.includes(r.key))}
+                    kolommen={Object.keys(historie)
+                      .map(Number)
+                      .sort((a2, b2) => a2 - b2)
+                      .map(i => ({
+                        id: i,
+                        label: periodeKop(historie[i].start, periodMode),
+                        map: Object.fromEntries(kerncijfers(historie[i]).map(r => [r.key, r.waarde])),
+                      }))}
+                    bezig={historieBezig}
                   />
+
+                  {/* Verder terug kijken: zes periodes per klik erbij. */}
+                  <button
+                    onClick={() => setAantalTerug(n => n + 6)}
+                    disabled={historieBezig}
+                    style={{
+                      display: 'block', margin: '0 auto 0.9rem',
+                      fontSize: '0.66rem', fontWeight: 800,
+                      padding: '5px 12px', borderRadius: 999,
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      color: 'rgba(255,255,255,0.65)',
+                      cursor: historieBezig ? 'wait' : 'pointer', fontFamily: 'inherit',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    {historieBezig ? 'Laden…' : `Verder terug (nu ${Object.keys(historie).length} ${periodeWoord}en)`}
+                  </button>
                 </>
               ) : (
                 <>
@@ -2082,6 +2121,17 @@ const callDatum = (v) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+// Korte kop per periode-kolom: de vorm hangt af van wat je bekijkt.
+function periodeKop(d, mode) {
+  if (!d) return ''
+  if (mode === 'day')   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  if (mode === 'month') return d.toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })
+  if (mode === 'year')  return String(d.getFullYear())
+  if (mode === 'quarter') return `Q${Math.floor(d.getMonth() / 3) + 1} '${String(d.getFullYear()).slice(2)}`
+  // week en eigen periode: de begindatum zegt het meest.
+  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+}
+
 // Alle cijfers van één periode als platte lijst — zo kun je twee periodes
 // naast elkaar zetten zonder de tegel-berekening te dupliceren.
 // `soort`: 'aantal' | 'euro' | 'procent'. `omgekeerd` = lager is beter.
@@ -2122,10 +2172,11 @@ function kerncijfers({ activity, funnel, reactionStats, cash } = {}) {
   ]
 }
 
-// Tabelweergave: elke stat op een regel, met de vorige even lange periode
-// ernaast en het verschil erachter.
-function StatTabel({ nu, vorig, bezig, periodeLabel, vorigLabel }) {
-  const vorigMap = Object.fromEntries((vorig || []).map(r => [r.key, r.waarde]))
+// Tabelweergave: elke stat op een regel, met een kolom per periode. De eerste
+// kolom (de stat-naam) en de kolom "Nu" blijven staan; de geschiedenis scrolt
+// horizontaal weg. Elke oudere kolom wordt vergeleken met NU: groen als het nu
+// beter is dan toen, rood als het slechter is.
+function StatTabel({ rijen, kolommen, bezig }) {
   const toon = (r, v) => {
     if (v == null) return '—'
     if (r.soort === 'euro') return '€' + Number(v).toLocaleString('nl-NL')
@@ -2133,43 +2184,63 @@ function StatTabel({ nu, vorig, bezig, periodeLabel, vorigLabel }) {
     return String(v)
   }
   const kop = {
-    fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-    textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0 0 6px',
+    fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+    textTransform: 'uppercase', letterSpacing: '0.06em',
+    padding: '0 0 7px', whiteSpace: 'nowrap',
   }
+  const cel = {
+    fontSize: '0.72rem', fontWeight: 800, textAlign: 'right',
+    padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.05)',
+    fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+  }
+  // Vaste kolommen links: stat-naam + Nu. Die plakken bij het scrollen.
+  const plak = (links) => ({
+    position: 'sticky', left: links, zIndex: 1, background: '#0a0a0a',
+  })
+  const NAAM_B = 132
+  const NU_B = 62
+
+  if (!rijen.length) {
+    return <div style={{ padding: '0.6rem 0 1rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>Geen stats geselecteerd.</div>
+  }
+
   return (
-    <div style={{ margin: '0 0 0.8rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '0 10px', alignItems: 'center' }}>
-        <div style={kop}>Stat</div>
-        <div style={{ ...kop, textAlign: 'right' }}>{periodeLabel}</div>
-        <div style={{ ...kop, textAlign: 'right' }}>{vorigLabel}</div>
-        <div style={{ ...kop, textAlign: 'right' }}>Verschil</div>
-        {nu.map((r) => {
-          const v = vorig ? (vorigMap[r.key] ?? null) : null
-          const heeftBeide = r.waarde != null && v != null
-          const delta = heeftBeide ? r.waarde - v : null
-          const beter = delta == null || delta === 0 ? null : (r.omgekeerd ? delta < 0 : delta > 0)
-          const kleur = beter == null ? 'rgba(255,255,255,0.35)' : (beter ? '#10b981' : '#ef4444')
-          const cel = {
-            fontSize: '0.72rem', fontWeight: 800, textAlign: 'right',
-            padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.05)',
-            fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
-          }
-          return (
-            <React.Fragment key={r.key}>
-              <div style={{ ...cel, textAlign: 'left', color: 'rgba(255,255,255,0.65)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 0 0.8rem', paddingBottom: 4 }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: NAAM_B + NU_B + kolommen.length * 64 }}>
+        <thead>
+          <tr>
+            <th style={{ ...kop, ...plak(0), width: NAAM_B, minWidth: NAAM_B, textAlign: 'left' }}>Stat</th>
+            <th style={{ ...kop, ...plak(NAAM_B), width: NU_B, minWidth: NU_B, textAlign: 'right', color: '#fff' }}>Nu</th>
+            {kolommen.map(k => (
+              <th key={k.id} style={{ ...kop, textAlign: 'right', minWidth: 64, paddingLeft: 12 }}>{k.label}</th>
+            ))}
+            {bezig && <th style={{ ...kop, textAlign: 'right', paddingLeft: 12 }}>…</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rijen.map(r => (
+            <tr key={r.key}>
+              <td style={{ ...cel, ...plak(0), textAlign: 'left', color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>
                 {r.label}
-              </div>
-              <div style={{ ...cel, color: '#fff' }}>{toon(r, r.waarde)}</div>
-              <div style={{ ...cel, color: 'rgba(255,255,255,0.45)' }}>
-                {bezig && !vorig ? '…' : toon(r, v)}
-              </div>
-              <div style={{ ...cel, color: kleur }}>
-                {delta == null ? '—' : delta === 0 ? '0' : `${delta > 0 ? '+' : '-'}${toon(r, Math.abs(delta))}`}
-              </div>
-            </React.Fragment>
-          )
-        })}
-      </div>
+              </td>
+              <td style={{ ...cel, ...plak(NAAM_B), color: '#fff' }}>{toon(r, r.waarde)}</td>
+              {kolommen.map(k => {
+                const v = k.map[r.key] ?? null
+                const beide = r.waarde != null && v != null
+                const delta = beide ? r.waarde - v : null
+                const beter = delta == null || delta === 0 ? null : (r.omgekeerd ? delta < 0 : delta > 0)
+                const kleur = beter == null ? 'rgba(255,255,255,0.45)' : (beter ? '#10b981' : '#ef4444')
+                return (
+                  <td key={k.id} style={{ ...cel, paddingLeft: 12, color: kleur }}>
+                    {toon(r, v)}
+                  </td>
+                )
+              })}
+              {bezig && <td style={{ ...cel, paddingLeft: 12, color: 'rgba(255,255,255,0.25)' }}>…</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
