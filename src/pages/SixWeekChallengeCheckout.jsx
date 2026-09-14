@@ -464,7 +464,8 @@ export default function SixWeekChallengeCheckout() {
                 { Icon: BadgeEuro, tekst: 'Vind je tijdens de 6 weken dat je geen €297 aan coaching waarde krijgt? Geld terug.' },
               ].map((r, i) => (
                 <div key={r.tekst} style={{
-                  display: 'flex', gap: '0.7rem', alignItems: 'center',
+                  display: 'flex', gap: '0.7rem',
+                  alignItems: 'center', justifyContent: 'center',
                   padding: isMobile ? '0.7rem 0' : '0.8rem 0',
                   borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
