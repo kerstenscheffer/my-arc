@@ -354,8 +354,9 @@ export default function SixWeekChallengeCheckout() {
 
           <div style={{
             maxWidth: 520, width: '100%',
-            // Negatieve marge: de kop schuift over de onderkant van de foto.
-            marginTop: isMobile ? -46 : -60,
+            // Negatieve marge: de kop schuift over de onderkant van de foto,
+            // maar houdt afstand tot het beeld.
+            marginTop: isMobile ? -18 : -22,
             padding: isMobile ? `0 1.25rem 3.5rem` : `0 2rem 5rem`,
             position: 'relative', zIndex: 2,
           }}>
@@ -363,20 +364,44 @@ export default function SixWeekChallengeCheckout() {
             <div style={{
               fontSize: isMobile ? '1.6rem' : '2.1rem', fontWeight: 900, color: '#fff',
               lineHeight: 1.15, letterSpacing: '-0.025em',
-              marginBottom: isMobile ? '0.5rem' : '0.6rem',
+              marginBottom: isMobile ? '1.6rem' : '2rem',
               textShadow: '0 2px 14px rgba(0,0,0,0.85)',
             }}>
               6 Weken In Shape Challenge
             </div>
-            <p style={{
+            {/* De twee regels van de challenge, genummerd zoals de garantie. */}
+            <div style={{
               margin: `0 auto ${isMobile ? '2.5rem' : '3rem'}`,
-              maxWidth: 420,
-              fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 600,
-              color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
+              maxWidth: 440, width: '100%', textAlign: 'left',
             }}>
-              <span style={{ color: GOLD, fontWeight: 900 }}>Win Your Money Back.</span> Haal je doel,
-              of voer je acties uit en krijg je investering terug.
-            </p>
+              <div style={{
+                fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                color: GOLD, letterSpacing: '-0.015em', textAlign: 'center',
+                marginBottom: isMobile ? '0.75rem' : '0.9rem',
+              }}>
+                Win Your Money Back regels:
+              </div>
+              {[
+                'Haal afgesproken resultaat.',
+                'Of voer afgesproken acties uit, en krijg je investering terug.',
+              ].map((tekst, i) => (
+                <div key={i} style={{
+                  display: 'flex', gap: '0.7rem', alignItems: 'baseline',
+                  padding: isMobile ? '0.6rem 0' : '0.7rem 0',
+                  borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  <span style={{
+                    flexShrink: 0,
+                    fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: GOLD,
+                  }}>{i + 1}.</span>
+                  <span style={{
+                    fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
+                  }}>{tekst}</span>
+                </div>
+              ))}
+            </div>
 
             {/* Twee knoppen: de methode en de voorwaarden. De prijs stond
                 hierboven als los blok; dat maakte het scherm druk, dus die
