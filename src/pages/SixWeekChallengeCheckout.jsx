@@ -378,7 +378,7 @@ export default function SixWeekChallengeCheckout() {
               marginBottom: isMobile ? '1.6rem' : '2rem',
               textShadow: '0 2px 14px rgba(0,0,0,0.85)',
             }}>
-              6 Weken In Shape Challenge
+              6 WEKEN IN SHAPE CHALLENGE
             </div>
             {/* De twee regels van de challenge: een icoon in plaats van een
                 cijfer, en gecentreerd in plaats van links uitgelijnd. */}
