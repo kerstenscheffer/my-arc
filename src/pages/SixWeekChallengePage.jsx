@@ -10,7 +10,7 @@
 // pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro } from 'lucide-react'
+import { Star, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2 } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -117,19 +117,22 @@ function Blad({ open, titel, onClose, isMobile, children }) {
         position: 'fixed', inset: 0, zIndex: 200,
         background: 'rgba(0,0,0,0.82)',
         backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        // Op telefoon schuift hij van onder in beeld, op desktop staat hij
+        // midden op het scherm: daar is onderaan plakken alleen maar ver weg.
+        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
+        padding: isMobile ? 0 : '2rem',
         animation: 'bladWaas 0.2s ease',
       }}
     >
       <div style={{
         width: '100%', maxWidth: 520,
         background: BG,
-        borderRadius: '18px 18px 0 0',
+        borderRadius: isMobile ? '18px 18px 0 0' : 18,
         border: '1px solid rgba(255,255,255,0.1)',
-        borderBottom: 'none',
-        maxHeight: '80vh',
+        borderBottom: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
+        maxHeight: isMobile ? '80vh' : '84vh',
         display: 'flex', flexDirection: 'column',
-        animation: 'bladOmhoog 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+        animation: `${isMobile ? 'bladOmhoog' : 'bladIn'} 0.28s cubic-bezier(0.22, 1, 0.36, 1)`,
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -197,6 +200,8 @@ export default function SixWeekChallengePage() {
   const aanbodRef = useRef(null)
   // Wat er onder de twee knoppen openklapt: 'methode', 'voorwaarden' of niets.
   const [open, setOpen] = useState(null)
+  // Volledig scherm: handig als je de pagina op een groot scherm laat zien.
+  const [volledig, setVolledig] = useState(false)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768)
@@ -265,6 +270,17 @@ export default function SixWeekChallengePage() {
       el.removeEventListener('touchend', resume)
     }
   }, [])
+
+  useEffect(() => {
+    const kijk = () => setVolledig(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', kijk)
+    return () => document.removeEventListener('fullscreenchange', kijk)
+  }, [])
+
+  const wisselVolledig = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.()
+    else document.documentElement.requestFullscreen?.().catch(() => {})
+  }
 
   const doubledSlides = [...SLIDES, ...SLIDES]
 
@@ -338,42 +354,6 @@ export default function SixWeekChallengePage() {
             }}>
               6 Weken In Shape Challenge
             </div>
-            {/* De twee regels van de challenge: een icoon in plaats van een
-                cijfer, en gecentreerd in plaats van links uitgelijnd. */}
-            <div style={{
-              margin: `0 auto ${isMobile ? '4rem' : '4.5rem'}`,
-              maxWidth: isMobile ? 440 : 620, width: '100%',
-            }}>
-              <div style={{
-                fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 900,
-                color: GOLD, letterSpacing: '-0.015em', textAlign: 'center',
-                marginBottom: isMobile ? '0.75rem' : '1rem',
-              }}>
-                Geld terug voorwaarden:
-              </div>
-              {[
-                { Icon: Target, tekst: 'Haal afgesproken doel.' },
-                { Icon: CheckCircle2, tekst: 'Of voer afgesproken acties uit.' },
-              ].map((r, i) => (
-                <div key={r.tekst} style={{
-                  display: 'flex', gap: '0.6rem',
-                  alignItems: 'center', justifyContent: 'center', textAlign: 'left',
-                  padding: isMobile ? '0.7rem 0' : '1rem 0',
-                  borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)',
-                }}>
-                  <r.Icon
-                    size={isMobile ? 18 : 24} strokeWidth={2.4}
-                    style={{ flexShrink: 0, color: GOLD }}
-                  />
-                  <span style={{
-                    fontSize: isMobile ? '0.85rem' : '1.08rem', fontWeight: 700,
-                    color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
-                  }}>{r.tekst}</span>
-                </div>
-              ))}
-            </div>
-
             {/* Twee knoppen: de methode en de voorwaarden. Geen omlijnde
                 vakken meer maar een icoon met het woord eronder; het scherm
                 oogde te druk met alles in een container. */}
@@ -606,6 +586,30 @@ export default function SixWeekChallengePage() {
         Doe mee <ChevronDown size={16} strokeWidth={3} />
       </button>
 
+      {/* Volledig scherm — linksboven, zodat hij nergens overheen valt. */}
+      <button
+        onClick={wisselVolledig}
+        title={volledig ? 'Volledig scherm verlaten' : 'Volledig scherm'}
+        aria-label={volledig ? 'Volledig scherm verlaten' : 'Volledig scherm'}
+        style={{
+          position: 'fixed',
+          left: isMobile ? 10 : 20,
+          top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 10 : 20}px)`,
+          zIndex: 120,
+          width: 36, height: 36, padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.45)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          borderRadius: 10,
+          color: 'rgba(255,255,255,0.8)',
+          cursor: 'pointer', fontFamily: 'inherit',
+          backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {volledig ? <Minimize2 size={16} strokeWidth={2.6} /> : <Maximize2 size={16} strokeWidth={2.6} />}
+      </button>
+
       {/* ══ Nav-dots — zoals /16week ══ */}
       <div style={{
         position: 'fixed',
@@ -652,8 +656,44 @@ export default function SixWeekChallengePage() {
       {/* De voorwaarden — dezelfde stroken, plus de regel dat een coach ze
           mondeling mag bijstellen. */}
       <Blad open={open === 'voorwaarden'} titel="De voorwaarden" onClose={() => setOpen(null)} isMobile={isMobile}>
+        {/* De geld-terug-regels stonden op het eerste scherm; ze horen hier,
+            bij de acties waar ze over gaan. */}
+        <div style={{ marginBottom: isMobile ? '1rem' : '1.15rem' }}>
+          <div style={{
+            fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+            color: GOLD, letterSpacing: '-0.015em',
+            marginBottom: isMobile ? '0.6rem' : '0.75rem',
+          }}>
+            Geld terug voorwaarden:
+          </div>
+          {[
+            { Icon: Target, tekst: 'Haal afgesproken doel.' },
+            { Icon: CheckCircle2, tekst: 'Of voer afgesproken acties uit.' },
+          ].map((r, i) => (
+            <div key={r.tekst} style={{
+              display: 'flex', gap: '0.6rem', alignItems: 'center',
+              padding: isMobile ? '0.6rem 0' : '0.7rem 0',
+              borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <r.Icon size={isMobile ? 18 : 20} strokeWidth={2.4} style={{ flexShrink: 0, color: GOLD }} />
+              <span style={{
+                fontSize: isMobile ? '0.85rem' : '0.95rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
+              }}>{r.tekst}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
+          letterSpacing: '0.15em', textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.35)', marginBottom: isMobile ? '0.5rem' : '0.6rem',
+        }}>
+          De acties
+        </div>
         <Stroken isMobile={isMobile} items={[
-          { foto: '/voorwaarden/workouts.jpg', kop: '3 workouts per week',     sub: 'van 45 minuten' },
+          { foto: '/voorwaarden/workouts.jpg', kop: 'Minimaal 2 trainingen per week', sub: 'van 45 minuten' },
           { foto: '/voorwaarden/voeding.jpg',  kop: '80% van je voedingsplan', sub: 'macrodoelen gehaald of plan gevolgd' },
           { foto: '/voorwaarden/wegen.jpg',    kop: '3x per week wegen',       sub: 'we sturen op het weekgemiddelde' },
           { foto: '/voorwaarden/checkin.jpg',  kop: 'Elke week je check-in',   sub: 'invullen in de app' },
@@ -725,6 +765,7 @@ export default function SixWeekChallengePage() {
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
         @keyframes bladWaas { from { opacity: 0; } to { opacity: 1; } }
         @keyframes bladOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes bladIn { from { transform: translateY(14px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
         body { overflow: hidden; }
         ::-webkit-scrollbar { display: none; }
       `}</style>
