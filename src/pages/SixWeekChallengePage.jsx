@@ -234,7 +234,7 @@ export default function SixWeekChallengePage() {
     background: BG,
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    padding: isMobile ? '3.5rem 1.25rem' : '5rem 2rem',
+    padding: isMobile ? '3.5rem 1.25rem' : '4rem 3rem',
     position: 'relative',
   }
 
@@ -294,7 +294,7 @@ export default function SixWeekChallengePage() {
               we de breedte, zodat de hoogte binnen het scherm blijft. */}
           <div style={{
             position: 'relative', width: '100%',
-            maxWidth: isMobile ? '100%' : 760,
+            maxWidth: isMobile ? '100%' : 1000,
             margin: '0 auto',
             aspectRatio: '2 / 1',
             flexShrink: 0,
@@ -311,11 +311,11 @@ export default function SixWeekChallengePage() {
           </div>
 
           <div style={{
-            maxWidth: 520, width: '100%',
+            maxWidth: isMobile ? 520 : 880, width: '100%',
             // Negatieve marge: de kop schuift over de onderkant van de foto,
             // maar houdt afstand tot het beeld.
-            marginTop: isMobile ? -18 : -22,
-            padding: isMobile ? `0 1.25rem 3.5rem` : `0 2rem 5rem`,
+            marginTop: isMobile ? -18 : -34,
+            padding: isMobile ? `0 1.25rem 3.5rem` : `0 2rem 4rem`,
             position: 'relative', zIndex: 2,
           }}>
             {/* Logo boven de kop, zoals op de salespagina's. */}
@@ -323,7 +323,7 @@ export default function SixWeekChallengePage() {
               src="/ma-logo-header.png"
               alt="MY ARC"
               style={{
-                width: isMobile ? 96 : 120, height: 'auto', display: 'block',
+                width: isMobile ? 96 : 140, height: 'auto', display: 'block',
                 margin: `0 auto ${isMobile ? '0.9rem' : '1.15rem'}`,
                 filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.85))',
               }}
@@ -331,9 +331,9 @@ export default function SixWeekChallengePage() {
 
             {/* Kop boven de prijs — dit is waar het aanbod om draait. */}
             <div style={{
-              fontSize: isMobile ? '1.6rem' : '2.1rem', fontWeight: 900, color: '#fff',
-              lineHeight: 1.15, letterSpacing: '-0.025em',
-              marginBottom: isMobile ? '1.6rem' : '2rem',
+              fontSize: isMobile ? '1.6rem' : '3rem', fontWeight: 900, color: '#fff',
+              lineHeight: 1.1, letterSpacing: '-0.03em',
+              marginBottom: isMobile ? '1.6rem' : '2.25rem',
               textShadow: '0 2px 14px rgba(0,0,0,0.85)',
             }}>
               6 Weken In Shape Challenge
@@ -341,13 +341,13 @@ export default function SixWeekChallengePage() {
             {/* De twee regels van de challenge: een icoon in plaats van een
                 cijfer, en gecentreerd in plaats van links uitgelijnd. */}
             <div style={{
-              margin: `0 auto ${isMobile ? '4rem' : '5rem'}`,
-              maxWidth: 440, width: '100%',
+              margin: `0 auto ${isMobile ? '4rem' : '4.5rem'}`,
+              maxWidth: isMobile ? 440 : 620, width: '100%',
             }}>
               <div style={{
-                fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 900,
                 color: GOLD, letterSpacing: '-0.015em', textAlign: 'center',
-                marginBottom: isMobile ? '0.75rem' : '0.9rem',
+                marginBottom: isMobile ? '0.75rem' : '1rem',
               }}>
                 Geld terug voorwaarden:
               </div>
@@ -358,16 +358,16 @@ export default function SixWeekChallengePage() {
                 <div key={r.tekst} style={{
                   display: 'flex', gap: '0.6rem',
                   alignItems: 'center', justifyContent: 'center', textAlign: 'left',
-                  padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+                  padding: isMobile ? '0.7rem 0' : '1rem 0',
                   borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
                 }}>
                   <r.Icon
-                    size={isMobile ? 18 : 20} strokeWidth={2.4}
+                    size={isMobile ? 18 : 24} strokeWidth={2.4}
                     style={{ flexShrink: 0, color: GOLD }}
                   />
                   <span style={{
-                    fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
+                    fontSize: isMobile ? '0.85rem' : '1.08rem', fontWeight: 700,
                     color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
                   }}>{r.tekst}</span>
                 </div>
@@ -378,7 +378,7 @@ export default function SixWeekChallengePage() {
                 vakken meer maar een icoon met het woord eronder; het scherm
                 oogde te druk met alles in een container. */}
             <div style={{
-              display: 'flex', gap: isMobile ? '1.1rem' : '3rem',
+              display: 'flex', gap: isMobile ? '1.1rem' : '5rem',
               justifyContent: 'center',
             }}>
               {[
@@ -396,14 +396,14 @@ export default function SixWeekChallengePage() {
                       gap: isMobile ? 9 : 11,
                       padding: 0, border: 'none', background: 'transparent',
                       color: '#fff', opacity: aan ? 1 : 0.75,
-                      fontSize: isMobile ? '0.75rem' : '0.95rem', fontWeight: 900,
+                      fontSize: isMobile ? '0.75rem' : '1.05rem', fontWeight: 900,
                       letterSpacing: '-0.01em', whiteSpace: 'nowrap',
                       fontFamily: 'inherit', cursor: 'pointer',
                       transition: 'opacity 0.15s ease',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <k.Icon size={isMobile ? 32 : 38} strokeWidth={2.4} />
+                    <k.Icon size={isMobile ? 32 : 44} strokeWidth={2.4} />
                     {k.label}
                   </button>
                 )
