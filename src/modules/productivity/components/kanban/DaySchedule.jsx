@@ -133,7 +133,7 @@ export default function DaySchedule({
 
               {tasks.length > 0 && (
                 <span style={{
-                  fontSize: '0.45rem', fontWeight: '700',
+                  fontSize: '0.58rem', fontWeight: '700',
                   color: isToday ? '#FFD700' : 'rgba(255,255,255,0.2)',
                   opacity: 0.7
                 }}>{tasks.length}</span>
@@ -151,7 +151,7 @@ export default function DaySchedule({
 
               {/* Drop indicator */}
               {isDrop && tasks.length === 0 && (
-                <span style={{ fontSize: '0.4rem', color: '#FFD700', fontWeight: '700' }}>LOSLATEN</span>
+                <span style={{ fontSize: '0.55rem', color: '#FFD700', fontWeight: '700' }}>Loslaten</span>
               )}
             </div>
 
@@ -193,13 +193,13 @@ export default function DaySchedule({
                     {onStartTask && (
                       <button
                         onClick={(e) => { e.stopPropagation(); onStartTask(task) }}
-                        style={{ width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isActive ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: '3px', color: isActive ? '#10b981' : 'rgba(255,255,255,0.2)', cursor: 'pointer', touchAction: 'manipulation', padding: 0 }}>
+                        style={{ width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isActive ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 8, color: isActive ? '#10b981' : 'rgba(255,255,255,0.2)', cursor: 'pointer', touchAction: 'manipulation', padding: 0 }}>
                         <Play size={8} />
                       </button>
                     )}
                     <button
                       onClick={(e) => { e.stopPropagation(); onCompleteTask(task.id) }}
-                      style={{ width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16,185,129,0.06)', border: 'none', borderRadius: '3px', color: '#10b981', cursor: 'pointer', touchAction: 'manipulation', padding: 0 }}>
+                      style={{ width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16,185,129,0.06)', border: 'none', borderRadius: 8, color: '#10b981', cursor: 'pointer', touchAction: 'manipulation', padding: 0 }}>
                       <CheckCircle size={8} />
                     </button>
                     <button
@@ -217,13 +217,13 @@ export default function DaySchedule({
               <div style={{
                 height: isDrop ? '32px' : '4px',
                 margin: '0 0.5rem 0.25rem',
-                borderRadius: '3px',
+                borderRadius: 8,
                 border: isDrop ? '1px dashed rgba(255,215,0,0.3)' : 'none',
                 background: isDrop ? 'rgba(255,215,0,0.04)' : 'transparent',
                 transition: 'all 0.15s ease',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                {isDrop && <span style={{ fontSize: '0.45rem', color: '#FFD700', fontWeight: '700' }}>HIER NEERZETTEN</span>}
+                {isDrop && <span style={{ fontSize: '0.58rem', color: '#FFD700', fontWeight: '700' }}>Hier neerzetten</span>}
               </div>
             )}
           </div>

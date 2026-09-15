@@ -73,7 +73,7 @@ export default function TaskTimer({ task, onComplete, onStop, isMobile, producti
       background: '#0a0a0a',
       border: `1px solid ${timerColor}30`,
       borderLeft: `3px solid ${timerColor}`,
-      borderRadius: '10px',
+      borderRadius: 12,
       overflow: 'hidden',
       zIndex: 9999,
       boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
@@ -99,7 +99,7 @@ export default function TaskTimer({ task, onComplete, onStop, isMobile, producti
         <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden', margin: '0.5rem 0 0.25rem' }}>
           <div style={{ height: '100%', width: `${pct}%`, background: timerColor, borderRadius: '2px', transition: 'width 1s linear' }} />
         </div>
-        <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           {isDone ? 'TIJD OP' : paused ? 'GEPAUZEERD' : `${pct}% OVER`}
         </div>
       </div>
@@ -107,11 +107,11 @@ export default function TaskTimer({ task, onComplete, onStop, isMobile, producti
       {/* Actions */}
       <div style={{ display: 'flex', gap: '0.375rem', padding: '0.375rem 0.625rem 0.625rem' }}>
         <button onClick={() => setPaused(p => !p)}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', padding: '0.4rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', minHeight: '32px', touchAction: 'manipulation' }}>
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', padding: '0.4rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 9, color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', minHeight: '32px', touchAction: 'manipulation' }}>
           {paused ? <><Play size={11} /> Hervat</> : <><Pause size={11} /> Pauze</>}
         </button>
         <button onClick={handleComplete}
-          style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', padding: '0.4rem', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', minHeight: '32px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', padding: '0.4rem', background: '#10b981', border: 'none', borderRadius: 9, color: '#fff', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', minHeight: '32px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
           <CheckCircle size={11} /> Afronden
         </button>
       </div>

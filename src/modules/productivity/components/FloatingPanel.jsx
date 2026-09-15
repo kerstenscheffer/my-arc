@@ -100,29 +100,29 @@ export default function FloatingPanel({
         onDrop={onDrop}
         title={label}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-          padding: '0.35rem 0.65rem',
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '0 0.75rem',
           minHeight: 30,
-          background: open ? `${accent}22` : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${open ? accent : 'rgba(255,255,255,0.1)'}`,
+          background: open ? '#fff' : 'rgba(255,255,255,0.05)',
+          border: `1px solid ${open ? '#fff' : 'rgba(255,255,255,0.12)'}`,
           borderRadius: 999,
-          color: open ? accent : '#fff',
-          fontSize: '0.7rem', fontWeight: 800,
+          color: open ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+          fontSize: '0.68rem', fontWeight: 800,
           letterSpacing: '-0.005em',
-          cursor: 'pointer',
+          cursor: 'pointer', fontFamily: 'inherit',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          transition: 'background 0.15s, border-color 0.15s',
+          transition: 'background 0.15s, border-color 0.15s, color 0.15s',
         }}
       >
-        {Icon && <Icon size={12} color={open ? accent : iconColor} />}
+        {Icon && <Icon size={12} strokeWidth={2.6} color={open ? '#0a0a0a' : iconColor} />}
         <span>{label}</span>
         {badge != null && (
           <span style={{
             padding: '1px 6px',
-            background: open ? accent : 'rgba(255,255,255,0.08)',
-            color: open ? '#000' : 'rgba(255,255,255,0.7)',
-            borderRadius: 999, fontSize: '0.6rem', fontWeight: 800,
-            fontFamily: 'monospace', minWidth: 16, textAlign: 'center',
+            background: open ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.1)',
+            color: open ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+            borderRadius: 999, fontSize: '0.6rem', fontWeight: 900,
+            minWidth: 16, textAlign: 'center', fontVariantNumeric: 'tabular-nums',
           }}>
             {badge}
           </span>
@@ -148,8 +148,8 @@ export default function FloatingPanel({
             zIndex: 2147483000,
             isolation: 'isolate',
             background: '#0a0a0a',
-            border: isMobile ? 'none' : `1px solid ${accent}66`,
-            borderRadius: isMobile ? 0 : 10,
+            border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.12)',
+            borderRadius: isMobile ? 0 : 14,
             overflow: 'hidden',
             boxShadow: '0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
             display: 'flex', flexDirection: 'column',
@@ -172,15 +172,15 @@ export default function FloatingPanel({
             }}
           >
             {!isMobile && <GripHorizontal size={11} color="rgba(255,255,255,0.3)" />}
-            {Icon && <Icon size={12} color={accent} />}
-            <span style={{ flex: 1, fontSize: '0.7rem', fontWeight: 800, color: '#fff' }}>
+            {Icon && <Icon size={12} strokeWidth={2.6} color={accent} />}
+            <span style={{ flex: 1, fontSize: '0.74rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
               {label}
               {badge != null && (
                 <span style={{
                   marginLeft: 6, padding: '1px 5px',
-                  background: 'rgba(255,255,255,0.06)',
+                  background: 'rgba(255,255,255,0.08)',
                   color: 'rgba(255,255,255,0.65)',
-                  borderRadius: 4, fontSize: '0.55rem', fontFamily: 'monospace',
+                  borderRadius: 999, fontSize: '0.58rem', fontWeight: 800,
                 }}>{badge}</span>
               )}
             </span>
@@ -189,11 +189,11 @@ export default function FloatingPanel({
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               style={{
-                width: 22, height: 22, padding: 0,
+                width: 26, height: 26, padding: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'transparent',
+                background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 5,
+                borderRadius: 8,
                 color: 'rgba(255,255,255,0.5)',
                 cursor: 'pointer', touchAction: 'manipulation',
               }}

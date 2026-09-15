@@ -83,12 +83,12 @@ export default function TimeInsightsHub({ productivityService, coachId, isMobile
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0.625rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.375rem' }}>
           <span style={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: '800', color: '#fff' }}>{fmtMins(stats.totalMinutes)}</span>
-          <span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>TOTAAL · {stats.sessionCount} SESSIES</span>
+          <span style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>TOTAAL · {stats.sessionCount} SESSIES</span>
         </div>
         <div style={{ display: 'flex', gap: '0.25rem' }}>
           {RANGES.map(r => (
             <button key={r.days} onClick={() => setRange(r.days)}
-              style={{ padding: '0.2rem 0.4rem', background: range === r.days ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${range === r.days ? 'rgba(59,130,246,0.35)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '4px', color: range === r.days ? '#3b82f6' : 'rgba(255,255,255,0.3)', fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', minHeight: '24px', touchAction: 'manipulation' }}>
+              style={{ padding: '0.2rem 0.4rem', background: range === r.days ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${range === r.days ? 'rgba(59,130,246,0.35)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, color: range === r.days ? '#3b82f6' : 'rgba(255,255,255,0.3)', fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', minHeight: '24px', touchAction: 'manipulation' }}>
               {r.label}
             </button>
           ))}
@@ -99,7 +99,7 @@ export default function TimeInsightsHub({ productivityService, coachId, isMobile
       <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
         <div style={{ padding: isMobile ? '0.4rem 0.75rem' : '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
           <Tag size={10} color="rgba(255,255,255,0.2)" />
-          <span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>PER CATEGORIE</span>
+          <span style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>PER CATEGORIE</span>
         </div>
 
         {GOAL_CATEGORIES.map(cat => {
@@ -114,7 +114,7 @@ export default function TimeInsightsHub({ productivityService, coachId, isMobile
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: cat.color, flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: '0.65rem', fontWeight: '700', color: 'rgba(255,255,255,0.7)' }}>{cat.label}</span>
                 <span style={{ fontSize: '0.6rem', fontWeight: '800', color: cat.color }}>{fmtMins(mins)}</span>
-                <span style={{ fontSize: '0.45rem', fontWeight: '600', color: 'rgba(255,255,255,0.2)', minWidth: '28px', textAlign: 'right' }}>{totalPct}%</span>
+                <span style={{ fontSize: '0.58rem', fontWeight: '600', color: 'rgba(255,255,255,0.2)', minWidth: '28px', textAlign: 'right' }}>{totalPct}%</span>
               </div>
               <div style={{ height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${pct}%`, background: cat.color, borderRadius: '2px', transition: 'width 0.4s ease' }} />
@@ -135,7 +135,7 @@ export default function TimeInsightsHub({ productivityService, coachId, isMobile
                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#6b7280', flexShrink: 0 }} />
                   <span style={{ flex: 1, fontSize: '0.65rem', fontWeight: '700', color: 'rgba(255,255,255,0.7)' }}>{id}</span>
                   <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#6b7280' }}>{fmtMins(mins)}</span>
-                  <span style={{ fontSize: '0.45rem', fontWeight: '600', color: 'rgba(255,255,255,0.2)', minWidth: '28px', textAlign: 'right' }}>{totalPct}%</span>
+                  <span style={{ fontSize: '0.58rem', fontWeight: '600', color: 'rgba(255,255,255,0.2)', minWidth: '28px', textAlign: 'right' }}>{totalPct}%</span>
                 </div>
                 <div style={{ height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${pct}%`, background: '#6b7280', borderRadius: '2px' }} />
@@ -149,7 +149,7 @@ export default function TimeInsightsHub({ productivityService, coachId, isMobile
       <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
         <div style={{ padding: isMobile ? '0.4rem 0.75rem' : '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
           <BarChart2 size={10} color="rgba(255,255,255,0.2)" />
-          <span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>PER DAG</span>
+          <span style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>PER DAG</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.25rem', padding: isMobile ? '0.375rem 0.75rem 0.625rem' : '0.375rem 1rem 0.625rem', height: '80px' }}>
@@ -160,11 +160,11 @@ export default function TimeInsightsHub({ productivityService, coachId, isMobile
 
             return (
               <div key={date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', height: '100%', justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '0.4rem', fontWeight: '700', color: dayMins > 0 ? '#fff' : 'transparent' }}>{dayMins > 0 ? fmtMins(dayMins) : ''}</span>
+                <span style={{ fontSize: '0.55rem', fontWeight: '700', color: dayMins > 0 ? '#fff' : 'transparent' }}>{dayMins > 0 ? fmtMins(dayMins) : ''}</span>
                 <div style={{ width: '100%', background: 'rgba(255,255,255,0.04)', borderRadius: '3px 3px 0 0', height: '52px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
                   <div style={{ width: '100%', height: `${Math.max(barPct * 100, dayMins > 0 ? 8 : 0)}%`, background: isToday ? '#3b82f6' : 'rgba(59,130,246,0.4)', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease' }} />
                 </div>
-                <span style={{ fontSize: '0.4rem', fontWeight: '600', color: isToday ? '#3b82f6' : 'rgba(255,255,255,0.2)', textTransform: 'uppercase' }}>{dayLabel}</span>
+                <span style={{ fontSize: '0.55rem', fontWeight: '600', color: isToday ? '#3b82f6' : 'rgba(255,255,255,0.2)', textTransform: 'uppercase' }}>{dayLabel}</span>
               </div>
             )
           })}
@@ -175,7 +175,7 @@ export default function TimeInsightsHub({ productivityService, coachId, isMobile
       <div>
         <div style={{ padding: isMobile ? '0.4rem 0.75rem' : '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.3rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
           <Clock size={10} color="rgba(255,255,255,0.2)" />
-          <span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>RECENTE SESSIES</span>
+          <span style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>RECENTE SESSIES</span>
         </div>
 
         {stats.logs.slice(0, 15).map(log => {
@@ -185,9 +185,9 @@ export default function TimeInsightsHub({ productivityService, coachId, isMobile
             <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: isMobile ? '0.35rem 0.75rem' : '0.35rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.025)', borderLeft: `3px solid ${catColor}30` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.task_title}</div>
-                <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)', marginTop: '1px' }}>{fmtDay(log.logged_at)} · {fmtTime(log.logged_at)}</div>
+                <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)', marginTop: '1px' }}>{fmtDay(log.logged_at)} · {fmtTime(log.logged_at)}</div>
               </div>
-              <span style={{ padding: '1px 5px', background: `${catColor}12`, border: `1px solid ${catColor}20`, borderRadius: '3px', fontSize: '0.45rem', fontWeight: '600', color: catColor, flexShrink: 0 }}>
+              <span style={{ padding: '1px 5px', background: `${catColor}12`, border: `1px solid ${catColor}20`, borderRadius: 8, fontSize: '0.58rem', fontWeight: '600', color: catColor, flexShrink: 0 }}>
                 {cat?.label || log.category}
               </span>
               <span style={{ fontSize: '0.65rem', fontWeight: '800', color: '#fff', flexShrink: 0, minWidth: '30px', textAlign: 'right' }}>

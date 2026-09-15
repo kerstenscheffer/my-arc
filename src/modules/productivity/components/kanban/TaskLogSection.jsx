@@ -221,7 +221,7 @@ export default function TaskLogSection({ taskId, coachId, db, isMobile }) {
       }}>
         <BookOpen size={11} color="#FFD700" />
         <span style={{
-          fontSize: '0.5rem', fontWeight: 800,
+          fontSize: '0.58rem', fontWeight: 800,
           color: 'rgba(255,255,255,0.45)',
           letterSpacing: '0.06em', textTransform: 'uppercase',
         }}>
@@ -229,7 +229,7 @@ export default function TaskLogSection({ taskId, coachId, db, isMobile }) {
         </span>
         <span style={{
           marginLeft: 'auto',
-          fontSize: '0.5rem', fontWeight: 700,
+          fontSize: '0.58rem', fontWeight: 700,
           color: savingState === 'saving' ? 'rgba(255,215,0,0.7)'
             : savingState === 'saved' ? 'rgba(16,185,129,0.7)' : 'rgba(255,255,255,0.25)',
           letterSpacing: '0.04em', textTransform: 'uppercase',
@@ -298,7 +298,7 @@ export default function TaskLogSection({ taskId, coachId, db, isMobile }) {
         <div style={{ marginTop: '0.85rem' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.35rem',
-            fontSize: '0.5rem', fontWeight: 800,
+            fontSize: '0.58rem', fontWeight: 800,
             color: 'rgba(255,255,255,0.45)',
             letterSpacing: '0.06em', textTransform: 'uppercase',
             marginBottom: '0.4rem',

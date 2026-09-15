@@ -128,14 +128,14 @@ export default function DayDetailView({
         background: '#0a0a0a',
         border: `1px solid ${isToday ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.06)'}`,
         borderTop: `2px solid ${isToday ? '#FFD700' : 'rgba(255,255,255,0.15)'}`,
-        borderRadius: '10px',
+        borderRadius: 12,
         overflow: 'hidden'
       }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           <button onClick={onBack}
-            style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0, padding: 0 }}>
+            style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 9, color: 'rgba(255,255,255,0.4)', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0, padding: 0 }}>
             <ArrowLeft size={12} />
           </button>
           <div style={{ flex: 1 }}>
@@ -143,7 +143,7 @@ export default function DayDetailView({
               {DAYS_NL[dayId]}
             </div>
             {isToday && (
-              <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>VANDAAG</div>
+              <div style={{ fontSize: '0.55rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>VANDAAG</div>
             )}
           </div>
           <span style={{ fontSize: '0.55rem', fontWeight: '800', color: 'rgba(255,255,255,0.25)' }}>{dayTasks.length} taken</span>
@@ -175,7 +175,7 @@ export default function DayDetailView({
           )}
 
           {dragOverPanel && dayTasks.length === 0 && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed rgba(255,215,0,0.3)', borderRadius: '8px', color: '#FFD700', fontSize: '0.65rem', fontWeight: '700', minHeight: '80px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed rgba(255,215,0,0.3)', borderRadius: 10, color: '#FFD700', fontSize: '0.65rem', fontWeight: '700', minHeight: '80px' }}>
               NEERZETTEN
             </div>
           )}
@@ -203,12 +203,12 @@ export default function DayDetailView({
                   background: isActive ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)',
                   border: `1px solid ${task.is_this_week ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.05)'}`,
                   borderLeft: `3px solid ${task.is_this_week ? '#FFD700' : color}`,
-                  borderRadius: '8px',
+                  borderRadius: 10,
                   cursor: 'grab',
                   transition: 'background 0.1s ease'
                 }}>
                   {/* Positie nummer */}
-                  <span style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.15)', minWidth: '14px', flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.55rem', fontWeight: '700', color: 'rgba(255,255,255,0.15)', minWidth: '14px', flexShrink: 0 }}>
                     {idx + 1}
                   </span>
 
@@ -227,12 +227,12 @@ export default function DayDetailView({
                   <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
                     {onStartTask && (
                       <button onClick={() => onStartTask(task)}
-                        style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isActive ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: '4px', color: isActive ? '#10b981' : 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation', padding: 0 }}>
+                        style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isActive ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 8, color: isActive ? '#10b981' : 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation', padding: 0 }}>
                         <Play size={10} />
                       </button>
                     )}
                     <button onClick={() => onCompleteTask(task.id)}
-                      style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16,185,129,0.08)', border: 'none', borderRadius: '4px', color: '#10b981', cursor: 'pointer', touchAction: 'manipulation', padding: 0 }}>
+                      style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16,185,129,0.08)', border: 'none', borderRadius: 8, color: '#10b981', cursor: 'pointer', touchAction: 'manipulation', padding: 0 }}>
                       <CheckCircle size={10} />
                     </button>
                     <button onClick={() => onRemoveFromDay(task.id)}
@@ -248,7 +248,7 @@ export default function DayDetailView({
 
           {/* Drop indicator onderaan als er al taken zijn */}
           {dragOverPanel && dayTasks.length > 0 && (
-            <div style={{ height: '32px', border: '2px dashed rgba(255,215,0,0.3)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFD700', fontSize: '0.5rem', fontWeight: '700' }}>
+            <div style={{ height: '32px', border: '2px dashed rgba(255,215,0,0.3)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFD700', fontSize: '0.58rem', fontWeight: '700' }}>
               HIER TOEVOEGEN
             </div>
           )}
@@ -271,7 +271,7 @@ export default function DayDetailView({
                 padding: '0.4rem 0.625rem',
                 background: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: '6px',
+                borderRadius: 9,
                 color: '#fff',
                 fontSize: '0.75rem',
                 outline: 'none'
@@ -289,14 +289,14 @@ export default function DayDetailView({
               kanbanBySectie.map(section => {
                 const isExpanded = expandedSections[section.id] !== false // standaard open
                 return (
-                  <div key={section.id} style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div key={section.id} style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden' }}>
                     {/* Sectie header */}
                     <button
                       onClick={() => setExpandedSections(prev => ({ ...prev, [section.id]: !isExpanded }))}
                       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.4rem 0.625rem', background: 'transparent', border: 'none', borderBottom: isExpanded ? `1px solid ${section.color}20` : 'none', cursor: 'pointer', touchAction: 'manipulation' }}>
                       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: section.color, flexShrink: 0 }} />
                       <span style={{ fontSize: '0.65rem', fontWeight: '700', color: section.color, flex: 1, textAlign: 'left' }}>{section.title}</span>
-                      <span style={{ fontSize: '0.5rem', fontWeight: '700', color: section.color, opacity: 0.6 }}>{section.tasks.length}</span>
+                      <span style={{ fontSize: '0.58rem', fontWeight: '700', color: section.color, opacity: 0.6 }}>{section.tasks.length}</span>
                       {isExpanded ? <ChevronUp size={10} color="rgba(255,255,255,0.2)" /> : <ChevronDown size={10} color="rgba(255,255,255,0.2)" />}
                     </button>
 
@@ -317,7 +317,7 @@ export default function DayDetailView({
                               background: 'rgba(255,255,255,0.02)',
                               border: `1px solid rgba(255,255,255,0.04)`,
                               borderLeft: `3px solid ${task.is_this_week ? '#FFD700' : section.color}`,
-                              borderRadius: '6px',
+                              borderRadius: 9,
                               cursor: 'grab',
                               transition: 'background 0.1s ease',
                               userSelect: 'none'
@@ -330,7 +330,7 @@ export default function DayDetailView({
                             </span>
                             {task.is_this_week && <Star size={9} color="#FFD700" fill="#FFD700" style={{ flexShrink: 0 }} />}
                             {task.estimated_minutes && (
-                              <span style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>{task.estimated_minutes}m</span>
+                              <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>{task.estimated_minutes}m</span>
                             )}
                           </div>
                         ))}
@@ -347,7 +347,7 @@ export default function DayDetailView({
       {/* Mobile: kanban onderaan als scrollbare lijst */}
       {isMobile && allKanbanTasks.length > 0 && (
         <div style={{ marginTop: '0.75rem' }}>
-          <div style={{ fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.375rem' }}>
+          <div style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.375rem' }}>
             SLEEP NAAR BOVEN
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
@@ -358,9 +358,9 @@ export default function DayDetailView({
                   e.dataTransfer.setData('task', JSON.stringify(task))
                   e.dataTransfer.setData('source', 'kanban')
                 }}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderLeft: `3px solid ${task._sectionColor}`, borderRadius: '6px', cursor: 'grab' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderLeft: `3px solid ${task._sectionColor}`, borderRadius: 9, cursor: 'grab' }}>
                 <span style={{ flex: 1, fontSize: '0.7rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>{task.title}</span>
-                <span style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.2)' }}>{task._sectionTitle}</span>
+                <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>{task._sectionTitle}</span>
               </div>
             ))}
           </div>

@@ -93,7 +93,7 @@ export default function ReflectionsHub({ productivityService, coachId, isMobile,
         <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           <div style={{ padding: isMobile ? '0.4rem 0.75rem' : '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
             <Clock size={10} color="#8b5cf6" />
-            <span style={{ fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>WACHTEN ({pendingReflections.length})</span>
+            <span style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>WACHTEN ({pendingReflections.length})</span>
           </div>
           {pendingReflections.map(task => {
             const priorityConfig = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium
@@ -103,18 +103,18 @@ export default function ReflectionsHub({ productivityService, coachId, isMobile,
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
                   <div style={{ display: 'flex', gap: '0.25rem', marginTop: '2px' }}>
-                    <span style={{ padding: '1px 4px', background: `${priorityConfig.color}12`, border: `1px solid ${priorityConfig.color}20`, borderRadius: '3px', fontSize: '0.45rem', fontWeight: '700', color: priorityConfig.color }}>
+                    <span style={{ padding: '1px 4px', background: `${priorityConfig.color}12`, border: `1px solid ${priorityConfig.color}20`, borderRadius: 8, fontSize: '0.58rem', fontWeight: '700', color: priorityConfig.color }}>
                       {priorityConfig.label}
                     </span>
                     {categoryConfig && (
-                      <span style={{ padding: '1px 4px', background: `${categoryConfig.color}12`, border: `1px solid ${categoryConfig.color}20`, borderRadius: '3px', fontSize: '0.45rem', fontWeight: '600', color: categoryConfig.color }}>
+                      <span style={{ padding: '1px 4px', background: `${categoryConfig.color}12`, border: `1px solid ${categoryConfig.color}20`, borderRadius: 8, fontSize: '0.58rem', fontWeight: '600', color: categoryConfig.color }}>
                         {categoryConfig.label}
                       </span>
                     )}
                   </div>
                 </div>
                 <button onClick={() => onStartReflection(task)}
-                  style={{ padding: '0.3rem 0.5rem', background: '#8b5cf6', border: 'none', borderRadius: '5px', color: '#fff', cursor: 'pointer', fontSize: '0.55rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '2px', minHeight: '28px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
+                  style={{ padding: '0.3rem 0.5rem', background: '#8b5cf6', border: 'none', borderRadius: 9, color: '#fff', cursor: 'pointer', fontSize: '0.55rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '2px', minHeight: '28px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
                   <Lightbulb size={10} /> Reflecteer
                 </button>
               </div>
@@ -127,7 +127,7 @@ export default function ReflectionsHub({ productivityService, coachId, isMobile,
       <div>
         <div style={{ padding: isMobile ? '0.4rem 0.75rem' : '0.4rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
           <CheckCircle size={10} color="#10b981" />
-          <span style={{ fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>GESCHIEDENIS ({history.length})</span>
+          <span style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>GESCHIEDENIS ({history.length})</span>
         </div>
 
         {history.length === 0 ? (
@@ -152,13 +152,13 @@ export default function ReflectionsHub({ productivityService, coachId, isMobile,
                       <div style={{ fontSize: '0.72rem', fontWeight: '700', color: reflection.skipped ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {taskTitle}
                       </div>
-                      <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <Calendar size={7} /> {formatDate(reflection.created_at)}
                       </div>
                     </div>
 
                     {reflection.skipped ? (
-                      <span style={{ padding: '1px 5px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '3px', fontSize: '0.45rem', color: 'rgba(255,255,255,0.25)', fontWeight: '600' }}>SKIP</span>
+                      <span style={{ padding: '1px 5px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, fontSize: '0.58rem', color: 'rgba(255,255,255,0.25)', fontWeight: '600' }}>SKIP</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0 }}>
                         {renderStars(reflection.rating)}
@@ -176,7 +176,7 @@ export default function ReflectionsHub({ productivityService, coachId, isMobile,
                         <div key={field.key} style={{ display: 'flex', gap: '0.5rem', padding: isMobile ? '0.35rem 0.75rem 0.35rem 1.25rem' : '0.35rem 1rem 0.35rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
                           <div style={{ width: '2px', background: field.color, borderRadius: '1px', flexShrink: 0, opacity: 0.5 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '0.4rem', fontWeight: '700', color: field.color, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{field.label}</div>
+                            <div style={{ fontSize: '0.55rem', fontWeight: '700', color: field.color, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{field.label}</div>
                             <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{reflection[field.key]}</div>
                           </div>
                         </div>

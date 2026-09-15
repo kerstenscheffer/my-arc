@@ -263,7 +263,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
           <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#f59e0b' }}>{formatWeekRange(weekStart, weekEnd)}</span>
         </div>
         <button onClick={handleGenerateReport} disabled={generating}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '5px', color: '#a78bfa', fontSize: '0.55rem', fontWeight: '700', cursor: generating ? 'not-allowed' : 'pointer', minHeight: '26px', touchAction: 'manipulation' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 9, color: '#a78bfa', fontSize: '0.55rem', fontWeight: '700', cursor: generating ? 'not-allowed' : 'pointer', minHeight: '26px', touchAction: 'manipulation' }}>
           <Sparkles size={9} /> {generating ? 'Genereren...' : 'Rapport'}
         </button>
       </div>
@@ -275,7 +275,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
             style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', padding: '0.4rem 0.25rem', background: 'transparent', border: 'none', borderBottom: activeSection === s.id ? `2px solid ${s.color}` : '2px solid transparent', color: activeSection === s.id ? s.color : 'rgba(255,255,255,0.2)', fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: activeSection === s.id ? '700' : '500', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '34px', whiteSpace: 'nowrap' }}>
             {s.label}
             {s.count !== null && s.count !== undefined && (
-              <span style={{ fontSize: '0.45rem', fontWeight: '800', opacity: 0.7 }}>({s.count})</span>
+              <span style={{ fontSize: '0.58rem', fontWeight: '800', opacity: 0.7 }}>({s.count})</span>
             )}
           </button>
         ))}
@@ -290,7 +290,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
               <div style={{ flex: 1, height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${goalsProgress}%`, background: goalsProgress === 100 ? '#10b981' : '#f59e0b', borderRadius: '2px', transition: 'width 0.3s ease' }} />
               </div>
-              <span style={{ fontSize: '0.5rem', fontWeight: '800', color: goalsProgress === 100 ? '#10b981' : 'rgba(255,255,255,0.3)', minWidth: '28px' }}>{goalsDone}/{weekGoals.length}</span>
+              <span style={{ fontSize: '0.58rem', fontWeight: '800', color: goalsProgress === 100 ? '#10b981' : 'rgba(255,255,255,0.3)', minWidth: '28px' }}>{goalsDone}/{weekGoals.length}</span>
             </div>
           )}
 
@@ -309,9 +309,9 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                 {/* Categorie header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: isMobile ? '0.35rem 0.75rem' : '0.35rem 1rem', borderBottom: `1px solid ${cat.color}15`, background: `${cat.color}05` }}>
                   <CatIcon name={cat.icon} size={11} color={cat.color} />
-                  <span style={{ fontSize: '0.5rem', fontWeight: '800', color: cat.color, textTransform: 'uppercase', letterSpacing: '0.06em', flex: 1 }}>{cat.label}</span>
+                  <span style={{ fontSize: '0.58rem', fontWeight: '800', color: cat.color, textTransform: 'uppercase', letterSpacing: '0.06em', flex: 1 }}>{cat.label}</span>
                   {catGoals.length > 0 && (
-                    <span style={{ fontSize: '0.45rem', fontWeight: '700', color: catDone === catGoals.length ? '#10b981' : 'rgba(255,255,255,0.2)' }}>{catDone}/{catGoals.length}</span>
+                    <span style={{ fontSize: '0.58rem', fontWeight: '700', color: catDone === catGoals.length ? '#10b981' : 'rgba(255,255,255,0.2)' }}>{catDone}/{catGoals.length}</span>
                   )}
                 </div>
 
@@ -326,7 +326,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                     <div key={goal.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: isMobile ? '0.45rem 0.75rem' : '0.45rem 1rem', borderLeft: `3px solid ${cat.color}40` }}>
                         <button onClick={() => handleToggleGoal(goal.id)}
-                          style={{ width: '20px', height: '20px', minWidth: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: goal.done ? 'rgba(16,185,129,0.1)' : 'transparent', border: goal.done ? '1.5px solid rgba(16,185,129,0.4)' : `1.5px solid ${cat.color}40`, borderRadius: '4px', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
+                          style={{ width: '20px', height: '20px', minWidth: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: goal.done ? 'rgba(16,185,129,0.1)' : 'transparent', border: goal.done ? '1.5px solid rgba(16,185,129,0.4)' : `1.5px solid ${cat.color}40`, borderRadius: 8, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
                           {goal.done && <Check size={11} color="#10b981" strokeWidth={2.5} />}
                         </button>
 
@@ -334,7 +334,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                           style={{ flex: 1, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, touchAction: 'manipulation' }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: '700', color: goal.done ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)', textDecoration: goal.done ? 'line-through' : 'none', lineHeight: 1.2 }}>{goal.text}</div>
                           {subtasks.length > 0 && (
-                            <div style={{ fontSize: '0.45rem', fontWeight: '700', color: subtasksDone === subtasks.length ? '#10b981' : 'rgba(255,255,255,0.25)', marginTop: '2px' }}>
+                            <div style={{ fontSize: '0.58rem', fontWeight: '700', color: subtasksDone === subtasks.length ? '#10b981' : 'rgba(255,255,255,0.25)', marginTop: '2px' }}>
                               {subtasksDone}/{subtasks.length} taken {hasKanban && <span style={{ color: '#f59e0b' }}>· in kanban</span>}
                             </div>
                           )}
@@ -342,7 +342,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
 
                         {subtasks.length > 0 && (
                           <div style={{ width: '26px', height: '26px', borderRadius: '50%', border: `2px solid ${subtasksDone === subtasks.length ? '#10b981' : cat.color + '30'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span style={{ fontSize: '0.4rem', fontWeight: '800', color: subtasksDone === subtasks.length ? '#10b981' : 'rgba(255,255,255,0.3)' }}>
+                            <span style={{ fontSize: '0.55rem', fontWeight: '800', color: subtasksDone === subtasks.length ? '#10b981' : 'rgba(255,255,255,0.3)' }}>
                               {Math.round((subtasksDone / subtasks.length) * 100)}%
                             </span>
                           </div>
@@ -357,7 +357,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                           value={goal.category || 'overig'}
                           onChange={(e) => { e.stopPropagation(); handleChangeGoalCategory(goal.id, e.target.value) }}
                           onClick={(e) => e.stopPropagation()}
-                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', color: 'rgba(255,255,255,0.3)', fontSize: '0.5rem', padding: '1px 2px', cursor: 'pointer', outline: 'none', maxWidth: '70px', touchAction: 'manipulation' }}
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.3)', fontSize: '0.58rem', padding: '1px 2px', cursor: 'pointer', outline: 'none', maxWidth: '70px', touchAction: 'manipulation' }}
                         >
                           {GOAL_CATEGORIES.map(c => (
                             <option key={c.id} value={c.id}>{c.label}</option>
@@ -378,17 +378,17 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                             return (
                               <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: isMobile ? '0.35rem 0.75rem 0.35rem 1.25rem' : '0.35rem 1rem 0.35rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.025)', opacity: sub.done ? 0.5 : 1 }}>
                                 <button onClick={() => handleToggleSubtask(goal.id, sub.id)}
-                                  style={{ width: '16px', height: '16px', minWidth: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: sub.done ? 'rgba(16,185,129,0.1)' : 'transparent', border: sub.done ? '1.5px solid rgba(16,185,129,0.35)' : '1.5px solid rgba(255,255,255,0.12)', borderRadius: '3px', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}>
+                                  style={{ width: '16px', height: '16px', minWidth: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: sub.done ? 'rgba(16,185,129,0.1)' : 'transparent', border: sub.done ? '1.5px solid rgba(16,185,129,0.35)' : '1.5px solid rgba(255,255,255,0.12)', borderRadius: 8, cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}>
                                   {sub.done && <Check size={9} color="#10b981" strokeWidth={2.5} />}
                                 </button>
                                 <span style={{ flex: 1, fontSize: '0.68rem', color: sub.done ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)', textDecoration: sub.done ? 'line-through' : 'none', lineHeight: 1.3 }}>{sub.text}</span>
                                 {inKanban ? (
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '1px 5px', background: sub.done ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${sub.done ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`, borderRadius: '3px', fontSize: '0.4rem', fontWeight: '700', color: sub.done ? '#10b981' : '#f59e0b', flexShrink: 0 }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '1px 5px', background: sub.done ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${sub.done ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`, borderRadius: 8, fontSize: '0.55rem', fontWeight: '700', color: sub.done ? '#10b981' : '#f59e0b', flexShrink: 0 }}>
                                     {sub.done ? <><Check size={7} /> KLAAR</> : <><Zap size={7} /> IN KANBAN</>}
                                   </span>
                                 ) : (
                                   <button onClick={() => setKanbanPickerFor({ goalId: goal.id, subtaskId: sub.id })}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '1px 5px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '3px', fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0, minHeight: '18px' }}>
+                                    style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '1px 5px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, fontSize: '0.55rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0, minHeight: '18px' }}>
                                     <ArrowRight size={7} /> Kanban
                                   </button>
                                 )}
@@ -401,14 +401,14 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                           })}
                           {addingSubtaskFor === goal.id ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: isMobile ? '0.35rem 0.75rem 0.35rem 1.25rem' : '0.35rem 1rem 0.35rem 1.5rem' }}>
-                              <div style={{ width: '16px', height: '16px', border: '1.5px dashed rgba(255,255,255,0.1)', borderRadius: '3px', flexShrink: 0 }} />
+                              <div style={{ width: '16px', height: '16px', border: '1.5px dashed rgba(255,255,255,0.1)', borderRadius: 8, flexShrink: 0 }} />
                               <input autoFocus type="text" value={newSubtaskText}
                                 onChange={(e) => setNewSubtaskText(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === 'Enter') handleAddSubtask(goal.id); if (e.key === 'Escape') { setAddingSubtaskFor(null); setNewSubtaskText('') } }}
                                 placeholder="Taak omschrijven..."
                                 style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.68rem', padding: 0 }} />
                               <button onClick={() => handleAddSubtask(goal.id)}
-                                style={{ padding: '2px 5px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '3px', color: '#10b981', fontSize: '0.45rem', fontWeight: '700', cursor: 'pointer', minHeight: '18px', touchAction: 'manipulation' }}>OK</button>
+                                style={{ padding: '2px 5px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, color: '#10b981', fontSize: '0.58rem', fontWeight: '700', cursor: 'pointer', minHeight: '18px', touchAction: 'manipulation' }}>OK</button>
                               <button onClick={() => { setAddingSubtaskFor(null); setNewSubtaskText('') }}
                                 style={{ padding: '2px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><X size={9} /></button>
                             </div>
@@ -434,9 +434,9 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                       style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: `1px solid ${cat.color}30`, outline: 'none', color: '#fff', fontSize: '0.75rem', padding: '0.2rem 0' }} />
                     <div style={{ display: 'flex', gap: '0.25rem' }}>
                       <button onClick={handleAddGoal}
-                        style={{ padding: '2px 8px', background: `${cat.color}15`, border: `1px solid ${cat.color}30`, borderRadius: '3px', color: cat.color, fontSize: '0.5rem', fontWeight: '700', cursor: 'pointer', minHeight: '22px', touchAction: 'manipulation' }}>Toevoegen</button>
+                        style={{ padding: '2px 8px', background: `${cat.color}15`, border: `1px solid ${cat.color}30`, borderRadius: 8, color: cat.color, fontSize: '0.58rem', fontWeight: '700', cursor: 'pointer', minHeight: '22px', touchAction: 'manipulation' }}>Toevoegen</button>
                       <button onClick={() => { setAddingGoal(false); setNewGoalText('') }}
-                        style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '3px', color: 'rgba(255,255,255,0.3)', fontSize: '0.5rem', cursor: 'pointer', minHeight: '22px', touchAction: 'manipulation' }}>Annuleer</button>
+                        style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, color: 'rgba(255,255,255,0.3)', fontSize: '0.58rem', cursor: 'pointer', minHeight: '22px', touchAction: 'manipulation' }}>Annuleer</button>
                     </div>
                   </div>
                 ) : (
@@ -462,7 +462,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
               <div key={win.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: isMobile ? '0.45rem 0.75rem' : '0.45rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                 <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>{config.emoji}</span>
                 <span style={{ flex: 1, fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.3 }}>{win.win_text}</span>
-                <span style={{ padding: '1px 4px', background: `${config.color}12`, border: `1px solid ${config.color}20`, borderRadius: '3px', fontSize: '0.45rem', fontWeight: '600', color: config.color, flexShrink: 0 }}>{config.label}</span>
+                <span style={{ padding: '1px 4px', background: `${config.color}12`, border: `1px solid ${config.color}20`, borderRadius: 8, fontSize: '0.58rem', fontWeight: '600', color: config.color, flexShrink: 0 }}>{config.label}</span>
                 <button onClick={() => handleDeleteWin(win.id)}
                   style={{ padding: '2px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.1)', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}><Trash2 size={10} /></button>
               </div>
@@ -471,20 +471,20 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
           {showAddWin ? (
             <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
               <textarea value={newWinText} onChange={(e) => setNewWinText(e.target.value)} placeholder="Wat was je win?" rows={2}
-                style={{ width: '100%', padding: '0.4rem 0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', fontSize: '0.75rem', resize: 'none', outline: 'none', marginBottom: '0.375rem' }} />
+                style={{ width: '100%', padding: '0.4rem 0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 9, color: '#fff', fontSize: '0.75rem', resize: 'none', outline: 'none', marginBottom: '0.375rem' }} />
               <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.375rem' }}>
                 {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
                   <button key={key} onClick={() => setNewWinCategory(key)}
-                    style={{ padding: '2px 6px', background: newWinCategory === key ? `${config.color}15` : 'transparent', border: `1px solid ${newWinCategory === key ? config.color + '40' : 'rgba(255,255,255,0.08)'}`, borderRadius: '4px', color: newWinCategory === key ? config.color : 'rgba(255,255,255,0.3)', fontSize: '0.55rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}>
+                    style={{ padding: '2px 6px', background: newWinCategory === key ? `${config.color}15` : 'transparent', border: `1px solid ${newWinCategory === key ? config.color + '40' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: newWinCategory === key ? config.color : 'rgba(255,255,255,0.3)', fontSize: '0.55rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}>
                     {config.emoji} {config.label}
                   </button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '0.375rem' }}>
                 <button onClick={() => { setShowAddWin(false); setNewWinText('') }}
-                  style={{ flex: 1, padding: '0.4rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '5px', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', cursor: 'pointer', minHeight: '30px', touchAction: 'manipulation' }}>Annuleer</button>
+                  style={{ flex: 1, padding: '0.4rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 9, color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', cursor: 'pointer', minHeight: '30px', touchAction: 'manipulation' }}>Annuleer</button>
                 <button onClick={handleAddWin} disabled={!newWinText.trim()}
-                  style={{ flex: 2, padding: '0.4rem', background: newWinText.trim() ? '#f59e0b' : 'rgba(245,158,11,0.2)', border: 'none', borderRadius: '5px', color: '#fff', fontSize: '0.7rem', fontWeight: '700', cursor: newWinText.trim() ? 'pointer' : 'not-allowed', minHeight: '30px', touchAction: 'manipulation' }}>Toevoegen</button>
+                  style={{ flex: 2, padding: '0.4rem', background: newWinText.trim() ? '#f59e0b' : 'rgba(245,158,11,0.2)', border: 'none', borderRadius: 9, color: '#fff', fontSize: '0.7rem', fontWeight: '700', cursor: newWinText.trim() ? 'pointer' : 'not-allowed', minHeight: '30px', touchAction: 'manipulation' }}>Toevoegen</button>
               </div>
             </div>
           ) : (
@@ -509,9 +509,9 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                 <CheckCircle size={12} color="#10b981" style={{ flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-                  {steps.length > 0 && <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)' }}>{steps.filter(s => s.done).length}/{steps.length} stappen</div>}
+                  {steps.length > 0 && <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)' }}>{steps.filter(s => s.done).length}/{steps.length} stappen</div>}
                 </div>
-                <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>{formatDate(task.completed_at)}</span>
+                <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>{formatDate(task.completed_at)}</span>
               </div>
             )
           })}
@@ -525,7 +525,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
             <div style={{ padding: '1.5rem 1rem', textAlign: 'center' }}>
               <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.7rem', marginBottom: '0.75rem' }}>Nog geen rapport gegenereerd</div>
               <button onClick={handleGenerateReport} disabled={generating}
-                style={{ padding: '0.5rem 0.875rem', background: '#8b5cf6', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.7rem', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', minHeight: '32px', touchAction: 'manipulation' }}>
+                style={{ padding: '0.5rem 0.875rem', background: '#8b5cf6', border: 'none', borderRadius: 9, color: '#fff', fontSize: '0.7rem', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', minHeight: '32px', touchAction: 'manipulation' }}>
                 <Sparkles size={11} /> Rapport genereren
               </button>
             </div>
@@ -552,7 +552,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                 {/* Doelen + subtasks */}
                 {weekGoals.length > 0 && (
                   <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <Target size={8} /> WEEKDOELEN
                     </div>
                     {weekGoals.map(g => {
@@ -561,9 +561,9 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                       return (
                         <div key={g.id} style={{ marginBottom: '0.5rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.2rem' }}>
-                            {g.done ? <CheckCircle size={11} color="#10b981" /> : <div style={{ width: '11px', height: '11px', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: '3px' }} />}
+                            {g.done ? <CheckCircle size={11} color="#10b981" /> : <div style={{ width: '11px', height: '11px', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: 8 }} />}
                             <span style={{ fontSize: '0.68rem', fontWeight: '700', color: g.done ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.8)', textDecoration: g.done ? 'line-through' : 'none' }}>{g.text}</span>
-                            {subs.length > 0 && <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)', marginLeft: 'auto' }}>{subsDone}/{subs.length}</span>}
+                            {subs.length > 0 && <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)', marginLeft: 'auto' }}>{subsDone}/{subs.length}</span>}
                           </div>
                           {subs.length > 0 && (
                             <div style={{ paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -579,7 +579,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                         </div>
                       )
                     })}
-                    <div style={{ marginTop: '0.375rem', fontSize: '0.5rem', fontWeight: '700', color: goalsProgress === 100 ? '#10b981' : '#f59e0b' }}>
+                    <div style={{ marginTop: '0.375rem', fontSize: '0.58rem', fontWeight: '700', color: goalsProgress === 100 ? '#10b981' : '#f59e0b' }}>
                       {goalsDone}/{weekGoals.length} doelen behaald ({goalsProgress}%)
                     </div>
                   </div>
@@ -588,12 +588,12 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                 {/* Voltooide tasks */}
                 {d.completedTasks?.length > 0 && (
                   <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <CheckCircle size={8} color="#10b981" /> VOLTOOIDE TASKS
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
                       {d.completedTasks.map((t, i) => (
-                        <span key={i} style={{ padding: '1px 6px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '3px', color: '#10b981', fontSize: '0.55rem' }}>{t.title}</span>
+                        <span key={i} style={{ padding: '1px 6px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 8, color: '#10b981', fontSize: '0.55rem' }}>{t.title}</span>
                       ))}
                     </div>
                   </div>
@@ -611,7 +611,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                       <div key={rep.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0.4rem 0.75rem' : '0.4rem 1rem', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
                         <div>
                           <div style={{ fontSize: '0.65rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>{formatWeekRange(rep.week_start, rep.week_end)}</div>
-                          <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)' }}>{rep.report_data?.summary?.totalCompleted ?? 0} tasks</div>
+                          <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)' }}>{rep.report_data?.summary?.totalCompleted ?? 0} tasks</div>
                         </div>
                         <FileText size={11} color="rgba(255,255,255,0.15)" />
                       </div>
@@ -629,11 +629,11 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
         <div onClick={() => setKanbanPickerFor(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1.5rem' }}>
           <div onClick={(e) => e.stopPropagation()}
-            style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', width: '100%', maxWidth: '320px', overflow: 'hidden' }}>
+            style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, width: '100%', maxWidth: '320px', overflow: 'hidden' }}>
             <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#fff' }}>Naar welke sectie?</span>
               <button onClick={() => setKanbanPickerFor(null)}
-                style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
+                style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 9, color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
                 <X size={12} />
               </button>
             </div>
@@ -648,7 +648,7 @@ export default function WeeklyWinsHub({ productivityService, coachId, isMobile, 
                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: section.color, flexShrink: 0 }} />
                 <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>{section.title}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)' }}>{section.tasks?.length || 0} taken</span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)' }}>{section.tasks?.length || 0} taken</span>
               </button>
             ))}
           </div>

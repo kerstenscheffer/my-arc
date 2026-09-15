@@ -111,7 +111,7 @@ export default function FloatingTaskTimer({ task, sessionMinutes, onComplete, on
       background: '#0a0a0a',
       border: `1px solid rgba(255,255,255,0.08)`,
       borderLeft: `3px solid ${timerColor}`,
-      borderRadius: '10px',
+      borderRadius: 12,
       overflow: 'hidden',
       boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
       transform: 'translateZ(0)',
@@ -193,7 +193,7 @@ export default function FloatingTaskTimer({ task, sessionMinutes, onComplete, on
             {/* Status */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
               <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: paused ? '#6b7280' : timerColor, animation: paused ? 'none' : 'ftPulse 1.5s ease infinite' }} />
-              <span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <span style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 {isDone ? 'TIJD OP' : paused ? 'GEPAUZEERD' : `${pct}% OVER`}
               </span>
             </div>
@@ -202,7 +202,7 @@ export default function FloatingTaskTimer({ task, sessionMinutes, onComplete, on
           {/* Category badge */}
           {task.category && (
             <div style={{ textAlign: 'center', paddingBottom: '0.375rem' }}>
-              <span style={{ padding: '1px 6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '3px', fontSize: '0.45rem', fontWeight: '600', color: 'rgba(255,255,255,0.3)' }}>
+              <span style={{ padding: '1px 6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, fontSize: '0.58rem', fontWeight: '600', color: 'rgba(255,255,255,0.3)' }}>
                 {task.category}
               </span>
             </div>
@@ -215,7 +215,7 @@ export default function FloatingTaskTimer({ task, sessionMinutes, onComplete, on
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem',
                 padding: '0.4rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: '700',
+                borderRadius: 9, color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: '700',
                 cursor: 'pointer', minHeight: '32px', touchAction: 'manipulation'
               }}
             >
@@ -226,7 +226,7 @@ export default function FloatingTaskTimer({ task, sessionMinutes, onComplete, on
               style={{
                 flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem',
                 padding: '0.4rem', background: '#10b981', border: 'none',
-                borderRadius: '6px', color: '#fff', fontSize: '0.6rem', fontWeight: '700',
+                borderRadius: 9, color: '#fff', fontSize: '0.6rem', fontWeight: '700',
                 cursor: 'pointer', minHeight: '32px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
               }}
             >
@@ -245,7 +245,7 @@ export default function FloatingTaskTimer({ task, sessionMinutes, onComplete, on
 }
 
 const iconBtnStyle = {
-  width: '20px', height: '20px', borderRadius: '3px',
+  width: '20px', height: '20px', borderRadius: 8,
   background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
   color: 'rgba(255,255,255,0.3)', cursor: 'pointer',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
