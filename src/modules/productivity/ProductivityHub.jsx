@@ -2,7 +2,7 @@
 // VERSION 4.0 - Timer state omhoog naar CoachHub via onStartTask prop
 
 import { useState, useEffect } from 'react'
-import { LayoutGrid, CalendarDays, Lightbulb, Trophy, Bell, Zap, Timer, Target, ChevronDown, MoreHorizontal } from 'lucide-react'
+import { LayoutGrid, CalendarDays, Lightbulb, Trophy, Timer, Target, ChevronDown, MoreHorizontal } from 'lucide-react'
 import ProductivityService from './ProductivityService'
 import ProductivityKanban from './components/kanban/ProductivityKanban'
 import ReflectionsHub from './components/reflections/ReflectionsHub'
@@ -10,7 +10,7 @@ import WeeklyWinsHub from './components/weekly-wins/WeeklyWinsHub'
 import ReflectionModal from './components/reflections/ReflectionModal'
 import TimeInsightsHub from './components/time/TimeInsightsHub'
 import WeekGoalsManager from './components/WeekGoalsManager'
-import FloatingPanel from './components/FloatingPanel'
+import { Venster, VensterKop } from './components/ui'
 
 // Bord en agenda zijn de twee schermen waar je de hele dag in zit; die staan
 // als schakelaar in de werkbalk. Reflecties, wins en tijd kijk je af en toe
@@ -30,6 +30,9 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
     catch { return 'kanban' }
   })
   const [extraOpen, setExtraOpen] = useState(false)
+  // Doelen van deze week: geen vaste knop meer in de balk, maar een venster
+  // dat je uit het menu opent.
+  const [doelenOpen, setDoelenOpen] = useState(false)
   const [productivityService, setProductivityService] = useState(null)
   const [coachId, setCoachId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -109,26 +112,10 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
   return (
     <div style={{ background: '#0a0a0a', borderRadius: isMobile ? '10px' : '12px', overflow: 'hidden' }}>
 
-      {/* ═══ HEADER ═══ */}
-      <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: 1, minWidth: 0 }}>
-          <Zap size={14} color="rgba(255,255,255,0.65)" strokeWidth={2.6} />
-          <h2 style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em' }}>
-            Productiviteit
-          </h2>
-        </div>
-        {pendingReflections.length > 0 && (
-          <button onClick={() => { setCurrentReflectionTask(pendingReflections[0]); setShowReflectionModal(true) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 999, color: '#a78bfa', fontSize: '0.66rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: 30, flexShrink: 0 }}>
-            <Bell size={10} />
-            {pendingReflections.length} reflectie{pendingReflections.length > 1 ? 's' : ''}
-          </button>
-        )}
-      </div>
-
       {/* ═══ WERKBALK ═══ */}
-      {/* Eén regel: links de schakelaar bord/agenda, rechts de doelen van deze
-          week en het knopje met reflecties, wins en tijd. */}
+      {/* Eén regel, verder niets: links de schakelaar bord/agenda, rechts het
+          knopje met de rest. De titel en de reflectie-teller stonden daarboven
+          en kostten een hele regel zonder iets te doen. */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
         padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem',
@@ -181,21 +168,6 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
 
         <div style={{ flex: 1 }} />
 
-        <FloatingPanel
-          icon={Target}
-          label={isMobile ? 'Doelen' : 'Doelen deze week'}
-          accent="#FFD700"
-          iconColor="#FFD700"
-          isMobile={isMobile}
-          align="right"
-          panelWidth={isMobile ? 320 : 420}
-          panelMaxHeight="75vh"
-        >
-          <div style={{ padding: '0.5rem 0.65rem' }}>
-            <WeekGoalsManager db={db} coachId={coachId} isMobile={isMobile} />
-          </div>
-        </FloatingPanel>
-
         {/* Reflecties, wins en tijd achter één knop. */}
         <div style={{ position: 'relative' }}>
           <button
@@ -230,13 +202,17 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
                 background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)',
                 borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
               }}>
-                {[{ id: 'kanban', label: 'Terug naar taken', icon: LayoutGrid }, ...EXTRA_TABS].map(t => {
+                {[{ id: 'kanban', label: 'Terug naar taken', icon: LayoutGrid }, ...EXTRA_TABS, { id: 'doelen', label: 'Doelen deze week', icon: Target }].map(t => {
                   const aan = activeTab === t.id
                   const Icon = t.icon
                   return (
                     <button
                       key={t.id}
-                      onClick={() => { setActiveTab(t.id); setExtraOpen(false) }}
+                      onClick={() => {
+                        setExtraOpen(false)
+                        if (t.id === 'doelen') setDoelenOpen(true)
+                        else setActiveTab(t.id)
+                      }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                         minHeight: 34, padding: '0 0.6rem', borderRadius: 8,
@@ -299,6 +275,15 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
           />
         )}
       </div>
+
+      {doelenOpen && (
+        <Venster isMobile={isMobile} onClose={() => setDoelenOpen(false)} maxWidth={460}>
+          <VensterKop isMobile={isMobile} titel="Doelen deze week" onClose={() => setDoelenOpen(false)} />
+          <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0.75rem' : '0.85rem' }}>
+            <WeekGoalsManager db={db} coachId={coachId} isMobile={isMobile} />
+          </div>
+        </Venster>
+      )}
 
       {showReflectionModal && currentReflectionTask && (
         <ReflectionModal
