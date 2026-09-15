@@ -10,7 +10,7 @@
 // pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2 } from 'lucide-react'
+import { Star, ChevronDown, ChevronLeft, ChevronRight, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2 } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -52,6 +52,229 @@ const SLIDES = REVIEWS.flatMap((review, i) => {
 // Foto links (zo'n 20% zichtbaar), de kop half over de fade en de toelichting
 // in grijs helemaal rechts. Een lijn scheidt de stroken. De negatieve marge
 // haalt de padding van het blad weg, zodat de foto's de rand raken.
+// ── De methode: schermvullend, één pijler per slide ─────────────────────────
+//
+// Drie pijlers zijn drie verhalen; in een lijstje van drie regels lees je ze
+// als opsomming. Als slide krijgt elke pijler het hele scherm: foto, wat het
+// is, en wat we concreet gaan doen.
+const PIJLERS = [
+  {
+    foto: '/methode/voeding.jpg',
+    kop: 'Weet wat je eet',
+    zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
+    doen: [
+      'Je plan staat klaar op jouw dag, met boodschappenlijst',
+      'Eten loggen in een paar tikken, geen calorieën uitrekenen',
+      'Etentje of vakantie? Die bouwen we in, niet wegstrepen',
+      'Elke week bijsturen op wat de weegschaal laat zien',
+    ],
+  },
+  {
+    foto: '/methode/training.jpg',
+    kop: 'Elke training telt',
+    zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
+    doen: [
+      'Schema op jouw dagen, jouw gym en jouw niveau',
+      'Per oefening een video, zodat de uitvoering klopt',
+      'Gewicht en reps bijhouden, zodat je progressie ziet',
+      'Kan een oefening niet? Dan wisselen we hem om',
+    ],
+  },
+  {
+    foto: '/methode/begeleiding.jpg',
+    kop: 'Coach in jouw corner',
+    zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
+    doen: [
+      'Elke week een call over je cijfers en je week',
+      'Check-in op vrijdag, daar stuur ik maandag op bij',
+      'Korte lijn in de app, geen dagen wachten',
+      'Ik zie je logs, dus je hoeft niets uit te leggen',
+    ],
+  },
+]
+
+function MethodeSlider({ isMobile, onClose }) {
+  const [i, setI] = useState(0)
+  const raakX = useRef(null)
+  const p = PIJLERS[i]
+  const naar = (n) => setI(Math.max(0, Math.min(PIJLERS.length - 1, n)))
+
+  useEffect(() => {
+    const toets = (e) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowRight') setI(v => Math.min(PIJLERS.length - 1, v + 1))
+      if (e.key === 'ArrowLeft') setI(v => Math.max(0, v - 1))
+    }
+    window.addEventListener('keydown', toets)
+    return () => window.removeEventListener('keydown', toets)
+  }, [onClose])
+
+  const pijlKnop = (kant, uit, aan) => (
+    <button
+      onClick={aan}
+      disabled={uit}
+      aria-label={kant === 'links' ? 'Vorige' : 'Volgende'}
+      style={{
+        width: isMobile ? 40 : 52, height: isMobile ? 40 : 52, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)',
+        background: 'rgba(255,255,255,0.06)', color: '#fff',
+        opacity: uit ? 0.25 : 1, cursor: uit ? 'default' : 'pointer',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {kant === 'links' ? <ChevronLeft size={isMobile ? 18 : 24} strokeWidth={2.6} /> : <ChevronRight size={isMobile ? 18 : 24} strokeWidth={2.6} />}
+    </button>
+  )
+
+  return (
+    <div
+      onTouchStart={(e) => { raakX.current = e.touches[0].clientX }}
+      onTouchEnd={(e) => {
+        if (raakX.current == null) return
+        const verschil = e.changedTouches[0].clientX - raakX.current
+        if (Math.abs(verschil) > 50) naar(i + (verschil < 0 ? 1 : -1))
+        raakX.current = null
+      }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: BG, color: '#fff',
+        display: 'flex', flexDirection: 'column',
+        animation: 'bladWaas 0.2s ease',
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      }}
+    >
+      {/* Foto over de volle breedte, met de kop er half overheen. */}
+      <div style={{
+        position: 'relative', width: '100%', flexShrink: 0,
+        height: isMobile ? '34vh' : 'min(46vh, 460px)',
+      }}>
+        <div key={p.foto} style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${p.foto})`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+          animation: 'pijlerIn 0.35s ease',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: `linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.25) 30%, rgba(10,10,10,0.8) 72%, ${BG} 100%)`,
+        }} />
+        <button
+          onClick={onClose}
+          aria-label="Sluiten"
+          style={{
+            position: 'absolute', top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 12 : 20}px)`,
+            right: isMobile ? 12 : 20,
+            width: 40, height: 40, padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 12, color: '#fff', cursor: 'pointer',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <X size={18} strokeWidth={2.8} />
+        </button>
+      </div>
+
+      {/* Tekst: wat het is, en wat we gaan doen. */}
+      <div style={{
+        flex: 1, minHeight: 0, overflowY: 'auto',
+        padding: isMobile ? '0 1.25rem 1.25rem' : '0 2rem 2rem',
+      }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', marginTop: isMobile ? -18 : -28, position: 'relative' }}>
+          <div style={{
+            fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
+            letterSpacing: '0.16em', color: GOLD, marginBottom: isMobile ? 8 : 12,
+          }}>
+            PIJLER {i + 1} VAN {PIJLERS.length}
+          </div>
+          <div style={{
+            fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
+            letterSpacing: '-0.03em', lineHeight: 1.08,
+            textShadow: '0 2px 14px rgba(0,0,0,0.85)',
+          }}>
+            {p.kop}
+          </div>
+          <p style={{
+            margin: `${isMobile ? 10 : 14}px 0 ${isMobile ? '1.4rem' : '2rem'}`,
+            fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 600,
+            color: 'rgba(255,255,255,0.65)', lineHeight: 1.45,
+          }}>
+            {p.zin}
+          </p>
+
+          <div style={{
+            fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
+            letterSpacing: '0.16em', textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.35)', marginBottom: isMobile ? 6 : 10,
+          }}>
+            Wat we doen
+          </div>
+          {p.doen.map((regel, r) => (
+            <div key={regel} style={{
+              display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14,
+              padding: isMobile ? '0.75rem 0' : '1rem 0',
+              borderTop: r === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <CheckCircle2 size={isMobile ? 18 : 24} strokeWidth={2.4} style={{ flexShrink: 0, color: GOLD }} />
+              <span style={{
+                fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
+              }}>
+                {regel}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bladeren: pijlen en bolletjes. */}
+      <div style={{
+        flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: isMobile ? '1.25rem' : '2rem',
+        padding: `${isMobile ? '0.9rem' : '1.25rem'} 1.25rem calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '1.1rem' : '1.5rem'})`,
+        borderTop: '1px solid rgba(255,255,255,0.07)',
+      }}>
+        {pijlKnop('links', i === 0, () => naar(i - 1))}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {PIJLERS.map((_, n) => (
+            <button
+              key={n}
+              onClick={() => naar(n)}
+              aria-label={`Pijler ${n + 1}`}
+              style={{
+                width: n === i ? 26 : 9, height: 9, padding: 0, borderRadius: 999,
+                background: n === i ? '#fff' : 'rgba(255,255,255,0.25)',
+                border: 'none', cursor: 'pointer', transition: 'width 0.2s ease, background 0.2s ease',
+                touchAction: 'manipulation',
+              }}
+            />
+          ))}
+        </div>
+        {i === PIJLERS.length - 1
+          ? (
+            <button
+              onClick={onClose}
+              style={{
+                minHeight: isMobile ? 40 : 52, padding: `0 ${isMobile ? '1.1rem' : '1.6rem'}`,
+                borderRadius: 999, border: 'none', background: '#fff', color: '#000',
+                fontSize: isMobile ? '0.8rem' : '0.95rem', fontWeight: 900,
+                cursor: 'pointer', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Klaar
+            </button>
+          )
+          : pijlKnop('rechts', false, () => naar(i + 1))}
+      </div>
+    </div>
+  )
+}
+
 function Stroken({ items, isMobile, genummerd = false, hoog = false }) {
   return (
     <div style={{ margin: isMobile ? '-0.9rem -1.15rem 0' : '-1rem -1.35rem 0' }}>
@@ -308,17 +531,21 @@ export default function SixWeekChallengePage() {
               want anders sneed cover er op desktop meer dan de helft af: een
               venster van 1440 breed en 300 hoog is 4,8:1. Op desktop begrenzen
               we de breedte, zodat de hoogte binnen het scherm blijft. */}
+          {/* Op desktop loopt de foto van rand tot rand; de hoogte is
+              begrensd zodat de kop eronder nog in beeld valt. Op telefoon
+              houden we de echte 2:1-verhouding aan, daar past hij precies. */}
           <div style={{
             position: 'relative', width: '100%',
-            maxWidth: isMobile ? '100%' : 1000,
-            margin: '0 auto',
-            aspectRatio: '2 / 1',
+            margin: 0,
+            ...(isMobile
+              ? { aspectRatio: '2 / 1' }
+              : { height: 'min(58vh, 620px)' }),
             flexShrink: 0,
           }}>
             <div style={{
               position: 'absolute', inset: 0,
               backgroundImage: 'url(/6week-challenge-hero.jpg)',
-              backgroundSize: 'cover', backgroundPosition: 'center',
+              backgroundSize: 'cover', backgroundPosition: 'center 45%',
             }} />
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -358,8 +585,9 @@ export default function SixWeekChallengePage() {
                 vakken meer maar een icoon met het woord eronder; het scherm
                 oogde te druk met alles in een container. */}
             <div style={{
-              display: 'flex', gap: isMobile ? '1.1rem' : '5rem',
+              display: 'flex', gap: isMobile ? '1.1rem' : '7rem',
               justifyContent: 'center',
+              marginTop: isMobile ? 0 : '1.5rem',
             }}>
               {[
                 { id: 'methode', label: 'De methode', Icon: Compass },
@@ -373,17 +601,17 @@ export default function SixWeekChallengePage() {
                     onClick={() => setOpen(aan ? null : k.id)}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      gap: isMobile ? 9 : 11,
+                      gap: isMobile ? 9 : 18,
                       padding: 0, border: 'none', background: 'transparent',
                       color: '#fff', opacity: aan ? 1 : 0.75,
-                      fontSize: isMobile ? '0.75rem' : '1.05rem', fontWeight: 900,
+                      fontSize: isMobile ? '0.75rem' : '1.4rem', fontWeight: 900,
                       letterSpacing: '-0.01em', whiteSpace: 'nowrap',
                       fontFamily: 'inherit', cursor: 'pointer',
                       transition: 'opacity 0.15s ease',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <k.Icon size={isMobile ? 32 : 44} strokeWidth={2.4} />
+                    <k.Icon size={isMobile ? 32 : 68} strokeWidth={2.2} />
                     {k.label}
                   </button>
                 )
@@ -644,14 +872,10 @@ export default function SixWeekChallengePage() {
         ))}
       </div>
 
-      {/* De methode — drie stroken, verder geen tekst. */}
-      <Blad open={open === 'methode'} titel="De methode" onClose={() => setOpen(null)} isMobile={isMobile}>
-        <Stroken isMobile={isMobile} genummerd hoog items={[
-          { foto: '/methode/voeding.jpg',     kop: 'Weet wat je eet',      sub: 'vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.' },
-          { foto: '/methode/training.jpg',    kop: 'Elke training telt',   sub: "schema op maat, uitlegvideo's per oefening, onder het uur." },
-          { foto: '/methode/begeleiding.jpg', kop: 'Coach in jouw corner', sub: 'wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.' },
-        ]} />
-      </Blad>
+      {/* De methode — schermvullend, één pijler per slide. */}
+      {open === 'methode' && (
+        <MethodeSlider isMobile={isMobile} onClose={() => setOpen(null)} />
+      )}
 
       {/* De voorwaarden — dezelfde stroken, plus de regel dat een coach ze
           mondeling mag bijstellen. */}
@@ -766,6 +990,7 @@ export default function SixWeekChallengePage() {
         @keyframes bladWaas { from { opacity: 0; } to { opacity: 1; } }
         @keyframes bladOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes bladIn { from { transform: translateY(14px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes pijlerIn { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: none; } }
         body { overflow: hidden; }
         ::-webkit-scrollbar { display: none; }
       `}</style>
