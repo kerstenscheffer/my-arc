@@ -270,7 +270,7 @@ export default function CustomExerciseModal({ onClose, onSave, client, db, schem
               <div style={{ marginBottom: '1rem' }}>
                 <label style={labelStyle}>Equipment</label>
                 <select value={equipment} onChange={(e) => setEquipment(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
-                  {[['dumbbells','Dumbbells'],['barbell','Barbell'],['cables','Kabels'],['machine','Machine'],['bodyweight','Bodyweight']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                  {[['dumbbells','Dumbbells'],['barbell','Barbell'],['cables','Kabels'],['machine','Machine'],['bodyweight','Bodyweight'],['kettlebell','Kettlebell']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
 

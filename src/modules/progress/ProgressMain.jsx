@@ -14,6 +14,7 @@ import RecentProgressPhotos from './components/RecentProgressPhotos'
 import BeforeAfterCard from './components/BeforeAfterCard'
 import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
+import SleepLogSection from './SleepLogSection'
 import { useChallenge } from '../../hooks/useChallenge'
 
 // Coach-tip bovenaan de tracking pagina — foto links, vaste boodschap rechts.
@@ -377,6 +378,9 @@ export default function ProgressMain({ db, client }) {
             borderTop: '1px solid rgba(255,255,255,0.04)',
           }}>
             <CircumferenceMeasurements weightService={weightService} clientId={client?.id} isMobile={isMobile} onSave={loadAllData} />
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+            <SleepLogSection client={client} db={db} isMobile={isMobile} />
           </div>
         </div>
       )}

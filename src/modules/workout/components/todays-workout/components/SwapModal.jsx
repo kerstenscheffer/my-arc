@@ -141,7 +141,7 @@ const MUSCLE_LABELS = {
 
 const EQUIPMENT_LABELS = {
   'barbell': 'Barbell', 'dumbbells': 'Dumbbells', 'cables': 'Kabels',
-  'machine': 'Machine', 'bodyweight': 'Bodyweight'
+  'machine': 'Machine', 'bodyweight': 'Bodyweight', 'kettlebell': 'Kettlebell'
 }
 
 export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, schema, onClose, onSwapComplete, db, client }) {

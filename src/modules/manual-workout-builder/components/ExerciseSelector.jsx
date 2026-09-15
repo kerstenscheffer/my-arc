@@ -132,7 +132,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
   }
 
   const muscleGroups = ['all', ...Object.keys(EXERCISE_DATABASE)]
-  const equipmentTypes = ['all', 'bodyweight', 'dumbbell', 'barbell', 'cable', 'machine', 'band']
+  const equipmentTypes = ['all', 'bodyweight', 'dumbbell', 'barbell', 'cable', 'machine', 'band', 'kettlebell']
   const difficultyLevels = ['all', 'beginner', 'intermediate', 'advanced']
 
   const getDifficultyColor = (d) => ({ beginner: '#10b981', intermediate: '#f59e0b', advanced: '#ef4444' }[d] || '#6b7280')

@@ -13,7 +13,8 @@ const EQUIPMENT_TYPES = {
   dumbbell: { label: 'Dumbbell', icon: Dumbbell },
   barbell: { label: 'Barbell', icon: Activity },
   cable: { label: 'Cable', icon: Zap },
-  machine: { label: 'Machine', icon: Users }
+  machine: { label: 'Machine', icon: Users },
+  kettlebell: { label: 'Kettlebell', icon: Dumbbell }
 }
 
 const DIFFICULTY_LEVELS = {
