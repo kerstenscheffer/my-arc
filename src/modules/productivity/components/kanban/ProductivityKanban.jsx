@@ -15,7 +15,11 @@ import RecurringActionPrompt from './RecurringActionPrompt'
 export default function ProductivityKanban({
   productivityService, coachId, db, isMobile,
   onTaskCompleted, onSectionsChange,
-  onStartTask, activeTaskId
+  onStartTask, activeTaskId,
+  // De schakelaar bord/agenda staat in de werkbalk van de hub, zodat alles
+  // op één regel past. Zonder deze props valt hij terug op eigen state.
+  viewMode: viewModeProp = null,
+  onViewModeChange = null,
 }) {
   const [sections, setSectionsRaw] = useState([])
   const [originalSections, setOriginalSections] = useState([])
@@ -50,10 +54,11 @@ export default function ProductivityKanban({
 
   // Agenda-view toggle. Persisted in localStorage so users stay in the view
   // they last picked.
-  const [viewMode, setViewMode] = useState(() => {
+  const [viewModeEigen, setViewModeEigen] = useState(() => {
     try { return localStorage.getItem('productivity_view_mode') || 'kanban' }
     catch { return 'kanban' }
   })
+  const viewMode = viewModeProp ?? viewModeEigen
   const [agendaModalTask, setAgendaModalTask] = useState(null)
 
   // Recurring-task action prompt — surfaces when the user deletes/resizes a
@@ -65,7 +70,8 @@ export default function ProductivityKanban({
   const bumpOverridesVersion = () => setRecurringOverridesVersion(v => v + 1)
 
   const switchView = (mode) => {
-    setViewMode(mode)
+    if (onViewModeChange) onViewModeChange(mode)
+    else setViewModeEigen(mode)
     try { localStorage.setItem('productivity_view_mode', mode) } catch { /* private mode */ }
   }
 
@@ -866,7 +872,9 @@ export default function ProductivityKanban({
   return (
     <div style={{ padding: isMobile ? '0.625rem' : '0.75rem', transform: 'translateZ(0)' }}>
 
-      {/* View toggle: Kanban ↔ Agenda */}
+      {/* De schakelaar bord/agenda staat in de werkbalk van de hub; alleen
+          als die ontbreekt tonen we 'm hier nog zelf. */}
+      {!onViewModeChange && (
       <div style={{
         display: 'flex', alignItems: 'center', gap: '0.4rem',
         marginBottom: '0.625rem',
@@ -914,6 +922,7 @@ export default function ProductivityKanban({
           })}
         </div>
       </div>
+      )}
 
       {/* Agenda view replaces the entire kanban body */}
       {viewMode === 'agenda' && (

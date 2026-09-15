@@ -2,7 +2,7 @@
 // VERSION 4.0 - Timer state omhoog naar CoachHub via onStartTask prop
 
 import { useState, useEffect } from 'react'
-import { LayoutGrid, Lightbulb, Trophy, Bell, Zap, Timer, Target } from 'lucide-react'
+import { LayoutGrid, CalendarDays, Lightbulb, Trophy, Bell, Zap, Timer, Target, ChevronDown, MoreHorizontal } from 'lucide-react'
 import ProductivityService from './ProductivityService'
 import ProductivityKanban from './components/kanban/ProductivityKanban'
 import ReflectionsHub from './components/reflections/ReflectionsHub'
@@ -12,15 +12,24 @@ import TimeInsightsHub from './components/time/TimeInsightsHub'
 import WeekGoalsManager from './components/WeekGoalsManager'
 import FloatingPanel from './components/FloatingPanel'
 
-const TABS = [
-  { id: 'kanban',      label: 'Tasks',      icon: LayoutGrid, color: '#10b981' },
-  { id: 'reflections', label: 'Reflecties', icon: Lightbulb,  color: '#8b5cf6' },
-  { id: 'weekly-wins', label: 'Wins',       icon: Trophy,     color: '#f59e0b' },
-  { id: 'tijd',        label: 'Tijd',       icon: Timer,      color: '#3b82f6' }
+// Bord en agenda zijn de twee schermen waar je de hele dag in zit; die staan
+// als schakelaar in de werkbalk. Reflecties, wins en tijd kijk je af en toe
+// na, dus die zitten achter één knop. Zo past alles op één regel.
+const EXTRA_TABS = [
+  { id: 'reflections', label: 'Reflecties', icon: Lightbulb },
+  { id: 'weekly-wins', label: 'Wins',       icon: Trophy },
+  { id: 'tijd',        label: 'Tijd',       icon: Timer },
 ]
 
 export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskId }) {
   const [activeTab, setActiveTab] = useState('kanban')
+  // Bord of agenda — hier omhoog gehaald omdat de schakelaar in de werkbalk
+  // staat en niet meer in de kanban zelf.
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('productivity_view_mode') || 'kanban' }
+    catch { return 'kanban' }
+  })
+  const [extraOpen, setExtraOpen] = useState(false)
   const [productivityService, setProductivityService] = useState(null)
   const [coachId, setCoachId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -117,48 +126,135 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
         )}
       </div>
 
-      {/* ═══ TABBLADEN ═══ */}
-      {/* Schuifknop met een wit blokje op het actieve tabblad — zelfde
-          schakelaar als in de log-modal, in plaats van vier gekleurde
-          onderstrepingen die om aandacht vochten. */}
-      <div style={{ padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem' }}>
+      {/* ═══ WERKBALK ═══ */}
+      {/* Eén regel: links de schakelaar bord/agenda, rechts de doelen van deze
+          week en het knopje met reflecties, wins en tijd. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem',
+      }}>
         <div style={{
-          position: 'relative', display: 'flex',
+          position: 'relative', display: 'inline-flex',
           background: 'rgba(255,255,255,0.05)',
           border: '1px solid rgba(255,255,255,0.09)',
           borderRadius: 999, padding: 3,
         }}>
           <div style={{
             position: 'absolute', top: 3, bottom: 3,
-            left: `calc(${(TABS.findIndex(t => t.id === activeTab) * 100) / TABS.length}% + 3px)`,
-            width: `calc(${100 / TABS.length}% - 6px)`,
-            background: '#fff', borderRadius: 999,
-            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            left: activeTab === 'kanban' && viewMode === 'agenda' ? 'calc(50% + 1.5px)' : 3,
+            width: 'calc(50% - 4.5px)',
+            background: activeTab === 'kanban' ? '#fff' : 'transparent',
+            borderRadius: 999,
+            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease',
           }} />
-          {TABS.map(tab => {
-            const aan = activeTab === tab.id
-            const Icon = tab.icon
+          {[
+            { id: 'kanban', label: 'Kanban', Icon: LayoutGrid },
+            { id: 'agenda', label: 'Agenda', Icon: CalendarDays },
+          ].map(k => {
+            const aan = activeTab === 'kanban' && viewMode === k.id
             return (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                key={k.id}
+                onClick={() => {
+                  setActiveTab('kanban')
+                  setViewMode(k.id)
+                  try { localStorage.setItem('productivity_view_mode', k.id) } catch { /* private mode */ }
+                }}
                 style={{
                   position: 'relative', zIndex: 1,
-                  flex: 1, minHeight: 34,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  minWidth: isMobile ? 78 : 92, minHeight: 32, padding: '0 0.8rem',
                   background: 'transparent', border: 'none', borderRadius: 999,
                   color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
-                  fontSize: isMobile ? '0.68rem' : '0.74rem', fontWeight: aan ? 900 : 800,
-                  cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                  fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: aan ? 900 : 800,
+                  cursor: 'pointer', fontFamily: 'inherit',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   transition: 'color 0.15s ease',
                 }}
               >
-                <Icon size={isMobile ? 12 : 13} strokeWidth={2.6} />
-                {tab.label}
+                <k.Icon size={13} strokeWidth={2.6} />
+                {k.label}
               </button>
             )
           })}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        <FloatingPanel
+          icon={Target}
+          label={isMobile ? 'Doelen' : 'Doelen deze week'}
+          accent="#FFD700"
+          iconColor="#FFD700"
+          isMobile={isMobile}
+          align="right"
+          panelWidth={isMobile ? 320 : 420}
+          panelMaxHeight="75vh"
+        >
+          <div style={{ padding: '0.5rem 0.65rem' }}>
+            <WeekGoalsManager db={db} coachId={coachId} isMobile={isMobile} />
+          </div>
+        </FloatingPanel>
+
+        {/* Reflecties, wins en tijd achter één knop. */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setExtraOpen(v => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              minHeight: 30, padding: '0 0.75rem', borderRadius: 999,
+              background: activeTab !== 'kanban' ? '#fff' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${activeTab !== 'kanban' ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+              color: activeTab !== 'kanban' ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+              fontSize: '0.68rem', fontWeight: 800,
+              cursor: 'pointer', fontFamily: 'inherit',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {(() => {
+              const huidig = EXTRA_TABS.find(t => t.id === activeTab)
+              const Icon = huidig?.icon || MoreHorizontal
+              return <Icon size={13} strokeWidth={2.6} />
+            })()}
+            {EXTRA_TABS.find(t => t.id === activeTab)?.label || 'Meer'}
+            <ChevronDown size={12} strokeWidth={2.8} style={{ transform: extraOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+          </button>
+
+          {extraOpen && (
+            <>
+              {/* Klik ernaast sluit de lijst. */}
+              <div onClick={() => setExtraOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 41,
+                minWidth: 170, padding: 5,
+                background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+              }}>
+                {[{ id: 'kanban', label: 'Terug naar taken', icon: LayoutGrid }, ...EXTRA_TABS].map(t => {
+                  const aan = activeTab === t.id
+                  const Icon = t.icon
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => { setActiveTab(t.id); setExtraOpen(false) }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                        minHeight: 34, padding: '0 0.6rem', borderRadius: 8,
+                        background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        border: 'none', color: aan ? '#fff' : 'rgba(255,255,255,0.65)',
+                        fontSize: '0.72rem', fontWeight: 800, textAlign: 'left',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <Icon size={13} strokeWidth={2.5} />
+                      {t.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -166,26 +262,9 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
       <div>
         {activeTab === 'kanban' && (
           <>
-            <div style={{
-              display: 'flex', justifyContent: 'flex-end',
-              padding: isMobile ? '0.5rem 0.75rem 0' : '0.625rem 1rem 0',
-            }}>
-              <FloatingPanel
-                icon={Target}
-                label="Doelen deze week"
-                accent="#FFD700"
-                iconColor="#FFD700"
-                isMobile={isMobile}
-                align="right"
-                panelWidth={isMobile ? 320 : 420}
-                panelMaxHeight="75vh"
-              >
-                <div style={{ padding: '0.5rem 0.65rem' }}>
-                  <WeekGoalsManager db={db} coachId={coachId} isMobile={isMobile} />
-                </div>
-              </FloatingPanel>
-            </div>
             <ProductivityKanban
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
               productivityService={productivityService}
               coachId={coachId}
               db={db}
