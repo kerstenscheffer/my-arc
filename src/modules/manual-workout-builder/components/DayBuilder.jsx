@@ -1,6 +1,6 @@
 // src/modules/manual-workout-builder/components/DayBuilder.jsx
 import { useState } from 'react'
-import { Trash2, Copy, Plus, ChevronDown, ChevronUp, Heart, BookmarkPlus } from 'lucide-react'
+import { Trash2, Copy, Plus, ChevronDown, ChevronUp, Heart, BookmarkPlus, SlidersHorizontal } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
 import BuilderExerciseCard from './BuilderExerciseCard'
 
@@ -17,9 +17,23 @@ export default function DayBuilder({
   // the whole exercise object so the modal can show name + current
   // video_url / thumbnail_url without an extra fetch.
   const [videoEditing, setVideoEditing] = useState(null)
-  // Tijdens het typen mag het veld even leeg of ongeldig zijn zonder dat de
-  // dag meteen op 60 terugvalt. null = toon gewoon wat er in de dag staat.
   const [tempMinuten, setTempMinuten] = useState(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkSets, setBulkSets] = useState('')
+  const [bulkReps, setBulkReps] = useState('')
+  const [bulkRest, setBulkRest] = useState('')
+
+  const applyBulk = () => {
+    if (!bulkSets && !bulkReps && !bulkRest) return
+    const updated = day.exercises.map(ex => ({
+      ...ex,
+      ...(bulkSets ? { sets: parseInt(bulkSets, 10) } : {}),
+      ...(bulkReps ? { reps: bulkReps } : {}),
+      ...(bulkRest ? { rest: bulkRest } : {}),
+    }))
+    onUpdate({ ...day, exercises: updated })
+    setBulkSets(''); setBulkReps(''); setBulkRest(''); setBulkOpen(false)
+  }
 
   const handleSaveName = () => { onUpdate({ ...day, name: tempName || `Dag ${dayNumber}` }); setEditingName(false) }
   const handleSaveFocus = () => { onUpdate({ ...day, focus: tempFocus || '' }); setEditingFocus(false) }
@@ -177,6 +191,46 @@ export default function DayBuilder({
       {/* Exercises */}
       {!collapsed && (
         <>
+          {/* Bulk edit panel */}
+          {day.exercises.length > 0 && (
+            <div style={{ marginTop: '0.85rem', marginBottom: bulkOpen ? '0.75rem' : '0.25rem' }}>
+              <button
+                onClick={e => { e.stopPropagation(); setBulkOpen(v => !v) }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.65rem', background: bulkOpen ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${bulkOpen ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 7, color: bulkOpen ? '#FFD700' : 'rgba(255,255,255,0.5)', fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}
+              >
+                <SlidersHorizontal size={13} /> Bulk bewerken
+              </button>
+              {bulkOpen && (
+                <div style={{ marginTop: '0.5rem', padding: '0.7rem', background: 'rgba(255,215,0,0.05)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: 9 }}>
+                  <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Toepassen op alle oefeningen — laat leeg om niet te wijzigen</div>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    {[['Sets', bulkSets, setBulkSets, 'number', '4'], ['Reps', bulkReps, setBulkReps, 'text', '8-12'], ['Rust', bulkRest, setBulkRest, 'text', '90s']].map(([label, val, setter, type, ph]) => (
+                      <div key={label} style={{ flex: 1 }}>
+                        <div style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.25rem' }}>{label}</div>
+                        <input
+                          type={type}
+                          inputMode={type === 'number' ? 'numeric' : 'text'}
+                          value={val}
+                          onChange={e => setter(e.target.value)}
+                          placeholder={ph}
+                          onClick={e => e.stopPropagation()}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '0.4rem 0.5rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, color: '#fff', fontSize: isMobile ? '0.8rem' : '0.85rem', fontFamily: 'inherit', outline: 'none' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); applyBulk() }}
+                    disabled={!bulkSets && !bulkReps && !bulkRest}
+                    style={{ width: '100%', padding: '0.5rem', background: (!bulkSets && !bulkReps && !bulkRest) ? 'rgba(255,215,0,0.2)' : '#FFD700', border: 'none', borderRadius: 7, color: '#0a0a0a', fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 900, cursor: (!bulkSets && !bulkReps && !bulkRest) ? 'default' : 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    Toepassen op alle {day.exercises.length} oefeningen
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem', marginBottom: '1rem', maxHeight: isMobile ? '400px' : '440px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: day.exercises.length > 5 ? '0.4rem' : 0 }}>
             {day.exercises.map((exercise, index) => (
               <BuilderExerciseCard
