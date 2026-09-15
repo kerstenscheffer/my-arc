@@ -2077,7 +2077,9 @@ function CampaignStatCard({ campaign: c, isMobile, onRevert, revertingId, onDele
   // anders is het pijltje een dode klik.
   const metNamen = (sleutel) => (namen[sleutel]?.length ? sleutel : undefined)
   const countItems = [
-    { label: 'Getagd',      value: c.total,          Icon: UserPlus,      color: '#a855f7', stage: metNamen('getagd') },
+    { label: 'Getagd',      value: c.total,          Icon: UserPlus,      color: '#a855f7', stage: metNamen('getagd'),
+      sub: c.afgeslotenLeads ? `${c.afgeslotenLeads} verder in andere campagne` : undefined,
+      info: c.afgeslotenLeads ? 'Deze cijfers staan vast voor de periode dat de lead aan deze campagne hing. Ging de lead daarna naar een andere campagne, dan tellen nieuwe reacties en stappen daar mee, niet meer hier.' : undefined },
     { label: 'Reacties',    value: s.replied,        Icon: MessageCircle, color: '#10b981', stage: metNamen('replied') },
     { label: 'Voorgesteld', value: s.callProposed,   Icon: PhoneCall,     color: '#a855f7', stage: metNamen('callProposed') },
     { label: 'Ingepland',   value: s.callScheduled,  Icon: CalendarCheck, color: '#06b6d4', stage: metNamen('callScheduled') },
