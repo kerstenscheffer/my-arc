@@ -199,6 +199,19 @@ async updateLead(leadId, updates, coachId = null) {
 
     if (error) throw error
 
+    // Campagne gewijzigd? Leg de koppeling vast in de historie: de oude
+    // koppeling sluit (met de opvolg-stand erin), de nieuwe gaat open. Zo
+    // veranderen de cijfers van de vorige campagne niet meer. Best-effort.
+    if (updates.outreach_campaign_id) {
+      try {
+        await this.tagLeadCampaign(
+          leadId,
+          updates.outreach_campaign_id,
+          updates.campaign_message_sent_at || new Date().toISOString(),
+        )
+      } catch (e) { console.warn('campagne-koppeling loggen mislukt:', e?.message) }
+    }
+
     // Log de losse reactie (élke +/- klik) met een timestamp. Best-effort:
     // een fout hier mag het bijwerken van de lead nooit breken.
     if (replyDelta !== 0) {
@@ -3311,35 +3324,47 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // (die leads zijn niet "nieuw in de periode", dus de bron-breakdown mist ze).
   // Groepeert ALLE campagne-getagde leads op campagne, met dezelfde funnel-
   // stages als getRangeLeadSources zodat de UI SourceRow kan hergebruiken.
+  // Campagne-koppeling bijwerken: sluit de oude koppeling (met de opvolg-stand
+  // erin) en opent een nieuwe. De RPC doet beide in één keer, zodat een lead
+  // nooit twee open koppelingen heeft.
+  async tagLeadCampaign(leadId, campaignId, atISO = null) {
+    if (!leadId || !campaignId) return { ok: false }
+    const { data, error } = await this.db.supabase.rpc('tag_lead_campaign', {
+      p_lead: leadId,
+      p_campaign: campaignId,
+      p_at: atISO || new Date().toISOString(),
+    })
+    if (error) { console.warn('Campagne-koppeling bijwerken mislukt:', error.message); return { ok: false, error: error.message } }
+    return { ok: true, id: data }
+  }
+
+  // Cijfers per campagne, op basis van de KOPPELINGEN (lead_campaign_tags) en
+  // niet van de huidige tag op de lead. Elke koppeling heeft een venster:
+  // vanaf het campagne-bericht tot het moment dat de lead naar een volgende
+  // campagne ging. Reacties en funnel-stappen tellen alleen binnen dat venster,
+  // zodat de cijfers van een afgesloten campagne niet meer veranderen.
   async getCampaignBreakdown(coachId) {
     try {
-      // Alle campagne-getagde leads (geen datum-venster). Gepagineerd i.v.m. de
-      // 1000-rijen-cap. Geen coach_id-filter → RLS neemt team-leads mee.
-      // campaign_message_sent_at = stabiele tijd van het campagne-bericht
-      // (handleCampaignDM stempelt dit; wordt NIET gereset bij een reactie, i.t.t.
-      // last_followup_sent_at) → onze betrouwbare "na-campagne"-anker.
-      const leads = await this._fetchAllRows(() => this.db.supabase
-        .from('call_leads')
-        .select('id, outreach_campaign_id, followup_count, campaign_message_sent_at, first_name, last_name')
-        .not('outreach_campaign_id', 'is', null)
-        .is('deleted_at', null))
+      const tags = await this._fetchAllRows(() => this.db.supabase
+        .from('lead_campaign_tags')
+        .select('id, lead_id, campaign_id, tagged_at, untagged_at, followups_snapshot'))
+      if (!tags?.length) return { campaigns: [], totalLeads: 0 }
 
-      const leadIds = (leads || []).map(l => l.id)
-      if (leadIds.length === 0) return { campaigns: [], totalLeads: 0 }
+      const leadIds = [...new Set(tags.map(t => t.lead_id))]
 
-      // Anker per lead: het moment van het campagne-bericht. Reacties/funnel-
-      // stappen tellen ALLEEN als ze ná dit moment gebeurden — anders vervuilen
-      // oude reacties (van vóór de campagne) de cijfers.
-      const anchor = new Map((leads || []).map(l => [l.id, l.campaign_message_sent_at ? new Date(l.campaign_message_sent_at).getTime() : null]))
+      // Leads (naam + huidige opvolg-teller) in brokken ophalen.
+      const leadMap = new Map()
+      for (let i = 0; i < leadIds.length; i += 300) {
+        const chunk = leadIds.slice(i, i + 300)
+        const { data } = await this.db.supabase
+          .from('call_leads')
+          .select('id, first_name, last_name, followup_count, deleted_at')
+          .in('id', chunk)
+        ;(data || []).forEach(l => leadMap.set(l.id, l))
+      }
 
-      // 1) REACTIES + 2) DIEPERE FUNNEL — beide sets chunk-queries parallel starten.
-      const stageKeywords = [
-        { key: 'callProposed',  words: ['voorgesteld', 'voorstel'] },
-        { key: 'callScheduled', words: ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'] },
-        { key: 'sale',          words: ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal'] },
-      ]
       const rxBatches = []
-      const movBatches2 = []
+      const movBatches = []
       for (let i = 0; i < leadIds.length; i += 300) {
         const chunk = leadIds.slice(i, i + 300)
         rxBatches.push(this.db.supabase
@@ -3347,125 +3372,130 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .select('lead_id, delta, created_at')
           .in('lead_id', chunk)
           .gt('delta', 0))
-        movBatches2.push(this.db.supabase
-          // id + namen erbij: de drill-down per campagne laat zien WIE er in
-          // een stap zit, en kan de verplaatsing terugdraaien of verwijderen.
+        movBatches.push(this.db.supabase
           .from('lead_movements')
           .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at')
           .in('lead_id', chunk))
       }
       const [rxResults, movResults] = await Promise.all([
         Promise.all(rxBatches),
-        Promise.all(movBatches2),
+        Promise.all(movBatches),
       ])
-      const repliedAfter = new Set()
-      // Wanneer een lead voor het eerst reageerde — voor de namenlijst.
-      const reactieMoment = new Map()
+
+      const reactiesPerLead = new Map()
       rxResults.forEach(({ data }) => {
         ;(data || []).forEach(ev => {
-          const a = anchor.get(ev.lead_id)
-          if (!a || !ev.created_at) return
-          if (new Date(ev.created_at).getTime() >= a) {
-            repliedAfter.add(ev.lead_id)
-            const bestaand = reactieMoment.get(ev.lead_id)
-            if (!bestaand || ev.created_at < bestaand) reactieMoment.set(ev.lead_id, ev.created_at)
-          }
+          if (!ev.created_at) return
+          const lijst = reactiesPerLead.get(ev.lead_id) || []
+          lijst.push(ev.created_at)
+          reactiesPerLead.set(ev.lead_id, lijst)
         })
       })
-      const perLeadStages = new Map()
-      const reachedCall = new Set()
-      // De verplaatsing zelf bewaren per lead + stap, zodat de drill-down een
-      // naam en een knop "ongedaan maken" heeft.
-      const perLeadMovement = new Map()   // `${leadId}|${stage}` → rij
+      const movPerLead = new Map()
       movResults.forEach(({ data }) => {
         ;(data || []).forEach(m => {
-          const a = anchor.get(m.lead_id)
-          if (!a) return
-          if (!m.moved_at || new Date(m.moved_at).getTime() < a) return
-          const t = (m.to_section_title || '').toLowerCase()
-          if (NEGATIVE_FUNNEL_WORDS.some(w => t.includes(w))) return
-          for (const stage of stageKeywords) {
-            if (stage.words.some(k => t.includes(k))) {
-              const entry = perLeadStages.get(m.lead_id) || { callProposed: 0, callScheduled: 0, sale: 0 }
-              entry[stage.key] = 1
-              perLeadStages.set(m.lead_id, entry)
-              const sleutel = `${m.lead_id}|${stage.key}`
-              const vorig = perLeadMovement.get(sleutel)
-              // Eerste keer dat de lead deze stap raakte telt.
-              if (!vorig || m.moved_at < vorig.moved_at) perLeadMovement.set(sleutel, m)
-              if (stage.key === 'callProposed' || stage.key === 'callScheduled') reachedCall.add(m.lead_id)
-              break
-            }
-          }
+          if (!m.moved_at) return
+          const lijst = movPerLead.get(m.lead_id) || []
+          lijst.push(m)
+          movPerLead.set(m.lead_id, lijst)
         })
       })
 
-      const campIds = [...new Set((leads || []).map(l => l.outreach_campaign_id).filter(Boolean))]
+      const stageKeywords = [
+        { key: 'callProposed',  words: ['voorgesteld', 'voorstel'] },
+        { key: 'callScheduled', words: ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'] },
+        { key: 'sale',          words: ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal'] },
+      ]
+
+      const campIds = [...new Set(tags.map(t => t.campaign_id))]
       const { data: camps } = campIds.length
         ? await this.db.supabase.from('outreach_campaigns').select('id, name, variant_tag, message_text, platform, purpose').in('id', campIds)
         : { data: [] }
       const campMap = new Map((camps || []).map(c => [c.id, c]))
 
       const campStats = new Map()
-      ;(leads || []).forEach(l => {
-        const st = perLeadStages.get(l.id) || { callProposed: 0, callScheduled: 0, sale: 0 }
-        const fc = l.followup_count || 0
-        const repliedOne = repliedAfter.has(l.id) ? 1 : 0
-        const c = campMap.get(l.outreach_campaign_id)
-        const entry = campStats.get(l.outreach_campaign_id) || {
-          id: l.outreach_campaign_id,
+      tags.forEach(t => {
+        const lead = leadMap.get(t.lead_id)
+        if (!lead || lead.deleted_at) return
+        const vanaf = t.tagged_at ? new Date(t.tagged_at).getTime() : null
+        const tot = t.untagged_at ? new Date(t.untagged_at).getTime() : Infinity
+        const binnen = (iso) => {
+          if (!iso || vanaf == null) return false
+          const tijd = new Date(iso).getTime()
+          return tijd >= vanaf && tijd < tot
+        }
+
+        const c = campMap.get(t.campaign_id)
+        const entry = campStats.get(t.campaign_id) || {
+          id: t.campaign_id,
           name: c ? `${c.name}${c.variant_tag ? ` · ${c.variant_tag}` : ''}` : 'Onbekende campagne',
           messageText: c?.message_text || null,
           platform: c?.platform || null,
           purpose: c?.purpose || null,
           total: 0, reached: 0, followupCount: 0,
           repliedLeads: 0, followedLeads: 0,
-          // Wanneer het bericht de deur uitging, en naar hoeveel leads. Zonder
-          // dit leest "1 reactie op 96 leads" als een kapotte teller, terwijl
-          // het klopt zodra je ziet dat de campagne een uur geleden verstuurd
-          // is. Alle cijfers hieronder meten vanaf dat moment.
           sentCount: 0, lastSentAt: null,
+          // Hoeveel koppelingen inmiddels naar een andere campagne zijn gegaan.
+          afgeslotenLeads: 0,
           stages: { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 },
-          // Namen per stap voor de drill-down.
           leads: { getagd: [], replied: [], callProposed: [], callScheduled: [], sale: [] },
         }
-        entry.total += 1
-        if (l.campaign_message_sent_at) {
-          entry.sentCount += 1
-          if (!entry.lastSentAt || l.campaign_message_sent_at > entry.lastSentAt) {
-            entry.lastSentAt = l.campaign_message_sent_at
-          }
-        }
-        entry.reached += reachedCall.has(l.id) ? 1 : 0
-        entry.followupCount += fc
-        entry.repliedLeads  += repliedOne
-        entry.followedLeads += fc > 0 ? 1 : 0
-        entry.stages.replied       += repliedOne
-        entry.stages.callProposed  += st.callProposed
-        entry.stages.callScheduled += st.callScheduled
-        entry.stages.sale          += st.sale
 
-        const naam = [l.first_name, l.last_name].filter(Boolean).join(' ').trim() || 'Onbekend'
-        entry.leads.getagd.push({ leadId: l.id, name: naam, at: l.campaign_message_sent_at || null })
-        if (repliedOne) entry.leads.replied.push({ leadId: l.id, name: naam, at: reactieMoment.get(l.id) || null })
-        ;['callProposed', 'callScheduled', 'sale'].forEach(stap => {
-          if (!st[stap]) return
-          const m = perLeadMovement.get(`${l.id}|${stap}`)
-          entry.leads[stap].push({
-            id: m?.id || null,
-            leadId: l.id,
-            name: m?.lead_name || naam,
-            from: m?.from_section_title || null,
-            to: m?.to_section_title || null,
-            at: m?.moved_at || null,
+        const naam = [lead.first_name, lead.last_name].filter(Boolean).join(' ').trim() || 'Onbekend'
+        entry.total += 1
+        if (t.untagged_at) entry.afgeslotenLeads += 1
+        if (t.tagged_at) {
+          entry.sentCount += 1
+          if (!entry.lastSentAt || t.tagged_at > entry.lastSentAt) entry.lastSentAt = t.tagged_at
+        }
+        entry.leads.getagd.push({ leadId: lead.id, name: naam, at: t.tagged_at })
+
+        // Opvolg: voor een afgesloten koppeling de bevroren stand, anders de
+        // huidige teller van de lead.
+        const opvolg = t.untagged_at
+          ? (Number(t.followups_snapshot) || 0)
+          : (Number(lead.followup_count) || 0)
+        entry.followupCount += opvolg
+        if (opvolg > 0) entry.followedLeads += 1
+
+        const eersteReactie = (reactiesPerLead.get(lead.id) || []).filter(binnen).sort()[0] || null
+        if (eersteReactie) {
+          entry.repliedLeads += 1
+          entry.stages.replied += 1
+          entry.leads.replied.push({ leadId: lead.id, name: naam, at: eersteReactie })
+        }
+
+        const gezien = {}
+        ;(movPerLead.get(lead.id) || [])
+          .filter(m => binnen(m.moved_at))
+          .sort((a, b) => String(a.moved_at).localeCompare(String(b.moved_at)))
+          .forEach(m => {
+            const titel = (m.to_section_title || '').toLowerCase()
+            if (NEGATIVE_FUNNEL_WORDS.some(w => titel.includes(w))) return
+            for (const stage of stageKeywords) {
+              if (!stage.words.some(k => titel.includes(k))) continue
+              if (gezien[stage.key]) break
+              gezien[stage.key] = true
+              entry.stages[stage.key] += 1
+              entry.leads[stage.key].push({
+                id: m.id,
+                leadId: lead.id,
+                name: m.lead_name || naam,
+                from: m.from_section_title || null,
+                to: m.to_section_title || null,
+                at: m.moved_at,
+              })
+              break
+            }
           })
-        })
-        campStats.set(l.outreach_campaign_id, entry)
+        if (gezien.callProposed || gezien.callScheduled) entry.reached += 1
+
+        campStats.set(t.campaign_id, entry)
       })
 
       return {
         campaigns: [...campStats.values()].sort((a, b) => b.total - a.total),
-        totalLeads: (leads || []).length,
+        totalLeads: tags.length,
       }
     } catch (error) {
       console.error('❌ Get campaign breakdown failed:', error)
