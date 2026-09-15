@@ -113,7 +113,7 @@ export default function TaskCard({
   // ── EDIT MODE ──────────────────────────────────────────────────────────────
   if (isEditing) {
     return (
-      <div style={{ background: '#0a0a0a', border: `1px solid ${accent}40`, borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ background: '#0a0a0a', border: `1px solid ${accent}40`, borderRadius: 10, overflow: 'hidden' }}>
         <div style={{ padding: '0.4rem 0.625rem', borderBottom: `1px solid ${accent}25`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '0.5rem', fontWeight: '700', color: accent, textTransform: 'uppercase', letterSpacing: '0.06em' }}>BEWERKEN</span>
           <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -129,11 +129,11 @@ export default function TaskCard({
           <div style={{ display: 'flex', gap: '0.25rem' }}>
             <select value={editData.priority} onChange={(e) => setEditData({ ...editData, priority: e.target.value })}
               style={{ flex: 1, padding: '0.3rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', color: '#fff', fontSize: '0.7rem', outline: 'none', minHeight: '28px' }}>
-              <option value="low">🟢 Laag</option><option value="medium">🟡 Med</option><option value="high">🔴 Hoog</option>
+              <option value="low">Laag</option><option value="medium">Medium</option><option value="high">Hoog</option>
             </select>
             <select value={editData.category} onChange={(e) => setEditData({ ...editData, category: e.target.value })}
               style={{ flex: 1, padding: '0.3rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', color: '#fff', fontSize: '0.7rem', outline: 'none', minHeight: '28px' }}>
-              <option value="">Geen</option><option value="werk">💼 Werk</option><option value="prive">🏠 Privé</option><option value="myarc">💪 MY ARC</option><option value="gezondheid">❤️ Gezondheid</option>
+              <option value="">Geen</option><option value="werk">Werk</option><option value="prive">Privé</option><option value="myarc">MY ARC</option><option value="gezondheid">Gezondheid</option>
             </select>
           </div>
           <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -152,7 +152,7 @@ export default function TaskCard({
           <div style={{ display: 'flex', gap: '0.25rem' }}>
             <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', padding: '0.25rem 0.4rem', background: editData.is_this_week ? 'rgba(255,215,0,0.08)' : 'transparent', border: `1px solid ${editData.is_this_week ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '5px' }}>
               <input type="checkbox" checked={editData.is_this_week} onChange={(e) => setEditData({ ...editData, is_this_week: e.target.checked })} style={{ accentColor: '#FFD700' }} />
-              <span style={{ color: editData.is_this_week ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: '0.6rem' }}>⭐ Deze week</span>
+              <span style={{ color: editData.is_this_week ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: '0.6rem', fontWeight: 800 }}>Deze week</span>
             </label>
             <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', padding: '0.25rem 0.4rem', background: editData.needs_reflection ? 'rgba(139,92,246,0.08)' : 'transparent', border: `1px solid ${editData.needs_reflection ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '5px' }}>
               <input type="checkbox" checked={editData.needs_reflection} onChange={(e) => setEditData({ ...editData, needs_reflection: e.target.checked })} style={{ accentColor: '#8b5cf6' }} />
@@ -179,7 +179,7 @@ export default function TaskCard({
               ? '1px solid rgba(239,68,68,0.15)'
               : '1px solid rgba(255,255,255,0.05)',
         borderLeft: `3px solid ${isCompleted ? '#10b981' : isThisWeek ? '#FFD700' : isOverdue ? '#ef4444' : accent}`,
-        borderRadius: '8px',
+        borderRadius: 10,
         overflow: 'hidden',
         cursor: 'grab',
         transform: 'translateZ(0)',

@@ -97,42 +97,69 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
     )
   }
 
-  const activeTabConfig = TABS.find(t => t.id === activeTab)
-
   return (
     <div style={{ background: '#0a0a0a', borderRadius: isMobile ? '10px' : '12px', overflow: 'hidden' }}>
 
       {/* ═══ HEADER ═══ */}
       <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
-          <Zap size={14} color="#10b981" />
-          <h2 style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '800', color: '#fff', margin: 0 }}>Productivity</h2>
-          <span style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.15)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            {activeTabConfig?.label?.toUpperCase()}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: 1, minWidth: 0 }}>
+          <Zap size={14} color="rgba(255,255,255,0.65)" strokeWidth={2.6} />
+          <h2 style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em' }}>
+            Productiviteit
+          </h2>
         </div>
         {pendingReflections.length > 0 && (
           <button onClick={() => { setCurrentReflectionTask(pendingReflections[0]); setShowReflectionModal(true) }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '5px', color: '#a78bfa', fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px', flexShrink: 0 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 999, color: '#a78bfa', fontSize: '0.66rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: 30, flexShrink: 0 }}>
             <Bell size={10} />
             {pendingReflections.length} reflectie{pendingReflections.length > 1 ? 's' : ''}
           </button>
         )}
       </div>
 
-      {/* ═══ TAB NAV ═══ */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-        {TABS.map(tab => {
-          const isActive = activeTab === tab.id
-          const Icon = tab.icon
-          return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', padding: isMobile ? '0.5rem 0.25rem' : '0.5rem 0.5rem', background: 'transparent', border: 'none', borderBottom: isActive ? `2px solid ${tab.color}` : '2px solid transparent', color: isActive ? tab.color : 'rgba(255,255,255,0.25)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: isActive ? '700' : '500', cursor: 'pointer', transition: 'all 0.15s ease', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '36px', whiteSpace: 'nowrap' }}>
-              <Icon size={isMobile ? 12 : 13} />
-              {tab.label}
-            </button>
-          )
-        })}
+      {/* ═══ TABBLADEN ═══ */}
+      {/* Schuifknop met een wit blokje op het actieve tabblad — zelfde
+          schakelaar als in de log-modal, in plaats van vier gekleurde
+          onderstrepingen die om aandacht vochten. */}
+      <div style={{ padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem' }}>
+        <div style={{
+          position: 'relative', display: 'flex',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          borderRadius: 999, padding: 3,
+        }}>
+          <div style={{
+            position: 'absolute', top: 3, bottom: 3,
+            left: `calc(${(TABS.findIndex(t => t.id === activeTab) * 100) / TABS.length}% + 3px)`,
+            width: `calc(${100 / TABS.length}% - 6px)`,
+            background: '#fff', borderRadius: 999,
+            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          }} />
+          {TABS.map(tab => {
+            const aan = activeTab === tab.id
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  position: 'relative', zIndex: 1,
+                  flex: 1, minHeight: 34,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  background: 'transparent', border: 'none', borderRadius: 999,
+                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                  fontSize: isMobile ? '0.68rem' : '0.74rem', fontWeight: aan ? 900 : 800,
+                  cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  transition: 'color 0.15s ease',
+                }}
+              >
+                <Icon size={isMobile ? 12 : 13} strokeWidth={2.6} />
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ═══ TAB CONTENT ═══ */}
