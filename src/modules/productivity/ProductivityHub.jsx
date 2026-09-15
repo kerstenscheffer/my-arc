@@ -261,20 +261,18 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
       {/* ═══ TAB CONTENT ═══ */}
       <div>
         {activeTab === 'kanban' && (
-          <>
-            <ProductivityKanban
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              productivityService={productivityService}
-              coachId={coachId}
-              db={db}
-              isMobile={isMobile}
-              onTaskCompleted={handleTaskCompleted}
-              onSectionsChange={setSections}
-              onStartTask={onStartTask}
-              activeTaskId={activeTaskId}
-            />
-          </>
+          <ProductivityKanban
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            productivityService={productivityService}
+            coachId={coachId}
+            db={db}
+            isMobile={isMobile}
+            onTaskCompleted={handleTaskCompleted}
+            onSectionsChange={setSections}
+            onStartTask={onStartTask}
+            activeTaskId={activeTaskId}
+          />
         )}
         {activeTab === 'reflections' && (
           <ReflectionsHub
