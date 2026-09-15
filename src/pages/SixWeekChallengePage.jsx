@@ -12,8 +12,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Star, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro } from 'lucide-react'
 
-// Eenmalige prijs.
-const PRICE = 297
+// Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
+// pas op /6week-checkout.
 
 const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
@@ -430,7 +430,7 @@ export default function SixWeekChallengePage() {
               </div>
               {[
                 { Icon: Clock, tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
-                { Icon: BadgeEuro, tekst: 'Vind je tijdens de 6 weken dat je geen €297 aan coaching waarde krijgt? Geld terug.' },
+                { Icon: BadgeEuro, tekst: 'Vind je tijdens de 6 weken dat je niet genoeg coaching waarde krijgt? Geld terug.' },
               ].map((r, i) => (
                 <div key={r.tekst} style={{
                   display: 'flex', gap: '0.7rem',
@@ -466,7 +466,7 @@ export default function SixWeekChallengePage() {
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              Doe mee · €{PRICE}
+              Doe mee
             </button>
 
             {/* ══ Reviews en transformaties ══ */}
@@ -585,7 +585,7 @@ export default function SixWeekChallengePage() {
           fontFamily: 'inherit',
         }}
       >
-        Doe mee · €{PRICE} <ChevronDown size={16} strokeWidth={3} />
+        Doe mee <ChevronDown size={16} strokeWidth={3} />
       </button>
 
       {/* ══ Nav-dots — zoals /16week ══ */}
