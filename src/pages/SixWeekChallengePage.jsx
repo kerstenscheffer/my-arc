@@ -415,16 +415,25 @@ export default function SixWeekChallengePage() {
 
         {/* ══ SCHERM 2: GARANTIES + REVIEWS ══ */}
         <section ref={aanbodRef} style={{ ...screen, justifyContent: 'center' }}>
-          <div style={{ maxWidth: 520, width: '100%' }}>
-            {/* De twee garanties onder elkaar, met een icoon ervoor. */}
+          <div style={{ maxWidth: isMobile ? 520 : 1000, width: '100%' }}>
+            {/* Op desktop staan de garanties en de knop naast elkaar; op
+                telefoon onder elkaar. Zo blijft de sectie op een breed scherm
+                gevuld in plaats van een smalle kolom in het midden. */}
             <div style={{
-              margin: isMobile ? '0 auto 1.75rem' : '0 auto 2.25rem',
-              maxWidth: 480, width: '100%', textAlign: 'left',
+              display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'center',
+              gap: isMobile ? 0 : '3rem',
+            }}>
+            <div style={{
+              margin: isMobile ? '0 auto 1.75rem' : 0,
+              flex: 1, minWidth: 0,
+              maxWidth: isMobile ? 480 : 560, width: '100%', textAlign: 'left',
             }}>
               <div style={{
-                fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
+                fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
                 letterSpacing: '0.15em', color: GOLD,
-                marginBottom: isMobile ? '0.6rem' : '0.75rem', textAlign: 'center',
+                marginBottom: isMobile ? '0.6rem' : '0.85rem',
+                textAlign: isMobile ? 'center' : 'left',
               }}>
                 EXTRA GARANTIES
               </div>
@@ -434,8 +443,8 @@ export default function SixWeekChallengePage() {
               ].map((r, i) => (
                 <div key={r.tekst} style={{
                   display: 'flex', gap: '0.7rem',
-                  alignItems: 'center', justifyContent: 'center',
-                  padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+                  alignItems: 'center', justifyContent: isMobile ? 'center' : 'flex-start',
+                  padding: isMobile ? '0.7rem 0' : '1rem 0',
                   borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
                 }}>
@@ -445,32 +454,41 @@ export default function SixWeekChallengePage() {
                     style={{ flexShrink: 0, color: '#fff' }}
                   />
                   <span style={{
-                    fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
+                    fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 700,
                     color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
-                    textAlign: 'center',
+                    textAlign: isMobile ? 'center' : 'left',
                   }}>{r.tekst}</span>
                 </div>
               ))}
             </div>
 
             {/* Geen formulier hier: één knop naar de checkout. */}
-            <button
-              onClick={naarCheckout}
-              style={{
-                width: '100%', minHeight: 54, borderRadius: 14, border: 'none',
-                background: '#fff', color: '#000',
-                fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900,
-                letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 4px 24px rgba(255,255,255,0.14)',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Doe mee
-            </button>
+            <div style={{ flexShrink: 0, width: isMobile ? '100%' : 300 }}>
+              <button
+                onClick={naarCheckout}
+                style={{
+                  width: '100%', minHeight: isMobile ? 54 : 60, borderRadius: 14, border: 'none',
+                  background: '#fff', color: '#000',
+                  fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                  letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: '0 4px 24px rgba(255,255,255,0.14)',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Doe mee
+              </button>
+              <div style={{
+                marginTop: 10, textAlign: 'center',
+                fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)',
+              }}>
+                Je gegevens vul je op de volgende pagina in
+              </div>
+            </div>
+            </div>
 
             {/* ══ Reviews en transformaties ══ */}
-            <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>
+            <div style={{ marginTop: isMobile ? '2rem' : '3rem' }}>
               <TrustpilotBadge style={{ margin: isMobile ? '1rem 0' : '1.25rem 0' }} />
 
               <div
@@ -478,15 +496,15 @@ export default function SixWeekChallengePage() {
                 style={{
                   display: 'flex', gap: isMobile ? '0.75rem' : '1rem',
                   overflow: 'hidden', cursor: 'grab',
-                  marginLeft: isMobile ? '-1.25rem' : '-2rem',
-                  marginRight: isMobile ? '-1.25rem' : '-2rem',
-                  paddingLeft: isMobile ? '1.25rem' : '2rem',
-                  paddingRight: isMobile ? '1.25rem' : '2rem',
+                  marginLeft: isMobile ? '-1.25rem' : '-3rem',
+                  marginRight: isMobile ? '-1.25rem' : '-3rem',
+                  paddingLeft: isMobile ? '1.25rem' : '3rem',
+                  paddingRight: isMobile ? '1.25rem' : '3rem',
                 }}
               >
                 {doubledSlides.map((slide, idx) => (
                   <div key={idx} style={{
-                    minWidth: isMobile ? 240 : 280, maxWidth: isMobile ? 240 : 280,
+                    minWidth: isMobile ? 240 : 300, maxWidth: isMobile ? 240 : 300,
                     padding: slide.soort === 'foto'
                       ? (isMobile ? '0.6rem' : '0.7rem')
                       : (isMobile ? '0.85rem 1rem' : '1rem 1.15rem'),
