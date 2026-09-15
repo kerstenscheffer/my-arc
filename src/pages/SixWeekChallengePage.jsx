@@ -317,7 +317,7 @@ export default function SixWeekChallengePage() {
           }}>
             <div style={{
               position: 'absolute', inset: 0,
-              backgroundImage: 'url(/6week-offer-hero.jpg)',
+              backgroundImage: 'url(/6week-challenge-hero.jpg)',
               backgroundSize: 'cover', backgroundPosition: 'center',
             }} />
             <div style={{
