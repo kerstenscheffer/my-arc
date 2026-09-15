@@ -3,7 +3,7 @@
 // can be queried by Claude from any session ("check probleem tabellen").
 
 import { useState, useEffect, useRef } from 'react'
-import { Bug, X, Check, Trash2, Plus, BookmarkPlus, Bookmark, Pencil, MessageSquare, Send, Undo2, ImagePlus } from 'lucide-react'
+import { Bug, X, Check, Trash2, Plus, BookmarkPlus, Bookmark, Pencil, MessageSquare, Send, Undo2, ImagePlus, Palette } from 'lucide-react'
 
 // Publieke bucket voor issue-screenshots. Zelfde patroon als de andere
 // coach-uploads (MealGuideManager, CardGeneratorTab).
@@ -61,6 +61,11 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
   const fileInputRef = useRef(null)
   // Fullscreen-lightbox voor het bekijken van een screenshot.
   const [lightbox, setLightbox] = useState(null)
+  // Stijlprompts uit de tabel style_prompts. Vink er een aan en het issue
+  // wordt met die slug opgeslagen, zodat "volgens de geselecteerde prompt"
+  // eenduidig is: de AI haalt de volledige tekst bij die slug op.
+  const [stijlen, setStijlen] = useState([])
+  const [stijlRef, setStijlRef] = useState(null)
 
   const load = async () => {
     if (!db?.supabase || !coachId) return
@@ -160,6 +165,21 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
 
   const removePendingImage = (url) => setPendingImages(prev => prev.filter(u => u !== url))
 
+  useEffect(() => {
+    if (!db?.supabase) return
+    let gestopt = false
+    db.supabase
+      .from('style_prompts')
+      .select('slug, naam, omschrijving')
+      .order('naam')
+      .then(({ data, error }) => {
+        if (gestopt) return
+        if (error) { console.warn('style_prompts laden mislukt:', error.message); return }
+        setStijlen(data || [])
+      })
+    return () => { gestopt = true }
+  }, [db])
+
   const handleAdd = async () => {
     setAddError(null)
     const t = text.trim()
@@ -172,7 +192,7 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
     setAdding(true)
     const { data, error } = await db.supabase
       .from('app_issues')
-      .insert({ coach_id: coachId, text: t, images: pendingImages })
+      .insert({ coach_id: coachId, text: t, images: pendingImages, style_ref: stijlRef })
       .select()
       .single()
     setAdding(false)
@@ -184,6 +204,7 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
     setIssues(prev => [data, ...prev])
     setText('')
     setPendingImages([])
+    setStijlRef(null)
     setAddedFlash(true)
     setTimeout(() => setAddedFlash(false), 1500)
   }
@@ -516,9 +537,42 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
                 {uploading ? 'Uploaden…' : 'Screenshot'}
               </button>
               <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>
-                of plak (⌘V) in het tekstveld
+                of plak (⌘V)
               </span>
             </div>
+
+            {/* Stijl-referentie: aanvinken en het issue draagt die stijlprompt
+                mee. Zo weet de AI wat "volgens de geselecteerde prompt" is. */}
+            {stijlen.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>
+                  Stijl
+                </span>
+                {stijlen.map(st => {
+                  const aan = stijlRef === st.slug
+                  return (
+                    <button
+                      key={st.slug}
+                      onClick={() => setStijlRef(aan ? null : st.slug)}
+                      title={st.omschrijving || st.naam}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        minHeight: 28, padding: '0 0.7rem', borderRadius: 999,
+                        background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                        color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.65)',
+                        fontSize: '0.66rem', fontWeight: 800,
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <Palette size={11} strokeWidth={2.6} />
+                      {st.naam}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Preview-thumbnails van de mee te sturen screenshots */}
             {pendingImages.length > 0 && (
@@ -775,6 +829,21 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
                           verticalAlign: 'middle',
                         }}>
                           Geparkeerd
+                        </span>
+                      )}
+                      {issue.style_ref && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '1px 7px', marginRight: 6,
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          borderRadius: 999,
+                          fontSize: '0.55rem', fontWeight: 800,
+                          color: 'rgba(255,255,255,0.7)',
+                          verticalAlign: 'middle',
+                        }}>
+                          <Palette size={9} strokeWidth={2.8} />
+                          {stijlen.find(st => st.slug === issue.style_ref)?.naam || issue.style_ref}
                         </span>
                       )}
                       {issue.text}
