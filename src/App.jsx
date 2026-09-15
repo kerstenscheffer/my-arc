@@ -39,7 +39,10 @@ import SevenSecretsFunnel from './lead-magnet/7secretsfunnel/7SecretsFunnel'
 import GiveawayPage from './lead-magnet/7secretsfunnel/GiveawayPage'
 import SalesCallPage from './sales-call/SalesCallPage'
 import SalesCall16WeekPage from './sales-call-16week/SalesCall16WeekPage'
-import SixWeekChallengePage from './sales-call-6week/SixWeekChallengePage'
+// /6weekchallenge draait sinds 15 sep op de checkout-opzet zonder betaaldeel
+// (hero, methode/voorwaarden/waarom, garanties, reviewslider). De oude
+// sales-call-6week-pagina staat er nog maar wordt niet meer gerenderd.
+import SixWeekChallengePage from './pages/SixWeekChallengePage'
 import SixWeekChallengeCheckout from './pages/SixWeekChallengeCheckout'
 import BackInShapePage from './sales-call/BackInShapePage'
 import VSLLandingPage from './sales-call-vsl/VSLLandingPage'
