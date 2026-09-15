@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { Star, ThumbsUp, BookOpen, RefreshCw, SkipForward } from 'lucide-react'
-import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../ui'
+import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../../../components/arc-ui'
 
 const RATING_LABELS = { 1: 'Niet goed', 2: 'Kon beter', 3: 'Oké', 4: 'Goed', 5: 'Uitstekend' }
 

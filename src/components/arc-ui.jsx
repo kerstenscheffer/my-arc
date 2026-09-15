@@ -1,16 +1,16 @@
-// src/modules/productivity/components/ui.jsx
+// src/components/arc-ui.jsx
 //
-// Gedeelde bouwstenen voor het hele productiviteits- en agendasysteem, in
-// dezelfde taal als de oefening-log-modal: zwart, witte accenten, alles naast
-// elkaar in plaats van onder elkaar, en kleine labels boven een dikke waarde.
+// Gedeelde bouwstenen voor de MY ARC modal-stijl: zwart, witte accenten,
+// alles naast elkaar in plaats van onder elkaar, kleine labels boven een dikke
+// waarde. De volledige beschrijving staat in docs/stijl-myarc-modal.md en in
+// de tabel style_prompts (slug myarc-modal).
 //
-// Waarom hier en niet per bestand: de kanban, de agenda en de task-modal
-// hadden alle drie hun eigen randen, radii en knopkleuren. Eén set hier houdt
-// dat gelijk zonder dat je in vijf bestanden dezelfde stijl moet bijwerken.
+// Stond eerst in modules/productivity; nu app-breed, want ook schermen buiten
+// de kanban en agenda gebruiken deze stijl.
 
 import { createPortal } from 'react-dom'
 import { ChevronDown, X } from 'lucide-react'
-import { LIJN, LIJN_ZACHT, ZWART, KNOP_STIJL } from './uiTokens'
+import { LIJN, LIJN_ZACHT, ZWART, KNOP_STIJL } from './arc-tokens'
 
 // ── Venster ────────────────────────────────────────────────────────────────
 // Op telefoon plakt hij aan de onderkant, op desktop staat hij midden in beeld.

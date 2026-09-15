@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { Play, Clock } from 'lucide-react'
-import { Venster, VensterKop, VensterVoet, Kopje, Chip, Knop } from '../ui'
+import { Venster, VensterKop, VensterVoet, Kopje, Chip, Knop } from '../../../../components/arc-ui'
 
 const PRESETS = [5, 15, 25, 30, 45, 60, 90]
 

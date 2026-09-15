@@ -1,7 +1,7 @@
-// src/modules/productivity/components/uiTokens.js
-// Kleuren en vaste stijlen voor het productiviteits- en agendasysteem. Apart
-// van ui.jsx omdat een bestand met componenten alleen componenten mag
-// exporteren (fast refresh).
+// src/components/arc-tokens.js
+// Kleuren en vaste stijlen van de MY ARC modal-stijl. Apart van arc-ui.jsx
+// omdat een bestand met componenten alleen componenten mag exporteren
+// (fast refresh).
 
 export const LIJN = 'rgba(255,255,255,0.08)'
 export const LIJN_ZACHT = 'rgba(255,255,255,0.05)'

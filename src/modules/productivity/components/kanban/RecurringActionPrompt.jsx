@@ -3,7 +3,7 @@
 // onChoose.
 
 import { Repeat, Calendar } from 'lucide-react'
-import { Venster, VensterKop, VensterVoet, Knop } from '../ui'
+import { Venster, VensterKop, VensterVoet, Knop } from '../../../../components/arc-ui'
 
 export default function RecurringActionPrompt({
   action,           // 'delete' | 'shorten'

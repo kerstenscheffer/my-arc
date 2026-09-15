@@ -13,8 +13,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Calendar, Flag, Tag, Clock, Plus, Trash2, Timer, Layers, Repeat, CheckCircle2, CalendarMinus, MessageSquare, Palette, History } from 'lucide-react'
 import TaskLogSection from './TaskLogSection'
-import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Stat, Punt, Pil, Chip, Knop } from '../ui'
-import { keuzeSelect } from '../uiTokens'
+import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Stat, Punt, Pil, Chip, Knop } from '../../../../components/arc-ui'
+import { keuzeSelect } from '../../../../components/arc-tokens'
 
 const WEEK_DAYS = [
   { id: 'monday',    short: 'Ma' },

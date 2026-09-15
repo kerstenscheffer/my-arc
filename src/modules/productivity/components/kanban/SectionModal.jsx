@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { Trash2, Palette } from 'lucide-react'
-import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../ui'
+import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../../../components/arc-ui'
 
 const PRESET_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16']
 

@@ -10,7 +10,7 @@ import WeeklyWinsHub from './components/weekly-wins/WeeklyWinsHub'
 import ReflectionModal from './components/reflections/ReflectionModal'
 import TimeInsightsHub from './components/time/TimeInsightsHub'
 import WeekGoalsManager from './components/WeekGoalsManager'
-import { Venster, VensterKop } from './components/ui'
+import { Venster, VensterKop } from '../../components/arc-ui'
 
 // Bord en agenda zijn de twee schermen waar je de hele dag in zit; die staan
 // als schakelaar in de werkbalk. Reflecties, wins en tijd kijk je af en toe

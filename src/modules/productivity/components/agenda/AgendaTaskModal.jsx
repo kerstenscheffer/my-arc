@@ -5,8 +5,8 @@
 import { useState, useEffect } from 'react'
 import { Trash2, Check, Calendar, Clock, CheckCircle2, Timer, MessageSquare } from 'lucide-react'
 import { DAYS, timeToMinutes, minutesToTime, START_HOUR, END_HOUR } from './agendaConstants'
-import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Stat, Punt, Chip, Knop } from '../ui'
-import { keuzeSelect } from '../uiTokens'
+import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Stat, Punt, Chip, Knop } from '../../../../components/arc-ui'
+import { keuzeSelect } from '../../../../components/arc-tokens'
 
 const DURATION_PRESETS = [15, 30, 45, 60, 90, 120]
 

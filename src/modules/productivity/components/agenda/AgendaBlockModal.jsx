@@ -6,8 +6,8 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Calendar, Clock, Coffee, Users, Palette } from 'lucide-react'
 import { DAYS } from './agendaConstants'
-import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Knop } from '../ui'
-import { keuzeSelect } from '../uiTokens'
+import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Knop } from '../../../../components/arc-ui'
+import { keuzeSelect } from '../../../../components/arc-tokens'
 
 const COLORS = [
   { value: '#64748b', label: 'Grijs' },

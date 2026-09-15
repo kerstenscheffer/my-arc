@@ -1,14 +1,25 @@
 // src/client/pages/ClientProfile.jsx
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, AlertTriangle, Weight } from 'lucide-react'
+import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, Weight } from 'lucide-react'
 import DatabaseService from '../../services/DatabaseService'
+import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/arc-ui'
 const db = DatabaseService
 
-const GOLD = '#FFD700'
-const GOLD_DIM = 'rgba(255,215,0,0.12)'
-const GOLD_BORDER = 'rgba(255,215,0,0.15)'
-const GOLD_BORDER_ACTIVE = 'rgba(255,215,0,0.3)'
+// MY ARC modal-stijl: zwart met wit accent. Het goud dat hier overal in de
+// randen zat is eruit; kleur betekent nu iets (rood = verwijderen).
+const VLAK = 'rgba(255,255,255,0.04)'
+const LIJN = 'rgba(255,255,255,0.08)'
+const LABEL = {
+  display: 'block', fontSize: '0.52rem', fontWeight: 800,
+  letterSpacing: '0.09em', textTransform: 'uppercase',
+  color: 'rgba(255,255,255,0.35)', marginBottom: 6,
+}
+const VELD = {
+  width: '100%', padding: '0.6rem 0.7rem', borderRadius: 10,
+  background: VLAK, border: `1px solid ${LIJN}`,
+  color: '#fff', fontSize: '0.85rem', fontWeight: 700,
+  outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+}
 
 export default function ClientProfile({ client, user, onClientUpdate }) {
   const isMobile = window.innerWidth <= 768
@@ -116,14 +127,20 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
 
   const selectField = (label, value, key, options) => (
     <div>
-      <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>{label}</label>
+      <label style={LABEL}>{label}</label>
       <select
         value={value}
-        onChange={(e) => setFormData({...formData, [key]: e.target.value})}
+        onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
         disabled={!isEditing}
-        style={{ width: '100%', padding: '0.7rem 0.875rem', background: isEditing ? 'rgba(255,255,255,0.04)' : 'transparent', border: `1px solid ${isEditing ? GOLD_BORDER_ACTIVE : GOLD_BORDER}`, borderRadius: '6px', color: value ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: '0.875rem', fontWeight: '500', outline: 'none', boxSizing: 'border-box', appearance: isEditing ? 'auto' : 'none', WebkitAppearance: isEditing ? 'auto' : 'none' }}
+        style={{
+          ...VELD,
+          background: isEditing ? VLAK : 'transparent',
+          color: value ? '#fff' : 'rgba(255,255,255,0.35)',
+          cursor: isEditing ? 'pointer' : 'default',
+          appearance: isEditing ? 'auto' : 'none', WebkitAppearance: isEditing ? 'auto' : 'none',
+        }}
       >
-        <option value="">— niet ingesteld —</option>
+        <option value="">Niet ingesteld</option>
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </div>
@@ -131,41 +148,29 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
 
   const readonlyField = (label, displayValue, note) => (
     <div>
-      <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>{label}</label>
-      <div style={{ padding: '0.7rem 0.875rem', border: `1px solid ${GOLD_BORDER}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: displayValue ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)' }}>
+      <label style={LABEL}>{label}</label>
+      <div style={{
+        ...VELD, background: 'transparent',
+        color: displayValue ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)',
+      }}>
         {displayValue || '—'}
       </div>
-      {note && <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.25)', marginTop: '0.25rem' }}>{note}</div>}
+      {note && <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginTop: 5 }}>{note}</div>}
     </div>
   )
 
   const field = (label, value, key, type = 'text', disabled = false) => (
     <div>
-      <label style={{
-        display: 'block',
-        fontSize: '0.7rem',
-        fontWeight: '700',
-        color: 'rgba(255,255,255,0.3)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
-        marginBottom: '0.4rem'
-      }}>{label}</label>
+      <label style={LABEL}>{label}</label>
       <input
         type={type}
         value={value}
-        onChange={(e) => setFormData({...formData, [key]: e.target.value})}
+        onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
         disabled={!isEditing || disabled}
         style={{
-          width: '100%',
-          padding: '0.7rem 0.875rem',
-          background: isEditing && !disabled ? 'rgba(255,255,255,0.04)' : 'transparent',
-          border: `1px solid ${isEditing && !disabled ? GOLD_BORDER_ACTIVE : GOLD_BORDER}`,
-          borderRadius: '6px',
-          color: disabled ? 'rgba(255,255,255,0.3)' : '#fff',
-          fontSize: '0.875rem',
-          fontWeight: '500',
-          outline: 'none',
-          boxSizing: 'border-box'
+          ...VELD,
+          background: isEditing && !disabled ? VLAK : 'transparent',
+          color: disabled ? 'rgba(255,255,255,0.35)' : '#fff',
         }}
       />
     </div>
@@ -174,137 +179,102 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
   return (
     <div style={{ padding: isMobile ? '0.75rem' : '1rem', paddingBottom: isMobile ? '100px' : '2rem' }}>
 
-      {/* Header card */}
+      {/* Kop: naam groot, daaronder één regel met wie je bent. */}
       <div style={{
-        background: '#111',
-        border: `1px solid ${GOLD_BORDER}`,
-        borderRadius: '10px',
-        padding: isMobile ? '1.25rem' : '1.5rem',
-        marginBottom: '1rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem',
-        position: 'relative'
+        display: 'flex', alignItems: 'center', gap: isMobile ? '0.8rem' : '1rem',
+        padding: isMobile ? '0.9rem' : '1.1rem',
+        background: 'rgba(255,255,255,0.02)',
+        border: `1px solid ${LIJN}`,
+        borderRadius: 14,
+        marginBottom: '0.85rem',
       }}>
-        {/* Avatar */}
         <div style={{
-          width: isMobile ? '56px' : '64px',
-          height: isMobile ? '56px' : '64px',
+          width: isMobile ? 52 : 60, height: isMobile ? 52 : 60, flexShrink: 0,
           borderRadius: '50%',
-          background: GOLD_DIM,
-          border: `2px solid ${GOLD_BORDER_ACTIVE}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
+          background: 'rgba(255,255,255,0.06)',
+          border: `1px solid ${LIJN}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <span style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '800', color: GOLD }}>
+          <span style={{ fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
             {client?.first_name?.[0]}{client?.last_name?.[0]}
           </span>
         </div>
 
-        {/* Name + info */}
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.02em' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff',
+            letterSpacing: '-0.025em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
             {client?.first_name} {client?.last_name}
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontWeight: '500', marginTop: '0.1rem' }}>
-            MY ARC Member
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginTop: 3,
+            fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)',
+          }}>
+            MY ARC
+            {client?.location && (
+              <>
+                <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                <MapPin size={11} />
+                {client.location}
+              </>
+            )}
           </div>
-          {client?.location && (
-            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <MapPin size={11} />
-              {client.location}
-            </div>
-          )}
         </div>
 
-        {/* Edit button */}
         {!isEditing ? (
-          <button onClick={() => setIsEditing(true)} style={{
-            padding: '0.5rem 0.875rem',
-            background: GOLD_DIM,
-            border: `1px solid ${GOLD_BORDER_ACTIVE}`,
-            borderRadius: '6px',
-            color: GOLD,
-            fontSize: '0.8rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.375rem',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
-          }}>
+          <Knop soort="stil" onClick={() => setIsEditing(true)}>
             <Edit size={14} />
             Bewerk
-          </button>
+          </Knop>
         ) : (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={handleSave} disabled={saving} style={{
-              padding: '0.5rem 0.875rem',
-              background: GOLD,
-              border: 'none',
-              borderRadius: '6px',
-              color: '#000',
-              fontSize: '0.8rem',
-              fontWeight: '800',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}>
-              {saving ? '...' : <Save size={14} />}
-            </button>
-            <button onClick={() => setIsEditing(false)} style={{
-              padding: '0.5rem',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '6px',
-              color: 'rgba(255,255,255,0.5)',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}>
-              <X size={14} />
-            </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Knop soort="primair" onClick={handleSave} disabled={saving}>
+              <Save size={14} />
+              {saving ? 'Bezig…' : 'Opslaan'}
+            </Knop>
+            <Knop soort="stil" breedte={44} titel="Annuleer" onClick={() => setIsEditing(false)}>
+              <X size={15} />
+            </Knop>
           </div>
         )}
       </div>
 
-      {/* Tab bar */}
+      {/* Drie secties als schuifknop met een wit blokje. */}
       <div style={{
-        display: 'flex',
-        background: '#111',
-        border: `1px solid ${GOLD_BORDER}`,
-        borderRadius: '8px',
-        padding: '3px',
-        marginBottom: '1rem',
-        gap: '2px'
+        position: 'relative', display: 'flex',
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.09)',
+        borderRadius: 999, padding: 3, marginBottom: '0.85rem',
       }}>
-        {sections.map(s => {
-          const Icon = s.icon
-          const active = activeSection === s.id
+        <div style={{
+          position: 'absolute', top: 3, bottom: 3,
+          left: `calc(${(sections.findIndex(x => x.id === activeSection) * 100) / sections.length}% + 3px)`,
+          width: `calc(${100 / sections.length}% - 6px)`,
+          background: '#fff', borderRadius: 999,
+          transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+        }} />
+        {sections.map(sec => {
+          const Icon = sec.icon
+          const aan = activeSection === sec.id
           return (
-            <button key={s.id} onClick={() => setActiveSection(s.id)} style={{
-              flex: 1,
-              padding: '0.5rem',
-              background: active ? GOLD_DIM : 'transparent',
-              border: active ? `1px solid ${GOLD_BORDER_ACTIVE}` : '1px solid transparent',
-              borderRadius: '6px',
-              color: active ? GOLD : 'rgba(255,255,255,0.4)',
-              fontSize: '0.75rem',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.375rem',
-              transition: 'all 0.15s ease',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}>
-              <Icon size={14} />
-              {s.label}
+            <button
+              key={sec.id}
+              onClick={() => setActiveSection(sec.id)}
+              style={{
+                position: 'relative', zIndex: 1,
+                flex: 1, minHeight: 34,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                background: 'transparent', border: 'none', borderRadius: 999,
+                color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: aan ? 900 : 800,
+                cursor: 'pointer', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                transition: 'color 0.15s ease',
+              }}
+            >
+              <Icon size={13} strokeWidth={2.6} />
+              {sec.label}
             </button>
           )
         })}
@@ -312,11 +282,11 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
 
       {/* Content */}
       <div style={{
-        background: '#111',
-        border: `1px solid ${GOLD_BORDER}`,
-        borderRadius: '10px',
-        padding: isMobile ? '1.25rem' : '1.5rem',
-        marginBottom: '1rem'
+        background: 'rgba(255,255,255,0.02)',
+        border: `1px solid ${LIJN}`,
+        borderRadius: 14,
+        padding: isMobile ? '1rem' : '1.15rem',
+        marginBottom: '0.85rem',
       }}>
 
         {/* Persoonlijk */}
@@ -341,10 +311,8 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
               ])}
               {field('Geboortedatum', formData.date_of_birth, 'date_of_birth', 'date')}
             </div>
-            <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '0.25rem 0' }} />
-            <div style={{ fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '-0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Weight size={12} /> Gewicht
-            </div>
+            <div style={{ height: 1, background: LIJN, margin: '0.25rem 0' }} />
+            <div style={{ marginBottom: '-0.35rem' }}><Kopje Icon={Weight} tekst="Gewicht" /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               {field('Huidig gewicht (kg)', formData.current_weight, 'current_weight', 'number')}
               {readonlyField('Streefgewicht (kg)', client?.goal_weight || client?.target_weight || '', 'Ingesteld door je coach')}
@@ -354,134 +322,87 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
 
         {/* Coach */}
         {activeSection === 'coach' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem',
-              padding: '1rem',
-              background: GOLD_DIM,
-              border: `1px solid ${GOLD_BORDER_ACTIVE}`,
-              borderRadius: '8px'
+              display: 'flex', alignItems: 'center', gap: '0.85rem',
+              padding: '0.85rem',
+              background: VLAK, border: `1px solid ${LIJN}`, borderRadius: 12,
             }}>
               <div style={{
-                width: '48px', height: '48px',
-                borderRadius: '50%',
-                background: 'rgba(255,215,0,0.2)',
-                border: `2px solid ${GOLD_BORDER_ACTIVE}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                <span style={{ fontSize: '1.1rem', fontWeight: '800', color: GOLD }}>KS</span>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.95rem', fontWeight: '800', color: GOLD }}>Kersten Scheffer</div>
-                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: '0.1rem' }}>Jouw Personal Coach</div>
+                width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+                backgroundImage: 'url(/coach-compliment.jpg)',
+                backgroundSize: 'cover', backgroundPosition: 'center 30%',
+                border: `1px solid ${LIJN}`,
+              }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Kersten Scheffer</div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Jouw coach</div>
               </div>
             </div>
 
-            <div style={{
-              padding: '1rem',
-              background: 'rgba(255,255,255,0.02)',
-              border: `1px solid ${GOLD_BORDER}`,
-              borderRadius: '8px'
-            }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>Jouw Programma</div>
+            <div>
+              <Kopje Icon={Target} tekst="Jouw programma" />
               {[
-                ['Status', 'Actief', GOLD],
-                ['Start datum', new Date(client?.created_at || Date.now()).toLocaleDateString('nl-NL'), 'rgba(255,255,255,0.7)'],
-                ['Doel', client?.goal || 'Nog niet ingesteld', 'rgba(255,255,255,0.7)']
-              ].map(([label, value, color]) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', marginBottom: '0.5rem', borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-                  <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', fontWeight: '500' }}>{label}</span>
-                  <span style={{ fontSize: '0.8rem', color, fontWeight: '700' }}>{value}</span>
+                ['Status', 'Actief'],
+                ['Startdatum', new Date(client?.created_at || Date.now()).toLocaleDateString('nl-NL')],
+                ['Doel', client?.goal || 'Nog niet ingesteld'],
+              ].map(([label, value], i) => (
+                <div key={label} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                  padding: '0.65rem 0',
+                  borderTop: i === 0 ? `1px solid ${LIJN}` : 'none',
+                  borderBottom: `1px solid ${LIJN}`,
+                }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{label}</span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>{value}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Instellingen */}
+        {/* Instellingen — rijen met een lijn ertussen, geen losse kaders. */}
         {activeSection === 'instellingen' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-
-            {/* Wachtwoord */}
-            <button onClick={async () => {
-              await db.supabase.auth.resetPasswordForEmail(client.email, {
-                redirectTo: 'https://myarcfitness.com/reset-password'
-              })
-              alert('Reset link verstuurd naar ' + client.email)
-            }} style={{
-              width: '100%',
-              padding: '0.875rem 1rem',
-              background: 'transparent',
-              border: `1px solid ${GOLD_BORDER}`,
-              borderRadius: '8px',
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                <Shield size={16} color={GOLD} />
-                Wachtwoord wijzigen
-              </div>
-              <ChevronRight size={16} color='rgba(255,255,255,0.3)' />
-            </button>
-
-            {/* Privacy Policy */}
-            <button onClick={() => window.open('https://myarcfitness.com/privacy', '_blank')} style={{
-              width: '100%',
-              padding: '0.875rem 1rem',
-              background: 'transparent',
-              border: `1px solid ${GOLD_BORDER}`,
-              borderRadius: '8px',
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                <Globe size={16} color={GOLD} />
-                Privacybeleid
-              </div>
-              <ChevronRight size={16} color='rgba(255,255,255,0.3)' />
-            </button>
-
-            {/* Delete account */}
-            <button onClick={() => setShowDeleteModal(true)} style={{
-              width: '100%',
-              padding: '0.875rem 1rem',
-              background: 'rgba(239,68,68,0.05)',
-              border: '1px solid rgba(239,68,68,0.2)',
-              borderRadius: '8px',
-              color: '#ef4444',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              marginTop: '0.5rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                <Trash2 size={16} />
-                Account verwijderen
-              </div>
-              <ChevronRight size={16} color='rgba(239,68,68,0.4)' />
-            </button>
+          <div>
+            {[
+              {
+                Icon: Shield, label: 'Wachtwoord wijzigen',
+                onClick: async () => {
+                  await db.supabase.auth.resetPasswordForEmail(client.email, {
+                    redirectTo: 'https://myarcfitness.com/reset-password',
+                  })
+                  alert('Reset link verstuurd naar ' + client.email)
+                },
+              },
+              {
+                Icon: Globe, label: 'Privacybeleid',
+                onClick: () => window.open('https://myarcfitness.com/privacy', '_blank'),
+              },
+              {
+                Icon: Trash2, label: 'Account verwijderen', gevaar: true,
+                onClick: () => setShowDeleteModal(true),
+              },
+            ].map((r, i, arr) => (
+              <button
+                key={r.label}
+                onClick={r.onClick}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '0.85rem 0', minHeight: 48,
+                  background: 'transparent', border: 'none',
+                  borderTop: i === 0 ? 'none' : `1px solid ${LIJN}`,
+                  color: r.gevaar ? '#fca5a5' : 'rgba(255,255,255,0.8)',
+                  fontSize: '0.85rem', fontWeight: 800, textAlign: 'left',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <r.Icon size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>{r.label}</span>
+                <ChevronRight size={15} color={r.gevaar ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.25)'} />
+                {i === arr.length - 1 && null}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -490,104 +411,66 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
           gaf elke klant een route naar de coach-hub (zie PortalSwitchButton).
           Wisselen tussen coach en client hoort alleen thuis in CoachHub. */}
 
-      {/* Logout */}
+      {/* Uitloggen */}
       <button onClick={handleLogout} style={{
-        width: '100%',
-        padding: '0.875rem',
-        background: 'transparent',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '8px',
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: '0.875rem',
-        fontWeight: '600',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '0.5rem',
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent'
+        width: '100%', minHeight: 44, borderRadius: 10,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        background: VLAK, border: `1px solid ${LIJN}`,
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: '0.8rem', fontWeight: 800,
+        cursor: 'pointer', fontFamily: 'inherit',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}>
-        <LogOut size={16} />
+        <LogOut size={15} />
         Uitloggen
       </button>
 
-      {/* Delete Modal */}
-      {showDeleteModal && createPortal(
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.85)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1.5rem'
-        }}>
-          <div style={{
-            background: '#111',
-            border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            width: '100%',
-            maxWidth: '400px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <AlertTriangle size={20} color='#ef4444' />
-              <div style={{ fontSize: '1rem', fontWeight: '800', color: '#fff' }}>Account verwijderen</div>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6', marginBottom: '1.25rem' }}>
-              {/* Stond op "binnen 30 dagen" terwijl er niets werd verwijderd.
-                  Nu gebeurt het meteen, en dan hoort dat er ook te staan. */}
-              Je account, je plannen en al je voortgang worden direct en
-              permanent verwijderd. Je kunt daarna niet meer inloggen. Dit kan
-              niet ongedaan worden gemaakt.
+      {/* Account verwijderen — zelfde venster als de rest van de app. */}
+      {showDeleteModal && (
+        <Venster isMobile={isMobile} onClose={() => { setShowDeleteModal(false); setDeleteConfirm('') }} maxWidth={420} zIndex={9999}>
+          <VensterKop
+            isMobile={isMobile}
+            titel="Account verwijderen"
+            sub="Dit kan niet ongedaan worden gemaakt"
+            onClose={() => { setShowDeleteModal(false); setDeleteConfirm('') }}
+          />
+
+          <div style={{ padding: isMobile ? '1rem' : '1.15rem' }}>
+            <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.55 }}>
+              Je account, je plannen en al je voortgang worden direct en permanent
+              verwijderd. Je kunt daarna niet meer inloggen.
             </p>
-            <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.5rem' }}>
-              Typ <strong style={{ color: '#ef4444' }}>VERWIJDER</strong> om te bevestigen:
-            </p>
-            <input
-              type='text'
-              value={deleteConfirm}
-              onChange={(e) => setDeleteConfirm(e.target.value)}
-              placeholder='VERWIJDER'
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: 'rgba(239,68,68,0.05)',
-                border: '1px solid rgba(239,68,68,0.2)',
-                borderRadius: '6px',
-                color: '#fff',
-                fontSize: '0.875rem',
-                marginBottom: '1rem',
-                boxSizing: 'border-box',
-                outline: 'none'
-              }}
-            />
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={() => { setShowDeleteModal(false); setDeleteConfirm('') }} style={{
-                flex: 1, padding: '0.75rem',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '6px',
-                color: 'rgba(255,255,255,0.6)',
-                fontWeight: '700', fontSize: '0.875rem',
-                cursor: 'pointer'
-              }}>Annuleer</button>
-              <button onClick={handleDeleteAccount} disabled={deleteConfirm !== 'VERWIJDER' || deleting} style={{
-                flex: 1, padding: '0.75rem',
-                background: deleteConfirm === 'VERWIJDER' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${deleteConfirm === 'VERWIJDER' ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.06)'}`,
-                borderRadius: '6px',
-                color: deleteConfirm === 'VERWIJDER' ? '#ef4444' : 'rgba(255,255,255,0.2)',
-                fontWeight: '700', fontSize: '0.875rem',
-                cursor: deleteConfirm === 'VERWIJDER' ? 'pointer' : 'not-allowed'
-              }}>
-                {deleting ? 'Bezig...' : 'Verwijder'}
-              </button>
+
+            <div style={{ marginTop: '1rem' }}>
+              <Kopje Icon={Trash2} tekst="Typ VERWIJDER om te bevestigen" />
+              <input
+                type="text"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="VERWIJDER"
+                style={{
+                  ...VELD,
+                  background: 'rgba(239,68,68,0.06)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                }}
+              />
             </div>
           </div>
-        </div>,
-        document.body
+
+          <VensterVoet isMobile={isMobile}>
+            <Knop soort="stil" flex={1} onClick={() => { setShowDeleteModal(false); setDeleteConfirm('') }}>
+              Annuleer
+            </Knop>
+            <Knop
+              soort="gevaar"
+              flex={1}
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirm !== 'VERWIJDER' || deleting}
+            >
+              {deleting ? 'Bezig…' : 'Verwijder'}
+            </Knop>
+          </VensterVoet>
+        </Venster>
       )}
     </div>
   )
