@@ -11,9 +11,10 @@
 //      doesn't nuke the work.
 
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { X, Calendar, Flag, Tag, Clock, Plus, Trash2, Timer, Layers, Repeat, CheckCircle2, CalendarMinus, ChevronDown, MessageSquare, Palette, History } from 'lucide-react'
+import { Calendar, Flag, Tag, Clock, Plus, Trash2, Timer, Layers, Repeat, CheckCircle2, CalendarMinus, MessageSquare, Palette, History } from 'lucide-react'
 import TaskLogSection from './TaskLogSection'
+import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Stat, Punt, Pil, Chip, Knop } from '../ui'
+import { keuzeSelect } from '../uiTokens'
 
 const WEEK_DAYS = [
   { id: 'monday',    short: 'Ma' },
@@ -252,42 +253,21 @@ export default function AddTaskModal({
     if (userChoice) { await flushPending(); onClose() }
   }
 
-  return createPortal(
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) handleAttemptClose() }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 2147483600, padding: isMobile ? '0' : '1.5rem' }}
-    >
-      <div style={{
-        background: '#0a0a0a',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: isMobile ? '12px 12px 0 0' : '12px',
-        width: '100%',
-        maxWidth: isMobile ? '100%' : '480px',
-        maxHeight: isMobile ? '92vh' : '85vh',
-        display: 'flex', flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-
-        {/* ═══ HEADER ═══ */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0.75rem 1rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#fff' }}>{isEditMode ? 'Task bewerken' : 'Nieuwe Task'}</span>
-            {autosaveEnabled && hasContent && (
-              <span style={{
-                marginLeft: '0.5rem',
-                fontSize: '0.55rem', fontWeight: 700,
-                color: savingState === 'saving' ? 'rgba(255,215,0,0.7)' : 'rgba(16,185,129,0.7)',
-                letterSpacing: '0.04em', textTransform: 'uppercase',
-              }}>
-                {savingState === 'saving' ? 'Opslaan…' : savingState === 'saved' ? 'Bewaard' : ''}
-              </span>
-            )}
-          </div>
-          <button onClick={handleAttemptClose} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', touchAction: 'manipulation' }}>
-            <X size={13} />
-          </button>
-        </div>
+  return (
+    <Venster isMobile={isMobile} onClose={handleAttemptClose} maxWidth={480}>
+      <VensterKop
+        isMobile={isMobile}
+        titel={isEditMode ? 'Task bewerken' : 'Nieuwe task'}
+        onClose={handleAttemptClose}
+        rechts={autosaveEnabled && hasContent && savingState !== 'idle' ? (
+          <span style={{
+            fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
+            color: savingState === 'saving' ? 'rgba(255,215,0,0.75)' : 'rgba(16,185,129,0.8)',
+          }}>
+            {savingState === 'saving' ? 'Opslaan…' : 'Bewaard'}
+          </span>
+        ) : null}
+      />
 
         {/* ═══ FORM ═══ */}
         <div style={{ overflowY: 'auto', flex: 1 }}>
@@ -391,21 +371,9 @@ export default function AddTaskModal({
               {[15, 25, 30, 45, 60].map(m => {
                 const aan = Number(formData.estimated_minutes) === m
                 return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, estimated_minutes: aan ? '' : m })}
-                    style={{
-                      minHeight: 30, padding: '0 0.7rem', borderRadius: 999,
-                      background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
-                      border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.1)'}`,
-                      color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
-                      fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer',
-                      fontFamily: 'inherit', touchAction: 'manipulation',
-                    }}
-                  >
+                  <Chip key={m} actief={aan} onClick={() => setFormData({ ...formData, estimated_minutes: aan ? '' : m })}>
                     {m}m
-                  </button>
+                  </Chip>
                 )
               })}
               <input
@@ -588,186 +556,69 @@ export default function AddTaskModal({
           )}
         </div>
 
-        {/* ═══ FOOTER ACTIONS ═══ */}
-        <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          {isEditMode && onAutoDelete && (
-            <button
-              onClick={async () => {
-                if (!window.confirm('Task verwijderen?')) return
-                try { await onAutoDelete(draftId) } catch (e) { console.error(e) }
-                onClose()
-              }}
-              title="Task verwijderen"
-              style={{
-                width: 44, padding: 0, minHeight: 44,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(239,68,68,0.1)',
-                border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: 10, color: '#fca5a5',
-                cursor: 'pointer', touchAction: 'manipulation',
-              }}
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
+      {/* ═══ VOET ═══ */}
+      <VensterVoet isMobile={isMobile}>
+        {isEditMode && onAutoDelete && (
+          <Knop
+            soort="gevaar"
+            breedte={44}
+            titel="Task verwijderen"
+            onClick={async () => {
+              if (!window.confirm('Task verwijderen?')) return
+              try { await onAutoDelete(draftId) } catch (e) { console.error(e) }
+              onClose()
+            }}
+          >
+            <Trash2 size={15} />
+          </Knop>
+        )}
 
-          {/* Uitplannen — alleen als de task daadwerkelijk gepland staat.
-              Strip scheduled_day/date/start/end zodat 'ie terug naar
-              Niet gepland gaat. Recurring blijft recurring (toggle apart). */}
-          {isEditMode && onUnscheduleTask && initialTask?.scheduled_day && (
-            <button
-              onClick={async () => {
-                if (debounceRef.current) clearTimeout(debounceRef.current)
-                submittedRef.current = true
-                try { await onUnscheduleTask(draftId) } catch (e) { console.error('Unschedule failed:', e) }
-                onClose()
-              }}
-              title="Uitplannen — terug naar Niet gepland"
-              style={{
-                width: 44, padding: 0, minHeight: 44,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(251,191,36,0.1)',
-                border: '1px solid rgba(251,191,36,0.3)',
-                borderRadius: 10, color: '#fbbf24',
-                cursor: 'pointer', touchAction: 'manipulation',
-              }}
-            >
-              <CalendarMinus size={14} />
-            </button>
-          )}
-          <button onClick={handleAttemptClose}
-            style={{ flex: 1, padding: '0.6rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', minHeight: 44, touchAction: 'manipulation', fontFamily: 'inherit' }}>
-            {isEditMode ? 'Sluiten' : 'Annuleer'}
-          </button>
-          {isEditMode && onCompleteTask && (
-            <button
-              onClick={async () => {
-                // Flush pending autosave first so any unsaved edits land
-                // before completion fires.
-                if (debounceRef.current) clearTimeout(debounceRef.current)
-                submittedRef.current = true
-                try {
-                  await onCompleteTask(draftId)
-                } catch (e) { console.error('Complete failed:', e) }
-                onClose()
-              }}
-              title={recurrenceActive ? 'Voltooi vandaag' : 'Voltooi taak'}
-              style={{
-                flex: 1, padding: '0.6rem',
-                background: 'rgba(16,185,129,0.14)',
-                border: '1px solid rgba(16,185,129,0.4)',
-                borderRadius: 10,
-                color: '#10b981', fontSize: '0.78rem', fontWeight: 800,
-                cursor: 'pointer', minHeight: 44, fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <CheckCircle2 size={13} />
-              Voltooi
-            </button>
-          )}
-          <button onClick={handleSubmit}
-            style={{ flex: 2, padding: '0.6rem', background: '#fff', border: 'none', borderRadius: 10, color: '#0a0a0a', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', minHeight: 44, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>
-            <Plus size={14} strokeWidth={3} />
-            {isEditMode ? 'Opslaan' : 'Toevoegen'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  )
-}
+        {/* Uitplannen — alleen als de task echt gepland staat. Strip
+            scheduled_day/date/start/end zodat 'ie terug naar Niet gepland gaat. */}
+        {isEditMode && onUnscheduleTask && initialTask?.scheduled_day && (
+          <Knop
+            soort="stil"
+            breedte={44}
+            titel="Uitplannen, terug naar Niet gepland"
+            onClick={async () => {
+              if (debounceRef.current) clearTimeout(debounceRef.current)
+              submittedRef.current = true
+              try { await onUnscheduleTask(draftId) } catch (e) { console.error('Unschedule failed:', e) }
+              onClose()
+            }}
+          >
+            <CalendarMinus size={15} />
+          </Knop>
+        )}
 
-// ── Kleine bouwstenen, in de taal van de oefening-log-modal ─────────────────
+        <Knop soort="stil" flex={1} onClick={handleAttemptClose}>
+          {isEditMode ? 'Sluiten' : 'Annuleer'}
+        </Knop>
 
-const keuzeSelect = {
-  width: '100%', background: 'transparent', border: 'none', outline: 'none',
-  color: '#fff', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
-  fontFamily: 'inherit', padding: 0, appearance: 'none', WebkitAppearance: 'none',
-}
+        {isEditMode && onCompleteTask && (
+          <Knop
+            soort="goed"
+            flex={1}
+            titel={recurrenceActive ? 'Voltooi vandaag' : 'Voltooi taak'}
+            onClick={async () => {
+              // Eerst de wachtende autosave afvuren, anders gaan de laatste
+              // bewerkingen verloren bij het voltooien.
+              if (debounceRef.current) clearTimeout(debounceRef.current)
+              submittedRef.current = true
+              try { await onCompleteTask(draftId) } catch (e) { console.error('Complete failed:', e) }
+              onClose()
+            }}
+          >
+            <CheckCircle2 size={14} />
+            Voltooi
+          </Knop>
+        )}
 
-// Een keuzevak: icoon links, label klein erboven, de waarde eronder, chevron rechts.
-function Keuzevak({ label, isMobile, children, ...rest }) {
-  // Als losse variabele (en niet uit de props gedestructureerd) zodat de
-  // linter 'm als component herkent in plaats van als ongebruikt argument.
-  const Icon = rest.Icon
-  return (
-    <div style={{
-      flex: 1, minWidth: 0,
-      display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 10,
-      padding: isMobile ? '0.5rem 0.6rem' : '0.55rem 0.7rem',
-      borderRadius: 10,
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.08)',
-    }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-        background: 'rgba(255,255,255,0.05)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: 'rgba(255,255,255,0.75)',
-      }}>
-        <Icon size={14} strokeWidth={2.4} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: '0.52rem', fontWeight: 800, letterSpacing: '0.09em',
-          textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 2,
-        }}>
-          {label}
-        </div>
-        {children}
-      </div>
-      <ChevronDown size={13} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
-    </div>
-  )
-}
-
-function Kopje({ tekst, ...rest }) {
-  const Icon = rest.Icon
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 5, marginBottom: 7,
-      fontSize: '0.52rem', fontWeight: 800, letterSpacing: '0.09em',
-      textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)',
-    }}>
-      <Icon size={10} strokeWidth={2.6} />
-      {tekst}
-    </div>
-  )
-}
-
-// Regel onder de titel: groot getal, klein woord erachter.
-function Stat({ waarde, eenheid }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
-      <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{waarde}</span>
-      <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{eenheid}</span>
-    </span>
-  )
-}
-
-const Punt = () => <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>·</span>
-
-function Pil({ label, aan, stip, stipKleur, onClick, ...rest }) {
-  const Icon = rest.Icon
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        minHeight: 30, padding: '0 0.75rem', borderRadius: 999,
-        background: aan ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${aan ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`,
-        color: aan ? '#fff' : 'rgba(255,255,255,0.6)',
-        fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer',
-        fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <Icon size={12} strokeWidth={2.5} />
-      {label}
-      {stip && <span style={{ width: 6, height: 6, borderRadius: '50%', background: stipKleur || '#10b981' }} />}
-    </button>
+        <Knop soort="primair" flex={2} onClick={handleSubmit}>
+          <Plus size={14} strokeWidth={3} />
+          {isEditMode ? 'Opslaan' : 'Toevoegen'}
+        </Knop>
+      </VensterVoet>
+    </Venster>
   )
 }
