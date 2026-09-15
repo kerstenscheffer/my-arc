@@ -962,10 +962,10 @@ export default function AgendaView({
             <ChevronLeft size={16} />
           </button>
           <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <div style={{ fontSize: '0.9rem', fontWeight: '800', color: mobileDay === todayDayId && isCurrentWeek ? '#10b981' : '#fff', lineHeight: 1.2 }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
               {DAYS.find(d => d.id === mobileDay)?.label}
               {mobileDay === todayDayId && isCurrentWeek && (
-                <span style={{ fontSize: '0.6rem', color: '#10b981', marginLeft: '0.4rem', fontWeight: '700' }}>· vandaag</span>
+                <span style={{ fontSize: '0.62rem', color: '#10b981', marginLeft: '0.4rem', fontWeight: 800 }}>· vandaag</span>
               )}
             </div>
             <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', fontWeight: '600', marginTop: '1px' }}>
@@ -1000,7 +1000,7 @@ export default function AgendaView({
             </FloatingPanel>
           </div>
           <button onClick={() => setEditingBlock({})}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, color: '#FFD700', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 9, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}
             title="Nieuw vast blok">
             <Plus size={12} strokeWidth={3} />
           </button>
@@ -1020,12 +1020,12 @@ export default function AgendaView({
             disabled={isCurrentWeek}
             style={{
               ...navBtnStyle,
-              padding: '0.3rem 0.6rem',
-              opacity: isCurrentWeek ? 0.4 : 1,
-              fontSize: '0.65rem',
-              fontWeight: '700',
-              color: isCurrentWeek ? 'rgba(255,255,255,0.3)' : '#10b981',
-              borderColor: isCurrentWeek ? 'rgba(255,255,255,0.06)' : 'rgba(16,185,129,0.3)',
+              width: 'auto', padding: '0 0.75rem', borderRadius: 999,
+              opacity: isCurrentWeek ? 0.45 : 1,
+              fontSize: '0.68rem', fontWeight: 800,
+              background: isCurrentWeek ? 'rgba(255,255,255,0.04)' : '#fff',
+              border: `1px solid ${isCurrentWeek ? 'rgba(255,255,255,0.1)' : '#fff'}`,
+              color: isCurrentWeek ? 'rgba(255,255,255,0.35)' : '#0a0a0a',
             }}
           >
             Vandaag
@@ -1040,7 +1040,7 @@ export default function AgendaView({
             <ChevronLeft size={14} />
           </button>
           <Calendar size={13} />
-          <span style={{ fontSize: '0.7rem', fontWeight: '700' }}>Week {weekNumber}</span>
+          <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Week {weekNumber}</span>
           <button
             onClick={() => setWeekAnchor(prev => { const d = new Date(prev); d.setDate(d.getDate() + 7); return d })}
             aria-label="Volgende week"
@@ -1078,14 +1078,14 @@ export default function AgendaView({
             onClick={() => setEditingBlock({})} // empty = new
             style={{
               marginLeft: '0.5rem',
-              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-              padding: '0.3rem 0.55rem',
-              background: 'rgba(255,215,0,0.12)',
-              border: '1px solid rgba(255,215,0,0.3)',
-              borderRadius: 6,
-              color: '#FFD700',
-              fontSize: '0.65rem', fontWeight: 800,
-              cursor: 'pointer', touchAction: 'manipulation',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              minHeight: 30, padding: '0 0.75rem',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 999,
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: '0.68rem', fontWeight: 800,
+              cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
             }}
             title="Nieuw vast blok (lunch / coaching / focus)"
           >
@@ -1121,7 +1121,7 @@ export default function AgendaView({
           <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             Tik op een dag/tijd om <span style={{ color: '#FFD700' }}>{armedTask.title}</span> in te plannen
           </span>
-          <button onClick={() => setArmedTask(null)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 6, color: 'rgba(255,255,255,0.8)', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation' }}>
+          <button onClick={() => setArmedTask(null)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, minHeight: 28, padding: '0 0.7rem', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 999, color: 'rgba(255,255,255,0.85)', fontSize: '0.66rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation' }}>
             <X size={11} /> Annuleer
           </button>
         </div>
@@ -1296,12 +1296,13 @@ export default function AgendaView({
 
 const navBtnStyle = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  width: '28px', height: '28px',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: '6px',
-  color: 'rgba(255,255,255,0.6)',
+  width: 30, height: 30,
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 9,
+  color: 'rgba(255,255,255,0.65)',
   cursor: 'pointer',
+  fontFamily: 'inherit',
   touchAction: 'manipulation',
   WebkitTapHighlightColor: 'transparent',
 }

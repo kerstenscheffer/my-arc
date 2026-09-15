@@ -29,12 +29,6 @@ export default function ProductivityKanban({
   // When set, AddTaskModal opens in edit-mode for this task.
   const [editingTask, setEditingTask] = useState(null)
 
-  // Observe state changes so we can see whether setShowAddTask actually
-  // commits. If this never logs `true` after the cell-click, the setter
-  // is being batched away or the component is unmounting.
-  useEffect(() => {
-    console.log('[ProductivityKanban] showAddTask state =', showAddTask, ' viewMode =', viewMode)
-  }, [showAddTask])
   const [showSectionModal, setShowSectionModal] = useState(false)
   const [selectedSection, setSelectedSection] = useState(null)
   const [selectedSectionForTask, setSelectedSectionForTask] = useState(null)
@@ -877,38 +871,43 @@ export default function ProductivityKanban({
         display: 'flex', alignItems: 'center', gap: '0.4rem',
         marginBottom: '0.625rem',
       }}>
+        {/* Schuifknop tussen bord en agenda — zelfde schakelaar als boven in
+            de hub en in de log-modal. */}
         <div style={{
-          display: 'inline-flex',
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '8px',
-          padding: '3px',
+          position: 'relative', display: 'inline-flex',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          borderRadius: 999, padding: 3,
         }}>
+          <div style={{
+            position: 'absolute', top: 3, bottom: 3,
+            left: viewMode === 'agenda' ? 'calc(50% + 1.5px)' : 3,
+            width: 'calc(50% - 4.5px)',
+            background: '#fff', borderRadius: 999,
+            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          }} />
           {[
             { id: 'kanban', label: 'Kanban', Icon: LayoutGrid },
             { id: 'agenda', label: 'Agenda', Icon: CalendarDays },
           ].map(({ id, label, Icon }) => {
-            const active = viewMode === id
+            const aan = viewMode === id
             return (
               <button
                 key={id}
                 onClick={() => switchView(id)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '0.35rem',
-                  padding: '0.35rem 0.75rem',
-                  background: active ? 'rgba(16,185,129,0.15)' : 'transparent',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: active ? '#10b981' : 'rgba(255,255,255,0.5)',
-                  fontSize: '0.7rem',
-                  fontWeight: active ? '800' : '600',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  minHeight: '30px',
+                  position: 'relative', zIndex: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  minWidth: 92, minHeight: 32, padding: '0 0.8rem',
+                  background: 'transparent', border: 'none', borderRadius: 999,
+                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                  fontSize: '0.72rem', fontWeight: aan ? 900 : 800,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  transition: 'color 0.15s ease',
                 }}
               >
-                <Icon size={12} />
+                <Icon size={13} strokeWidth={2.6} />
                 {label}
               </button>
             )
