@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Calendar, Flag, Tag, Clock, Plus, Circle, Trash2, Timer, Layers, Repeat, CheckCircle2, CalendarMinus } from 'lucide-react'
+import { X, Calendar, Flag, Tag, Clock, Plus, Trash2, Timer, Layers, Repeat, CheckCircle2, CalendarMinus, ChevronDown, MessageSquare, Palette, History } from 'lucide-react'
 import TaskLogSection from './TaskLogSection'
 
 const WEEK_DAYS = [
@@ -102,12 +102,12 @@ export default function AddTaskModal({
   )
   const [newStepText, setNewStepText] = useState('')
   const [titleError, setTitleError] = useState(false)
-  // For recurring tasks in edit-mode the focus is the daily logbook —
-  // collapse all edit-fields by default so the coach lands straight on
-  // "log vandaag" instead of scrolling past description/prio/recurring
-  // pickers etc. Create-mode (or non-recurring edit) stays expanded.
-  const [detailsOpen, setDetailsOpen] = useState(
-    !(initialTask?.id && initialTask?.recurrence_active)
+  // Welk paneel onder de pillen openstaat: 'notitie' | 'herhalen' | 'kleur' |
+  // 'logboek' | null. Eén tegelijk, zodat de modal kort blijft. Bij een
+  // terugkerende task in bewerk-modus staat het logboek meteen open, want
+  // daarvoor open je hem.
+  const [paneel, setPaneel] = useState(
+    initialTask?.id && initialTask?.recurrence_active ? 'logboek' : null
   )
 
   // Draft autosave bookkeeping
@@ -252,7 +252,6 @@ export default function AddTaskModal({
     if (userChoice) { await flushPending(); onClose() }
   }
 
-  console.log('[AddTaskModal] mounting, portal target body present:', !!document?.body)
   return createPortal(
     <div
       onClick={(e) => { if (e.target === e.currentTarget) handleAttemptClose() }}
@@ -293,282 +292,275 @@ export default function AddTaskModal({
         {/* ═══ FORM ═══ */}
         <div style={{ overflowY: 'auto', flex: 1 }}>
 
-          {/* Titel */}
-          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>TITEL *</div>
+          {/* Kop: de titel is het onderwerp, net als de oefening in de
+              log-modal. Daaronder één regel met de stand van zaken. */}
+          <div style={{ padding: isMobile ? '0.9rem 1rem 0.75rem' : '1rem 1.15rem 0.85rem' }}>
             <input
               autoFocus
               type="text"
               value={formData.title}
               onChange={(e) => { setFormData({ ...formData, title: e.target.value }); setTitleError(false) }}
               placeholder="Wat moet je doen?"
-              style={{ width: '100%', padding: '0.4rem 0', background: 'transparent', border: 'none', borderBottom: `1px solid ${titleError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`, outline: 'none', color: '#fff', fontSize: '0.9rem', fontWeight: '700' }}
+              style={{
+                width: '100%', padding: 0, background: 'transparent', border: 'none', outline: 'none',
+                color: '#fff', fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900,
+                letterSpacing: '-0.025em',
+              }}
             />
-            {titleError && <p style={{ margin: '0.3rem 0 0 0', color: '#ef4444', fontSize: '0.6rem' }}>Titel is verplicht</p>}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+              <Stat waarde={steps.length} eenheid={steps.length === 1 ? 'stap' : 'stappen'} />
+              <Punt />
+              <Stat waarde={formData.estimated_minutes || '—'} eenheid="min" />
+              <Punt />
+              <Stat waarde={{ low: 'Laag', medium: 'Medium', high: 'Hoog' }[formData.priority]} eenheid="prio" />
+              {recurrenceActive && <><Punt /><Stat waarde="Elke week" eenheid={recurrenceDays.length ? `${recurrenceDays.length}d` : 'geen dag'} /></>}
+            </div>
+            {titleError && <p style={{ margin: '0.4rem 0 0', color: '#ef4444', fontSize: '0.65rem', fontWeight: 700 }}>Titel is verplicht</p>}
           </div>
 
-          {/* Sectie (kolom) — verschijnt zodra de kanban secties heeft */}
-          {sections.length > 0 && (
-            <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <Layers size={8} /> SECTIE
-              </div>
+          {/* Twee keuzevakken naast elkaar, zoals materiaal en instellingen in
+              de log-modal: label klein erboven, waarde eronder. */}
+          <div style={{ display: 'flex', gap: isMobile ? '0.6rem' : '0.8rem', padding: isMobile ? '0 1rem 0.75rem' : '0 1.15rem 0.85rem' }}>
+            <Keuzevak Icon={Layers} label="Sectie" isMobile={isMobile}>
               <select
                 value={sectionId}
                 onChange={(e) => setSectionId(e.target.value)}
-                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}
+                style={keuzeSelect}
               >
                 <option value="">Niet toegewezen</option>
-                {sections
-                  .filter(s => s.id !== 'unassigned')
-                  .map(s => (
-                    <option key={s.id} value={s.id}>{s.title}</option>
-                  ))}
+                {sections.filter(s2 => s2.id !== 'unassigned').map(s2 => (
+                  <option key={s2.id} value={s2.id}>{s2.title}</option>
+                ))}
               </select>
-            </div>
-          )}
+            </Keuzevak>
+            <Keuzevak Icon={Flag} label="Prioriteit" isMobile={isMobile}>
+              <select
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                style={keuzeSelect}
+              >
+                <option value="low">Laag</option>
+                <option value="medium">Medium</option>
+                <option value="high">Hoog</option>
+              </select>
+            </Keuzevak>
+          </div>
 
-          {/* Agenda preset — geeft kort weer wanneer de task gepland is */}
+          <div style={{ display: 'flex', gap: isMobile ? '0.6rem' : '0.8rem', padding: isMobile ? '0 1rem 0.85rem' : '0 1.15rem 1rem' }}>
+            <Keuzevak Icon={Tag} label="Categorie" isMobile={isMobile}>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                style={keuzeSelect}
+              >
+                <option value="">Geen</option>
+                <option value="werk">Werk</option>
+                <option value="prive">Privé</option>
+                <option value="myarc">MY ARC</option>
+                <option value="gezondheid">Gezondheid</option>
+              </select>
+            </Keuzevak>
+            <Keuzevak Icon={Calendar} label="Deadline" isMobile={isMobile}>
+              <input
+                type="date"
+                value={formData.deadline}
+                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                style={{ ...keuzeSelect, color: formData.deadline ? '#fff' : 'rgba(255,255,255,0.35)' }}
+              />
+            </Keuzevak>
+          </div>
+
+          {/* Gepland-melding uit de agenda. */}
           {agendaPreset && (
             <div style={{
-              padding: '0.55rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)',
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              background: 'rgba(16,185,129,0.06)',
-              color: '#86efac', fontSize: '0.7rem', fontWeight: 700,
-              letterSpacing: '0.02em',
+              margin: isMobile ? '0 1rem 0.85rem' : '0 1.15rem 1rem',
+              padding: '0.5rem 0.7rem', borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.22)',
+              color: '#86efac', fontSize: '0.7rem', fontWeight: 800,
             }}>
-              <Calendar size={11} />
+              <Calendar size={12} />
               Gepland op {agendaPreset.day} {agendaPreset.startTime}–{agendaPreset.endTime}
             </div>
           )}
 
-          {/* Logboek FIRST when this is a recurring task in edit-mode —
-              dat is de hele reden waarom de modal nu open staat. */}
-          {isEditMode && recurrenceActive && db && coachId && draftId && (
-            <TaskLogSection
-              taskId={draftId}
-              coachId={coachId}
-              db={db}
-              isMobile={isMobile}
-            />
-          )}
-
-          {/* Collapse-toggle voor alle edit-velden. Default-state hangt af
-              van of we in recurring-edit zitten (dichtgeklapt) of niet. */}
-          <button
-            type="button"
-            onClick={() => setDetailsOpen(v => !v)}
-            style={{
-              width: '100%', padding: '0.5rem 1rem',
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-              background: detailsOpen ? 'rgba(255,255,255,0.02)' : 'transparent',
-              border: 'none',
-              borderBottom: '1px solid rgba(255,255,255,0.04)',
-              color: 'rgba(255,255,255,0.55)',
-              fontSize: '0.65rem', fontWeight: 800,
-              letterSpacing: '0.05em', textTransform: 'uppercase',
-              cursor: 'pointer', touchAction: 'manipulation',
-            }}
-          >
-            <span style={{
-              fontSize: '0.7rem',
-              transform: detailsOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-              transition: 'transform 0.15s', display: 'inline-block', width: 12,
-            }}>▸</span>
-            {detailsOpen ? 'Verberg task-instellingen' : 'Bewerk task-instellingen'}
-          </button>
-
-          {detailsOpen && (
-          <>
-          {/* Beschrijving */}
-          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>BESCHRIJVING</div>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Extra details (optioneel)"
-              rows={2}
-              style={{ width: '100%', padding: 0, background: 'transparent', border: 'none', outline: 'none', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', resize: 'none', lineHeight: 1.5 }}
-            />
-          </div>
-
-          {/* Prioriteit + Categorie */}
-          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ flex: 1, padding: '0.625rem 1rem', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Flag size={8} /> PRIORITEIT</div>
-              <select value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}>
-                <option value="low">🟢 Laag</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 Hoog</option>
-              </select>
-            </div>
-            <div style={{ flex: 1, padding: '0.625rem 1rem' }}>
-              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Tag size={8} /> CATEGORIE</div>
-              <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}>
-                <option value="">Geen</option>
-                <option value="werk">💼 Werk</option>
-                <option value="prive">🏠 Privé</option>
-                <option value="myarc">💪 MY ARC</option>
-                <option value="gezondheid">❤️ Gezondheid</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Deadline */}
-          <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Calendar size={8} /> DEADLINE</div>
-            <input type="date" value={formData.deadline} onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-              style={{ background: 'transparent', border: 'none', outline: 'none', color: formData.deadline ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }} />
-          </div>
-
-          {/* ═══ STAPPEN ═══ */}
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            {/* Stappen header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.625rem 1rem', borderBottom: steps.length > 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <Circle size={8} /> STAPPEN
-                {steps.length > 0 && <span style={{ color: '#10b981', marginLeft: '4px' }}>{steps.length}</span>}
-              </div>
-            </div>
-
-            {/* Stappen lijst */}
-            {steps.map((step, i) => (
-              <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                <div style={{ width: '16px', height: '16px', border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: '3px', flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', minWidth: '20px' }}>#{i + 1}</span>
-                <span style={{ flex: 10, fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.3 }}>{step.text}</span>
-                <button onClick={() => handleDeleteStep(step.id)}
-                  style={{ padding: '2px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.15)', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}>
-                  <Trash2 size={10} />
-                </button>
-              </div>
-            ))}
-
-            {/* Geschatte tijd */}
-          <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Timer size={8} /> GESCHATTE TIJD</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              {[15, 25, 30, 45, 60].map(p => (
-                <button key={p} onClick={() => setFormData({ ...formData, estimated_minutes: p })}
-                  style={{ padding: '0.2rem 0.4rem', background: formData.estimated_minutes === p ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${formData.estimated_minutes === p ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '4px', color: formData.estimated_minutes === p ? '#10b981' : 'rgba(255,255,255,0.3)', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
-                  {p}m
-                </button>
-              ))}
-              <input type="number" min="1" max="480" placeholder="Eigen" value={formData.estimated_minutes || ''}
+          {/* Duur — losse chips, zelfde ritme als de rest. */}
+          <div style={{ padding: isMobile ? '0 1rem 0.85rem' : '0 1.15rem 1rem' }}>
+            <Kopje Icon={Timer} tekst="Geschatte tijd" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {[15, 25, 30, 45, 60].map(m => {
+                const aan = Number(formData.estimated_minutes) === m
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, estimated_minutes: aan ? '' : m })}
+                    style={{
+                      minHeight: 30, padding: '0 0.7rem', borderRadius: 999,
+                      background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.1)'}`,
+                      color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                      fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer',
+                      fontFamily: 'inherit', touchAction: 'manipulation',
+                    }}
+                  >
+                    {m}m
+                  </button>
+                )
+              })}
+              <input
+                type="number" min="1" max="480" placeholder="eigen"
+                value={[15, 25, 30, 45, 60].includes(Number(formData.estimated_minutes)) ? '' : (formData.estimated_minutes || '')}
                 onChange={(e) => setFormData({ ...formData, estimated_minutes: e.target.value ? parseInt(e.target.value) : '' })}
-                style={{ width: '52px', padding: '0.2rem 0.375rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px', color: '#fff', fontSize: '0.7rem', outline: 'none', minHeight: '26px' }}
+                style={{
+                  width: 62, minHeight: 30, padding: '0 0.6rem', borderRadius: 999,
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff', fontSize: '0.7rem', fontWeight: 800, outline: 'none', fontFamily: 'inherit',
+                }}
               />
             </div>
           </div>
 
-          {/* Stap invoer */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 1rem' }}>
-              <div style={{ width: '16px', height: '16px', border: '1.5px dashed rgba(255,255,255,0.1)', borderRadius: '3px', flexShrink: 0 }} />
+          {/* Stappen — als lijst, zoals de sets. */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            {steps.map((step, i) => (
+              <div key={step.id} style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                padding: isMobile ? '0.55rem 1rem' : '0.6rem 1.15rem',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+              }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', minWidth: 18 }}>{i + 1}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.3 }}>{step.text}</span>
+                <button
+                  onClick={() => handleDeleteStep(step.id)}
+                  style={{ padding: 4, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation' }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              padding: isMobile ? '0.55rem 1rem' : '0.6rem 1.15rem',
+            }}>
+              <Plus size={13} color="rgba(255,255,255,0.3)" />
               <input
                 type="text"
                 value={newStepText}
                 onChange={(e) => setNewStepText(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddStep() } }}
-                placeholder="Stap toevoegen... (Enter)"
-                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.75rem', padding: '0.2rem 0' }}
+                placeholder="Stap toevoegen"
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'inherit' }}
               />
               {newStepText.trim() && (
-                <button onClick={handleAddStep}
-                  style={{ padding: '2px 6px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '3px', color: '#10b981', fontSize: '0.5rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '20px' }}>
-                  <Plus size={9} />
+                <button
+                  onClick={handleAddStep}
+                  style={{ minHeight: 26, padding: '0 0.7rem', borderRadius: 999, background: '#fff', border: 'none', color: '#0a0a0a', fontSize: '0.65rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Erbij
                 </button>
               )}
             </div>
           </div>
 
-          {/* Recurring toggle + dag-picker */}
-          <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer',
-              padding: '0.4rem 0.5rem',
-              background: recurrenceActive ? 'rgba(255,215,0,0.08)' : 'transparent',
-              border: `1px solid ${recurrenceActive ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
-              borderRadius: '6px',
-            }}>
-              <input
-                type="checkbox"
-                checked={recurrenceActive}
-                onChange={(e) => setRecurrenceActive(e.target.checked)}
-                style={{ accentColor: '#FFD700' }}
-              />
-              <Repeat size={10} color={recurrenceActive ? '#FFD700' : 'rgba(255,255,255,0.3)'} />
-              <span style={{ color: recurrenceActive ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: '700' }}>
-                Herhalen elke week
-              </span>
-            </label>
-            {recurrenceActive && (
-              <div style={{
-                marginTop: '0.5rem',
-                display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.25rem',
-              }}>
-                {WEEK_DAYS.map(d => {
-                  const active = recurrenceDays.includes(d.id)
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => toggleRecurrenceDay(d.id)}
-                      style={{
-                        padding: '0.4rem 0', minHeight: 32,
-                        background: active ? '#FFD700' : 'rgba(255,255,255,0.04)',
-                        border: active ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: 5,
-                        color: active ? '#000' : 'rgba(255,255,255,0.55)',
-                        fontSize: '0.65rem', fontWeight: 800,
-                        cursor: 'pointer', touchAction: 'manipulation',
-                      }}
-                    >
-                      {d.short}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            {recurrenceActive && recurrenceDays.length === 0 && (
-              <div style={{
-                marginTop: '0.4rem', fontSize: '0.6rem', color: 'rgba(245,158,11,0.85)', fontWeight: 700,
-              }}>
-                Kies minimaal één dag — anders herhaalt 't doel niet.
-              </div>
+          {/* Pillen: alles wat je zelden nodig hebt zit hierachter, net als
+              Notitie en Historie onder de log-knop. */}
+          <div style={{
+            display: 'flex', gap: 6, flexWrap: 'wrap',
+            padding: isMobile ? '0.75rem 1rem' : '0.85rem 1.15rem',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <Pil Icon={MessageSquare} label="Notitie" aan={paneel === 'notitie'} stip={!!formData.description}
+              onClick={() => setPaneel(p2 => p2 === 'notitie' ? null : 'notitie')} />
+            <Pil Icon={Repeat} label="Herhalen" aan={paneel === 'herhalen'} stip={recurrenceActive}
+              onClick={() => setPaneel(p2 => p2 === 'herhalen' ? null : 'herhalen')} />
+            <Pil Icon={Palette} label="Kleur" aan={paneel === 'kleur'} stip={!!formData.color} stipKleur={formData.color}
+              onClick={() => setPaneel(p2 => p2 === 'kleur' ? null : 'kleur')} />
+            <Pil Icon={Clock} label="Reflectie" aan={formData.needs_reflection} stip={false}
+              onClick={() => setFormData({ ...formData, needs_reflection: !formData.needs_reflection })} />
+            {isEditMode && recurrenceActive && db && coachId && draftId && (
+              <Pil Icon={History} label="Logboek" aan={paneel === 'logboek'} stip={false}
+                onClick={() => setPaneel(p2 => p2 === 'logboek' ? null : 'logboek')} />
             )}
           </div>
 
-          {/* Kleur — overschrijft sectiekleur op de card. Klik nogmaals = leeg. */}
-          <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
-              KLEUR
+          {paneel === 'notitie' && (
+            <div style={{ padding: isMobile ? '0 1rem 0.9rem' : '0 1.15rem 1rem' }}>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Extra details"
+                rows={3}
+                style={{
+                  width: '100%', padding: '0.6rem 0.7rem', borderRadius: 8,
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.85)', fontSize: '0.8rem', outline: 'none',
+                  resize: 'none', lineHeight: 1.5, fontFamily: 'inherit',
+                }}
+              />
             </div>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-              {[
-                '#10b981', // groen
-                '#3b82f6', // blauw
-                '#8b5cf6', // paars
-                '#FFD700', // goud
-                '#f59e0b', // amber
-                '#ef4444', // rood
-                '#ec4899', // roze
-                '#06b6d4', // cyan
-                '#6b7280', // grijs
-              ].map(c => {
-                const active = formData.color === c
+          )}
+
+          {paneel === 'herhalen' && (
+            <div style={{ padding: isMobile ? '0 1rem 0.9rem' : '0 1.15rem 1rem' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                padding: '0.5rem 0.7rem', borderRadius: 8, marginBottom: recurrenceActive ? 8 : 0,
+                background: recurrenceActive ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${recurrenceActive ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)'}`,
+              }}>
+                <input type="checkbox" checked={recurrenceActive} onChange={(e) => setRecurrenceActive(e.target.checked)} style={{ accentColor: '#FFD700' }} />
+                <span style={{ color: recurrenceActive ? '#FFD700' : 'rgba(255,255,255,0.55)', fontSize: '0.75rem', fontWeight: 800 }}>
+                  Elke week herhalen
+                </span>
+              </label>
+              {recurrenceActive && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                    {WEEK_DAYS.map(d => {
+                      const aan = recurrenceDays.includes(d.id)
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => toggleRecurrenceDay(d.id)}
+                          style={{
+                            minHeight: 32, padding: 0, borderRadius: 7,
+                            background: aan ? '#FFD700' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${aan ? '#FFD700' : 'rgba(255,255,255,0.08)'}`,
+                            color: aan ? '#000' : 'rgba(255,255,255,0.55)',
+                            fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer',
+                            fontFamily: 'inherit', touchAction: 'manipulation',
+                          }}
+                        >
+                          {d.short}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {recurrenceDays.length === 0 && (
+                    <div style={{ marginTop: 6, fontSize: '0.62rem', fontWeight: 700, color: 'rgba(245,158,11,0.85)' }}>
+                      Kies minimaal één dag, anders herhaalt hij niet.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {paneel === 'kleur' && (
+            <div style={{ padding: isMobile ? '0 1rem 0.9rem' : '0 1.15rem 1rem', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {['#10b981', '#3b82f6', '#8b5cf6', '#FFD700', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#6b7280'].map(c => {
+                const aan = formData.color === c
                 return (
                   <button
                     key={c}
                     type="button"
-                    onClick={() => setFormData({ ...formData, color: active ? '' : c })}
+                    onClick={() => setFormData({ ...formData, color: aan ? '' : c })}
                     title={c}
                     style={{
-                      width: 24, height: 24, padding: 0,
-                      background: c, borderRadius: 6,
-                      border: active ? '2px solid #fff' : '1px solid rgba(255,255,255,0.1)',
-                      boxShadow: active ? `0 0 0 2px ${c}55` : 'none',
+                      width: 26, height: 26, padding: 0, background: c, borderRadius: 7,
+                      border: aan ? '2px solid #fff' : '1px solid rgba(255,255,255,0.1)',
                       cursor: 'pointer', touchAction: 'manipulation',
                     }}
                   />
@@ -579,43 +571,20 @@ export default function AddTaskModal({
                   type="button"
                   onClick={() => setFormData({ ...formData, color: '' })}
                   style={{
-                    minHeight: 24, padding: '2px 7px', marginLeft: 4,
-                    background: 'transparent',
-                    border: '1px dashed rgba(255,255,255,0.15)',
-                    borderRadius: 5,
-                    color: 'rgba(255,255,255,0.4)',
-                    fontSize: '0.55rem', fontWeight: 700,
-                    cursor: 'pointer', touchAction: 'manipulation',
+                    minHeight: 26, padding: '0 0.6rem', borderRadius: 999,
+                    background: 'transparent', border: '1px dashed rgba(255,255,255,0.18)',
+                    color: 'rgba(255,255,255,0.45)', fontSize: '0.6rem', fontWeight: 800,
+                    cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
                   Geen kleur
                 </button>
               )}
             </div>
-          </div>
-
-          {/* Reflectie toggle */}
-          <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0.5rem', background: formData.needs_reflection ? 'rgba(139,92,246,0.08)' : 'transparent', border: `1px solid ${formData.needs_reflection ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '6px' }}>
-              <input type="checkbox" checked={formData.needs_reflection} onChange={(e) => setFormData({ ...formData, needs_reflection: e.target.checked })} style={{ accentColor: '#8b5cf6' }} />
-              <Clock size={10} color={formData.needs_reflection ? '#8b5cf6' : 'rgba(255,255,255,0.3)'} />
-              <span style={{ color: formData.needs_reflection ? '#a78bfa' : 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: '600' }}>
-                Reflectie na voltooien
-              </span>
-            </label>
-          </div>
-
-          {/* Logboek — alleen voor recurring tasks in edit-mode, en alleen
-              wanneer we de db + coachId hebben (passed-through prop). */}
-          {isEditMode && recurrenceActive && db && coachId && draftId && (
-            <TaskLogSection
-              taskId={draftId}
-              coachId={coachId}
-              db={db}
-              isMobile={isMobile}
-            />
           )}
-          </>
+
+          {paneel === 'logboek' && isEditMode && recurrenceActive && db && coachId && draftId && (
+            <TaskLogSection taskId={draftId} coachId={coachId} db={db} isMobile={isMobile} />
           )}
         </div>
 
@@ -630,11 +599,11 @@ export default function AddTaskModal({
               }}
               title="Task verwijderen"
               style={{
-                width: 40, padding: 0, minHeight: 40,
+                width: 44, padding: 0, minHeight: 44,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'rgba(239,68,68,0.1)',
                 border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: '6px', color: '#fca5a5',
+                borderRadius: 10, color: '#fca5a5',
                 cursor: 'pointer', touchAction: 'manipulation',
               }}
             >
@@ -655,11 +624,11 @@ export default function AddTaskModal({
               }}
               title="Uitplannen — terug naar Niet gepland"
               style={{
-                width: 40, padding: 0, minHeight: 40,
+                width: 44, padding: 0, minHeight: 44,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'rgba(251,191,36,0.1)',
                 border: '1px solid rgba(251,191,36,0.3)',
-                borderRadius: '6px', color: '#fbbf24',
+                borderRadius: 10, color: '#fbbf24',
                 cursor: 'pointer', touchAction: 'manipulation',
               }}
             >
@@ -667,7 +636,7 @@ export default function AddTaskModal({
             </button>
           )}
           <button onClick={handleAttemptClose}
-            style={{ flex: 1, padding: '0.6rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', minHeight: '40px', touchAction: 'manipulation' }}>
+            style={{ flex: 1, padding: '0.6rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', minHeight: 44, touchAction: 'manipulation', fontFamily: 'inherit' }}>
             {isEditMode ? 'Sluiten' : 'Annuleer'}
           </button>
           {isEditMode && onCompleteTask && (
@@ -685,11 +654,11 @@ export default function AddTaskModal({
               title={recurrenceActive ? 'Voltooi vandaag' : 'Voltooi taak'}
               style={{
                 flex: 1, padding: '0.6rem',
-                background: '#10b981',
-                border: '1px solid #10b981',
-                borderRadius: '6px',
-                color: '#fff', fontSize: '0.75rem', fontWeight: 800,
-                cursor: 'pointer', minHeight: 40,
+                background: 'rgba(16,185,129,0.14)',
+                border: '1px solid rgba(16,185,129,0.4)',
+                borderRadius: 10,
+                color: '#10b981', fontSize: '0.78rem', fontWeight: 800,
+                cursor: 'pointer', minHeight: 44, fontFamily: 'inherit',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
@@ -699,13 +668,106 @@ export default function AddTaskModal({
             </button>
           )}
           <button onClick={handleSubmit}
-            style={{ flex: 2, padding: '0.6rem', background: isEditMode ? 'rgba(255,255,255,0.06)' : '#10b981', border: isEditMode ? '1px solid rgba(255,255,255,0.12)' : 'none', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', minHeight: '40px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
-            <Plus size={13} />
-            {isEditMode ? 'Opslaan' : `Task Toevoegen${steps.length > 0 ? ` + ${steps.length} stap${steps.length > 1 ? 'pen' : ''}` : ''}`}
+            style={{ flex: 2, padding: '0.6rem', background: '#fff', border: 'none', borderRadius: 10, color: '#0a0a0a', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', minHeight: 44, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit', letterSpacing: '-0.01em' }}>
+            <Plus size={14} strokeWidth={3} />
+            {isEditMode ? 'Opslaan' : 'Toevoegen'}
           </button>
         </div>
       </div>
     </div>,
     document.body
+  )
+}
+
+// ── Kleine bouwstenen, in de taal van de oefening-log-modal ─────────────────
+
+const keuzeSelect = {
+  width: '100%', background: 'transparent', border: 'none', outline: 'none',
+  color: '#fff', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
+  fontFamily: 'inherit', padding: 0, appearance: 'none', WebkitAppearance: 'none',
+}
+
+// Een keuzevak: icoon links, label klein erboven, de waarde eronder, chevron rechts.
+function Keuzevak({ label, isMobile, children, ...rest }) {
+  // Als losse variabele (en niet uit de props gedestructureerd) zodat de
+  // linter 'm als component herkent in plaats van als ongebruikt argument.
+  const Icon = rest.Icon
+  return (
+    <div style={{
+      flex: 1, minWidth: 0,
+      display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 10,
+      padding: isMobile ? '0.5rem 0.6rem' : '0.55rem 0.7rem',
+      borderRadius: 10,
+      background: 'rgba(255,255,255,0.04)',
+      border: '1px solid rgba(255,255,255,0.08)',
+    }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+        background: 'rgba(255,255,255,0.05)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'rgba(255,255,255,0.75)',
+      }}>
+        <Icon size={14} strokeWidth={2.4} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: '0.52rem', fontWeight: 800, letterSpacing: '0.09em',
+          textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 2,
+        }}>
+          {label}
+        </div>
+        {children}
+      </div>
+      <ChevronDown size={13} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
+    </div>
+  )
+}
+
+function Kopje({ tekst, ...rest }) {
+  const Icon = rest.Icon
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5, marginBottom: 7,
+      fontSize: '0.52rem', fontWeight: 800, letterSpacing: '0.09em',
+      textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)',
+    }}>
+      <Icon size={10} strokeWidth={2.6} />
+      {tekst}
+    </div>
+  )
+}
+
+// Regel onder de titel: groot getal, klein woord erachter.
+function Stat({ waarde, eenheid }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
+      <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{waarde}</span>
+      <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{eenheid}</span>
+    </span>
+  )
+}
+
+const Punt = () => <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>·</span>
+
+function Pil({ label, aan, stip, stipKleur, onClick, ...rest }) {
+  const Icon = rest.Icon
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        minHeight: 30, padding: '0 0.75rem', borderRadius: 999,
+        background: aan ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${aan ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`,
+        color: aan ? '#fff' : 'rgba(255,255,255,0.6)',
+        fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer',
+        fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <Icon size={12} strokeWidth={2.5} />
+      {label}
+      {stip && <span style={{ width: 6, height: 6, borderRadius: '50%', background: stipKleur || '#10b981' }} />}
+    </button>
   )
 }
