@@ -81,7 +81,7 @@ function Stroken({ items, isMobile, genummerd = false, hoog = false }) {
           }}>
             <div style={{
               flex: 1, minWidth: 0,
-              fontSize: isMobile ? '0.86rem' : '1rem', fontWeight: 900,
+              fontSize: isMobile ? '0.86rem' : '1.2rem', fontWeight: 900,
               color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em',
               textShadow: '0 1px 8px rgba(0,0,0,0.9)',
             }}>
@@ -91,8 +91,8 @@ function Stroken({ items, isMobile, genummerd = false, hoog = false }) {
             <div style={{
               flexShrink: 0, maxWidth: isMobile ? '48%' : '46%',
               textAlign: 'right',
-              fontSize: isMobile ? '0.66rem' : '0.76rem', fontWeight: 600,
-              color: 'rgba(255,255,255,0.4)', lineHeight: 1.3,
+              fontSize: isMobile ? '0.66rem' : '0.88rem', fontWeight: 600,
+              color: 'rgba(255,255,255,0.45)', lineHeight: 1.35,
             }}>
               {r.sub}
             </div>
@@ -139,7 +139,7 @@ function Blad({ open, titel, onClose, isMobile, children }) {
           padding: isMobile ? '1rem 1.15rem' : '1.1rem 1.35rem',
           borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0,
         }}>
-          <span style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+          <span style={{ fontSize: isMobile ? '1rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
             {titel}
           </span>
           <button
