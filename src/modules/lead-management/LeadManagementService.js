@@ -3320,7 +3320,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // last_followup_sent_at) → onze betrouwbare "na-campagne"-anker.
       const leads = await this._fetchAllRows(() => this.db.supabase
         .from('call_leads')
-        .select('id, outreach_campaign_id, followup_count, campaign_message_sent_at')
+        .select('id, outreach_campaign_id, followup_count, campaign_message_sent_at, first_name, last_name')
         .not('outreach_campaign_id', 'is', null)
         .is('deleted_at', null))
 
@@ -3348,8 +3348,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .in('lead_id', chunk)
           .gt('delta', 0))
         movBatches2.push(this.db.supabase
+          // id + namen erbij: de drill-down per campagne laat zien WIE er in
+          // een stap zit, en kan de verplaatsing terugdraaien of verwijderen.
           .from('lead_movements')
-          .select('lead_id, to_section_title, moved_at')
+          .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at')
           .in('lead_id', chunk))
       }
       const [rxResults, movResults] = await Promise.all([
@@ -3357,15 +3359,24 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         Promise.all(movBatches2),
       ])
       const repliedAfter = new Set()
+      // Wanneer een lead voor het eerst reageerde — voor de namenlijst.
+      const reactieMoment = new Map()
       rxResults.forEach(({ data }) => {
         ;(data || []).forEach(ev => {
           const a = anchor.get(ev.lead_id)
           if (!a || !ev.created_at) return
-          if (new Date(ev.created_at).getTime() >= a) repliedAfter.add(ev.lead_id)
+          if (new Date(ev.created_at).getTime() >= a) {
+            repliedAfter.add(ev.lead_id)
+            const bestaand = reactieMoment.get(ev.lead_id)
+            if (!bestaand || ev.created_at < bestaand) reactieMoment.set(ev.lead_id, ev.created_at)
+          }
         })
       })
       const perLeadStages = new Map()
       const reachedCall = new Set()
+      // De verplaatsing zelf bewaren per lead + stap, zodat de drill-down een
+      // naam en een knop "ongedaan maken" heeft.
+      const perLeadMovement = new Map()   // `${leadId}|${stage}` → rij
       movResults.forEach(({ data }) => {
         ;(data || []).forEach(m => {
           const a = anchor.get(m.lead_id)
@@ -3378,6 +3389,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               const entry = perLeadStages.get(m.lead_id) || { callProposed: 0, callScheduled: 0, sale: 0 }
               entry[stage.key] = 1
               perLeadStages.set(m.lead_id, entry)
+              const sleutel = `${m.lead_id}|${stage.key}`
+              const vorig = perLeadMovement.get(sleutel)
+              // Eerste keer dat de lead deze stap raakte telt.
+              if (!vorig || m.moved_at < vorig.moved_at) perLeadMovement.set(sleutel, m)
               if (stage.key === 'callProposed' || stage.key === 'callScheduled') reachedCall.add(m.lead_id)
               break
             }
@@ -3411,6 +3426,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           // is. Alle cijfers hieronder meten vanaf dat moment.
           sentCount: 0, lastSentAt: null,
           stages: { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 },
+          // Namen per stap voor de drill-down.
+          leads: { getagd: [], replied: [], callProposed: [], callScheduled: [], sale: [] },
         }
         entry.total += 1
         if (l.campaign_message_sent_at) {
@@ -3427,6 +3444,22 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         entry.stages.callProposed  += st.callProposed
         entry.stages.callScheduled += st.callScheduled
         entry.stages.sale          += st.sale
+
+        const naam = [l.first_name, l.last_name].filter(Boolean).join(' ').trim() || 'Onbekend'
+        entry.leads.getagd.push({ leadId: l.id, name: naam, at: l.campaign_message_sent_at || null })
+        if (repliedOne) entry.leads.replied.push({ leadId: l.id, name: naam, at: reactieMoment.get(l.id) || null })
+        ;['callProposed', 'callScheduled', 'sale'].forEach(stap => {
+          if (!st[stap]) return
+          const m = perLeadMovement.get(`${l.id}|${stap}`)
+          entry.leads[stap].push({
+            id: m?.id || null,
+            leadId: l.id,
+            name: m?.lead_name || naam,
+            from: m?.from_section_title || null,
+            to: m?.to_section_title || null,
+            at: m?.moved_at || null,
+          })
+        })
         campStats.set(l.outreach_campaign_id, entry)
       })
 

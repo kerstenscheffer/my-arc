@@ -1278,7 +1278,13 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   <SectionTitle icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.85rem' }}>
                     {campaignBreakdown.campaigns.map(c => (
-                      <CampaignStatCard key={c.id} campaign={c} isMobile={isMobile} />
+                      <CampaignStatCard
+                        key={c.id}
+                        campaign={c}
+                        isMobile={isMobile}
+                        onRevert={handleRevertMovement} revertingId={revertingId}
+                        onDelete={handleDeleteMovement} deletingId={deletingId}
+                      />
                     ))}
                   </div>
                 </>
@@ -2059,19 +2065,26 @@ function GenderRing({ gender }) {
 // Per-campagne stat-kaart: naam + total, met daaronder de Aantallen- en
 // Percentages-rijen in exact dezelfde StatFlow-stijl als bovenin de modal.
 // Alle cijfers zijn "ná campagne-bericht" (uit getCampaignBreakdown).
-function CampaignStatCard({ campaign: c, isMobile }) {
+function CampaignStatCard({ campaign: c, isMobile, onRevert, revertingId, onDelete, deletingId }) {
   const [showMsg, setShowMsg] = useState(false)
+  // Welke stap er per campagne is opengeklapt om de namen te zien.
+  const [stap, setStap] = useState(null)
   const s = c.stages || { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 }
+  const namen = c.leads || {}
   const p = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
   const frac = (a, b) => `${a} van ${b}`
+  // stage = de sleutel in c.leads; alleen invullen als er ook namen zijn,
+  // anders is het pijltje een dode klik.
+  const metNamen = (sleutel) => (namen[sleutel]?.length ? sleutel : undefined)
   const countItems = [
-    { label: 'Getagd',      value: c.total,          Icon: UserPlus,      color: '#a855f7' },
-    { label: 'Reacties',    value: s.replied,        Icon: MessageCircle, color: '#10b981' },
-    { label: 'Voorgesteld', value: s.callProposed,   Icon: PhoneCall,     color: '#a855f7' },
-    { label: 'Ingepland',   value: s.callScheduled,  Icon: CalendarCheck, color: '#06b6d4' },
-    { label: 'Sale',        value: s.sale,           Icon: Trophy,        color: '#FFD700' },
+    { label: 'Getagd',      value: c.total,          Icon: UserPlus,      color: '#a855f7', stage: metNamen('getagd') },
+    { label: 'Reacties',    value: s.replied,        Icon: MessageCircle, color: '#10b981', stage: metNamen('replied') },
+    { label: 'Voorgesteld', value: s.callProposed,   Icon: PhoneCall,     color: '#a855f7', stage: metNamen('callProposed') },
+    { label: 'Ingepland',   value: s.callScheduled,  Icon: CalendarCheck, color: '#06b6d4', stage: metNamen('callScheduled') },
+    { label: 'Sale',        value: s.sale,           Icon: Trophy,        color: '#FFD700', stage: metNamen('sale') },
     { label: 'Opvolg',      value: c.followupCount,  Icon: Send,          color: '#f59e0b' },
   ]
+  const STAP_KLEUR = { getagd: '#a855f7', replied: '#10b981', callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#FFD700' }
   const pctItems = [
     { label: 'Reactie',       value: p(s.replied, c.total),          Icon: MessageCircle, color: '#10b981', sub: frac(s.replied, c.total) },
     { label: 'Voorstel',      value: p(s.callProposed, c.total),     Icon: PhoneCall,     color: '#a855f7', sub: frac(s.callProposed, c.total) },
@@ -2091,7 +2104,15 @@ function CampaignStatCard({ campaign: c, isMobile }) {
         )}
       </div>
       <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '4px 0 2px' }}>Aantallen</div>
-      <StatFlow items={countItems} activeStage={null} onToggle={() => {}} />
+      <StatFlow items={countItems} activeStage={stap} onToggle={(st) => setStap(p2 => p2 === st ? null : st)} />
+      {stap && (
+        <DrillPanel
+          leads={namen[stap]}
+          accent={STAP_KLEUR[stap] || '#a855f7'}
+          onRevert={onRevert} revertingId={revertingId}
+          onDelete={onDelete} deletingId={deletingId}
+        />
+      )}
       <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '2px 0' }}>Percentages</div>
       <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
       {showMsg && c.messageText && (
