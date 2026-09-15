@@ -1,116 +1,84 @@
-// Confirmation prompt that fires when a user deletes or shortens a
-// recurring task. Asks whether the action should apply to ONLY this date
-// or to the ENTIRE recurrence. Returns the chosen scope via onChoose.
+// Vraag die verschijnt als je een terugkerende taak verwijdert of inkort:
+// geldt het voor deze datum of voor de hele reeks? De keuze gaat terug via
+// onChoose.
 
-import { createPortal } from 'react-dom'
-import { Repeat, Calendar, X } from 'lucide-react'
+import { Repeat, Calendar } from 'lucide-react'
+import { Venster, VensterKop, VensterVoet, Knop } from '../ui'
 
 export default function RecurringActionPrompt({
   action,           // 'delete' | 'shorten'
-  dateLabel,        // human-readable date string for the "only this" option
+  dateLabel,        // leesbare datum bij de "alleen deze"-keuze
   onChoose,         // (scope: 'only-this' | 'all') => void
   onCancel,
+  isMobile = false,
 }) {
   const isDelete = action === 'delete'
-  const title = isDelete ? 'Recurring task verwijderen?' : 'Recurring task aanpassen?'
-  const onlyLabel = isDelete ? 'Alleen deze datum verwijderen' : 'Alleen deze datum aanpassen'
-  const allLabel  = isDelete ? 'Hele reeks verwijderen' : 'Hele reeks aanpassen'
 
-  return createPortal(
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 2147483640, padding: '1rem',
-      }}
-    >
-      <div style={{
-        width: '100%', maxWidth: 400,
-        background: '#0a0a0a',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 12,
-        overflow: 'hidden',
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '0.875rem 1rem',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Repeat size={14} color="#FFD700" />
-            <span style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 800 }}>
-              {title}
-            </span>
-          </div>
-          <button onClick={onCancel} style={iconCloseStyle}>
-            <X size={13} />
-          </button>
-        </div>
+  // Twee brede keuzes met uitleg eronder, zoals pauze/coaching in de agenda.
+  const keuzes = [
+    {
+      scope: 'only-this',
+      Icon: Calendar,
+      kop: isDelete ? 'Alleen deze datum verwijderen' : 'Alleen deze datum aanpassen',
+      sub: dateLabel || 'De rest van de reeks blijft staan',
+    },
+    {
+      scope: 'all',
+      Icon: Repeat,
+      kop: isDelete ? 'Hele reeks verwijderen' : 'Hele reeks aanpassen',
+      sub: 'Geldt voor elke week',
+      gevaar: isDelete,
+    },
+  ]
 
-        {/* Choices */}
-        <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+  return (
+    <Venster isMobile={isMobile} onClose={onCancel} maxWidth={400} zIndex={2147483640}>
+      <VensterKop
+        isMobile={isMobile}
+        titel={isDelete ? 'Terugkerende taak verwijderen' : 'Terugkerende taak aanpassen'}
+        sub="Voor welke dagen geldt dit?"
+        onClose={onCancel}
+      />
+
+      <div style={{ padding: isMobile ? '1rem' : '1.15rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {keuzes.map(k => (
           <button
-            onClick={() => onChoose('only-this')}
-            style={choiceBtnStyle('#10b981')}
-          >
-            <Calendar size={14} />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-              <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{onlyLabel}</span>
-              {dateLabel && (
-                <span style={{ fontSize: '0.65rem', opacity: 0.7, fontWeight: 600 }}>{dateLabel}</span>
-              )}
-            </div>
-          </button>
-
-          <button
-            onClick={() => onChoose('all')}
-            style={choiceBtnStyle(isDelete ? '#ef4444' : '#FFD700')}
-          >
-            <Repeat size={14} />
-            <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{allLabel}</span>
-          </button>
-
-          <button
-            onClick={onCancel}
+            key={k.scope}
+            type="button"
+            onClick={() => onChoose(k.scope)}
             style={{
-              padding: '0.6rem', marginTop: '0.25rem',
-              background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8,
-              color: 'rgba(255,255,255,0.5)',
-              fontSize: '0.75rem', fontWeight: 600,
-              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
+              padding: '0.7rem 0.85rem', minHeight: 52, borderRadius: 10,
+              background: k.gevaar ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${k.gevaar ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`,
+              cursor: 'pointer', fontFamily: 'inherit',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            Annuleer
+            <k.Icon
+              size={16}
+              strokeWidth={2.4}
+              color={k.gevaar ? '#fca5a5' : 'rgba(255,255,255,0.7)'}
+              style={{ flexShrink: 0 }}
+            />
+            <span style={{ minWidth: 0 }}>
+              <span style={{
+                display: 'block', fontSize: '0.85rem', fontWeight: 900,
+                color: k.gevaar ? '#fca5a5' : '#fff', letterSpacing: '-0.015em',
+              }}>
+                {k.kop}
+              </span>
+              <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                {k.sub}
+              </span>
+            </span>
           </button>
-        </div>
+        ))}
       </div>
-    </div>,
-    document.body
+
+      <VensterVoet isMobile={isMobile}>
+        <Knop soort="stil" flex={1} onClick={onCancel}>Annuleer</Knop>
+      </VensterVoet>
+    </Venster>
   )
 }
-
-const iconCloseStyle = {
-  width: 28, height: 28,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'transparent',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 6,
-  color: 'rgba(255,255,255,0.4)',
-  cursor: 'pointer',
-}
-
-const choiceBtnStyle = (accent) => ({
-  padding: '0.7rem 0.85rem',
-  display: 'flex', alignItems: 'center', gap: '0.6rem',
-  background: `${accent}15`,
-  border: `1px solid ${accent}40`,
-  borderRadius: 8,
-  color: accent,
-  fontSize: '0.85rem',
-  cursor: 'pointer', textAlign: 'left',
-  touchAction: 'manipulation',
-})
