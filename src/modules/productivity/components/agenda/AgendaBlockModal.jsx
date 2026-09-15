@@ -4,9 +4,10 @@
 // AgendaTaskModal so the two feel like siblings.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { X, Trash2, Save, Calendar, Clock, Coffee, Users } from 'lucide-react'
+import { Trash2, Calendar, Clock, Coffee, Users, Palette } from 'lucide-react'
 import { DAYS } from './agendaConstants'
+import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Knop } from '../ui'
+import { keuzeSelect } from '../uiTokens'
 
 const COLORS = [
   { value: '#64748b', label: 'Grijs' },
@@ -69,192 +70,116 @@ export default function AgendaBlockModal({
     catch (e) { setError(e?.message || 'Verwijderen mislukt'); setSaving(false) }
   }
 
-  const sheet = (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)',
-        backdropFilter: 'blur(6px)', zIndex: 2147483400,
-        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
-        padding: isMobile ? 0 : '1rem',
-      }}
-    >
-      <div style={{
-        width: '100%', maxWidth: 440,
-        background: '#0a0a0a',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: isMobile ? '16px 16px 0 0' : 12,
-        display: 'flex', flexDirection: 'column',
-        maxHeight: isMobile ? '92vh' : '85vh',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          flexShrink: 0,
-          padding: 'calc(0.7rem + env(safe-area-inset-top)) 1rem 0.7rem',
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}>
-          {type === 'coaching' ? <Users size={16} color={color} /> : <Coffee size={16} color={color} />}
-          <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>
-            {isNew ? 'Nieuw blok' : 'Blok bewerken'}
-          </div>
-          <button onClick={onClose} style={iconBtn} title="Sluiten">
-            <X size={15} />
-          </button>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-          <Field label="Label">
-            <input
-              autoFocus value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="bv. Lunch, Coaching, Focus"
-              style={inputStyle}
-            />
-          </Field>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
-            <Field label="Dag" icon={<Calendar size={11} />}>
-              <select value={day} onChange={(e) => setDay(e.target.value)} style={inputStyle}>
-                {DAYS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Start" icon={<Clock size={11} />}>
-              <input type="time" step={600} value={startTime} onChange={(e) => setStartTime(e.target.value)} style={inputStyle} />
-            </Field>
-            <Field label="Einde" icon={<Clock size={11} />}>
-              <input type="time" step={600} value={endTime} onChange={(e) => setEndTime(e.target.value)} style={inputStyle} />
-            </Field>
-          </div>
-
-          <Field label="Type">
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
-              {[
-                { v: 'pauze',    Icon: Coffee, label: 'Pauze — blokkeert taken' },
-                { v: 'coaching', Icon: Users,  label: 'Coaching — taken mogen overheen' },
-              ].map(({ v, Icon, label: lbl }) => {
-                const active = type === v
-                return (
-                  <button key={v} type="button" onClick={() => setType(v)}
-                    style={{
-                      flex: 1, display: 'flex', alignItems: 'center', gap: '0.4rem',
-                      padding: '0.55rem 0.7rem', minHeight: 42,
-                      background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
-                      border: active ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 7,
-                      color: active ? '#fff' : 'rgba(255,255,255,0.6)',
-                      fontSize: '0.72rem', fontWeight: active ? 800 : 600,
-                      cursor: 'pointer', touchAction: 'manipulation',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <Icon size={13} color={active ? color : 'rgba(255,255,255,0.5)'} />
-                    {lbl}
-                  </button>
-                )
-              })}
-            </div>
-          </Field>
-
-          <Field label="Kleur">
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {COLORS.map(c => {
-                const active = color === c.value
-                return (
-                  <button key={c.value} type="button" onClick={() => setColor(c.value)}
-                    style={{
-                      width: 30, height: 30, borderRadius: '50%',
-                      background: c.value,
-                      border: active ? '3px solid #fff' : '2px solid rgba(255,255,255,0.1)',
-                      cursor: 'pointer', touchAction: 'manipulation',
-                      boxShadow: active ? `0 0 0 2px ${c.value}55` : 'none',
-                    }}
-                    title={c.label}
-                  />
-                )
-              })}
-            </div>
-          </Field>
-
-          {error && (
-            <div style={{
-              padding: '0.5rem 0.7rem', borderRadius: 6,
-              background: 'rgba(239,68,68,0.15)', color: '#fca5a5',
-              fontSize: '0.78rem', fontWeight: 600,
-            }}>{error}</div>
-          )}
-        </div>
-
-        <div style={{
-          flexShrink: 0, padding: '0.7rem 1rem calc(0.85rem + env(safe-area-inset-bottom))',
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-        }}>
-          {!isNew && onDelete && (
-            <button onClick={handleDelete} disabled={saving} style={{
-              ...iconBtn, padding: '0.55rem',
-              background: 'rgba(239,68,68,0.08)',
-              border: '1px solid rgba(239,68,68,0.2)',
-              color: '#fca5a5',
-            }} title="Verwijderen">
-              <Trash2 size={14} />
-            </button>
-          )}
-          <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{
-            padding: '0.55rem 0.95rem',
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 6, color: 'rgba(255,255,255,0.55)',
-            fontSize: '0.75rem', fontWeight: 700,
-            cursor: 'pointer', minHeight: 36,
-          }}>
-            Annuleer
-          </button>
-          <button onClick={handleSave} disabled={saving} style={{
-            padding: '0.55rem 1.05rem', minHeight: 36,
-            display: 'flex', alignItems: 'center', gap: '0.35rem',
-            background: saving ? `${color}55` : color,
-            border: 'none', borderRadius: 6,
-            color: '#fff', fontSize: '0.78rem', fontWeight: 800,
-            cursor: saving ? 'wait' : 'pointer',
-          }}>
-            <Save size={13} /> {saving ? 'Bezig…' : 'Opslaan'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
-  return createPortal(sheet, document.body)
-}
-
-function Field({ label, icon, children }) {
   return (
-    <div>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '0.3rem',
-        fontSize: '0.6rem', fontWeight: 700,
-        color: 'rgba(255,255,255,0.5)',
-        letterSpacing: '0.04em', textTransform: 'uppercase',
-        marginBottom: 4,
-      }}>
-        {icon}{label}
-      </div>
-      {children}
-    </div>
-  )
-}
+    <Venster isMobile={isMobile} onClose={onClose} maxWidth={440} zIndex={2147483400}>
+      <VensterKop
+        isMobile={isMobile}
+        titel={isNew ? 'Nieuw blok' : 'Blok bewerken'}
+        onClose={onClose}
+      />
 
-const inputStyle = {
-  width: '100%', boxSizing: 'border-box',
-  padding: '0.5rem 0.65rem', minHeight: 40,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6,
-  color: '#fff', fontSize: '0.85rem', fontWeight: 600,
-  outline: 'none',
-}
-const iconBtn = {
-  width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(255,255,255,0.06)', border: 'none',
-  borderRadius: 6, color: '#fff', cursor: 'pointer', touchAction: 'manipulation',
+      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '1rem' : '1.15rem' }}>
+        {/* Het label is het onderwerp: groot, zonder kader. */}
+        <input
+          autoFocus
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="Lunch, coaching, focusblok"
+          style={{
+            width: '100%', padding: 0, background: 'transparent', border: 'none', outline: 'none',
+            color: '#fff', fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900,
+            letterSpacing: '-0.025em',
+          }}
+        />
+        <div style={{ height: 2, marginTop: 8, marginBottom: isMobile ? '1rem' : '1.15rem', borderRadius: 2, background: color }} />
+
+        {/* Dag, start en einde naast elkaar. */}
+        <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.7rem', marginBottom: isMobile ? '0.85rem' : '1rem' }}>
+          <Keuzevak Icon={Calendar} label="Dag" isMobile={isMobile}>
+            <select value={day} onChange={(e) => setDay(e.target.value)} style={keuzeSelect}>
+              {DAYS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          </Keuzevak>
+          <Keuzevak Icon={Clock} label="Start" isMobile={isMobile}>
+            <input type="time" step={600} value={startTime} onChange={(e) => setStartTime(e.target.value)} style={keuzeSelect} />
+          </Keuzevak>
+          <Keuzevak Icon={Clock} label="Einde" isMobile={isMobile}>
+            <input type="time" step={600} value={endTime} onChange={(e) => setEndTime(e.target.value)} style={keuzeSelect} />
+          </Keuzevak>
+        </div>
+
+        {/* Soort blok: het verschil is of taken er overheen mogen. */}
+        <Kopje Icon={Coffee} tekst="Soort" />
+        <div style={{ display: 'flex', gap: 6, marginBottom: isMobile ? '0.85rem' : '1rem' }}>
+          {[
+            { v: 'pauze',    Icon: Coffee, kop: 'Pauze',    sub: 'blokkeert taken' },
+            { v: 'coaching', Icon: Users,  kop: 'Coaching', sub: 'taken mogen erover' },
+          ].map(o => {
+            const aan = type === o.v
+            return (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => setType(o.v)}
+                style={{
+                  flex: 1, minWidth: 0, textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '0.55rem 0.7rem', minHeight: 46, borderRadius: 10,
+                  background: aan ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${aan ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                  cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
+                }}
+              >
+                <o.Icon size={15} color={aan ? '#fff' : 'rgba(255,255,255,0.45)'} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 900, color: aan ? '#fff' : 'rgba(255,255,255,0.7)' }}>{o.kop}</span>
+                  <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{o.sub}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <Kopje Icon={Palette} tekst="Kleur" />
+        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+          {COLORS.map(c => {
+            const aan = color === c.value
+            return (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setColor(c.value)}
+                title={c.label}
+                style={{
+                  width: 30, height: 30, padding: 0, background: c.value, borderRadius: 8,
+                  border: aan ? '2px solid #fff' : '1px solid rgba(255,255,255,0.1)',
+                  cursor: 'pointer', touchAction: 'manipulation',
+                }}
+              />
+            )
+          })}
+        </div>
+
+        {error && (
+          <div style={{
+            marginTop: '0.85rem', padding: '0.5rem 0.7rem', borderRadius: 8,
+            background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+            color: '#fca5a5', fontSize: '0.75rem', fontWeight: 700,
+          }}>{error}</div>
+        )}
+      </div>
+
+      <VensterVoet isMobile={isMobile}>
+        {!isNew && onDelete && (
+          <Knop soort="gevaar" breedte={44} titel="Blok verwijderen" onClick={handleDelete} disabled={saving}>
+            <Trash2 size={15} />
+          </Knop>
+        )}
+        <Knop soort="stil" flex={1} onClick={onClose}>Annuleer</Knop>
+        <Knop soort="primair" flex={2} onClick={handleSave} disabled={saving}>
+          {saving ? 'Bezig…' : 'Opslaan'}
+        </Knop>
+      </VensterVoet>
+    </Venster>
+  )
 }
