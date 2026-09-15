@@ -3,7 +3,7 @@
 // over Mon–Sun, with arrow buttons to step backward/forward through
 // previous weeks. Mounts via portal so it sits above the kanban board.
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
@@ -481,46 +481,70 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     setPresetBezig(false)
   }
 
-  // Eerdere periodes: even lange vensters, steeds een stap verder terug. We
-  // laden ze pas in tabelweergave en alleen die er nog niet zijn, want het zijn
-  // vier queries per periode.
+  // Eerdere periodes: even lange vensters, steeds een stap verder terug.
+  //
+  // Eén periode tegelijk, niet alles tegelijk: bij maanden en kwartalen zijn
+  // het zware queries en dan stond je naar een lege tabel te kijken tot alles
+  // binnen was — of liep het hele blok stuk op één fout en kwam er nooit meer
+  // een kolom bij. Nu verschijnt elke kolom zodra die klaar is, en een fout
+  // stopt alleen de rest van de rij.
+  const historieRef = useRef({ sleutel: null, data: {} })
+  const bezigRef = useRef(false)
+  const periodeSleutel = `${periodMode}|${+start}|${+end}|${reloadKey}`
+
   useEffect(() => {
     if (!isOpen || weergave !== 'tabel') return
     if (!leadService || !coachId) return
-    let cancelled = false
-    const nodig = []
-    for (let i = 1; i <= aantalTerug; i++) if (!historie[i]) nodig.push(i)
-    if (!nodig.length) return
+    let gestopt = false
 
-    setHistorieBezig(true)
-    Promise.all(nodig.map(async (i) => {
-      const { start: vStart, end: vEnd } = vensterTerug(periodMode, start, end, i)
-      const [a, f, rxn, geld] = await Promise.all([
-        leadService.getRangeActivity(coachId, vStart.toISOString(), vEnd.toISOString()),
-        leadService.getRangeFunnelStats(coachId, vStart.toISOString(), vEnd.toISOString()),
-        leadService.getRangeReactionStats
-          ? leadService.getRangeReactionStats(coachId, vStart.toISOString(), vEnd.toISOString())
-          : Promise.resolve(null),
-        leadService.getRangeCashCollected
-          ? leadService.getRangeCashCollected(coachId, vStart.toISOString(), vEnd.toISOString())
-          : Promise.resolve(null),
-      ])
-      return [i, { activity: a, funnel: f, reactionStats: rxn, cash: geld, start: vStart, end: vEnd }]
-    }))
-      .then(paren => { if (!cancelled) setHistorie(h => ({ ...h, ...Object.fromEntries(paren) })) })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setHistorieBezig(false) })
-    return () => { cancelled = true }
+    const laad = async () => {
+      if (bezigRef.current) return
+      // Andere periode in beeld? Begin met een schone lei.
+      if (historieRef.current.sleutel !== periodeSleutel) {
+        historieRef.current = { sleutel: periodeSleutel, data: {} }
+        setHistorie({})
+      }
+      bezigRef.current = true
+      setHistorieBezig(true)
+      for (let i = 1; i <= aantalTerug; i++) {
+        if (gestopt) break
+        if (historieRef.current.data[i]) continue
+        try {
+          const { start: vStart, end: vEnd } = vensterTerug(periodMode, start, end, i)
+          const [a2, f2, rxn2, geld2] = await Promise.all([
+            leadService.getRangeActivity(coachId, vStart.toISOString(), vEnd.toISOString()),
+            leadService.getRangeFunnelStats(coachId, vStart.toISOString(), vEnd.toISOString()),
+            leadService.getRangeReactionStats
+              ? leadService.getRangeReactionStats(coachId, vStart.toISOString(), vEnd.toISOString())
+              : Promise.resolve(null),
+            leadService.getRangeCashCollected
+              ? leadService.getRangeCashCollected(coachId, vStart.toISOString(), vEnd.toISOString())
+              : Promise.resolve(null),
+          ])
+          if (gestopt || historieRef.current.sleutel !== periodeSleutel) break
+          historieRef.current.data = {
+            ...historieRef.current.data,
+            [i]: { activity: a2, funnel: f2, reactionStats: rxn2, cash: geld2, start: vStart, end: vEnd },
+          }
+          setHistorie(historieRef.current.data)
+        } catch (e) {
+          console.warn('Periode laden mislukt:', i, e?.message)
+          break
+        }
+      }
+      bezigRef.current = false
+      if (!gestopt) setHistorieBezig(false)
+    }
+
+    laad()
+    return () => { gestopt = true; bezigRef.current = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, weergave, leadService, coachId, periodMode, +start, +end, reloadKey, aantalTerug])
+  }, [isOpen, weergave, leadService, coachId, periodeSleutel, aantalTerug])
 
-  // Van periode wisselen of herladen? Dan is de opgeslagen historie niet meer
-  // van deze periode.
+  // Van periode wisselen? Dan begint het tellen weer bij zes terug.
   useEffect(() => {
-    setHistorie({})
     setAantalTerug(6)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMode, +start, +end, reloadKey])
+  }, [periodeSleutel])
 
   // Campagne-breakdown is all-time → alleen laden bij openen / reload, niet bij
   // periode-navigatie (scheelt onnodige queries).
@@ -1071,22 +1095,26 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   />
 
                   {/* Verder terug kijken: zes periodes per klik erbij. */}
-                  <button
-                    onClick={() => setAantalTerug(n => n + 6)}
-                    disabled={historieBezig}
-                    style={{
-                      display: 'block', margin: '0 auto 0.9rem',
-                      fontSize: '0.66rem', fontWeight: 800,
-                      padding: '5px 12px', borderRadius: 999,
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      color: 'rgba(255,255,255,0.65)',
-                      cursor: historieBezig ? 'wait' : 'pointer', fontFamily: 'inherit',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >
-                    {historieBezig ? 'Laden…' : `Verder terug (nu ${Object.keys(historie).length} ${periodeMeervoud})`}
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '0 0 0.9rem' }}>
+                    <button
+                      onClick={() => setAantalTerug(n => n + 6)}
+                      style={{
+                        fontSize: '0.66rem', fontWeight: 800,
+                        padding: '5px 12px', borderRadius: 999,
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.65)',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      Verder terug
+                    </button>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
+                      {Object.keys(historie).length} {periodeMeervoud}
+                      {historieBezig ? ' · laden…' : ''}
+                    </span>
+                  </div>
                 </>
               ) : (
                 <>
