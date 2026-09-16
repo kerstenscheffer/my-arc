@@ -377,19 +377,19 @@ function VoorwaardenVenster({ isMobile, onClose }) {
                   <span style={{
                     fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800,
                     color: 'rgba(255,255,255,0.25)', alignSelf: isMobile ? 'center' : 'flex-start',
-                    marginTop: isMobile ? 0 : 20,
+                    marginTop: isMobile ? 0 : 14,
                   }}>
                     of
                   </span>
                 )}
                 <div style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: isMobile ? 8 : 12, textAlign: 'center',
-                  width: isMobile ? '100%' : 330,
+                  gap: isMobile ? 7 : 10, textAlign: 'center',
+                  width: isMobile ? '100%' : 300,
                 }}>
-                  <g.Icon size={isMobile ? 28 : 42} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                  <g.Icon size={isMobile ? 24 : 34} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
                   <span style={{
-                    fontSize: isMobile ? '1rem' : '1.4rem', fontWeight: 900,
+                    fontSize: isMobile ? '0.9rem' : '1.15rem', fontWeight: 900,
                     color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
                     whiteSpace: isMobile ? 'normal' : 'nowrap',
                   }}>
