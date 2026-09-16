@@ -119,7 +119,9 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             letterSpacing: '-0.03em', lineHeight: 1.15, textAlign: 'center',
             maxWidth: 820, margin: '0 auto',
           }}>
-            €300 inleg, die je terug krijgt door het plan te volgen.
+            €300 inleg, die je terug krijgt
+            <br />
+            door het plan te volgen.
           </div>
 
           {/* Drie garanties naast elkaar, op telefoon onder elkaar. */}
