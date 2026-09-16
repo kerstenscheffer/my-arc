@@ -10,8 +10,17 @@ import { useModalHost } from '../../../../coach/ModalHost'
 import {
   MessageCircle, Plus, Minus,
   ArrowLeftCircle, Clock, CheckCircle, Circle, Flame,
-  Info, FileText, Send, Gift, FolderInput, ChevronDown, Trash2,
+  Info, FileText, Send, Gift, FolderInput, ChevronDown, Trash2, Target,
 } from 'lucide-react'
+
+// Doel van een lead. Slaat op in call_leads.lead_goal; de lege waarde wist het.
+const DOELEN = [
+  { id: 'vetverlies', label: 'Vet verliezen' },
+  { id: 'spieropbouw', label: 'Spier opbouwen' },
+  { id: 'in_shape', label: 'In shape komen' },
+  { id: '', label: 'Geen doel' },
+]
+const DOEL_LABEL = Object.fromEntries(DOELEN.filter(d => d.id).map(d => [d.id, d.label]))
 import DMConversationModal from "../../../dm-conversation/components/DMConversationModal"
 import LeadDetailModalV2 from "./LeadDetailModalV2"
 
@@ -105,6 +114,13 @@ export default function KanbanCard({
   const [movePos, setMovePos] = useState({ top: 0, left: 0 })
   const moveBtnRef = useRef(null)
   const moveMenuRef = useRef(null)
+  // Doel van de lead (vetverlies / spieropbouw / in shape). Staat in
+  // call_leads.lead_goal en is los van de kwalificatie-velden.
+  const [showGoalDropdown, setShowGoalDropdown] = useState(false)
+  const [goalPos, setGoalPos] = useState({ top: 0, left: 0 })
+  const [leadGoal, setLeadGoal] = useState(lead.lead_goal || '')
+  const goalBtnRef = useRef(null)
+  const goalMenuRef = useRef(null)
   const [returnPos, setReturnPos] = useState({ top: 0, left: 0 })
   const returnBtnRef = useRef(null)
   const returnMenuRef = useRef(null)
@@ -218,6 +234,29 @@ export default function KanbanCard({
     }
   }, [showMoveDropdown])
 
+  useEffect(() => {
+    if (!showGoalDropdown) return
+    const buitenKlik = (event) => {
+      const inBtn = goalBtnRef.current && goalBtnRef.current.contains(event.target)
+      const inMenu = goalMenuRef.current && goalMenuRef.current.contains(event.target)
+      if (!inBtn && !inMenu) setShowGoalDropdown(false)
+    }
+    const sluitBijScroll = (ev) => {
+      if (goalMenuRef.current && goalMenuRef.current.contains(ev.target)) return
+      setShowGoalDropdown(false)
+    }
+    document.addEventListener('mousedown', buitenKlik)
+    document.addEventListener('touchstart', buitenKlik)
+    window.addEventListener('scroll', sluitBijScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', buitenKlik)
+      document.removeEventListener('touchstart', buitenKlik)
+      window.removeEventListener('scroll', sluitBijScroll, true)
+    }
+  }, [showGoalDropdown])
+
+  useEffect(() => { setLeadGoal(lead.lead_goal || '') }, [lead.lead_goal])
+
   // Temp-dropdown (cold/warm/hot) is óók fixed-geportald → zelfde sluit-logica.
   useEffect(() => {
     if (!showTempDropdown) return
@@ -246,6 +285,22 @@ export default function KanbanCard({
     const r = moveBtnRef.current?.getBoundingClientRect()
     if (r) setMovePos({ top: r.bottom + 4, left: r.left })
     setShowMoveDropdown(true)
+  }
+
+  const openGoalDropdown = (e) => {
+    e.stopPropagation()
+    if (showGoalDropdown) { setShowGoalDropdown(false); return }
+    const r = goalBtnRef.current?.getBoundingClientRect()
+    if (r) setGoalPos({ top: r.bottom + 4, left: r.left })
+    setShowGoalDropdown(true)
+  }
+
+  const kiesDoel = async (waarde) => {
+    setShowGoalDropdown(false)
+    const vorig = leadGoal
+    setLeadGoal(waarde)
+    try { await onEdit({ lead_goal: waarde || null }) }
+    catch (e) { console.error('Doel opslaan mislukt:', e); setLeadGoal(vorig) }
   }
 
   const openReturnDropdown = (e) => {
@@ -716,27 +771,8 @@ export default function KanbanCard({
             modalHost
           )}
 
-          {/* Tweede dag-teller ("{n}d", sinds stale-move) verwijderd — alleen de
-              "dagen stil"-stat hieronder blijft (op verzoek). */}
-
-          {/* Dagen stil — sinds laatste bewuste actie van de coach (followup
-              verstuurd of contact). Dit is de zichtbare "dagen stil"-stat. */}
-          {daysSinceAction !== null && (
-            <span
-              title={`${daysSinceAction} dag${daysSinceAction === 1 ? '' : 'en'} stil`}
-              style={{
-                padding: '1px 5px',
-                background: `${actionColor}1f`,
-                border: `1px solid ${actionColor}55`,
-                borderRadius: '3px',
-                fontSize: '0.6rem',
-                fontWeight: '700',
-                color: actionColor,
-              }}
-            >
-              {daysSinceAction === 0 ? 'vandaag' : `${daysSinceAction}d stil`}
-            </span>
-          )}
+          {/* De dag-tellers ("{n}d" en "{n}d stil") zijn eruit: ze vertelden
+              niets waar je op handelde en vulden de kaart. */}
 
           {/* Call ready badge */}
           {isCallReady && !contactedToday && (
@@ -853,6 +889,67 @@ export default function KanbanCard({
           overflow: 'hidden',
           minHeight: '22px'
         }}>
+          {/* Doel van de lead — wit zodra het ingevuld is, zodat je in één
+              oogopslag ziet waar deze lead voor komt. */}
+          <>
+            <div
+              ref={goalBtnRef}
+              data-no-click
+              onClick={openGoalDropdown}
+              title={leadGoal ? DOEL_LABEL[leadGoal] : 'Doel kiezen'}
+              style={{
+                flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: 3,
+                padding: '2px 6px',
+                background: leadGoal ? '#fff' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${leadGoal ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                borderRadius: 999,
+                cursor: 'pointer',
+                transition: 'background 0.15s ease',
+              }}
+            >
+              <Target size={10} color={leadGoal ? '#0a0a0a' : 'rgba(255,255,255,0.7)'} style={{ flexShrink: 0 }} />
+              <span style={{
+                fontSize: '0.58rem', fontWeight: 800, whiteSpace: 'nowrap',
+                color: leadGoal ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+              }}>
+                {leadGoal ? DOEL_LABEL[leadGoal] : 'Doel'}
+              </span>
+              <ChevronDown size={9} color={leadGoal ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)'} style={{ flexShrink: 0 }} />
+            </div>
+
+            {showGoalDropdown && createPortal(
+              <div
+                ref={goalMenuRef}
+                onClick={(e) => e.stopPropagation()}
+                style={{ position: 'fixed', top: goalPos.top, left: goalPos.left, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.7)', zIndex: 2147483600, minWidth: 180, padding: 5 }}
+              >
+                {DOELEN.map(d => {
+                  const aan = leadGoal === d.id
+                  return (
+                    <div
+                      key={d.id || 'geen'}
+                      onClick={(e) => { e.stopPropagation(); kiesDoel(d.id) }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        minHeight: 34, padding: '0 0.6rem', borderRadius: 8,
+                        background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        color: aan ? '#fff' : 'rgba(255,255,255,0.65)',
+                        fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => { if (!aan) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                      onMouseLeave={(e) => { if (!aan) e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <Target size={12} strokeWidth={2.5} style={{ flexShrink: 0, opacity: d.id ? 1 : 0.4 }} />
+                      {d.label}
+                    </div>
+                  )
+                })}
+              </div>,
+              modalHost
+            )}
+          </>
+
           {/* Verplaats-naar-sectie dropdown — alternatief voor slepen (handig
               als de doelsectie niet in beeld staat). */}
           {onMoveToSection && sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).length > 0 && (
@@ -863,22 +960,22 @@ export default function KanbanCard({
                 onClick={openMoveDropdown}
                 style={{
                   flexShrink: 0,
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '3px 8px',
-                  background: 'rgba(255,215,0,0.12)',
-                  border: '1px solid rgba(255,215,0,0.3)',
-                  borderRadius: 6,
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  padding: '2px 6px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 999,
                   cursor: 'pointer',
                   transition: 'background 0.15s ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,215,0,0.2)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,215,0,0.12)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
               >
-                <FolderInput size={11} color="#FFD700" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', whiteSpace: 'nowrap', letterSpacing: '0.01em' }}>
-                  Verplaats
+                <FolderInput size={10} color="rgba(255,255,255,0.7)" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap' }}>
+                  Move
                 </span>
-                <ChevronDown size={10} color="#FFD700" style={{ flexShrink: 0, opacity: 0.8 }} />
+                <ChevronDown size={9} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
               </div>
 
               {/* Portal + fixed positie zodat de dropdown niet wordt geclipt
