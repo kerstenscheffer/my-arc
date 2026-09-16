@@ -542,7 +542,7 @@ export default function SixWeekChallengePage() {
           </div>
 
           <div style={{
-            maxWidth: isMobile ? 520 : 880, width: '100%',
+            maxWidth: isMobile ? 520 : 1100, width: '100%',
             // Negatieve marge: de kop schuift over de onderkant van de foto,
             // maar houdt afstand tot het beeld.
             marginTop: isMobile ? '1.5rem' : '2.5rem',
@@ -554,10 +554,15 @@ export default function SixWeekChallengePage() {
             {/* Twee knoppen: de methode en de voorwaarden. Geen omlijnde
                 vakken meer maar een icoon met het woord eronder; het scherm
                 oogde te druk met alles in een container. */}
+            {/* Drie gelijke kolommen, samen ongeveer zo breed als de titel op
+                het beeld erboven. */}
             <div style={{
-              display: 'flex', gap: isMobile ? '1.1rem' : '7rem',
-              justifyContent: 'center',
-              marginTop: isMobile ? 0 : '1.5rem',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: isMobile ? '0.75rem' : '1.5rem',
+              width: '100%',
+              maxWidth: isMobile ? '100%' : 980,
+              margin: `${isMobile ? 0 : '1.5rem'} auto 0`,
             }}>
               {[
                 { id: 'methode', label: 'De methode', Icon: Compass },
@@ -573,7 +578,7 @@ export default function SixWeekChallengePage() {
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
                       gap: isMobile ? 9 : 18,
                       padding: 0, border: 'none', background: 'transparent',
-                      color: '#fff', opacity: aan ? 1 : 0.75,
+                      color: '#fff', opacity: aan ? 1 : 0.9,
                       fontSize: isMobile ? '0.75rem' : '1.4rem', fontWeight: 900,
                       letterSpacing: '-0.01em', whiteSpace: 'nowrap',
                       fontFamily: 'inherit', cursor: 'pointer',
@@ -581,7 +586,7 @@ export default function SixWeekChallengePage() {
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <k.Icon size={isMobile ? 32 : 68} strokeWidth={2.2} />
+                    <k.Icon size={isMobile ? 32 : 68} strokeWidth={2.6} color="#fff" />
                     {k.label}
                   </button>
                 )
