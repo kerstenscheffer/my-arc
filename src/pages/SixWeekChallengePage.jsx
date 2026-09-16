@@ -73,7 +73,8 @@ const PIJLERS = [
     ],
   },
   {
-    foto: '/methode/training.jpg',
+    foto: '/methode/training-slide.jpg',
+    beeldVult: true,
     kop: 'Elke training telt',
     zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
     doen: [
