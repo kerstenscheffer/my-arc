@@ -365,7 +365,6 @@ export default function KanbanBoard({
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   // Urgente opvolg-melding: hot/call-voorgesteld leads die >24u stil zijn.
   const [staleCheckResult, setStaleCheckResult] = useState(null)
-  const [snoozeSection, setSnoozeSection] = useState(null)
   // "Follow up stil"-sectie: leads die 3 dagen stil staan en al 1x opgevolgd
   // zijn, gaan hierheen zodat de opvolg-werklijst zuiver blijft.
   const [followupStilSection, setFollowupStilSection] = useState(null)
@@ -529,41 +528,10 @@ export default function KanbanBoard({
     return () => { document.removeEventListener('keydown', handleKeyDown); document.body.style.overflow = '' }
   }, [isFullscreen])
 
-  useEffect(() => {
-    if (sections.length === 0) return
-    // Sluit de "Follow up stil"-sectie expliciet uit van de snooze-detectie.
-    const found = sections.find(s => !isFollowupStilTitle(s.title) && SNOOZE_SECTION_PATTERNS.some(p => (s.title || '').toLowerCase().includes(p)))
-    if (found) {
-      setSnoozeSection(found)
-      return
-    }
-    setSnoozeSection(null)
-    // No snooze section yet — auto-create a default one once. The ref guard
-    // prevents re-creation when this effect runs again after sections update.
-    if (!coachId || !leadService || snoozeAutoCreatedRef.current || loading) return
-    snoozeAutoCreatedRef.current = true
-    ;(async () => {
-      try {
-        const ns = await leadService.ensureSystemSection(coachId, {
-          title: '💤 Snooze',
-          color: '#64748b',
-          position: sections.filter(s => s.id !== 'unassigned').length,
-        })
-        const sectionWithLeads = { ...ns, leads: [] }
-        const update = (prev) => {
-          const u = prev.find(s => s.id === 'unassigned')
-          const others = prev.filter(s => s.id !== 'unassigned')
-          return [...others, sectionWithLeads, ...(u ? [u] : [])]
-        }
-        setSections(update)
-        setOriginalSections(update)
-      } catch (e) {
-        console.error('Auto-create snooze section failed:', e)
-        // Allow retry on next mount if it failed.
-        snoozeAutoCreatedRef.current = false
-      }
-    })()
-  }, [sections, coachId, leadService, loading])
+  // Snooze is eruit. Er stond hier een effect dat een "💤 Snooze"-sectie
+  // aanmaakte zodra er geen sectie met 'snooze', 'later follow', 'follow up'
+  // of 'parkeer' in de titel bestond — daardoor kwam die kolom telkens terug
+  // nadat je 'm had weggegooid (drie stuks in de database).
 
   // "Follow up stil"-sectie vinden, of eenmalig auto-aanmaken (zelfde patroon
   // als snooze). Hierheen verplaatsen leads die 3 dagen stil staan zodra ze
@@ -940,29 +908,6 @@ export default function KanbanBoard({
   // ========================================
   // HANDLERS — ALL PRESERVED 1:1
   // ========================================
-  const handleSnoozeLead = async (leadId) => {
-    if (!snoozeSection) { alert('⚠️ Geen "Later Follow Up" sectie gevonden!'); return }
-    let currentSectionId = null, leadData = null
-    for (const section of sections) {
-      const found = (section.leads || []).find(l => l.id === leadId)
-      if (found) { currentSectionId = section.id; leadData = found; break }
-    }
-    if (currentSectionId === snoozeSection.id) return
-    try {
-      await leadService.moveLeadToSection(leadId, snoozeSection.id, 0, coachId)
-      setSections(prev => prev.map(section => {
-        if (section.id === currentSectionId) return { ...section, leads: (section.leads || []).filter(l => l.id !== leadId) }
-        if (section.id === snoozeSection.id) return { ...section, leads: [leadData, ...(section.leads || []).filter(l => l.id !== leadId)] }
-        return section
-      }))
-      setExpandedSections(prev => ({ ...prev, [snoozeSection.id]: true }))
-      setHighlightedLeadId(leadId)
-      setTimeout(() => setHighlightedLeadId(null), 2000)
-      loadActivityData()
-    } catch (error) { console.error('❌ Snooze lead failed:', error); loadBoard(false) }
-  }
-
-  const isSnoozeSectionById = (sectionId) => snoozeSection && snoozeSection.id === sectionId
 
   const handleSave = async () => {
     if (!hasUnsavedChanges()) return
@@ -1539,7 +1484,6 @@ export default function KanbanBoard({
           onDragStart={(e) => onLeadDragStart(e, lead, section.id)}
           onEdit={(updates) => handleLeadEdit(lead, section, updates)}
           onDelete={() => handleLeadDelete(lead)}
-          onSnooze={snoozeSection && !isThisSnooze ? handleSnoozeLead : null}
           sections={sections} currentSectionId={section.id}
           onMoveToSection={(targetSectionId) => handleMoveLeadToSection(lead, section.id, targetSectionId)}
           sectionTitle={section.title}
@@ -2218,13 +2162,6 @@ export default function KanbanBoard({
               <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.45rem' }}>geen activiteit</span>
               <div style={{ flex: 1 }} />
               <button onClick={() => setStaleCheckResult(null)} style={{ padding: '1px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.15)', cursor: 'pointer', touchAction: 'manipulation' }}><X size={9} /></button>
-            </div>
-          )}
-
-          {!snoozeSection && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.625rem', marginBottom: '0.375rem', borderLeft: '3px solid #3b82f6' }}>
-              <Clock size={9} color="#3b82f6" style={{ flexShrink: 0 }} />
-              <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.5rem' }}>Maak "Later Follow Up" sectie voor ⏰</span>
             </div>
           )}
 
