@@ -68,10 +68,10 @@ const PIJLERS = [
     kop: 'Weet wat je eet',
     zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
     doen: [
-      { Icon: ClipboardList, kop: 'Structuur',     tekst: 'Plan voor jouw doel staat klaar, boodschappenlijst erbij. Nul denkwerk.' },
-      { Icon: ShieldCheck,   kop: 'Zekerheid',     tekst: 'Zeker weten dat wat je doet klopt. Nooit meer gokken.' },
-      { Icon: Utensils,      kop: 'Keuze',         tekst: 'Bijna 500 gerechten die in je plan passen. Twee tikken.' },
-      { Icon: PartyPopper,   kop: 'Flexibiliteit', tekst: 'Etentjes, vakanties, verjaardagen: leren we mee omgaan, strepen we niet.' },
+      { Icon: ClipboardList, kop: 'Structuur',     tekst: 'Plan voor jouw doel staat klaar. Nul denkwerk.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',     tekst: 'Zeker weten dat het klopt. Nooit meer gokken.' },
+      { Icon: Utensils,      kop: 'Keuze',         tekst: '500 gerechten die in je plan passen.' },
+      { Icon: PartyPopper,   kop: 'Flexibiliteit', tekst: 'Etentjes en vakanties leren we mee omgaan.' },
     ],
   },
   {
@@ -245,8 +245,9 @@ function MethodeSlider({ isMobile, onClose }) {
                 fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
                 color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
               }}>
+                {/* Dubbele punt in plaats van een streepje. */}
                 {regel.kop && (
-                  <span style={{ color: '#fff', fontWeight: 900 }}>{regel.kop} — </span>
+                  <span style={{ color: '#fff', fontWeight: 900 }}>{regel.kop}: </span>
                 )}
                 {regel.tekst}
               </span>
