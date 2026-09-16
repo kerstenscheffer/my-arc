@@ -402,13 +402,16 @@ function VoorwaardenVenster({ isMobile, onClose }) {
 
           <p style={{
             margin: `${isMobile ? '2rem' : '3rem'} auto 0`,
-            maxWidth: 560, textAlign: 'center',
+            maxWidth: 900, textAlign: 'center',
             paddingTop: isMobile ? '1.25rem' : '1.75rem',
             borderTop: '1px solid rgba(255,255,255,0.1)',
             fontSize: isMobile ? '1.2rem' : '1.75rem', fontWeight: 900,
             color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.25,
           }}>
-            Mijn doel: serieuze mannen gratis serieus resultaat laten zien.
+            {/* Eén regel: afbreken haalt de klap uit de zin. */}
+            <span style={{ whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+              Mijn doel: serieuze mannen gratis serieus resultaat laten zien.
+            </span>
           </p>
 
         </div>
