@@ -59,7 +59,10 @@ const SLIDES = REVIEWS.flatMap((review, i) => {
 // is, en wat we concreet gaan doen.
 const PIJLERS = [
   {
-    foto: '/methode/voeding.jpg',
+    // Op dit beeld staan de titel en de kernwoorden al; die laten we dan ook
+    // weg uit de tekst eronder, anders staat alles er twee keer.
+    foto: '/methode/voeding-slide.jpg',
+    beeldVult: true,
     kop: 'Weet wat je eet',
     zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
     doen: [
@@ -152,12 +155,18 @@ function MethodeSlider({ isMobile, onClose }) {
         <div key={p.foto} style={{
           position: 'absolute', inset: 0,
           backgroundImage: `url(${p.foto})`,
-          backgroundSize: 'cover', backgroundPosition: 'center',
+          backgroundSize: p.beeldVult ? 'contain' : 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
           animation: 'pijlerIn 0.35s ease',
         }} />
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: `linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.25) 30%, rgba(10,10,10,0.8) 72%, ${BG} 100%)`,
+          // Staat de tekst al op het beeld, dan alleen onderaan een zachte
+          // overgang naar zwart; anders zou de fade die tekst wegpoetsen.
+          background: p.beeldVult
+            ? `linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0) 78%, ${BG} 100%)`
+            : `linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.25) 30%, rgba(10,10,10,0.8) 72%, ${BG} 100%)`,
         }} />
         <button
           onClick={onClose}
@@ -182,28 +191,32 @@ function MethodeSlider({ isMobile, onClose }) {
         flex: 1, minHeight: 0, overflowY: 'auto',
         padding: isMobile ? '0 1.25rem 1.25rem' : '0 2rem 2rem',
       }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', marginTop: isMobile ? -18 : -28, position: 'relative' }}>
-          <div style={{
-            fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
-            letterSpacing: '0.16em', color: GOLD, marginBottom: isMobile ? 8 : 12,
-          }}>
-            PIJLER {i + 1} VAN {PIJLERS.length}
-          </div>
-          <div style={{
-            fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
-            letterSpacing: '-0.03em', lineHeight: 1.08,
-            textShadow: '0 2px 14px rgba(0,0,0,0.85)',
-          }}>
-            <span style={{ color: GOLD }}>{i + 1}. </span>
-            {p.kop}
-          </div>
-          <p style={{
-            margin: `${isMobile ? 10 : 14}px 0 ${isMobile ? '1.4rem' : '2rem'}`,
-            fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 600,
-            color: 'rgba(255,255,255,0.65)', lineHeight: 1.45,
-          }}>
-            {p.zin}
-          </p>
+        <div style={{ maxWidth: 760, margin: '0 auto', marginTop: p.beeldVult ? (isMobile ? 10 : 16) : (isMobile ? -18 : -28), position: 'relative' }}>
+          {!p.beeldVult && (
+            <>
+              <div style={{
+                fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
+                letterSpacing: '0.16em', color: GOLD, marginBottom: isMobile ? 8 : 12,
+              }}>
+                PIJLER {i + 1} VAN {PIJLERS.length}
+              </div>
+              <div style={{
+                fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
+                letterSpacing: '-0.03em', lineHeight: 1.08,
+                textShadow: '0 2px 14px rgba(0,0,0,0.85)',
+              }}>
+                <span style={{ color: GOLD }}>{i + 1}. </span>
+                {p.kop}
+              </div>
+              <p style={{
+                margin: `${isMobile ? 10 : 14}px 0 ${isMobile ? '1.4rem' : '2rem'}`,
+                fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 600,
+                color: 'rgba(255,255,255,0.65)', lineHeight: 1.45,
+              }}>
+                {p.zin}
+              </p>
+            </>
+          )}
 
           <div style={{
             fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
