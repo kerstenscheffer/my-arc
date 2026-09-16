@@ -30,6 +30,7 @@ import LeadSourceModal from './LeadSourceModal'
 import CallProposalModal from './CallProposalModal'
 import DMBibleModal from '../DMBibleModal'
 import StartCampaignModal from '../StartCampaignModal'
+import WeekStatsModal from '../WeekStatsModal'
 
 
 // "Nieuwe volgers"-kolom — hier krijgt elke card een DM-Run knop (75 volgers
@@ -122,7 +123,6 @@ export default function KanbanBoard({
   const [dueCalls, setDueCalls] = useState([])
   const [showDueCalls, setShowDueCalls] = useState(false)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
-  const [showStats, setShowStats] = useState(!isMobile)
   // boardFilter shape: {
   //   sort: string,
   //   types: Set<'magnet'|'outreach'>,        // leeg = alle types
@@ -1726,12 +1726,11 @@ export default function KanbanBoard({
         </>
       ) : (
         <div>
-          {!isMobile && showStats && <PeriodStatsBar
+          {!isMobile && <PeriodStatsBar
                 leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey}
                 verbergControls
                 period={statsPeriode} onPeriodChange={setStatsPeriode}
                 customRange={statsRange} onCustomRange={setStatsRange}
-                showWeek={statsVolledig} onShowWeek={setStatsVolledig}
               />}
 
           {/* ═══ PIN-ON-SCROLL ACTIE-RIJ ═══
@@ -1762,14 +1761,13 @@ export default function KanbanBoard({
           }}>
             {/* Uitgeklapte stats (mobiel) — opent BINNEN de balk, tussen de
                 knoppen (order:0) en de zoekbalk (order:2) via order:1, volle breedte. */}
-            {isMobile && showStats && (
+            {isMobile && (
               <div style={{ order: 1, flexBasis: '100%', width: '100%' }}>
                 <PeriodStatsBar
                 leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey}
                 verbergControls
                 period={statsPeriode} onPeriodChange={setStatsPeriode}
                 customRange={statsRange} onCustomRange={setStatsRange}
-                showWeek={statsVolledig} onShowWeek={setStatsVolledig}
               />
               </div>
             )}
@@ -1991,12 +1989,8 @@ export default function KanbanBoard({
 
             {/* 'Mijn berichten' stond hier als los icoon; die knop is eruit. */}
 
-            {/* Cijfers in- of uitklappen — laatste knop van de groep. */}
-            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
-            <button onClick={() => setShowStats(v => !v)} title={showStats ? 'Cijfers verbergen' : 'Cijfers tonen'}
-              style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: showStats ? 'rgba(255,255,255,0.12)' : 'transparent', border: 'none', color: showStats ? '#fff' : 'rgba(255,255,255,0.65)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <BarChart3 size={15} />
-            </button>
+            {/* De knop om de cijfers te verbergen is eruit: de stats-balk
+                staat nu altijd aan. */}
             </div>
 
             {/* De oog-knop (namen verbergen) is eruit. */}
@@ -2322,7 +2316,6 @@ export default function KanbanBoard({
                 verbergControls
                 period={statsPeriode} onPeriodChange={setStatsPeriode}
                 customRange={statsRange} onCustomRange={setStatsRange}
-                showWeek={statsVolledig} onShowWeek={setStatsVolledig}
               />
                 {/* Fullscreen toolbar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
