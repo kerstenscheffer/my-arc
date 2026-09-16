@@ -116,20 +116,11 @@ function VoorwaardenVenster({ isMobile, onClose }) {
         }}>
           <div style={{
             fontSize: isMobile ? '1.5rem' : '2.2rem', fontWeight: 900,
-            letterSpacing: '-0.03em', lineHeight: 1.1, textAlign: 'center',
+            letterSpacing: '-0.03em', lineHeight: 1.15, textAlign: 'center',
+            maxWidth: 820, margin: '0 auto',
           }}>
-            Je risico is nul
+            €300 inleg, die je terug krijgt door het plan te volgen.
           </div>
-          <p style={{
-            margin: `${isMobile ? '0.85rem' : '1.1rem'} auto 0`,
-            maxWidth: 720, textAlign: 'center',
-            fontSize: isMobile ? '0.88rem' : '1.05rem', fontWeight: 700,
-            color: 'rgba(255,255,255,0.55)', lineHeight: 1.5,
-          }}>
-            Je legt €300 in. Die verdien je terug door het plan te volgen dat we
-            samen in je opstart-call maken. Wat precies telt, spreken we daar af
-            en zie je daarna in je app.
-          </p>
 
           {/* Drie garanties naast elkaar, op telefoon onder elkaar. */}
           <div style={{
