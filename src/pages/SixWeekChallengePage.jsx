@@ -51,8 +51,8 @@ const SLIDES = REVIEWS.flatMap((review, i) => {
 // De 3 pijlers — copy gelijk aan /16week (OfferPilarenSection).
 // ── De voorwaarden: schermvullend, zelfde opzet als de methode-slides ──────
 const GARANTIE_KAARTEN = [
-  { Icon: Target,    kop: 'Win je geld terug', tekst: 'Plan gevolgd? €300 terug, cash of doorrollen.' },
-  { Icon: Clock,     kop: '1-week garantie',   tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
+  { Icon: Target,    kop: 'Het plan volgt',    tekst: 'Plan gevolgd? €300 terug, cash of doorrollen.' },
+  { Icon: Clock,     kop: 'Merkt dat het niet past', tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
   { Icon: BadgeEuro, kop: '6-weken service',   tekst: 'Aan het eind niet het geld waard? Geld terug.' },
 ]
 
@@ -124,35 +124,65 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             door het plan te volgen.
           </div>
 
-          {/* Drie garanties naast elkaar, op telefoon onder elkaar. */}
+          {/* Links de zin, rechts de drie voorwaarden genummerd. Op telefoon
+              onder elkaar. */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-            gap: isMobile ? '0.75rem' : '1rem',
-            marginTop: isMobile ? '1.75rem' : '2.5rem',
+            gridTemplateColumns: isMobile ? '1fr' : 'minmax(220px, 0.8fr) 1.2fr',
+            gap: isMobile ? '1.25rem' : '3rem',
+            alignItems: 'center',
+            marginTop: isMobile ? '2rem' : '3rem',
+            textAlign: 'left',
           }}>
-            {GARANTIE_KAARTEN.map(g => (
-              <div key={g.kop} style={{
-                display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-start' : 'center',
-                gap: isMobile ? 6 : 10, textAlign: isMobile ? 'left' : 'center',
-                padding: isMobile ? '0.9rem 0' : '1.25rem 0.5rem',
-              }}>
-                <g.Icon size={isMobile ? 22 : 30} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
-                <span style={{
-                  fontSize: isMobile ? '0.95rem' : '1.15rem', fontWeight: 900,
-                  color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15,
+            <div style={{
+              fontSize: isMobile ? '1.15rem' : '1.6rem', fontWeight: 900,
+              color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.15,
+            }}>
+              Het is gratis als je
+            </div>
+
+            <div>
+              {GARANTIE_KAARTEN.map((g, n) => (
+                <div key={g.kop} style={{
+                  display: 'flex', alignItems: 'baseline', gap: isMobile ? 10 : 14,
+                  padding: isMobile ? '0.7rem 0' : '0.9rem 0',
+                  borderTop: n === 0 ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
                 }}>
-                  {g.kop}
-                </span>
-                <span style={{
-                  fontSize: isMobile ? '0.8rem' : '0.95rem', fontWeight: 700,
-                  color: 'rgba(255,255,255,0.55)', lineHeight: 1.4,
-                }}>
-                  {g.tekst}
-                </span>
-              </div>
-            ))}
+                  <span style={{
+                    flexShrink: 0, fontSize: isMobile ? '0.95rem' : '1.15rem',
+                    fontWeight: 900, color: GOLD,
+                  }}>
+                    {n + 1}.
+                  </span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{
+                      display: 'block', fontSize: isMobile ? '0.95rem' : '1.15rem',
+                      fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
+                    }}>
+                      {g.kop}
+                    </span>
+                    <span style={{
+                      display: 'block', marginTop: 3,
+                      fontSize: isMobile ? '0.8rem' : '0.95rem', fontWeight: 700,
+                      color: 'rgba(255,255,255,0.5)', lineHeight: 1.4,
+                    }}>
+                      {g.tekst}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
+
+          <p style={{
+            margin: `${isMobile ? '1.75rem' : '2.5rem'} auto 0`,
+            maxWidth: 720, textAlign: 'center',
+            fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 900,
+            color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.35,
+          }}>
+            Mijn doel is om je resultaat te laten zien.
+          </p>
 
           <p style={{
             margin: `${isMobile ? '1.5rem' : '2rem'} auto 0`,
