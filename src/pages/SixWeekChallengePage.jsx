@@ -148,9 +148,14 @@ function MethodeSlider({ isMobile, onClose }) {
       }}
     >
       {/* Foto over de volle breedte, met de kop er half overheen. */}
+      {/* Beeld met tekst erop krijgt een vaste verhouding van 16:5, zodat wat
+          je exporteert ook precies is wat je ziet: geen bijsnijden, geen zwarte
+          balken. De gewone foto's blijven een band met vaste hoogte. */}
       <div style={{
         position: 'relative', width: '100%', flexShrink: 0,
-        height: isMobile ? '34vh' : 'min(46vh, 460px)',
+        ...(p.beeldVult && !isMobile
+          ? { aspectRatio: '16 / 5', maxHeight: '60vh' }
+          : { height: isMobile ? '34vh' : 'min(46vh, 460px)' }),
       }}>
         <div key={p.foto} style={{
           position: 'absolute', inset: 0,
