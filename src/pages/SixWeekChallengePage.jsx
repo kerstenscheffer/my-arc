@@ -177,7 +177,7 @@ function MethodeSlider({ isMobile, onClose }) {
           // fade, anders vreet die de onderste regel op. De gewone foto's
           // lopen wel naar zwart, daar staat de kop overheen.
           background: p.beeldVult
-            ? 'none'
+            ? `linear-gradient(180deg, rgba(0,0,0,0) 86%, ${BG} 100%)`
             : `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 30%, rgba(0,0,0,0.8) 72%, ${BG} 100%)`,
         }} />
         <button
@@ -554,7 +554,13 @@ export default function SixWeekChallengePage() {
               backgroundImage: 'url(/6week-challenge-hero.jpg)',
               backgroundSize: 'cover', backgroundPosition: 'center 45%',
             }} />
-            {/* Geen fade: het beeld loopt zelf al naar zwart. */}
+            {/* Klein randje naar zwart onderaan, zodat de foto niet met een
+                harde lijn eindigt. */}
+            <div style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0,
+              height: '14%', pointerEvents: 'none',
+              background: `linear-gradient(180deg, rgba(0,0,0,0) 0%, ${BG} 100%)`,
+            }} />
           </div>
 
           <div style={{
