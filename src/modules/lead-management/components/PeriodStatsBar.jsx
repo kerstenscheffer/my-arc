@@ -5,7 +5,7 @@
 // de stats voor die periode laadt. Data uit dezelfde range-methodes als de
 // week-analytics modal (getRangeFunnelStats + getRangeReactionStats).
 import { useState, useEffect } from 'react'
-import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX, Euro, PhoneOff, XCircle, PhoneCall, Ban } from 'lucide-react'
+import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, Euro, XCircle, PhoneCall } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
 import GrowthChart from './GrowthChart'
 import { kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
@@ -161,10 +161,9 @@ export default function PeriodStatsBar({
     { key: 'callGevoerd', label: 'Call gevoerd',     value: s.callGevoerd, num: s.callGevoerd, Icon: PhoneCall,   color: '#10b981' },
     { key: 'sales',       label: 'Sales',            value: s.sales,       num: s.sales,     Icon: Trophy,        color: GOLD },
     { key: 'omzet',       label: 'Omzet',            value: '€' + Math.round(s.omzet || 0).toLocaleString('nl-NL'), num: s.omzet, Icon: Euro, color: '#22c55e' },
-    { key: 'noshow',      label: 'No-shows',         value: s.noshow,      num: s.noshow,    Icon: UserX,         color: '#ef4444' },
-    { key: 'afgewezen',   label: 'Call afgewezen',   value: s.afgewezen,   num: s.afgewezen, Icon: PhoneOff,      color: '#f97316' },
     { key: 'saleVerloren', label: 'Sale verloren',   value: s.saleVerloren, num: s.saleVerloren, Icon: XCircle,     color: '#ef4444' },
-    { key: 'nietGeschikt', label: 'Niet geschikt',   value: s.nietGeschikt, num: s.nietGeschikt, Icon: Ban,        color: '#64748b' },
+    // No-shows, call afgewezen en niet geschikt staan niet meer in de balk;
+    // die kijk je na in het statistiekenvenster, niet de hele dag door.
   ]
   const PERIOD_SHORT = { day: 'Vandaag', week: 'Week', month: 'Maand', lastMonth: 'Vorige', custom: 'Datum' }
   const pill = (active) => ({ flexShrink: 0, minHeight: 32, padding: '0 0.7rem', borderRadius: 9, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 5, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: active ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.08)'}`, color: active ? GOLD : 'rgba(255,255,255,0.62)' })
