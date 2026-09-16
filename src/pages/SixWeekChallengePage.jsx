@@ -10,7 +10,7 @@
 // pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, ChevronDown, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Utensils, CalendarDays, PlayCircle, TrendingUp, Phone, ClipboardCheck, MessageCircle } from 'lucide-react'
+import { Star, ChevronDown, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, Phone, ClipboardCheck, MessageCircle } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -81,9 +81,10 @@ const PIJLERS = [
     kop: 'Elke training telt',
     zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
     doen: [
-      { Icon: CalendarDays, tekst: 'Schema op jouw dagen, jouw gym en jouw niveau' },
-      { Icon: PlayCircle,   tekst: 'Per oefening een video, zodat de uitvoering klopt' },
-      { Icon: TrendingUp,   tekst: 'Gewicht en reps bijhouden, zodat je progressie ziet' },
+      { Icon: ClipboardList, kop: 'Structuur',  tekst: 'Persoonlijk schema: jouw dagen, jouw locatie, jouw niveau.' },
+      { Icon: Crosshair,     kop: 'Focus',      tekst: 'Precies doen wat telt. Niks erbij.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',  tekst: 'Precies weten hoe, hoeveel en welke oefeningen. Nooit meer twijfelen.' },
+      { Icon: TrendingUp,    kop: 'Resultaatgericht' },
     ],
   },
   {
@@ -245,9 +246,10 @@ function MethodeSlider({ isMobile, onClose }) {
                 fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
                 color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
               }}>
-                {/* Dubbele punt in plaats van een streepje. */}
+                {/* Dubbele punt in plaats van een streepje; staat er geen zin
+                    achter, dan ook geen dubbele punt. */}
                 {regel.kop && (
-                  <span style={{ color: '#fff', fontWeight: 900 }}>{regel.kop}: </span>
+                  <span style={{ color: '#fff', fontWeight: 900 }}>{regel.kop}{regel.tekst ? ': ' : ''}</span>
                 )}
                 {regel.tekst}
               </span>
