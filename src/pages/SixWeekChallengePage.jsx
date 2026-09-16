@@ -10,7 +10,7 @@
 // pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, ChevronDown, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, Phone, ClipboardCheck, MessageCircle } from 'lucide-react'
+import { Star, ChevronDown, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, ClipboardCheck, LineChart, SlidersHorizontal, Video } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -94,9 +94,10 @@ const PIJLERS = [
     kop: 'Coach in jouw corner',
     zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
     doen: [
-      { Icon: Phone,          tekst: 'Elke week een call over je cijfers en je week' },
-      { Icon: ClipboardCheck, tekst: 'Check-in op vrijdag, daar stuur ik maandag op bij' },
-      { Icon: MessageCircle,  tekst: 'Korte lijn in de app, geen dagen wachten' },
+      { Icon: LineChart,          kop: 'Cijfers',   tekst: 'Ik kijk dagelijks mee en stuur op data.' },
+      { Icon: ClipboardCheck,     kop: 'Check-in',  tekst: 'Elke week: wat liep vast, wat doen we volgende week anders.' },
+      { Icon: SlidersHorizontal,  kop: 'Bijsturen', tekst: 'Stilstaan is geen optie. Ik pas aan wanneer nodig.' },
+      { Icon: Video,              kop: 'Weekcall',  tekst: 'Elke week samen kijken wat werkt en wat niet.' },
     ],
   },
 ]
