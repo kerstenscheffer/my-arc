@@ -10,11 +10,12 @@ import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp, Info,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
-  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, Wallet, PhoneOff, XCircle, Check, Ban,
+  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, Wallet, PhoneOff, XCircle, Check, Ban, Trash2,
   Table as TableIcon, Filter,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import CallProposalsModal from './CallProposalsModal'
+import { Venster, VensterKop, VensterVoet, Knop } from '../../../components/arc-ui'
 import GrowthChart from './GrowthChart'
 import { KPI_STATS, kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
 
@@ -152,6 +153,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [aantalTerug, setAantalTerug] = useState(6)
   // Bump om de stats opnieuw te laden na het terugdraaien van een verplaatsing.
   const [reloadKey, setReloadKey] = useState(0)
+  // Welke rij staat op het punt teruggedraaid of verwijderd te worden.
+  // Shape: { item, statLabel }
+  const [bevestig, setBevestig] = useState(null)
   const [revertingId, setRevertingId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   // PDF-preview: { url, filename } zodra de export klaar is; null = geen preview.
@@ -1127,8 +1131,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       leads={funnel?.[drillStage]?.leads}
                       accent={STAGE_ACCENT[drillStage]}
                       reasons={drillStage === 'callRejected' ? funnel?.callRejected?.reasons : drillStage === 'saleLost' ? funnel?.saleLost?.reasons : null}
-                      onRevert={handleRevertMovement} revertingId={revertingId}
-                      onDelete={handleDeleteMovement} deletingId={deletingId}
+                      onVraag={setBevestig} revertingId={revertingId} deletingId={deletingId}
+                      statLabel={countItems.find(it => it.stage === drillStage)?.label || ''}
                     />
                   )}
 
@@ -1282,8 +1286,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                         key={c.id}
                         campaign={c}
                         isMobile={isMobile}
-                        onRevert={handleRevertMovement} revertingId={revertingId}
-                        onDelete={handleDeleteMovement} deletingId={deletingId}
+                        onVraag={setBevestig} revertingId={revertingId} deletingId={deletingId}
                       />
                     ))}
                   </div>
@@ -1715,6 +1718,74 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           </div>
         </div>
       )}
+      {/* Bevestiging met de gevolgen erbij: welke stat verdwijnt en waar de
+          lead naartoe gaat. Anders druk je op 'Ongedaan' zonder te weten wat
+          er op het bord gebeurt. */}
+      {bevestig && (
+        <Venster isMobile={isMobile} onClose={() => setBevestig(null)} maxWidth={440} zIndex={2147483560}>
+          <VensterKop
+            isMobile={isMobile}
+            titel="Wat wil je doen?"
+            sub={bevestig.item?.name}
+            onClose={() => setBevestig(null)}
+          />
+
+          <div style={{ padding: isMobile ? '1rem' : '1.15rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button
+              onClick={async () => {
+                const id = bevestig.item.id
+                setBevestig(null)
+                await handleRevertMovement(id)
+              }}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
+                padding: '0.75rem 0.85rem', borderRadius: 12,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <RotateCcw size={16} color="#fff" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 2 }} />
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>Terugdraaien</span>
+                <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45, marginTop: 3 }}>
+                  {bevestig.statLabel
+                    ? `${bevestig.item?.name} verdwijnt uit "${bevestig.statLabel}"`
+                    : `${bevestig.item?.name} verdwijnt uit deze stat`}
+                  {bevestig.item?.from ? ` en gaat terug naar "${bevestig.item.from}".` : '.'}
+                  {' '}De rij blijft bewaard, dus je kunt 'm later terugzien.
+                </span>
+              </span>
+            </button>
+
+            <button
+              onClick={async () => {
+                const id = bevestig.item.id
+                setBevestig(null)
+                await handleDeleteMovement(id)
+              }}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
+                padding: '0.75rem 0.85rem', borderRadius: 12,
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <Trash2 size={16} color="#fca5a5" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 2 }} />
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 900, color: '#fca5a5' }}>Definitief verwijderen</span>
+                <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45, marginTop: 3 }}>
+                  De rij gaat uit de database. {bevestig.statLabel ? `"${bevestig.statLabel}" telt ${bevestig.item?.name} niet meer mee` : 'De stat telt niet meer mee'}, en de lead blijft staan waar hij nu staat. Dit kun je niet ongedaan maken.
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <VensterVoet isMobile={isMobile}>
+            <Knop soort="stil" flex={1} onClick={() => setBevestig(null)}>Annuleer</Knop>
+          </VensterVoet>
+        </Venster>
+      )}
+
       {showCallProposals && (
         <CallProposalsModal
           leadService={leadService}
@@ -2065,7 +2136,7 @@ function GenderRing({ gender }) {
 // Per-campagne stat-kaart: naam + total, met daaronder de Aantallen- en
 // Percentages-rijen in exact dezelfde StatFlow-stijl als bovenin de modal.
 // Alle cijfers zijn "ná campagne-bericht" (uit getCampaignBreakdown).
-function CampaignStatCard({ campaign: c, isMobile, onRevert, revertingId, onDelete, deletingId }) {
+function CampaignStatCard({ campaign: c, isMobile, onVraag, revertingId, deletingId }) {
   const [showMsg, setShowMsg] = useState(false)
   // Welke stap er per campagne is opengeklapt om de namen te zien.
   const [stap, setStap] = useState(null)
@@ -2087,6 +2158,7 @@ function CampaignStatCard({ campaign: c, isMobile, onRevert, revertingId, onDele
     { label: 'Opvolg',      value: c.followupCount,  Icon: Send,          color: '#f59e0b' },
   ]
   const STAP_KLEUR = { getagd: '#a855f7', replied: '#10b981', callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#FFD700' }
+  const STAP_LABEL = { getagd: 'Getagd', replied: 'Reacties', callProposed: 'Voorgesteld', callScheduled: 'Ingepland', sale: 'Sale' }
   const pctItems = [
     { label: 'Reactie',       value: p(s.replied, c.total),          Icon: MessageCircle, color: '#10b981', sub: frac(s.replied, c.total) },
     { label: 'Voorstel',      value: p(s.callProposed, c.total),     Icon: PhoneCall,     color: '#a855f7', sub: frac(s.callProposed, c.total) },
@@ -2111,8 +2183,8 @@ function CampaignStatCard({ campaign: c, isMobile, onRevert, revertingId, onDele
         <DrillPanel
           leads={namen[stap]}
           accent={STAP_KLEUR[stap] || '#a855f7'}
-          onRevert={onRevert} revertingId={revertingId}
-          onDelete={onDelete} deletingId={deletingId}
+          onVraag={onVraag} revertingId={revertingId} deletingId={deletingId}
+          statLabel={STAP_LABEL[stap] || ''}
         />
       )}
       <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '2px 0' }}>Percentages</div>
@@ -2330,8 +2402,7 @@ function StatTabel({ rijen, kolommen, bezig, nuKop }) {
   )
 }
 
-function DrillPanel({ leads, accent = '#FFD700', reasons = null, onRevert, revertingId, onDelete, deletingId }) {
-  const [confirmId, setConfirmId] = useState(null)
+function DrillPanel({ leads, accent = '#FFD700', reasons = null, onVraag = null, revertingId, deletingId, statLabel = '' }) {
   const items = Array.isArray(leads) ? leads : []
   const reasonEntries = reasons ? Object.entries(reasons).sort((a, b) => b[1] - a[1]) : []
   if (!items.length) {
@@ -2349,11 +2420,8 @@ function DrillPanel({ leads, accent = '#FFD700', reasons = null, onRevert, rever
         </div>
       )}
       {items.map((d, i) => {
-        const busyRevert = revertingId && revertingId === d.id
-        const busyDelete = deletingId && deletingId === d.id
-        const busy = busyRevert || busyDelete
-        const confirming = confirmId === d.id
-        const canAct = (onRevert || onDelete) && d.id
+        const busy = (revertingId && revertingId === d.id) || (deletingId && deletingId === d.id)
+        const canAct = !!onVraag && !!d.id
         return (
           <div key={d.id || i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingBottom: 5, borderBottom: i < items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -2371,15 +2439,16 @@ function DrillPanel({ leads, accent = '#FFD700', reasons = null, onRevert, rever
                 </div>
               )}
             </div>
-            {canAct && (confirming ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
-                {onRevert && <button onClick={() => { setConfirmId(null); onRevert(d.id) }} disabled={busy} title="Verplaatsing ongedaan maken (rij blijft bewaard)" style={{ fontSize: '0.55rem', fontWeight: 800, color: '#fff', background: 'rgba(212,175,55,0.7)', border: 'none', borderRadius: 5, padding: '3px 7px', cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}><RotateCcw size={8} />{busyRevert ? '...' : 'Ongedaan'}</button>}
-                {onDelete && <button onClick={() => { setConfirmId(null); onDelete(d.id) }} disabled={busy} title="Stat permanent verwijderen" style={{ fontSize: '0.55rem', fontWeight: 800, color: '#fff', background: 'rgba(239,68,68,0.75)', border: 'none', borderRadius: 5, padding: '3px 7px', cursor: busy ? 'wait' : 'pointer' }}>{busyDelete ? '...' : 'Verwijder'}</button>}
-                <button onClick={() => setConfirmId(null)} style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 5, padding: '3px 7px', cursor: 'pointer' }}>Nee</button>
-              </div>
-            ) : (
-              <button onClick={() => setConfirmId(d.id)} title="Bewerken — ongedaan maken of verwijderen" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 5, padding: '3px 7px', cursor: 'pointer' }}><RotateCcw size={10} /> Aanpassen</button>
-            ))}
+            {canAct && (
+              <button
+                onClick={() => onVraag({ item: d, statLabel })}
+                disabled={busy}
+                title="Terugdraaien of verwijderen"
+                style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 5, padding: '3px 7px', cursor: busy ? 'wait' : 'pointer' }}
+              >
+                <RotateCcw size={10} /> {busy ? '…' : 'Aanpassen'}
+              </button>
+            )}
           </div>
         )
       })}

@@ -2317,7 +2317,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         if (startDate && endDate) {
           const { data: heldRows } = await this.db.supabase
             .from('lead_movements')
-            .select('lead_id, lead_name, call_date')
+            .select('id, lead_id, lead_name, call_date, from_section_title, to_section_title')
             .eq('call_happened', true)
             .is('reverted_at', null)
             .gte('call_date', startDate).lte('call_date', endDate)
@@ -2326,7 +2326,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             if (r.lead_id && !heldSeen.has(r.lead_id)) {
               heldSeen.add(r.lead_id)
               funnel.callHeld.count++
-              funnel.callHeld.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date })
+              funnel.callHeld.leads.push({ id: r.id, leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date, from: r.from_section_title || null, to: r.to_section_title || null })
             }
           })
         }
@@ -2349,7 +2349,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           for (let from = 0; ; from += 1000) {
             const { data, error } = await this.db.supabase
               .from('lead_movements')
-              .select('lead_id, lead_name, call_date, call_happened, moved_at, outcome_type')
+              .select('id, lead_id, lead_name, call_date, call_happened, moved_at, outcome_type, from_section_title, to_section_title')
               .not('call_date', 'is', null)
               .is('reverted_at', null)
               .order('call_date', { ascending: false })
@@ -2379,7 +2379,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             if (bookedSeen.has(key)) return
             bookedSeen.add(key)
             funnel.callBooked.count++
-            funnel.callBooked.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date })
+            funnel.callBooked.leads.push({ id: r.id, leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date, from: r.from_section_title || null, to: r.to_section_title || null })
           })
 
           const latestByLead = new Map()
