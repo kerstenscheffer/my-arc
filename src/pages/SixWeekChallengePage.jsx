@@ -200,36 +200,41 @@ function MethodeSlider({ isMobile, onClose }) {
         padding: isMobile ? '0 1.25rem 1.25rem' : '0 2rem 2rem',
       }}>
         <div style={{ maxWidth: 760, margin: '0 auto', marginTop: p.beeldVult ? (isMobile ? 10 : 16) : (isMobile ? -18 : -28), position: 'relative' }}>
+          {/* Het label 'PIJLER x VAN 3' blijft weg als het beeld al tekst
+              draagt; de titel staat er altijd, zodat elke slide op de pagina
+              zelf zijn kop heeft. */}
           {!p.beeldVult && (
-            <>
-              <div style={{
-                fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
-                letterSpacing: '0.16em', color: GOLD, marginBottom: isMobile ? 8 : 12,
-              }}>
-                PIJLER {i + 1} VAN {PIJLERS.length}
-              </div>
-              <div style={{
-                fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
-                letterSpacing: '-0.03em', lineHeight: 1.08,
-                textShadow: '0 2px 14px rgba(0,0,0,0.85)',
-              }}>
-                <span style={{ color: GOLD }}>{i + 1}. </span>
-                {p.kop}
-              </div>
-              <p style={{
-                margin: `${isMobile ? 10 : 14}px 0 ${isMobile ? '1.4rem' : '2rem'}`,
-                fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 600,
-                color: 'rgba(255,255,255,0.65)', lineHeight: 1.45,
-              }}>
-                {p.zin}
-              </p>
-            </>
+            <div style={{
+              fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
+              letterSpacing: '0.16em', color: GOLD, marginBottom: isMobile ? 8 : 12,
+            }}>
+              PIJLER {i + 1} VAN {PIJLERS.length}
+            </div>
+          )}
+          <div style={{
+            fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
+            letterSpacing: '-0.03em', lineHeight: 1.08,
+            textShadow: '0 2px 14px rgba(0,0,0,0.85)',
+          }}>
+            <span style={{ color: GOLD }}>{i + 1}. </span>
+            {p.kop}
+          </div>
+          {!p.beeldVult && (
+            <p style={{
+              margin: `${isMobile ? 10 : 14}px 0 ${isMobile ? '1.4rem' : '2rem'}`,
+              fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 600,
+              color: 'rgba(255,255,255,0.65)', lineHeight: 1.45,
+            }}>
+              {p.zin}
+            </p>
           )}
 
           <div style={{
             fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
             letterSpacing: '0.16em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.35)', marginBottom: isMobile ? 6 : 10,
+            color: 'rgba(255,255,255,0.35)',
+            marginTop: p.beeldVult ? (isMobile ? '1.4rem' : '2rem') : 0,
+            marginBottom: isMobile ? 6 : 10,
           }}>
             Wat we doen
           </div>
