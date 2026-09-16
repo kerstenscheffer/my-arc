@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import {
+import { 
   CheckCircle2, Star, RefreshCw, Circle,
   Flame, Dumbbell, Zap, Droplets, Clock,
-  TrendingUp, ChevronRight, UtensilsCrossed
+  TrendingUp, ChevronRight
 } from 'lucide-react'
+import { foodImageFallback } from '../foodImageFallback'
 
 export default function MealListToday({ 
   meals, 
@@ -142,7 +143,7 @@ function CompactMealCard({
   const [isHovered, setIsHovered] = useState(false)
   const isMobile = window.innerWidth <= 768
   
-  const imageUrl = meal.image_url && meal.image_url.trim() !== '' ? meal.image_url : null
+  const getMealImage = (name) => foodImageFallback(name, null, 150)
   
   // Time status
   const getTimeStatus = () => {
@@ -205,22 +206,19 @@ function CompactMealCard({
             transition: 'all 0.3s ease'
           }}
         >
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={meal.name}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                filter: isChecked ? 'brightness(0.7)' : 'brightness(1)'
-              }}
-            />
-          ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}>
-              <UtensilsCrossed size={20} style={{ color: '#FFD700', opacity: 0.35 }} />
-            </div>
-          )}
+          <img
+            src={meal.image_url || getMealImage(meal.name)}
+            alt={meal.name}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: isChecked ? 'brightness(0.7)' : 'brightness(1)'
+            }}
+            onError={(e) => {
+              e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150&h=150&fit=crop'
+            }}
+          />
           
           {isChecked && (
             <div style={{

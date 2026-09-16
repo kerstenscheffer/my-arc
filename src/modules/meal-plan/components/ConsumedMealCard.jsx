@@ -2,6 +2,7 @@
 // 🎴 MEAL CARD v5.0 - Ultra Compact Premium Design
 import React from 'react'
 import { Clock, Trash2, Flame, Target, Zap, Droplets } from 'lucide-react'
+import { foodImageFallback } from '../foodImageFallback'
 
 const truncateMealName = (name, maxLength) => {
   if (!name) return ''
@@ -15,7 +16,11 @@ const formatTime = (timestamp) => {
   return date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 }
 
-const getMealImage = (meal) => meal?.image_url || null
+const getMealImage = (meal) => {
+  if (meal?.image_url) return meal.image_url
+  // Titel-gebaseerde fallback (kwark -> zuivel, kip -> kip, enz.).
+  return foodImageFallback(meal?.name || meal?.title || meal?.product_name, meal?.meal_type, 100)
+}
 
 const getMealTypeLabel = (type) => {
   const labels = {
@@ -65,7 +70,7 @@ export default function ConsumedMealCard({ meal, onDelete, isMobile }) {
           width: isMobile ? '44px' : '52px',
           height: isMobile ? '44px' : '52px',
           borderRadius: '8px',
-          background: getMealImage(meal) ? `url(${getMealImage(meal)}) center/cover` : '#111',
+          background: `url(${getMealImage(meal)}) center/cover`,
           border: '2px solid rgba(245, 158, 11, 0.3)',
           flexShrink: 0,
           boxShadow: '0 2px 8px rgba(245, 158, 11, 0.15)'

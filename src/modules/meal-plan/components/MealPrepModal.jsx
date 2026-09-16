@@ -14,6 +14,7 @@
 import React, { useState } from 'react'
 import { X, ChefHat, Check, Loader, Package, Snowflake, Lightbulb } from 'lucide-react'
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
+import { foodImageFallback } from '../foodImageFallback'
 
 const GROEN = '#10b981'
 const GOUD = '#FFD700'
@@ -162,7 +163,7 @@ export default function MealPrepModal({ meal, ingredients = [], client, db, onCl
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0', borderBottom: i < ingredients.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
                       <div style={{ width: 38, height: 38, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {ing.image_url && <img src={ing.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />}
+                        <img src={ing.image_url || foodImageFallback(ing.name, null, 120)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ing.name}</div>

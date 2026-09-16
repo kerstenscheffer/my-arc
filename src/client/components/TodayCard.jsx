@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react'
 import { Dumbbell, Play, Phone, Moon, ChevronRight } from 'lucide-react'
 import MacroBoxes from './MacroBoxes'
 import AIMealPlanService from '../../modules/meal-plan/AIMealPlanService'
+import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
 
 const GOLD = '#FFD700'
 const todayYMD = () => new Date().toISOString().split('T')[0]
@@ -131,7 +132,7 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
     kcal: Math.round(nextMeal.calories || 0),
     slot: nextMeal.timeSlot || '',
     time: (() => { const h = Math.floor(nextMeal.plannedTime || 0); const m = Math.round(((nextMeal.plannedTime || 0) - h) * 60); return `${h}:${String(m).padStart(2, '0')}` })(),
-    img: nextMeal.image_url && nextMeal.image_url.trim() !== '' ? nextMeal.image_url : null,
+    img: resolveFoodImage(nextMeal, { size: 160 }),
   } : null
 
   return (
@@ -187,7 +188,7 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
             onClick={() => setCurrentView && setCurrentView('meal')}
             style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '0.6rem 0.7rem', display: 'flex', alignItems: 'center', gap: '0.7rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           >
-            <div style={{ width: 52, height: 52, borderRadius: 10, flexShrink: 0, backgroundImage: meal.img ? `url(${meal.img})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', background: meal.img ? undefined : '#111', border: '1px solid rgba(255,255,255,0.08)' }} />
+            <div style={{ width: 52, height: 52, borderRadius: 10, flexShrink: 0, backgroundImage: `url(${meal.img})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.08)' }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,215,0,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
                 Volgende{meal.slot ? ` · ${meal.slot}` : ''}

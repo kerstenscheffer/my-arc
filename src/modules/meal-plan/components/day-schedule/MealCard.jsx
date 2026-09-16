@@ -6,10 +6,17 @@
 // de foto en niet meer over de hele breedte eronder.
 
 import React from 'react'
-import { Check, Info, RefreshCw, UtensilsCrossed } from 'lucide-react'
-import { getMealImageUrl, MealImagePlaceholder } from '../../utils/mealImage'
+import { Check, Info, RefreshCw } from 'lucide-react'
+import { foodImageFallback } from '../../foodImageFallback'
 
 const DIVIDER = 'rgba(255,255,255,0.06)'
+
+// Foto: eigen image_url indien aanwezig, anders een titel-gebaseerde fallback
+// (kwark -> zuivel, kip -> kip, enz.) zodat er altijd een passende foto is.
+const getMealImage = (meal) => {
+  if (meal?.image_url) return meal.image_url
+  return foodImageFallback(meal?.name || meal?.title, meal?.slot, 200)
+}
 
 const SLOT_LABELS = {
   breakfast: 'Ontbijt',
@@ -52,7 +59,6 @@ export default function MealCard({
   rechts = null,
 }) {
   const photoSize = isMobile ? 78 : 90
-  const imageUrl = getMealImageUrl(meal)
   // Een lege string betekent bewust geen label op de foto (ingrediënten).
   const moment = momentLabel === '' ? '' : (momentLabel || getMealTypeLabel(meal))
   const tijd = tijdLabel || (typeof meal.timing === 'string' && /^\d{1,2}:\d{2}/.test(meal.timing) ? meal.timing : null)
@@ -79,51 +85,44 @@ export default function MealCard({
           style={{
             width: photoSize, alignSelf: 'stretch',
             flexShrink: 0,
-            background: imageUrl ? `url(${imageUrl}) center/cover` : '#0a0a0a',
-            border: imageUrl ? 'none' : '1px solid rgba(255,255,255,0.06)',
+            background: `url(${getMealImage(meal)}) center/cover`,
             position: 'relative', overflow: 'hidden',
             cursor: 'pointer',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          {!imageUrl && (
-            <UtensilsCrossed size={20} style={{ color: '#FFD700', opacity: 0.35 }} />
-          )}
           {/* Donkerder, zodat het moment en de tijd erop leesbaar zijn zonder
               dat je van elke foto de belichting hoeft te vertrouwen. */}
-          {imageUrl && <div style={{
+          <div style={{
             position: 'absolute', inset: 0, pointerEvents: 'none',
             background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.8) 100%)',
-          }} />}
-          {imageUrl && (
-            <div style={{
-              position: 'absolute', left: 0, right: 0, bottom: 0,
-              padding: isMobile ? '0 5px 5px' : '0 6px 6px',
-              pointerEvents: 'none',
+          }} />
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            padding: isMobile ? '0 5px 5px' : '0 6px 6px',
+            pointerEvents: 'none',
+          }}>
+            {moment && <div style={{
+              fontSize: isMobile ? '0.6rem' : '0.66rem',
+              fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.01em', lineHeight: 1.1,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              textShadow: '0 1px 6px rgba(0,0,0,0.9)',
             }}>
-              {moment && <div style={{
-                fontSize: isMobile ? '0.6rem' : '0.66rem',
-                fontWeight: 900, color: '#fff',
-                letterSpacing: '-0.01em', lineHeight: 1.1,
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              {moment}
+            </div>}
+            {tijd && (
+              <div style={{
+                fontSize: isMobile ? '0.55rem' : '0.6rem',
+                fontWeight: 800, color: 'rgba(255,255,255,0.75)',
+                lineHeight: 1.2, marginTop: 1,
                 textShadow: '0 1px 6px rgba(0,0,0,0.9)',
               }}>
-                {moment}
-              </div>}
-              {tijd && (
-                <div style={{
-                  fontSize: isMobile ? '0.55rem' : '0.6rem',
-                  fontWeight: 800, color: 'rgba(255,255,255,0.75)',
-                  lineHeight: 1.2, marginTop: 1,
-                  textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-                }}>
-                  {tijd}
-                </div>
-              )}
-            </div>
-          )}
+                {tijd}
+              </div>
+            )}
+          </div>
           {isChecked && (
             <div style={{
               position: 'absolute', inset: 0,
