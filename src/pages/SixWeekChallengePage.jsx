@@ -219,7 +219,7 @@ function MethodeSlider({ isMobile, onClose }) {
               borderTop: r === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}>
-              <regel.Icon size={isMobile ? 18 : 24} strokeWidth={2.4} style={{ flexShrink: 0, color: GOLD }} />
+              <regel.Icon size={isMobile ? 18 : 24} strokeWidth={2.8} style={{ flexShrink: 0, color: '#fff' }} />
               <span style={{
                 fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
                 color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
