@@ -87,6 +87,89 @@ export const allesGehaald = (stand) => {
   return EISEN.every(e => w[e.key] >= e.nodig)
 }
 
+// ---------------------------------------------------------------------------
+// De weekkant
+//
+// De zes eisen hierboven gaan over de hele looptijd, en dat is precies wat je
+// er niet naar laat handelen: "14 van de 18" zegt niets over wat je vandaag
+// moet doen. Daarom dezelfde regels nog een keer, maar dan per week.
+//
+// De aantallen zijn de weekversie van EISEN: 18 workouts en 24 weegmomenten in
+// zes weken is 3 en 4 per week, een geldige voedingsweek is 5 goede dagen, en
+// de check-in is er sowieso één per week. Foto's en calls hebben geen
+// weekritme — die staan apart onder WEEK_LOOPT_DOOR.
+export const WEEK_EISEN = [
+  {
+    key: 'workouts', label: 'Workouts', nodig: 3,
+    info: 'Drie workouts per week uit je schema. Een workout telt zodra 70% van de sets is afgevinkt.',
+  },
+  {
+    key: 'wegingen', label: 'Wegingen', nodig: 4,
+    info: 'Vier keer je gewicht invullen deze week. Twee keer op dezelfde dag telt één keer.',
+  },
+  {
+    key: 'voeding', label: 'Voedingsdagen', nodig: 5,
+    info: 'Vijf dagen deze week waarop je 70% van je maaltijden hebt afgevinkt. Dat maakt de week geldig.',
+  },
+  {
+    key: 'checkins', label: 'Check-in', nodig: 1,
+    info: 'De wekelijkse check-in in de app. Eén per week, deze mag je niet missen.',
+  },
+]
+
+// Eisen die niet per week lopen, maar wel zichtbaar moeten blijven.
+export const WEEK_LOOPT_DOOR = ['fotos', 'calls']
+
+const isoDag = (v) => String(v ?? '').slice(0, 10)
+
+// Een Date terug naar YYYY-MM-DD in de lokale tijdzone. Niet toISOString():
+// die rekent naar UTC om en schuift in de zomertijd een dag terug, waardoor de
+// week een dag te vroeg begon.
+const alsDatum = (d) => {
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+// De challenge-week waar `nu` in valt: blokken van zeven dagen vanaf de
+// startdatum. Bewust niet de ISO-week (maandag t/m zondag): begint de
+// challenge op een donderdag, dan zou week 1 vier dagen duren en niemand die
+// eisen halen.
+export function challengeWeek(deelname, nu = new Date()) {
+  if (!deelname) return null
+  const dag0 = new Date(`${deelname.start_date}T00:00:00`)
+  const eind = new Date(`${deelname.end_date}T00:00:00`)
+  const vandaag = new Date(nu); vandaag.setHours(0, 0, 0, 0)
+  const dagen = (a, b) => Math.round((a - b) / 86400000)
+  const totaal = Math.max(1, Math.ceil((dagen(eind, dag0) + 1) / 7))
+  // Vóór de start staat week 1 klaar, na afloop blijft de laatste week staan.
+  const nummer = Math.min(totaal, Math.max(1, Math.floor(dagen(vandaag, dag0) / 7) + 1))
+  const start = new Date(dag0); start.setDate(start.getDate() + (nummer - 1) * 7)
+  const laatste = new Date(start); laatste.setDate(laatste.getDate() + 6)
+  const weekEind = laatste > eind ? eind : laatste
+  return {
+    nummer, totaal,
+    start: alsDatum(start),
+    eind: alsDatum(weekEind),
+    resterend: Math.max(0, dagen(weekEind, vandaag)),
+  }
+}
+
+// Wat er deze week binnen is, in dezelfde sleutels als WEEK_EISEN. Telt niet
+// opnieuw wat meetelt: het leest de `telt`-vlaggen en de datums die de RPC al
+// heeft bepaald, zodat klant en coach dezelfde grens hanteren.
+export function weekWaardenUit(stand, venster) {
+  if (!stand || !venster) return { workouts: 0, wegingen: 0, voeding: 0, checkins: 0 }
+  const erin = (v) => { const d = isoDag(v); return d >= venster.start && d <= venster.eind }
+  const tel = (lijst, datumveld) =>
+    (lijst || []).filter(r => (datumveld ? r.telt && erin(r[datumveld]) : erin(r))).length
+  return {
+    workouts: tel(stand.workouts?.dagen, 'datum'),
+    voeding: tel(stand.voeding?.dagen, 'dag'),
+    wegingen: tel(stand.weeg_dagen),
+    checkins: tel(stand.checkin_dagen),
+  }
+}
+
 // De grensdatum voor "hoort nog in het overzicht", als YYYY-MM-DD.
 export const naloopGrens = () => {
   const d = new Date()

@@ -25,6 +25,12 @@
 -- sessies, 31 wegingen, 13 geldige voedingsdagen, 4 check-ins. De losse
 -- workout-percentages liepen van 8% tot 113%, dus de 70%-grens onderscheidt.
 
+--
+-- Sinds migratie `challenge_stand_dagen_per_eis` (16 sep 2026) komen naast de
+-- tellers ook de losse datums mee: weeg_dagen, checkin_dagen, foto_dagen en
+-- call_dagen. Daarmee kan een scherm "deze week" laten zien zonder zelf
+-- opnieuw te bepalen wat meetelt.
+
 create or replace function public.get_challenge_stand(
   p_client_id uuid,
   p_start date,
@@ -118,6 +124,25 @@ v_weken as (
   select date_trunc('week', dag)::date as week_start,
          count(*) filter (where telt) as geldige_dagen
   from v_geldig group by 1
+),
+-- De losse datums per eis. De tellers hierboven blijven leidend; dit is er
+-- zodat een scherm "deze week" kan laten zien zonder zelf te tellen wat telt.
+weeg_d as (
+  select distinct date as dag from weight_challenge_logs
+   where client_id = p_client_id and date between p_start and p_eind
+),
+checkin_d as (
+  select checkin_date as dag from client_checkins
+   where client_id = p_client_id and checkin_date between p_start and p_eind
+),
+foto_d as (
+  select coalesce(date, created_at::date) as dag from progress_photos
+   where client_id = p_client_id and coalesce(date, created_at::date) between p_start and p_eind
+),
+call_d as (
+  select completed_date::date as dag from client_calls
+   where client_id = p_client_id and status = 'completed'
+     and completed_date::date between p_start and p_eind
 )
 select jsonb_build_object(
   'periode', jsonb_build_object('start', p_start, 'eind', p_eind),
@@ -131,8 +156,8 @@ select jsonb_build_object(
                     'gedaan', d.done_sets,
                     'telt', d.telt) order by d.workout_date), '[]'::jsonb)
                   from w_detail d)),
-  'wegingen', (select count(distinct date) from weight_challenge_logs
-                where client_id = p_client_id and date between p_start and p_eind),
+  'wegingen', (select count(*) from weeg_d),
+  'weeg_dagen', (select coalesce(jsonb_agg(dag order by dag), '[]'::jsonb) from weeg_d),
   'voeding', jsonb_build_object(
       'geldige_dagen', (select count(*) from v_geldig where telt),
       'dagen', (select coalesce(jsonb_agg(jsonb_build_object(
@@ -143,13 +168,12 @@ select jsonb_build_object(
                  left join v_gelogd vg on vg.dag = vd.dag),
       'geldige_weken', (select count(*) from v_weken where geldige_dagen >= p_dagen_per_week),
       'weken', (select coalesce(jsonb_agg(jsonb_build_object('week', week_start, 'dagen', geldige_dagen) order by week_start), '[]'::jsonb) from v_weken)),
-  'checkins', (select count(*) from client_checkins
-                where client_id = p_client_id and checkin_date between p_start and p_eind),
-  'fotos', (select count(*) from progress_photos
-             where client_id = p_client_id and coalesce(date, created_at::date) between p_start and p_eind),
-  'calls', (select count(*) from client_calls
-             where client_id = p_client_id and status = 'completed'
-               and completed_date::date between p_start and p_eind)
+  'checkins', (select count(*) from checkin_d),
+  'checkin_dagen', (select coalesce(jsonb_agg(dag order by dag), '[]'::jsonb) from checkin_d),
+  'fotos', (select count(*) from foto_d),
+  'foto_dagen', (select coalesce(jsonb_agg(dag order by dag), '[]'::jsonb) from foto_d),
+  'calls', (select count(*) from call_d),
+  'call_dagen', (select coalesce(jsonb_agg(dag order by dag), '[]'::jsonb) from call_d)
 );
 $$;
 
