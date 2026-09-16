@@ -9,7 +9,7 @@
 // stukgaan, en de twee pagina's zullen uit elkaar lopen zodra de copy per
 // pagina verandert.
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { Star, ChevronDown, X, Compass, ListChecks, Target, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, ClipboardCheck, LineChart, SlidersHorizontal, Video } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
@@ -51,9 +51,9 @@ const SLIDES = REVIEWS.flatMap((review, i) => {
 // De 3 pijlers — copy gelijk aan /16week (OfferPilarenSection).
 // ── De voorwaarden: schermvullend, zelfde opzet als de methode-slides ──────
 const GARANTIE_KAARTEN = [
-  { Icon: Target,    kop: 'Het plan volgt',    tekst: 'Plan gevolgd? €300 terug, cash of doorrollen.' },
-  { Icon: Clock,     kop: 'Merkt dat het niet past', tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
-  { Icon: BadgeEuro, kop: '6-weken service',   tekst: 'Aan het eind niet het geld waard? Geld terug.' },
+  { Icon: Target,    kop: 'Het plan volgt of resultaat haalt' },
+  { Icon: Clock,     kop: 'Merkt dat het niet past' },
+  { Icon: BadgeEuro, kop: '6 weken service' },
 ]
 
 function VoorwaardenVenster({ isMobile, onClose }) {
@@ -119,60 +119,52 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             letterSpacing: '-0.03em', lineHeight: 1.15, textAlign: 'center',
             maxWidth: 820, margin: '0 auto',
           }}>
-            €300 inleg, die je terug krijgt
-            <br />
-            door het plan te volgen.
+            €300 inleg, die je terug krijgt.
           </div>
 
-          {/* Links de zin, rechts de drie voorwaarden genummerd. Op telefoon
-              onder elkaar. */}
+          {/* Eén regel: de drie manieren om je inleg terug te krijgen, met
+              'of' ertussen. Zelfde vorm als de knoppen op het eerste scherm:
+              icoon boven een bold wit woord. */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'minmax(220px, 0.8fr) 1.2fr',
-            gap: isMobile ? '1.25rem' : '3rem',
-            alignItems: 'center',
             marginTop: isMobile ? '2rem' : '3rem',
-            textAlign: 'left',
+            fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 900,
+            color: '#fff', letterSpacing: '-0.02em', textAlign: 'center',
           }}>
-            <div style={{
-              fontSize: isMobile ? '1.15rem' : '1.6rem', fontWeight: 900,
-              color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.15,
-            }}>
-              Het is gratis als je
-            </div>
+            Inleg terug als je:
+          </div>
 
-            <div>
-              {GARANTIE_KAARTEN.map((g, n) => (
-                <div key={g.kop} style={{
-                  display: 'flex', alignItems: 'baseline', gap: isMobile ? 10 : 14,
-                  padding: isMobile ? '0.7rem 0' : '0.9rem 0',
-                  borderTop: n === 0 ? '1px solid rgba(255,255,255,0.1)' : 'none',
-                  borderBottom: '1px solid rgba(255,255,255,0.1)',
-                }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: 'center', justifyContent: 'center',
+            gap: isMobile ? '0.9rem' : '2.5rem',
+            marginTop: isMobile ? '1.25rem' : '2rem',
+          }}>
+            {GARANTIE_KAARTEN.map((g, n) => (
+              <Fragment key={g.kop}>
+                {n > 0 && (
                   <span style={{
-                    flexShrink: 0, fontSize: isMobile ? '0.95rem' : '1.15rem',
-                    fontWeight: 900, color: GOLD,
+                    fontSize: isMobile ? '0.78rem' : '0.95rem', fontWeight: 800,
+                    color: 'rgba(255,255,255,0.35)',
                   }}>
-                    {n + 1}.
+                    of
                   </span>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{
-                      display: 'block', fontSize: isMobile ? '0.95rem' : '1.15rem',
-                      fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
-                    }}>
-                      {g.kop}
-                    </span>
-                    <span style={{
-                      display: 'block', marginTop: 3,
-                      fontSize: isMobile ? '0.8rem' : '0.95rem', fontWeight: 700,
-                      color: 'rgba(255,255,255,0.5)', lineHeight: 1.4,
-                    }}>
-                      {g.tekst}
-                    </span>
+                )}
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: isMobile ? 8 : 14, textAlign: 'center',
+                  maxWidth: isMobile ? '100%' : 260,
+                }}>
+                  <g.Icon size={isMobile ? 28 : 48} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                  <span style={{
+                    fontSize: isMobile ? '0.9rem' : '1.15rem', fontWeight: 900,
+                    color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
+                  }}>
+                    {g.kop}
                   </span>
                 </div>
-              ))}
-            </div>
+              </Fragment>
+            ))}
           </div>
 
           <p style={{
