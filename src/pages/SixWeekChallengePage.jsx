@@ -10,7 +10,7 @@
 // pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, ChevronDown, ChevronLeft, ChevronRight, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ShoppingCart, Utensils, Wine, Scale, CalendarDays, PlayCircle, TrendingUp, RefreshCw, Phone, ClipboardCheck, MessageCircle, Eye } from 'lucide-react'
+import { Star, ChevronDown, ChevronLeft, ChevronRight, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ShoppingCart, Utensils, Wine, CalendarDays, PlayCircle, TrendingUp, Phone, ClipboardCheck, MessageCircle } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -71,7 +71,6 @@ const PIJLERS = [
       { Icon: ShoppingCart, tekst: 'Je plan staat klaar op jouw dag, met boodschappenlijst' },
       { Icon: Utensils,     tekst: 'Eten loggen in een paar tikken, geen calorieën uitrekenen' },
       { Icon: Wine,         tekst: 'Etentje of vakantie? Die bouwen we in, niet wegstrepen' },
-      { Icon: Scale,        tekst: 'Elke week bijsturen op wat de weegschaal laat zien' },
     ],
   },
   {
@@ -84,7 +83,6 @@ const PIJLERS = [
       { Icon: CalendarDays, tekst: 'Schema op jouw dagen, jouw gym en jouw niveau' },
       { Icon: PlayCircle,   tekst: 'Per oefening een video, zodat de uitvoering klopt' },
       { Icon: TrendingUp,   tekst: 'Gewicht en reps bijhouden, zodat je progressie ziet' },
-      { Icon: RefreshCw,    tekst: 'Kan een oefening niet? Dan wisselen we hem om' },
     ],
   },
   {
@@ -97,7 +95,6 @@ const PIJLERS = [
       { Icon: Phone,          tekst: 'Elke week een call over je cijfers en je week' },
       { Icon: ClipboardCheck, tekst: 'Check-in op vrijdag, daar stuur ik maandag op bij' },
       { Icon: MessageCircle,  tekst: 'Korte lijn in de app, geen dagen wachten' },
-      { Icon: Eye,            tekst: 'Ik zie je logs, dus je hoeft niets uit te leggen' },
     ],
   },
 ]
@@ -111,8 +108,15 @@ function MethodeSlider({ isMobile, onClose }) {
   useEffect(() => {
     const toets = (e) => {
       if (e.key === 'Escape') onClose()
-      if (e.key === 'ArrowRight') setI(v => Math.min(PIJLERS.length - 1, v + 1))
       if (e.key === 'ArrowLeft') setI(v => Math.max(0, v - 1))
+      // Pijl naar rechts en Enter doen hetzelfde: verder, en op de laatste
+      // slide sluiten.
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        setI(v => {
+          if (v >= PIJLERS.length - 1) { onClose(); return v }
+          return v + 1
+        })
+      }
     }
     window.addEventListener('keydown', toets)
     return () => window.removeEventListener('keydown', toets)
@@ -138,6 +142,13 @@ function MethodeSlider({ isMobile, onClose }) {
 
   return (
     <div
+      // Klikken in het venster gaat naar de volgende slide; knoppen en
+      // bolletjes vangen hun eigen klik af.
+      onClick={(e) => {
+        if (e.target.closest('button')) return
+        if (i >= PIJLERS.length - 1) onClose()
+        else naar(i + 1)
+      }}
       onTouchStart={(e) => { raakX.current = e.touches[0].clientX }}
       onTouchEnd={(e) => {
         if (raakX.current == null) return
@@ -237,15 +248,8 @@ function MethodeSlider({ isMobile, onClose }) {
             </p>
           )}
 
-          <div style={{
-            fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
-            letterSpacing: '0.16em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.35)',
-            marginTop: p.beeldVult ? (isMobile ? '1.4rem' : '2rem') : 0,
-            marginBottom: isMobile ? 6 : 10,
-          }}>
-            Wat we doen
-          </div>
+          {/* Geen kopje boven de punten: de regels spreken voor zich. */}
+          <div style={{ marginTop: p.beeldVult ? (isMobile ? '1.2rem' : '1.75rem') : 0 }} />
           {p.doen.map((regel, r) => (
             <div key={regel.tekst} style={{
               display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14,
@@ -289,22 +293,9 @@ function MethodeSlider({ isMobile, onClose }) {
             />
           ))}
         </div>
-        {i === PIJLERS.length - 1
-          ? (
-            <button
-              onClick={onClose}
-              style={{
-                minHeight: isMobile ? 40 : 52, padding: `0 ${isMobile ? '1.1rem' : '1.6rem'}`,
-                borderRadius: 999, border: 'none', background: '#fff', color: '#000',
-                fontSize: isMobile ? '0.8rem' : '0.95rem', fontWeight: 900,
-                cursor: 'pointer', fontFamily: 'inherit',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Klaar
-            </button>
-          )
-          : pijlKnop('rechts', false, () => naar(i + 1))}
+        {/* Op de laatste slide sluit de rechterpijl het venster, zodat je
+            met dezelfde knop doorklikt tot je klaar bent. */}
+        {pijlKnop('rechts', false, () => (i === PIJLERS.length - 1 ? onClose() : naar(i + 1)))}
       </div>
     </div>
   )
