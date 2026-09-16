@@ -142,10 +142,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
               <div key={g.kop} style={{
                 display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-start' : 'center',
                 gap: isMobile ? 6 : 10, textAlign: isMobile ? 'left' : 'center',
-                padding: isMobile ? '0.9rem 1rem' : '1.25rem 1rem',
-                borderRadius: 14,
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                padding: isMobile ? '0.9rem 0' : '1.25rem 0.5rem',
               }}>
                 <g.Icon size={isMobile ? 22 : 30} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
                 <span style={{
