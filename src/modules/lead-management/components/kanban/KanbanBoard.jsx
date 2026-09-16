@@ -16,6 +16,10 @@ import DueCallsModal from './DueCallsModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
 import SectionModal from './SectionModal'
 import PeriodStatsBar from '../PeriodStatsBar'
+
+// Korte namen voor de periode-dropdown in de werkbalk; gelijk aan die van de
+// stats-balk zelf.
+const PERIODE_KORT = { day: 'Vandaag', week: 'Week', month: 'Maand', lastMonth: 'Vorige maand', custom: 'Eigen datum' }
 import LeadMoreMenu from '../LeadMoreMenu'
 import WarmUpBoard from './WarmUpBoard'
 import { exportDailyReport } from '../../utils/exportDailyReport'
@@ -110,6 +114,11 @@ export default function KanbanBoard({
     setNamenVerborgen(nieuw)
     try { localStorage.setItem('leadsNamenVerborgen', String(nieuw)) } catch { /* private mode */ }
   }
+  // Periode en 'alle statistieken' staan in de werkbalk; de stats-balk toont
+  // alleen nog de cijfers en krijgt deze waarden als props.
+  const [statsPeriode, setStatsPeriode] = useState('day')
+  const [statsRange, setStatsRange] = useState({ start: '', end: '' })
+  const [statsVolledig, setStatsVolledig] = useState(false)
   const [dueCalls, setDueCalls] = useState([])
   const [showDueCalls, setShowDueCalls] = useState(false)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
@@ -1717,7 +1726,13 @@ export default function KanbanBoard({
         </>
       ) : (
         <div>
-          {!isMobile && showStats && <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />}
+          {!isMobile && showStats && <PeriodStatsBar
+                leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey}
+                verbergControls
+                period={statsPeriode} onPeriodChange={setStatsPeriode}
+                customRange={statsRange} onCustomRange={setStatsRange}
+                showWeek={statsVolledig} onShowWeek={setStatsVolledig}
+              />}
 
           {/* ═══ PIN-ON-SCROLL ACTIE-RIJ ═══
               barSlotRef = in-flow placeholder die de ruimte vasthoudt (zodat de
@@ -1749,7 +1764,13 @@ export default function KanbanBoard({
                 knoppen (order:0) en de zoekbalk (order:2) via order:1, volle breedte. */}
             {isMobile && showStats && (
               <div style={{ order: 1, flexBasis: '100%', width: '100%' }}>
-                <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
+                <PeriodStatsBar
+                leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey}
+                verbergControls
+                period={statsPeriode} onPeriodChange={setStatsPeriode}
+                customRange={statsRange} onCustomRange={setStatsRange}
+                showWeek={statsVolledig} onShowWeek={setStatsVolledig}
+              />
               </div>
             )}
             {/* Search — op mobiel op een eigen rij ONDER de knoppen (order:2 +
@@ -1776,9 +1797,17 @@ export default function KanbanBoard({
               )}
             </div>
 
-            {/* DM Copy Center — inline trigger naast de zoekbalk (verving de
-                zwevende FAB rechtsonder). */}
+            {/* Eén groep: gelijke vierkante knoppen tegen elkaar aan, met
+                één rand eromheen. Stonden eerder los met elk een eigen kleur
+                en rand; dat gaf zes losse blokjes op een rij. */}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 10, overflow: 'hidden',
+            }}>
             <DMBibleModal triggerVariant="inline" isMobile={isMobile} db={db} coachId={coachId} />
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
 
             {/* Openstaande calls — opent de afhandel-pop-up (2-staps). */}
             <button
@@ -1786,20 +1815,22 @@ export default function KanbanBoard({
               title="Openstaande calls afhandelen"
               style={{
                 position: 'relative',
-                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)',
-                borderRadius: 8, color: '#FFD700',
+                width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: 'none',
+                color: dueCalls.length > 0 ? '#FFD700' : 'rgba(255,255,255,0.65)',
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
               <Phone size={16} />
               {dueCalls.length > 0 && (
-                <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, background: '#ef4444', color: '#fff', borderRadius: 8, padding: '0 3px', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dueCalls.length}</span>
+                <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 14, height: 14, background: '#ef4444', color: '#fff', borderRadius: 7, padding: '0 3px', fontSize: '0.52rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dueCalls.length}</span>
               )}
             </button>
 
             {/* De prioriteit-knop (vlam) staat nu in het filtervenster, samen
                 met de andere filters. */}
+
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
 
             {/* Start campagne — kies een outreach-campagne; daarna krijgt elke
                 card een campagne-DM-knop. Paars = actief. */}
@@ -1807,10 +1838,10 @@ export default function KanbanBoard({
               onClick={() => runCampaign ? setRunCampaign(null) : setShowCampaignModal(true)}
               title={runCampaign ? `Campagne "${runCampaign.name}" stoppen` : 'Start een outreach-campagne'}
               style={{
-                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: runCampaign ? 'rgba(168,85,247,0.2)' : 'rgba(168,85,247,0.1)',
-                border: `1px solid ${runCampaign ? 'rgba(168,85,247,0.6)' : 'rgba(168,85,247,0.35)'}`,
-                borderRadius: 8, color: '#a855f7',
+                width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: runCampaign ? 'rgba(168,85,247,0.22)' : 'transparent',
+                border: 'none',
+                color: runCampaign ? '#a855f7' : 'rgba(255,255,255,0.65)',
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
@@ -1825,17 +1856,17 @@ export default function KanbanBoard({
               const filterCount = boardFilter.types.size + boardFilter.temps.size + boardFilter.followups.size + boardFilter.genders.size + (boardFilter.sort !== 'default' ? 1 : 0)
               const GOLD = '#FFD700'
               return (
-                <div style={{ position: 'relative', flexShrink: 0 }} ref={boardFilterRef}>
+                <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignSelf: 'stretch' }} ref={boardFilterRef}>
+                  <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
                   <button
                     onClick={() => setShowBoardFilter(v => !v)}
                     title="Filter & sorteer alle leads (hele bord)"
                     style={{
                       position: 'relative',
-                      width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: hasFilter ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${hasFilter ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                      borderRadius: 8,
-                      color: hasFilter ? GOLD : 'rgba(255,255,255,0.5)',
+                      width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: hasFilter ? 'rgba(255,215,0,0.18)' : 'transparent',
+                      border: 'none',
+                      color: hasFilter ? GOLD : 'rgba(255,255,255,0.65)',
                       cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
@@ -1960,19 +1991,50 @@ export default function KanbanBoard({
 
             {/* 'Mijn berichten' stond hier als los icoon; die knop is eruit. */}
 
-            {/* Stats in/uitklappen — houdt de pagina rustig, stats op aanvraag */}
-            <button onClick={() => setShowStats(v => !v)} title={showStats ? 'Statistieken verbergen' : 'Statistieken tonen'}
-              style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: showStats ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showStats ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: showStats ? '#FFD700' : 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            {/* Cijfers in- of uitklappen — laatste knop van de groep. */}
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
+            <button onClick={() => setShowStats(v => !v)} title={showStats ? 'Cijfers verbergen' : 'Cijfers tonen'}
+              style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: showStats ? 'rgba(255,255,255,0.12)' : 'transparent', border: 'none', color: showStats ? '#fff' : 'rgba(255,255,255,0.65)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <BarChart3 size={15} />
             </button>
+            </div>
 
             {/* De oog-knop (namen verbergen) is eruit. */}
 
             {/* De vrouwen-schakelaar staat nu in het filtervenster. */}
 
+            {/* Periode + alle statistieken — stonden op een eigen regel in de
+                stats-balk; nu in dezelfde rij als de rest. */}
+            <div style={{
+              position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+              minHeight: 34, padding: '0 0.7rem', borderRadius: 10,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+            }}>
+              <Clock size={13} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, marginRight: 6 }} />
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>
+                {PERIODE_KORT[statsPeriode] || 'Periode'}
+              </span>
+              <ChevronDown size={12} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0, marginLeft: 6 }} />
+              <select
+                value={statsPeriode}
+                onChange={(e) => setStatsPeriode(e.target.value)}
+                aria-label="Periode"
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', border: 'none', background: 'transparent', fontFamily: 'inherit' }}
+              >
+                {Object.entries(PERIODE_KORT).map(([id, label]) => (
+                  <option key={id} value={id}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <button onClick={() => setStatsVolledig(true)} title="Alle statistieken"
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', minHeight: 34, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <BarChart3 size={14} /> Stats
+            </button>
+
             {/* Sectie */}
             <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.45rem 0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', minHeight: 34, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <Plus size={14} /> Sectie
             </button>
             {/* De knop voor volledig scherm is eruit. */}
@@ -2174,6 +2236,10 @@ export default function KanbanBoard({
               onRemoved={handleRapidRemoved}
             />
           )}
+          {/* Alle statistieken — hoort bij de Stats-knop in de werkbalk, dus
+              hier en niet in de stats-balk (die is niet altijd zichtbaar). */}
+          <WeekStatsModal isOpen={statsVolledig} onClose={() => setStatsVolledig(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} />
+
           {showSectionModal && <SectionModal isMobile={isMobile} section={selectedSection} onClose={() => { setShowSectionModal(false); setSelectedSection(null) }} onSubmit={selectedSection ? (u) => handleUpdateSection(selectedSection.id, u) : handleCreateSection} onDelete={selectedSection ? () => handleDeleteSection(selectedSection.id) : null} />}
         </div>
       )}
@@ -2251,7 +2317,13 @@ export default function KanbanBoard({
               <WarmUpBoard leadService={leadService} coachId={coachId} isMobile={isMobile} sections={sections} />
             ) : (
               <>
-                <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
+                <PeriodStatsBar
+                leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey}
+                verbergControls
+                period={statsPeriode} onPeriodChange={setStatsPeriode}
+                customRange={statsRange} onCustomRange={setStatsRange}
+                showWeek={statsVolledig} onShowWeek={setStatsVolledig}
+              />
                 {/* Fullscreen toolbar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.5rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', minHeight: '28px' }}>

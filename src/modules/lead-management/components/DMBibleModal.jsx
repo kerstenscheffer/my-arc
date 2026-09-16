@@ -727,9 +727,11 @@ export default function DMBibleModal({
       onClick={() => setIsOpen(true)}
       title="DM Copy Center"
       style={{
-        width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(212,175,55,0.14)', border: '1px solid rgba(212,175,55,0.4)',
-        borderRadius: 8, color: GOLD.primary,
+        // Kaal: deze knop staat in de knoppengroep van het bord, die de rand
+        // en de achtergrond levert.
+        width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'transparent', border: 'none',
+        color: 'rgba(255,255,255,0.65)',
         cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >
