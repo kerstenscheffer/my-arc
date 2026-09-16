@@ -17,7 +17,9 @@ import { Star, ChevronDown, X, Compass, ListChecks, Target, CheckCircle2, HelpCi
 
 const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
-const BG = '#0a0a0a'
+// Puur zwart: de fades in de banners lopen naar #000, dus elke andere
+// donkergrijze tint geeft een zichtbare rand rond het beeld.
+const BG = '#000000'
 
 // Offer(0) + formulier(1). Het hero-scherm is weg: je komt hier met een
 // beslissing in je hoofd, dus je begint bij het aanbod. Trustpilot en de
@@ -176,7 +178,7 @@ function MethodeSlider({ isMobile, onClose }) {
           // lopen wel naar zwart, daar staat de kop overheen.
           background: p.beeldVult
             ? 'none'
-            : `linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.25) 30%, rgba(10,10,10,0.8) 72%, ${BG} 100%)`,
+            : `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 30%, rgba(0,0,0,0.8) 72%, ${BG} 100%)`,
         }} />
         <button
           onClick={onClose}
@@ -296,7 +298,7 @@ function Stroken({ items, isMobile, genummerd = false, hoog = false }) {
           }} />
           <div style={{
             position: 'absolute', inset: 0, pointerEvents: 'none',
-            background: 'linear-gradient(90deg, rgba(10,10,10,0.4) 0%, rgba(10,10,10,0.5) 10%, rgba(10,10,10,0.85) 21%, #0a0a0a 32%)',
+            background: 'linear-gradient(90deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.5) 10%, rgba(0,0,0,0.85) 21%, #000 32%)',
           }} />
           <div style={{
             position: 'relative', zIndex: 1,
@@ -939,7 +941,7 @@ export default function SixWeekChallengePage() {
           {/* Fade naar links, zodat de tekst over de foto heen kan lopen. */}
           <div style={{
             position: 'absolute', inset: 0, pointerEvents: 'none',
-            background: 'linear-gradient(270deg, rgba(10,10,10,0.15) 0%, rgba(10,10,10,0.45) 18%, rgba(10,10,10,0.88) 38%, #0a0a0a 54%)',
+            background: 'linear-gradient(270deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.45) 18%, rgba(0,0,0,0.88) 38%, #000 54%)',
           }} />
           <div style={{
             position: 'relative', zIndex: 1, width: '100%',
