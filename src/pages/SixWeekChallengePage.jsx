@@ -154,7 +154,7 @@ function MethodeSlider({ isMobile, onClose }) {
       <div style={{
         position: 'relative', width: '100%', flexShrink: 0,
         ...(p.beeldVult && !isMobile
-          ? { aspectRatio: '16 / 5', maxHeight: '60vh' }
+          ? { aspectRatio: '49 / 15', maxHeight: '60vh' }   // 1960x600
           : { height: isMobile ? '34vh' : 'min(46vh, 460px)' }),
       }}>
         <div key={p.foto} style={{
