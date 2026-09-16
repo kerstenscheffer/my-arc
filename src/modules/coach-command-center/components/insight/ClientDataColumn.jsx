@@ -777,8 +777,16 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
   const liveSurplus = surplusDraft != null
     ? (parseInt(surplusDraft) || 0)
     : savedSurplus
-  const tdeeForDoel = savedTdee ?? computedTdee
+  // Het doel rekent met het onderhoud dat hierboven op het scherm staat, niet
+  // met de waarde die ooit is opgeslagen. Die twee lopen uiteen zodra het
+  // gewicht verandert: de BMR rekent mee, clients.tdee blijft staan tot iemand
+  // een schuifje aanraakt. Dat gaf sommen als "2468 − 400 = 2594", waarin geen
+  // van de drie getallen bij elkaar hoorde. Alleen als er niets te berekenen
+  // valt (geen lengte, leeftijd of log) valt hij terug op de opgeslagen waarde.
+  const tdeeForDoel = computedTdee ?? savedTdee
   const targetCal = tdeeForDoel != null ? tdeeForDoel + liveSurplus : null
+  // Wijkt de opgeslagen waarde af, dan hoort de coach dat te kunnen zien.
+  const tdeeWijktAf = savedTdee != null && computedTdee != null && savedTdee !== computedTdee
 
   // ── Save handlers ─────────────────────────────────────────────────────
   const saveField = async (field, val) => {
@@ -835,7 +843,9 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
 
   const handleComputeMacros = () => {
     if (busy) return
-    const tdee = savedTdee ?? computedTdee
+    // Zelfde bron als de som op het scherm: anders bevestigt de coach macro's
+    // die niet horen bij het doel dat hij ziet staan.
+    const tdee = tdeeForDoel
     if (tdee == null) {
       alert('Kan macro\'s niet berekenen — geen TDEE bekend. Klik eerst "Bereken TDEE".')
       return
@@ -1372,7 +1382,11 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           Onderhoud
         </span>
         <span
-          title={tdeeOpslaan ? 'Opslaan…' : savedTdee != null ? `Opgeslagen: ${savedTdee} kcal` : 'Nog niet opgeslagen'}
+          title={tdeeOpslaan
+            ? 'Opslaan…'
+            : tdeeWijktAf
+              ? `Berekend uit de onderdelen hierboven. Opgeslagen staat nog ${savedTdee} kcal; die wordt bijgewerkt zodra je hierboven iets aanpast.`
+              : savedTdee != null ? `Opgeslagen: ${savedTdee} kcal` : 'Nog niet opgeslagen'}
           style={{
             fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em',
             color: computedTdee != null ? '#fff' : 'rgba(255,255,255,0.35)',
