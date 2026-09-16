@@ -157,22 +157,37 @@ const normalize = (s) => (s || '')
   .trim()
 
 // Bouwt de Engelse zoekterm. Geeft null terug als niets herkend wordt.
+// Langste term eerst, en een gevonden term wordt uit de naam geknipt, zodat
+// "zoete aardappel" niet óók nog als "aardappel" meetelt.
+const SORTED = [...DICT].sort((a, b) => b[0].length - a[0].length)
+
 function buildQuery(rawName) {
-  // accenten behouden voor 'açaí'/'huttenkäse' -> daarom losse lowercase-variant
   const name = (rawName || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim()
   const plain = normalize(rawName).replace(NOISE, ' ').replace(/\s+/g, ' ').trim()
-  const hay = ` ${name} `
-  const hayPlain = ` ${plain} `
+  let hay = ` ${name} `
+  let hayPlain = ` ${plain} `
 
   const hits = []
   const seen = new Set()
-  for (const [nl, en, weight] of DICT) {
-    if (seen.has(en)) continue
+  for (const [nl, en, weight] of SORTED) {
     const needle = nl.toLowerCase()
-    const found = needle.length <= 3
-      ? new RegExp(`(^|\\s)${needle}(\\s|$)`).test(hayPlain) || new RegExp(`(^|\\s)${needle}(\\s|$)`).test(hay)
+    const short = needle.length <= 3
+    const re = new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, 'g')
+    const found = short
+      ? re.test(hayPlain) || re.test(hay)
       : hay.includes(needle) || hayPlain.includes(needle)
-    if (found) { hits.push({ en, weight }); seen.add(en) }
+    if (!found) continue
+    // knip de term weg zodat losse woorden erin niet opnieuw matchen
+    if (short) {
+      hay = hay.replace(new RegExp(re.source, 'g'), ' ')
+      hayPlain = hayPlain.replace(new RegExp(re.source, 'g'), ' ')
+    } else {
+      hay = hay.split(needle).join(' ')
+      hayPlain = hayPlain.split(needle).join(' ')
+    }
+    if (seen.has(en)) continue
+    hits.push({ en, weight })
+    seen.add(en)
   }
   if (!hits.length) return null
   hits.sort((a, b) => b.weight - a.weight)
