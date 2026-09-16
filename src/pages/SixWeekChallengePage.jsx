@@ -51,7 +51,7 @@ const SLIDES = REVIEWS.flatMap((review, i) => {
 // De 3 pijlers — copy gelijk aan /16week (OfferPilarenSection).
 // ── De voorwaarden: schermvullend, zelfde opzet als de methode-slides ──────
 const GARANTIE_KAARTEN = [
-  { Icon: Target,    kop: 'Het plan volgt of resultaat haalt' },
+  { Icon: Target,    kop: 'Plan volgt of resultaat haalt' },
   { Icon: Clock,     kop: 'Merkt dat het niet past' },
   { Icon: BadgeEuro, kop: '6 weken service' },
 ]
@@ -149,7 +149,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
                   <span style={{
                     fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800,
                     color: 'rgba(255,255,255,0.25)', alignSelf: isMobile ? 'center' : 'flex-start',
-                    marginTop: isMobile ? 0 : 22,
+                    marginTop: isMobile ? 0 : 28,
                   }}>
                     of
                   </span>
@@ -157,12 +157,12 @@ function VoorwaardenVenster({ isMobile, onClose }) {
                 <div style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
                   gap: isMobile ? 8 : 12, textAlign: 'center',
-                  width: isMobile ? '100%' : 230,
+                  width: isMobile ? '100%' : 280,
                 }}>
-                  <g.Icon size={isMobile ? 26 : 40} strokeWidth={2.6} color="rgba(255,255,255,0.9)" style={{ flexShrink: 0 }} />
+                  <g.Icon size={isMobile ? 32 : 54} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
                   <span style={{
-                    fontSize: isMobile ? '0.85rem' : '1.05rem', fontWeight: 800,
-                    color: 'rgba(255,255,255,0.85)', letterSpacing: '-0.015em', lineHeight: 1.25,
+                    fontSize: isMobile ? '1rem' : '1.4rem', fontWeight: 900,
+                    color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
                   }}>
                     {g.kop}
                   </span>
