@@ -356,21 +356,20 @@ function VoorwaardenVenster({ isMobile, onClose }) {
           {/* Eén regel: de drie manieren om je inleg terug te krijgen, met
               'of' ertussen. Zelfde vorm als de knoppen op het eerste scherm:
               icoon boven een bold wit woord. */}
+          {/* Een streep in plaats van een kopje: hij scheidt de zin van de
+              drie voorwaarden zonder zelf gelezen te willen worden. */}
           <div style={{
-            marginTop: isMobile ? '2rem' : '3rem',
-            fontSize: isMobile ? '0.62rem' : '0.7rem', fontWeight: 800,
-            letterSpacing: '0.16em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.4)', textAlign: 'center',
-          }}>
-            Inleg terug als je
-          </div>
+            width: isMobile ? 120 : 180, height: 1,
+            margin: `${isMobile ? '1.25rem' : '1.75rem'} auto 0`,
+            background: 'rgba(255,255,255,0.35)',
+          }} />
 
           <div style={{
             display: 'flex',
             flexDirection: isMobile ? 'column' : 'row',
             alignItems: 'center', justifyContent: 'center',
             gap: isMobile ? '0.9rem' : '2.75rem',
-            marginTop: isMobile ? '1.25rem' : '1.75rem',
+            marginTop: isMobile ? '1rem' : '1.25rem',
           }}>
             {GARANTIE_KAARTEN.map((g, n) => (
               <Fragment key={g.kop}>
@@ -378,7 +377,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
                   <span style={{
                     fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800,
                     color: 'rgba(255,255,255,0.25)', alignSelf: isMobile ? 'center' : 'flex-start',
-                    marginTop: isMobile ? 0 : 28,
+                    marginTop: isMobile ? 0 : 20,
                   }}>
                     of
                   </span>
@@ -388,7 +387,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
                   gap: isMobile ? 8 : 12, textAlign: 'center',
                   width: isMobile ? '100%' : 330,
                 }}>
-                  <g.Icon size={isMobile ? 32 : 54} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                  <g.Icon size={isMobile ? 28 : 42} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
                   <span style={{
                     fontSize: isMobile ? '1rem' : '1.4rem', fontWeight: 900,
                     color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
@@ -406,8 +405,8 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             maxWidth: 560, textAlign: 'center',
             paddingTop: isMobile ? '1.25rem' : '1.75rem',
             borderTop: '1px solid rgba(255,255,255,0.1)',
-            fontSize: isMobile ? '1rem' : '1.3rem', fontWeight: 900,
-            color: GOLD, letterSpacing: '-0.02em', lineHeight: 1.3,
+            fontSize: isMobile ? '1.2rem' : '1.75rem', fontWeight: 900,
+            color: GOLD, letterSpacing: '-0.025em', lineHeight: 1.25,
           }}>
             Mijn doel is om je resultaat te laten zien.
           </p>
