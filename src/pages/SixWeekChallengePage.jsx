@@ -233,29 +233,40 @@ function MethodeSlider({ isMobile, onClose }) {
             </p>
           )}
 
-          {/* Geen kopje boven de punten: de regels spreken voor zich. */}
-          <div style={{ marginTop: p.beeldVult ? (isMobile ? '1.2rem' : '1.75rem') : 0 }} />
-          {p.doen.map((regel, r) => (
-            <div key={regel.tekst} style={{
-              display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14,
-              padding: isMobile ? '0.75rem 0' : '1rem 0',
-              borderTop: r === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-            }}>
-              <regel.Icon size={isMobile ? 18 : 24} strokeWidth={2.8} style={{ flexShrink: 0, color: '#fff' }} />
-              <span style={{
-                fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
-                color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
+          {/* Zelfde opzet als het eerste scherm: gelijke kolommen met het
+              icoon boven een bold wit woord, en de zin eronder. Zo leest elke
+              slide hetzelfde als de knoppenrij op de homeslide. */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${p.doen.length}, 1fr)`,
+            gap: isMobile ? '1.5rem 0.75rem' : '2rem',
+            width: '100%',
+            maxWidth: isMobile ? '100%' : 1100,
+            margin: '0 auto',
+          }}>
+            {p.doen.map((regel) => (
+              <div key={regel.kop || regel.tekst} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: isMobile ? 9 : 16, textAlign: 'center',
               }}>
-                {/* Dubbele punt in plaats van een streepje; staat er geen zin
-                    achter, dan ook geen dubbele punt. */}
-                {regel.kop && (
-                  <span style={{ color: '#fff', fontWeight: 900 }}>{regel.kop}{regel.tekst ? ': ' : ''}</span>
+                <regel.Icon size={isMobile ? 30 : 56} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.85rem' : '1.25rem', fontWeight: 900,
+                  color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.15,
+                }}>
+                  {regel.kop || regel.tekst}
+                </span>
+                {regel.kop && regel.tekst && (
+                  <span style={{
+                    fontSize: isMobile ? '0.72rem' : '0.92rem', fontWeight: 600,
+                    color: 'rgba(255,255,255,0.6)', lineHeight: 1.4,
+                  }}>
+                    {regel.tekst}
+                  </span>
                 )}
-                {regel.tekst}
-              </span>
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
