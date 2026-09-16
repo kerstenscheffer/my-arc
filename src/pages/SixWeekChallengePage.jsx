@@ -10,7 +10,7 @@
 // pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, ChevronDown, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ShoppingCart, Utensils, Wine, CalendarDays, PlayCircle, TrendingUp, Phone, ClipboardCheck, MessageCircle } from 'lucide-react'
+import { Star, ChevronDown, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Utensils, CalendarDays, PlayCircle, TrendingUp, Phone, ClipboardCheck, MessageCircle } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -68,9 +68,10 @@ const PIJLERS = [
     kop: 'Weet wat je eet',
     zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
     doen: [
-      { Icon: ShoppingCart, tekst: 'Je plan staat klaar op jouw dag, met boodschappenlijst' },
-      { Icon: Utensils,     tekst: 'Eten loggen in een paar tikken, geen calorieën uitrekenen' },
-      { Icon: Wine,         tekst: 'Etentje of vakantie? Die bouwen we in, niet wegstrepen' },
+      { Icon: ClipboardList, kop: 'Structuur',     tekst: 'Plan voor jouw doel staat klaar, boodschappenlijst erbij. Nul denkwerk.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',     tekst: 'Zeker weten dat wat je doet klopt. Nooit meer gokken.' },
+      { Icon: Utensils,      kop: 'Keuze',         tekst: 'Bijna 500 gerechten die in je plan passen. Twee tikken.' },
+      { Icon: PartyPopper,   kop: 'Flexibiliteit', tekst: 'Etentjes, vakanties, verjaardagen: leren we mee omgaan, strepen we niet.' },
     ],
   },
   {
@@ -244,6 +245,9 @@ function MethodeSlider({ isMobile, onClose }) {
                 fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
                 color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
               }}>
+                {regel.kop && (
+                  <span style={{ color: '#fff', fontWeight: 900 }}>{regel.kop} — </span>
+                )}
                 {regel.tekst}
               </span>
             </div>
