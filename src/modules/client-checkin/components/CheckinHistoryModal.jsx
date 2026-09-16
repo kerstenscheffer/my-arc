@@ -73,9 +73,6 @@ const datumLang = (iso) =>
     weekday: 'long', day: 'numeric', month: 'long',
   })
 
-const datumKort = (iso) =>
-  new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-
 export default function CheckinHistoryModal({ db, client, isMobile = false, onClose }) {
   const [rijen, setRijen] = useState(null)   // null = nog aan het laden
   const [fout, setFout] = useState(null)
@@ -312,5 +309,3 @@ function Tekstblok({ label, tekst }) {
     </div>
   )
 }
-
-export { datumKort }

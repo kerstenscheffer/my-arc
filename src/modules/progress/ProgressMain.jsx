@@ -11,6 +11,7 @@ import WeightStatsGrid from '../weight-tracker/components/WeightStatsGrid'
 import WeightHistory from '../weight-tracker/components/WeightHistory'
 import CircumferenceMeasurements from '../weight-tracker/components/CircumferenceMeasurements'
 import RecentProgressPhotos from './components/RecentProgressPhotos'
+import CheckinHistoryCard from './components/CheckinHistoryCard'
 import BeforeAfterCard from './components/BeforeAfterCard'
 import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
@@ -372,6 +373,11 @@ export default function ProgressMain({ db, client }) {
         <div style={{ marginTop: isMobile ? '4.25rem' : '5.25rem' }}>
           <div>
             <WeightHistory history={weightHistory} isMobile={isMobile} maxItems={200} />
+          </div>
+          {/* Direct onder de grafiek: je eigen check-ins teruglezen. Ze horen
+              bij het terugkijken dat je hier toch al doet. */}
+          <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
+            <CheckinHistoryCard db={db} client={client} isMobile={isMobile} />
           </div>
           <div style={{
             marginTop: isMobile ? '4rem' : '5rem',
