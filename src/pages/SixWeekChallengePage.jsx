@@ -524,12 +524,13 @@ export default function SixWeekChallengePage() {
           {/* Op desktop loopt de foto van rand tot rand; de hoogte is
               begrensd zodat de kop eronder nog in beeld valt. Op telefoon
               houden we de echte 2:1-verhouding aan, daar past hij precies. */}
+          {/* De herofoto draagt het logo en de titel al, dus die staan niet
+              meer als tekst in de pagina. Vaste verhouding 49:15 (1960x600),
+              zodat er niets wordt bijgesneden. */}
           <div style={{
             position: 'relative', width: '100%',
             margin: 0,
-            ...(isMobile
-              ? { aspectRatio: '2 / 1' }
-              : { height: 'min(58vh, 620px)' }),
+            aspectRatio: '49 / 15',
             flexShrink: 0,
           }}>
             <div style={{
@@ -537,40 +538,19 @@ export default function SixWeekChallengePage() {
               backgroundImage: 'url(/6week-challenge-hero.jpg)',
               backgroundSize: 'cover', backgroundPosition: 'center 45%',
             }} />
-            <div style={{
-              position: 'absolute', inset: 0, pointerEvents: 'none',
-              background: `linear-gradient(180deg, rgba(10,10,10,0.3) 0%, rgba(10,10,10,0.1) 18%, rgba(10,10,10,0.55) 42%, rgba(10,10,10,0.88) 68%, ${BG} 92%)`,
-            }} />
+            {/* Geen fade: het beeld loopt zelf al naar zwart. */}
           </div>
 
           <div style={{
             maxWidth: isMobile ? 520 : 880, width: '100%',
             // Negatieve marge: de kop schuift over de onderkant van de foto,
             // maar houdt afstand tot het beeld.
-            marginTop: isMobile ? -18 : -34,
+            marginTop: isMobile ? '1.5rem' : '2.5rem',
             padding: isMobile ? `0 1.25rem 3.5rem` : `0 2rem 4rem`,
             position: 'relative', zIndex: 2,
           }}>
-            {/* Logo boven de kop, zoals op de salespagina's. */}
-            <img
-              src="/ma-logo-header.png"
-              alt="MY ARC"
-              style={{
-                width: isMobile ? 96 : 140, height: 'auto', display: 'block',
-                margin: `0 auto ${isMobile ? '0.9rem' : '1.15rem'}`,
-                filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.85))',
-              }}
-            />
+            {/* Logo en kop stonden hier; die staan nu op de herofoto zelf. */}
 
-            {/* Kop boven de prijs — dit is waar het aanbod om draait. */}
-            <div style={{
-              fontSize: isMobile ? '1.6rem' : '3rem', fontWeight: 900, color: '#fff',
-              lineHeight: 1.1, letterSpacing: '-0.03em',
-              marginBottom: isMobile ? '1.6rem' : '2.25rem',
-              textShadow: '0 2px 14px rgba(0,0,0,0.85)',
-            }}>
-              6 Weken In Shape Challenge
-            </div>
             {/* Twee knoppen: de methode en de voorwaarden. Geen omlijnde
                 vakken meer maar een icoon met het woord eronder; het scherm
                 oogde te druk met alles in een container. */}
