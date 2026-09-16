@@ -201,7 +201,10 @@ function MethodeSlider({ isMobile, onClose }) {
         flex: 1, minHeight: 0, overflowY: 'auto',
         padding: isMobile ? '0 1.25rem 1.25rem' : '0 2rem 2rem',
       }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', marginTop: p.beeldVult ? (isMobile ? 10 : 16) : (isMobile ? -18 : -28), position: 'relative' }}>
+        <div style={{
+          maxWidth: 1100, width: '100%', margin: '0 auto', position: 'relative',
+          marginTop: p.beeldVult ? (isMobile ? '1.25rem' : '2.25rem') : (isMobile ? -18 : -28),
+        }}>
           {/* Het label 'PIJLER x VAN 3' blijft weg als het beeld al tekst
               draagt; de titel staat er altijd, zodat elke slide op de pagina
               zelf zijn kop heeft. */}
