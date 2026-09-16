@@ -80,8 +80,7 @@ const DICT = [
   ['kipfilet', 'chicken breast', 9], ['kip', 'chicken', 9], ['chicken', 'chicken', 9],
   ['kalkoen', 'turkey', 9], ['gehakt', 'ground beef', 9], ['minced', 'ground beef', 9],
   ['runderreepjes', 'beef strips', 9], ['rundvlees', 'beef', 9], ['biefstuk', 'steak', 9],
-  ['varkenshaas', 'pork tenderloin', 9], ['slavink', 'meat roll', 9],
-  ['rookworst', 'smoked sausage', 9], ['worst', 'sausage', 8], ['rookvlees', 'cured beef', 8],
+  ['varkenshaas', 'pork tenderloin', 9],   ['rookworst', 'smoked sausage', 9], ['worst', 'sausage', 8], ['rookvlees', 'cured beef', 8],
   ['ham', 'ham', 8], ['zalm', 'salmon', 9], ['salmon', 'salmon', 9], ['tonijn', 'tuna', 9],
   ['tuna', 'tuna', 9], ['kabeljauw', 'cod fish', 9], ['garnalen', 'shrimp', 9],
   ['vissticks', 'fish sticks', 9], ['hollandse nieuwe', 'herring', 9], ['haring', 'herring', 9],
@@ -89,6 +88,7 @@ const DICT = [
   ['eiwitomelet', 'egg white omelette', 10], ['egg white', 'egg white omelette', 10],
   ['roerei', 'scrambled eggs', 10], ['scrambled egg', 'scrambled eggs', 10],
   ['spiegelei', 'fried egg', 10], ['gebakken ei', 'fried egg', 10], ['omelet', 'omelette', 10],
+  ['gekookte eieren', 'boiled eggs', 10], ['gekookt ei', 'boiled eggs', 10],
   ['eieren', 'eggs', 8], ['eiwitten', 'egg whites', 8], ['ei', 'eggs', 8],
   ['whey', 'protein shake', 8], ['caseine', 'protein shake', 8], ['proteïne', 'protein', 5],
   ['proteine', 'protein', 5], ['protein', 'protein', 5], ['mass gainer', 'protein shake', 9],
@@ -213,24 +213,33 @@ function scorePhoto(photo, terms) {
   const text = [photo.description, photo.alt_description, ...(photo.tags || []).map((t) => t.title)]
     .filter(Boolean).join(' ').toLowerCase()
   let score = 0
-  const words = terms.join(' ').split(/\s+/).filter((w) => w.length > 2)
+  const words = [...new Set(terms.join(' ').split(/\s+/).filter((w) => w.length > 2))]
   for (const w of words) if (text.includes(w)) score += 1
   const primaryWords = terms[0].split(/\s+/).filter((w) => w.length > 2)
   const primaryHit = primaryWords.some((w) => text.includes(w))
-  return { score, primaryHit }
+  return { score, primaryHit, likes: photo.likes || 0 }
 }
 
 async function findPhoto(plan) {
-  const attempts = [plan.query, `${plan.primary} food`]
-  for (const q of attempts) {
-    const results = await unsplashSearch(q)
-    const ranked = results
-      .filter((p) => !usedPhotoIds.has(p.id))
-      .map((p) => ({ p, ...scorePhoto(p, plan.terms) }))
-      .filter((r) => r.primaryHit)
-      .sort((a, b) => b.score - a.score)
-    if (ranked.length) return { photo: ranked[0].p, query: q, score: ranked[0].score }
-    if (DELAY) await sleep(DELAY)
+  // Van specifiek naar breed: alle termen, dan de twee zwaarste, dan alleen de hoofdterm.
+  const queries = [...new Set([
+    plan.query,
+    `${plan.terms.slice(0, 2).join(' ')} food`,
+    `${plan.primary} food`,
+  ])]
+  // Eerste ronde: eis dat minstens twee zoekwoorden terugkomen in de foto.
+  for (const minScore of [2, 1]) {
+    for (const q of queries) {
+      const results = await unsplashSearch(q)
+      const ranked = results
+        .filter((p) => !usedPhotoIds.has(p.id))
+        .map((p) => ({ p, ...scorePhoto(p, plan.terms) }))
+        .filter((r) => r.primaryHit && r.score >= minScore)
+        .sort((a, b) => (b.score - a.score) || (b.likes - a.likes))
+      if (ranked.length) return { photo: ranked[0].p, query: q, score: ranked[0].score }
+      if (DELAY) await sleep(DELAY)
+    }
+    if (plan.terms.length === 1) break
   }
   return null
 }

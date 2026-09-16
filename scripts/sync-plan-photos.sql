@@ -26,12 +26,15 @@ select count(*) filter (where meal ? 'meal_id')                                a
 from meals;
 
 -- ------------------------------------------------------------- 1. back-ups
+-- Herbruikbaar: de back-up bevat altijd de stand van vlak vóór deze run.
 create table if not exists client_meal_plans_backup_photos as
   select * from client_meal_plans where false;
+truncate client_meal_plans_backup_photos;
 insert into client_meal_plans_backup_photos select * from client_meal_plans;
 
 create table if not exists meal_plan_templates_backup_photos as
   select * from meal_plan_templates where false;
+truncate meal_plan_templates_backup_photos;
 insert into meal_plan_templates_backup_photos select * from meal_plan_templates;
 
 -- ------------------------------------------------------------- 2. functie
