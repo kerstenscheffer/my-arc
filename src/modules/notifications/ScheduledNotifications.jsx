@@ -44,7 +44,7 @@ const CHECK_TYPES = [
   {
     value: 'photo_not_uploaded', label: 'Geen progressiefoto', Icon: Camera, color: '#ec4899',
     desc: 'Stuurt naar klanten die in de gekozen periode geen foto uploadden.',
-    defaults: { name: 'Progressiefoto', title: 'Tijd voor een nieuwe foto', message: 'Heyy, upload even een nieuwe progressiefoto — dan zien we je vooruitgang terug!', page_context: 'tracking' },
+    defaults: { name: 'Progressiefoto', title: 'Tijd voor een nieuwe foto', message: 'Heyy, upload even een nieuwe progressiefoto, dan zien we je vooruitgang terug!', page_context: 'tracking' },
   },
   {
     value: 'always', label: 'Altijd sturen', Icon: Bell, color: AMBER,
@@ -167,16 +167,24 @@ export default function ScheduledNotifications({ db, coachId, isMobile }) {
     } finally { setBusyId(null) }
   }
 
+  // Lange streepjes eruit. Ze komen mee met tekst die door een AI is
+  // voorgesteld en verraden dat meteen; een klant hoort een bericht van zijn
+  // coach te lezen, niet van een model.
+  const zonderStreepjes = (t) => String(t ?? '')
+    .replace(/\s*[\u2014\u2013]\s*/g, ', ')
+    .replace(/\s+,/g, ',')
+    .trim()
+
   const saveRule = async (draft) => {
     const payload = {
       coach_id: coachId,
-      name: draft.name?.trim() || 'Naamloze regel',
+      name: zonderStreepjes(draft.name)?.trim() || 'Naamloze regel',
       check_type: draft.check_type,
       check_days: Number(draft.check_days) || 1,
       run_at: draft.run_at,
       days_of_week: draft.days_of_week?.length ? draft.days_of_week : [1, 2, 3, 4, 5, 6, 7],
-      title: draft.title?.trim() || 'Herinnering',
-      message: draft.message?.trim() || '',
+      title: zonderStreepjes(draft.title) || 'Herinnering',
+      message: zonderStreepjes(draft.message),
       page_context: draft.page_context || 'all',
       priority: draft.priority || 'normal',
       audience: draft.audience || 'active',

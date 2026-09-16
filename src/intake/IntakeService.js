@@ -49,7 +49,7 @@ const IntakeService = {
           type: 'intake_submitted',
           priority: 'high',
           title: 'Nieuwe aanmelding',
-          message: `${contact.name || 'Iemand'} heeft het intakeformulier ingevuld${answers.goal ? ` — doel: ${answers.goal}` : ''}`,
+          message: `${contact.name || 'Iemand'} heeft het intakeformulier ingevuld${answers.goal ? `, doel: ${answers.goal}` : ''}`,
           read_status: false,
         }])
       } catch (notifyErr) {
