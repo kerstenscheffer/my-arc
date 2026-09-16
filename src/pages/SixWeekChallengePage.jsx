@@ -10,7 +10,7 @@
 // pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, ChevronDown, ChevronLeft, ChevronRight, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ShoppingCart, Utensils, Wine, CalendarDays, PlayCircle, TrendingUp, Phone, ClipboardCheck, MessageCircle } from 'lucide-react'
+import { Star, ChevronDown, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ShoppingCart, Utensils, Wine, CalendarDays, PlayCircle, TrendingUp, Phone, ClipboardCheck, MessageCircle } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -121,24 +121,6 @@ function MethodeSlider({ isMobile, onClose }) {
     window.addEventListener('keydown', toets)
     return () => window.removeEventListener('keydown', toets)
   }, [onClose])
-
-  const pijlKnop = (kant, uit, aan) => (
-    <button
-      onClick={aan}
-      disabled={uit}
-      aria-label={kant === 'links' ? 'Vorige' : 'Volgende'}
-      style={{
-        width: isMobile ? 40 : 52, height: isMobile ? 40 : 52, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)',
-        background: 'rgba(255,255,255,0.06)', color: '#fff',
-        opacity: uit ? 0.25 : 1, cursor: uit ? 'default' : 'pointer',
-        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      {kant === 'links' ? <ChevronLeft size={isMobile ? 18 : 24} strokeWidth={2.6} /> : <ChevronRight size={isMobile ? 18 : 24} strokeWidth={2.6} />}
-    </button>
-  )
 
   return (
     <div
@@ -269,34 +251,8 @@ function MethodeSlider({ isMobile, onClose }) {
         </div>
       </div>
 
-      {/* Bladeren: pijlen en bolletjes. */}
-      <div style={{
-        flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: isMobile ? '1.25rem' : '2rem',
-        padding: `${isMobile ? '0.9rem' : '1.25rem'} 1.25rem calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '1.1rem' : '1.5rem'})`,
-        borderTop: '1px solid rgba(255,255,255,0.07)',
-      }}>
-        {pijlKnop('links', i === 0, () => naar(i - 1))}
-        <div style={{ display: 'flex', gap: 8 }}>
-          {PIJLERS.map((_, n) => (
-            <button
-              key={n}
-              onClick={() => naar(n)}
-              aria-label={`Pijler ${n + 1}`}
-              style={{
-                width: n === i ? 26 : 9, height: 9, padding: 0, borderRadius: 999,
-                background: n === i ? '#fff' : 'rgba(255,255,255,0.25)',
-                border: 'none', cursor: 'pointer', transition: 'width 0.2s ease, background 0.2s ease',
-                touchAction: 'manipulation',
-              }}
-            />
-          ))}
-        </div>
-        {/* Op de laatste slide sluit de rechterpijl het venster, zodat je
-            met dezelfde knop doorklikt tot je klaar bent. */}
-        {pijlKnop('rechts', false, () => (i === PIJLERS.length - 1 ? onClose() : naar(i + 1)))}
-      </div>
+      {/* Geen knoppenbalk: je bladert met de pijltjestoetsen, Enter, een
+          klik in het venster of een swipe. */}
     </div>
   )
 }
