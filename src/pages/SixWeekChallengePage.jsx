@@ -114,12 +114,14 @@ function VoorwaardenVenster({ isMobile, onClose }) {
           maxWidth: 1000, width: '100%', margin: '0 auto',
           marginTop: isMobile ? '2rem' : '3.5rem',
         }}>
+          {/* Hiërarchie: het bedrag is waar het oog begint, daarna het
+              lijstje, dan de belofte. */}
           <div style={{
-            fontSize: isMobile ? '1.5rem' : '2.2rem', fontWeight: 900,
-            letterSpacing: '-0.03em', lineHeight: 1.15, textAlign: 'center',
+            fontSize: isMobile ? '1.75rem' : '2.8rem', fontWeight: 900,
+            letterSpacing: '-0.035em', lineHeight: 1.1, textAlign: 'center',
             maxWidth: 820, margin: '0 auto',
           }}>
-            €300 inleg, die je terug krijgt.
+            <span style={{ color: GOLD }}>€300 inleg</span>, die je terug krijgt.
           </div>
 
           {/* Eén regel: de drie manieren om je inleg terug te krijgen, met
@@ -127,38 +129,40 @@ function VoorwaardenVenster({ isMobile, onClose }) {
               icoon boven een bold wit woord. */}
           <div style={{
             marginTop: isMobile ? '2rem' : '3rem',
-            fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 900,
-            color: '#fff', letterSpacing: '-0.02em', textAlign: 'center',
+            fontSize: isMobile ? '0.62rem' : '0.7rem', fontWeight: 800,
+            letterSpacing: '0.16em', textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.4)', textAlign: 'center',
           }}>
-            Inleg terug als je:
+            Inleg terug als je
           </div>
 
           <div style={{
             display: 'flex',
             flexDirection: isMobile ? 'column' : 'row',
             alignItems: 'center', justifyContent: 'center',
-            gap: isMobile ? '0.9rem' : '2.5rem',
-            marginTop: isMobile ? '1.25rem' : '2rem',
+            gap: isMobile ? '0.9rem' : '2rem',
+            marginTop: isMobile ? '1.25rem' : '1.75rem',
           }}>
             {GARANTIE_KAARTEN.map((g, n) => (
               <Fragment key={g.kop}>
                 {n > 0 && (
                   <span style={{
-                    fontSize: isMobile ? '0.78rem' : '0.95rem', fontWeight: 800,
-                    color: 'rgba(255,255,255,0.35)',
+                    fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800,
+                    color: 'rgba(255,255,255,0.25)', alignSelf: isMobile ? 'center' : 'flex-start',
+                    marginTop: isMobile ? 0 : 22,
                   }}>
                     of
                   </span>
                 )}
                 <div style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: isMobile ? 8 : 14, textAlign: 'center',
-                  maxWidth: isMobile ? '100%' : 260,
+                  gap: isMobile ? 8 : 12, textAlign: 'center',
+                  width: isMobile ? '100%' : 230,
                 }}>
-                  <g.Icon size={isMobile ? 28 : 48} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                  <g.Icon size={isMobile ? 26 : 40} strokeWidth={2.6} color="rgba(255,255,255,0.9)" style={{ flexShrink: 0 }} />
                   <span style={{
-                    fontSize: isMobile ? '0.9rem' : '1.15rem', fontWeight: 900,
-                    color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
+                    fontSize: isMobile ? '0.85rem' : '1.05rem', fontWeight: 800,
+                    color: 'rgba(255,255,255,0.85)', letterSpacing: '-0.015em', lineHeight: 1.25,
                   }}>
                     {g.kop}
                   </span>
@@ -168,10 +172,12 @@ function VoorwaardenVenster({ isMobile, onClose }) {
           </div>
 
           <p style={{
-            margin: `${isMobile ? '1.75rem' : '2.5rem'} auto 0`,
-            maxWidth: 720, textAlign: 'center',
-            fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 900,
-            color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.35,
+            margin: `${isMobile ? '2rem' : '3rem'} auto 0`,
+            maxWidth: 560, textAlign: 'center',
+            paddingTop: isMobile ? '1.25rem' : '1.75rem',
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+            fontSize: isMobile ? '1rem' : '1.3rem', fontWeight: 900,
+            color: GOLD, letterSpacing: '-0.02em', lineHeight: 1.3,
           }}>
             Mijn doel is om je resultaat te laten zien.
           </p>
