@@ -2026,19 +2026,26 @@ export default function KanbanBoard({
               <BarChart3 size={14} /> Stats
             </button>
 
-            {/* Sectie */}
+            {/* Sectie — op telefoon zit deze knop als plus in de sectie-slider,
+                anders neemt hij daar een hele regel in beslag. */}
+            {!isMobile && (
             <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
               style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', minHeight: 34, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <Plus size={14} /> Sectie
             </button>
+            )}
             {/* De knop voor volledig scherm is eruit. */}
 
             {/* Stage-switcher (mobiel) — rij BINNEN de balk (order:3), sluit aan
                 op de zoekbalk (zelfde achtergrond, geen losse strook eronder). */}
-            {isMobile && sections.length > 1 && (() => {
+            {/* Ook bij één sectie tonen: de plus-knop hangt aan deze rij. */}
+            {isMobile && (() => {
               const activeSecId = sections.some(s => s.id === activeMobileSectionId) ? activeMobileSectionId : sections[0]?.id
               return (
-                <div style={{ order: 4, flexBasis: '100%', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6 }}>
+                // De plus-knop staat vast aan de rechterkant; de secties
+                // scrollen eronderdoor. Zo kost 'Sectie' geen eigen regel meer.
+                <div style={{ order: 4, flexBasis: '100%', width: '100%', marginTop: 6, position: 'relative' }}>
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: 44 }}>
                   <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
                     {sections.map((s, i) => {
                       const active = s.id === activeSecId
@@ -2060,6 +2067,33 @@ export default function KanbanBoard({
                       )
                     })}
                   </div>
+                </div>
+
+                {/* Vaste plus-knop met een zwarte fade ervoor, zodat een sectie
+                    die eronder doorschuift niet half zichtbaar blijft hangen. */}
+                <div style={{
+                  position: 'absolute', top: 0, bottom: 0, right: 0,
+                  display: 'flex', alignItems: 'center', paddingLeft: 14,
+                  background: 'linear-gradient(90deg, rgba(10,10,10,0) 0%, #0a0a0a 45%)',
+                  pointerEvents: 'none',
+                }}>
+                  <button
+                    onClick={() => { setSelectedSection(null); setShowSectionModal(true) }}
+                    title="Nieuwe sectie"
+                    aria-label="Nieuwe sectie"
+                    style={{
+                      pointerEvents: 'auto',
+                      width: 34, height: 34, padding: 0, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 10, color: 'rgba(255,255,255,0.7)',
+                      cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <Plus size={16} strokeWidth={2.8} />
+                  </button>
+                </div>
                 </div>
               )
             })()}
