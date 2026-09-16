@@ -10,7 +10,7 @@
 // pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, ChevronDown, ChevronLeft, ChevronRight, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2 } from 'lucide-react'
+import { Star, ChevronDown, ChevronLeft, ChevronRight, X, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ShoppingCart, Utensils, Wine, Scale, CalendarDays, PlayCircle, TrendingUp, RefreshCw, Phone, ClipboardCheck, MessageCircle, Eye } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -63,10 +63,10 @@ const PIJLERS = [
     kop: 'Weet wat je eet',
     zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
     doen: [
-      'Je plan staat klaar op jouw dag, met boodschappenlijst',
-      'Eten loggen in een paar tikken, geen calorieën uitrekenen',
-      'Etentje of vakantie? Die bouwen we in, niet wegstrepen',
-      'Elke week bijsturen op wat de weegschaal laat zien',
+      { Icon: ShoppingCart, tekst: 'Je plan staat klaar op jouw dag, met boodschappenlijst' },
+      { Icon: Utensils,     tekst: 'Eten loggen in een paar tikken, geen calorieën uitrekenen' },
+      { Icon: Wine,         tekst: 'Etentje of vakantie? Die bouwen we in, niet wegstrepen' },
+      { Icon: Scale,        tekst: 'Elke week bijsturen op wat de weegschaal laat zien' },
     ],
   },
   {
@@ -74,10 +74,10 @@ const PIJLERS = [
     kop: 'Elke training telt',
     zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
     doen: [
-      'Schema op jouw dagen, jouw gym en jouw niveau',
-      'Per oefening een video, zodat de uitvoering klopt',
-      'Gewicht en reps bijhouden, zodat je progressie ziet',
-      'Kan een oefening niet? Dan wisselen we hem om',
+      { Icon: CalendarDays, tekst: 'Schema op jouw dagen, jouw gym en jouw niveau' },
+      { Icon: PlayCircle,   tekst: 'Per oefening een video, zodat de uitvoering klopt' },
+      { Icon: TrendingUp,   tekst: 'Gewicht en reps bijhouden, zodat je progressie ziet' },
+      { Icon: RefreshCw,    tekst: 'Kan een oefening niet? Dan wisselen we hem om' },
     ],
   },
   {
@@ -85,10 +85,10 @@ const PIJLERS = [
     kop: 'Coach in jouw corner',
     zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
     doen: [
-      'Elke week een call over je cijfers en je week',
-      'Check-in op vrijdag, daar stuur ik maandag op bij',
-      'Korte lijn in de app, geen dagen wachten',
-      'Ik zie je logs, dus je hoeft niets uit te leggen',
+      { Icon: Phone,          tekst: 'Elke week een call over je cijfers en je week' },
+      { Icon: ClipboardCheck, tekst: 'Check-in op vrijdag, daar stuur ik maandag op bij' },
+      { Icon: MessageCircle,  tekst: 'Korte lijn in de app, geen dagen wachten' },
+      { Icon: Eye,            tekst: 'Ik zie je logs, dus je hoeft niets uit te leggen' },
     ],
   },
 ]
@@ -194,6 +194,7 @@ function MethodeSlider({ isMobile, onClose }) {
             letterSpacing: '-0.03em', lineHeight: 1.08,
             textShadow: '0 2px 14px rgba(0,0,0,0.85)',
           }}>
+            <span style={{ color: GOLD }}>{i + 1}. </span>
             {p.kop}
           </div>
           <p style={{
@@ -212,18 +213,18 @@ function MethodeSlider({ isMobile, onClose }) {
             Wat we doen
           </div>
           {p.doen.map((regel, r) => (
-            <div key={regel} style={{
+            <div key={regel.tekst} style={{
               display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14,
               padding: isMobile ? '0.75rem 0' : '1rem 0',
               borderTop: r === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}>
-              <CheckCircle2 size={isMobile ? 18 : 24} strokeWidth={2.4} style={{ flexShrink: 0, color: GOLD }} />
+              <regel.Icon size={isMobile ? 18 : 24} strokeWidth={2.4} style={{ flexShrink: 0, color: GOLD }} />
               <span style={{
                 fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
                 color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
               }}>
-                {regel}
+                {regel.tekst}
               </span>
             </div>
           ))}
