@@ -341,7 +341,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
       }}>
         <div style={{
           maxWidth: 1250, width: '100%', margin: '0 auto',
-          marginTop: isMobile ? '1rem' : '1.5rem',
+          marginTop: isMobile ? '0.5rem' : '0.75rem',
         }}>
           {/* Hiërarchie: het bedrag is waar het oog begint, daarna het
               lijstje, dan de belofte. */}
@@ -408,7 +408,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             fontSize: isMobile ? '1.2rem' : '1.75rem', fontWeight: 900,
             color: GOLD, letterSpacing: '-0.025em', lineHeight: 1.25,
           }}>
-            Mijn doel is om je resultaat te laten zien.
+            Mijn doel: serieuze mannen gratis serieus resultaat laten zien.
           </p>
 
           <p style={{
