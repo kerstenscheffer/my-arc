@@ -411,15 +411,6 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             Mijn doel: serieuze mannen gratis serieus resultaat laten zien.
           </p>
 
-          <p style={{
-            margin: `${isMobile ? '1.5rem' : '2rem'} auto 0`,
-            maxWidth: 720, textAlign: 'center',
-            fontSize: isMobile ? '0.72rem' : '0.82rem', fontWeight: 700,
-            color: 'rgba(255,255,255,0.35)', lineHeight: 1.5,
-          }}>
-            Ziek of geblesseerd? Dan pauzeren we of haal je in. Je wordt niet
-            afgerekend op overmacht.
-          </p>
         </div>
       </div>
     </div>
