@@ -155,8 +155,10 @@ function MethodeSlider({ isMobile, onClose }) {
         <div key={p.foto} style={{
           position: 'absolute', inset: 0,
           backgroundImage: `url(${p.foto})`,
-          backgroundSize: p.beeldVult ? 'contain' : 'cover',
-          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+          // Staat de tekst op het beeld, dan houden we de onderkant vast: daar
+          // staat de titel. Bijsnijden gebeurt dan bovenin.
+          backgroundPosition: p.beeldVult ? 'center bottom' : 'center',
           backgroundRepeat: 'no-repeat',
           animation: 'pijlerIn 0.35s ease',
         }} />
