@@ -112,7 +112,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
       }}>
         <div style={{
           maxWidth: 1250, width: '100%', margin: '0 auto',
-          marginTop: isMobile ? '2rem' : '3.5rem',
+          marginTop: isMobile ? '1rem' : '1.5rem',
         }}>
           {/* Hiërarchie: het bedrag is waar het oog begint, daarna het
               lijstje, dan de belofte. */}
