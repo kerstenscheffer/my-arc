@@ -40,8 +40,8 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
     location: client?.location || '',
     gender: client?.gender || '',
     date_of_birth: client?.date_of_birth || '',
-    current_weight: client?.current_weight || '',
   })
+  const [latestTrackedWeight, setLatestTrackedWeight] = useState(null)
 
   useEffect(() => {
     if (client) {
@@ -55,10 +55,22 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
         location: client.location || '',
         gender: client.gender || '',
         date_of_birth: client.date_of_birth || '',
-        current_weight: client.current_weight || '',
       })
     }
   }, [client])
+
+  useEffect(() => {
+    if (!client?.id) return
+    db.supabase
+      .from('weight_tracking')
+      .select('weight, date')
+      .eq('client_id', client.id)
+      .order('date', { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) setLatestTrackedWeight(data[0])
+      })
+  }, [client?.id])
 
   const sections = [
     { id: 'persoonlijk', label: 'Persoonlijk', icon: User },
@@ -79,7 +91,6 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
         location: formData.location,
         gender: formData.gender || null,
         date_of_birth: formData.date_of_birth || null,
-        current_weight: formData.current_weight ? parseFloat(formData.current_weight) : null,
         updated_at: new Date().toISOString()
       }).eq('id', client.id).select().single()
       console.log('✅ Result:', data)
@@ -314,7 +325,11 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
             <div style={{ height: 1, background: LIJN, margin: '0.25rem 0' }} />
             <div style={{ marginBottom: '-0.35rem' }}><Kopje Icon={Weight} tekst="Gewicht" /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              {field('Huidig gewicht (kg)', formData.current_weight, 'current_weight', 'number')}
+              {readonlyField(
+                'Huidig gewicht (kg)',
+                latestTrackedWeight ? `${latestTrackedWeight.weight} kg` : (client?.current_weight ? `${client.current_weight} kg` : ''),
+                latestTrackedWeight ? `Gemeten op ${new Date(latestTrackedWeight.date).toLocaleDateString('nl-NL')}` : 'Bijhouden via Tracking'
+              )}
               {readonlyField('Streefgewicht (kg)', client?.goal_weight || client?.target_weight || '', 'Ingesteld door je coach')}
             </div>
           </div>
