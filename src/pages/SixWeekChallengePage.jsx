@@ -49,6 +49,233 @@ const SLIDES = REVIEWS.flatMap((review, i) => {
 })
 
 // De 3 pijlers — copy gelijk aan /16week (OfferPilarenSection).
+// ── De methode: schermvullend, één pijler per slide ─────────────────────────
+//
+// Drie pijlers zijn drie verhalen; in een lijstje van drie regels lees je ze
+// als opsomming. Als slide krijgt elke pijler het hele scherm: foto, wat het
+// is, en wat we concreet gaan doen.
+const PIJLERS = [
+  {
+    // Op dit beeld staan de titel en de kernwoorden al; die laten we dan ook
+    // weg uit de tekst eronder, anders staat alles er twee keer.
+    foto: '/methode/voeding-slide.jpg',
+    beeldVult: true,
+    // De titel staat op dit beeld, dus de pagina zet er geen tweede boven.
+    titelInBeeld: true,
+    kop: 'Weet wat je eet',
+    zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
+    doen: [
+      { Icon: ClipboardList, kop: 'Structuur',     tekst: 'Plan staat klaar. Nul denkwerk.' },
+      { Icon: Utensils,      kop: 'Keuze',         tekst: '500 gerechten in jouw plan.' },
+      { Icon: PartyPopper,   kop: 'Flexibiliteit', tekst: 'Etentjes leren we mee omgaan.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',     tekst: 'Weten dat het klopt.' },
+    ],
+  },
+  {
+    foto: '/methode/training-slide.jpg',
+    beeldVult: true,
+    titelInBeeld: true,
+    kop: 'Elke training telt',
+    zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
+    doen: [
+      { Icon: ClipboardList, kop: 'Schema',           tekst: 'Jouw dagen, locatie, niveau.' },
+      { Icon: Crosshair,     kop: 'Focus',            tekst: 'Alleen wat telt.' },
+      { Icon: TrendingUp,    kop: 'Resultaatgericht', tekst: 'Zie dat het werkt.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',        tekst: 'Hoe, hoeveel, welke. Nooit twijfelen.' },
+    ],
+  },
+  {
+    foto: '/methode/begeleiding-slide.jpg',
+    beeldVult: true,
+    titelInBeeld: true,
+    kop: 'Coach in jouw corner',
+    zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
+    doen: [
+      { Icon: LineChart,          kop: 'Cijfers',   tekst: 'Kijk dagelijks mee, stuur op data.' },
+      { Icon: SlidersHorizontal,  kop: 'Bijsturen', tekst: 'Stilstaan is geen optie.' },
+      { Icon: ClipboardCheck,     kop: 'Check-in',  tekst: 'Wat liep vast, wat gaat anders.' },
+      { Icon: Video,              kop: 'Weekcall',  tekst: 'Wat werkt, wat niet.' },
+    ],
+  },
+]
+
+function MethodeSlider({ isMobile, onClose }) {
+  const [i, setI] = useState(0)
+  const raakX = useRef(null)
+  const p = PIJLERS[i]
+  const naar = (n) => setI(Math.max(0, Math.min(PIJLERS.length - 1, n)))
+
+  useEffect(() => {
+    const toets = (e) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft') setI(v => Math.max(0, v - 1))
+      // Pijl naar rechts en Enter doen hetzelfde: verder, en op de laatste
+      // slide sluiten.
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        setI(v => {
+          if (v >= PIJLERS.length - 1) { onClose(); return v }
+          return v + 1
+        })
+      }
+    }
+    window.addEventListener('keydown', toets)
+    return () => window.removeEventListener('keydown', toets)
+  }, [onClose])
+
+  return (
+    <div
+      // Klikken in het venster gaat naar de volgende slide; knoppen en
+      // bolletjes vangen hun eigen klik af.
+      onClick={(e) => {
+        if (e.target.closest('button')) return
+        if (i >= PIJLERS.length - 1) onClose()
+        else naar(i + 1)
+      }}
+      onTouchStart={(e) => { raakX.current = e.touches[0].clientX }}
+      onTouchEnd={(e) => {
+        if (raakX.current == null) return
+        const verschil = e.changedTouches[0].clientX - raakX.current
+        if (Math.abs(verschil) > 50) naar(i + (verschil < 0 ? 1 : -1))
+        raakX.current = null
+      }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: BG, color: '#fff',
+        display: 'flex', flexDirection: 'column',
+        animation: 'bladWaas 0.2s ease',
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      }}
+    >
+      {/* Foto over de volle breedte, met de kop er half overheen. */}
+      {/* Beeld met tekst erop krijgt een vaste verhouding van 16:5, zodat wat
+          je exporteert ook precies is wat je ziet: geen bijsnijden, geen zwarte
+          balken. De gewone foto's blijven een band met vaste hoogte. */}
+      <div style={{
+        position: 'relative', width: '100%', flexShrink: 0,
+        ...(p.beeldVult && !isMobile
+          ? { aspectRatio: '49 / 15' }   // 1960x600, exact de verhouding van het beeld
+          : { height: isMobile ? '34vh' : 'min(46vh, 460px)' }),
+      }}>
+        <div key={p.foto} style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${p.foto})`,
+          backgroundSize: 'cover',
+          // Staat de tekst op het beeld, dan houden we de onderkant vast: daar
+          // staat de titel. Bijsnijden gebeurt dan bovenin.
+          backgroundPosition: p.beeldVult ? 'center bottom' : 'center',
+          backgroundRepeat: 'no-repeat',
+          animation: 'pijlerIn 0.35s ease',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          // Beeld dat zelf al tekst draagt laten we helemaal met rust: geen
+          // fade, anders vreet die de onderste regel op. De gewone foto's
+          // lopen wel naar zwart, daar staat de kop overheen.
+          background: p.beeldVult
+            ? `linear-gradient(180deg, rgba(0,0,0,0) 86%, ${BG} 100%)`
+            : `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 30%, rgba(0,0,0,0.8) 72%, ${BG} 100%)`,
+        }} />
+        <button
+          onClick={onClose}
+          aria-label="Sluiten"
+          style={{
+            position: 'absolute', top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 12 : 20}px)`,
+            right: isMobile ? 12 : 20,
+            width: 40, height: 40, padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 12, color: '#fff', cursor: 'pointer',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <X size={18} strokeWidth={2.8} />
+        </button>
+      </div>
+
+      {/* Tekst: wat het is, en wat we gaan doen. */}
+      <div style={{
+        flex: 1, minHeight: 0, overflowY: 'auto',
+        padding: isMobile ? '0 1.25rem 1.25rem' : '0 2rem 2rem',
+      }}>
+        <div style={{
+          maxWidth: 1100, width: '100%', margin: '0 auto', position: 'relative',
+          marginTop: p.beeldVult ? (isMobile ? '2.5rem' : '4.5rem') : (isMobile ? -18 : -28),
+        }}>
+          {/* Het label 'PIJLER x VAN 3' blijft weg als het beeld al tekst
+              draagt; de titel staat er altijd, zodat elke slide op de pagina
+              zelf zijn kop heeft. */}
+          {!p.beeldVult && (
+            <div style={{
+              fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
+              letterSpacing: '0.16em', color: GOLD, marginBottom: isMobile ? 8 : 12,
+            }}>
+              PIJLER {i + 1} VAN {PIJLERS.length}
+            </div>
+          )}
+          {!p.titelInBeeld && (
+            <div style={{
+              fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
+              letterSpacing: '-0.03em', lineHeight: 1.08,
+              textShadow: '0 2px 14px rgba(0,0,0,0.85)',
+            }}>
+              <span style={{ color: GOLD }}>{i + 1}. </span>
+              {p.kop}
+            </div>
+          )}
+          {!p.beeldVult && (
+            <p style={{
+              margin: `${isMobile ? 10 : 14}px 0 ${isMobile ? '1.4rem' : '2rem'}`,
+              fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 600,
+              color: 'rgba(255,255,255,0.65)', lineHeight: 1.45,
+            }}>
+              {p.zin}
+            </p>
+          )}
+
+          {/* Zelfde opzet als het eerste scherm: gelijke kolommen met het
+              icoon boven een bold wit woord, en de zin eronder. Zo leest elke
+              slide hetzelfde als de knoppenrij op de homeslide. */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${p.doen.length}, 1fr)`,
+            gap: isMobile ? '1.75rem 1rem' : '3.5rem',
+            width: '100%',
+            maxWidth: isMobile ? '100%' : 1250,
+            margin: '0 auto',
+          }}>
+            {p.doen.map((regel) => (
+              <div key={regel.kop || regel.tekst} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: isMobile ? 9 : 16, textAlign: 'center',
+              }}>
+                <regel.Icon size={isMobile ? 32 : 60} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.95rem' : '1.45rem', fontWeight: 900,
+                  color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15,
+                }}>
+                  {regel.kop || regel.tekst}
+                </span>
+                {regel.kop && regel.tekst && (
+                  <span style={{
+                    fontSize: isMobile ? '0.82rem' : '1.05rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.55)', lineHeight: 1.4,
+                  }}>
+                    {regel.tekst}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Geen knoppenbalk: je bladert met de pijltjestoetsen, Enter, een
+          klik in het venster of een swipe. */}
+    </div>
+  )
+}
+
 // ── De voorwaarden: schermvullend, zelfde opzet als de methode-slides ──────
 const GARANTIE_KAARTEN = [
   { Icon: Target,    kop: 'Plan volgt of resultaat haalt' },
@@ -76,7 +303,9 @@ function VoorwaardenVenster({ isMobile, onClose }) {
       {/* Banner met de titel erop, net als bij de methode. */}
       <div style={{
         position: 'relative', width: '100%', flexShrink: 0,
-        ...(isMobile ? { height: '30vh' } : { aspectRatio: '49 / 15', maxHeight: '46vh' }),
+        // Geen maxHeight: die maakte het vak lager dan de verhouding van de
+        // foto, waardoor cover de bovenkant eraf sneed.
+        ...(isMobile ? { height: '30vh' } : { aspectRatio: '49 / 15' }),
       }}>
         <div style={{
           position: 'absolute', inset: 0,
