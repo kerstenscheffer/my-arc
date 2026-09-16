@@ -342,6 +342,9 @@ function VoorwaardenVenster({ isMobile, onClose }) {
         <div style={{
           maxWidth: 1250, width: '100%', margin: '0 auto',
           marginTop: isMobile ? '0.5rem' : '0.75rem',
+          // Kolom over de volle hoogte, zodat de slotzin onderaan het scherm
+          // kan staan in plaats van vlak onder de iconen.
+          minHeight: '100%', display: 'flex', flexDirection: 'column',
         }}>
           {/* Hiërarchie: het bedrag is waar het oog begint, daarna het
               lijstje, dan de belofte. */}
@@ -401,8 +404,9 @@ function VoorwaardenVenster({ isMobile, onClose }) {
           </div>
 
           <p style={{
-            margin: `${isMobile ? '2rem' : '3rem'} auto 0`,
-            maxWidth: 900, textAlign: 'center',
+            margin: `${isMobile ? '2rem' : '3rem'} auto ${isMobile ? '0.5rem' : '1rem'}`,
+            marginTop: 'auto',
+            maxWidth: 900, width: '100%', textAlign: 'center',
             paddingTop: isMobile ? '1.25rem' : '1.75rem',
             borderTop: '1px solid rgba(255,255,255,0.1)',
             fontSize: isMobile ? '1.2rem' : '1.75rem', fontWeight: 900,
