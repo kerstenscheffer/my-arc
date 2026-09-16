@@ -49,6 +49,136 @@ const SLIDES = REVIEWS.flatMap((review, i) => {
 })
 
 // De 3 pijlers — copy gelijk aan /16week (OfferPilarenSection).
+// ── De voorwaarden: schermvullend, zelfde opzet als de methode-slides ──────
+const GARANTIE_KAARTEN = [
+  { Icon: Target,    kop: 'Win je geld terug', tekst: 'Plan gevolgd? €300 terug, cash of doorrollen.' },
+  { Icon: Clock,     kop: '1-week garantie',   tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
+  { Icon: BadgeEuro, kop: '6-weken service',   tekst: 'Aan het eind niet het geld waard? Geld terug.' },
+]
+
+function VoorwaardenVenster({ isMobile, onClose }) {
+  useEffect(() => {
+    const toets = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', toets)
+    return () => window.removeEventListener('keydown', toets)
+  }, [onClose])
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: BG, color: '#fff',
+        display: 'flex', flexDirection: 'column',
+        animation: 'bladWaas 0.2s ease',
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      }}
+    >
+      {/* Banner met de titel erop, net als bij de methode. */}
+      <div style={{
+        position: 'relative', width: '100%', flexShrink: 0,
+        ...(isMobile ? { height: '30vh' } : { aspectRatio: '49 / 15', maxHeight: '46vh' }),
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'url(/voorwaarden-banner.jpg)',
+          backgroundSize: 'cover', backgroundPosition: 'center bottom',
+        }} />
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          height: '14%', pointerEvents: 'none',
+          background: `linear-gradient(180deg, rgba(0,0,0,0) 0%, ${BG} 100%)`,
+        }} />
+        <button
+          onClick={onClose}
+          aria-label="Sluiten"
+          style={{
+            position: 'absolute', top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 12 : 20}px)`,
+            right: isMobile ? 12 : 20,
+            width: 40, height: 40, padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 12, color: '#fff', cursor: 'pointer',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <X size={18} strokeWidth={2.8} />
+        </button>
+      </div>
+
+      <div style={{
+        flex: 1, minHeight: 0, overflowY: 'auto',
+        padding: isMobile ? '0 1.25rem 1.5rem' : '0 2rem 2.5rem',
+      }}>
+        <div style={{
+          maxWidth: 1000, width: '100%', margin: '0 auto',
+          marginTop: isMobile ? '2rem' : '3.5rem',
+        }}>
+          <div style={{
+            fontSize: isMobile ? '1.5rem' : '2.2rem', fontWeight: 900,
+            letterSpacing: '-0.03em', lineHeight: 1.1, textAlign: 'center',
+          }}>
+            Je risico is nul
+          </div>
+          <p style={{
+            margin: `${isMobile ? '0.85rem' : '1.1rem'} auto 0`,
+            maxWidth: 720, textAlign: 'center',
+            fontSize: isMobile ? '0.88rem' : '1.05rem', fontWeight: 700,
+            color: 'rgba(255,255,255,0.55)', lineHeight: 1.5,
+          }}>
+            Je legt €300 in. Die verdien je terug door het plan te volgen dat we
+            samen in je opstart-call maken. Wat precies telt, spreken we daar af
+            en zie je daarna in je app.
+          </p>
+
+          {/* Drie garanties naast elkaar, op telefoon onder elkaar. */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gap: isMobile ? '0.75rem' : '1rem',
+            marginTop: isMobile ? '1.75rem' : '2.5rem',
+          }}>
+            {GARANTIE_KAARTEN.map(g => (
+              <div key={g.kop} style={{
+                display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-start' : 'center',
+                gap: isMobile ? 6 : 10, textAlign: isMobile ? 'left' : 'center',
+                padding: isMobile ? '0.9rem 1rem' : '1.25rem 1rem',
+                borderRadius: 14,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}>
+                <g.Icon size={isMobile ? 22 : 30} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.95rem' : '1.15rem', fontWeight: 900,
+                  color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15,
+                }}>
+                  {g.kop}
+                </span>
+                <span style={{
+                  fontSize: isMobile ? '0.8rem' : '0.95rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.55)', lineHeight: 1.4,
+                }}>
+                  {g.tekst}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p style={{
+            margin: `${isMobile ? '1.5rem' : '2rem'} auto 0`,
+            maxWidth: 720, textAlign: 'center',
+            fontSize: isMobile ? '0.72rem' : '0.82rem', fontWeight: 700,
+            color: 'rgba(255,255,255,0.35)', lineHeight: 1.5,
+          }}>
+            Ziek of geblesseerd? Dan pauzeren we of haal je in. Je wordt niet
+            afgerekend op overmacht.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Blad dat vanaf de onderkant openschuift ──────────────────────────────────
 // Zelfde vorm als het blad in het log-scherm van de app: de pagina erachter
 // vervaagt, het blad komt van onderen omhoog en groeit mee met zijn inhoud tot
