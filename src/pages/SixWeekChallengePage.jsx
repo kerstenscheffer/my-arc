@@ -111,7 +111,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
         padding: isMobile ? '0 1.25rem 1.5rem' : '0 2rem 2.5rem',
       }}>
         <div style={{
-          maxWidth: 1000, width: '100%', margin: '0 auto',
+          maxWidth: 1250, width: '100%', margin: '0 auto',
           marginTop: isMobile ? '2rem' : '3.5rem',
         }}>
           {/* Hiërarchie: het bedrag is waar het oog begint, daarna het
@@ -140,7 +140,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             display: 'flex',
             flexDirection: isMobile ? 'column' : 'row',
             alignItems: 'center', justifyContent: 'center',
-            gap: isMobile ? '0.9rem' : '2rem',
+            gap: isMobile ? '0.9rem' : '2.75rem',
             marginTop: isMobile ? '1.25rem' : '1.75rem',
           }}>
             {GARANTIE_KAARTEN.map((g, n) => (
@@ -157,12 +157,13 @@ function VoorwaardenVenster({ isMobile, onClose }) {
                 <div style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
                   gap: isMobile ? 8 : 12, textAlign: 'center',
-                  width: isMobile ? '100%' : 280,
+                  width: isMobile ? '100%' : 330,
                 }}>
                   <g.Icon size={isMobile ? 32 : 54} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
                   <span style={{
                     fontSize: isMobile ? '1rem' : '1.4rem', fontWeight: 900,
                     color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
+                    whiteSpace: isMobile ? 'normal' : 'nowrap',
                   }}>
                     {g.kop}
                   </span>
