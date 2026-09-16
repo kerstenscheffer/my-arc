@@ -156,25 +156,38 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
 
   return (
     <div style={{ padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-      {/* Rij 1 — periode als aaneengesloten segmented control + volledig */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
-        <div style={{ display: 'inline-flex', flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
-          {PERIODS.filter(p => p.id !== 'lastMonth').map((p, i) => {
-            const active = period === p.id
-            return (
-              <button key={p.id} onClick={() => setPeriod(p.id)} style={{
-                minHeight: 32, padding: '0 0.8rem', border: 'none',
-                borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                background: active ? 'rgba(255,215,0,0.16)' : 'transparent',
-                color: active ? GOLD : 'rgba(255,255,255,0.6)',
-                fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>{PERIOD_SHORT[p.id] || p.label}</button>
-            )
-          })}
+      {/* Rij 1 — periode als dropdown, daarnaast de knop naar alle stats.
+          Was een rij van vier knoppen; die nam een hele regel in beslag. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
+        <div style={{
+          position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+          minHeight: 32, padding: '0 0.7rem', borderRadius: 9,
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+        }}>
+          <CalendarCheck size={13} color="rgba(255,255,255,0.55)" style={{ flexShrink: 0, marginRight: 6 }} />
+          <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
+            {PERIOD_SHORT[period] || 'Periode'}
+          </span>
+          <ChevronDown size={12} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0, marginLeft: 6 }} />
+          {/* De echte select ligt onzichtbaar over de knop: één tik opent de
+              lijst van het systeem, ook op telefoon. */}
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            aria-label="Periode"
+            style={{
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              opacity: 0, cursor: 'pointer', border: 'none', background: 'transparent',
+              fontFamily: 'inherit',
+            }}
+          >
+            {PERIODS.map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
         </div>
-        <button onClick={() => setShowWeek(true)} style={pill(false)} title="Volledige statistieken">
-          <BarChart3 size={13} /> Volledig
+        <button onClick={() => setShowWeek(true)} style={pill(false)} title="Alle statistieken">
+          <BarChart3 size={13} /> Stats
         </button>
       </div>
 

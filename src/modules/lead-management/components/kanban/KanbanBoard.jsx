@@ -1798,21 +1798,8 @@ export default function KanbanBoard({
               )}
             </button>
 
-            {/* Prioriteit-toggle (icon-only) — één knop die hot, warm én
-                call-voorgesteld combineert. Toont in één klik alle actie-leads. */}
-            <button
-              onClick={() => setGlobalPriorityOnly(v => !v)}
-              title={globalPriorityOnly ? 'Toon alle leads weer' : 'Toon alleen actie-leads (hot, warm of call voorgesteld)'}
-              style={{
-                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: globalPriorityOnly ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${globalPriorityOnly ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius: 8, color: globalPriorityOnly ? '#f87171' : 'rgba(255,255,255,0.5)',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Flame size={16} />
-            </button>
+            {/* De prioriteit-knop (vlam) staat nu in het filtervenster, samen
+                met de andere filters. */}
 
             {/* Start campagne — kies een outreach-campagne; daarna krijgt elke
                 card een campagne-DM-knop. Paars = actief. */}
@@ -1876,6 +1863,27 @@ export default function KanbanBoard({
                             </label>
                           )
                         })}
+                      </div>
+
+                      {/* Wat eerst als losse icoontjes in de balk stond: de
+                          actie-leads-knop en het meeladen van vrouwen. */}
+                      <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Snel</div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: globalPriorityOnly ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: globalPriorityOnly ? 700 : 500 }}>
+                          <input type="checkbox" checked={globalPriorityOnly} onChange={() => setGlobalPriorityOnly(v => !v)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                          Alleen actie-leads (hot, warm of call voorgesteld)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: metVrouwen ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: metVrouwen ? 700 : 500 }}>
+                          <input type="checkbox" checked={metVrouwen} onChange={wisselVrouwen} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                          Vrouwen meeladen
+                        </label>
+                        {/* De oog-knop is uit de balk; het verbergen zelf blijft
+                            hier bereikbaar, anders zit je vast aan wat er in
+                            localStorage staat. */}
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: namenVerborgen ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: namenVerborgen ? 700 : 500 }}>
+                          <input type="checkbox" checked={namenVerborgen} onChange={wisselNamen} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                          Namen verbergen (screenshot)
+                        </label>
                       </div>
 
                       {/* Temperatuur-filter */}
@@ -1950,17 +1958,7 @@ export default function KanbanBoard({
               )
             })()}
 
-            {/* Mijn berichten (icon-only) */}
-            <button onClick={() => setShowOutreachLogger(true)}
-              title="Bekijk je berichten en log hoeveel je vandaag verstuurde"
-              style={{
-                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(225,48,108,0.14)', border: '1px solid rgba(225,48,108,0.4)',
-                borderRadius: 8, color: '#E1306C', cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-              <Send size={16} />
-            </button>
+            {/* 'Mijn berichten' stond hier als los icoon; die knop is eruit. */}
 
             {/* Stats in/uitklappen — houdt de pagina rustig, stats op aanvraag */}
             <button onClick={() => setShowStats(v => !v)} title={showStats ? 'Statistieken verbergen' : 'Statistieken tonen'}
@@ -1968,31 +1966,16 @@ export default function KanbanBoard({
               <BarChart3 size={15} />
             </button>
 
-            {/* Namen verbergen — voor een deelbare screenshot van het bord. */}
-            <button onClick={wisselNamen}
-              title={namenVerborgen ? 'Namen zijn verborgen — klik om ze te tonen' : 'Namen verbergen voor een screenshot'}
-              style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: namenVerborgen ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${namenVerborgen ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: namenVerborgen ? '#FFD700' : 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              {namenVerborgen ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
+            {/* De oog-knop (namen verbergen) is eruit. */}
 
-            {/* Vrouwelijke leads meenemen. Standaard uit: dat scheelt ~1720
-                van de ~6900 leads bij het openen van het bord. */}
-            <button onClick={wisselVrouwen}
-              title={metVrouwen ? 'Vrouwen worden meegeladen — klik om ze over te slaan' : 'Vrouwen worden overgeslagen — klik om ze op te halen'}
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.45rem 0.65rem', background: metVrouwen ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${metVrouwen ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: metVrouwen ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Users size={14} /> {metVrouwen ? 'Incl. vrouwen' : 'Excl. vrouwen'}
-            </button>
+            {/* De vrouwen-schakelaar staat nu in het filtervenster. */}
 
             {/* Sectie */}
             <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
               style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.45rem 0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <Plus size={14} /> Sectie
             </button>
-            {/* Fullscreen */}
-            <button onClick={() => setIsFullscreen(true)} title="Volledig scherm"
-              style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Maximize2 size={15} />
-            </button>
+            {/* De knop voor volledig scherm is eruit. */}
 
             {/* Stage-switcher (mobiel) — rij BINNEN de balk (order:3), sluit aan
                 op de zoekbalk (zelfde achtergrond, geen losse strook eronder). */}
