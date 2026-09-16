@@ -172,10 +172,11 @@ function MethodeSlider({ isMobile, onClose }) {
         }} />
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          // Staat de tekst al op het beeld, dan alleen onderaan een zachte
-          // overgang naar zwart; anders zou de fade die tekst wegpoetsen.
+          // Beeld dat zelf al tekst draagt laten we helemaal met rust: geen
+          // fade, anders vreet die de onderste regel op. De gewone foto's
+          // lopen wel naar zwart, daar staat de kop overheen.
           background: p.beeldVult
-            ? `linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0) 78%, ${BG} 100%)`
+            ? 'none'
             : `linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.25) 30%, rgba(10,10,10,0.8) 72%, ${BG} 100%)`,
         }} />
         <button
