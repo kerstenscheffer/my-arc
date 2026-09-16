@@ -828,8 +828,8 @@ export default function KanbanCard({
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.3rem',
-          padding: isMobile ? '0.3rem 0.625rem' : '0.3rem 0.75rem',
+          gap: isMobile ? '0.5rem' : '0.6rem',
+          padding: isMobile ? '0.35rem 0.625rem' : '0.35rem 0.75rem',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           // Eén regel: lange campagne-/magnet-namen korten in met … i.p.v. naar
           // een nieuwe regel te springen.
@@ -837,6 +837,67 @@ export default function KanbanCard({
           overflow: 'hidden',
           minHeight: '22px'
         }}>
+          {/* Verplaats-naar-sectie dropdown — alternatief voor slepen (handig
+              als de doelsectie niet in beeld staat). */}
+          {onMoveToSection && sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).length > 0 && (
+            <>
+              <div
+                ref={moveBtnRef}
+                data-no-click
+                onClick={openMoveDropdown}
+                style={{
+                  flexShrink: 0,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '2px 0',
+                  background: 'transparent', border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <FolderInput size={12} color="#fff" strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span style={{
+                  fontSize: '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120,
+                }}>
+                  {previousSectionTitle || 'Move'}
+                </span>
+                <ChevronDown size={10} color="rgba(255,255,255,0.35)" style={{ flexShrink: 0 }} />
+              </div>
+
+              {/* Portal + fixed positie zodat de dropdown niet wordt geclipt
+                  door de card (overflow:hidden) of achter andere cards valt. */}
+              {showMoveDropdown && createPortal(
+                <div
+                  ref={moveMenuRef}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ position: 'fixed', top: movePos.top, left: movePos.left, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.7)', zIndex: 2147483600, minWidth: '170px', maxHeight: '260px', overflowY: 'auto' }}
+                >
+                  <div style={{ padding: '6px 10px', fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    {previousSectionTitle ? `Verplaats naar · nu uit ${previousSectionTitle}` : 'Verplaats naar'}
+                  </div>
+                  {sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).map(section => (
+                    <div
+                      key={section.id}
+                      onClick={(e) => { e.stopPropagation(); setShowMoveDropdown(false); onMoveToSection(section.id) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 11px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.85)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = `${section.color}18`}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: section.color, flexShrink: 0 }} />
+                      {section.title}
+                    </div>
+                  ))}
+                </div>,
+                modalHost
+              )}
+            </>
+          )}
+
+          {/* Return section dropdown — fixed-geportald zodat 'ie niet onder de
+              card valt (card heeft overflow:hidden). */}
+
+          {/* Streepje tussen de knoppen, nu de vakjes weg zijn. */}
+          <span style={{ flexShrink: 0, width: 1, height: 12, background: 'rgba(255,255,255,0.18)' }} />
+
           {/* Doel van de lead — wit zodra het ingevuld is, zodat je in één
               oogopslag ziet waar deze lead voor komt. */}
           <>
@@ -847,23 +908,20 @@ export default function KanbanCard({
               title={leadGoal ? DOEL_LABEL[leadGoal] : 'Doel kiezen'}
               style={{
                 flexShrink: 0,
-                display: 'flex', alignItems: 'center', gap: 3,
-                padding: '2px 6px',
-                background: leadGoal ? '#fff' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${leadGoal ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                borderRadius: 999,
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '2px 0',
+                background: 'transparent', border: 'none',
                 cursor: 'pointer',
-                transition: 'background 0.15s ease',
               }}
             >
-              <Target size={10} color={leadGoal ? '#0a0a0a' : 'rgba(255,255,255,0.7)'} style={{ flexShrink: 0 }} />
+              <Target size={12} color={leadGoal ? '#fff' : 'rgba(255,255,255,0.45)'} strokeWidth={2.4} style={{ flexShrink: 0 }} />
               <span style={{
-                fontSize: '0.58rem', fontWeight: 800, whiteSpace: 'nowrap',
-                color: leadGoal ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+                fontSize: '0.72rem', fontWeight: 900, whiteSpace: 'nowrap', letterSpacing: '-0.01em',
+                color: leadGoal ? '#fff' : 'rgba(255,255,255,0.45)',
               }}>
                 {leadGoal ? DOEL_LABEL[leadGoal] : 'Doel'}
               </span>
-              <ChevronDown size={9} color={leadGoal ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)'} style={{ flexShrink: 0 }} />
+              <ChevronDown size={10} color="rgba(255,255,255,0.35)" style={{ flexShrink: 0 }} />
             </div>
 
             {showGoalDropdown && createPortal(
@@ -898,88 +956,27 @@ export default function KanbanCard({
             )}
           </>
 
-          {/* Verplaats-naar-sectie dropdown — alternatief voor slepen (handig
-              als de doelsectie niet in beeld staat). */}
-          {onMoveToSection && sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).length > 0 && (
-            <>
-              <div
-                ref={moveBtnRef}
-                data-no-click
-                onClick={openMoveDropdown}
-                style={{
-                  flexShrink: 0,
-                  display: 'flex', alignItems: 'center', gap: 3,
-                  padding: '2px 6px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 999,
-                  cursor: 'pointer',
-                  transition: 'background 0.15s ease',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-              >
-                <FolderInput size={10} color="rgba(255,255,255,0.7)" style={{ flexShrink: 0 }} />
-                <span style={{
-                  fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 110,
-                }}>
-                  {previousSectionTitle || 'Move'}
-                </span>
-                <ChevronDown size={9} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
-              </div>
-
-              {/* Portal + fixed positie zodat de dropdown niet wordt geclipt
-                  door de card (overflow:hidden) of achter andere cards valt. */}
-              {showMoveDropdown && createPortal(
-                <div
-                  ref={moveMenuRef}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ position: 'fixed', top: movePos.top, left: movePos.left, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.7)', zIndex: 2147483600, minWidth: '170px', maxHeight: '260px', overflowY: 'auto' }}
-                >
-                  <div style={{ padding: '6px 10px', fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    {previousSectionTitle ? `Verplaats naar · nu uit ${previousSectionTitle}` : 'Verplaats naar'}
-                  </div>
-                  {sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).map(section => (
-                    <div
-                      key={section.id}
-                      onClick={(e) => { e.stopPropagation(); setShowMoveDropdown(false); onMoveToSection(section.id) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 11px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.85)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = `${section.color}18`}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: section.color, flexShrink: 0 }} />
-                      {section.title}
-                    </div>
-                  ))}
-                </div>,
-                modalHost
-              )}
-            </>
-          )}
-
-          {/* Return section dropdown — fixed-geportald zodat 'ie niet onder de
-              card valt (card heeft overflow:hidden). */}
           {/* De losse 'terug naar'-chip is samengevoegd met Move: die knop
               draagt nu de sectienaam waar de lead vandaan komt. */}
 
-          {/* Campaign banner — gold chip; naam kort in met … en krimpt mee. */}
+          {/* Campagne — naam kort in met … en krimpt mee. */}
+          {lead.outreach_campaign?.name && (
+            <span style={{ flexShrink: 0, width: 1, height: 12, background: 'rgba(255,255,255,0.18)' }} />
+          )}
           {lead.outreach_campaign?.name && (
             <span
               title={`Campagne: ${lead.outreach_campaign.name}${lead.outreach_campaign.variant_tag ? ` (${lead.outreach_campaign.variant_tag})` : ''}`}
               style={{
                 flexShrink: 1, minWidth: 0,
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '2px 8px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 999,
-                color: 'rgba(255,255,255,0.65)',
-                fontSize: '0.58rem', fontWeight: 800,
-                maxWidth: 170,
+                padding: '2px 0',
+                background: 'transparent', border: 'none',
+                color: '#fff',
+                fontSize: '0.72rem', fontWeight: 900, letterSpacing: '-0.01em',
+                maxWidth: 190,
               }}
             >
-              <Send size={10} style={{ flexShrink: 0 }} />
+              <Send size={12} strokeWidth={2.4} style={{ flexShrink: 0 }} />
               <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {lead.outreach_campaign.name}
                 {lead.outreach_campaign.variant_tag ? ` · ${lead.outreach_campaign.variant_tag}` : ''}
