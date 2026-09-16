@@ -1,5 +1,6 @@
 // src/modules/workout/services/WorkoutServiceNew.js
 import { createClient } from '@supabase/supabase-js'
+import { laadExerciseMeta, verrijkWeekStructure } from '../utils/exerciseMeta'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -242,7 +243,12 @@ class WorkoutServiceNew {
       console.log('🔍 getSchemaWithOverrides — clientId:', clientId, 'schemaId:', schema.id)
       const overrides = await this.getWeeklyOverrides(clientId, schema.id, db)
       console.log('🔍 Overrides raw:', JSON.stringify(overrides))
-      return this.applyOverridesToSchema(schema, overrides)
+      const metOverrides = this.applyOverridesToSchema(schema, overrides)
+      // Spiergroep en materiaal uit de exercises-tabel eroverheen: de kopieën
+      // in het schema en in de overrides lopen achter zodra de bron wordt
+      // gecorrigeerd. Zie utils/exerciseMeta.js.
+      const meta = await laadExerciseMeta(this._client(db))
+      return { ...metOverrides, week_structure: verrijkWeekStructure(metOverrides.week_structure, meta) }
     } catch (error) {
       console.error('❌ getSchemaWithOverrides failed:', error)
       return schema
