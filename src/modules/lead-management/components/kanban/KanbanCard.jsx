@@ -843,13 +843,16 @@ export default function KanbanCard({
               title="Lead verwijderen"
               style={{
                 flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: isMobile ? 32 : 22, height: isMobile ? 32 : 22, padding: 0,
-                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
-                borderRadius: isMobile ? 8 : 5, color: 'rgba(239,68,68,0.85)', cursor: 'pointer',
+                width: isMobile ? 26 : 20, height: isMobile ? 26 : 20, padding: 0,
+                background: 'transparent', border: 'none',
+                color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+                transition: 'color 0.15s ease',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#fff' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)' }}
             >
-              <Trash2 size={isMobile ? 15 : 12} />
+              <Trash2 size={isMobile ? 14 : 12} />
             </button>
           )}
         </div>
@@ -950,8 +953,11 @@ export default function KanbanCard({
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
               >
                 <FolderInput size={10} color="rgba(255,255,255,0.7)" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap' }}>
-                  Move
+                <span style={{
+                  fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 110,
+                }}>
+                  {previousSectionTitle || 'Move'}
                 </span>
                 <ChevronDown size={9} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
               </div>
@@ -965,7 +971,7 @@ export default function KanbanCard({
                   style={{ position: 'fixed', top: movePos.top, left: movePos.left, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.7)', zIndex: 2147483600, minWidth: '170px', maxHeight: '260px', overflowY: 'auto' }}
                 >
                   <div style={{ padding: '6px 10px', fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    Verplaats naar
+                    {previousSectionTitle ? `Verplaats naar · nu uit ${previousSectionTitle}` : 'Verplaats naar'}
                   </div>
                   {sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).map(section => (
                     <div
@@ -987,44 +993,8 @@ export default function KanbanCard({
 
           {/* Return section dropdown — fixed-geportald zodat 'ie niet onder de
               card valt (card heeft overflow:hidden). */}
-          {hasPreviousSection && (
-            <div style={{ position: 'relative', flexShrink: 0 }} ref={dropdownRef}>
-              <div
-                ref={returnBtnRef}
-                data-no-click
-                onClick={openReturnDropdown}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '2px 7px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 999,
-                  maxWidth: '130px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <ArrowLeftCircle size={10} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {previousSectionTitle}
-                </span>
-                <ChevronDown size={9} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
-              </div>
-
-              {showReturnDropdown && createPortal(
-                <div ref={returnMenuRef} onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: returnPos.top, left: returnPos.left, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', boxShadow: '0 10px 30px rgba(0,0,0,0.7)', zIndex: 2147483600, minWidth: '150px', maxHeight: '180px', overflowY: 'auto' }}>
-                  {sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).map(section => (
-                    <div key={section.id} onClick={async (e) => { e.stopPropagation(); setShowReturnDropdown(false); await onEdit({ previous_section_id: section.id, previous_section_title: section.title, previous_section_color: section.color }) }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)' }} onMouseEnter={(e) => e.currentTarget.style.background = `${section.color}15`} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: section.color, flexShrink: 0 }} />
-                      {section.title}
-                      {section.id === lead.previous_section_id && <span style={{ marginLeft: 'auto', fontSize: '0.6rem', color: section.color }}>✓</span>}
-                    </div>
-                  ))}
-                </div>,
-                modalHost
-              )}
-            </div>
-          )}
+          {/* De losse 'terug naar'-chip is samengevoegd met Move: die knop
+              draagt nu de sectienaam waar de lead vandaan komt. */}
 
           {/* Campaign banner — gold chip; naam kort in met … en krimpt mee. */}
           {lead.outreach_campaign?.name && (
@@ -1050,41 +1020,9 @@ export default function KanbanCard({
             </span>
           )}
 
-          {/* Source magnet banner — shows which lead magnet brought this lead
-              in. Distinct purple so it pops above the regular source pill.
-              Prefers the FK-linked source_lead_magnet (modern flow), but
-              falls back to the first entry of lead_magnets_shared so older
-              leads — created before source_lead_magnet_id existed — still
-              show their magnet on the card. */}
-          {(() => {
-            const magnetName =
-              lead.source_lead_magnet?.name ||
-              (Array.isArray(lead.lead_magnets_shared) && lead.lead_magnets_shared.length > 0
-                ? lead.lead_magnets_shared[0]
-                : null)
-            if (!magnetName) return null
-            return (
-              <span
-                title={`Binnengekomen via lead magnet: ${magnetName}`}
-                style={{
-                  flexShrink: 1, minWidth: 0,
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '2px 8px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 999,
-                  color: 'rgba(255,255,255,0.65)',
-                  fontSize: '0.58rem', fontWeight: 800,
-                  maxWidth: 170,
-                }}
-              >
-                <Gift size={10} style={{ flexShrink: 0 }} />
-                <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {magnetName}
-                </span>
-              </span>
-            )
-          })()}
+          {/* De lead-magnet-chip is van de kaart af: je ziet 'm in het
+              detailvenster en in de bron-breakdown, op de kaart was het
+              alleen ruis. */}
 
           {/* Opvolg-teller verhuisd naar de actie-strip onderaan. */}
         </div>
@@ -1111,13 +1049,13 @@ export default function KanbanCard({
             in de stijl van de meal-cards. Reacties · Opvolg · Later. ═══ */}
         <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <Stepper
-            label="Reacties van lead" Icon={MessageCircle}
+            label="Reacties van lead" Icon={MessageCircle} accent="#10b981"
             count={replyCount} disabled={updatingReply}
             onInc={(e) => handleReplyChange(1, e)}
           />
           <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
           <Stepper
-            label="Opvolg-berichten verstuurd" Icon={Send}
+            label="Opvolg-berichten verstuurd" Icon={Send} accent="#facc15"
             count={followupCount} disabled={updatingFollowup}
             onInc={(e) => handleFollowupChange(1, e)}
           />
@@ -1191,10 +1129,10 @@ export default function KanbanCard({
 // ── Teller-cel voor de actie-strip (reacties / opvolg) ──
 // De HELE cel is één +knop (tik = +1). Count + icoon blijven zichtbaar; geen
 // min-knop meer. Edge-to-edge in de stijl van de meal-card actie-cellen.
-// De tellers zijn feiten, geen waarschuwingen: wit als er iets staat, grijs
-// als het nul is. Het accent bepaalt alleen nog de hover-tint.
-function Stepper({ label, Icon, count, disabled, onInc }) {
-  const valColor = count > 0 ? '#fff' : 'rgba(255,255,255,0.35)'
+// De tellers houden hun eigen kleur: groen voor reacties van de lead, geel
+// voor wat jij hebt gestuurd. Op nul blijft het grijs.
+function Stepper({ label, Icon, accent = '#fff', count, disabled, onInc }) {
+  const valColor = count > 0 ? accent : 'rgba(255,255,255,0.35)'
   return (
     <button
       onClick={onInc}
@@ -1209,12 +1147,12 @@ function Stepper({ label, Icon, count, disabled, onInc }) {
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         transition: 'background 0.15s ease',
       }}
-      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = `${accent}12` }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
     >
       <Icon size={13} color={valColor} />
       <span style={{ fontSize: '0.78rem', fontWeight: 800, color: valColor }}>{count}</span>
-      <Plus size={13} color="rgba(255,255,255,0.4)" strokeWidth={2.6} />
+      <Plus size={13} color={accent} strokeWidth={2.6} style={{ opacity: 0.85 }} />
     </button>
   )
 }
