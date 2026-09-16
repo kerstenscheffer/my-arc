@@ -351,31 +351,8 @@ export default function KanbanCard({
   }
   const daysSinceStale = getDaysSinceStale()
 
-  // Dagen sinds laatste BEWUSTE actie van de coach (followup verstuurd of
-  // 'vandaag gehad'-tap). Automatische section-moves (stale detection)
-  // tellen NIET mee — de coach wil weten of zelf nog iets gedaan moet
-  // worden. Bij geen actie ooit: val terug op lead.created_at zodat de
-  // counter altijd zinvol gevuld is.
-  const getDaysSinceLastAction = () => {
-    const candidates = [lead.last_followup_sent_at, lead.contacted_today_date]
-      .filter(Boolean)
-      .map(v => new Date(v).getTime())
-      .filter(t => !Number.isNaN(t))
-    const ref = candidates.length > 0
-      ? Math.max(...candidates)
-      : (lead.created_at ? new Date(lead.created_at).getTime() : null)
-    if (!ref) return null
-    const days = Math.floor((Date.now() - ref) / (1000 * 60 * 60 * 24))
-    return Math.max(0, days)
-  }
-  const daysSinceAction = getDaysSinceLastAction()
-  // Kleur-codering: 0-2 groen, 3-6 amber, 7+ rood. Zo zie je in één oogopslag
-  // welke leads stilstaan en opvolging nodig hebben.
-  const actionColor = daysSinceAction == null
-    ? 'rgba(255,255,255,0.3)'
-    : daysSinceAction <= 2 ? '#10b981'
-    : daysSinceAction <= 6 ? '#f59e0b'
-    : '#ef4444'
+  // De dagen-sinds-actie-teller is met de badge meeverdwenen; stond hier
+  // alleen nog voor de kleur van die badge.
 
   // ============================================
   // ✅ HANDLERS — ALL PRESERVED FROM v6.2
