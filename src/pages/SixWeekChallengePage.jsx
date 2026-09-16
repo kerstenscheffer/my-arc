@@ -199,17 +199,9 @@ function MethodeSlider({ isMobile, onClose }) {
       {/* Tekst: wat het is, en wat we gaan doen. */}
       <div style={{
         flex: 1, minHeight: 0, overflowY: 'auto',
-        // Kolommen lopen tot de rand, net als het beeld erboven; een gewone
-        // lijst houdt zijn marge.
-        padding: p.beeldVult
-          ? (isMobile ? '0 0.75rem 1.25rem' : '0 0 2rem')
-          : (isMobile ? '0 1.25rem 1.25rem' : '0 2rem 2rem'),
+        padding: isMobile ? '0 1.25rem 1.25rem' : '0 2rem 2rem',
       }}>
-        <div style={{
-          maxWidth: p.beeldVult ? 1960 : 760, width: '100%', margin: '0 auto',
-          marginTop: p.beeldVult ? (isMobile ? 10 : 16) : (isMobile ? -18 : -28),
-          position: 'relative',
-        }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', marginTop: p.beeldVult ? (isMobile ? 10 : 16) : (isMobile ? -18 : -28), position: 'relative' }}>
           {/* Het label 'PIJLER x VAN 3' blijft weg als het beeld al tekst
               draagt; de titel staat er altijd, zodat elke slide op de pagina
               zelf zijn kop heeft. */}
@@ -243,52 +235,27 @@ function MethodeSlider({ isMobile, onClose }) {
 
           {/* Geen kopje boven de punten: de regels spreken voor zich. */}
           <div style={{ marginTop: p.beeldVult ? (isMobile ? '1.2rem' : '1.75rem') : 0 }} />
-
-          {p.beeldVult ? (
-            // Vier kolommen, precies onder de vier vlakken van de banner. Het
-            // kernwoord staat al op het beeld, dus hier alleen icoon en zin.
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
-              gap: isMobile ? '1.25rem 0.75rem' : '0 1.5rem',
+          {p.doen.map((regel, r) => (
+            <div key={regel.tekst} style={{
+              display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14,
+              padding: isMobile ? '0.75rem 0' : '1rem 0',
+              borderTop: r === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}>
-              {p.doen.map((regel) => (
-                <div key={regel.kop || regel.tekst} style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: isMobile ? 8 : 12, textAlign: 'center',
-                  padding: isMobile ? '0 0.25rem' : '0 0.5rem',
-                }}>
-                  <regel.Icon size={isMobile ? 22 : 30} strokeWidth={2.6} style={{ flexShrink: 0, color: '#fff' }} />
-                  <span style={{
-                    fontSize: isMobile ? '0.78rem' : '0.95rem', fontWeight: 700,
-                    color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, letterSpacing: '-0.01em',
-                  }}>
-                    {regel.tekst || regel.kop}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            p.doen.map((regel, r) => (
-              <div key={regel.tekst} style={{
-                display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14,
-                padding: isMobile ? '0.75rem 0' : '1rem 0',
-                borderTop: r === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
+              <regel.Icon size={isMobile ? 18 : 24} strokeWidth={2.8} style={{ flexShrink: 0, color: '#fff' }} />
+              <span style={{
+                fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
               }}>
-                <regel.Icon size={isMobile ? 18 : 24} strokeWidth={2.8} style={{ flexShrink: 0, color: '#fff' }} />
-                <span style={{
-                  fontSize: isMobile ? '0.88rem' : '1.1rem', fontWeight: 700,
-                  color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
-                }}>
-                  {regel.kop && (
-                    <span style={{ color: '#fff', fontWeight: 900 }}>{regel.kop}{regel.tekst ? ': ' : ''}</span>
-                  )}
-                  {regel.tekst}
-                </span>
-              </div>
-            ))
-          )}
+                {/* Dubbele punt in plaats van een streepje; staat er geen zin
+                    achter, dan ook geen dubbele punt. */}
+                {regel.kop && (
+                  <span style={{ color: '#fff', fontWeight: 900 }}>{regel.kop}{regel.tekst ? ': ' : ''}</span>
+                )}
+                {regel.tekst}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
