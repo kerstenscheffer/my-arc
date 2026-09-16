@@ -27,7 +27,6 @@ import CallProposalModal from './CallProposalModal'
 import DMBibleModal from '../DMBibleModal'
 import StartCampaignModal from '../StartCampaignModal'
 
-const SNOOZE_SECTION_PATTERNS = ['later follow', 'later opvolg', 'follow up', 'followup', 'snooze', 'parkeer']
 
 // "Nieuwe volgers"-kolom — hier krijgt elke card een DM-Run knop (75 volgers
 // snel opvolgen via Instagram DM). Vaste section_id zodat de knop + de teller
@@ -372,7 +371,6 @@ export default function KanbanBoard({
   // Tracks whether we've already attempted to auto-create the default snooze
   // section this session, so the effect below stays idempotent if it re-fires
   // (e.g. after sections state updates).
-  const snoozeAutoCreatedRef = useRef(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [salesCallLead, setSalesCallLead] = useState(null)
   const fullscreenContentRef = useRef(null)
@@ -1470,7 +1468,6 @@ export default function KanbanBoard({
   // RENDER: LEAD CARD WRAPPER — PRESERVED
   // ========================================
   const renderLeadCard = (lead, section) => {
-    const isThisSnooze = isSnoozeSectionById(section.id)
     const qualScore = [lead.qual_goal_checked, lead.qual_pain_checked, lead.qual_urgency_checked, lead.qual_open_checked].filter(Boolean).length
     const isCallReady = qualScore >= 3
     let cardShadow = 'none'
@@ -1551,7 +1548,6 @@ export default function KanbanBoard({
           const isBeingDragged = draggedSection?.id === section.id
           const isSectionDrop = dragOverForSection === section.id
           const isLeadDrop = dragOverSectionId === section.id
-          const isThisSnooze = isSnoozeSectionById(section.id)
           const contactedCount = getContactedTodayCount(section)
           // DM-Run voortgang — alleen in de "Nieuwe volgers"-kolom.
           const isNieuweVolgers = section.id === NIEUWE_VOLGERS_SECTION_ID
@@ -1595,7 +1591,6 @@ export default function KanbanBoard({
                   flex: 1, display: 'flex', alignItems: 'center', gap: '0.3rem'
                 }}>
                   {section.title}
-                  {isThisSnooze && <Clock size={11} style={{ opacity: 0.5 }} />}
                 </h3>
 
                 {/* Count */}

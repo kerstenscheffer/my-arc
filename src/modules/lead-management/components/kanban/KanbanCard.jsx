@@ -95,7 +95,6 @@ export default function KanbanCard({
   onDragStart,
   onEdit,
   onDelete,
-  onSnooze,
   onClick,
   sections = [],
   currentSectionId,
@@ -155,7 +154,6 @@ export default function KanbanCard({
     }
     return `${maskeer(voor)} ${maskeer(achter)}`.trim() || '•••••'
   })()
-  const [snoozingLead, setSnoozingLead] = useState(false)
   const [contactedToday, setContactedToday] = useState(false)
   const [updatingContacted, setUpdatingContacted] = useState(false)
   // DM-Run status (alleen relevant in de "Nieuwe volgers"-kolom). Bron van
@@ -293,7 +291,6 @@ export default function KanbanCard({
   // COMPUTED VALUES
   // ============================================
   const previousSectionTitle = lead.previous_section_title || ''
-  const isSnoozed = lead.is_snoozed || false
   // Elke lead toont standaard "cold" als er nog geen temperatuur gezet is —
   // zo is het één klik om iemand op warm/hot te zetten. We tonen de lokale
   // (optimistische) waarde zodat een keuze meteen zichtbaar is.
@@ -491,19 +488,6 @@ export default function KanbanCard({
       console.error('Update followup count failed:', error)
     } finally {
       setUpdatingFollowup(false)
-    }
-  }
-
-  const handleSnooze = async (e) => {
-    e.stopPropagation()
-    if (snoozingLead || !onSnooze) return
-    setSnoozingLead(true)
-    try {
-      await onSnooze(lead.id)
-    } catch (error) {
-      console.error('Snooze lead failed:', error)
-    } finally {
-      setSnoozingLead(false)
     }
   }
 
@@ -731,11 +715,6 @@ export default function KanbanCard({
               <Flame size={9} color="#D4AF37" />
               <span style={{ fontSize: '0.6rem', fontWeight: '700', color: '#D4AF37', letterSpacing: '0.04em' }}>CALL</span>
             </span>
-          )}
-
-          {/* Snoozed badge */}
-          {isSnoozed && !isCallReady && !contactedToday && (
-            <Clock size={11} color="#fbbf24" style={{ opacity: 0.6, flexShrink: 0 }} />
           )}
 
           {/* Sales call badge */}
@@ -1023,27 +1002,8 @@ export default function KanbanCard({
             count={followupCount} disabled={updatingFollowup}
             onInc={(e) => handleFollowupChange(1, e)}
           />
-          {onSnooze && !isSnoozed && (
-            <>
-              <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-              <button
-                onClick={handleSnooze}
-                disabled={snoozingLead}
-                title="Later opvolgen"
-                style={{
-                  flex: '0 0 auto',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                  padding: isMobile ? '0 0.75rem' : '0 0.95rem', minHeight: 34,
-                  background: 'transparent', border: 'none',
-                  color: 'rgba(255,255,255,0.55)', fontSize: '0.62rem', fontWeight: 800,
-                  cursor: snoozingLead ? 'wait' : 'pointer', opacity: snoozingLead ? 0.5 : 1,
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <Clock size={12} /> Later
-              </button>
-            </>
-          )}
+          {/* De Later-knop (snooze) is eruit; die hoorde bij een sectie die
+              telkens opnieuw werd aangemaakt. */}
         </div>
 
         {/* Inline info panel removed — opens in LeadDetailModalV2. */}

@@ -61,12 +61,9 @@ export default function KanbanColumn({
   onLeadEdit,
   onLeadDelete,
   onLeadClick,
-  onSnoozeLead,
   onOpenSettings,
   onAddLead,
   // Snooze detection
-  isSnoozeSection = false,
-  snoozeSection = null
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [sortMode, setSortMode] = useState('default')
@@ -225,7 +222,6 @@ export default function KanbanColumn({
               gap: '0.4rem' 
             }}>
               {section.title}
-              {isSnoozeSection && <Clock size={14} style={{ opacity: 0.7 }} />}
             </h3>
 
             {/* Lead Count Badge */}
@@ -447,7 +443,6 @@ export default function KanbanColumn({
                 onEdit={(updates) => onLeadEdit?.(lead, section, updates)}
                 onDelete={() => onLeadDelete?.(lead)}
                 onClick={onLeadClick}
-                onSnooze={snoozeSection && !isSnoozeSection ? onSnoozeLead : null}
               />
             ))}
 
