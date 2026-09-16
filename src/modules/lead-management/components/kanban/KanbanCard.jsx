@@ -109,7 +109,6 @@ export default function KanbanCard({
   activeCampaign = null,
 }) {
   const modalHost = useModalHost()
-  const [showReturnDropdown, setShowReturnDropdown] = useState(false)
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
   const [movePos, setMovePos] = useState({ top: 0, left: 0 })
   const moveBtnRef = useRef(null)
@@ -121,9 +120,6 @@ export default function KanbanCard({
   const [leadGoal, setLeadGoal] = useState(lead.lead_goal || '')
   const goalBtnRef = useRef(null)
   const goalMenuRef = useRef(null)
-  const [returnPos, setReturnPos] = useState({ top: 0, left: 0 })
-  const returnBtnRef = useRef(null)
-  const returnMenuRef = useRef(null)
   const [showTempDropdown, setShowTempDropdown] = useState(false)
   const [tempPos, setTempPos] = useState({ top: 0, left: 0 })
   const tempBtnRef = useRef(null)
@@ -135,7 +131,6 @@ export default function KanbanCard({
   // Central tabbed lead-detail modal — primary path for "open this lead and
   // see/edit everything". Triggered by card click + by the explicit button.
   const [showDetail, setShowDetail] = useState(false)
-  const dropdownRef = useRef(null)
 
   const [replyCount, setReplyCount] = useState(lead.reply_count || 0)
   const [updatingReply, setUpdatingReply] = useState(false)
@@ -189,26 +184,6 @@ export default function KanbanCard({
   // NOTE: magnet picker uses createPortal with its own backdrop, so NOT handled here
   // De return-dropdown is óók fixed-geportald (zoals de move-dropdown) zodat 'ie
   // niet onder de card valt — daarom checken we hier zowel de knop als het menu.
-  useEffect(() => {
-    if (!showReturnDropdown) return
-    const handleClickOutside = (event) => {
-      const inBtn = returnBtnRef.current && returnBtnRef.current.contains(event.target)
-      const inMenu = returnMenuRef.current && returnMenuRef.current.contains(event.target)
-      if (!inBtn && !inMenu) setShowReturnDropdown(false)
-    }
-    const closeOnScroll = (ev) => {
-      if (returnMenuRef.current && returnMenuRef.current.contains(ev.target)) return
-      setShowReturnDropdown(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('touchstart', handleClickOutside)
-    window.addEventListener('scroll', closeOnScroll, true)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('touchstart', handleClickOutside)
-      window.removeEventListener('scroll', closeOnScroll, true)
-    }
-  }, [showReturnDropdown])
 
   useEffect(() => {
     if (!showMoveDropdown) return
@@ -303,13 +278,6 @@ export default function KanbanCard({
     catch (e) { console.error('Doel opslaan mislukt:', e); setLeadGoal(vorig) }
   }
 
-  const openReturnDropdown = (e) => {
-    e.stopPropagation()
-    if (showReturnDropdown) { setShowReturnDropdown(false); return }
-    const r = returnBtnRef.current?.getBoundingClientRect()
-    if (r) setReturnPos({ top: r.bottom + 4, left: r.left })
-    setShowReturnDropdown(true)
-  }
 
   useEffect(() => {
     if (lead.contacted_today_date) {
@@ -324,7 +292,6 @@ export default function KanbanCard({
   // ============================================
   // COMPUTED VALUES
   // ============================================
-  const hasPreviousSection = lead.previous_section_id && lead.previous_section_title
   const previousSectionTitle = lead.previous_section_title || ''
   const isSnoozed = lead.is_snoozed || false
   // Elke lead toont standaard "cold" als er nog geen temperatuur gezet is —
