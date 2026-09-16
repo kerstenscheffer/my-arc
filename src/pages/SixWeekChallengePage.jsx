@@ -88,7 +88,9 @@ const PIJLERS = [
     ],
   },
   {
-    foto: '/methode/begeleiding.jpg',
+    foto: '/methode/begeleiding-slide.jpg',
+    beeldVult: true,
+    titelInBeeld: true,
     kop: 'Coach in jouw corner',
     zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
     doen: [
