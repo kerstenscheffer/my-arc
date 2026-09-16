@@ -325,7 +325,6 @@ export default function KanbanCard({
   // COMPUTED VALUES
   // ============================================
   const hasPreviousSection = lead.previous_section_id && lead.previous_section_title
-  const previousSectionColor = lead.previous_section_color || '#6b7280'
   const previousSectionTitle = lead.previous_section_title || ''
   const isSnoozed = lead.is_snoozed || false
   // Elke lead toont standaard "cold" als er nog geen temperatuur gezet is —
@@ -703,23 +702,25 @@ export default function KanbanCard({
             data-no-click
             onClick={openTempDropdown}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: '2px',
-              padding: '1px 4px 1px 5px',
-              background: tempConfig.bg,
-              border: `1px solid ${tempConfig.border}`,
-              borderRadius: '3px',
-              fontSize: '0.6rem',
-              fontWeight: '700',
-              color: tempConfig.color,
-              letterSpacing: '0.05em',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '2px 7px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 999,
+              fontSize: '0.58rem',
+              fontWeight: 800,
+              color: 'rgba(255,255,255,0.7)',
+              letterSpacing: '0.04em',
               cursor: 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
               lineHeight: 1.4
             }}
           >
+            {/* Alleen een stip houdt de kleur; het vak eromheen schreeuwde. */}
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: tempConfig.color, flexShrink: 0 }} />
             {tempConfig.label}
-            <ChevronDown size={8} style={{ flexShrink: 0, opacity: 0.7 }} />
+            <ChevronDown size={9} style={{ flexShrink: 0, opacity: 0.5 }} />
           </button>
           {showTempDropdown && createPortal(
             <div
@@ -820,10 +821,10 @@ export default function KanbanCard({
               style={{
                 flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 minHeight: 28, padding: isMobile ? '0 0.7rem' : '0 0.6rem',
-                background: campaignDmDone ? 'rgba(16,185,129,0.14)' : 'rgba(168,85,247,0.16)',
-                border: `1px solid ${campaignDmDone ? 'rgba(16,185,129,0.4)' : 'rgba(168,85,247,0.45)'}`,
-                borderRadius: 8,
-                color: campaignDmDone ? '#10b981' : '#a855f7',
+                background: campaignDmDone ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${campaignDmDone ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                borderRadius: 999,
+                color: campaignDmDone ? '#10b981' : 'rgba(255,255,255,0.7)',
                 fontSize: isMobile ? '0.62rem' : '0.6rem', fontWeight: 800, letterSpacing: '0.04em',
                 cursor: campaignDmDone ? 'default' : 'pointer',
                 opacity: dmBusy ? 0.6 : 1,
@@ -993,21 +994,21 @@ export default function KanbanCard({
                 data-no-click
                 onClick={openReturnDropdown}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '3px',
-                  padding: '2px 6px',
-                  background: `${previousSectionColor}10`,
-                  border: `1px solid ${previousSectionColor}25`,
-                  borderRadius: '3px',
-                  maxWidth: '120px',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '2px 7px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 999,
+                  maxWidth: '130px',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
               >
-                <ArrowLeftCircle size={9} color={previousSectionColor} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.6rem', fontWeight: '600', color: previousSectionColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <ArrowLeftCircle size={10} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {previousSectionTitle}
                 </span>
-                <span style={{ fontSize: '0.4rem', color: previousSectionColor }}>▼</span>
+                <ChevronDown size={9} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
               </div>
 
               {showReturnDropdown && createPortal(
@@ -1032,12 +1033,12 @@ export default function KanbanCard({
               style={{
                 flexShrink: 1, minWidth: 0,
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '3px 8px',
-                background: 'rgba(255,215,0,0.12)',
-                border: '1px solid rgba(255,215,0,0.32)',
-                borderRadius: 6,
-                color: '#FFD700',
-                fontSize: '0.6rem', fontWeight: 700,
+                padding: '2px 8px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 999,
+                color: 'rgba(255,255,255,0.65)',
+                fontSize: '0.58rem', fontWeight: 800,
                 maxWidth: 170,
               }}
             >
@@ -1068,12 +1069,12 @@ export default function KanbanCard({
                 style={{
                   flexShrink: 1, minWidth: 0,
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '3px 8px',
-                  background: 'rgba(168,85,247,0.14)',
-                  border: '1px solid rgba(168,85,247,0.38)',
-                  borderRadius: 6,
-                  color: '#c4a4f7',
-                  fontSize: '0.6rem', fontWeight: 700,
+                  padding: '2px 8px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 999,
+                  color: 'rgba(255,255,255,0.65)',
+                  fontSize: '0.58rem', fontWeight: 800,
                   maxWidth: 170,
                 }}
               >
@@ -1110,13 +1111,13 @@ export default function KanbanCard({
             in de stijl van de meal-cards. Reacties · Opvolg · Later. ═══ */}
         <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <Stepper
-            label="Reacties van lead" Icon={MessageCircle} accent="#10b981"
+            label="Reacties van lead" Icon={MessageCircle}
             count={replyCount} disabled={updatingReply}
             onInc={(e) => handleReplyChange(1, e)}
           />
           <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
           <Stepper
-            label="Opvolg-berichten verstuurd" Icon={Send} accent="#FFD700"
+            label="Opvolg-berichten verstuurd" Icon={Send}
             count={followupCount} disabled={updatingFollowup}
             onInc={(e) => handleFollowupChange(1, e)}
           />
@@ -1132,7 +1133,7 @@ export default function KanbanCard({
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                   padding: isMobile ? '0 0.75rem' : '0 0.95rem', minHeight: 34,
                   background: 'transparent', border: 'none',
-                  color: '#fbbf24', fontSize: '0.62rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.55)', fontSize: '0.62rem', fontWeight: 800,
                   cursor: snoozingLead ? 'wait' : 'pointer', opacity: snoozingLead ? 0.5 : 1,
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
@@ -1190,8 +1191,10 @@ export default function KanbanCard({
 // ── Teller-cel voor de actie-strip (reacties / opvolg) ──
 // De HELE cel is één +knop (tik = +1). Count + icoon blijven zichtbaar; geen
 // min-knop meer. Edge-to-edge in de stijl van de meal-card actie-cellen.
-function Stepper({ label, Icon, accent, count, disabled, onInc }) {
-  const valColor = count > 0 ? accent : 'rgba(255,255,255,0.4)'
+// De tellers zijn feiten, geen waarschuwingen: wit als er iets staat, grijs
+// als het nul is. Het accent bepaalt alleen nog de hover-tint.
+function Stepper({ label, Icon, count, disabled, onInc }) {
+  const valColor = count > 0 ? '#fff' : 'rgba(255,255,255,0.35)'
   return (
     <button
       onClick={onInc}
@@ -1206,12 +1209,12 @@ function Stepper({ label, Icon, accent, count, disabled, onInc }) {
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         transition: 'background 0.15s ease',
       }}
-      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = `${accent}12` }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
     >
       <Icon size={13} color={valColor} />
       <span style={{ fontSize: '0.78rem', fontWeight: 800, color: valColor }}>{count}</span>
-      <Plus size={13} color={accent} strokeWidth={2.6} style={{ opacity: 0.75 }} />
+      <Plus size={13} color="rgba(255,255,255,0.4)" strokeWidth={2.6} />
     </button>
   )
 }
