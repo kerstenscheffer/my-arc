@@ -70,11 +70,27 @@ function rangeFor(period, custom) {
   return { start: start.toISOString(), end: now.toISOString() }
 }
 
-export default function PeriodStatsBar({ leadService, coachId, isMobile, refreshKey = 0 }) {
-  const [period, setPeriod] = useState('day')
-  const [customRange, setCustomRange] = useState({ start: '', end: '' })
+// De periode-keuze en de knop naar alle statistieken staan in de werkbalk van
+// het bord, zodat die regel niet twee keer voorkomt. Deze balk toont dan
+// alleen nog de cijfers. Zonder die props stuurt hij zichzelf aan, zoals
+// eerst.
+export default function PeriodStatsBar({
+  leadService, coachId, isMobile, refreshKey = 0,
+  period: periodProp = null, onPeriodChange = null,
+  customRange: customProp = null, onCustomRange = null,
+  showWeek: showWeekProp = null, onShowWeek = null,
+  verbergControls = false,
+}) {
+  const [periodEigen, setPeriodEigen] = useState('day')
+  const [customEigen, setCustomEigen] = useState({ start: '', end: '' })
+  const period = periodProp ?? periodEigen
+  const setPeriod = onPeriodChange || setPeriodEigen
+  const customRange = customProp ?? customEigen
+  const setCustomRange = onCustomRange || setCustomEigen
   const [open, setOpen] = useState(false)
-  const [showWeek, setShowWeek] = useState(false)
+  const [showWeekEigen, setShowWeekEigen] = useState(false)
+  const showWeek = showWeekProp ?? showWeekEigen
+  const setShowWeek = onShowWeek || setShowWeekEigen
   const [loading, setLoading] = useState(true)
   const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, callGevoerd: 0, sales: 0, omzet: 0, noshow: 0, afgewezen: 0, saleVerloren: 0, nietGeschikt: 0 })
   const [timeSeries, setTimeSeries] = useState([])
@@ -156,6 +172,8 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
 
   return (
     <div style={{ padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+{!verbergControls && (
+        <>
       {/* Rij 1 — periode als dropdown, daarnaast de knop naar alle stats.
           Was een rij van vier knoppen; die nam een hele regel in beslag. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
@@ -190,8 +208,10 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
           <BarChart3 size={13} /> Stats
         </button>
       </div>
+        </>
+      )}
 
-      {/* Aangepaste datum-range — alleen bij 'Datum' */}
+            {/* Aangepaste datum-range — alleen bij 'Datum' */}
       {period === 'custom' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <input type="date" value={customRange.start} max={customRange.end || undefined}
