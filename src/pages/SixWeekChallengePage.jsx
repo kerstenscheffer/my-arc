@@ -70,10 +70,10 @@ const PIJLERS = [
     kop: 'Weet wat je eet',
     zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
     doen: [
-      { Icon: ClipboardList, kop: 'Structuur',     tekst: 'Plan voor jouw doel staat klaar. Nul denkwerk.' },
-      { Icon: Utensils,      kop: 'Keuze',         tekst: '500 gerechten die in je plan passen.' },
-      { Icon: PartyPopper,   kop: 'Flexibiliteit', tekst: 'Etentjes en vakanties leren we mee omgaan.' },
-      { Icon: ShieldCheck,   kop: 'Zekerheid',     tekst: 'Zeker weten dat het klopt. Nooit meer gokken.' },
+      { Icon: ClipboardList, kop: 'Structuur',     tekst: 'Plan staat klaar. Nul denkwerk.' },
+      { Icon: Utensils,      kop: 'Keuze',         tekst: '500 gerechten in jouw plan.' },
+      { Icon: PartyPopper,   kop: 'Flexibiliteit', tekst: 'Etentjes leren we mee omgaan.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',     tekst: 'Weten dat het klopt.' },
     ],
   },
   {
@@ -83,10 +83,10 @@ const PIJLERS = [
     kop: 'Elke training telt',
     zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
     doen: [
-      { Icon: ClipboardList, kop: 'Schema',          tekst: 'Jouw dagen, jouw locatie, jouw niveau.' },
-      { Icon: Crosshair,     kop: 'Focus',           tekst: 'Precies doen wat telt. Niks erbij.' },
-      { Icon: TrendingUp,    kop: 'Resultaatgericht', tekst: 'Elke week zwaarder of meer reps. Dat is de graadmeter.' },
-      { Icon: ShieldCheck,   kop: 'Zekerheid',       tekst: 'Precies weten hoe, hoeveel en welke oefeningen. Nooit meer twijfelen.' },
+      { Icon: ClipboardList, kop: 'Schema',           tekst: 'Jouw dagen, locatie, niveau.' },
+      { Icon: Crosshair,     kop: 'Focus',            tekst: 'Alleen wat telt.' },
+      { Icon: TrendingUp,    kop: 'Resultaatgericht', tekst: 'Zie dat het werkt.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',        tekst: 'Hoe, hoeveel, welke. Nooit twijfelen.' },
     ],
   },
   {
@@ -96,10 +96,10 @@ const PIJLERS = [
     kop: 'Coach in jouw corner',
     zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
     doen: [
-      { Icon: LineChart,          kop: 'Cijfers',   tekst: 'Ik kijk dagelijks mee en stuur op data.' },
-      { Icon: SlidersHorizontal,  kop: 'Bijsturen', tekst: 'Stilstaan is geen optie. Ik pas aan wanneer nodig.' },
-      { Icon: ClipboardCheck,     kop: 'Check-in',  tekst: 'Elke week: wat liep vast, wat doen we volgende week anders.' },
-      { Icon: Video,              kop: 'Weekcall',  tekst: 'Elke week samen kijken wat werkt en wat niet.' },
+      { Icon: LineChart,          kop: 'Cijfers',   tekst: 'Kijk dagelijks mee, stuur op data.' },
+      { Icon: SlidersHorizontal,  kop: 'Bijsturen', tekst: 'Stilstaan is geen optie.' },
+      { Icon: ClipboardCheck,     kop: 'Check-in',  tekst: 'Wat liep vast, wat gaat anders.' },
+      { Icon: Video,              kop: 'Weekcall',  tekst: 'Wat werkt, wat niet.' },
     ],
   },
 ]
@@ -263,8 +263,8 @@ function MethodeSlider({ isMobile, onClose }) {
                 </span>
                 {regel.kop && regel.tekst && (
                   <span style={{
-                    fontSize: isMobile ? '0.72rem' : '0.92rem', fontWeight: 600,
-                    color: 'rgba(255,255,255,0.6)', lineHeight: 1.4,
+                    fontSize: isMobile ? '0.75rem' : '0.95rem', fontWeight: 800,
+                    color: '#fff', lineHeight: 1.4,
                   }}>
                     {regel.tekst}
                   </span>
