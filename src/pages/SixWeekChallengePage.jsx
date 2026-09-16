@@ -63,6 +63,8 @@ const PIJLERS = [
     // weg uit de tekst eronder, anders staat alles er twee keer.
     foto: '/methode/voeding-slide.jpg',
     beeldVult: true,
+    // De titel staat op dit beeld, dus de pagina zet er geen tweede boven.
+    titelInBeeld: true,
     kop: 'Weet wat je eet',
     zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
     doen: [
@@ -211,14 +213,16 @@ function MethodeSlider({ isMobile, onClose }) {
               PIJLER {i + 1} VAN {PIJLERS.length}
             </div>
           )}
-          <div style={{
-            fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
-            letterSpacing: '-0.03em', lineHeight: 1.08,
-            textShadow: '0 2px 14px rgba(0,0,0,0.85)',
-          }}>
-            <span style={{ color: GOLD }}>{i + 1}. </span>
-            {p.kop}
-          </div>
+          {!p.titelInBeeld && (
+            <div style={{
+              fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
+              letterSpacing: '-0.03em', lineHeight: 1.08,
+              textShadow: '0 2px 14px rgba(0,0,0,0.85)',
+            }}>
+              <span style={{ color: GOLD }}>{i + 1}. </span>
+              {p.kop}
+            </div>
+          )}
           {!p.beeldVult && (
             <p style={{
               margin: `${isMobile ? 10 : 14}px 0 ${isMobile ? '1.4rem' : '2rem'}`,
