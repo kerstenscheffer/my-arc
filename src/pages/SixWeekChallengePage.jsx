@@ -244,9 +244,9 @@ function MethodeSlider({ isMobile, onClose }) {
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${p.doen.length}, 1fr)`,
-            gap: isMobile ? '1.5rem 0.75rem' : '2rem',
+            gap: isMobile ? '1.75rem 1rem' : '3.5rem',
             width: '100%',
-            maxWidth: isMobile ? '100%' : 1100,
+            maxWidth: isMobile ? '100%' : 1250,
             margin: '0 auto',
           }}>
             {p.doen.map((regel) => (
@@ -254,17 +254,17 @@ function MethodeSlider({ isMobile, onClose }) {
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 gap: isMobile ? 9 : 16, textAlign: 'center',
               }}>
-                <regel.Icon size={isMobile ? 30 : 56} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                <regel.Icon size={isMobile ? 32 : 60} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
                 <span style={{
-                  fontSize: isMobile ? '0.85rem' : '1.25rem', fontWeight: 900,
-                  color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.15,
+                  fontSize: isMobile ? '0.95rem' : '1.45rem', fontWeight: 900,
+                  color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15,
                 }}>
                   {regel.kop || regel.tekst}
                 </span>
                 {regel.kop && regel.tekst && (
                   <span style={{
-                    fontSize: isMobile ? '0.75rem' : '0.95rem', fontWeight: 800,
-                    color: '#fff', lineHeight: 1.4,
+                    fontSize: isMobile ? '0.82rem' : '1.05rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.55)', lineHeight: 1.4,
                   }}>
                     {regel.tekst}
                   </span>
