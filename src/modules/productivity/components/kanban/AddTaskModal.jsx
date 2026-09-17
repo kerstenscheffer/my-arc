@@ -11,7 +11,7 @@
 //      doesn't nuke the work.
 
 import { useEffect, useRef, useState } from 'react'
-import { Calendar, Flag, Tag, Clock, Plus, Trash2, Timer, Layers, Repeat, CheckCircle2, CalendarMinus, MessageSquare, Palette, History } from 'lucide-react'
+import { Calendar, Flag, Tag, Clock, Plus, Trash2, Timer, Layers, Repeat, CheckCircle2, CalendarMinus, MessageSquare, Palette, History, ListChecks } from 'lucide-react'
 import TaskLogSection from './TaskLogSection'
 import { Venster, VensterKop, VensterVoet, Keuzevak, Kopje, Stat, Punt, Pil, Chip, Knop } from '../../../../components/arc-ui'
 import { keuzeSelect } from '../../../../components/arc-tokens'
@@ -253,8 +253,13 @@ export default function AddTaskModal({
     if (userChoice) { await flushPending(); onClose() }
   }
 
+  // Schermvullend, en op een breed scherm in twee kolommen: links waar je aan
+  // werkt (titel en stappen), rechts waar je hem mee instelt. Eén kolom over
+  // de volle breedte zou een lint van 1600 pixels worden.
+  const breed = !isMobile
+
   return (
-    <Venster isMobile={isMobile} onClose={handleAttemptClose} maxWidth={480}>
+    <Venster isMobile={isMobile} onClose={handleAttemptClose} vol maxWidth={1180}>
       <VensterKop
         isMobile={isMobile}
         titel={isEditMode ? 'Task bewerken' : 'Nieuwe task'}
@@ -271,6 +276,17 @@ export default function AddTaskModal({
 
         {/* ═══ FORM ═══ */}
         <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div style={{
+            width: '100%',
+            display: breed ? 'grid' : 'block',
+            gridTemplateColumns: breed ? 'minmax(0, 1fr) 420px' : undefined,
+            gap: breed ? '1.5rem' : 0,
+            alignItems: 'start',
+            padding: breed ? '0.5rem 0 2.5rem' : 0,
+          }}>
+
+          {/* ── Links: waar de taak over gaat ── */}
+          <div style={{ minWidth: 0 }}>
 
           {/* Kop: de titel is het onderwerp, net als de oefening in de
               log-modal. Daaronder één regel met de stand van zaken. */}
@@ -283,7 +299,7 @@ export default function AddTaskModal({
               placeholder="Wat moet je doen?"
               style={{
                 width: '100%', padding: 0, background: 'transparent', border: 'none', outline: 'none',
-                color: '#fff', fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900,
+                color: '#fff', fontSize: isMobile ? '1.15rem' : '1.6rem', fontWeight: 900,
                 letterSpacing: '-0.025em',
               }}
             />
@@ -297,6 +313,70 @@ export default function AddTaskModal({
             </div>
             {titleError && <p style={{ margin: '0.4rem 0 0', color: '#ef4444', fontSize: '0.65rem', fontWeight: 700 }}>Titel is verplicht</p>}
           </div>
+
+          {/* Gepland-melding uit de agenda. */}
+          {agendaPreset && (
+            <div style={{
+              margin: isMobile ? '0 1rem 0.85rem' : '0 1.15rem 1rem',
+              padding: '0.5rem 0.7rem', borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.22)',
+              color: '#86efac', fontSize: '0.7rem', fontWeight: 800,
+            }}>
+              <Calendar size={12} />
+              Gepland op {agendaPreset.day} {agendaPreset.startTime}–{agendaPreset.endTime}
+            </div>
+          )}
+
+          {/* Stappen — als lijst, zoals de sets. */}
+          <div style={{ padding: isMobile ? '0.2rem 1rem 0' : '0.3rem 1.15rem 0' }}>
+            <Kopje Icon={ListChecks} tekst="Stappen" />
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            {steps.map((step, i) => (
+              <div key={step.id} style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                padding: isMobile ? '0.55rem 1rem' : '0.6rem 1.15rem',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+              }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', minWidth: 18 }}>{i + 1}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.3 }}>{step.text}</span>
+                <button
+                  onClick={() => handleDeleteStep(step.id)}
+                  style={{ padding: 4, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation' }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              padding: isMobile ? '0.55rem 1rem' : '0.6rem 1.15rem',
+            }}>
+              <Plus size={13} color="rgba(255,255,255,0.3)" />
+              <input
+                type="text"
+                value={newStepText}
+                onChange={(e) => setNewStepText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddStep() } }}
+                placeholder="Stap toevoegen"
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'inherit' }}
+              />
+              {newStepText.trim() && (
+                <button
+                  onClick={handleAddStep}
+                  style={{ minHeight: 26, padding: '0 0.7rem', borderRadius: 999, background: '#fff', border: 'none', color: '#0a0a0a', fontSize: '0.65rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Erbij
+                </button>
+              )}
+            </div>
+          </div>
+
+          </div>
+
+          {/* ── Rechts: waarmee je hem instelt ── */}
+          <div style={{ minWidth: 0 }}>
 
           {/* Twee keuzevakken naast elkaar, zoals materiaal en instellingen in
               de log-modal: label klein erboven, waarde eronder. */}
@@ -350,20 +430,6 @@ export default function AddTaskModal({
             </Keuzevak>
           </div>
 
-          {/* Gepland-melding uit de agenda. */}
-          {agendaPreset && (
-            <div style={{
-              margin: isMobile ? '0 1rem 0.85rem' : '0 1.15rem 1rem',
-              padding: '0.5rem 0.7rem', borderRadius: 8,
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.22)',
-              color: '#86efac', fontSize: '0.7rem', fontWeight: 800,
-            }}>
-              <Calendar size={12} />
-              Gepland op {agendaPreset.day} {agendaPreset.startTime}–{agendaPreset.endTime}
-            </div>
-          )}
-
           {/* Duur — losse chips, zelfde ritme als de rest. */}
           <div style={{ padding: isMobile ? '0 1rem 0.85rem' : '0 1.15rem 1rem' }}>
             <Kopje Icon={Timer} tekst="Geschatte tijd" />
@@ -386,48 +452,6 @@ export default function AddTaskModal({
                   color: '#fff', fontSize: '0.7rem', fontWeight: 800, outline: 'none', fontFamily: 'inherit',
                 }}
               />
-            </div>
-          </div>
-
-          {/* Stappen — als lijst, zoals de sets. */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {steps.map((step, i) => (
-              <div key={step.id} style={{
-                display: 'flex', alignItems: 'center', gap: '0.6rem',
-                padding: isMobile ? '0.55rem 1rem' : '0.6rem 1.15rem',
-                borderBottom: '1px solid rgba(255,255,255,0.04)',
-              }}>
-                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', minWidth: 18 }}>{i + 1}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.3 }}>{step.text}</span>
-                <button
-                  onClick={() => handleDeleteStep(step.id)}
-                  style={{ padding: 4, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation' }}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            ))}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.6rem',
-              padding: isMobile ? '0.55rem 1rem' : '0.6rem 1.15rem',
-            }}>
-              <Plus size={13} color="rgba(255,255,255,0.3)" />
-              <input
-                type="text"
-                value={newStepText}
-                onChange={(e) => setNewStepText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddStep() } }}
-                placeholder="Stap toevoegen"
-                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'inherit' }}
-              />
-              {newStepText.trim() && (
-                <button
-                  onClick={handleAddStep}
-                  style={{ minHeight: 26, padding: '0 0.7rem', borderRadius: 999, background: '#fff', border: 'none', color: '#0a0a0a', fontSize: '0.65rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                  Erbij
-                </button>
-              )}
             </div>
           </div>
 
@@ -554,6 +578,9 @@ export default function AddTaskModal({
           {paneel === 'logboek' && isEditMode && recurrenceActive && db && coachId && draftId && (
             <TaskLogSection taskId={draftId} coachId={coachId} db={db} isMobile={isMobile} />
           )}
+
+          </div>
+          </div>
         </div>
 
       {/* ═══ VOET ═══ */}

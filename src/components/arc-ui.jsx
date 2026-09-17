@@ -14,24 +14,31 @@ import { LIJN, LIJN_ZACHT, ZWART, KNOP_STIJL } from './arc-tokens'
 
 // ── Venster ────────────────────────────────────────────────────────────────
 // Op telefoon plakt hij aan de onderkant, op desktop staat hij midden in beeld.
-export function Venster({ isMobile, onClose, maxWidth = 480, children, zIndex = 2147483600 }) {
+// `vol` maakt hem schermvullend: geen rand, geen radius, geen marge. Voor een
+// venster waar je langer in werkt (een taak met stappen, notitie en logboek)
+// is een kaartje van 480 breed te krap; dan wil je het hele scherm.
+export function Venster({ isMobile, onClose, maxWidth = 480, children, zIndex = 2147483600, vol = false }) {
   return createPortal(
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+      onClick={(e) => { if (!vol && e.target === e.currentTarget) onClose?.() }}
       style={{
         position: 'fixed', inset: 0, zIndex,
-        background: 'rgba(0,0,0,0.82)',
-        backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
-        padding: isMobile ? 0 : '1.5rem',
+        background: vol ? ZWART : 'rgba(0,0,0,0.82)',
+        ...(vol ? {} : { backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }),
+        display: 'flex', alignItems: isMobile && !vol ? 'flex-end' : 'center', justifyContent: 'center',
+        padding: isMobile || vol ? 0 : '1.5rem',
       }}
     >
       <div style={{
         background: ZWART,
-        border: `1px solid ${LIJN}`,
-        borderRadius: isMobile ? '16px 16px 0 0' : 16,
+        border: vol ? 'none' : `1px solid ${LIJN}`,
+        borderRadius: vol ? 0 : (isMobile ? '16px 16px 0 0' : 16),
+        // Ook schermvullend houden we een bovengrens aan de breedte: op een
+        // breed scherm wordt een formulier van 2000 pixels onleesbaar. De kop,
+        // het formulier en de voet houden zo dezelfde breedte.
         width: '100%', maxWidth: isMobile ? '100%' : maxWidth,
-        maxHeight: isMobile ? '92vh' : '85vh',
+        height: vol ? '100%' : undefined,
+        maxHeight: vol ? '100%' : (isMobile ? '92vh' : '85vh'),
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
         {children}
