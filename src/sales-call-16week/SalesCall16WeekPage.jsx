@@ -1,4 +1,10 @@
 // src/sales-call-16week/SalesCall16WeekPage.jsx
+//
+// NIET MEER IN GEBRUIK sinds 17 sep 2026: /16week wijst naar
+// src/pages/SixteenWeekPage.jsx, dat de vorm van de 6-weken challenge volgt.
+// Dit bestand en zijn sections/ blijven staan zodat de oude opzet terug te
+// halen is; er hangt geen route aan.
+//
 // 16-weken offer — kopie van SalesCallPage (/programma), aparte copy.
 // Main wrapper — snap scroll + Enter key navigation
 import { useEffect, useRef, useState } from 'react'

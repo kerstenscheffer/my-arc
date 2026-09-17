@@ -38,7 +38,7 @@ import ResultPage from './lead-magnet/ResultPage'
 import SevenSecretsFunnel from './lead-magnet/7secretsfunnel/7SecretsFunnel'
 import GiveawayPage from './lead-magnet/7secretsfunnel/GiveawayPage'
 import SalesCallPage from './sales-call/SalesCallPage'
-import SalesCall16WeekPage from './sales-call-16week/SalesCall16WeekPage'
+import SixteenWeekPage from './pages/SixteenWeekPage'
 // /6weekchallenge draait sinds 15 sep op de checkout-opzet zonder betaaldeel
 // (hero, methode/voorwaarden/waarom, garanties, reviewslider). De oude
 // sales-call-6week-pagina staat er nog maar wordt niet meer gerenderd.
@@ -205,9 +205,12 @@ function App() {
     return <CalorieCalculator />
   }
 
-  // 16-weken offer — kopie van /programma met eigen copy.
+  // 16-weken offer — zelfde opbouw als de 6-weken challenge: banner met de
+  // titel erop, drie vensters (methode, voorwaarden, waarom) en de
+  // investering met de reviews. De oude snap-scroll versie staat nog in
+  // sales-call-16week/, maar hangt niet meer aan een route.
   if (currentPath === '/16week') {
-    return <SalesCall16WeekPage />
+    return <SixteenWeekPage />
   }
 
   // Gratis 6 weken 80/20 challenge — zelfde opbouw als /16week, eigen kop en
