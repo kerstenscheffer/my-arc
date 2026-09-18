@@ -35,7 +35,6 @@ import {
   LogOut,
   Bell,
   HelpCircle,
-  PlayCircle,
   MoreHorizontal
 } from 'lucide-react'
 
@@ -555,19 +554,16 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           de meldingen en vragen van de klant — niet waarvoor je meekijkt. */}
       {!ingebed && <WidgetSidebar
         isMobile={isMobile}
+        plek="rechtsboven"
         buttons={[
           {
             id: 'notifications', label: 'Meldingen', Icon: Bell, color: '#FFD700',
             active: widgetOpen === 'notifications', badge: widgetCounts.notifications,
             onClick: () => setWidgetOpen(o => o === 'notifications' ? null : 'notifications'),
           },
-          // Vragen zit nu in het Meer-menu op de onderbalk; twee ingangen
-          // naar hetzelfde venster maakte de zijbalk onnodig lang.
-          {
-            id: 'video', label: 'Bibliotheek', Icon: PlayCircle, color: '#FFD700',
-            active: widgetOpen === 'video', badge: widgetCounts.video,
-            onClick: () => setWidgetOpen(o => o === 'video' ? null : 'video'),
-          },
+          // Vragen zit in het Meer-menu op de onderbalk en de bibliotheek in
+          // de video-balk daarboven; twee ingangen naar hetzelfde venster
+          // maakte deze balk onnodig lang.
         ]}
       />}
 

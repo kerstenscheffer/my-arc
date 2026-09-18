@@ -7,17 +7,20 @@
 //   buttons: [{ id, label, Icon, onClick, active?, badge?, color? }]
 //   isMobile: bool
 //
-// Hoort op een vaste plek rechts onder zodat 't niet conflicteert met de
-// floating bottom-nav. Alleen iconen, tegen de rand geplakt: met labels
-// eronder was het een blok van 60px breed dat over de pagina viel. Het label
-// blijft als title/aria-label voor wie erop blijft staan of een schermlezer
-// gebruikt.
+// Stond rechtsonder, boven de bottom-nav. Met nog maar één knop erin (de
+// meldingen; de video's zitten nu in de balk boven de navigatie) hoort hij
+// rechtsboven: daar kijk je voor berichten, en onderin was het een tweede
+// zwevend ding vlak naast de navigatie. Positie is instelbaar via `plek`.
+//
+// Alleen iconen, tegen de rand geplakt: met labels eronder was het een blok
+// van 60px breed dat over de pagina viel. Het label blijft als title en
+// aria-label voor wie erop blijft staan of een schermlezer gebruikt.
 
 import React from 'react'
 
 const GOLD = '#FFD700'
 
-export default function WidgetSidebar({ buttons = [], isMobile = false }) {
+export default function WidgetSidebar({ buttons = [], isMobile = false, plek = 'rechtsonder' }) {
   if (!buttons.length) return null
 
   return (
@@ -26,9 +29,9 @@ export default function WidgetSidebar({ buttons = [], isMobile = false }) {
       style={{
         position: 'fixed',
         right: 0,
-        // Boven de bottom-nav uitkomen. Bottom-nav zit op 30px + ~64px hoog
-        // + safe-area. Plus marge → ~120px van onderen.
-        bottom: 'calc(120px + env(safe-area-inset-bottom, 0px))',
+        ...(plek === 'rechtsboven'
+          ? { top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 10 : 16}px)` }
+          : { bottom: 'calc(120px + env(safe-area-inset-bottom, 0px))' }),
         // Smal randje tegen de zijkant: alleen iconen, geen labels en geen
         // kader per knop. Met tekst eronder was het een blok van 60px breed
         // dat over de pagina viel.
@@ -38,7 +41,7 @@ export default function WidgetSidebar({ buttons = [], isMobile = false }) {
         border: '1px solid rgba(255,255,255,0.1)',
         borderRight: 'none',
         borderRadius: '14px 0 0 14px',
-        boxShadow: '-6px 10px 30px rgba(0,0,0,0.55)',
+        boxShadow: '-6px 8px 26px rgba(0,0,0,0.55)',
         padding: 3,
         zIndex: 99,
         display: 'flex',
