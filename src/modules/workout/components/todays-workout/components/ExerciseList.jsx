@@ -33,6 +33,13 @@ export default function ExerciseList({
   const [localExercises, setLocalExercises] = useState(exercises || [])
   const [deletingIndex, setDeletingIndex] = useState(null)
   const [swipedIndex, setSwipedIndex] = useState(null)
+  // Slepen op de telefoon: kaart ingedrukt houden, dan verschuiven. `sleep`
+  // beschrijft wat er onder je vinger zit; is hij null, dan gebeurt er niets
+  // bijzonders en werkt swipen-om-te-verwijderen gewoon.
+  const [sleep, setSleep] = useState(null)
+  const sleepRef = useRef(null)
+  const drukTimer = useRef(null)
+  const startPunt = useRef(null)
   const [terugzetBezig, setTerugzetBezig] = useState(false)
 
   useEffect(() => {
@@ -162,6 +169,83 @@ export default function ExerciseList({
       if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
     } catch (e) {
       console.error('❌ Make permanent failed:', e)
+    }
+  }
+
+  // Verplaatsen: de lijst gaat mee, het schema wordt opgeslagen en de
+  // week-overrides verhuizen mee. Die hangen aan de index, dus zonder dat
+  // laatste zou de aangepaste set van oefening 2 ineens bij oefening 3 staan.
+  const handleVerplaats = async (vanIndex, naarIndex) => {
+    if (vanIndex === naarIndex) return
+    const orde = localExercises.map((_, i) => i)
+    const [verhuisd] = orde.splice(vanIndex, 1)
+    orde.splice(naarIndex, 0, verhuisd)
+    const nieuweLijst = orde.map(i => localExercises[i])
+    const vorige = localExercises
+
+    setLocalExercises(nieuweLijst)
+    try {
+      await saveExercises(nieuweLijst)
+      if (client?.id && schema?.id && workoutDayKey) {
+        await WorkoutServiceNew.hernummerOverridesNaVerplaatsen(client.id, schema.id, workoutDayKey, orde, db)
+      }
+      if (navigator.vibrate) navigator.vibrate(20)
+      if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
+    } catch (error) {
+      console.error('❌ Volgorde opslaan mislukt:', error)
+      setLocalExercises(vorige)
+    }
+  }
+
+  // Ingedrukt houden start het slepen. Beweeg je meteen, dan wilde je scrollen
+  // of swipen en gaat het niet door.
+  const startDruk = (e, groepNaam, posInGroep, aantalInGroep, element) => {
+    if (!isMobile) return
+    const t = e.touches?.[0]
+    if (!t) return
+    startPunt.current = { x: t.clientX, y: t.clientY }
+    if (drukTimer.current) clearTimeout(drukTimer.current)
+    drukTimer.current = setTimeout(() => {
+      const hoogte = element?.getBoundingClientRect?.().height || 96
+      const staat = { groep: groepNaam, van: posInGroep, naar: posInGroep, aantal: aantalInGroep, hoogte, dy: 0 }
+      sleepRef.current = staat
+      setSleep(staat)
+      setSwipedIndex(null)
+      if (navigator.vibrate) navigator.vibrate(30)
+    }, 350)
+  }
+
+  const beweeg = (e) => {
+    const t = e.touches?.[0]
+    if (!t) return
+    if (!sleepRef.current) {
+      // Nog niet aan het slepen: te veel beweging betekent scrollen of swipen.
+      const s0 = startPunt.current
+      if (s0 && (Math.abs(t.clientX - s0.x) > 8 || Math.abs(t.clientY - s0.y) > 8)) {
+        if (drukTimer.current) { clearTimeout(drukTimer.current); drukTimer.current = null }
+      }
+      return
+    }
+    const staat = sleepRef.current
+    const dy = t.clientY - (startPunt.current?.y ?? t.clientY)
+    const sprongen = Math.round(dy / staat.hoogte)
+    const naar = Math.max(0, Math.min(staat.aantal - 1, staat.van + sprongen))
+    const nieuweStaat = { ...staat, dy, naar }
+    sleepRef.current = nieuweStaat
+    setSleep(nieuweStaat)
+  }
+
+  const laatLos = (groep) => {
+    if (drukTimer.current) { clearTimeout(drukTimer.current); drukTimer.current = null }
+    const staat = sleepRef.current
+    sleepRef.current = null
+    startPunt.current = null
+    if (!staat) return
+    setSleep(null)
+    if (staat.naar !== staat.van) {
+      const vanIndex = groep.items[staat.van].index
+      const naarIndex = groep.items[staat.naar].index
+      handleVerplaats(vanIndex, naarIndex)
     }
   }
 

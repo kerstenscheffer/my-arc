@@ -255,6 +255,58 @@ class WorkoutServiceNew {
     }
   }
 
+  // Na het verslepen van een oefening kloppen de index-gebonden week-overrides
+  // niet meer: die hangen aan de plek in de lijst, niet aan de oefening. `orde`
+  // is de nieuwe volgorde uitgedrukt in oude indexen (orde[nieuw] = oud), dus
+  // precies wat er nodig is om ze mee te verhuizen.
+  async hernummerOverridesNaVerplaatsen(clientId, schemaId, dayKey, orde, db) {
+    if (!clientId || !schemaId || !dayKey || !Array.isArray(orde)) return false
+    try {
+      const weekStart = this.getCurrentWeekStart()
+      const client = this._client(db)
+      const alle = await this.getWeeklyOverrides(clientId, schemaId, db)
+      const vanDeze = alle.filter(o => o.day_key === dayKey)
+      if (!vanDeze.length) return true
+
+      // oud → nieuw omkeren, zodat elke override zijn nieuwe plek krijgt.
+      const nieuwVoorOud = new Map()
+      orde.forEach((oud, nieuw) => nieuwVoorOud.set(Number(oud), nieuw))
+
+      const opnieuw = vanDeze
+        .map(o => {
+          const nieuweIndex = nieuwVoorOud.get(parseInt(o.exercise_index))
+          if (nieuweIndex === undefined) return null
+          return {
+            client_id: clientId, schema_id: schemaId, week_start: weekStart,
+            day_key: dayKey,
+            exercise_index: nieuweIndex,
+            exercise_data: o.exercise_data,
+          }
+        })
+        .filter(Boolean)
+
+      const { error } = await client
+        .from('client_exercise_overrides')
+        .delete()
+        .eq('client_id', clientId)
+        .eq('schema_id', schemaId)
+        .eq('week_start', weekStart)
+        .eq('day_key', dayKey)
+      if (error) throw error
+
+      if (opnieuw.length) {
+        const { error: insErr } = await client
+          .from('client_exercise_overrides')
+          .insert(opnieuw)
+        if (insErr) throw insErr
+      }
+      return true
+    } catch (error) {
+      console.error('❌ hernummerOverridesNaVerplaatsen failed:', error)
+      return false
+    }
+  }
+
   async resetWeeklyOverrides(clientId, schemaId, db) {
     if (!clientId || !schemaId) return false
     try {
