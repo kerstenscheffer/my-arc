@@ -1878,7 +1878,6 @@ export default function KanbanBoard({
               const counts = [...new Set(sections.flatMap(s => (s.leads || []).map(l => Number(l.followup_count) || 0)))].sort((a, b) => a - b)
               const hasFilter = boardFilter.sort !== 'default' || boardFilter.types.size > 0 || boardFilter.temps.size > 0 || boardFilter.followups.size > 0 || boardFilter.genders.size > 0
               const filterCount = boardFilter.types.size + boardFilter.temps.size + boardFilter.followups.size + boardFilter.genders.size + (boardFilter.sort !== 'default' ? 1 : 0)
-              const GOLD = '#FFD700'
               return (
                 <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignSelf: 'stretch' }} ref={boardFilterRef}>
                   <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
@@ -1889,32 +1888,32 @@ export default function KanbanBoard({
                     style={{
                       position: 'relative',
                       width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: hasFilter ? 'rgba(255,215,0,0.18)' : 'transparent',
+                      background: hasFilter ? 'rgba(255,255,255,0.16)' : 'transparent',
                       border: 'none',
-                      color: hasFilter ? GOLD : 'rgba(255,255,255,0.65)',
+                      color: hasFilter ? '#fff' : 'rgba(255,255,255,0.65)',
                       cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
                     <SlidersHorizontal size={16} />
                     {filterCount > 0 && (
-                      <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, background: GOLD, color: '#000', borderRadius: 8, padding: '0 3px', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</span>
+                      <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, background: '#fff', color: '#000', borderRadius: 8, padding: '0 4px', fontSize: '0.65rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</span>
                     )}
                   </button>
                   {showBoardFilter && boardFilterPos && createPortal(
                     <div ref={boardFilterMenuRef} style={{
                       position: 'fixed', top: boardFilterPos.top, left: boardFilterPos.left,
-                      zIndex: 2147483500, minWidth: 230,
-                      background: '#111', border: '1px solid rgba(255,215,0,0.3)',
-                      borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                      zIndex: 2147483500, minWidth: 250,
+                      background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.14)',
+                      borderRadius: 12, overflow: 'hidden', boxShadow: '0 16px 40px rgba(0,0,0,0.65)',
                     }}>
                       {/* Type-filter */}
-                      <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Type lead</div>
+                      <div style={{ padding: '0.6rem 0.75rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Type lead</div>
                         {[{ id: 'magnet', label: 'Lead-magnet' }, { id: 'outreach', label: 'Zelf bericht' }].map(opt => {
                           const active = boardFilter.types.has(opt.id)
                           return (
-                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: active ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: active ? 700 : 500 }}>
-                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('types', opt.id)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.1rem', cursor: 'pointer', color: active ? '#fff' : 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: active ? 800 : 600 }}>
+                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('types', opt.id)} style={{ accentColor: '#fff', width: 15, height: 15 }} />
                               {opt.label}
                             </label>
                           )
@@ -1923,33 +1922,34 @@ export default function KanbanBoard({
 
                       {/* Wat eerst als losse icoontjes in de balk stond: de
                           actie-leads-knop en het meeladen van vrouwen. */}
-                      <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Snel</div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: globalPriorityOnly ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: globalPriorityOnly ? 700 : 500 }}>
-                          <input type="checkbox" checked={globalPriorityOnly} onChange={() => setGlobalPriorityOnly(v => !v)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                      <div style={{ padding: '0.6rem 0.75rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Snel</div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.1rem', cursor: 'pointer', color: globalPriorityOnly ? '#fff' : 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: globalPriorityOnly ? 800 : 600 }}>
+                          <input type="checkbox" checked={globalPriorityOnly} onChange={() => setGlobalPriorityOnly(v => !v)} style={{ accentColor: '#fff', width: 15, height: 15 }} />
                           Alleen actie-leads (hot, warm of call voorgesteld)
                         </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: metVrouwen ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: metVrouwen ? 700 : 500 }}>
-                          <input type="checkbox" checked={metVrouwen} onChange={wisselVrouwen} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.1rem', cursor: 'pointer', color: metVrouwen ? '#fff' : 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: metVrouwen ? 800 : 600 }}>
+                          <input type="checkbox" checked={metVrouwen} onChange={wisselVrouwen} style={{ accentColor: '#fff', width: 15, height: 15 }} />
                           Vrouwen meeladen
                         </label>
                         {/* De oog-knop is uit de balk; het verbergen zelf blijft
                             hier bereikbaar, anders zit je vast aan wat er in
                             localStorage staat. */}
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: namenVerborgen ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: namenVerborgen ? 700 : 500 }}>
-                          <input type="checkbox" checked={namenVerborgen} onChange={wisselNamen} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.1rem', cursor: 'pointer', color: namenVerborgen ? '#fff' : 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: namenVerborgen ? 800 : 600 }}>
+                          <input type="checkbox" checked={namenVerborgen} onChange={wisselNamen} style={{ accentColor: '#fff', width: 15, height: 15 }} />
                           Namen verbergen (screenshot)
                         </label>
                       </div>
 
                       {/* Temperatuur-filter */}
-                      <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Temperatuur</div>
-                        {[{ id: 'hot', label: '🔥 Hot' }, { id: 'warm', label: '🌤 Warm' }, { id: 'cold', label: '❄️ Cold' }, { id: 'none', label: '— Geen' }].map(opt => {
+                      <div style={{ padding: '0.6rem 0.75rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Temperatuur</div>
+                        {[{ id: 'hot', label: 'Hot', kleur: '#ef4444' }, { id: 'warm', label: 'Warm', kleur: '#f59e0b' }, { id: 'cold', label: 'Cold', kleur: '#3b82f6' }, { id: 'none', label: 'Geen', kleur: 'rgba(255,255,255,0.25)' }].map(opt => {
                           const active = boardFilter.temps.has(opt.id)
                           return (
-                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: active ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: active ? 700 : 500 }}>
-                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('temps', opt.id)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.1rem', cursor: 'pointer', color: active ? '#fff' : 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: active ? 800 : 600 }}>
+                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('temps', opt.id)} style={{ accentColor: '#fff', width: 15, height: 15 }} />
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: opt.kleur, flexShrink: 0 }} />
                               {opt.label}
                             </label>
                           )
@@ -1957,13 +1957,13 @@ export default function KanbanBoard({
                       </div>
 
                       {/* Geslacht-filter */}
-                      <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Geslacht</div>
+                      <div style={{ padding: '0.6rem 0.75rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Geslacht</div>
                         {[{ id: 'male', label: 'Man' }, { id: 'female', label: 'Vrouw' }].map(opt => {
                           const active = boardFilter.genders.has(opt.id)
                           return (
-                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: active ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: active ? 700 : 500 }}>
-                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('genders', opt.id)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.1rem', cursor: 'pointer', color: active ? '#fff' : 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: active ? 800 : 600 }}>
+                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('genders', opt.id)} style={{ accentColor: '#fff', width: 15, height: 15 }} />
                               {opt.label}
                             </label>
                           )
@@ -1972,14 +1972,14 @@ export default function KanbanBoard({
 
                       {/* Opvolg-berichten filter */}
                       {counts.length > 0 && (
-                        <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Opvolg-berichten</div>
+                        <div style={{ padding: '0.6rem 0.75rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Opvolg-berichten</div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                             {counts.map(n => {
                               const active = boardFilter.followups.has(n)
                               return (
                                 <button key={n} onClick={() => toggleBoardSet('followups', n)}
-                                  style={{ padding: '0.25rem 0.5rem', background: active ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? GOLD : 'rgba(255,255,255,0.08)'}`, borderRadius: '5px', color: active ? GOLD : 'rgba(255,255,255,0.6)', fontSize: '0.7rem', fontWeight: active ? 800 : 600, cursor: 'pointer', minHeight: 26, touchAction: 'manipulation' }}>
+                                  style={{ padding: '0.3rem 0.6rem', background: active ? '#fff' : 'transparent', border: `1px solid ${active ? '#fff' : 'rgba(255,255,255,0.14)'}`, borderRadius: 7, color: active ? '#000' : 'rgba(255,255,255,0.7)', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation' }}>
                                   {n}×
                                 </button>
                               )
@@ -1990,12 +1990,12 @@ export default function KanbanBoard({
 
                       {/* Sorteer */}
                       <div style={{ padding: '0.4rem 0' }}>
-                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 0.65rem 0.2rem' }}>Sorteer</div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 0.65rem 0.2rem' }}>Sorteer</div>
                         {SECTION_SORT_OPTIONS.map(opt => {
                           const active = (boardFilter.sort || 'default') === opt.id
                           return (
                             <button key={opt.id} onClick={() => setBoardSort(opt.id)}
-                              style={{ display: 'block', width: '100%', padding: '0.4rem 0.65rem', background: active ? 'rgba(255,215,0,0.12)' : 'transparent', border: 'none', color: active ? GOLD : 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: active ? 700 : 500, textAlign: 'left', cursor: 'pointer', minHeight: 30 }}>
+                              style={{ display: 'block', width: '100%', padding: '0.45rem 0.65rem', background: active ? 'rgba(255,255,255,0.08)' : 'transparent', border: 'none', color: active ? '#fff' : 'rgba(255,255,255,0.72)', fontSize: '0.82rem', fontWeight: active ? 800 : 600, textAlign: 'left', cursor: 'pointer', minHeight: 32 }}>
                               {opt.label}
                             </button>
                           )
@@ -2004,8 +2004,8 @@ export default function KanbanBoard({
 
                       {hasFilter && (
                         <button onClick={() => { resetBoardFilter(); setShowBoardFilter(false) }}
-                          style={{ display: 'block', width: '100%', padding: '0.5rem 0.65rem', background: 'rgba(239,68,68,0.06)', borderBottom: 'none', borderRight: 'none', borderLeft: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#fca5a5', fontSize: '0.65rem', fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>
-                          Reset filters
+                          style={{ display: 'block', width: '100%', padding: '0.6rem 0.65rem', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>
+                          Filters wissen
                         </button>
                       )}
                     </div>,
