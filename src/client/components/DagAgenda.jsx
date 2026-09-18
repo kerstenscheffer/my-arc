@@ -25,10 +25,11 @@ import { workoutFoto } from './workoutFoto'
 const LIJN = 'rgba(255,255,255,0.07)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.04)'
 
-// Hoogte van één uur. Met een raster dat zich in een vaste hoogte propte werd
-// een maaltijd van een kwartier een streepje van acht pixels; daar past geen
-// foto en geen naam in. Nu bepaalt het uur de hoogte en scrolt de dag.
-const UUR_HOOGTE = { mobiel: 108, desktop: 124 }
+// Hoogte van één uur. Google Agenda houdt op een telefoon ongeveer 48 pixels
+// per uur aan; dat is de maat waar een dag in één blik op past. Wij zitten er
+// iets boven omdat onze blokken kaarten zijn met een foto erin en geen kale
+// balk met één regel tekst.
+const UUR_HOOGTE = { mobiel: 64, desktop: 76 }
 
 const ICOON = {
   meal: Utensils,
