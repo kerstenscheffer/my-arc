@@ -58,6 +58,14 @@ function LoginFooter() {
     WebkitBackdropFilter: 'blur(8px)',
   }
   return (
+    <>
+      {/* Zachte bodem onder de knoppen: scrollt er inhoud onderdoor, dan loopt
+          die weg in het zwart in plaats van half achter een pil te eindigen. */}
+      <div aria-hidden style={{
+        position: 'fixed', left: 0, right: 0, bottom: 0, height: 110,
+        zIndex: 19, pointerEvents: 'none',
+        background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 45%, #000 100%)',
+      }} />
     <div
       style={{
         position: 'fixed',
@@ -79,5 +87,6 @@ function LoginFooter() {
         Privacy
       </a>
     </div>
+    </>
   )
 }

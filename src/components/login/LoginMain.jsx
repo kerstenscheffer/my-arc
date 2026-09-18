@@ -294,11 +294,7 @@ function Veld({ style, ...props }) {
 function Wrapper({ children, slide }) {
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: '#000',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)',
-      paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)',
-      overflow: 'hidden',
+      position: 'fixed', inset: 0, background: '#000', overflow: 'hidden',
     }}>
       {SLIDES.map((src, i) => (
         <div key={src} style={{
@@ -312,13 +308,29 @@ function Wrapper({ children, slide }) {
         position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
         background: 'radial-gradient(ellipse at 50% 35%, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.8) 55%, rgba(0,0,0,0.97) 100%)',
       }} />
+
+      {/* Scrollen mag, maar pas als het moet.
+          Het formulier stond midden in een vast vlak; paste het er niet in —
+          een kleiner toestel, of de Apple-knop erbij — dan viel de onderkant
+          achter de Support/Privacy-knoppen. Nu is deze laag zelf de scroller en
+          centreert het blok erbinnen alleen zolang er ruimte is. Onderin staat
+          ruimte gereserveerd voor die twee knoppen, zodat ze nooit meer over de
+          inhoud vallen.
+
+          Let op: centreren met align-items op een scrollende laag knipt de
+          bovenkant af zodra de inhoud te hoog wordt (je kunt er dan niet meer
+          bij scrollen). Vandaar de tussenlaag met minHeight: 100%. */}
       <div style={{
-        position: 'relative', zIndex: 10, width: '100%',
-        padding: '2rem 1.5rem 5rem',
-        display: 'flex', justifyContent: 'center',
-        maxHeight: '100dvh', overflowY: 'auto',
+        position: 'absolute', inset: 0, zIndex: 10,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
       }}>
-        {children}
+        <div style={{
+          minHeight: '100%', boxSizing: 'border-box',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: `calc(env(safe-area-inset-top, 0px) + 2rem) 1.5rem calc(env(safe-area-inset-bottom, 0px) + 6rem)`,
+        }}>
+          {children}
+        </div>
       </div>
     </div>
   )
