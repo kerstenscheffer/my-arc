@@ -870,7 +870,25 @@ export default function ClientHome({ client, db, setCurrentView }) {
         <HomeVideoSlider client={client} />
       </div>
 
-      {/* Vandaag-overzicht: training, macro's over, water, volgende call. */}
+      {/* ── De dag als agenda ─────────────────────────────────────────────
+          Eigen component (DagAgenda), los van het coach-gereedschap. Dit is
+          waar de dag staat: de macro's, de maaltijden met hun afrondknop en
+          de training met zijn startknop. Daarom vlak onder de video's. */}
+      <FadeOnScroll>
+        <div style={{ marginTop: isMobile ? '1.75rem' : '2.25rem' }}>
+          <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+            <DagAgenda
+              client={client}
+              db={db}
+              isMobile={isMobile}
+              hoogte={isMobile ? 520 : 620}
+              onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
+            />
+          </div>
+        </div>
+      </FadeOnScroll>
+
+      {/* Wat er nog los boven de acties staat: de eerstvolgende call. */}
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '2.75rem' : '3.5rem' }}>
           <TodayCard client={client} db={db} setCurrentView={setCurrentView} isMobile={isMobile} />
@@ -881,31 +899,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '4.5rem' : '5.5rem' }}>
           <ActionItems client={client} db={db} />
-        </div>
-      </FadeOnScroll>
-
-      {/* ── De dag als agenda ─────────────────────────────────────────────
-          Eigen component (DagAgenda), los van het coach-gereedschap. Staat
-          nog onderaan zolang we eraan sleutelen. */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '4.5rem' : '5.5rem' }}>
-          <div style={{
-            padding: isMobile ? '0 1rem' : '0 1.5rem',
-            marginBottom: isMobile ? '0.55rem' : '0.7rem',
-            fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.025em',
-          }}>
-            Jouw dag
-          </div>
-          <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-            <DagAgenda
-              client={client}
-              db={db}
-              isMobile={isMobile}
-              hoogte={isMobile ? 520 : 620}
-              onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
-            />
-          </div>
         </div>
       </FadeOnScroll>
 

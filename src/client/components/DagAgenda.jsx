@@ -15,7 +15,7 @@
 //   - blokken lezen als kaarten: bold wit, tijd rechts, kleur alleen als streep
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Utensils, Dumbbell, Moon, Briefcase, Pill } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, Utensils, Dumbbell, Moon, Briefcase, Pill } from 'lucide-react'
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
 } from '../../modules/client-agenda/ClientAgendaService'
@@ -456,10 +456,9 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
 
   const soort = isMaaltijd ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || '')
   const naam = blok.sublabel || (isMaaltijd ? null : blok.label)
-  // De kaart zelf is geen knop meer bij een maaltijd: daar zitten twee
-  // handelingen op (afronden en openen), en dan is "ergens op de kaart tikken"
-  // een gok.
-  const klikbaar = !!onOpen && isTraining
+  // De kaarten zijn zelf geen knop: er zitten handelingen op (afronden,
+  // starten, openen), en dan is "ergens op de kaart tikken" een gok.
+  const klikbaar = false
 
   // Hoeveel past erin? De kaart met foto vanaf een halfuurhoogte, het
   // slot-label op de foto zodra daar plek voor is, de macro's pas als het blok
@@ -594,7 +593,7 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
           display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
           padding: isMobile ? '6px 9px' : '8px 11px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{
               flex: 1, minWidth: 0,
               fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: '#fff',
@@ -605,6 +604,26 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
               {naam || 'Training'}
             </span>
             <span style={{ ...tijdStempel, color: 'rgba(255,255,255,0.6)' }}>{tijd(blok.start)}</span>
+            {onOpen && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onOpen(blok) }}
+                  title="Start je training"
+                  aria-label="Start je training"
+                  style={kaartKnop}
+                >
+                  <Play size={14} strokeWidth={3.2} fill="#fff" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onOpen(blok) }}
+                  title="Open je schema"
+                  aria-label="Open je schema"
+                  style={kaartKnop}
+                >
+                  <Pijl size={14} strokeWidth={3.2} />
+                </button>
+              </>
+            )}
           </div>
           <span style={{
             fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)',
