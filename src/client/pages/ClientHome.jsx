@@ -4,8 +4,11 @@
 //   1) (challenge-stand zit nu in de zwevende ChallengeProgressTab)
 //   2) WelcomeSection (datum + naam)
 //   3) GoalCard — primaire doelstelling van de client
-//   4) TrajectProgress — hoeveel weken in, hoeveel over
-//   5) ActionItems — afgesproken acties tussen coach en client
+//   4) ActionItems — afgesproken acties tussen coach en client
+//
+// Het weekdoel-blok (WeekGoalStatus) is van de pagina af: het gewicht en de
+// weekgemiddelden staan op de tracking-pagina, hier stond het een tweede keer.
+// De component blijft in dit bestand staan voor als hij terug moet.
 //
 // Quick-action tiles zijn verwijderd: de bottom-nav heeft al alle hoofd-
 // navigatie en de tiles voegden alleen duplicaat-navigatie toe zonder content.
@@ -16,7 +19,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Calendar, Coffee, Sun, Moon, Target, Clock,
   CheckCircle2, Circle, Phone, MessageCircle, Sparkles,
-  ListChecks,
 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
@@ -646,6 +648,8 @@ function ActionItems({ client, db }) {
 
   const open = items.filter(i => i.status !== 'done')
   const done = items.filter(i => i.status === 'done')
+  const pct = items.length > 0 ? Math.round((done.length / items.length) * 100) : 0
+  const klaar = items.length > 0 && open.length === 0
 
   if (loading) return null
   // Sectie pas tonen als er actie-items zijn (anders is'ie lege ruimte).
@@ -666,51 +670,61 @@ function ActionItems({ client, db }) {
 
   return (
     <div>
+      {/* Kop in dezelfde vorm als "Voeding vandaag" en "Training vandaag":
+          bold wit, met rechts hoe ver je bent in plaats van een gouden pil. */}
       <div style={{
         padding: isMobile ? '0 1rem' : '0 1.5rem',
-        marginBottom: isMobile ? '0.7rem' : '0.85rem',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: isMobile ? '0.55rem' : '0.7rem',
+        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
         gap: 10,
       }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          fontSize: isMobile ? '0.65rem' : '0.72rem',
-          fontWeight: 800, color: '#FFD700',
-          textTransform: 'uppercase', letterSpacing: '0.1em',
-          opacity: 0.85,
+        <span style={{
+          fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
+          letterSpacing: '-0.025em',
         }}>
-          <ListChecks size={isMobile ? 13 : 14} strokeWidth={2.4} />
-          Acties
-        </div>
-        {open.length > 0 && (
-          <div style={{
-            fontSize: '0.7rem', fontWeight: 800, color: '#FFD700',
-            padding: '0.18rem 0.55rem',
-            background: 'rgba(255,215,0,0.12)',
-            border: '1px solid rgba(255,215,0,0.3)',
-            borderRadius: 999,
-            fontVariantNumeric: 'tabular-nums',
-          }}>
-            {open.length} open
-          </div>
-        )}
+          Acties deze week
+        </span>
+        <span style={{
+          flexShrink: 0,
+          fontSize: '0.7rem', fontWeight: 800,
+          color: klaar ? '#10b981' : 'rgba(255,255,255,0.4)',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {done.length}/{items.length} gedaan
+        </span>
       </div>
 
+      {/* Dunne balk: één blik en je weet of er nog iets ligt. */}
+      <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem', marginBottom: isMobile ? '0.7rem' : '0.85rem' }}>
+        <div style={{ height: 3, background: 'rgba(255,255,255,0.07)', borderRadius: 2 }}>
+          <div style={{
+            width: `${pct}%`, height: '100%', borderRadius: 2,
+            background: klaar ? '#10b981' : '#fff',
+            transition: 'width 0.3s ease',
+          }} />
+        </div>
+      </div>
+
+      {/* Rijen met een haarlijn ertussen in plaats van kaartjes in een kaart:
+          het is een lijstje om af te vinken, geen verzameling vakjes. */}
       <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-      <div style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 14,
-        padding: isMobile ? '0.95rem 1.05rem' : '1.1rem 1.35rem',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+      <div>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           {open.map(item => (
             <ActionRow key={item.id} item={item} onToggle={toggle} isMobile={isMobile} formatDate={formatDate} />
           ))}
+          {open.length === 0 && (
+            <div style={{
+              padding: '0.8rem 0', fontSize: '0.8rem', fontWeight: 700,
+              color: '#10b981',
+            }}>
+              Alles afgevinkt.
+            </div>
+          )}
         </div>
 
         {done.length > 0 && (
-          <div style={{ marginTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.7rem' }}>
+          <div style={{ marginTop: '0.7rem', paddingTop: '0.6rem' }}>
             <button
               onClick={() => setShowCompleted(v => !v)}
               style={{
@@ -725,7 +739,7 @@ function ActionItems({ client, db }) {
               {showCompleted ? '−' : '+'} {done.length} afgerond
             </button>
             {showCompleted && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.55rem' }}>
+              <div style={{ marginTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 {done.map(item => (
                   <ActionRow key={item.id} item={item} onToggle={toggle} isMobile={isMobile} formatDate={formatDate} />
                 ))}
@@ -752,16 +766,15 @@ function ActionRow({ item, onToggle, isMobile, formatDate }) {
       onClick={() => onToggle(item)}
       style={{
         display: 'flex', alignItems: 'flex-start', gap: 10,
-        padding: '0.55rem 0.7rem',
-        background: done ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.03)',
-        border: `1px solid ${done ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.08)'}`,
-        borderRadius: 10,
+        padding: '0.7rem 0',
+        background: 'transparent',
+        border: 'none',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
         cursor: 'pointer',
         textAlign: 'left',
         width: '100%',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        transition: 'background 0.15s ease, border-color 0.15s ease',
       }}
     >
       <div style={{
@@ -770,8 +783,8 @@ function ActionRow({ item, onToggle, isMobile, formatDate }) {
         marginTop: 1,
       }}>
         {done
-          ? <CheckCircle2 size={20} color="#10b981" strokeWidth={2.4} />
-          : <Circle size={20} color="rgba(255,255,255,0.35)" strokeWidth={2} />}
+          ? <CheckCircle2 size={19} color="#10b981" strokeWidth={2.4} />
+          : <Circle size={19} color="rgba(255,255,255,0.3)" strokeWidth={2} />}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
@@ -804,7 +817,7 @@ function ActionRow({ item, onToggle, isMobile, formatDate }) {
               </span>
             )}
             {item.due_date && !done && (
-              <span style={{ color: '#FFD700', fontWeight: 800 }}>
+              <span style={{ color: '#fff', fontWeight: 800 }}>
                 · uiterlijk {formatDate(item.due_date)}
               </span>
             )}
@@ -820,34 +833,9 @@ function ActionRow({ item, onToggle, isMobile, formatDate }) {
 // ============================================
 export default function ClientHome({ client, db, setCurrentView }) {
   const [loading, setLoading] = useState(true)
-  const [weightHistory, setWeightHistory] = useState([])
   const isMobile = useIsMobile()
 
   useEffect(() => { setTimeout(() => setLoading(false), 300) }, [])
-
-  // Gewicht-logs uit weight_challenge_logs (source-of-truth; clients.current_weight
-  // is vaak NULL). Nieuwste-eerst — [0] = huidig gewicht, de rest voor de log-kaart.
-  useEffect(() => {
-    if (!client?.id || !db?.supabase) return
-    let cancelled = false
-    ;(async () => {
-      const { data, error } = await db.supabase
-        .from('weight_challenge_logs')
-        .select('weight, date, is_friday_weighin')
-        .eq('client_id', client.id)
-        .order('date', { ascending: false })
-        .limit(60)
-      if (cancelled) return
-      if (error) {
-        console.error('Load weight logs failed:', error)
-        return
-      }
-      if (data && data.length > 0) {
-        setWeightHistory(data)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [client?.id, db])
 
   if (loading) {
     return (
@@ -888,14 +876,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
         </div>
       </FadeOnScroll>
 
-
-      {/* Hero: weekdoel + weekgemiddelden. (2e gewicht-kaart WeightLogCard
-          verwijderd — stond dubbel op home; detail staat op de tracking-pagina.) */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '4rem' : '5rem' }}>
-          <WeekGoalStatus client={client} history={weightHistory} />
-        </div>
-      </FadeOnScroll>
 
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '4.5rem' : '5.5rem' }}>
