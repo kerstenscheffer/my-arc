@@ -52,6 +52,44 @@ const StappenService = {
     return uit
   },
 
+  // De lopende week, maandag t/m zondag. Dagen in de toekomst krijgen
+  // toekomst: true, zodat een gemiddelde niet door lege dagen wordt verpest.
+  async haalWeek(db, clientId, anker = new Date()) {
+    if (!db?.supabase || !clientId) return []
+    const maandag = new Date(anker)
+    maandag.setDate(maandag.getDate() - ((maandag.getDay() + 6) % 7))
+    maandag.setHours(0, 0, 0, 0)
+    const zondag = new Date(maandag)
+    zondag.setDate(zondag.getDate() + 6)
+
+    const { data, error } = await db.supabase
+      .from('client_step_logs')
+      .select('date, steps, source')
+      .eq('client_id', clientId)
+      .gte('date', vandaagIso(maandag))
+      .lte('date', vandaagIso(zondag))
+    if (error) { console.error('Stappen van de week laden mislukt:', error); return [] }
+
+    const perDag = new Map((data || []).map(r => [String(r.date).slice(0, 10), r]))
+    const vandaag = vandaagIso()
+    const uit = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(maandag)
+      d.setDate(d.getDate() + i)
+      const iso = vandaagIso(d)
+      const rij = perDag.get(iso)
+      uit.push({
+        iso,
+        dag: d.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2),
+        steps: Number(rij?.steps) || 0,
+        source: rij?.source || null,
+        isVandaag: iso === vandaag,
+        toekomst: iso > vandaag,
+      })
+    }
+    return uit
+  },
+
   async bewaar(db, clientId, steps, { datum = vandaagIso(), source = 'handmatig' } = {}) {
     if (!db?.supabase || !clientId) return null
     const aantal = Math.max(0, Math.min(200000, Math.round(Number(steps) || 0)))
