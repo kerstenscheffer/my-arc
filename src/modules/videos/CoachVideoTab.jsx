@@ -1,7 +1,7 @@
 // src/modules/videos/CoachVideoTab.jsx
 // v3.0 — Netflix categorie rijen + nieuwe filters (custom categorie + page filter)
 import React, { useState, useEffect } from 'react'
-import { Video, Plus, FolderPlus, ChevronRight, ChevronDown, ChevronUp, GraduationCap, Send, Pencil, Trash2, Globe } from 'lucide-react'
+import { Video, Plus, FolderPlus, ChevronDown, ChevronUp, GraduationCap, Search, X, MoreHorizontal, Send, Pencil, Trash2 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import videoService from './VideoService'
 import CoachFileManager from './CoachFileManager'
@@ -9,8 +9,7 @@ import ManageAssignmentsModal from './ManageAssignmentsModal'
 import CategoryManagerModal from './CategoryManagerModal'
 import CourseManagerModal from './CourseManagerModal'
 
-import VideoSearchFilters from './video-tab-components/VideoSearchFilters'
-import VideoCard from './video-tab-components/VideoCard'
+import VideoRow from './video-tab-components/VideoRow'
 import VideoUploadModal from './video-tab-components/VideoUploadModal'
 import VideoAssignModal from './video-tab-components/VideoAssignModal'
 import VideoVisibilityModal from './video-tab-components/VideoVisibilityModal'
@@ -18,6 +17,30 @@ import CourseVisibilityModal from './video-tab-components/CourseVisibilityModal'
 import VideoEditModal from './video-tab-components/VideoEditModal'
 
 const GOLD = '#FFD700'
+
+const PAGINAS = [
+  { id: 'home',         label: 'Home' },
+  { id: 'workout',      label: 'Workout' },
+  { id: 'meal',         label: 'Meal' },
+  { id: 'boodschappen', label: 'Boodschappen' },
+  { id: 'tracking',     label: 'Tracking' },
+  { id: 'calls',        label: 'Calls' },
+  { id: 'profile',      label: 'Profiel' },
+]
+
+const selectStyle = (isMobile) => ({
+  flex: isMobile ? '1 1 45%' : '0 0 auto',
+  minHeight: 38,
+  padding: '0 0.7rem',
+  background: '#0a0a0a',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 8,
+  color: '#fff',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  cursor: 'pointer',
+  outline: 'none',
+})
 
 // Legacy categories — alleen nog voor VideoCard categoryConfig fallback
 const LEGACY_TAG_LOOKUP = {
@@ -31,6 +54,7 @@ const LEGACY_TAG_LOOKUP = {
 
 export default function CoachVideoTab({ clients = [], db }) {
   const [videos, setVideos] = useState([])
+  const [assignCounts, setAssignCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState('all')
@@ -88,10 +112,32 @@ export default function CoachVideoTab({ clients = [], db }) {
       const uid = userId || coachId || (await db.getCurrentUser()).id
       const data = await videoService.getCoachVideos(uid)
       setVideos(data)
+      await loadAssignCounts(data)
     } catch (error) {
       console.error('Error loading videos:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Per video: aan hoeveel klanten is 'ie toegewezen? Dat is wat je op het
+  // scherm wil zien — anders weet je van geen enkele video voor wie 'ie is.
+  const loadAssignCounts = async (lijst) => {
+    try {
+      const ids = (lijst || []).map(v => v.id)
+      if (!ids.length) { setAssignCounts({}); return }
+      const { data, error } = await db.supabase
+        .from('video_assignments').select('video_id, client_id').in('video_id', ids)
+      if (error) return
+      const perVideo = {}
+      for (const rij of data || []) {
+        (perVideo[rij.video_id] ||= new Set()).add(rij.client_id)
+      }
+      setAssignCounts(Object.fromEntries(
+        Object.entries(perVideo).map(([id, set]) => [id, set.size])
+      ))
+    } catch (e) {
+      console.error('Tellen van toewijzingen mislukt:', e)
     }
   }
 
@@ -168,35 +214,6 @@ export default function CoachVideoTab({ clients = [], db }) {
     !courseVideoIds.has(v.id) && matchesSearch(v) && matchesCategory(v) && matchesPage(v)
   )
 
-  // ── GROUP BY CATEGORY ──
-  const grouped = {}
-  const uncategorized = []
-
-  filteredVideos.forEach(video => {
-    const catId = video.category_id
-    if (catId && customCategories.find(c => c.id === catId)) {
-      if (!grouped[catId]) grouped[catId] = []
-      grouped[catId].push(video)
-    } else {
-      uncategorized.push(video)
-    }
-  })
-
-  // Order categories by order_index, only those with videos
-  const orderedCategories = customCategories
-    .filter(cat => grouped[cat.id] && grouped[cat.id].length > 0)
-    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-
-  const getCategoryConfig = (video) => {
-    // Try custom category first
-    const customCat = customCategories.find(c => c.id === video.category_id)
-    if (customCat) {
-      return { label: customCat.name, color: customCat.color || GOLD }
-    }
-    // Fallback to legacy tag
-    return LEGACY_TAG_LOOKUP[video.category] || { label: video.category || 'Video', color: 'rgba(255,255,255,0.4)' }
-  }
-
   const handleDeleteVideo = async (video) => {
     // "Standaard" = default_pages heeft pagina's (de echte bron van waarheid),
     // niet het dode is_default-veld.
@@ -214,6 +231,18 @@ export default function CoachVideoTab({ clients = [], db }) {
       }
     }
   }
+
+  const categorieNaamVan = (v) =>
+    customCategories.find(c => c.id === v.category_id)?.name
+    || LEGACY_TAG_LOOKUP[v.category]?.label
+    || null
+
+  // Eén lijst, gesorteerd op categorie en dan titel. Video's van dezelfde
+  // categorie staan zo bij elkaar zonder dat er een kop tussen hoeft.
+  const gesorteerdeVideos = [...filteredVideos].sort((a, b) =>
+    (categorieNaamVan(a) || 'zzz').localeCompare(categorieNaamVan(b) || 'zzz')
+    || (a.title || '').localeCompare(b.title || '')
+  )
 
   const totalCount = filteredVideos.length
   const isFilteringActive = searchQuery || selectedCategoryId !== 'all' || selectedPage !== 'all'
@@ -234,16 +263,6 @@ export default function CoachVideoTab({ clients = [], db }) {
         justifyContent: 'space-between'
       }}>
         <div>
-          <div style={{
-            fontSize: isMobile ? '0.4rem' : '0.45rem',
-            fontWeight: '700',
-            color: 'rgba(255, 255, 255, 0.2)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            marginBottom: '0.2rem'
-          }}>
-            Coach Studio
-          </div>
           <h2 style={{
             fontSize: isMobile ? '1.2rem' : '1.4rem',
             fontWeight: '800',
@@ -254,13 +273,12 @@ export default function CoachVideoTab({ clients = [], db }) {
             gap: '0.5rem',
             letterSpacing: '-0.02em'
           }}>
-            <Video size={20} color={GOLD} />
-            Video Library
+            <Video size={19} />
+            Video's
             <span style={{
-              fontSize: '0.7rem',
-              color: 'rgba(255, 255, 255, 0.3)',
-              fontWeight: '700',
-              marginLeft: '0.2rem'
+              fontSize: '0.8rem',
+              color: 'rgba(255, 255, 255, 0.4)',
+              fontWeight: '700'
             }}>
               {videos.length}
             </span>
@@ -278,12 +296,12 @@ export default function CoachVideoTab({ clients = [], db }) {
             style={{
               flex: isMobile ? 1 : '0 0 auto',
               padding: '0.55rem 0.875rem',
-              background: '#0a0a0a',
-              border: `1px solid ${GOLD}`,
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.14)',
               borderRadius: '8px',
-              color: GOLD,
-              fontSize: '0.7rem',
-              fontWeight: '800',
+              color: 'rgba(255,255,255,0.8)',
+              fontSize: '0.74rem',
+              fontWeight: '700',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -291,9 +309,7 @@ export default function CoachVideoTab({ clients = [], db }) {
               gap: '0.4rem',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              minHeight: '40px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
+              minHeight: '40px'
             }}
           >
             <FolderPlus size={13} />
@@ -301,10 +317,10 @@ export default function CoachVideoTab({ clients = [], db }) {
             {customCategories.length > 0 && (
               <span style={{
                 padding: '0.1rem 0.35rem',
-                background: GOLD,
-                color: '#000',
-                borderRadius: '8px',
-                fontSize: '0.55rem',
+                background: 'rgba(255,255,255,0.12)',
+                color: '#fff',
+                borderRadius: '6px',
+                fontSize: '0.7rem',
                 fontWeight: '800'
               }}>
                 {customCategories.length}
@@ -317,12 +333,12 @@ export default function CoachVideoTab({ clients = [], db }) {
             style={{
               flex: isMobile ? 1 : '0 0 auto',
               padding: '0.55rem 0.875rem',
-              background: '#0a0a0a',
-              border: `1px solid ${GOLD}`,
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.14)',
               borderRadius: '8px',
-              color: GOLD,
-              fontSize: '0.7rem',
-              fontWeight: '800',
+              color: 'rgba(255,255,255,0.8)',
+              fontSize: '0.74rem',
+              fontWeight: '700',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -330,9 +346,7 @@ export default function CoachVideoTab({ clients = [], db }) {
               gap: '0.4rem',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              minHeight: '40px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
+              minHeight: '40px'
             }}
           >
             <GraduationCap size={14} />
@@ -344,11 +358,11 @@ export default function CoachVideoTab({ clients = [], db }) {
             style={{
               flex: isMobile ? 1 : '0 0 auto',
               padding: '0.55rem 1rem',
-              background: GOLD,
+              background: '#fff',
               border: 'none',
               borderRadius: '8px',
               color: '#000',
-              fontSize: '0.7rem',
+              fontSize: '0.74rem',
               fontWeight: '800',
               cursor: 'pointer',
               display: 'flex',
@@ -357,9 +371,7 @@ export default function CoachVideoTab({ clients = [], db }) {
               gap: '0.4rem',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              minHeight: '40px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
+              minHeight: '40px'
             }}
           >
             <Plus size={14} />
@@ -368,149 +380,132 @@ export default function CoachVideoTab({ clients = [], db }) {
         </div>
       </div>
 
-      {/* Search + Filters */}
-      <VideoSearchFilters
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        customCategories={customCategories}
-        selectedCategoryId={selectedCategoryId}
-        setSelectedCategoryId={setSelectedCategoryId}
-        selectedPage={selectedPage}
-        setSelectedPage={setSelectedPage}
-      />
+      {/* ── ZOEKEN + FILTERS — twee dropdowns, geen rijen chips ── */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '0.5rem',
+        alignItems: 'center', marginBottom: '0.9rem',
+      }}>
+        <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '1 1 280px', minWidth: 0 }}>
+          <Search
+            size={15}
+            style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.35)' }}
+          />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Zoek op titel"
+            style={{
+              width: '100%', minHeight: 38, padding: '0 0.7rem 0 2.1rem',
+              background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8, color: '#fff', fontSize: '0.82rem', fontWeight: 600,
+              outline: 'none',
+            }}
+          />
+        </div>
 
-      {/* Result count */}
-      {!loading && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: '0.4rem',
-          marginBottom: '0.75rem',
-          padding: '0 0.25rem'
-        }}>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            fontWeight: '800',
-            color: '#fff',
-            letterSpacing: '-0.01em'
-          }}>
-            {totalCount}
-          </div>
-          <div style={{
-            fontSize: '0.6rem',
-            fontWeight: '700',
-            color: 'rgba(255, 255, 255, 0.3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em'
-          }}>
-            {totalCount === 1 ? 'video' : "video's"}
-            {isFilteringActive && ' gevonden'}
-          </div>
-          {isFilteringActive && (
-            <button
-              onClick={() => {
+        <select
+          value={selectedCategoryId}
+          onChange={(e) => setSelectedCategoryId(e.target.value)}
+          style={selectStyle(isMobile)}
+        >
+          <option value="all">Alle categorieën</option>
+          {customCategories.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+          <option value="uncategorized">Zonder categorie</option>
+        </select>
+
+        <select
+          value={selectedPage}
+          onChange={(e) => setSelectedPage(e.target.value)}
+          title="Video's die standaard op een pagina staan"
+          style={selectStyle(isMobile)}
+        >
+          <option value="all">Alle pagina's</option>
+          {PAGINAS.map(pg => (
+            <option key={pg.id} value={pg.id}>{pg.label}</option>
+          ))}
+        </select>
+
+        {isFilteringActive && (
+          <button
+            onClick={() => { setSearchQuery(''); setSelectedCategoryId('all'); setSelectedPage('all') }}
+            style={{
+              minHeight: 38, padding: '0 0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem',
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
+              color: 'rgba(255,255,255,0.65)', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            <X size={14} /> Wis
+          </button>
+        )}
+      </div>
+
+      {/* ── INHOUD ── */}
+      {loading ? (
+        <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700 }}>
+          Video's laden...
+        </div>
+      ) : (
+        <>
+          {/* Cursussen: uitklapbaar, video's eronder */}
+          {courses.length > 0 && (
+            <CourseList
+              courses={courses}
+              videos={videos}
+              assignCounts={assignCounts}
+              categorieNaamVan={categorieNaamVan}
+              onAssign={(c) => { setAssigningCourse(c); setShowCourseAssign(true) }}
+              onVisibility={(c) => { setVisibilityCourse(c); setShowCourseVisibility(true) }}
+              onEdit={(c) => { setEditingCourse(c); setShowCourseModal(true) }}
+              onDelete={handleDeleteCourse}
+              onVideoAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
+              onVideoManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
+              onVideoEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
+              onVideoDelete={handleDeleteVideo}
+              isMobile={isMobile}
+            />
+          )}
+
+          {/* Losse video's — één lijst */}
+          {filteredVideos.length === 0 ? (
+            <EmptyState
+              isFiltering={isFilteringActive}
+              onUpload={() => setShowUploadModal(true)}
+              onResetFilters={() => {
                 setSearchQuery('')
                 setSelectedCategoryId('all')
                 setSelectedPage('all')
               }}
-              style={{
-                marginLeft: 'auto',
-                padding: '0.25rem 0.5rem',
-                background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '4px',
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: '0.55rem',
-                fontWeight: '800',
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em'
-              }}
-            >
-              Reset filters
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── CURSUSSEN ── */}
-      {courses.length > 0 && (
-        <CourseRow
-          courses={courses}
-          videos={videos}
-          onAssign={(c) => { setAssigningCourse(c); setShowCourseAssign(true) }}
-          onVisibility={(c) => { setVisibilityCourse(c); setShowCourseVisibility(true) }}
-          onEdit={(c) => { setEditingCourse(c); setShowCourseModal(true) }}
-          onDelete={handleDeleteCourse}
-          onVideoAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
-          onVideoManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
-          onVideoEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
-          onVideoDelete={handleDeleteVideo}
-          getCategoryConfig={getCategoryConfig}
-          isMobile={isMobile}
-        />
-      )}
-
-      {/* ── CONTENT ── */}
-      {loading ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '3rem',
-          color: 'rgba(255, 255, 255, 0.3)',
-          fontSize: '0.7rem',
-          fontWeight: '700',
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em'
-        }}>
-          Videos laden...
-        </div>
-      ) : filteredVideos.length === 0 ? (
-        <EmptyState
-          isFiltering={isFilteringActive}
-          onUpload={() => setShowUploadModal(true)}
-          onResetFilters={() => {
-            setSearchQuery('')
-            setSelectedCategoryId('all')
-            setSelectedPage('all')
-          }}
-          isMobile={isMobile}
-        />
-      ) : (
-        <div>
-          {/* Custom categories with videos */}
-          {orderedCategories.map(cat => (
-            <CategoryRow
-              key={cat.id}
-              title={cat.name}
-              color={cat.color || GOLD}
-              videos={grouped[cat.id]}
-              onAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
-              onManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
-              onEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
-              onDelete={handleDeleteVideo}
-              getCategoryConfig={getCategoryConfig}
               isMobile={isMobile}
             />
-          ))}
-
-          {/* Uncategorized */}
-          {uncategorized.length > 0 && (
-            <CategoryRow
-              title="Zonder Categorie"
-              color="rgba(255, 255, 255, 0.3)"
-              videos={uncategorized}
-              onAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
-              onManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
-              onEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
-              onDelete={handleDeleteVideo}
-              getCategoryConfig={getCategoryConfig}
-              isMobile={isMobile}
-              isUncategorized
-            />
+          ) : (
+            <div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                padding: '0 0.5rem 0.4rem',
+                fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)',
+              }}>
+                {isFilteringActive ? `${totalCount} van ${videos.length} video's` : `${totalCount} video's`}
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                {gesorteerdeVideos.map(v => (
+                  <VideoRow
+                    key={v.id}
+                    video={v}
+                    categorieNaam={categorieNaamVan(v)}
+                    aantalKlanten={assignCounts[v.id] || 0}
+                    onAssign={() => { setSelectedVideo(v); setShowVisibilityModal(true) }}
+                    onManage={() => { setManagingVideo(v); setShowManageModal(true) }}
+                    onEdit={() => { setEditingVideo(v); setShowEditModal(true) }}
+                    onDelete={() => handleDeleteVideo(v)}
+                    isMobile={isMobile}
+                  />
+                ))}
+              </div>
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {/* ── PDF / Bestanden manager — onderaan (video's hebben prioriteit). */}
@@ -664,178 +659,172 @@ export default function CoachVideoTab({ clients = [], db }) {
 }
 
 // ============================================
-// COURSE ROW — cursus-kaarten met toewijzen/bewerken/verwijderen
+// CURSUSSEN — compacte regels, klik klapt de video's eruit
 // ============================================
-function CourseRow({ courses, videos, onAssign, onVisibility, onEdit, onDelete, onVideoAssign, onVideoManage, onVideoEdit, onVideoDelete, getCategoryConfig, isMobile }) {
-  const [expandedId, setExpandedId] = useState(null)
+function CourseList({
+  courses, videos, assignCounts, categorieNaamVan,
+  onAssign, onVisibility, onEdit, onDelete,
+  onVideoAssign, onVideoManage, onVideoEdit, onVideoDelete, isMobile,
+}) {
+  const [openId, setOpenId] = useState(null)
+  const [menuId, setMenuId] = useState(null)
+
   const thumbFor = (course) => {
     if (course.thumbnail_url) return course.thumbnail_url
-    const first = videos.find(v => v.id === (course.videoIds || [])[0])
-    return first ? videoService.getThumbnailUrl(first) : null
+    const eerste = videos.find(v => v.id === (course.videoIds || [])[0])
+    return eerste ? videoService.getThumbnailUrl(eerste) : null
   }
-  const expanded = expandedId ? courses.find(c => c.id === expandedId) : null
-  const expandedVideos = expanded
-    ? (expanded.videoIds || []).map(id => videos.find(v => v.id === id)).filter(Boolean)
-    : []
+
+  const menuItem = {
+    display: 'flex', alignItems: 'center', gap: '0.55rem',
+    width: '100%', padding: '0.6rem 0.8rem',
+    background: 'transparent', border: 'none',
+    color: 'rgba(255,255,255,0.85)', fontSize: '0.78rem', fontWeight: 700,
+    cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap',
+  }
 
   return (
-    <div style={{ marginBottom: '1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem', padding: '0 0.25rem' }}>
-        <GraduationCap size={15} color={GOLD} />
-        <div style={{ fontSize: isMobile ? '0.7rem' : '0.78rem', fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cursussen</div>
-        <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: '700' }}>· {courses.length}</div>
+    <div style={{ marginBottom: '1.25rem' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.4rem',
+        padding: '0 0.5rem 0.4rem',
+        fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)',
+      }}>
+        <GraduationCap size={14} />
+        {courses.length === 1 ? '1 cursus' : `${courses.length} cursussen`}
       </div>
-      <div className="cvt-row" style={{ display: 'flex', gap: '0.625rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '0.25rem' }}>
+
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         {courses.map(course => {
+          const open = openId === course.id
           const thumb = thumbFor(course)
-          const isOpen = expandedId === course.id
+          const cursusVideos = open
+            ? (course.videoIds || []).map(id => videos.find(v => v.id === id)).filter(Boolean)
+            : []
+
           return (
-            <div key={course.id} style={{ flexShrink: 0, width: isMobile ? '220px' : '260px', background: '#0a0a0a', border: `1px solid ${isOpen ? GOLD : GOLD + '33'}`, borderRadius: 10, overflow: 'hidden' }}>
-              {/* Klik op de kaart = video's uitklappen */}
-              <div onClick={() => setExpandedId(isOpen ? null : course.id)} style={{ position: 'relative', height: isMobile ? 110 : 130, background: '#000', cursor: 'pointer' }}>
-                {thumb && <img src={thumb} alt={course.title} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} onError={e => { e.currentTarget.style.display = 'none' }} />}
-                <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 4, padding: '0.2rem 0.45rem', background: GOLD, borderRadius: 6, color: '#000', fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <GraduationCap size={11} /> Cursus · {course.videoCount}
+            <div key={course.id}>
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                gap: isMobile ? '0.6rem' : '0.85rem',
+                padding: isMobile ? '0.55rem 0.25rem' : '0.6rem 0.5rem',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <div
+                  onClick={() => setOpenId(open ? null : course.id)}
+                  style={{
+                    position: 'relative', flexShrink: 0,
+                    width: isMobile ? 76 : 96, aspectRatio: '16 / 9',
+                    borderRadius: 6, overflow: 'hidden', background: '#000', cursor: 'pointer',
+                  }}
+                >
+                  {thumb && (
+                    <img
+                      src={thumb} alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  )}
                 </div>
-                {/* Uitklap-indicator */}
-                <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', alignItems: 'center', gap: 3, padding: '0.2rem 0.4rem', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: '0.5rem', fontWeight: 800, textTransform: 'uppercase' }}>
-                  {isOpen ? <><ChevronUp size={11} /> Sluit</> : <><ChevronDown size={11} /> Video's</>}
+
+                <div
+                  onClick={() => setOpenId(open ? null : course.id)}
+                  style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+                >
+                  <div style={{
+                    fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 800, color: '#fff',
+                    letterSpacing: '-0.01em',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {course.title}
+                  </div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.2rem',
+                    fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)',
+                  }}>
+                    Cursus · {course.videoCount} video's
+                    {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onVisibility(course)}
+                  style={{
+                    flexShrink: 0, minHeight: 34, padding: isMobile ? '0 0.7rem' : '0 0.9rem',
+                    background: '#fff', border: 'none', borderRadius: 8,
+                    color: '#000', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
+                  }}
+                >
+                  Delen
+                </button>
+
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button
+                    onClick={() => setMenuId(menuId === course.id ? null : course.id)}
+                    title="Meer"
+                    style={{
+                      width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 8, color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                    }}
+                  >
+                    <MoreHorizontal size={16} />
+                  </button>
+                  {menuId === course.id && (
+                    <div style={{
+                      position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 30,
+                      minWidth: 200, padding: '0.25rem 0',
+                      background: 'rgba(10,10,10,0.96)',
+                      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+                      boxShadow: '0 12px 28px rgba(0,0,0,0.5)',
+                    }}>
+                      <button style={menuItem} onClick={() => { setMenuId(null); onAssign(course) }}>
+                        <Send size={14} /> Aan klanten toewijzen
+                      </button>
+                      <button style={menuItem} onClick={() => { setMenuId(null); onEdit(course) }}>
+                        <Pencil size={14} /> Bewerken
+                      </button>
+                      <button
+                        style={{ ...menuItem, color: '#ef4444' }}
+                        onClick={() => { setMenuId(null); onDelete(course) }}
+                      >
+                        <Trash2 size={14} /> Verwijderen
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div style={{ padding: '0.6rem 0.7rem' }}>
-                <div onClick={() => setExpandedId(isOpen ? null : course.id)} style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '0.5rem', cursor: 'pointer' }}>{course.title}</div>
-                <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  <button onClick={() => onAssign(course)} style={{ flex: 2, padding: '0.45rem', background: GOLD, border: 'none', borderRadius: 6, color: '#000', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, textTransform: 'uppercase' }}><Send size={11} /> Toewijzen</button>
-                  <button onClick={() => onEdit(course)} style={{ flex: 1, padding: '0.45rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={12} /></button>
-                  <button onClick={() => onDelete(course)} style={{ flex: 1, padding: '0.45rem', background: 'transparent', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, color: 'rgba(239,68,68,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={12} /></button>
-                </div>
-                {/* Cursus in één keer standaard zichtbaar maken (pagina's + slider) */}
-                <button onClick={() => onVisibility(course)} style={{ marginTop: '0.35rem', width: '100%', padding: '0.45rem', background: 'rgba(255,215,0,0.1)', border: `1px solid ${GOLD}44`, borderRadius: 6, color: GOLD, fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}><Globe size={11} /> Zichtbaarheid</button>
-              </div>
+
+              {open && (
+                cursusVideos.length === 0 ? (
+                  <div style={{
+                    padding: '0.9rem 1.75rem', fontSize: '0.75rem',
+                    color: 'rgba(255,255,255,0.4)', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    Nog geen video's in deze cursus.
+                  </div>
+                ) : (
+                  cursusVideos.map(v => (
+                    <VideoRow
+                      key={v.id}
+                      video={v}
+                      categorieNaam={categorieNaamVan(v)}
+                      aantalKlanten={assignCounts[v.id] || 0}
+                      onAssign={() => onVideoAssign(v)}
+                      onManage={() => onVideoManage(v)}
+                      onEdit={() => onVideoEdit(v)}
+                      onDelete={() => onVideoDelete(v)}
+                      isMobile={isMobile}
+                      ingesprongen
+                    />
+                  ))
+                )
+              )}
             </div>
           )
         })}
       </div>
-
-      {/* Uitgeklapte cursus → z'n video's eronder */}
-      {expanded && (
-        <div style={{ marginTop: '0.75rem', padding: isMobile ? '0.7rem' : '0.85rem', background: 'rgba(255,215,0,0.03)', border: `1px solid ${GOLD}22`, borderRadius: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-            <GraduationCap size={13} color={GOLD} />
-            <span style={{ fontWeight: 800, color: '#fff', fontSize: '0.72rem' }}>Video's in "{expanded.title}"</span>
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', fontWeight: 700 }}>· {expandedVideos.length}</span>
-            <button onClick={() => setExpandedId(null)} style={{ marginLeft: 'auto', padding: '0.25rem 0.55rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textTransform: 'uppercase' }}><ChevronUp size={11} /> Sluit</button>
-          </div>
-          {expandedVideos.length === 0 ? (
-            <div style={{ padding: '1rem', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem' }}>Nog geen video's in deze cursus.</div>
-          ) : (
-            <div className="cvt-row" style={{ display: 'flex', gap: '0.625rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '0.25rem' }}>
-              {expandedVideos.map(v => (
-                <div key={v.id} style={{ flexShrink: 0, width: isMobile ? '220px' : '260px' }}>
-                  <VideoCard
-                    video={v}
-                    categoryConfig={getCategoryConfig(v)}
-                    onAssign={() => onVideoAssign(v)}
-                    onManage={() => onVideoManage(v)}
-                    onEdit={() => onVideoEdit(v)}
-                    onDelete={() => onVideoDelete(v)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      <style>{`.cvt-row::-webkit-scrollbar { display: none; }`}</style>
-    </div>
-  )
-}
-
-// ============================================
-// CATEGORY ROW — horizontal scroll van VideoCards
-// ============================================
-function CategoryRow({
-  title,
-  color,
-  videos,
-  onAssign,
-  onManage,
-  onEdit,
-  onDelete,
-  getCategoryConfig,
-  isMobile,
-  isUncategorized
-}) {
-  return (
-    <div style={{
-      marginBottom: '1.25rem'
-    }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        marginBottom: '0.625rem',
-        padding: '0 0.25rem'
-      }}>
-        <div style={{
-          width: '3px',
-          height: '14px',
-          background: color,
-          borderRadius: '2px',
-          opacity: isUncategorized ? 0.5 : 1
-        }} />
-        <div style={{
-          fontSize: isMobile ? '0.7rem' : '0.78rem',
-          fontWeight: '800',
-          color: '#fff',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em'
-        }}>
-          {title}
-        </div>
-        <div style={{
-          fontSize: '0.6rem',
-          color: 'rgba(255, 255, 255, 0.3)',
-          fontWeight: '700'
-        }}>
-          · {videos.length}
-        </div>
-      </div>
-
-      {/* Horizontal scroll */}
-      <div
-        className="cvt-row"
-        style={{
-          display: 'flex',
-          gap: '0.625rem',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-          paddingBottom: '0.25rem'
-        }}
-      >
-        {videos.map(video => (
-          <div
-            key={video.id}
-            style={{
-              flexShrink: 0,
-              width: isMobile ? '220px' : '260px'
-            }}
-          >
-            <VideoCard
-              video={video}
-              categoryConfig={getCategoryConfig(video)}
-              onAssign={() => onAssign(video)}
-              onManage={() => onManage(video)}
-              onEdit={() => onEdit(video)}
-              onDelete={() => onDelete(video)}
-            />
-          </div>
-        ))}
-      </div>
-
-      <style>{`.cvt-row::-webkit-scrollbar { display: none; }`}</style>
     </div>
   )
 }
