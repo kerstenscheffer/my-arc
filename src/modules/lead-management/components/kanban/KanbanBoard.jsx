@@ -135,6 +135,24 @@ export default function KanbanBoard({
   const [boardFilter, setBoardFilter] = useState({ sort: 'default', types: new Set(), temps: new Set(), followups: new Set(), genders: new Set() })
   const [showBoardFilter, setShowBoardFilter] = useState(false)
   const boardFilterRef = useRef(null)
+  const boardFilterBtnRef = useRef(null)
+  const boardFilterMenuRef = useRef(null)
+  // Het venster hangt in een portal (de knoppengroep heeft overflow:hidden en
+  // knipte het anders weg), dus we rekenen zelf uit waar het moet staan.
+  const [boardFilterPos, setBoardFilterPos] = useState(null)
+
+  const openBoardFilter = () => {
+    if (showBoardFilter) { setShowBoardFilter(false); return }
+    const r = boardFilterBtnRef.current?.getBoundingClientRect()
+    if (r) {
+      const breedte = 230
+      setBoardFilterPos({
+        top: r.bottom + 6,
+        left: Math.max(8, Math.min(r.left, window.innerWidth - breedte - 8)),
+      })
+    }
+    setShowBoardFilter(true)
+  }
 
   const toggleBoardSet = (key, value) => setBoardFilter(cur => {
     const next = new Set(cur[key])
@@ -149,13 +167,21 @@ export default function KanbanBoard({
   useEffect(() => {
     if (!showBoardFilter) return
     const onDown = (e) => {
-      if (boardFilterRef.current && !boardFilterRef.current.contains(e.target)) setShowBoardFilter(false)
+      const binnenKnop = boardFilterRef.current?.contains(e.target)
+      const binnenVenster = boardFilterMenuRef.current?.contains(e.target)
+      if (!binnenKnop && !binnenVenster) setShowBoardFilter(false)
     }
+    // Scrollen zou het venster laten zweven; dan sluiten we het.
+    const onScroll = () => setShowBoardFilter(false)
     document.addEventListener('mousedown', onDown)
     document.addEventListener('touchstart', onDown)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('touchstart', onDown)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
     }
   }, [showBoardFilter])
   // Globale "prioriteit" toggle — één knop die de coach in één klik ALLE
@@ -1857,7 +1883,8 @@ export default function KanbanBoard({
                 <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignSelf: 'stretch' }} ref={boardFilterRef}>
                   <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
                   <button
-                    onClick={() => setShowBoardFilter(v => !v)}
+                    ref={boardFilterBtnRef}
+                    onClick={openBoardFilter}
                     title="Filter & sorteer alle leads (hele bord)"
                     style={{
                       position: 'relative',
@@ -1873,10 +1900,10 @@ export default function KanbanBoard({
                       <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, background: GOLD, color: '#000', borderRadius: 8, padding: '0 3px', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</span>
                     )}
                   </button>
-                  {showBoardFilter && (
-                    <div style={{
-                      position: 'absolute', top: 'calc(100% + 0.3rem)', left: 0,
-                      zIndex: 200, minWidth: 230,
+                  {showBoardFilter && boardFilterPos && createPortal(
+                    <div ref={boardFilterMenuRef} style={{
+                      position: 'fixed', top: boardFilterPos.top, left: boardFilterPos.left,
+                      zIndex: 2147483500, minWidth: 230,
                       background: '#111', border: '1px solid rgba(255,215,0,0.3)',
                       borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
                     }}>
@@ -1981,7 +2008,8 @@ export default function KanbanBoard({
                           Reset filters
                         </button>
                       )}
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
               )
