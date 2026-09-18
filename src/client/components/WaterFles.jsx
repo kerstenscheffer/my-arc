@@ -124,59 +124,83 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 1
         <Minus size={13} strokeWidth={3} />
       </button>
 
-      {/* De fles zelf. Hij loopt van onderen vol; de tekst staat eronder. */}
+      {/* De fles zelf: een echte flesvorm in SVG, die van onderen volloopt.
+          Een afgerond blokje leek op een knop; hier zie je in één oogopslag
+          waar het over gaat. */}
       <button
         onClick={() => verzet(STAP_ML)}
         aria-label={`${ml} van ${doelMl} milliliter water. Tik voor 100 ml erbij.`}
         title={`${liters} van ${(doelMl / 1000).toFixed(1)} liter — tik voor +100 ml`}
         style={{
-          position: 'relative', width: 46, height: 66, padding: 0,
-          background: 'rgba(10,10,10,0.9)',
-          backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-          border: `1px solid ${gehaald ? 'rgba(59,130,246,0.6)' : 'rgba(255,255,255,0.14)'}`,
-          borderRadius: 14,
-          overflow: 'hidden', cursor: 'pointer',
-          boxShadow: '0 10px 26px rgba(0,0,0,0.5)',
+          position: 'relative', padding: 0, border: 'none', background: 'transparent',
+          cursor: 'pointer', lineHeight: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.55))',
         }}
       >
-        {/* Het water */}
-        <span style={{
-          position: 'absolute', left: 0, right: 0, bottom: 0,
-          height: `${pct}%`,
-          background: 'linear-gradient(180deg, rgba(59,130,246,0.55) 0%, rgba(37,99,235,0.75) 100%)',
-          transition: 'height 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
-        }} />
+        <svg width={isMobile ? 42 : 46} height={isMobile ? 70 : 76} viewBox="0 0 40 72" fill="none">
+          <defs>
+            <clipPath id="fles-binnen">
+              <path d="M15.5 8 L15.5 15.5 C15.5 19.5 8.5 21.5 8.5 29.5 L8.5 62 C8.5 66.5 11.5 69.5 16 69.5 L24 69.5 C28.5 69.5 31.5 66.5 31.5 62 L31.5 29.5 C31.5 21.5 24.5 19.5 24.5 15.5 L24.5 8 Z" />
+            </clipPath>
+          </defs>
 
-        {/* Waterlijn: een streepje bovenop het water maakt het niveau leesbaar
-            ook als de fles bijna leeg is. */}
-        {pct > 0 && (
-          <span style={{
-            position: 'absolute', left: 0, right: 0, bottom: `${pct}%`,
-            height: 2, background: 'rgba(147,197,253,0.9)',
-            transition: 'bottom 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
-          }} />
-        )}
+          {/* Glas */}
+          <path
+            d="M15.5 8 L15.5 15.5 C15.5 19.5 8.5 21.5 8.5 29.5 L8.5 62 C8.5 66.5 11.5 69.5 16 69.5 L24 69.5 C28.5 69.5 31.5 66.5 31.5 62 L31.5 29.5 C31.5 21.5 24.5 19.5 24.5 15.5 L24.5 8 Z"
+            fill="rgba(10,10,10,0.85)"
+          />
+
+          {/* Water, van onderen omhoog */}
+          <g clipPath="url(#fles-binnen)">
+            <rect
+              x="0" width="40"
+              y={72 - (pct / 100) * 62}
+              height={(pct / 100) * 62 + 2}
+              fill="url(#water)"
+              style={{ transition: 'y 0.35s cubic-bezier(0.22, 1, 0.36, 1), height 0.35s cubic-bezier(0.22, 1, 0.36, 1)' }}
+            />
+            {pct > 0 && (
+              <rect
+                x="0" width="40" height="1.6"
+                y={72 - (pct / 100) * 62}
+                fill="rgba(147,197,253,0.95)"
+                style={{ transition: 'y 0.35s cubic-bezier(0.22, 1, 0.36, 1)' }}
+              />
+            )}
+          </g>
+
+          <defs>
+            <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(59,130,246,0.65)" />
+              <stop offset="100%" stopColor="rgba(37,99,235,0.85)" />
+            </linearGradient>
+          </defs>
+
+          {/* Rand van de fles en de dop */}
+          <path
+            d="M15.5 8 L15.5 15.5 C15.5 19.5 8.5 21.5 8.5 29.5 L8.5 62 C8.5 66.5 11.5 69.5 16 69.5 L24 69.5 C28.5 69.5 31.5 66.5 31.5 62 L31.5 29.5 C31.5 21.5 24.5 19.5 24.5 15.5 L24.5 8"
+            stroke={gehaald ? 'rgba(96,165,250,0.9)' : 'rgba(255,255,255,0.35)'}
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <rect
+            x="13.5" y="1.5" width="13" height="7" rx="2.2"
+            fill={gehaald ? 'rgba(96,165,250,0.9)' : 'rgba(255,255,255,0.75)'}
+          />
+        </svg>
 
         <span style={{
-          position: 'relative', width: '100%',
-          padding: '0 2px 5px',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+          minWidth: 44, padding: '2px 6px', borderRadius: 999,
+          background: 'rgba(10,10,10,0.9)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          fontSize: '0.6rem', fontWeight: 900, color: '#fff',
+          letterSpacing: '-0.01em', lineHeight: 1.4,
+          fontVariantNumeric: 'tabular-nums',
         }}>
-          <span style={{
-            fontSize: '0.78rem', fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.02em', lineHeight: 1,
-            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-          }}>
-            {liters}
-          </span>
-          <span style={{
-            fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)',
-            letterSpacing: '0.06em', textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-          }}>
-            /{(doelMl / 1000).toFixed(1)}L
-          </span>
+          {liters}<span style={{ color: 'rgba(255,255,255,0.45)' }}>/{(doelMl / 1000).toFixed(1)}L</span>
         </span>
       </button>
     </div>
