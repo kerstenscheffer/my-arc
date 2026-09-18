@@ -13,12 +13,22 @@
 // pas na een week gebruik iets zinnigs over kunt zeggen.
 
 import { useEffect, useRef, useState } from 'react'
-import { Play, X, ChevronDown, FileText } from 'lucide-react'
+import { Play, ChevronDown, FileText, Library, Video } from 'lucide-react'
 import clientVideoService from '../../modules/videos/ClientVideoService'
 import videoService from '../../modules/videos/VideoService'
 import fileService from '../../modules/videos/FileService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
 import { extractYouTubeId, getYouTubeThumbnail } from '../../modules/videos/utils/youtubeHelpers'
+
+// De twee knoppen op de balk: kaal en wit, zoals overal.
+const balkKnop = {
+  position: 'relative', flexShrink: 0,
+  width: 32, height: 32, padding: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'transparent', border: 'none',
+  color: '#fff', cursor: 'pointer',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
 
 // Hoe lang na binnenkomst de eerste verschijnt, hoe lang hij blijft staan, en
 // hoe lang het daarna stil is voor de volgende.
@@ -26,12 +36,14 @@ const WACHT_EERSTE_MS = 6000
 const ZICHTBAAR_MS = 16000
 const PAUZE_MS = 3 * 60 * 1000
 
-export default function VideoTeaser({ client, isMobile = false, onderMarge = 86, vast = false, pagina = 'home' }) {
+export default function VideoTeaser({
+  client, isMobile = false, onderMarge = 70, vast = false, pagina = 'home',
+  onBibliotheek = null,
+}) {
   const [items, setItems] = useState([])
   const [index, setIndex] = useState(0)
   const [open, setOpen] = useState(false)      // schuift hij in beeld?
   const [speler, setSpeler] = useState(null)   // welke video speelt
-  const [weg, setWeg] = useState(false)        // weggeklikt voor deze sessie
   // Op home blijft hij staan; heb je hem daar naar beneden geduwd, dan blijft
   // hij weg tot de volgende keer dat je de app opent. Bewust niet bewaard:
   // een video die je wegklikt hoort niet voorgoed te verdwijnen.
@@ -76,7 +88,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
   // onderbreking. Op de andere pagina's ben je ergens mee bezig; daar komt hij
   // even langs en gaat weer weg.
   useEffect(() => {
-    if (weg || speler || items.length === 0) return
+    if (dicht || speler || items.length === 0) return
     if (vast) {
       timers.current.forEach(clearTimeout)
       timers.current = []
@@ -102,9 +114,9 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
       timers.current.forEach(clearTimeout)
       timers.current = []
     }
-  }, [items.length, weg, speler, vast, dicht])
+  }, [items.length, speler, vast, dicht])
 
-  if (weg || items.length === 0) return null
+  if (items.length === 0) return null
 
   const huidig = items[index] || items[0]
   const isBestand = huidig?.soort === 'bestand'
@@ -123,6 +135,36 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
     setSpeler(huidig.item)
   }
 
+  // Weggeschoven: alleen een klein video-icoon boven de balk, zodat je hem
+  // terug kunt halen. Zonder dat was hij weg tot de volgende keer dat je de
+  // app opent, en dan weet je niet meer dat er iets voor je klaarstond.
+  if (dicht) {
+    return (
+      <button
+        onClick={() => { setDicht(false); setOpen(true) }}
+        title="Video van je coach"
+        aria-label="Video van je coach"
+        style={{
+          position: 'fixed',
+          bottom: onderMarge + 6,
+          left: isMobile ? 14 : '50%',
+          transform: isMobile ? 'none' : 'translateX(-50%)',
+          zIndex: 100,
+          width: 38, height: 38, padding: 0, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(10,10,10,0.92)',
+          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: '#fff', cursor: 'pointer',
+          boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <Video size={17} strokeWidth={2.6} />
+      </button>
+    )
+  }
+
   return (
     <>
       <div
@@ -131,9 +173,10 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
           bottom: onderMarge,
           left: isMobile ? 10 : '50%',
           right: isMobile ? 10 : 'auto',
+          // Schuift van onder de balk vandaan omhoog, en zakt er weer achter.
           transform: isMobile
-            ? (open ? 'translateY(0)' : 'translateY(140%)')
-            : `translateX(-50%) ${open ? 'translateY(0)' : 'translateY(140%)'}`,
+            ? (open ? 'translateY(0)' : 'translateY(120%)')
+            : `translateX(-50%) ${open ? 'translateY(0)' : 'translateY(120%)'}`,
           width: isMobile ? 'auto' : 'min(680px, calc(100vw - 32px))',
           opacity: open ? 1 : 0,
           transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease',
@@ -211,23 +254,24 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
           </span>
         </button>
 
+        {onBibliotheek && (
+          <button
+            onClick={onBibliotheek}
+            title="Open de bibliotheek"
+            aria-label="Open de bibliotheek"
+            style={balkKnop}
+          >
+            <Library size={17} strokeWidth={2.6} />
+          </button>
+        )}
+
         <button
-          onClick={() => {
-            setOpen(false)
-            if (vast) setDicht(true); else setWeg(true)
-          }}
-          title={vast ? 'Wegschuiven' : 'Niet meer tonen'}
-          aria-label={vast ? 'Wegschuiven' : 'Niet meer tonen'}
-          style={{
-            position: 'relative',
-            flexShrink: 0, width: 32, height: 32, padding: 0, marginRight: 4,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: 'none',
-            color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}
+          onClick={() => { setOpen(false); setDicht(true) }}
+          title="Wegschuiven"
+          aria-label="Wegschuiven"
+          style={{ ...balkKnop, marginRight: 4 }}
         >
-          {vast ? <ChevronDown size={17} strokeWidth={3} /> : <X size={15} strokeWidth={2.8} />}
+          <ChevronDown size={18} strokeWidth={3} />
         </button>
       </div>
 

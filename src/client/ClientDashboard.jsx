@@ -364,9 +364,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         <VideoTeaser
           client={client}
           isMobile={isMobile}
-          onderMarge={isMobile ? 86 : 92}
+          // Tegen de balk aan: die staat op 22 van de onderrand en is ~50
+          // hoog, dus hier begint hij precies waar de balk ophoudt.
+          onderMarge={isMobile ? 70 : 76}
           vast={currentView === 'home'}
           pagina={currentView}
+          onBibliotheek={() => setWidgetOpen('video')}
         />
       )}
 
@@ -391,9 +394,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       }}>
         <div style={{
           display: 'flex',
-          justifyContent: 'space-around',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          gap: 2,
+          gap: 0,
         }}>
           {navItems.map(item => {
             const isActive = currentView === item.id
@@ -406,8 +409,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 2,
-                  padding: isMobile ? '0.28rem 0.05rem' : '0.32rem 0.15rem',
+                  gap: 3,
+                  padding: isMobile ? '0.25rem 0.05rem' : '0.3rem 0.15rem',
                   // Actief is wit, niet de kleur van de pagina. Vijf tabs in
                   // vijf kleuren maakte van de balk een stoplicht.
                   background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
@@ -422,7 +425,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                 }}
               >
                 <item.Icon
-                  size={isMobile ? 17 : 19}
+                  size={isMobile ? 21 : 23}
                   color={isActive ? '#fff' : 'rgba(255, 255, 255, 0.4)'}
                   strokeWidth={isActive ? 2.8 : 2}
                 />
@@ -445,8 +448,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             aria-expanded={meerOpen}
             style={{
               flex: 1,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-              padding: isMobile ? '0.28rem 0.05rem' : '0.32rem 0.15rem',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              padding: isMobile ? '0.25rem 0.05rem' : '0.3rem 0.15rem',
               background: (meerOpen || meerActief) ? 'rgba(255,255,255,0.1)' : 'transparent',
               border: 'none', borderRadius: 12,
               cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -455,7 +458,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             }}
           >
             <MoreHorizontal
-              size={isMobile ? 17 : 19}
+              size={isMobile ? 21 : 23}
               color={(meerOpen || meerActief) ? '#fff' : 'rgba(255, 255, 255, 0.4)'}
               strokeWidth={(meerOpen || meerActief) ? 2.8 : 2}
             />
