@@ -40,6 +40,9 @@ export default function ExerciseList({
   const sleepRef = useRef(null)
   const drukTimer = useRef(null)
   const startPunt = useRef(null)
+  // Na het loslaten komt er nog een klik achteraan; die zou de oefening
+  // openen terwijl je alleen wilde verslepen.
+  const netGesleept = useRef(false)
   const [terugzetBezig, setTerugzetBezig] = useState(false)
 
   useEffect(() => {
@@ -242,6 +245,8 @@ export default function ExerciseList({
     startPunt.current = null
     if (!staat) return
     setSleep(null)
+    netGesleept.current = true
+    setTimeout(() => { netGesleept.current = false }, 300)
     if (staat.naar !== staat.van) {
       const vanIndex = groep.items[staat.van].index
       const naarIndex = groep.items[staat.naar].index
@@ -295,9 +300,37 @@ export default function ExerciseList({
                   color: 'rgba(255,255,255,0.3)',
                 }}>{groep.items.length}</span>
               </div>
-              {groep.items.map(({ ex: exercise, index }) => (
-            <SwipeableRow
+              {groep.items.map(({ ex: exercise, index }, posInGroep) => {
+                // Verschuiving tijdens het slepen: de opgepakte kaart volgt je
+                // vinger, de kaarten ertussen schuiven een plek op zodat je ziet
+                // waar hij terechtkomt.
+                const sleeptHier = sleep?.groep === groep.naam
+                const isOpgepakt = sleeptHier && sleep.van === posInGroep
+                let verschuif = 0
+                if (sleeptHier && !isOpgepakt) {
+                  if (sleep.van < sleep.naar && posInGroep > sleep.van && posInGroep <= sleep.naar) verschuif = -sleep.hoogte
+                  if (sleep.van > sleep.naar && posInGroep < sleep.van && posInGroep >= sleep.naar) verschuif = sleep.hoogte
+                }
+                return (
+            <div
               key={`${exercise.name}-${index}`}
+              onTouchStart={(e) => startDruk(e, groep.naam, posInGroep, groep.items.length, e.currentTarget)}
+              onTouchMove={beweeg}
+              onTouchEnd={() => laatLos(groep)}
+              onTouchCancel={() => laatLos(groep)}
+              onClickCapture={(e) => { if (netGesleept.current) { e.preventDefault(); e.stopPropagation() } }}
+              style={{
+                position: 'relative',
+                zIndex: isOpgepakt ? 5 : 1,
+                transform: isOpgepakt ? `translateY(${sleep.dy}px) scale(1.02)` : `translateY(${verschuif}px)`,
+                transition: isOpgepakt ? 'none' : 'transform 0.18s ease',
+                boxShadow: isOpgepakt ? '0 14px 30px rgba(0,0,0,0.55)' : 'none',
+                opacity: isOpgepakt ? 0.96 : 1,
+                // Tijdens het slepen mag de pagina niet meescrollen.
+                touchAction: sleeptHier ? 'none' : 'auto',
+              }}
+            >
+            <SwipeableRow
               index={index}
               swipedIndex={swipedIndex}
               onSwipeOpen={() => setSwipedIndex(index)}
@@ -305,6 +338,7 @@ export default function ExerciseList({
               onDelete={() => handleDelete(index)}
               deleting={deletingIndex === index}
               isMobile={isMobile}
+              sleepBezig={!!sleep}
             >
               <ExerciseCard
                 exercise={exercise}
@@ -323,7 +357,9 @@ export default function ExerciseList({
                 onVerwijder={(modus) => handleVerwijder(index, modus)}
               />
             </SwipeableRow>
-              ))}
+            </div>
+                )
+              })}
             </div>
           ))}
 
@@ -399,7 +435,7 @@ export default function ExerciseList({
   )
 }
 
-function SwipeableRow({ children, index, swipedIndex, onSwipeOpen, onSwipeClose, onDelete, deleting, isMobile }) {
+function SwipeableRow({ children, index, swipedIndex, onSwipeOpen, onSwipeClose, onDelete, deleting, isMobile, sleepBezig = false }) {
   const startX = useRef(null)
   const currentX = useRef(0)
   const rowRef = useRef(null)
@@ -459,9 +495,9 @@ function SwipeableRow({ children, index, swipedIndex, onSwipeOpen, onSwipeClose,
 
       {/* Content */}
       <div ref={rowRef} style={{ position: 'relative', zIndex: 1, background: '#0a0a0a', transform: 'translateX(0)', transition: 'transform 0.25s ease', userSelect: 'none' }}
-        onTouchStart={isMobile ? handleTouchStart : undefined}
-        onTouchMove={isMobile ? handleTouchMove : undefined}
-        onTouchEnd={isMobile ? handleTouchEnd : undefined}
+        onTouchStart={isMobile && !sleepBezig ? handleTouchStart : undefined}
+        onTouchMove={isMobile && !sleepBezig ? handleTouchMove : undefined}
+        onTouchEnd={isMobile && !sleepBezig ? handleTouchEnd : undefined}
         onClick={() => { if (isOpen) onSwipeClose() }}>
         {children}
       </div>
