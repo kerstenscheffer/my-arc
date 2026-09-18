@@ -115,10 +115,9 @@ function WelcomeSection({ client }) {
     <div>
       <div style={{
         position: 'relative', width: '100%',
-        // Vaste verhouding van het beeld (1200x600), dus er wordt niets
+        // Vaste verhouding van het beeld (1960x600), dus er wordt niets
         // bijgesneden en de hoogte klopt op elk scherm.
-        aspectRatio: '2 / 1',
-        maxHeight: isMobile ? 230 : 300,
+        aspectRatio: '49 / 15',
         overflow: 'hidden',
       }}>
         <div style={{
@@ -129,7 +128,7 @@ function WelcomeSection({ client }) {
         {/* Onderin doodlopen in het zwart van de pagina. */}
         <div style={{
           position: 'absolute', left: 0, right: 0, bottom: 0,
-          height: '38%', pointerEvents: 'none',
+          height: '28%', pointerEvents: 'none',
           background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.75) 55%, #0a0a0a 100%)',
         }} />
       </div>
