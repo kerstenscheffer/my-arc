@@ -15,7 +15,11 @@
 //   - blokken lezen als kaarten: bold wit, tijd rechts, kleur alleen als streep
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, Utensils, Dumbbell, Moon, Briefcase, Pill } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import {
+  Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, List,
+  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill,
+} from 'lucide-react'
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
 } from '../../modules/client-agenda/ClientAgendaService'
@@ -102,6 +106,11 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
   const [gelogd, setGelogd] = useState({})
   const [verbruikt, setVerbruikt] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 })
   const [doelen, setDoelen] = useState(null)
+  // Twee manieren om dezelfde dag te lezen. De lijst is de standaard: die
+  // beantwoordt "wat moet ik vandaag" zonder scrollen. Het rooster laat zien
+  // hoe de dag verdeeld is, en dat is pas nuttig op een heel scherm.
+  const [weergave, setWeergave] = useState('lijst')
+  const [volledig, setVolledig] = useState(false)
   const roosterRef = useRef(null)
 
   useEffect(() => {
@@ -136,6 +145,13 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
     return () => { weg = true }
   }, [db, client?.id])
 
+  useEffect(() => {
+    if (!volledig) return
+    const opToets = (e) => { if (e.key === 'Escape') setVolledig(false) }
+    window.addEventListener('keydown', opToets)
+    return () => window.removeEventListener('keydown', opToets)
+  }, [volledig])
+
   // De nu-lijn hoeft niet op de seconde te kloppen; elke minuut is genoeg.
   useEffect(() => {
     const t = setInterval(() => setNu(new Date()), 60000)
@@ -144,6 +160,11 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
 
   const blokken = useMemo(
     () => verdeelInKolommen((data?.blocksByDay?.[dag] || [])),
+    [data, dag]
+  )
+  // Voor de lijst: gewoon op tijd, zonder kolomverdeling.
+  const lijstBlokken = useMemo(
+    () => [...(data?.blocksByDay?.[dag] || [])].sort((a, b) => (a.start - b.start) || (a.end - b.end)),
     [data, dag]
   )
 
@@ -305,8 +326,11 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
     setDag(dagSleutelVan(new Date()))
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: hoogte || '100%', minHeight: 0 }}>
+  const inhoud = (
+    <div style={{
+      display: 'flex', flexDirection: 'column', minHeight: 0,
+      height: volledig ? '100%' : (hoogte || '100%'),
+    }}>
       {/* Kop: pijltjes om de dag heen, en alleen een weg-terug-knop als je
           niet op vandaag staat. Een weekkiezer heeft een klant niet nodig. */}
       <div style={{
@@ -332,6 +356,52 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
         </button>
       </div>
 
+      {/* Schakelaar tussen lijst en rooster, met rechts de knop om het op het
+          hele scherm te zetten. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+        paddingBottom: isMobile ? 10 : 12,
+      }}>
+        <div style={{
+          position: 'relative', display: 'flex', flex: 1, height: 30, padding: 3,
+          background: 'rgba(255,255,255,0.04)', border: `1px solid ${LIJN}`, borderRadius: 10,
+        }}>
+          <div style={{
+            position: 'absolute', top: 3, bottom: 3, width: 'calc(50% - 3px)',
+            left: weergave === 'lijst' ? 3 : '50%', borderRadius: 8, background: '#fff',
+            transition: 'left 0.2s cubic-bezier(0.4,0,0.2,1)',
+          }} />
+          {[
+            { id: 'lijst', label: 'Lijst', Icoon: List },
+            { id: 'rooster', label: 'Rooster', Icoon: CalendarClock },
+          ].map(v => (
+            <button
+              key={v.id}
+              onClick={() => setWeergave(v.id)}
+              style={{
+                position: 'relative', flex: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900,
+                color: weergave === v.id ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <v.Icoon size={12} strokeWidth={2.8} />
+              {v.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setVolledig(v => !v)}
+          title={volledig ? 'Sluiten' : 'Op het hele scherm'}
+          aria-label={volledig ? 'Sluiten' : 'Op het hele scherm'}
+          style={{ ...pijlKnop, width: 28, height: 28 }}
+        >
+          {volledig ? <X size={17} strokeWidth={3} /> : <Maximize2 size={15} strokeWidth={3} />}
+        </button>
+      </div>
+
       {/* De dagtotalen horen bij de dag die je bekijkt, dus staan ze onder de
           datum en niet los boven de agenda. */}
       {doelen && doelen.calories > 0 && (
@@ -340,7 +410,41 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
         </div>
       )}
 
+      {/* Lijst: wat er vandaag staat, van vroeg naar laat. Eén regel per
+          blok, met de tijden rechts — zoals de dagweergave van een
+          agenda-app. Beantwoordt "wat moet ik vandaag" zonder scrollen. */}
+      {weergave === 'lijst' && (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: `1px solid ${LIJN}` }}>
+          {laden && (
+            <div style={{ padding: '1.2rem 0', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
+              Dag laden…
+            </div>
+          )}
+          {!laden && lijstBlokken.length === 0 && (
+            <div style={{
+              padding: '1.6rem 0', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.3)',
+            }}>
+              <Calendar size={18} />
+              <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>Niets gepland op deze dag</span>
+            </div>
+          )}
+          {lijstBlokken.map(b => (
+            <LijstRegel
+              key={b.id}
+              blok={b}
+              isMobile={isMobile}
+              onOpen={onOpen}
+              afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
+              onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+              bezig={toonNuLijn && nuMin >= b.start && nuMin < b.end}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Rooster */}
+      {weergave === 'rooster' && (
       <div
         ref={roosterRef}
         style={{
@@ -418,6 +522,7 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
           ))}
         </div>
       </div>
+      )}
 
       {!isVandaag && (
         <button onClick={naarVandaag} style={{
@@ -432,6 +537,26 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
       )}
     </div>
   )
+
+  // Op het hele scherm: dezelfde inhoud, alleen zonder de pagina eromheen.
+  // Handig voor het rooster, waar je de hele dag in één keer wil zien.
+  if (volledig) {
+    return createPortal(
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 2147483000,
+        background: '#0a0a0a',
+        padding: isMobile
+          ? 'calc(env(safe-area-inset-top, 0px) + 0.75rem) 1rem calc(env(safe-area-inset-bottom, 0px) + 1rem)'
+          : '1.25rem 1.5rem',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {inhoud}
+      </div>,
+      document.body
+    )
+  }
+
+  return inhoud
 }
 
 // Eén blok. Maaltijden en trainingen krijgen hun eigen kaart — dezelfde vorm
@@ -659,6 +784,84 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
       </span>
       <span style={tijdStempel}>{tijd(blok.start)}</span>
     </Wrapper>
+  )
+}
+
+// Eén regel in de lijst: streep, naam, tijden rechts. Loopt het blok nu, dan
+// is de streep vol wit in plaats van doorzichtig — dat is het enige verschil
+// dat je nodig hebt om te zien waar je bent.
+function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, bezig }) {
+  const isMaaltijd = blok.type === 'meal'
+  const isTraining = blok.type === 'training'
+  const Icoon = ICOON[blok.type] || Calendar
+  const soort = isMaaltijd ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || '')
+  const naam = blok.sublabel || (isMaaltijd ? null : blok.label)
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: isMobile ? '0.6rem 0' : '0.7rem 0',
+      borderBottom: `1px solid ${LIJN_ZACHT}`,
+      opacity: afgerond ? 0.6 : 1,
+    }}>
+      <span style={{
+        width: 3, alignSelf: 'stretch', flexShrink: 0, borderRadius: 2,
+        background: bezig ? '#fff' : 'rgba(255,255,255,0.3)',
+        minHeight: 26,
+      }} />
+      <Icoon size={12} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800,
+          color: afgerond ? 'rgba(255,255,255,0.45)' : '#fff',
+          textDecoration: afgerond ? 'line-through' : 'none',
+          letterSpacing: '-0.015em', lineHeight: 1.25,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {naam || soort}
+        </div>
+        {naam && soort && (
+          <div style={{
+            fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)',
+            textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {soort}
+          </div>
+        )}
+      </div>
+
+      <div style={{ flexShrink: 0, textAlign: 'right', lineHeight: 1.25 }}>
+        <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+          {tijd(blok.start)}
+        </div>
+        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', fontVariantNumeric: 'tabular-nums' }}>
+          {tijd(blok.end)}
+        </div>
+      </div>
+
+      {onAfronden && (
+        <button
+          onClick={onAfronden}
+          title={afgerond ? 'Toch niet gegeten' : 'Afronden'}
+          aria-label={afgerond ? 'Afvinken ongedaan maken' : 'Afronden'}
+          style={{ ...kaartKnop, color: afgerond ? '#10b981' : '#fff' }}
+        >
+          <Check size={15} strokeWidth={3.2} />
+        </button>
+      )}
+      {onOpen && (isMaaltijd || isTraining) && (
+        <button
+          onClick={() => onOpen(blok)}
+          title={isTraining ? 'Open je schema' : 'Open in je maaltijdplan'}
+          aria-label={isTraining ? 'Open je schema' : 'Open in je maaltijdplan'}
+          style={kaartKnop}
+        >
+          {isTraining ? <Play size={14} strokeWidth={3.2} fill="#fff" /> : <Pijl size={15} strokeWidth={3.2} />}
+        </button>
+      )}
+    </div>
   )
 }
 
