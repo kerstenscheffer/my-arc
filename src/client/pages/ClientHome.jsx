@@ -908,9 +908,9 @@ export default function ClientHome({ client, db, setCurrentView }) {
               // Vaste hoogte: de agenda vult de ruimte die hij krijgt en
               // scrollt intern naar de late uren. Zonder hoogte zou hij zijn
               // minimum van 900 pixels pakken en de pagina uit elkaar trekken.
+              // Geen eigen rand eromheen: het rooster tekent er zelf al een.
               height: isMobile ? 460 : 560,
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 14, overflow: 'hidden',
+              overflow: 'hidden',
             }}>
               <ClientAgendaView
                 client={client}

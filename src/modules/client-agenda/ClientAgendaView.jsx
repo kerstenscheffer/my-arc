@@ -161,7 +161,7 @@ function layoutBlocks(blocks) {
   return [...achtergrond, ...uit]
 }
 
-function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus }) {
+function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus, rustig = false }) {
   const top = minToTop(block.start)
   const height = Math.max(2.2, minToTop(block.end) - top)
   const isPlaceholder = block.meta?.placeholder
@@ -279,13 +279,15 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
               )}
               <span style={{
                 fontSize: isMobile ? '0.5rem' : '0.55rem',
-                fontWeight: 800,
+                fontWeight: rustig ? 900 : 800,
                 // Op het gevulde vlak wit: de vlakkleur als tekstkleur zou
-                // op zichzelf staan en dus onleesbaar zijn.
-                color: isAchter ? 'rgba(255,255,255,0.9)' : block.color,
+                // op zichzelf staan en dus onleesbaar zijn. In de rustige
+                // weergave staat alles in wit en doet de gekleurde streep
+                // links het werk.
+                color: isAchter ? 'rgba(255,255,255,0.9)' : (rustig ? '#fff' : block.color),
                 textTransform: 'uppercase', letterSpacing: '0.1em',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                opacity: 0.9,
+                opacity: rustig ? 0.75 : 0.9,
               }}>
                 {topLabel}{isPlaceholderTime && ' *'}
               </span>
@@ -396,10 +398,26 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   )
 }
 
+const dagPijl = {
+  width: 22, height: 22, padding: 0, flexShrink: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'transparent', border: 'none',
+  color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+
 function DayColumn({
   day, blocks, isMobile, onBlockClick, onAddClick,
   onBlockPointerDownDrag, isDropTarget, ghostBlock, sourceBlockId, groepSleep, gridRef,
   dateForHeader, isToday, geselecteerd, selectieModus, onGridClick, plaatsModus,
+  // Rustige weergave: labels in wit in plaats van de kleur van het bloktype.
+  // Voor de klant, die één dag leest; de coach scant er zeven en heeft juist
+  // baat bij kleur.
+  rustig = false,
+  // Alleen gevuld als er één dag in beeld staat: dan bladeren de pijltjes
+  // naast de datum naar de vorige of volgende dag. Met zeven kolommen naast
+  // elkaar heeft dat geen betekenis.
+  onVorigeDag, onVolgendeDag,
 }) {
   return (
     <div
@@ -425,9 +443,15 @@ function DayColumn({
             informatie rechtvaardigt. Het aantal items zie je al doordat de
             blokken eronder staan. */}
         <div style={{
-          display: 'flex', alignItems: 'baseline', justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: 5, flexWrap: 'nowrap', whiteSpace: 'nowrap',
         }}>
+          {onVorigeDag && (
+            <button onClick={(e) => { e.stopPropagation(); onVorigeDag() }} title="Vorige dag"
+              style={dagPijl}>
+              <ChevronLeft size={13} strokeWidth={2.6} />
+            </button>
+          )}
           <span style={{
             fontSize: isMobile ? '0.62rem' : '0.72rem',
             fontWeight: 900,
@@ -454,6 +478,12 @@ function DayColumn({
               van het vaste weekpatroon, en dat zie je nergens anders. */}
           {blocks.some(b => b.meta?.isOverridden) && (
             <span style={{ color: '#fff', fontWeight: 900, fontSize: '0.72rem' }}>★</span>
+          )}
+          {onVolgendeDag && (
+            <button onClick={(e) => { e.stopPropagation(); onVolgendeDag() }} title="Volgende dag"
+              style={dagPijl}>
+              <ChevronRight size={13} strokeWidth={2.6} />
+            </button>
           )}
         </div>
         {onAddClick && (
@@ -517,6 +547,7 @@ function DayColumn({
             isDragSource={sourceBlockId === b.id || (groepSleep && !!geselecteerd?.has(b.id))}
             isSelected={!!geselecteerd?.has(b.id)}
             selectieModus={selectieModus}
+            rustig={rustig}
           />
         ))}
         {/* Bij een groepsverplaatsing staat hier de hele selectie in
@@ -1209,9 +1240,14 @@ export default function ClientAgendaView({
   //
   // Een expliciete singleDay (de Plan Analyzer geeft die mee) wint altijd.
   const [mobieleDag, setMobieleDag] = useState(() => DAYS[(new Date().getDay() + 6) % 7])
-  const visibleDays = singleDay && DAYS.includes(singleDay)
-    ? [singleDay]
+  // Bladeren binnen een vaste singleDay: de ouder geeft de startdag mee, maar
+  // met de pijltjes in de kop mag je verder kijken.
+  const [dagOverride, setDagOverride] = useState(null)
+  const vasteDag = dagOverride || (singleDay && DAYS.includes(singleDay) ? singleDay : null)
+  const visibleDays = vasteDag
+    ? [vasteDag]
     : (isMobile ? [mobieleDag] : DAYS)
+  const eenDag = visibleDays.length === 1
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -1906,9 +1942,22 @@ export default function ClientAgendaView({
 
   const { hasMealPlan, hasSchema, mealPlan, schema, schemaZonderWeekindeling, schemaDagen } = data
 
+  // Een dag vooruit of terug. Loop je voorbij zondag of vóór maandag, dan
+  // schuift de week mee; anders liep je vast op de rand van de week.
+  const verzetDag = (richting) => {
+    const huidig = visibleDays[0]
+    const i = DAYS.indexOf(huidig)
+    if (i < 0) return
+    const n = i + richting
+    const zetten = (d) => { if (vasteDag) setDagOverride(d); else setMobieleDag(d) }
+    if (n < 0) { shiftWeek(-1); zetten(DAYS[DAYS.length - 1]); return }
+    if (n > DAYS.length - 1) { shiftWeek(1); zetten(DAYS[0]); return }
+    zetten(DAYS[n])
+  }
+
   return (
     <div style={{
-      padding: isMobile ? '0.3rem 0.4rem' : '0.4rem 0.5rem',
+      padding: isClient ? 0 : (isMobile ? '0.3rem 0.4rem' : '0.4rem 0.5rem'),
       display: 'flex', flexDirection: 'column',
       gap: isMobile ? '0.3rem' : '0.4rem',
       height: '100%', overflow: 'hidden',
@@ -1920,6 +1969,10 @@ export default function ClientAgendaView({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6, rowGap: 6, flexWrap: 'wrap',
         flexShrink: 0, paddingBottom: 2,
+        // Bij de klant staat de weekkeuze onder de agenda: hij komt hier om
+        // zijn dag te zien, niet om weken te kiezen. `order` in plaats van
+        // het blok verplaatsen, zodat de coach-kant ongemoeid blijft.
+        ...(isClient ? { order: 3, paddingTop: 4, paddingBottom: 0, justifyContent: 'center' } : null),
       }}>
       {werkbalkExtra}
       {werkbalkExtra && <div style={balkScheiding(isMobile)} />}
@@ -2188,7 +2241,12 @@ export default function ClientAgendaView({
               blocks={blocksByDay[day]}
               isMobile={isMobile}
               onBlockClick={handleBlockClick}
-              onAddClick={handleAddClick}
+              // Een klant plant niets bij; die knop hoort bij het gereedschap
+              // van de coach.
+              onAddClick={isClient ? null : handleAddClick}
+              onVorigeDag={eenDag ? () => verzetDag(-1) : null}
+              onVolgendeDag={eenDag ? () => verzetDag(1) : null}
+              rustig={isClient}
               geselecteerd={geselecteerd}
               selectieModus={selectieModus}
               plaatsModus={!!teplaatsen}
@@ -2267,14 +2325,18 @@ export default function ClientAgendaView({
         />
       )}
 
-      {/* Footer */}
-      <div style={{
-        fontSize: '0.72rem', color: COLORS.text25,
-        textAlign: 'right', fontStyle: 'italic',
-      }}>
-        Bron: {mealPlan?.template_name ? `meal-plan "${mealPlan.template_name}"` : 'geen meal-plan'}
-        {schema?.name && ` · workout "${schema.name}"`}
-      </div>
+      {/* Footer — waar de blokken vandaan komen. Voor de coach nuttig bij
+          het nakijken; voor de klant is het de naam van een sjabloon waar hij
+          niets mee kan. */}
+      {!isClient && (
+        <div style={{
+          fontSize: '0.72rem', color: COLORS.text25,
+          textAlign: 'right', fontStyle: 'italic',
+        }}>
+          Bron: {mealPlan?.template_name ? `meal-plan "${mealPlan.template_name}"` : 'geen meal-plan'}
+          {schema?.name && ` · workout "${schema.name}"`}
+        </div>
+      )}
     </div>
   )
 }
