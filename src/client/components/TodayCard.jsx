@@ -10,7 +10,6 @@ import MacroBoxes from './MacroBoxes'
 import AIMealPlanService from '../../modules/meal-plan/AIMealPlanService'
 import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
 
-const GOLD = '#FFD700'
 const todayYMD = () => new Date().toISOString().split('T')[0]
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -137,11 +136,14 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
 
   return (
     <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-      {/* ── Workout-card volle breedte met foto ── */}
+      {/* ── Workout-card: foto over de volle breedte, alles op één regel ──
+          Was een blok van 140 hoog met de naam onderin en een gouden
+          start-knop. Compacter en in dezelfde taal als de rest: wit accent,
+          de knop wit met zwarte tekst. */}
       <div
         onClick={goWorkout}
         style={{
-          position: 'relative', width: '100%', minHeight: isMobile ? 140 : 165,
+          position: 'relative', width: '100%', minHeight: isMobile ? 96 : 112,
           borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: '#111',
           border: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
@@ -151,30 +153,59 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
         {workoutImg
           ? <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${workoutImg})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
           : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)' }} />}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.88) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.9) 100%)' }} />
 
-        <div style={{ position: 'relative', padding: isMobile ? '0.9rem 1rem' : '1.1rem 1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.3rem' }}>
-            {isRest ? <Moon size={13} color="rgba(255,255,255,0.65)" /> : <Dumbbell size={13} color={GOLD} />}
-            <span style={{ fontSize: '0.56rem', fontWeight: 800, color: isRest ? 'rgba(255,255,255,0.6)' : GOLD, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Training vandaag
-            </span>
-          </div>
-          {training == null ? (
-            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>…</div>
-          ) : isRest ? (
-            <div style={{ fontSize: isMobile ? '1.25rem' : '1.4rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Rustdag</div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.75rem' }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: isMobile ? '1.25rem' : '1.45rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {training.name}
+        <div style={{
+          position: 'relative',
+          padding: isMobile ? '0.7rem 0.8rem' : '0.8rem 1rem',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.75rem',
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+              {isRest
+                ? <Moon size={11} color="rgba(255,255,255,0.55)" />
+                : <Dumbbell size={11} color="rgba(255,255,255,0.55)" />}
+              <span style={{
+                fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
+                textTransform: 'uppercase', letterSpacing: '0.09em',
+                textShadow: '0 2px 6px rgba(0,0,0,0.8)',
+              }}>
+                Training vandaag
+              </span>
+            </div>
+
+            {training == null ? (
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>…</div>
+            ) : (
+              <>
+                <div style={{
+                  fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 900, color: '#fff',
+                  letterSpacing: '-0.025em', lineHeight: 1.1,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  textShadow: '0 2px 10px rgba(0,0,0,0.7)',
+                }}>
+                  {isRest ? 'Rustdag' : training.name}
                 </div>
-                {training.focus && <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{training.focus}</div>}
-              </div>
-              <div style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.5rem 0.85rem', background: GOLD, borderRadius: 10, color: '#0a0a0a', fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                <Play size={13} fill="#0a0a0a" /> Start
-              </div>
+                {!isRest && training.focus && (
+                  <div style={{
+                    fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {training.focus}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {training && !isRest && (
+            <div style={{
+              flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5,
+              minHeight: 34, padding: '0 0.8rem', background: '#fff', borderRadius: 10,
+              color: '#0a0a0a', fontSize: '0.74rem', fontWeight: 900, letterSpacing: '-0.01em',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.45)',
+            }}>
+              <Play size={12} fill="#0a0a0a" strokeWidth={0} /> Start
             </div>
           )}
         </div>
