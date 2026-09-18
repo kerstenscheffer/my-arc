@@ -19,11 +19,23 @@ import React, { useState, useEffect } from 'react'
 import {
   Calendar, Coffee, Sun, Moon, Target, Clock,
   CheckCircle2, Circle, Phone, MessageCircle, Sparkles,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
 import DagAgenda from '../components/DagAgenda'
+import { vandaagStand, verzetDag } from '../components/dagNavigatie'
+import { dateForDay } from '../../modules/client-agenda/ClientAgendaService'
 import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
+
+// Kale pijltjes naast de datumregel; ze horen bij de tekst, niet als knop
+// ernaast.
+const dagPijlKnop = {
+  width: 22, height: 22, padding: 0, flexShrink: 0,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  background: 'transparent', border: 'none', color: '#fff',
+  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
 
 // Klein gouden section-header, identiek aan het patroon op de workout-pagina.
 function SectionLabel({ icon: Icon, label, isMobile }) {
@@ -69,15 +81,19 @@ const pickTip = () => {
 //   1) Grote gouden DAG-naam + datum-pill (bv. "Maandag [10 juni]")
 //   2) Daaronder: "Goedemorgen, Kersten"
 // ============================================
-function WelcomeSection({ client }) {
+function WelcomeSection({ client, datum, onVerzet, isVandaag }) {
   const isMobile = useIsMobile()
 
   const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
   const months = ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
                   'juli', 'augustus', 'september', 'oktober', 'november', 'december']
   const today = new Date()
-  const dayName = days[today.getDay()]
-  const dateLabel = `${today.getDate()} ${months[today.getMonth()]}`
+  // De regel onder de begroeting is tegelijk de dagkiezer van de agenda: de
+  // pijltjes eromheen bladeren door de dagen. Staat er geen datum in, dan is
+  // het gewoon vandaag.
+  const getoond = datum || today
+  const dayName = days[getoond.getDay()]
+  const dateLabel = `${getoond.getDate()} ${months[getoond.getMonth()]}`
 
   const getGreeting = () => {
     const hour = today.getHours()
@@ -147,12 +163,25 @@ function WelcomeSection({ client }) {
         </div>
         <div style={{
           marginTop: 5,
+          display: 'flex', alignItems: 'center', gap: 4,
           fontSize: isMobile ? '0.72rem' : '0.78rem',
           fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '-0.01em',
         }}>
-          {dayName.toLowerCase()} {dateLabel}
-          {curWeek != null && (
-            <> · week {curWeek}{weeksTotal != null && `/${weeksTotal}`}</>
+          {onVerzet && (
+            <button onClick={() => onVerzet(-1)} aria-label="Vorige dag" style={dagPijlKnop}>
+              <ChevronLeft size={15} strokeWidth={3} />
+            </button>
+          )}
+          <span style={{ color: isVandaag === false ? '#fff' : 'inherit' }}>
+            {dayName.toLowerCase()} {dateLabel}
+            {curWeek != null && (
+              <> · week {curWeek}{weeksTotal != null && `/${weeksTotal}`}</>
+            )}
+          </span>
+          {onVerzet && (
+            <button onClick={() => onVerzet(1)} aria-label="Volgende dag" style={dagPijlKnop}>
+              <ChevronRight size={15} strokeWidth={3} />
+            </button>
           )}
         </div>
       </div>
@@ -835,6 +864,17 @@ function ActionRow({ item, onToggle, isMobile, formatDate }) {
 export default function ClientHome({ client, db, setCurrentView }) {
   const [loading, setLoading] = useState(true)
   const isMobile = useIsMobile()
+  // De dag die de agenda toont. Staat hier omdat de pijltjes bij de datum
+  // onder de begroeting staan en het rooster eronder; beide moeten het over
+  // dezelfde dag hebben.
+  const [dagStand, setDagStand] = useState(() => vandaagStand())
+  const agendaDatum = dateForDay(dagStand.weekAnker, dagStand.dag)
+  const isVandaagAgenda = agendaDatum
+    ? agendaDatum.toDateString() === new Date().toDateString()
+    : true
+  const verzetAgendaDag = (richting) => {
+    setDagStand(prev => (richting === 0 ? vandaagStand() : verzetDag(prev, richting)))
+  }
 
   useEffect(() => { setTimeout(() => setLoading(false), 300) }, [])
 
@@ -862,7 +902,12 @@ export default function ClientHome({ client, db, setCurrentView }) {
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: isMobile ? '9rem' : '6rem', background: '#0a0a0a' }}>
-      <WelcomeSection client={client} />
+      <WelcomeSection
+        client={client}
+        datum={agendaDatum}
+        isVandaag={isVandaagAgenda}
+        onVerzet={verzetAgendaDag}
+      />
 
       {/* ── De dag als agenda ─────────────────────────────────────────────
           Eigen component (DagAgenda), los van het coach-gereedschap. Dit is
@@ -877,6 +922,10 @@ export default function ClientHome({ client, db, setCurrentView }) {
               db={db}
               isMobile={isMobile}
               hoogte={isMobile ? 520 : 620}
+              dag={dagStand.dag}
+              weekAnker={dagStand.weekAnker}
+              onVerzetDag={verzetAgendaDag}
+              toonKop={false}
               onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
             />
           </div>

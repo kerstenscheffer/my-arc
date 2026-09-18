@@ -25,6 +25,7 @@ import {
 } from '../../modules/client-agenda/ClientAgendaService'
 import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
 import { workoutFoto } from './workoutFoto'
+import { verzetDag as verzetDagHelper } from './dagNavigatie'
 import MacroBoxes from './MacroBoxes'
 
 const LIJN = 'rgba(255,255,255,0.07)'
@@ -93,10 +94,24 @@ function verdeelInKolommen(blokken) {
   return [...achter, ...uit]
 }
 
-export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen }) {
+export default function DagAgenda({
+  client, db, isMobile = false, hoogte, onOpen,
+  // Van buitenaf gestuurd: staan de pijltjes elders op de pagina (bij de
+  // begroeting), dan houdt die de dag bij en toont de agenda zijn eigen kop
+  // niet. Zonder deze props stuurt hij zichzelf.
+  dag: dagProp = null,
+  weekAnker: weekAnkerProp = null,
+  onVerzetDag = null,
+  toonKop = true,
+}) {
   const service = useMemo(() => new ClientAgendaService(db?.supabase || db), [db])
-  const [weekAnker, setWeekAnker] = useState(() => getMondayOf(new Date()))
-  const [dag, setDag] = useState(() => dagSleutelVan(new Date()))
+  const [eigenWeekAnker, setEigenWeekAnker] = useState(() => getMondayOf(new Date()))
+  const [eigenDag, setEigenDag] = useState(() => dagSleutelVan(new Date()))
+  const gestuurd = !!dagProp && !!weekAnkerProp
+  const weekAnker = gestuurd ? weekAnkerProp : eigenWeekAnker
+  const dag = gestuurd ? dagProp : eigenDag
+  const setWeekAnker = setEigenWeekAnker
+  const setDag = setEigenDag
   const [data, setData] = useState(null)
   const [laden, setLaden] = useState(true)
   const [nu, setNu] = useState(() => new Date())
@@ -308,20 +323,14 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
   }
 
   const verzet = (richting) => {
-    const i = DAYS.indexOf(dag)
-    const n = i + richting
-    if (n < 0) {
-      const vorige = new Date(weekAnker); vorige.setDate(vorige.getDate() - 7)
-      setWeekAnker(vorige); setDag(DAYS[DAYS.length - 1]); return
-    }
-    if (n > DAYS.length - 1) {
-      const volgende = new Date(weekAnker); volgende.setDate(volgende.getDate() + 7)
-      setWeekAnker(volgende); setDag(DAYS[0]); return
-    }
-    setDag(DAYS[n])
+    if (onVerzetDag) { onVerzetDag(richting); return }
+    const volgende = verzetDagHelper({ dag, weekAnker }, richting)
+    setWeekAnker(volgende.weekAnker)
+    setDag(volgende.dag)
   }
 
   const naarVandaag = () => {
+    if (onVerzetDag) { onVerzetDag(0); return }
     setWeekAnker(getMondayOf(new Date()))
     setDag(dagSleutelVan(new Date()))
   }
@@ -333,8 +342,9 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
       // scrolt intern, anders wordt de pagina een tijdbalk van twee meter.
       height: volledig ? '100%' : (weergave === 'rooster' ? (hoogte || '100%') : 'auto'),
     }}>
-      {/* Kop: pijltjes om de dag heen, en alleen een weg-terug-knop als je
-          niet op vandaag staat. Een weekkiezer heeft een klant niet nodig. */}
+      {/* Kop: pijltjes om de dag heen. Staan die elders op de pagina, dan
+          slaat de agenda zijn eigen kop over. */}
+      {toonKop && (
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
         paddingBottom: isMobile ? 8 : 10,
@@ -357,6 +367,7 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
           <ChevronRight size={18} strokeWidth={3} />
         </button>
       </div>
+      )}
 
       {/* Schakelaar tussen lijst en rooster, met rechts de knop om het op het
           hele scherm te zetten. */}
