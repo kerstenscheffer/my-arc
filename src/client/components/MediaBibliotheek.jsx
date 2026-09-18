@@ -36,6 +36,7 @@ const zonderAccenten = (t) => String(t || '').toLowerCase()
 // de coach zelf: die horen bij zijn eigen berichten, niet als plaatje boven een
 // categorie.
 const FOTO = {
+  voorjou: 'https://images.unsplash.com/photo-1516534775068-ba3e7458af70?w=600&h=450&fit=crop&q=80',
   app: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&h=450&fit=crop&q=80',
   workout: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&h=450&fit=crop&q=80',
   meal: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=450&fit=crop&q=80',
@@ -88,6 +89,9 @@ export default function MediaBibliotheek({
   const modalHost = useModalHost()
   const [videos, setVideos] = useState([])
   const [bestanden, setBestanden] = useState([])
+  // Video's die je coach persoonlijk aan jou heeft gegeven: je plan, een
+  // aanpassing, uitleg over jouw situatie.
+  const [voorMij, setVoorMij] = useState(new Set())
   const [laden, setLaden] = useState(true)
   const [zoek, setZoek] = useState('')
   const [filter, setFilter] = useState('alles')   // 'alles' | 'video' | 'pdf'
@@ -102,33 +106,25 @@ export default function MediaBibliotheek({
     setLaden(true)
     ;(async () => {
       try {
-        // Welke video's zijn persoonlijk aan déze klant toegewezen?
-        const { data: toewijzingen } = await db.supabase
-          .from('video_assignments').select('video_id').eq('client_id', client.id)
-        const eigenIds = [...new Set((toewijzingen || []).map(a => a.video_id).filter(Boolean))]
-
         const videoSelect = '*, video_category:video_categories(id, name, color)'
-        const basis = () => db.supabase.from('coach_videos')
-          .select(videoSelect).eq('coach_id', coachId).eq('is_active', true)
-
-        const [algemeen, eigen, f] = await Promise.all([
-          // Algemeen: alles wat aan een pagina hangt, dat is voor iedereen.
-          basis().not('default_pages', 'is', null).not('default_pages', 'eq', '{}'),
-          // Persoonlijk: alleen wat aan jou is toegewezen.
-          eigenIds.length ? basis().in('id', eigenIds) : Promise.resolve({ data: [] }),
+        const [alle, f, t] = await Promise.all([
+          // Alles wat de coach actief heeft staan. Wat persoonlijk is en niet
+          // van jou, valt er bij het samenstellen van de lijst uit.
+          db.supabase.from('coach_videos')
+            .select(videoSelect).eq('coach_id', coachId).eq('is_active', true)
+            .order('created_at', { ascending: false }),
           db.supabase.from('coach_files')
             .select('*').eq('coach_id', coachId).eq('is_active', true)
             .order('created_at', { ascending: false }),
+          // Wat je coach persoonlijk aan jou heeft gegeven.
+          db.supabase.from('video_assignments')
+            .select('video_id').eq('client_id', client.id),
         ])
         if (weg) return
 
-        // Samenvoegen zonder dubbelen; nieuwste bovenaan.
-        const perId = new Map()
-        for (const v of [...(algemeen.data || []), ...(eigen.data || [])]) perId.set(v.id, v)
-        setVideos([...perId.values()].sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        ))
+        setVideos(alle.data || [])
         setBestanden(f.data || [])
+        setVoorMij(new Set((t.data || []).map(a => a.video_id).filter(Boolean)))
       } catch (e) {
         console.error('Bibliotheek laden mislukt:', e)
       } finally {
@@ -145,13 +141,19 @@ export default function MediaBibliotheek({
 
   // Eén lijst van allebei de soorten, met wat bij deze pagina hoort vooraan.
   const items = useMemo(() => {
+    const persoonlijk = (v) => v.is_personal === true
     const vanPagina = (lijst) => (lijst.default_pages || []).includes(pageContext)
     const alles = [
-      ...videos.map(v => ({
+      ...videos
+        // Een video die voor één klant is gemaakt hoort niet in de algemene
+        // bibliotheek van iedereen. Is hij aan jou toegewezen, dan staat hij
+        // onder "Voor jou".
+        .filter(v => !persoonlijk(v) || voorMij.has(v.id))
+        .map(v => ({
         soort: 'video', id: `v-${v.id}`, titel: v.title, beschrijving: v.description,
         categorieNaam: v.video_category?.name || null,
         duur: v.duration_seconds || null,
-        onderwerp: onderwerpVan({ default_pages: v.default_pages, categorie: v.video_category?.name || v.category }),
+        onderwerp: voorMij.has(v.id) ? 'voorjou' : onderwerpVan({ default_pages: v.default_pages, categorie: v.video_category?.name || v.category }),
         pagina: vanPagina(v),
         thumb: (extractYouTubeId(v.video_url) ? getYouTubeThumbnail(extractYouTubeId(v.video_url), 'mqdefault') : null) || v.thumbnail_url || null,
         ruw: v,
@@ -179,18 +181,22 @@ export default function MediaBibliotheek({
       // Wat bij deze pagina hoort eerst: je komt hier meestal met een vraag
       // over waar je net was.
       .sort((a, b) => (b.pagina === true) - (a.pagina === true))
-  }, [videos, bestanden, zoek, filter, onderwerp, pageContext])
+  }, [videos, bestanden, voorMij, zoek, filter, onderwerp, pageContext])
 
   // Aantallen voor de kaarten op het overzicht.
   const aantalPer = useMemo(() => {
     const telling = {}
     const alles = [
-      ...videos.map(v => onderwerpVan({ default_pages: v.default_pages, categorie: v.video_category?.name || v.category })),
+      ...videos
+        .filter(v => v.is_personal !== true || voorMij.has(v.id))
+        .map(v => (voorMij.has(v.id)
+          ? 'voorjou'
+          : onderwerpVan({ default_pages: v.default_pages, categorie: v.video_category?.name || v.category }))),
       ...bestanden.map(f => onderwerpVan({ default_pages: f.default_pages })),
     ]
     alles.forEach(o => { telling[o] = (telling[o] || 0) + 1 })
     return telling
-  }, [videos, bestanden])
+  }, [videos, bestanden, voorMij])
 
   const openItem = (i) => {
     if (i.soort === 'pdf') { window.open(i.ruw.file_url, '_blank', 'noopener'); return }
@@ -199,7 +205,9 @@ export default function MediaBibliotheek({
 
   if (!open) return null
 
-  const gekozen = ONDERWERPEN.find(o => o.id === onderwerp) || (onderwerp === 'overig' ? { id: 'overig', label: 'Overig' } : null)
+  const gekozen = ONDERWERPEN.find(o => o.id === onderwerp)
+    || (onderwerp === 'voorjou' ? { id: 'voorjou', label: 'Voor jou' } : null)
+    || (onderwerp === 'overig' ? { id: 'overig', label: 'Overig' } : null)
   const toonOverzicht = !onderwerp && !zoek.trim()
 
   const filters = [
@@ -349,7 +357,13 @@ export default function MediaBibliotheek({
             gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill, minmax(220px, 1fr))',
             gap: isMobile ? 10 : 12,
           }}>
-            {[...ONDERWERPEN, ...(aantalPer.overig ? [{ id: 'overig', label: 'Overig', foto: null }] : [])].map(o => {
+            {[
+              // Voor jou staat vooraan en alleen als er iets in zit: een lege
+              // kaart met je eigen naam erop is een loze belofte.
+              ...(aantalPer.voorjou ? [{ id: 'voorjou', label: 'Voor jou', foto: FOTO.voorjou }] : []),
+              ...ONDERWERPEN,
+              ...(aantalPer.overig ? [{ id: 'overig', label: 'Overig', foto: null }] : []),
+            ].map(o => {
               const aantal = aantalPer[o.id] || 0
               return (
                 <button

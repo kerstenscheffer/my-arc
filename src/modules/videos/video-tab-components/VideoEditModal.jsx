@@ -37,6 +37,7 @@ export default function VideoEditModal({
     description: video.description || '',
     video_url: video.video_url || '',
     category_id: video.category_id || null,
+    is_personal: video.is_personal === true,
     default_pages: video.default_pages || [],
     show_in_slider: video.show_in_slider || false
   })
@@ -98,6 +99,7 @@ export default function VideoEditModal({
         description: formData.description.trim(),
         video_url: formData.video_url.trim(),
         category_id: formData.category_id || null,
+        is_personal: formData.is_personal === true,
         default_pages: formData.default_pages,
         show_in_slider: formData.show_in_slider
       }
@@ -351,6 +353,31 @@ export default function VideoEditModal({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* ── PERSOONLIJK ── */}
+          <div style={{
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+          }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={formData.is_personal === true}
+                onChange={(e) => setFormData({ ...formData, is_personal: e.target.checked })}
+                style={{ marginTop: 3, width: 16, height: 16, accentColor: '#fff', cursor: 'pointer' }}
+              />
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>
+                  Persoonlijke video
+                </span>
+                <span style={{ display: 'block', marginTop: 2, fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
+                  Voor één klant: zijn plan, een aanpassing, uitleg over zijn
+                  situatie. Blijft uit de bibliotheek van de anderen en staat bij
+                  de klant onder "Voor jou" zodra je hem toewijst.
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* ── THUMBNAIL ── */}

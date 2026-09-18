@@ -250,20 +250,27 @@ export default function CoachVideoTab({ clients = [], db }) {
   // Secties: één kaart per categorie, plus de cursussen en wat geen categorie
   // heeft. Zonder dit stond de hele bibliotheek uitgeklapt op één pagina —
   // achttien video's en alle cursussen onder elkaar.
+  const persoonlijkeVideos = videos.filter(v => v.is_personal === true)
   const secties = [
+    // Persoonlijk vooraan: dat is het spul waar een naam aan hangt, dus waar
+    // je iets mee moet.
+    ...(persoonlijkeVideos.length > 0
+      ? [{ id: 'persoonlijk', label: 'Persoonlijk', aantal: persoonlijkeVideos.length,
+           thumb: persoonlijkeVideos.map(v => videoService.getThumbnailUrl(v)).find(Boolean) }]
+      : []),
     ...(courses.length > 0
       ? [{ id: 'cursussen', label: 'Cursussen', aantal: courses.length,
            thumb: courses.map(c => c.thumbnail_url || videoService.getThumbnailUrl(videos.find(v => v.id === (c.videoIds || [])[0]) || {})).find(Boolean) }]
       : []),
     ...customCategories.map(c => {
-      const erin = videos.filter(v => v.category_id === c.id)
+      const erin = videos.filter(v => v.category_id === c.id && v.is_personal !== true)
       return {
         id: c.id, label: c.name, aantal: erin.length,
         thumb: erin.map(v => videoService.getThumbnailUrl(v)).find(Boolean),
       }
     }),
     ...(() => {
-      const zonder = videos.filter(v => !v.category_id)
+      const zonder = videos.filter(v => !v.category_id && v.is_personal !== true)
       return zonder.length > 0
         ? [{ id: 'uncategorized', label: 'Zonder categorie', aantal: zonder.length,
              thumb: zonder.map(v => videoService.getThumbnailUrl(v)).find(Boolean) }]
@@ -272,11 +279,13 @@ export default function CoachVideoTab({ clients = [], db }) {
   ]
 
   const sectieLabel = secties.find(x => x.id === sectie)?.label
-  const videosVanSectie = sectie === 'uncategorized'
-    ? gesorteerdeVideos.filter(v => !v.category_id)
-    : (sectie && sectie !== 'cursussen')
-      ? gesorteerdeVideos.filter(v => v.category_id === sectie)
-      : gesorteerdeVideos
+  const videosVanSectie = sectie === 'persoonlijk'
+    ? gesorteerdeVideos.filter(v => v.is_personal === true)
+    : sectie === 'uncategorized'
+      ? gesorteerdeVideos.filter(v => !v.category_id && v.is_personal !== true)
+      : (sectie && sectie !== 'cursussen')
+        ? gesorteerdeVideos.filter(v => v.category_id === sectie && v.is_personal !== true)
+        : gesorteerdeVideos
   // Zoeken gaat door alles heen; zonder zoekterm blijf je in je sectie.
   const toonOverzicht = !sectie && !isFilteringActive
 
