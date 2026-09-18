@@ -5,10 +5,17 @@
 //   3. Training     -> `user_workout_preferences` tabel (deel 3)
 // Plus twee tabs die geen intake-deel zijn: de Agenda (de week zoals hij eruit
 // komt) en Plan (het voorstel uit `client_plan_proposals`, wel bewerkbaar).
+//
+// Zwevend venster, net als het logboek in Coach Command: geen gedimde
+// achtergrond, dus je kunt doorwerken op de pagina erachter, en je kunt hem
+// verslepen, vergroten en inklappen. Je leest een intake naast je werk, niet
+// in plaats daarvan.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { BASELINE_VRAGEN } from '../../../modules/public-intake/baselineVragen'
-import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays, ExternalLink, FileText } from 'lucide-react'
+import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays, ExternalLink, FileText, GripVertical, Minus, Maximize2 } from 'lucide-react'
+import { useModalHost } from '../../ModalHost'
+import useZwevendVenster from '../../../components/useZwevendVenster'
 import ClientAgendaView from '../../../modules/client-agenda/ClientAgendaView'
 import PlanVoorstelTab from './PlanVoorstelTab'
 
@@ -739,6 +746,10 @@ function renderSections(sections, data, toonLeeg = true) {
 // klant als geselecteerd en springt naar het juiste tabblad. Zonder die prop
 // verschijnen de knoppen niet — dan is er geen plek om heen te springen.
 export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNavigate }) {
+  const modalHost = useModalHost()
+  const {
+    ingeklapt, setIngeklapt, herstel, vensterStijl, sleepHandvat, formaatHandvat,
+  } = useZwevendVenster({ isMobile, standaard: { w: 560, h: 720 } })
   const [activeTab, setActiveTab] = useState('part1')
   // Alleen om het groene vinkje op de Plan-tab te kunnen zetten zonder dat je
   // de tab hebt geopend. De inhoud laadt de tab zelf.
@@ -890,78 +901,68 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
 
   const fullName = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'Client'
 
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.8)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        // Boven de CoachInsight-modal (zIndex 10000) zodat 'ie ook vanuit het
-        // Command Center vóór de insight-modal opent, niet erachter.
-        zIndex: 10600,
-        padding: isMobile ? '0' : '1rem',
-        animation: 'fadeIn 0.2s ease'
-      }}
-      onClick={onClose}
-    >
+  const venster = (
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
+          ...vensterStijl,
           background: '#0a0a0a',
-          borderRadius: isMobile ? '0' : '16px',
-          border: '1px solid rgba(255,255,255,0.08)',
-          width: '100%',
-          maxWidth: '560px',
-          height: isMobile ? '100%' : 'auto',
-          maxHeight: isMobile ? '100%' : '85vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-          animation: 'fadeIn 0.3s ease'
+          borderRadius: isMobile ? 0 : '14px',
+          border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+          // Zonder gedimde achtergrond is de schaduw wat het venster van de
+          // pagina eronder scheidt.
+          boxShadow: isMobile ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
         }}
       >
-        {/* Header */}
+        {/* Kop; op desktop tevens het handvat om te verslepen. */}
         <div
+          {...sleepHandvat}
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: isMobile ? '0.85rem 1rem' : '0.95rem 1.15rem',
+            gap: 8,
+            padding: isMobile ? '0.85rem 1rem' : '0.7rem 0.85rem',
             borderBottom: '1px solid rgba(255,255,255,0.05)',
-            flexShrink: 0
+            flexShrink: 0,
+            ...(sleepHandvat.style || {})
           }}
         >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>Intake</div>
-            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{fullName}</div>
+          {!isMobile && <GripVertical size={13} color="rgba(255,255,255,0.2)" style={{ flexShrink: 0 }} />}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>Intake</div>
+            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</div>
           </div>
+          {!isMobile && (
+            <button
+              onClick={() => setIngeklapt(v => !v)}
+              aria-label={ingeklapt ? 'Uitklappen' : 'Inklappen'}
+              title={ingeklapt ? 'Uitklappen' : 'Inklappen'}
+              style={kopKnop}
+            >
+              <Minus size={13} />
+            </button>
+          )}
+          {!isMobile && (
+            <button
+              onClick={herstel}
+              aria-label="Terug naar het midden"
+              title="Terug naar het midden"
+              style={kopKnop}
+            >
+              <Maximize2 size={13} />
+            </button>
+          )}
           <button
             onClick={onClose}
             aria-label="Sluiten"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '9px',
-              color: 'rgba(255,255,255,0.6)',
-              width: '30px',
-              height: '30px',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
+            style={kopKnop}
           >
-            <X size={15} />
+            <X size={13} />
           </button>
         </div>
 
+        {!ingeklapt && (
+        <>
         {/* Tabs */}
         <div
           style={{
@@ -1117,14 +1118,38 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
               renderSections(PART3_SECTIONS, trainingData)
             ))}
         </div>
-      </div>
+        </>
+        )}
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </div>
+        {/* Hoekje rechtsonder om het venster groter te maken. */}
+        {formaatHandvat && !ingeklapt && (
+          <div
+            {...formaatHandvat}
+            style={{
+              position: 'absolute', bottom: 0, right: 0,
+              width: 16, height: 16, cursor: 'se-resize',
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: 3,
+            }}
+          >
+            <div style={{
+              width: 8, height: 8,
+              borderRight: '2px solid rgba(255,255,255,0.15)',
+              borderBottom: '2px solid rgba(255,255,255,0.15)',
+            }} />
+          </div>
+        )}
+      </div>
   )
+
+  // Geen gedimde achtergrond en geen sluiten-door-ernaast-klikken: dat is de
+  // hele bedoeling van een zwevend venster. Sluiten gaat via het kruisje.
+  return createPortal(venster, modalHost)
+}
+
+const kopKnop = {
+  width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+  color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
