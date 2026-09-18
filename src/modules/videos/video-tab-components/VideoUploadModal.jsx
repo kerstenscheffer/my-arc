@@ -29,7 +29,11 @@ export default function VideoUploadModal({
   categories = [],
   customCategories = [],
   clients = [],
-  db
+  db,
+  // Waar de coach vandaan komt: staat hij in een categorie of in de
+  // persoonlijke sectie, dan begint de nieuwe video daar ook. Scheelt elke
+  // keer hetzelfde veld invullen.
+  voorinvulling = null,
 }) {
   const modalHost = useModalHost()
   const [formData, setFormData] = useState({
@@ -42,7 +46,9 @@ export default function VideoUploadModal({
     difficulty_level: 'beginner',
     best_time_to_watch: 'anytime',
     default_pages: [],
-    show_in_slider: false
+    show_in_slider: false,
+    is_personal: voorinvulling?.is_personal === true,
+    ...(voorinvulling?.category_id ? { category_id: voorinvulling.category_id } : null),
   })
   const [thumbnailFile, setThumbnailFile] = useState(null)
   const [thumbnailPreview, setThumbnailPreview] = useState(null)
@@ -51,7 +57,9 @@ export default function VideoUploadModal({
   // Voor wie is deze video? 'everyone' = standaard zichtbaar voor alle clients
   // (via default_pages/slider). 'specific' = alleen losse toewijzing aan gekozen
   // klant(en) op één pagina.
-  const [audience, setAudience] = useState('everyone')
+  // Een persoonlijke video is per definitie voor een specifieke klant; dan
+  // staat de klantkiezer meteen open.
+  const [audience, setAudience] = useState(voorinvulling?.is_personal ? 'specific' : 'everyone')
   const [selectedClientIds, setSelectedClientIds] = useState([])
   const [clientSearch, setClientSearch] = useState('')
   const [assignPage, setAssignPage] = useState('home')

@@ -417,7 +417,9 @@ export default function CoachVideoTab({ clients = [], db }) {
             }}
           >
             <Plus size={14} />
-            Nieuwe video
+            {sectie && sectieLabel && sectie !== 'cursussen'
+              ? `Nieuw in ${sectieLabel}`
+              : 'Nieuwe video'}
           </button>
         </div>
       </div>
@@ -655,6 +657,10 @@ export default function CoachVideoTab({ clients = [], db }) {
       {/* ── MODALS ── */}
       {showUploadModal && (
         <VideoUploadModal
+          voorinvulling={{
+            is_personal: sectie === 'persoonlijk',
+            category_id: (sectie && !['persoonlijk', 'cursussen', 'uncategorized'].includes(sectie)) ? sectie : null,
+          }}
           onClose={() => setShowUploadModal(false)}
           onSave={async (videoData) => {
             const user = await db.getCurrentUser()
