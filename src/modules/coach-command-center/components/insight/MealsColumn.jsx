@@ -3,19 +3,54 @@
 // Props: { client, mealData, isMobile, onNavigatePlan, onClose, db, coachId, onGeneratePlan }
 // v1.2 — ClientDocumentsSection toegevoegd
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet } from 'lucide-react'
 import GeneratePlanModal from './GeneratePlanModal'
 import ClientDocumentsSection from './ClientDocumentsSection'
 import SupplementTrouw from './SupplementTrouw'
 
-// Losse regel zodat de kolom zelf niet nog meer state krijgt.
+// Het waterblok: wat de klant drinkt, en het doel dat jij daarvoor zet.
+// Losse component zodat de kolom zelf niet nog meer state krijgt.
 function WaterDoel({ client, db, isMobile }) {
   const [liters, setLiters] = useState(
     Number(client?.water_intake_target) > 0 ? Number(client.water_intake_target) : 3
   )
   const [bezig, setBezig] = useState(false)
   const [bewaard, setBewaard] = useState(false)
+  // De laatste zeven dagen, oudste eerst. Zonder rij voor een dag heeft hij
+  // die dag niets gelogd — dat is ook informatie.
+  const [dagen, setDagen] = useState([])
+
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return
+    let weg = false
+    ;(async () => {
+      const vanaf = new Date(); vanaf.setDate(vanaf.getDate() - 6)
+      const vanafIso = vanaf.toISOString().split('T')[0]
+      const { data, error } = await db.supabase
+        .from('ai_water_tracking')
+        .select('date, milliliters, target_milliliters')
+        .eq('client_id', client.id)
+        .gte('date', vanafIso)
+        .order('date', { ascending: true })
+      if (weg || error) return
+      const perDag = new Map((data || []).map(r => [String(r.date).slice(0, 10), r]))
+      const lijst = []
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i)
+        const iso = d.toISOString().split('T')[0]
+        const rij = perDag.get(iso)
+        lijst.push({
+          iso,
+          dag: d.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2),
+          ml: Number(rij?.milliliters) || 0,
+          doel: Number(rij?.target_milliliters) || null,
+        })
+      }
+      setDagen(lijst)
+    })()
+    return () => { weg = true }
+  }, [db, client?.id])
 
   const zet = async (nieuw) => {
     const waarde = Math.max(0.5, Math.min(8, Math.round(nieuw * 10) / 10))
@@ -35,31 +70,78 @@ function WaterDoel({ client, db, isMobile }) {
     }
   }
 
+  const doelMl = liters * 1000
+  const vandaag = dagen[dagen.length - 1]
+  const gelogdeDagen = dagen.filter(d => d.ml > 0).length
+
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '0.6rem',
       padding: isMobile ? '0.5rem 0.75rem' : '0.6rem 1rem',
       borderBottom: '1px solid rgba(255,255,255,0.04)',
     }}>
-      <Droplet size={13} color="#3b82f6" style={{ flexShrink: 0 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
-          Waterdoel per dag
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <Droplet size={13} color="#3b82f6" style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
+            Water · doel per dag
+          </div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#fff', marginTop: 1 }}>
+            {vandaag ? `Vandaag ${(vandaag.ml / 1000).toFixed(1)}L` : 'Vandaag nog niets'}
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+              {' · '}{gelogdeDagen}/7 dagen gelogd
+            </span>
+          </div>
+          {bewaard && (
+            <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#10b981', marginTop: 1 }}>Doel bewaard</div>
+          )}
         </div>
-        {bewaard && (
-          <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#10b981', marginTop: 1 }}>Bewaard</div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, opacity: bezig ? 0.5 : 1 }}>
+          <button onClick={() => zet(liters - 0.5)} aria-label="Minder" style={waterKnop}>−</button>
+          <span style={{
+            minWidth: 44, textAlign: 'center',
+            fontSize: '0.85rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums',
+          }}>
+            {liters.toFixed(1)}L
+          </span>
+          <button onClick={() => zet(liters + 0.5)} aria-label="Meer" style={waterKnop}>+</button>
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, opacity: bezig ? 0.5 : 1 }}>
-        <button onClick={() => zet(liters - 0.5)} aria-label="Minder" style={waterKnop}>−</button>
-        <span style={{
-          minWidth: 44, textAlign: 'center',
-          fontSize: '0.85rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums',
-        }}>
-          {liters.toFixed(1)}L
-        </span>
-        <button onClick={() => zet(liters + 0.5)} aria-label="Meer" style={waterKnop}>+</button>
-      </div>
+
+      {/* Zeven staafjes: hoe vol de dag was ten opzichte van zijn doel. Een
+          lege dag blijft leeg staan, want niet loggen is ook een antwoord. */}
+      {dagen.length > 0 && (
+        <div style={{ display: 'flex', gap: 3, marginTop: '0.5rem', alignItems: 'flex-end' }}>
+          {dagen.map((d, i) => {
+            const doel = d.doel || doelMl
+            const pct = doel > 0 ? Math.min(100, (d.ml / doel) * 100) : 0
+            const vol = pct >= 100
+            return (
+              <div key={d.iso} style={{ flex: 1, textAlign: 'center' }}>
+                <div
+                  title={`${d.iso}: ${(d.ml / 1000).toFixed(1)} van ${(doel / 1000).toFixed(1)} liter`}
+                  style={{
+                    height: 26, borderRadius: 4, overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.05)',
+                    display: 'flex', alignItems: 'flex-end',
+                  }}
+                >
+                  <div style={{
+                    width: '100%', height: `${pct}%`,
+                    background: vol ? '#3b82f6' : 'rgba(59,130,246,0.55)',
+                  }} />
+                </div>
+                <div style={{
+                  marginTop: 2, fontSize: '0.52rem', fontWeight: 800,
+                  color: i === dagen.length - 1 ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.28)',
+                  textTransform: 'uppercase',
+                }}>
+                  {d.dag}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
