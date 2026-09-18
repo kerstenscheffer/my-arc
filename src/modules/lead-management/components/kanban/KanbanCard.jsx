@@ -1034,20 +1034,21 @@ export default function KanbanCard({
             onInc={(e) => handleFollowupChange(1, e)}
           />
           <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-          {/* Man of vrouw — één knop die doorschakelt. Wit zodra het bekend
+          {/* Man of vrouw — één knop die doorschakelt. Alleen het icoon: het
+              woord ernaast zei hetzelfde nog een keer. Wit zodra het bekend
               is, grijs zolang het onbekend is, zodat je in één blik ziet bij
               wie het nog mist. */}
           <button
             data-no-click
             onClick={volgendGeslacht}
             title={`${geslachtInfo.label} — tik om door te schakelen`}
+            aria-label={`Geslacht: ${geslachtInfo.label}`}
             style={{
               flexShrink: 0,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              minHeight: 36, padding: '0 0.7rem',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              minHeight: 36, width: 38, padding: 0,
               background: 'transparent', border: 'none',
               color: geslacht ? '#fff' : 'rgba(255,255,255,0.3)',
-              fontSize: '0.68rem', fontWeight: 800, fontFamily: 'inherit',
               cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               transition: 'background 0.15s ease, color 0.15s ease',
@@ -1055,8 +1056,7 @@ export default function KanbanCard({
             onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
           >
-            <geslachtInfo.Icon size={13} strokeWidth={2.8} />
-            {geslachtInfo.label}
+            <geslachtInfo.Icon size={15} strokeWidth={2.8} />
           </button>
           {/* De Later-knop (snooze) is eruit; die hoorde bij een sectie die
               telkens opnieuw werd aangemaakt. */}
