@@ -20,7 +20,7 @@ import { extractYouTubeId, getYouTubeThumbnail } from '../../modules/videos/util
 
 // Hoe lang na binnenkomst de eerste verschijnt, hoe lang hij blijft staan, en
 // hoe lang het daarna stil is voor de volgende.
-const WACHT_EERSTE_MS = 8000
+const WACHT_EERSTE_MS = 3000
 const ZICHTBAAR_MS = 16000
 const PAUZE_MS = 3 * 60 * 1000
 
@@ -39,6 +39,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86 
       try {
         const coachId = client.coach_id || client.trainer_id
         const vids = await clientVideoService.getSliderVideos(coachId)
+        console.log('[video-teaser] coach', coachId, '->', (vids || []).length, 'video(s)')
         if (!gestopt) setItems(vids || [])
       } catch (e) {
         console.error('Video-teaser laden mislukt:', e)
@@ -54,6 +55,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86 
     const plan = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); return t }
 
     const toon = () => {
+      console.log('[video-teaser] tonen')
       setOpen(true)
       plan(() => {
         setOpen(false)
