@@ -369,6 +369,14 @@ export default function DagAgenda({
       </div>
       )}
 
+      {/* De dagtotalen horen bij de dag die je bekijkt, dus staan ze onder de
+          datum en niet los boven de agenda. */}
+      {doelen && doelen.calories > 0 && (
+        <div style={{ flexShrink: 0, paddingBottom: isMobile ? 10 : 12 }}>
+          <MacroBoxes kaal consumed={verbruikt} targets={doelen} />
+        </div>
+      )}
+
       {/* Schakelaar tussen lijst en rooster, met rechts de knop om het op het
           hele scherm te zetten. */}
       <div style={{
@@ -414,14 +422,6 @@ export default function DagAgenda({
           {volledig ? <X size={17} strokeWidth={3} /> : <Maximize2 size={15} strokeWidth={3} />}
         </button>
       </div>
-
-      {/* De dagtotalen horen bij de dag die je bekijkt, dus staan ze onder de
-          datum en niet los boven de agenda. */}
-      {doelen && doelen.calories > 0 && (
-        <div style={{ flexShrink: 0, paddingBottom: isMobile ? 10 : 12 }}>
-          <MacroBoxes kaal consumed={verbruikt} targets={doelen} />
-        </div>
-      )}
 
       {/* Lijst: wat er vandaag staat, van vroeg naar laat. Eén regel per
           blok, met de tijden rechts — zoals de dagweergave van een
