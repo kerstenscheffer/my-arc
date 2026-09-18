@@ -11,6 +11,7 @@ import {
   MessageCircle, Plus, Minus,
   ArrowLeftCircle, Clock, CheckCircle, Circle, Flame,
   Info, FileText, Send, Gift, FolderInput, ChevronDown, Trash2, Target,
+  Mars, Venus,
 } from 'lucide-react'
 
 // Doel van een lead. Slaat op in call_leads.lead_goal; de lege waarde wist het.
@@ -117,6 +118,11 @@ export default function KanbanCard({
   const [showGoalDropdown, setShowGoalDropdown] = useState(false)
   const [goalPos, setGoalPos] = useState({ top: 0, left: 0 })
   const [leadGoal, setLeadGoal] = useState(lead.lead_goal || '')
+  // Man of vrouw. Staat in call_leads.gender ('male' | 'female' | leeg) en
+  // stuurt onder andere de vrouw-filter op het bord en de man/vrouw-telling
+  // in de stats. Bij het merendeel van de leads is het leeg, vandaar dat je
+  // het hier in één tik kunt zetten.
+  const [geslacht, setGeslacht] = useState(lead.gender || '')
   const goalBtnRef = useRef(null)
   const goalMenuRef = useRef(null)
   const [showTempDropdown, setShowTempDropdown] = useState(false)
@@ -174,6 +180,9 @@ export default function KanbanCard({
   useEffect(() => {
     setLocalTemp(lead.lead_temperature || 'cold')
   }, [lead.lead_temperature])
+  useEffect(() => {
+    setGeslacht(lead.gender || '')
+  }, [lead.gender])
   useEffect(() => {
     setDmDone(!!lead.last_contacted_at)
   }, [lead.last_contacted_at])
@@ -266,6 +275,17 @@ export default function KanbanCard({
     const r = goalBtnRef.current?.getBoundingClientRect()
     if (r) setGoalPos({ top: r.bottom + 4, left: r.left })
     setShowGoalDropdown(true)
+  }
+
+  // Nog een keer op dezelfde knop wist het weer: een verkeerde tik hoeft geen
+  // omweg via een menu te kosten.
+  const kiesGeslacht = async (waarde, e) => {
+    e?.stopPropagation()
+    const vorig = geslacht
+    const nieuw = geslacht === waarde ? '' : waarde
+    setGeslacht(nieuw)
+    try { await onEdit({ gender: nieuw || null }) }
+    catch (err) { console.error('Geslacht opslaan mislukt:', err); setGeslacht(vorig) }
   }
 
   const kiesDoel = async (waarde) => {
@@ -1002,6 +1022,43 @@ export default function KanbanCard({
             count={followupCount} disabled={updatingFollowup}
             onInc={(e) => handleFollowupChange(1, e)}
           />
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+          {/* Man of vrouw — twee tikken breed, want meer standen zijn er niet.
+              Wit als het gezet is, grijs zolang het leeg is, zodat je in één
+              blik ziet bij wie het nog mist. */}
+          <div
+            data-no-click
+            style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3,
+              padding: '0 0.4rem',
+            }}
+          >
+            {[
+              { id: 'male', Icon: Mars, titel: 'Man' },
+              { id: 'female', Icon: Venus, titel: 'Vrouw' },
+            ].map(g => {
+              const aan = geslacht === g.id
+              return (
+                <button
+                  key={g.id}
+                  data-no-click
+                  onClick={(e) => kiesGeslacht(g.id, e)}
+                  title={aan ? `${g.titel} — tik om te wissen` : g.titel}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 28, height: 28, padding: 0, borderRadius: 7,
+                    background: aan ? 'rgba(255,255,255,0.12)' : 'transparent',
+                    border: `1px solid ${aan ? 'rgba(255,255,255,0.3)' : 'transparent'}`,
+                    color: aan ? '#fff' : 'rgba(255,255,255,0.28)',
+                    cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <g.Icon size={13} strokeWidth={2.8} />
+                </button>
+              )
+            })}
+          </div>
           {/* De Later-knop (snooze) is eruit; die hoorde bij een sectie die
               telkens opnieuw werd aangemaakt. */}
         </div>
