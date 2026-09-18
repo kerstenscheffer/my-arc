@@ -19,6 +19,7 @@ import ChallengeProgressTab from '../modules/challenge-monitor/ChallengeProgress
 import MediaBibliotheek from './components/MediaBibliotheek'
 import WidgetSidebar from '../components/WidgetSidebar'
 import VideoTeaser from './components/VideoTeaser'
+import WaterFles from './components/WaterFles'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import ClientAgendaView from '../modules/client-agenda/ClientAgendaView'
@@ -355,6 +356,13 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.3) 30%, rgba(10,10,10,0.7) 58%, rgba(10,10,10,0.94) 80%, #0a0a0a 100%)',
           }}
         />
+      )}
+
+      {/* Water: alleen op de maaltijdpagina, want daar gaat het over wat je
+          binnenkrijgt. Zweeft rechts, want je tikt hem aan terwijl je met iets
+          anders bezig bent. */}
+      {!ingebed && !focusMode && currentView === 'meal' && client && (
+        <WaterFles client={client} db={db} isMobile={isMobile} onderMarge={isMobile ? 130 : 140} />
       )}
 
       {/* ── Video-teaser: komt af en toe boven de balk omhoog en zakt weer in.

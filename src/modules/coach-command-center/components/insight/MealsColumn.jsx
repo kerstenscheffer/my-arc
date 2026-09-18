@@ -4,10 +4,74 @@
 // v1.2 — ClientDocumentsSection toegevoegd
 
 import React, { useState } from 'react'
-import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3 } from 'lucide-react'
+import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet } from 'lucide-react'
 import GeneratePlanModal from './GeneratePlanModal'
 import ClientDocumentsSection from './ClientDocumentsSection'
 import SupplementTrouw from './SupplementTrouw'
+
+// Losse regel zodat de kolom zelf niet nog meer state krijgt.
+function WaterDoel({ client, db, isMobile }) {
+  const [liters, setLiters] = useState(
+    Number(client?.water_intake_target) > 0 ? Number(client.water_intake_target) : 3
+  )
+  const [bezig, setBezig] = useState(false)
+  const [bewaard, setBewaard] = useState(false)
+
+  const zet = async (nieuw) => {
+    const waarde = Math.max(0.5, Math.min(8, Math.round(nieuw * 10) / 10))
+    setLiters(waarde)
+    if (!db?.supabase || !client?.id) return
+    setBezig(true)
+    try {
+      const { error } = await db.supabase
+        .from('clients').update({ water_intake_target: waarde }).eq('id', client.id)
+      if (error) throw error
+      setBewaard(true)
+      setTimeout(() => setBewaard(false), 1400)
+    } catch (e) {
+      console.error('Waterdoel opslaan mislukt:', e)
+    } finally {
+      setBezig(false)
+    }
+  }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '0.6rem',
+      padding: isMobile ? '0.5rem 0.75rem' : '0.6rem 1rem',
+      borderBottom: '1px solid rgba(255,255,255,0.04)',
+    }}>
+      <Droplet size={13} color="#3b82f6" style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
+          Waterdoel per dag
+        </div>
+        {bewaard && (
+          <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#10b981', marginTop: 1 }}>Bewaard</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, opacity: bezig ? 0.5 : 1 }}>
+        <button onClick={() => zet(liters - 0.5)} aria-label="Minder" style={waterKnop}>−</button>
+        <span style={{
+          minWidth: 44, textAlign: 'center',
+          fontSize: '0.85rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums',
+        }}>
+          {liters.toFixed(1)}L
+        </span>
+        <button onClick={() => zet(liters + 0.5)} aria-label="Meer" style={waterKnop}>+</button>
+      </div>
+    </div>
+  )
+}
+
+const waterKnop = {
+  width: 26, height: 26, padding: 0, borderRadius: 7,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+  color: '#fff', fontSize: '0.9rem', fontWeight: 900, lineHeight: 1,
+  cursor: 'pointer', fontFamily: 'inherit',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
@@ -163,6 +227,11 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             </button>
           </div>
         )}
+
+        {/* Waterdoel — in liters op de klant (clients.water_intake_target). De
+            fles op de maaltijdpagina rekent daarmee; 3 liter is de standaard
+            als je niets invult. */}
+        <WaterDoel client={client} db={db} isMobile={isMobile} />
 
         {mealData.loggingDays > 0 && (
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
