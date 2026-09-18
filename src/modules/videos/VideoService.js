@@ -68,6 +68,8 @@ const videoService = {
         duration_seconds: videoData.duration_seconds || null,
         default_pages: videoData.default_pages || [],
         show_in_slider: videoData.show_in_slider || false,
+        // Video voor één klant: blijft uit de algemene bibliotheek.
+        is_personal: videoData.is_personal === true,
         is_active: true,
         view_count: 0,
         like_count: 0,
