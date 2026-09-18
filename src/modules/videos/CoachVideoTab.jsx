@@ -488,7 +488,14 @@ export default function CoachVideoTab({ clients = [], db }) {
               }}>
                 {isFilteringActive ? `${totalCount} van ${videos.length} video's` : `${totalCount} video's`}
               </div>
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              {/* Raster in plaats van regels over de volle breedte: daar stond
+                  de titel links en de knoppen een halve meter verderop. Op een
+                  telefoon blijft het één regel per video, want daar is de
+                  breedte toch niet het probleem. */}
+              <div style={isMobile
+                ? { borderTop: '1px solid rgba(255,255,255,0.06)' }
+                : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}
+              >
                 {gesorteerdeVideos.map(v => (
                   <VideoRow
                     key={v.id}
@@ -500,6 +507,7 @@ export default function CoachVideoTab({ clients = [], db }) {
                     onEdit={() => { setEditingVideo(v); setShowEditModal(true) }}
                     onDelete={() => handleDeleteVideo(v)}
                     isMobile={isMobile}
+                    vorm={isMobile ? 'regel' : 'kaart'}
                   />
                 ))}
               </div>
@@ -666,8 +674,16 @@ function CourseList({
   onAssign, onVisibility, onEdit, onDelete,
   onVideoAssign, onVideoManage, onVideoEdit, onVideoDelete, isMobile,
 }) {
-  const [openId, setOpenId] = useState(null)
+  // Alles staat open. Eén cursus tegelijk betekende dat je bij elke cursus
+  // eerst moest klikken om te zien wat erin zat, en dat is precies wat je van
+  // dit scherm wil weten. Dichtklappen kan nog steeds per cursus.
+  const [dicht, setDicht] = useState(() => new Set())
   const [menuId, setMenuId] = useState(null)
+  const wisselOpen = (id) => setDicht(prev => {
+    const kopie = new Set(prev)
+    if (kopie.has(id)) kopie.delete(id); else kopie.add(id)
+    return kopie
+  })
 
   const thumbFor = (course) => {
     if (course.thumbnail_url) return course.thumbnail_url
@@ -696,7 +712,7 @@ function CourseList({
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         {courses.map(course => {
-          const open = openId === course.id
+          const open = !dicht.has(course.id)
           const thumb = thumbFor(course)
           const cursusVideos = open
             ? (course.videoIds || []).map(id => videos.find(v => v.id === id)).filter(Boolean)
@@ -711,7 +727,7 @@ function CourseList({
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
               }}>
                 <div
-                  onClick={() => setOpenId(open ? null : course.id)}
+                  onClick={() => wisselOpen(course.id)}
                   style={{
                     position: 'relative', flexShrink: 0,
                     width: isMobile ? 76 : 96, aspectRatio: '16 / 9',
@@ -728,7 +744,7 @@ function CourseList({
                 </div>
 
                 <div
-                  onClick={() => setOpenId(open ? null : course.id)}
+                  onClick={() => wisselOpen(course.id)}
                   style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
                 >
                   <div style={{

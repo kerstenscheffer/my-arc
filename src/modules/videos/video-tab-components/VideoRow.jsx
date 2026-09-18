@@ -35,6 +35,9 @@ export default function VideoRow({
   onDelete,
   isMobile,
   ingesprongen = false,
+  // 'regel' = omslagje links, titel ernaast, knoppen rechts (smal scherm).
+  // 'kaart' = omslag boven, tekst en knoppen eronder (in een raster).
+  vorm = 'regel',
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
@@ -56,6 +59,125 @@ export default function VideoRow({
     background: 'transparent', border: 'none',
     color: 'rgba(255,255,255,0.85)', fontSize: '0.78rem', fontWeight: 700,
     cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap',
+  }
+
+  // ── Kaart: omslag boven, tekst eronder, knoppen onderaan ──────────────
+  // Over de volle breedte stond de titel links en de knoppen een halve meter
+  // verderop; in een raster hoort alles van één video bij elkaar.
+  if (vorm === 'kaart') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 12, overflow: 'hidden',
+      }}>
+        <div
+          onClick={() => video.video_url && window.open(video.video_url, '_blank')}
+          title="Bekijk de video"
+          style={{
+            position: 'relative', width: '100%', aspectRatio: '16 / 9',
+            background: '#000', cursor: video.video_url ? 'pointer' : 'default',
+          }}
+        >
+          {thumb && (
+            <img
+              src={thumb} alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }}
+              onError={(e) => {
+                const id = videoService.extractYouTubeId(video.video_url)
+                if (id && !e.target.src.includes('hqdefault')) {
+                  e.target.src = `https://img.youtube.com/vi/${id}/hqdefault.jpg`
+                } else {
+                  e.currentTarget.style.display = 'none'
+                }
+              }}
+            />
+          )}
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Play size={20} color="#fff" fill="#fff" style={{ filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))' }} />
+          </div>
+        </div>
+
+        <div style={{ padding: '0.7rem 0.8rem 0.5rem', flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: '0.85rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em',
+            lineHeight: 1.25,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {video.title}
+          </div>
+          <div style={{
+            marginTop: 4,
+            fontSize: '0.68rem', fontWeight: 700,
+            color: gedeeld ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.32)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {zichtbaarheidTekst(video, aantalKlanten)}
+            {categorieNaam && ` · ${categorieNaam}`}
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '0 0.8rem 0.7rem',
+        }}>
+          <button
+            onClick={onAssign}
+            style={{
+              flex: 1, minHeight: 32, padding: '0 0.7rem',
+              background: '#fff', border: 'none', borderRadius: 8,
+              color: '#000', fontSize: '0.72rem', fontWeight: 900,
+              cursor: 'pointer', touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            Delen
+          </button>
+          <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              title="Meer"
+              style={{
+                width: 32, height: 32,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 8, color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <MoreHorizontal size={15} />
+            </button>
+            {menuOpen && (
+              <div style={{
+                position: 'absolute', right: 0, bottom: 'calc(100% + 6px)', zIndex: 30,
+                minWidth: 200, padding: '0.25rem 0',
+                background: 'rgba(10,10,10,0.96)',
+                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+                boxShadow: '0 12px 28px rgba(0,0,0,0.5)',
+              }}>
+                <button style={menuItem} onClick={() => { setMenuOpen(false); onManage() }}>
+                  <Users size={14} /> Klanten beheren
+                </button>
+                <button style={menuItem} onClick={() => { setMenuOpen(false); onEdit() }}>
+                  <Pencil size={14} /> Bewerken
+                </button>
+                <button
+                  style={{ ...menuItem, color: '#ef4444' }}
+                  onClick={() => { setMenuOpen(false); onDelete() }}
+                >
+                  <Trash2 size={14} /> Verwijderen
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
