@@ -11,8 +11,16 @@ import {
   MessageCircle, Plus, Minus,
   ArrowLeftCircle, Clock, CheckCircle, Circle, Flame,
   Info, FileText, Send, Gift, FolderInput, ChevronDown, Trash2, Target,
-  Mars, Venus,
+  Mars, Venus, VenusAndMars,
 } from 'lucide-react'
+
+// De drie standen van de geslacht-knop, in de volgorde waarin je er met
+// klikken doorheen loopt. Leeg = nog niet bekend, en dat is de beginstand.
+const GESLACHTEN = [
+  { id: '',       label: 'Onbekend', Icon: VenusAndMars },
+  { id: 'male',   label: 'Man',      Icon: Mars },
+  { id: 'female', label: 'Vrouw',    Icon: Venus },
+]
 
 // Doel van een lead. Slaat op in call_leads.lead_goal; de lege waarde wist het.
 const DOELEN = [
@@ -277,12 +285,14 @@ export default function KanbanCard({
     setShowGoalDropdown(true)
   }
 
-  // Nog een keer op dezelfde knop wist het weer: een verkeerde tik hoeft geen
-  // omweg via een menu te kosten.
-  const kiesGeslacht = async (waarde, e) => {
+  // Eén knop die doorschakelt: onbekend, man, vrouw en weer terug. Een menu
+  // voor drie standen is meer geklik dan de keuze waard is, en zo kun je een
+  // verkeerde tik gewoon doorklikken tot je weer bij de goede staat.
+  const volgendGeslacht = async (e) => {
     e?.stopPropagation()
     const vorig = geslacht
-    const nieuw = geslacht === waarde ? '' : waarde
+    const nu = GESLACHTEN.findIndex(g => g.id === (geslacht || ''))
+    const nieuw = GESLACHTEN[(nu + 1) % GESLACHTEN.length].id
     setGeslacht(nieuw)
     try { await onEdit({ gender: nieuw || null }) }
     catch (err) { console.error('Geslacht opslaan mislukt:', err); setGeslacht(vorig) }
@@ -316,6 +326,7 @@ export default function KanbanCard({
   // (optimistische) waarde zodat een keuze meteen zichtbaar is.
   const temp = localTemp
   const tempConfig = TEMP_CONFIG[temp] || TEMP_CONFIG.cold
+  const geslachtInfo = GESLACHTEN.find(g => g.id === (geslacht || '')) || GESLACHTEN[0]
 
   const qualScore = [
     lead.qual_goal_checked,
@@ -1023,42 +1034,30 @@ export default function KanbanCard({
             onInc={(e) => handleFollowupChange(1, e)}
           />
           <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-          {/* Man of vrouw — twee tikken breed, want meer standen zijn er niet.
-              Wit als het gezet is, grijs zolang het leeg is, zodat je in één
-              blik ziet bij wie het nog mist. */}
-          <div
+          {/* Man of vrouw — één knop die doorschakelt. Wit zodra het bekend
+              is, grijs zolang het onbekend is, zodat je in één blik ziet bij
+              wie het nog mist. */}
+          <button
             data-no-click
+            onClick={volgendGeslacht}
+            title={`${geslachtInfo.label} — tik om door te schakelen`}
             style={{
-              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3,
-              padding: '0 0.4rem',
+              flexShrink: 0,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              minHeight: 36, padding: '0 0.7rem',
+              background: 'transparent', border: 'none',
+              color: geslacht ? '#fff' : 'rgba(255,255,255,0.3)',
+              fontSize: '0.68rem', fontWeight: 800, fontFamily: 'inherit',
+              cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              transition: 'background 0.15s ease, color 0.15s ease',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
           >
-            {[
-              { id: 'male', Icon: Mars, titel: 'Man' },
-              { id: 'female', Icon: Venus, titel: 'Vrouw' },
-            ].map(g => {
-              const aan = geslacht === g.id
-              return (
-                <button
-                  key={g.id}
-                  data-no-click
-                  onClick={(e) => kiesGeslacht(g.id, e)}
-                  title={aan ? `${g.titel} — tik om te wissen` : g.titel}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 28, height: 28, padding: 0, borderRadius: 7,
-                    background: aan ? 'rgba(255,255,255,0.12)' : 'transparent',
-                    border: `1px solid ${aan ? 'rgba(255,255,255,0.3)' : 'transparent'}`,
-                    color: aan ? '#fff' : 'rgba(255,255,255,0.28)',
-                    cursor: 'pointer',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  <g.Icon size={13} strokeWidth={2.8} />
-                </button>
-              )
-            })}
-          </div>
+            <geslachtInfo.Icon size={13} strokeWidth={2.8} />
+            {geslachtInfo.label}
+          </button>
           {/* De Later-knop (snooze) is eruit; die hoorde bij een sectie die
               telkens opnieuw werd aangemaakt. */}
         </div>
