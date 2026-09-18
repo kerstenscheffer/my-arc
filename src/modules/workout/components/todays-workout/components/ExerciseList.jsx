@@ -1,6 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ExerciseList.jsx
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, RotateCcw } from 'lucide-react'
+import { Plus, RotateCcw } from 'lucide-react'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
@@ -31,8 +31,6 @@ export default function ExerciseList({
   const [visibleExercises, setVisibleExercises] = useState([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [localExercises, setLocalExercises] = useState(exercises || [])
-  const [deletingIndex, setDeletingIndex] = useState(null)
-  const [swipedIndex, setSwipedIndex] = useState(null)
   // Slepen op de telefoon: kaart ingedrukt houden, dan verschuiven. `sleep`
   // beschrijft wat er onder je vinger zit; is hij null, dan gebeurt er niets
   // bijzonders en werkt swipen-om-te-verwijderen gewoon.
@@ -99,10 +97,8 @@ export default function ExerciseList({
 
   const handleDelete = async (index) => {
     try {
-      setDeletingIndex(index)
       const updatedExercises = localExercises.filter((_, i) => i !== index)
       setLocalExercises(updatedExercises)
-      setSwipedIndex(null)
       await saveExercises(updatedExercises)
       // Week-overrides hangen aan de index; alles achter de verwijderde
       // oefening schuift een plek op.
@@ -114,8 +110,6 @@ export default function ExerciseList({
     } catch (error) {
       console.error('❌ Delete failed:', error)
       setLocalExercises(exercises || [])
-    } finally {
-      setDeletingIndex(null)
     }
   }
 
@@ -213,7 +207,6 @@ export default function ExerciseList({
       const staat = { groep: groepNaam, van: posInGroep, naar: posInGroep, aantal: aantalInGroep, hoogte, dy: 0 }
       sleepRef.current = staat
       setSleep(staat)
-      setSwipedIndex(null)
       if (navigator.vibrate) navigator.vibrate(30)
     }, 350)
   }
@@ -330,16 +323,6 @@ export default function ExerciseList({
                 touchAction: sleeptHier ? 'none' : 'auto',
               }}
             >
-            <SwipeableRow
-              index={index}
-              swipedIndex={swipedIndex}
-              onSwipeOpen={() => setSwipedIndex(index)}
-              onSwipeClose={() => setSwipedIndex(null)}
-              onDelete={() => handleDelete(index)}
-              deleting={deletingIndex === index}
-              isMobile={isMobile}
-              sleepBezig={!!sleep}
-            >
               <ExerciseCard
                 exercise={exercise}
                 index={index}
@@ -356,7 +339,6 @@ export default function ExerciseList({
                 onMakePermanent={() => handleMakePermanent(index)}
                 onVerwijder={(modus) => handleVerwijder(index, modus)}
               />
-            </SwipeableRow>
             </div>
                 )
               })}
@@ -435,72 +417,3 @@ export default function ExerciseList({
   )
 }
 
-function SwipeableRow({ children, index, swipedIndex, onSwipeOpen, onSwipeClose, onDelete, deleting, isMobile, sleepBezig = false }) {
-  const startX = useRef(null)
-  const currentX = useRef(0)
-  const rowRef = useRef(null)
-  const DELETE_THRESHOLD = 80
-  const isOpen = swipedIndex === index
-
-  const handleTouchStart = (e) => {
-    startX.current = e.touches[0].clientX
-    currentX.current = 0
-  }
-
-  const handleTouchMove = (e) => {
-    if (startX.current === null) return
-    const diff = startX.current - e.touches[0].clientX
-    if (diff < 0) return
-    currentX.current = Math.min(diff, DELETE_THRESHOLD + 20)
-    if (rowRef.current) {
-      rowRef.current.style.transform = `translateX(-${currentX.current}px)`
-      rowRef.current.style.transition = 'none'
-    }
-  }
-
-  const handleTouchEnd = () => {
-    if (startX.current === null) return
-    if (rowRef.current) rowRef.current.style.transition = 'transform 0.25s ease'
-    if (currentX.current >= DELETE_THRESHOLD) {
-      onSwipeOpen()
-      if (rowRef.current) rowRef.current.style.transform = `translateX(-${DELETE_THRESHOLD}px)`
-    } else {
-      onSwipeClose()
-      if (rowRef.current) rowRef.current.style.transform = 'translateX(0)'
-    }
-    startX.current = null
-  }
-
-  useEffect(() => {
-    if (!isOpen && rowRef.current) {
-      rowRef.current.style.transition = 'transform 0.25s ease'
-      rowRef.current.style.transform = 'translateX(0)'
-    }
-  }, [isOpen])
-
-  return (
-    <div style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* Delete zone — alleen zichtbaar tijdens swipe (anders steekt de rode tint
-          uit langs de afgeronde card-randen). */}
-      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${DELETE_THRESHOLD}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isOpen ? 'rgba(239,68,68,0.12)' : 'transparent', borderLeft: isOpen ? '1px solid rgba(239,68,68,0.2)' : 'none', transition: 'background 0.2s ease' }}>
-        <button onClick={onDelete} disabled={deleting} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', padding: '0.5rem' }}>
-          {deleting ? (
-            <div style={{ width: '18px', height: '18px', border: '2px solid rgba(239,68,68,0.3)', borderTopColor: '#ef4444', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-          ) : (
-            <Trash2 size={18} color="#ef4444" strokeWidth={2} />
-          )}
-          <span style={{ fontSize: '0.55rem', color: '#ef4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Verwijder</span>
-        </button>
-      </div>
-
-      {/* Content */}
-      <div ref={rowRef} style={{ position: 'relative', zIndex: 1, background: '#0a0a0a', transform: 'translateX(0)', transition: 'transform 0.25s ease', userSelect: 'none' }}
-        onTouchStart={isMobile && !sleepBezig ? handleTouchStart : undefined}
-        onTouchMove={isMobile && !sleepBezig ? handleTouchMove : undefined}
-        onTouchEnd={isMobile && !sleepBezig ? handleTouchEnd : undefined}
-        onClick={() => { if (isOpen) onSwipeClose() }}>
-        {children}
-      </div>
-    </div>
-  )
-}
