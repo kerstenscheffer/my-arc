@@ -111,7 +111,10 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
   const vId = isBestand ? null : extractYouTubeId(huidig?.item?.video?.video_url)
   const thumb = isBestand
     ? (huidig?.item?.preview_url || null)
-    : ((vId ? getYouTubeThumbnail(vId, 'hqdefault') : null) || huidig?.item?.video?.thumbnail_url || null)
+    // mqdefault is 320x180, dus echt 16:9. hqdefault is 480x360 en heeft bij
+    // een breedbeeldvideo zwarte balken boven en onder ingebakken; die werden
+    // in een lage balk mee uitvergroot.
+    : ((vId ? getYouTubeThumbnail(vId, 'mqdefault') : null) || huidig?.item?.video?.thumbnail_url || null)
   const openHuidig = () => {
     if (isBestand) {
       window.open(huidig.item.file_url, '_blank', 'noopener')
@@ -138,7 +141,9 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
           zIndex: 100,
           overflow: 'hidden',
           display: 'flex', alignItems: 'center',
-          minHeight: 58,
+          // Hoger dan een regel tekst nodig heeft: een 16:9-beeld in een lage
+          // balk wordt anders tot een uitsnede van het midden.
+          minHeight: 70,
           background: 'rgba(10,10,10,0.92)',
           backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
           border: '1px solid rgba(255,255,255,0.1)',
@@ -152,14 +157,14 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
             van ernaast te staan. */}
         {thumb && (
           <div style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: '52%',
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: '42%',
             backgroundImage: `url(${thumb})`,
             backgroundSize: 'cover', backgroundPosition: 'center',
           }} />
         )}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'linear-gradient(90deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.25) 18%, rgba(10,10,10,0.8) 44%, rgba(10,10,10,0.97) 62%, rgba(10,10,10,1) 100%)',
+          background: 'linear-gradient(90deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.2) 14%, rgba(10,10,10,0.78) 36%, rgba(10,10,10,0.97) 52%, rgba(10,10,10,1) 100%)',
         }} />
 
         <button
@@ -167,7 +172,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
           style={{
             position: 'relative', flex: 1, minWidth: 0,
             display: 'flex', alignItems: 'center', gap: 8,
-            paddingLeft: thumb ? '24%' : '0.8rem',
+            paddingLeft: thumb ? '21%' : '0.8rem',
             paddingRight: '0.4rem', paddingTop: 8, paddingBottom: 8,
             background: 'transparent', border: 'none', textAlign: 'left',
             cursor: 'pointer', fontFamily: 'inherit',
