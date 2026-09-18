@@ -23,7 +23,7 @@ import {
 import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
 import DagAgenda from '../components/DagAgenda'
-import StappenKaart from '../components/StappenKaart'
+import StappenPil from '../components/StappenPil'
 import { vandaagStand, verzetDag } from '../components/dagNavigatie'
 import { dateForDay } from '../../modules/client-agenda/ClientAgendaService'
 import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
@@ -81,7 +81,7 @@ const pickTip = () => {
 //   1) Grote gouden DAG-naam + datum-pill (bv. "Maandag [10 juni]")
 //   2) Daaronder: "Goedemorgen, Kersten"
 // ============================================
-function WelcomeSection({ client, datum, onVerzet, isVandaag }) {
+function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
   const isMobile = useIsMobile()
 
   const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
@@ -156,11 +156,22 @@ function WelcomeSection({ client, datum, onVerzet, isVandaag }) {
         padding: isMobile ? '0.1rem 1rem 0' : '0.25rem 1.5rem 0',
         textAlign: 'center',
       }}>
-        <div style={{
-          fontSize: isMobile ? '1.35rem' : '1.6rem',
-          fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1,
-        }}>
-          {getGreeting()}, {firstName}
+        {/* De begroeting blijft gecentreerd; de stappen hangen ernaast in de
+            rechtermarge. Vandaar absoluut en niet in de tekstregel: anders
+            duwt een lange naam het getal scheef. */}
+        <div style={{ position: 'relative' }}>
+          <div style={{
+            fontSize: isMobile ? '1.35rem' : '1.6rem',
+            fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1,
+            padding: '0 4.5rem',
+          }}>
+            {getGreeting()}, {firstName}
+          </div>
+          <div style={{
+            position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
+          }}>
+            <StappenPil client={client} db={db} isMobile={isMobile} />
+          </div>
         </div>
         <div style={{
           marginTop: 5,
@@ -905,6 +916,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
     <div style={{ minHeight: '100vh', paddingBottom: isMobile ? '9rem' : '6rem', background: '#0a0a0a' }}>
       <WelcomeSection
         client={client}
+        db={db}
         datum={agendaDatum}
         isVandaag={isVandaagAgenda}
         onVerzet={verzetAgendaDag}
@@ -931,14 +943,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
               onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
             />
           </div>
-        </div>
-      </FadeOnScroll>
-
-      {/* Stappen van vandaag: een dagding waar je 's avonds nog iets aan kunt
-          doen, dus niet achter een tabblad. */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '1.6rem' : '2rem' }}>
-          <StappenKaart client={client} db={db} isMobile={isMobile} />
         </div>
       </FadeOnScroll>
 
