@@ -3,11 +3,14 @@
 //   1. Persoonlijk  -> velden uit de `clients` tabel (deel 1)
 //   2. Voeding      -> voedings-velden uit de `clients` tabel (deel 2)
 //   3. Training     -> `user_workout_preferences` tabel (deel 3)
+// Plus twee tabs die geen intake-deel zijn: de Agenda (de week zoals hij eruit
+// komt) en Plan (het voorstel uit `client_plan_proposals`, wel bewerkbaar).
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { BASELINE_VRAGEN } from '../../../modules/public-intake/baselineVragen'
-import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays, ExternalLink } from 'lucide-react'
+import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays, ExternalLink, FileText } from 'lucide-react'
 import ClientAgendaView from '../../../modules/client-agenda/ClientAgendaView'
+import PlanVoorstelTab from './PlanVoorstelTab'
 
 const GREEN = '#10b981'
 
@@ -740,6 +743,9 @@ function renderSections(sections, data, toonLeeg = true) {
 // verschijnen de knoppen niet — dan is er geen plek om heen te springen.
 export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNavigate }) {
   const [activeTab, setActiveTab] = useState('part1')
+  // Alleen om het groene vinkje op de Plan-tab te kunnen zetten zonder dat je
+  // de tab hebt geopend. De inhoud laadt de tab zelf.
+  const [heeftPlan, setHeeftPlan] = useState(false)
   const [training, setTraining] = useState(null)
   const [clientTraining, setClientTraining] = useState(null)
   const [loadingTraining, setLoadingTraining] = useState(true)
@@ -748,6 +754,21 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
   // Meetmomenten: nieuwste eerst, zodat een hermeting bovenaan staat en de
   // intake-nulmeting eronder — precies zoals je ze wil vergelijken.
   const [metingen, setMetingen] = useState([])
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    let weg = false
+    db.supabase
+      .from('client_plan_proposals')
+      .select('id')
+      .eq('client_id', client.id)
+      .limit(1)
+      .then(({ data, error }) => {
+        if (weg || error) return
+        setHeeftPlan((data || []).length > 0)
+      })
+    return () => { weg = true }
+  }, [db, client?.id])
+
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
     let weg = false
@@ -864,7 +885,10 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
     { id: 'part3', label: 'Training', icon: Dumbbell, done: training?.workout_completed || (hasTrainingData && client?.intake_completed) },
     // Het eindplaatje: werk, slaap, training en maaltijden in één week.
     // Dit is waar de losse antwoorden op uitkomen, dus het hoort hier.
-    { id: 'agenda', label: 'Agenda', icon: CalendarDays, done: false }
+    { id: 'agenda', label: 'Agenda', icon: CalendarDays, done: false },
+    // Geen intake-deel maar de uitkomst ervan: wat er besproken is en wat het
+    // plan wordt.
+    { id: 'plan', label: 'Plan', icon: FileText, done: heeftPlan }
   ]
 
   const fullName = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'Client'
@@ -944,7 +968,11 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
             display: 'flex',
             gap: '0.4rem',
             padding: '0.75rem 1.25rem 0',
-            borderBottom: '1px solid rgba(255,255,255,0.08)'
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            // Vijf tabs passen op een smal scherm niet naast elkaar; dan
+            // schuift de balk in plaats van dat de labels afbreken.
+            overflowX: 'auto',
+            scrollbarWidth: 'none'
           }}
         >
           {tabs.map((tab) => {
@@ -955,7 +983,8 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  flex: 1,
+                  flex: '1 0 auto',
+                  whiteSpace: 'nowrap',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1028,6 +1057,14 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
               />
               <WeekInTekst client={client} isMobile={isMobile} />
             </div>
+          )}
+          {activeTab === 'plan' && (
+            <PlanVoorstelTab
+              db={db}
+              client={client}
+              isMobile={isMobile}
+              onBestaatChange={setHeeftPlan}
+            />
           )}
           {activeTab === 'part1' && (
             <>
