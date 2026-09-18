@@ -14,7 +14,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Search, Play, FileText, Video as VideoIcon, Layers } from 'lucide-react'
+import { X, Search, Play, FileText, Video as VideoIcon, Layers, ArrowLeft, ChevronRight } from 'lucide-react'
 import { useModalHost } from '../../coach/ModalHost'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
 import { extractYouTubeId, getYouTubeThumbnail, formatDuration } from '../../modules/videos/utils/youtubeHelpers'
@@ -24,16 +24,60 @@ const LIJN_ZACHT = 'rgba(255,255,255,0.05)'
 
 const zonderAccenten = (t) => String(t || '').toLowerCase()
 
+// Vier onderwerpen in plaats van één lange lijst. De indeling volgt de
+// pagina's waaraan de coach zijn video's al hangt (default_pages), dus er valt
+// niets extra's in te stellen. Wat nergens bij hoort komt onder "Overig"
+// terecht — liever een restbak dan een video die nergens meer te vinden is.
+const ONDERWERPEN = [
+  {
+    id: 'app', label: 'App uitleg', foto: '/intro-coach.jpg',
+    paginas: ['home', 'profile', 'calls'],
+    woorden: ['app', 'uitleg', 'start'],
+  },
+  {
+    id: 'workout', label: 'Workout', foto: '/intro-workout.jpg',
+    paginas: ['workout'],
+    woorden: ['workout', 'training', 'oefening', 'loggen'],
+  },
+  {
+    id: 'meal', label: 'Voeding', foto: '/intro-meal.jpg',
+    paginas: ['meal', 'boodschappen'],
+    woorden: ['meal', 'voeding', 'maaltijd', 'eten', 'boodschappen'],
+  },
+  {
+    id: 'tracking', label: 'Tracking', foto: '/transformatie-1.png',
+    paginas: ['tracking'],
+    woorden: ['tracking', 'progressie', 'foto', 'gewicht', 'meting'],
+  },
+]
+
+// Eerst kijken aan welke pagina's het hangt; staat dat leeg, dan naar de
+// categorie van de video. Van de achttien video's hebben er elf geen pagina
+// maar wel een categorie ("Meal Systeem", "Workouts Loggen"), en die zouden
+// anders allemaal in de restbak belanden — precies de hoop waar dit venster
+// vanaf moest.
+const onderwerpVan = ({ default_pages, categorie }) => {
+  const paginas = Array.isArray(default_pages) ? default_pages : []
+  const opPagina = ONDERWERPEN.find(o => o.paginas.some(p => paginas.includes(p)))
+  if (opPagina) return opPagina.id
+  const naam = zonderAccenten(categorie)
+  if (naam) {
+    const opNaam = ONDERWERPEN.find(o => o.woorden.some(w => naam.includes(w)))
+    if (opNaam) return opNaam.id
+  }
+  return 'overig'
+}
+
 export default function MediaBibliotheek({
   client, db, pageContext = 'home', open, onOpenChange, onCountChange, isMobile = false,
 }) {
   const modalHost = useModalHost()
   const [videos, setVideos] = useState([])
   const [bestanden, setBestanden] = useState([])
-  const [categorieen, setCategorieen] = useState([])
   const [laden, setLaden] = useState(true)
   const [zoek, setZoek] = useState('')
-  const [filter, setFilter] = useState('alles')   // 'alles' | 'video' | 'pdf' | categorie-id
+  const [filter, setFilter] = useState('alles')   // 'alles' | 'video' | 'pdf'
+  const [onderwerp, setOnderwerp] = useState(null) // null = het overzicht
   const [speler, setSpeler] = useState(null)
 
   const coachId = client?.coach_id || client?.trainer_id
@@ -44,7 +88,7 @@ export default function MediaBibliotheek({
     setLaden(true)
     ;(async () => {
       try {
-        const [v, f, c] = await Promise.all([
+        const [v, f] = await Promise.all([
           db.supabase.from('coach_videos')
             .select('*, video_category:video_categories(id, name, color)')
             .eq('coach_id', coachId).eq('is_active', true)
@@ -52,14 +96,10 @@ export default function MediaBibliotheek({
           db.supabase.from('coach_files')
             .select('*').eq('coach_id', coachId).eq('is_active', true)
             .order('created_at', { ascending: false }),
-          db.supabase.from('video_categories')
-            .select('id, name, color, order_index').eq('coach_id', coachId)
-            .order('order_index', { ascending: true }),
         ])
         if (weg) return
         setVideos(v.data || [])
         setBestanden(f.data || [])
-        setCategorieen(c.data || [])
       } catch (e) {
         console.error('Bibliotheek laden mislukt:', e)
       } finally {
@@ -80,16 +120,17 @@ export default function MediaBibliotheek({
     const alles = [
       ...videos.map(v => ({
         soort: 'video', id: `v-${v.id}`, titel: v.title, beschrijving: v.description,
-        categorieId: v.category_id || null,
         categorieNaam: v.video_category?.name || null,
         duur: v.duration_seconds || null,
+        onderwerp: onderwerpVan({ default_pages: v.default_pages, categorie: v.video_category?.name || v.category }),
         pagina: vanPagina(v),
         thumb: (extractYouTubeId(v.video_url) ? getYouTubeThumbnail(extractYouTubeId(v.video_url), 'mqdefault') : null) || v.thumbnail_url || null,
         ruw: v,
       })),
       ...bestanden.map(f => ({
         soort: 'pdf', id: `f-${f.id}`, titel: f.title, beschrijving: f.description,
-        categorieId: null, categorieNaam: null, duur: null,
+        categorieNaam: null, duur: null,
+        onderwerp: onderwerpVan({ default_pages: f.default_pages }),
         pagina: vanPagina(f),
         thumb: f.thumb_url || null,
         ruw: f,
@@ -100,14 +141,27 @@ export default function MediaBibliotheek({
       .filter(i => {
         if (filter === 'video' && i.soort !== 'video') return false
         if (filter === 'pdf' && i.soort !== 'pdf') return false
-        if (filter !== 'alles' && filter !== 'video' && filter !== 'pdf' && i.categorieId !== filter) return false
+        // Zoeken gaat door alles heen; alleen zonder zoekterm blijf je binnen
+        // het onderwerp dat je hebt gekozen.
+        if (!term && onderwerp && i.onderwerp !== onderwerp) return false
         if (!term) return true
         return zonderAccenten(i.titel).includes(term) || zonderAccenten(i.beschrijving).includes(term)
       })
       // Wat bij deze pagina hoort eerst: je komt hier meestal met een vraag
       // over waar je net was.
       .sort((a, b) => (b.pagina === true) - (a.pagina === true))
-  }, [videos, bestanden, zoek, filter, pageContext])
+  }, [videos, bestanden, zoek, filter, onderwerp, pageContext])
+
+  // Aantallen voor de kaarten op het overzicht.
+  const aantalPer = useMemo(() => {
+    const telling = {}
+    const alles = [
+      ...videos.map(v => onderwerpVan({ default_pages: v.default_pages, categorie: v.video_category?.name || v.category })),
+      ...bestanden.map(f => onderwerpVan({ default_pages: f.default_pages })),
+    ]
+    alles.forEach(o => { telling[o] = (telling[o] || 0) + 1 })
+    return telling
+  }, [videos, bestanden])
 
   const openItem = (i) => {
     if (i.soort === 'pdf') { window.open(i.ruw.file_url, '_blank', 'noopener'); return }
@@ -116,11 +170,13 @@ export default function MediaBibliotheek({
 
   if (!open) return null
 
+  const gekozen = ONDERWERPEN.find(o => o.id === onderwerp) || (onderwerp === 'overig' ? { id: 'overig', label: 'Overig' } : null)
+  const toonOverzicht = !onderwerp && !zoek.trim()
+
   const filters = [
     { id: 'alles', label: 'Alles', Icoon: Layers },
     { id: 'video', label: "Video's", Icoon: VideoIcon },
     ...(bestanden.length ? [{ id: 'pdf', label: "PDF's", Icoon: FileText }] : []),
-    ...categorieen.map(c => ({ id: c.id, label: c.name })),
   ]
 
   const venster = (
@@ -136,13 +192,28 @@ export default function MediaBibliotheek({
         padding: isMobile ? '0.8rem 1rem' : '1rem 1.25rem',
         borderBottom: `1px solid ${LIJN_ZACHT}`,
       }}>
+        {gekozen && (
+          <button
+            onClick={() => { setOnderwerp(null); setZoek(''); setFilter('alles') }}
+            aria-label="Terug naar de onderwerpen"
+            style={{
+              width: 30, height: 30, padding: 0, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <ArrowLeft size={18} strokeWidth={3} />
+          </button>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
-            Bibliotheek
+            {gekozen ? gekozen.label : 'Bibliotheek'}
           </div>
           <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-            {videos.length} video{videos.length === 1 ? '' : "'s"}
-            {bestanden.length > 0 && ` · ${bestanden.length} PDF${bestanden.length === 1 ? '' : "'s"}`}
+            {gekozen
+              ? `${aantalPer[gekozen.id] || 0} item${(aantalPer[gekozen.id] || 0) === 1 ? '' : 's'}`
+              : `${videos.length} video${videos.length === 1 ? '' : "'s"}${bestanden.length > 0 ? ` · ${bestanden.length} PDF${bestanden.length === 1 ? '' : "'s"}` : ''}`}
           </div>
         </div>
         <button
@@ -188,7 +259,9 @@ export default function MediaBibliotheek({
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters — alleen binnen een onderwerp of bij een zoekterm; op het
+          overzicht staan de kaarten al voor de indeling. */}
+      {!toonOverzicht && (
       <div style={{
         flexShrink: 0, display: 'flex', gap: 6, overflowX: 'auto',
         padding: isMobile ? '0.6rem 1rem' : '0.7rem 1.25rem',
@@ -217,6 +290,7 @@ export default function MediaBibliotheek({
           )
         })}
       </div>
+      )}
 
       {/* Lijst */}
       <div style={{
@@ -229,7 +303,7 @@ export default function MediaBibliotheek({
           </div>
         )}
 
-        {!laden && items.length === 0 && (
+        {!laden && !toonOverzicht && items.length === 0 && (
           <div style={{ padding: '2.5rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>
             <VideoIcon size={20} />
             <div style={{ marginTop: 8, fontSize: '0.8rem', fontWeight: 700 }}>
@@ -238,6 +312,75 @@ export default function MediaBibliotheek({
           </div>
         )}
 
+        {/* Overzicht: één fotokaart per onderwerp. Klik je erop, dan staan de
+            video's en PDF's van dat onderwerp eronder. */}
+        {toonOverzicht && !laden && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: isMobile ? 10 : 12,
+          }}>
+            {[...ONDERWERPEN, ...(aantalPer.overig ? [{ id: 'overig', label: 'Overig', foto: null }] : [])].map(o => {
+              const aantal = aantalPer[o.id] || 0
+              return (
+                <button
+                  key={o.id}
+                  onClick={() => setOnderwerp(o.id)}
+                  disabled={aantal === 0}
+                  style={{
+                    position: 'relative', overflow: 'hidden',
+                    aspectRatio: '4 / 3',
+                    borderRadius: 14, border: `1px solid ${LIJN_ZACHT}`,
+                    background: '#141414', padding: 0,
+                    cursor: aantal === 0 ? 'default' : 'pointer',
+                    opacity: aantal === 0 ? 0.45 : 1,
+                    fontFamily: 'inherit', textAlign: 'left',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {o.foto && (
+                    <span style={{
+                      position: 'absolute', inset: 0,
+                      backgroundImage: `url(${o.foto})`,
+                      backgroundSize: 'cover', backgroundPosition: 'center',
+                    }} />
+                  )}
+                  <span style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.9) 100%)',
+                  }} />
+                  <span style={{
+                    position: 'absolute', left: 0, right: 0, bottom: 0,
+                    padding: isMobile ? '0.7rem 0.75rem' : '0.85rem 0.9rem',
+                    display: 'flex', alignItems: 'flex-end', gap: 6,
+                  }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{
+                        display: 'block',
+                        fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
+                        letterSpacing: '-0.025em', lineHeight: 1.15,
+                        textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+                      }}>
+                        {o.label}
+                      </span>
+                      <span style={{
+                        display: 'block', marginTop: 2,
+                        fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)',
+                        textTransform: 'uppercase', letterSpacing: '0.08em',
+                        textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+                      }}>
+                        {aantal === 0 ? 'nog niets' : `${aantal} item${aantal === 1 ? '' : 's'}`}
+                      </span>
+                    </span>
+                    {aantal > 0 && <ChevronRight size={16} color="#fff" strokeWidth={3} style={{ flexShrink: 0, marginBottom: 2 }} />}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {!toonOverzicht && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))',
@@ -305,6 +448,7 @@ export default function MediaBibliotheek({
             </button>
           ))}
         </div>
+        )}
       </div>
 
       {speler && (
