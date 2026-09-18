@@ -14,9 +14,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Footprints, X, Pencil, Smartphone, Check } from 'lucide-react'
 import StappenService, { STANDAARD_DOEL, vandaagIso } from '../../modules/steps/StappenService'
-import {
-  heeftTelefoonBron, isGekoppeld, koppel, stappenVanVandaag,
-} from '../../modules/steps/telefoonStappen'
+import { heeftTelefoonBron, isGekoppeld, koppel } from '../../modules/steps/telefoonStappen'
+import { STAPPEN_EVENT } from '../../modules/steps/stappenSync'
 
 const nl = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n || 0))
 const kort = (n) => (n >= 10000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : nl(n))
@@ -40,21 +39,14 @@ export default function StappenPil({ client, db, isMobile = false }) {
 
   useEffect(() => { laad() }, [laad])
 
-  // Is Apple Health gekoppeld, dan is zijn stand de waarheid van vandaag.
-  // Zonder koppeling gebeurt hier niets — geen popup bij het opstarten.
+  // Het uitlezen van de telefoon gebeurt in het dashboard (bij het openen van
+  // de app en bij terugkeer op de voorgrond). Wij wachten op het bericht dat er
+  // een nieuwe stand is.
   useEffect(() => {
-    if (!client?.id || !isGekoppeld()) return
-    let weg = false
-    ;(async () => {
-      if (!(await heeftTelefoonBron()) || weg) return
-      const n = await stappenVanVandaag()
-      if (weg || n == null) return
-      await StappenService.bewaar(db, client.id, n, { source: 'telefoon' })
-        .catch(e => console.error('Stappen van telefoon opslaan mislukt:', e))
-      if (!weg) laad()
-    })()
-    return () => { weg = true }
-  }, [db, client?.id, laad])
+    const opBijwerking = () => laad()
+    window.addEventListener(STAPPEN_EVENT, opBijwerking)
+    return () => window.removeEventListener(STAPPEN_EVENT, opBijwerking)
+  }, [laad])
 
   // Kan er gekoppeld worden op dit toestel? Alleen dan tonen we de knop.
   const [bron, setBron] = useState(false)

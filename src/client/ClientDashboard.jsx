@@ -20,6 +20,7 @@ import MediaBibliotheek from './components/MediaBibliotheek'
 import WidgetSidebar from '../components/WidgetSidebar'
 import VideoTeaser from './components/VideoTeaser'
 import WaterFles from './components/WaterFles'
+import { syncStappen } from '../modules/steps/stappenSync'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import ClientAgendaView from '../modules/client-agenda/ClientAgendaView'
@@ -181,6 +182,20 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
     try { await db.signOut(); window.location.href = '/' }
     catch (error) { console.error('Error logging out:', error) }
   }
+
+  // ── Stappen van de telefoon ──
+  // Bij het openen van de app: de eerste keer vraagt dit toestemming voor Apple
+  // Health, daarna leest het alleen nog. En telkens als de app terugkomt van de
+  // achtergrond, want tussendoor loop je door.
+  useEffect(() => {
+    if (!client?.id) return
+    syncStappen(db, client.id, { bijOpstart: true })
+    const opVoorgrond = () => {
+      if (document.visibilityState === 'visible') syncStappen(db, client.id)
+    }
+    document.addEventListener('visibilitychange', opVoorgrond)
+    return () => document.removeEventListener('visibilitychange', opVoorgrond)
+  }, [client?.id])
 
   const handleClientUpdate = (updatedClient) => {
     setClient(prev => ({ ...prev, ...updatedClient }))

@@ -5,10 +5,12 @@
 //
 // Twee dingen die dit bestand bewust regelt:
 //
-// 1. Toestemming vragen doen we niet bij het opstarten. Apple keurt apps af die
-//    ongevraagd een health-popup in je gezicht duwen, en terecht: de klant moet
-//    weten waarvoor hij tekent. De koppeling zit daarom achter een knop in de
-//    stappen-modal.
+// 1. De vraag komt bij het openen van de app, één keer. HealthKit toont zijn
+//    scherm alleen de eerste keer dat je om een gegevenssoort vraagt; daarna
+//    keert requestHealthPermissions meteen terug zonder iets te tonen. We
+//    houden zelf bij dat we het gevraagd hebben, zodat een 'nee' ook een nee
+//    blijft en we niet elke sessie opnieuw beginnen. Wie toen nee zei kan het
+//    later alsnog aanzetten met de knop in de stappen-modal.
 // 2. HealthKit vertelt niet of je leesrechten hebt — dat is zelf privacygevoelig
 //    ("deze app weet dat je geen hartslag deelt"). checkHealthPermissions geeft
 //    op iOS dus niets bruikbaars terug. We onthouden de koppeling daarom zelf in
@@ -24,6 +26,7 @@
 import { Health } from 'capacitor-health'
 
 const ONTHOUD_SLEUTEL = 'myarc_stappen_health_gekoppeld'
+const GEVRAAGD_SLEUTEL = 'myarc_stappen_health_gevraagd'
 
 // Draaien we in de app-schil of in een browser?
 export const isNative = () => {
@@ -82,6 +85,27 @@ export async function koppel() {
 }
 
 export const ontkoppel = () => onthoud(false)
+
+// Hebben we het ooit gevraagd? Zonder dit zou een klant die nee zei bij elke
+// start opnieuw een (lege) ronde langs HealthKit maken.
+const alGevraagd = () => {
+  try { return localStorage.getItem(GEVRAAGD_SLEUTEL) === 'ja' } catch { return false }
+}
+const noteerGevraagd = () => {
+  try { localStorage.setItem(GEVRAAGD_SLEUTEL, 'ja') } catch { /* private mode */ }
+}
+
+// Bij het openen van de app: de eerste keer vraagt dit toestemming, daarna
+// leest het alleen nog. Geeft het aantal stappen van vandaag terug, of null.
+export async function stappenBijOpstart() {
+  if (!(await heeftTelefoonBron())) return null
+  if (!alGevraagd()) {
+    noteerGevraagd()
+    return koppel()
+  }
+  if (!isGekoppeld()) return null
+  return stappenVanVandaag()
+}
 
 // Het aantal stappen van vandaag, of null als we het niet kunnen weten.
 export async function stappenVanVandaag() {
