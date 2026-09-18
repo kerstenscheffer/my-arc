@@ -230,11 +230,24 @@ export default function VideoTeaser({
         {onBibliotheek && (
           <button
             onClick={onBibliotheek}
-            title="Open de bibliotheek"
-            aria-label="Open de bibliotheek"
-            style={balkKnop}
+            title={`Bibliotheek — ${items.length} voor deze pagina`}
+            aria-label={`Bibliotheek, ${items.length} voor deze pagina`}
+            style={{ ...balkKnop, width: 38, height: 38 }}
           >
-            <Library size={17} strokeWidth={2.6} />
+            <Library size={22} strokeWidth={2.4} />
+            {/* Witte bol met hoeveel er voor deze pagina klaarstaat. */}
+            {items.length > 0 && (
+              <span style={{
+                position: 'absolute', top: -1, right: -1,
+                minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999,
+                background: '#fff', color: '#0a0a0a',
+                fontSize: '0.56rem', fontWeight: 900, lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+              }}>
+                {items.length > 99 ? '99+' : items.length}
+              </span>
+            )}
           </button>
         )}
 
