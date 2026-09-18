@@ -115,9 +115,10 @@ function WelcomeSection({ client }) {
     <div>
       <div style={{
         position: 'relative', width: '100%',
-        // Vaste verhouding van het beeld (1960x600), dus er wordt niets
+        // Vaste verhouding van het beeld (1200x600), dus er wordt niets
         // bijgesneden en de hoogte klopt op elk scherm.
-        aspectRatio: '49 / 15',
+        aspectRatio: '2 / 1',
+        maxHeight: isMobile ? 230 : 300,
         overflow: 'hidden',
       }}>
         <div style={{
