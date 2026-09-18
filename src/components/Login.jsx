@@ -21,7 +21,7 @@ export default function Login({ onLoginSuccess }) {
           transform: 'translateX(-50%)',
           width: '150%',
           height: '150%',
-          background: 'radial-gradient(ellipse at center, rgba(255, 215, 0, 0.02) 0%, transparent 50%)',
+          background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.03) 0%, transparent 50%)',
           zIndex: 1,
           pointerEvents: 'none',
           opacity: 0.4
@@ -71,7 +71,7 @@ function LoginFooter() {
       }}
     >
       <a href="/support" style={{ ...linkStyle, pointerEvents: 'auto' }}>
-        <LifeBuoy size={14} strokeWidth={2.4} color="#FFD700" />
+        <LifeBuoy size={14} strokeWidth={2.4} color="rgba(255,255,255,0.7)" />
         Support
       </a>
       <a href="/privacy" style={{ ...linkStyle, pointerEvents: 'auto' }}>

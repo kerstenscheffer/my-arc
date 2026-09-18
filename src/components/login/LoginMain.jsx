@@ -1,4 +1,19 @@
 // src/components/login/LoginMain.jsx
+//
+// Eén inlogscherm voor coach én klant. Waar je terechtkomt bepaalt de server:
+// App.jsx roept na het inloggen get_my_portal_role() aan en zet `isClientMode`
+// op basis daarvan. Het loginscherm hoeft dat niet te weten.
+//
+// Er stond hier een tussenstap: knop "Coach toegang" → toegangscode MYARC2025 →
+// pas dán een coach-formulier. Die code beschermde niets: hij stond in de
+// frontend-bundel en zette alleen een vlag die App.jsx bij de eerstvolgende
+// laadbeurt tóch overschreef met het serverantwoord.
+//
+// Alles staat op één as in het midden — logo, kop, velden, knoppen. Het was een
+// linkse kolom met een regel die links begon en een rij die uit elkaar geduwd
+// stond; op een telefoon leest dat als drie losse blokjes in plaats van één
+// formulier.
+
 import { useState, useEffect, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
 import DatabaseService from '../../services/DatabaseService'
@@ -16,8 +31,6 @@ const SLIDES = [
 ]
 
 export default function LoginMain() {
-  const isMobile = window.innerWidth <= 768
-
   // slideshow
   const [slide, setSlide] = useState(0)
   const timer = useRef(null)
@@ -25,15 +38,6 @@ export default function LoginMain() {
     timer.current = setInterval(() => setSlide(s => (s + 1) % SLIDES.length), 5000)
     return () => clearInterval(timer.current)
   }, [])
-
-  // Er is één inlogscherm voor iedereen. Waar je terechtkomt bepaalt de
-  // server na het inloggen: App.jsx roept get_my_portal_role() aan en zet
-  // `isClientMode` op basis daarvan. Het loginscherm hoeft dat niet te weten.
-  //
-  // Er stond hier een tussenstap: knop "Coach toegang" → toegangscode
-  // MYARC2025 → pas dán een coach-inlogformulier. Die code beschermde niets:
-  // hij stond in de frontend-bundel en zette alleen een vlag die App.jsx bij
-  // de eerstvolgende laadbeurt tóch overschreef met het serverantwoord.
 
   // form
   const [email, setEmail] = useState('')
@@ -94,106 +98,113 @@ export default function LoginMain() {
     setResetLoading(false)
   }
 
-  // ── shared input style ────────────────────────────────────────────────────
-  const inp = {
-    width: '100%',
-    padding: '0.875rem 1rem',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '10px',
-    color: '#fff',
-    fontSize: '1rem',
-    outline: 'none',
-    boxSizing: 'border-box',
-    fontFamily: 'inherit',
-    WebkitAppearance: 'none',
-    transition: 'border-color 0.2s',
-  }
-
-  // ── INLOGSCHERM — één voor coach én klant ────────────────────────────────
   return (
     <Wrapper slide={slide}>
-      <div style={{ width: '100%', maxWidth: '340px' }}>
+      <div style={{ width: '100%', maxWidth: 360, textAlign: 'center' }}>
 
-        {/* Logo — nieuwe MY ARC coaching-logo */}
-        <div style={{ textAlign: 'center', marginBottom: '2.25rem' }}>
-          <img
-            src="/ma-coaching-logo.png"
-            alt="MY ARC Coaching"
-            style={{ maxWidth: '230px', width: '100%', height: 'auto', margin: '0 auto', display: 'block' }}
-          />
-        </div>
+        <img
+          src="/ma-coaching-logo.png"
+          alt="MY ARC Coaching"
+          style={{
+            maxWidth: 200, width: '100%', height: 'auto',
+            margin: '0 auto 1.75rem', display: 'block',
+          }}
+        />
 
-        <div style={labelStyle}>INLOGGEN</div>
-        <h1 style={{ ...headingStyle, marginBottom: '1.75rem' }}>Welkom terug</h1>
+        <h1 style={{
+          fontSize: '1.65rem', fontWeight: 900, color: '#fff',
+          margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1,
+        }}>
+          Welkom terug
+        </h1>
+        <p style={{
+          fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)',
+          margin: '0.4rem 0 1.6rem',
+        }}>
+          Log in om verder te gaan
+        </p>
 
         {error && <ErrorBox>{error}</ErrorBox>}
 
-        {/* Form */}
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
-            style={inp} autoComplete="email" autoCapitalize="none"
-            onFocus={e => e.target.style.borderColor = '#ffffff'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Veld
+            type="email" placeholder="E-mailadres" value={email}
+            onChange={e => setEmail(e.target.value)}
+            autoComplete="email" autoCapitalize="none"
+          />
 
           <div style={{ position: 'relative' }}>
-            <input type={showPw ? 'text' : 'password'} placeholder="Wachtwoord" value={password}
-              onChange={e => setPassword(e.target.value)} style={{ ...inp, paddingRight: '3.5rem' }}
+            <Veld
+              type={showPw ? 'text' : 'password'} placeholder="Wachtwoord" value={password}
+              onChange={e => setPassword(e.target.value)}
               autoComplete="current-password"
-              onFocus={e => e.target.style.borderColor = '#ffffff'}
-              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+              style={{ paddingRight: '3.75rem' }}
+            />
             <button type="button" onClick={() => setShowPw(!showPw)} style={{
               position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)',
-              fontSize: '0.6rem', fontWeight: '700', letterSpacing: '0.06em',
+              background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+              fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.1em',
               cursor: 'pointer', padding: 0,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              {showPw ? 'HIDE' : 'SHOW'}
+              {showPw ? 'VERBERG' : 'TOON'}
             </button>
           </div>
 
-          {/* Remember + Forgot */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-              <div onClick={() => setRememberMe(!rememberMe)} style={{
-                width: '17px', height: '17px', flexShrink: 0, borderRadius: '4px',
-                background: rememberMe ? '#ffffff' : 'transparent',
-                border: `1px solid ${rememberMe ? '#ffffff' : 'rgba(255,255,255,0.18)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', transition: 'all 0.2s',
-              }}>
-                {rememberMe && <span style={{ fontSize: '10px', color: '#000', fontWeight: '900', lineHeight: 1 }}>✓</span>}
-              </div>
-              <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', userSelect: 'none' }}>Onthoud mij</span>
-            </label>
-            <button type="button" onClick={() => { setShowReset(true); setResetEmail(email); setResetMsg(null) }}
-              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.28)', fontSize: '0.72rem', cursor: 'pointer', padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              Wachtwoord vergeten?
-            </button>
-          </div>
-
-          <GoldButton type="submit" disabled={loading} style={{ marginTop: '0.25rem' }}>
-            {loading ? 'Inloggen...' : 'Inloggen'}
-          </GoldButton>
+          <WitteKnop type="submit" disabled={loading} style={{ marginTop: 4 }}>
+            {loading ? 'Inloggen…' : 'Inloggen'}
+          </WitteKnop>
         </form>
 
-        {/* Apple Sign-In (only renders on iOS native) */}
-        {Capacitor.isNativePlatform() && (
-          <div style={{ marginTop: '1.25rem' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.625rem',
-              marginBottom: '0.875rem',
+        {/* Onthouden en vergeten staan onder elkaar op één as in plaats van uit
+            elkaar geduwd langs de randen. */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 12, marginTop: '1rem',
+          fontSize: '0.72rem', fontWeight: 700,
+        }}>
+          <button type="button" onClick={() => setRememberMe(!rememberMe)} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            color: rememberMe ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.35)',
+            fontSize: '0.72rem', fontWeight: 700, fontFamily: 'inherit',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <span style={{
+              width: 16, height: 16, flexShrink: 0, borderRadius: 5,
+              background: rememberMe ? '#fff' : 'transparent',
+              border: `1px solid ${rememberMe ? '#fff' : 'rgba(255,255,255,0.2)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.2s',
             }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              {rememberMe && <span style={{ fontSize: 10, color: '#000', fontWeight: 900, lineHeight: 1 }}>✓</span>}
+            </span>
+            Onthoud mij
+          </button>
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
+          <button type="button" onClick={() => { setShowReset(true); setResetEmail(email); setResetMsg(null) }}
+            style={{
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              color: 'rgba(255,255,255,0.35)', fontSize: '0.72rem', fontWeight: 700,
+              fontFamily: 'inherit',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            Wachtwoord vergeten?
+          </button>
+        </div>
+
+        {/* Apple Sign-In — alleen in de iOS-app. */}
+        {Capacitor.isNativePlatform() && (
+          <div style={{ marginTop: '1.4rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.9rem' }}>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.07)' }} />
               <span style={{
-                fontSize: '0.6rem', fontWeight: '700',
-                color: 'rgba(255,255,255,0.25)',
-                letterSpacing: '0.12em', textTransform: 'uppercase',
+                fontSize: '0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.25)',
+                letterSpacing: '0.14em', textTransform: 'uppercase',
               }}>
                 of
               </span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.07)' }} />
             </div>
             <AppleSignInButton onError={(msg) => setError(msg)} />
           </div>
@@ -201,43 +212,44 @@ export default function LoginMain() {
 
       </div>
 
-      {/* Password Reset Modal */}
       {showReset && (
         <div onClick={() => setShowReset(false)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+          backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 200, padding: '1.5rem',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: '#0f0f0f', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '12px', padding: '1.75rem',
-            width: '100%', maxWidth: '340px',
+            background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 18, padding: '1.5rem',
+            width: '100%', maxWidth: 360, textAlign: 'center',
           }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#fff', margin: '0 0 0.3rem' }}>Wachtwoord resetten</h3>
-            <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', margin: '0 0 1.25rem' }}>
-              Je ontvangt een email met een resetlink.
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>
+              Wachtwoord resetten
+            </h3>
+            <p style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', margin: '0 0 1.25rem' }}>
+              Je ontvangt een e-mail met een resetlink.
             </p>
             {resetMsg && (
               <div style={{
-                padding: '0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600', marginBottom: '1rem',
+                padding: '0.7rem', borderRadius: 10, fontSize: '0.76rem', fontWeight: 800, marginBottom: '0.9rem',
                 background: resetMsg.ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
-                border: `1px solid ${resetMsg.ok ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                border: `1px solid ${resetMsg.ok ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
                 color: resetMsg.ok ? '#10b981' : '#ef4444',
               }}>
                 {resetMsg.text}
               </div>
             )}
-            <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <input type="email" placeholder="Email adres" value={resetEmail}
-                onChange={e => setResetEmail(e.target.value)} style={inp} autoFocus
-                onFocus={e => e.target.style.borderColor = '#ffffff'}
-                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
-              <GoldButton type="submit" disabled={resetLoading}>
-                {resetLoading ? 'Versturen...' : 'Reset sturen'}
-              </GoldButton>
+            <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Veld type="email" placeholder="E-mailadres" value={resetEmail}
+                onChange={e => setResetEmail(e.target.value)} autoFocus />
+              <WitteKnop type="submit" disabled={resetLoading}>
+                {resetLoading ? 'Versturen…' : 'Reset sturen'}
+              </WitteKnop>
               <button type="button" onClick={() => setShowReset(false)} style={{
-                background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)',
-                fontSize: '0.78rem', cursor: 'pointer', padding: '0.25rem',
+                background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+                fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', padding: '0.25rem',
+                fontFamily: 'inherit',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
                 Annuleren
@@ -252,6 +264,33 @@ export default function LoginMain() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+function Veld({ style, ...props }) {
+  return (
+    <input
+      {...props}
+      style={{
+        width: '100%', minHeight: 52, padding: '0 1rem',
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.09)',
+        borderRadius: 12,
+        color: '#fff', fontSize: '1rem', fontWeight: 600,
+        outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+        WebkitAppearance: 'none',
+        transition: 'border-color 0.2s, background 0.2s',
+        ...style,
+      }}
+      onFocus={e => {
+        e.target.style.borderColor = 'rgba(255,255,255,0.45)'
+        e.target.style.background = 'rgba(255,255,255,0.07)'
+      }}
+      onBlur={e => {
+        e.target.style.borderColor = 'rgba(255,255,255,0.09)'
+        e.target.style.background = 'rgba(255,255,255,0.05)'
+      }}
+    />
+  )
+}
+
 function Wrapper({ children, slide }) {
   return (
     <div style={{
@@ -261,43 +300,43 @@ function Wrapper({ children, slide }) {
       paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)',
       overflow: 'hidden',
     }}>
-      {/* Slideshow */}
-      {[
-        'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80',
-        'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80',
-        'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=800&q=80',
-        'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=800&q=80',
-      ].map((src, i) => (
-        <div key={i} style={{
+      {SLIDES.map((src, i) => (
+        <div key={src} style={{
           position: 'absolute', inset: 0,
           backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center',
-          opacity: i === slide ? 0.1 : 0, transition: 'opacity 1.8s ease', zIndex: 0,
+          opacity: i === slide ? 0.14 : 0, transition: 'opacity 1.8s ease', zIndex: 0,
+          transform: 'scale(1.04)',
         }} />
       ))}
-      {/* Dark gradient */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,0.97) 100%)',
+        background: 'radial-gradient(ellipse at 50% 35%, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.8) 55%, rgba(0,0,0,0.97) 100%)',
       }} />
-      {/* Content */}
-      <div style={{ position: 'relative', zIndex: 10, width: '100%', padding: '2rem 1.5rem', display: 'flex', justifyContent: 'center' }}>
+      <div style={{
+        position: 'relative', zIndex: 10, width: '100%',
+        padding: '2rem 1.5rem 5rem',
+        display: 'flex', justifyContent: 'center',
+        maxHeight: '100dvh', overflowY: 'auto',
+      }}>
         {children}
       </div>
     </div>
   )
 }
 
-function GoldButton({ children, disabled, style, ...props }) {
+// Wit is de primaire knop in de rest van de app; het gouden blok hoorde nog bij
+// de oude verkooppagina's.
+function WitteKnop({ children, disabled, style, ...props }) {
   return (
     <button disabled={disabled} style={{
-      width: '100%', padding: '0.9rem', minHeight: '48px',
-      background: disabled ? 'rgba(255,215,0,0.45)' : '#FFD700',
-      border: 'none', borderRadius: '10px',
-      color: '#000', fontSize: '0.95rem', fontWeight: '800',
+      width: '100%', minHeight: 52, padding: '0 1rem',
+      background: disabled ? 'rgba(255,255,255,0.35)' : '#fff',
+      border: 'none', borderRadius: 12,
+      color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900,
+      letterSpacing: '-0.01em', fontFamily: 'inherit',
       cursor: disabled ? 'not-allowed' : 'pointer',
-      letterSpacing: '0.02em',
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      transition: 'opacity 0.15s',
+      transition: 'opacity 0.15s, transform 0.15s',
       ...style,
     }} {...props}>
       {children}
@@ -308,21 +347,11 @@ function GoldButton({ children, disabled, style, ...props }) {
 function ErrorBox({ children }) {
   return (
     <div style={{
-      padding: '0.75rem 1rem', marginBottom: '1rem',
-      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-      borderRadius: '8px', color: '#ef4444', fontSize: '0.8rem', fontWeight: '600',
+      padding: '0.7rem 1rem', marginBottom: '0.9rem',
+      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+      borderRadius: 10, color: '#ef4444', fontSize: '0.78rem', fontWeight: 800,
     }}>
       {children}
     </div>
   )
-}
-
-const labelStyle = {
-  fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,255,255,0.5)',
-  letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: '0.35rem',
-}
-
-const headingStyle = {
-  fontSize: '1.75rem', fontWeight: '900', color: '#fff',
-  margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1,
 }
