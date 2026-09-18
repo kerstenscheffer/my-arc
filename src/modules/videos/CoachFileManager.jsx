@@ -8,14 +8,17 @@ import { useEffect, useState } from 'react'
 import { FileText, Upload, Trash2, Plus, Check, X } from 'lucide-react'
 import fileService from './FileService'
 
+// Dezelfde sleutels als de app gebruikt (currentView in ClientDashboard).
+// Stonden hier op 'shopping' en 'progress' terwijl de app 'boodschappen' en
+// 'tracking' heet: een gids die je op Shop zette, kwam daar dus nooit terecht.
 const ALL_PAGES = [
-  { id: 'home',     label: 'Home' },
-  { id: 'workout',  label: 'Workout' },
-  { id: 'meal',     label: 'Meal' },
-  { id: 'shopping', label: 'Shop' },
-  { id: 'progress', label: 'Tracking' },
-  { id: 'calls',    label: 'Calls' },
-  { id: 'profile',  label: 'Profile' },
+  { id: 'home',         label: 'Home' },
+  { id: 'workout',      label: 'Workout' },
+  { id: 'meal',         label: 'Meal' },
+  { id: 'boodschappen', label: 'Boodschappen' },
+  { id: 'tracking',     label: 'Tracking' },
+  { id: 'calls',        label: 'Calls' },
+  { id: 'profile',      label: 'Profiel' },
 ]
 
 const formatBytes = (b) => {
@@ -113,7 +116,7 @@ export default function CoachFileManager({ coachId }) {
   return (
     <div style={{
       background: '#171717',
-      border: '1px solid rgba(255,215,0,0.18)',
+      border: '1px solid rgba(255,255,255,0.08)',
       borderRadius: 14,
       padding: '1rem 1.1rem',
       marginBottom: '1rem',
@@ -124,7 +127,7 @@ export default function CoachFileManager({ coachId }) {
         marginBottom: '0.85rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FileText size={18} color="#FFD700" />
+          <FileText size={16} color="rgba(255,255,255,0.5)" />
           <span style={{
             fontSize: '0.95rem', fontWeight: 900, color: '#fff',
             letterSpacing: '-0.01em',
@@ -145,15 +148,14 @@ export default function CoachFileManager({ coachId }) {
           onClick={() => setShowUpload(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '0.5rem 0.85rem',
-            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+            padding: '0 0.9rem',
+            background: '#fff',
             border: 'none', borderRadius: 10,
             color: '#0a0a0a',
             fontSize: '0.78rem', fontWeight: 900,
-            textTransform: 'uppercase', letterSpacing: '0.04em',
+            letterSpacing: '-0.01em',
             cursor: 'pointer',
             minHeight: 38,
-            boxShadow: '0 4px 12px rgba(255,215,0,0.28)',
           }}
         >
           <Plus size={16} strokeWidth={2.4} /> Upload PDF
@@ -170,14 +172,18 @@ export default function CoachFileManager({ coachId }) {
           Nog geen bestanden geüpload. Klik "Upload PDF" om te beginnen.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+          gap: 10,
+        }}>
           {files.map(f => (
             <div key={f.id} style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10,
-              padding: '0.65rem 0.75rem',
-              display: 'flex', flexDirection: 'column', gap: '0.55rem',
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 12,
+              padding: '0.7rem 0.8rem',
+              display: 'flex', flexDirection: 'column', gap: '0.6rem',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
@@ -185,7 +191,7 @@ export default function CoachFileManager({ coachId }) {
                       controleert wat er straks in de app staat. */}
                   {f.thumb_url ? (
                     <div style={{
-                      width: 42, height: 42, flexShrink: 0, borderRadius: 7,
+                      width: 46, height: 60, flexShrink: 0, borderRadius: 8,
                       overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0a0a0a',
                     }}>
                       <img src={f.thumb_url} alt=""
@@ -199,7 +205,7 @@ export default function CoachFileManager({ coachId }) {
                     <a
                       href={f.file_url} target="_blank" rel="noopener noreferrer"
                       style={{
-                        fontSize: '0.85rem', fontWeight: 700, color: '#fff',
+                        fontSize: '0.85rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em',
                         textDecoration: 'none',
                         display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       }}
@@ -240,12 +246,12 @@ export default function CoachFileManager({ coachId }) {
                       key={p.id}
                       onClick={() => togglePage(f.id, p.id)}
                       style={{
-                        padding: '0.3rem 0.55rem',
-                        background: active ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${active ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                        borderRadius: 6,
-                        color: active ? '#FFD700' : 'rgba(255,255,255,0.6)',
-                        fontSize: '0.68rem', fontWeight: 700,
+                        minHeight: 28, padding: '0 0.55rem',
+                        background: active ? '#fff' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${active ? '#fff' : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: 999,
+                        color: active ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                        fontSize: '0.66rem', fontWeight: 800,
                         cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: 4,
                       }}
@@ -277,8 +283,8 @@ export default function CoachFileManager({ coachId }) {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#171717',
-              border: '1px solid rgba(255,215,0,0.3)',
+              background: '#0a0a0a',
+              border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 16,
               padding: '1.2rem',
               maxWidth: 460, width: '100%',
@@ -307,8 +313,8 @@ export default function CoachFileManager({ coachId }) {
 
             <div>
               <label style={{
-                fontSize: '0.7rem', fontWeight: 800, color: '#FFD700',
-                textTransform: 'uppercase', letterSpacing: '0.06em',
+                fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+                textTransform: 'uppercase', letterSpacing: '0.09em',
                 display: 'block', marginBottom: 6,
               }}>
                 Titel
@@ -331,8 +337,8 @@ export default function CoachFileManager({ coachId }) {
 
             <div>
               <label style={{
-                fontSize: '0.7rem', fontWeight: 800, color: '#FFD700',
-                textTransform: 'uppercase', letterSpacing: '0.06em',
+                fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+                textTransform: 'uppercase', letterSpacing: '0.09em',
                 display: 'block', marginBottom: 6,
               }}>
                 Bestand (PDF)
@@ -353,8 +359,8 @@ export default function CoachFileManager({ coachId }) {
 
             <div>
               <label style={{
-                fontSize: '0.7rem', fontWeight: 800, color: '#FFD700',
-                textTransform: 'uppercase', letterSpacing: '0.06em',
+                fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+                textTransform: 'uppercase', letterSpacing: '0.09em',
                 display: 'block', marginBottom: 6,
               }}>
                 Zichtbaar op pagina's
@@ -371,10 +377,10 @@ export default function CoachFileManager({ coachId }) {
                       }))}
                       style={{
                         padding: '0.4rem 0.65rem',
-                        background: active ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${active ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                        background: active ? '#fff' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${active ? '#fff' : 'rgba(255,255,255,0.1)'}`,
                         borderRadius: 7,
-                        color: active ? '#FFD700' : 'rgba(255,255,255,0.7)',
+                        color: active ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
                         fontSize: '0.72rem', fontWeight: 700,
                         cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: 4,
@@ -407,7 +413,7 @@ export default function CoachFileManager({ coachId }) {
               style={{
                 minHeight: 50,
                 padding: '0.7rem',
-                background: uploading ? 'rgba(255,215,0,0.25)' : 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+                background: '#fff', opacity: uploading ? 0.4 : 1,
                 border: 'none', borderRadius: 12,
                 color: '#0a0a0a',
                 fontSize: '0.88rem', fontWeight: 900,
@@ -415,7 +421,7 @@ export default function CoachFileManager({ coachId }) {
                 cursor: uploading ? 'wait' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 opacity: (!uploadDraft.file || !uploadDraft.title.trim()) ? 0.5 : 1,
-                boxShadow: '0 8px 22px rgba(255,215,0,0.3)',
+
               }}
             >
               <Upload size={16} strokeWidth={2.5} />
