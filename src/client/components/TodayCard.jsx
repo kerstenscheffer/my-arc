@@ -5,7 +5,7 @@
 //     eiwit te gaan vs doel
 //   - Eerstvolgende call
 import { useState, useEffect } from 'react'
-import { Dumbbell, Play, Phone, Moon, ChevronRight } from 'lucide-react'
+import { Play, Phone, ChevronRight } from 'lucide-react'
 import MacroBoxes from './MacroBoxes'
 import AIMealPlanService from '../../modules/meal-plan/AIMealPlanService'
 import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
@@ -136,6 +136,16 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
 
   return (
     <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+      {/* Kopje boven de kaart in plaats van erop: op de foto moest het
+          concurreren met het beeld, hier leest het als de titel van de
+          sectie die het is. */}
+      <div style={{
+        fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
+        letterSpacing: '-0.025em', marginBottom: isMobile ? '0.5rem' : '0.6rem',
+      }}>
+        Training vandaag
+      </div>
+
       {/* ── Workout-card: foto over de volle breedte, alles op één regel ──
           Was een blok van 140 hoog met de naam onderin en een gouden
           start-knop. Compacter en in dezelfde taal als de rest: wit accent,
@@ -161,19 +171,6 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
           display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.75rem',
         }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-              {isRest
-                ? <Moon size={11} color="rgba(255,255,255,0.55)" />
-                : <Dumbbell size={11} color="rgba(255,255,255,0.55)" />}
-              <span style={{
-                fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
-                textTransform: 'uppercase', letterSpacing: '0.09em',
-                textShadow: '0 2px 6px rgba(0,0,0,0.8)',
-              }}>
-                Training vandaag
-              </span>
-            </div>
-
             {training == null ? (
               <div style={{ fontSize: '1rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>…</div>
             ) : (
