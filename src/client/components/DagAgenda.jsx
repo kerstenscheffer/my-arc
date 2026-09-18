@@ -255,7 +255,7 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
           )}
 
           {blokken.map(b => (
-            <Blok key={b.id} blok={b} isMobile={isMobile} pxVan={pxVan} onOpen={onOpen} />
+            <Blok key={b.id} blok={b} isMobile={isMobile} pxVan={pxVan} uurHoogte={uurHoogte} onOpen={onOpen} />
           ))}
         </div>
       </div>
@@ -280,12 +280,15 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
 // tekstregels is maar hetzelfde spul op een tijdlijn. De rest (slaap, werk,
 // supplementen) blijft een rustige regel: dat hoef je alleen te zien, niet te
 // lezen.
-function Blok({ blok, isMobile, pxVan, onOpen }) {
+function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen }) {
   const top = pxVan(blok.start)
-  // Ondergrens per soort: een maaltijd van een kwartier is 27 pixels hoog en
-  // daar past geen kaart in. Maaltijden en trainingen krijgen daarom altijd
-  // genoeg hoogte voor hun foto; de tijd in de kaart blijft de echte tijd.
-  const minHoogte = (blok.type === 'meal' || blok.type === 'training') ? 56 : 26
+  // Ondergrens per soort. Een maaltijd duurt in het plan een kwartier; op
+  // ware grootte is dat een streepje. Hij krijgt daarom de ruimte van een half
+  // uur — genoeg voor de kaart, en niet zoveel dat hij het uur erna opslokt.
+  // De tijd in de kaart blijft de echte begintijd.
+  const minHoogte = blok.type === 'meal' ? uurHoogte / 2
+    : blok.type === 'training' ? uurHoogte * 0.75
+    : 26
   const hoogte = Math.max(minHoogte, pxVan(blok.end) - top)
   const achter = !!blok._achter
   const isMaaltijd = blok.type === 'meal'
@@ -296,9 +299,11 @@ function Blok({ blok, isMobile, pxVan, onOpen }) {
   const naam = blok.sublabel || (isMaaltijd ? null : blok.label)
   const klikbaar = !!onOpen && (isMaaltijd || isTraining)
 
-  // Hoeveel past erin? Boven de 74 pixels ook de macro's eronder; daaronder
-  // de kaart met alleen de naam.
-  const ruim = hoogte >= 56
+  // Hoeveel past erin? De kaart met foto vanaf een halfuurhoogte, het
+  // slot-label op de foto zodra daar plek voor is, de macro's pas als het blok
+  // echt hoog is.
+  const ruim = hoogte >= 30
+  const slotOpFoto = hoogte >= 52
   const metMacros = hoogte >= 74
 
   const buiten = {
@@ -338,7 +343,7 @@ function Blok({ blok, isMobile, pxVan, onOpen }) {
     return (
       <Wrapper {...wrapperProps} title={titel} style={{ ...buiten, display: 'flex', alignItems: 'stretch' }}>
         <div style={{
-          width: Math.min(92, Math.max(52, hoogte)), flexShrink: 0, alignSelf: 'stretch',
+          width: Math.min(92, Math.max(44, hoogte)), flexShrink: 0, alignSelf: 'stretch',
           background: foto ? `url(${foto}) center/cover` : 'rgba(255,255,255,0.05)',
           position: 'relative',
         }}>
@@ -346,18 +351,20 @@ function Blok({ blok, isMobile, pxVan, onOpen }) {
             position: 'absolute', inset: 0,
             background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.75) 100%)',
           }} />
-          <span style={{
-            position: 'absolute', left: 6, right: 4, bottom: 4,
-            fontSize: '0.56rem', fontWeight: 900, color: '#fff',
-            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {soort}
-          </span>
+          {slotOpFoto && (
+            <span style={{
+              position: 'absolute', left: 6, right: 4, bottom: 4,
+              fontSize: '0.56rem', fontWeight: 900, color: '#fff',
+              textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {soort}
+            </span>
+          )}
         </div>
         <div style={{
           flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          padding: isMobile ? '6px 8px' : '8px 10px', gap: 3,
+          padding: metMacros ? (isMobile ? '6px 8px' : '8px 10px') : '3px 8px', gap: 3,
         }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{
