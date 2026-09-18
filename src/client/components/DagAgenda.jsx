@@ -472,9 +472,13 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
     top, height: hoogte,
     left: achter ? 0 : `calc(${((blok._kolom || 0) / (blok._kolommen || 1)) * 100}% + 4px)`,
     width: achter ? '100%' : `calc(${100 / (blok._kolommen || 1)}% - 8px)`,
-    background: achter ? `${blok.color}26` : '#141414',
-    border: `1px solid ${achter ? `${blok.color}59` : 'rgba(255,255,255,0.07)'}`,
-    borderLeft: `3px solid ${blok.color}`,
+    // Eén kleur voor alles: wit. De blokken verschilden per soort van kleur
+    // (blauw voor slaap, groen voor eten, rood voor training) en daarmee las
+    // een dag als een kleurenkaart in plaats van als een dag. Wat het is, zegt
+    // het icoon en het label al.
+    background: achter ? 'rgba(255,255,255,0.05)' : '#141414',
+    border: `1px solid ${achter ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
+    borderLeft: '3px solid rgba(255,255,255,0.85)',
     borderRadius: 10,
     overflow: 'hidden',
     zIndex: achter ? 0 : 2,
