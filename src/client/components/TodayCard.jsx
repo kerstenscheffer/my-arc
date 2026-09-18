@@ -1,31 +1,25 @@
 // src/client/components/TodayCard.jsx
-// "Planning vandaag" bovenaan de client-home, in de volgorde waarin je er
-// op een dag mee te maken hebt:
-//   - Voeding: de vier macro-ringen (waar sta je) en de volgende maaltijd,
-//     in de vorm van de kaarten op de meal-pagina
+// "Planning vandaag" bovenaan de client-home:
 //   - Workout-card met foto (training van vandaag, of Rustdag)
 //   - Eerstvolgende call
+//
+// De voeding stond hier ook: de vier macro-ringen en de volgende maaltijd.
+// Die zitten nu in de dagagenda, onder de datum en op de maaltijdblokken
+// zelf — daar staan ze op hun plek in de dag in plaats van los erboven.
 import { useState, useEffect } from 'react'
-import { Play, Phone, ChevronRight } from 'lucide-react'
-import MacroBoxes from './MacroBoxes'
-import AIMealPlanService from '../../modules/meal-plan/AIMealPlanService'
-import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
+import { Play, Phone } from 'lucide-react'
 import { workoutFoto } from './workoutFoto'
 
-const todayYMD = () => new Date().toISOString().split('T')[0]
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 
 export default function TodayCard({ client, db, setCurrentView, isMobile }) {
   const [training, setTraining] = useState(null)   // null=laden; { rest:true } | { name, focus }
-  const [macros, setMacros] = useState(null)       // { targets, consumed }
-  const [nextMeal, setNextMeal] = useState(null)   // maaltijd-object | 'none'
   const [nextCall, setNextCall] = useState(null)   // { scheduled_date, ... } | 'none'
 
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
     let alive = true
-    const day = todayYMD()
 
     // ── Training van vandaag ──
     ;(async () => {
@@ -45,42 +39,6 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
       } catch { if (alive) setTraining({ rest: true }) }
     })()
 
-    // ── Macro's (voor MacroHero: ring + eiwit/koolh/vet) ──
-    ;(async () => {
-      try {
-        const [{ data: t }, { data: cm }] = await Promise.all([
-          db.supabase.from('clients').select('target_calories, target_protein, target_carbs, target_fat').eq('id', client.id).single(),
-          db.supabase.from('consumed_meals').select('calories, protein, carbs, fat')
-            .eq('client_id', client.id)
-            .gte('consumed_at', `${day}T00:00:00`).lt('consumed_at', `${day}T23:59:59`),
-        ])
-        let ck = 0, cp = 0, cc = 0, cf = 0
-        ;(cm || []).forEach(m => { ck += Number(m.calories) || 0; cp += parseFloat(m.protein) || 0; cc += parseFloat(m.carbs) || 0; cf += parseFloat(m.fat) || 0 })
-        if (alive) setMacros({
-          targets: {
-            calories: t?.target_calories || client.target_calories || 0,
-            protein: t?.target_protein || client.target_protein || 0,
-            carbs: t?.target_carbs || 0,
-            fat: t?.target_fat || 0,
-          },
-          consumed: { calories: Math.round(ck), protein: Math.round(cp), carbs: Math.round(cc), fat: Math.round(cf) },
-        })
-      } catch { if (alive) setMacros({ targets: { calories: 0, protein: 0, carbs: 0, fat: 0 }, consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 } }) }
-    })()
-
-    // ── Volgende maaltijd uit het plan ──
-    ;(async () => {
-      try {
-        const svc = new AIMealPlanService(db)
-        const plan = await svc.getActiveAIPlan(client.id)
-        if (!plan) { if (alive) setNextMeal('none'); return }
-        const progress = await svc.getAIProgress(client.id, day)
-        const meals = await svc.getTodayFromWeekStructure(plan, progress)
-        const nm = svc.calculateNextMeal(meals, progress?.consumed_meals)
-        if (alive) setNextMeal(nm || 'none')
-      } catch { if (alive) setNextMeal('none') }
-    })()
-
     // ── Eerstvolgende call ──
     ;(async () => {
       try {
@@ -96,13 +54,11 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
     })()
 
     return () => { alive = false }
-  }, [client?.id, db]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [client?.id, db])
 
   const goWorkout = () => setCurrentView && setCurrentView('workout')
   const isRest = training && training.rest
   const workoutImg = training && !isRest ? workoutFoto(training.name) : null
-
-  const hasTarget = macros && macros.targets.calories > 0
 
   const callInfo = () => {
     if (nextCall === 'none' || !nextCall) return null
@@ -115,116 +71,8 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
   }
   const call = callInfo()
 
-  const meal = (nextMeal && nextMeal !== 'none') ? {
-    name: nextMeal.meal_name || nextMeal.name || 'Maaltijd',
-    kcal: Math.round(nextMeal.calories || 0),
-    eiwit: Math.round(nextMeal.protein || 0),
-    koolh: Math.round(nextMeal.carbs || 0),
-    vet: Math.round(nextMeal.fat || 0),
-    slot: nextMeal.timeSlot || '',
-    time: (() => { const h = Math.floor(nextMeal.plannedTime || 0); const m = Math.round(((nextMeal.plannedTime || 0) - h) * 60); return `${h}:${String(m).padStart(2, '0')}` })(),
-    img: resolveFoodImage(nextMeal, { size: 160 }),
-  } : null
-
   return (
     <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-      {/* ── Voeding — eerst waar je staat, dan wat er aan komt ──
-          De vier ringen stonden onder de volgende maaltijd, elk in een eigen
-          kadertje. Nu staan ze bovenaan en zonder kaders (variant `kaal`,
-          dezelfde als op de maaltijdpagina), en daaronder de volgende
-          maaltijd in de vorm van de maaltijdkaarten daar: foto links over de
-          volle hoogte met het moment en de tijd erop, de naam en de macro's
-          ernaast. */}
-      <div>
-        {macros == null ? (
-          <div style={{ padding: '1rem', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>…</div>
-        ) : hasTarget ? (
-          <MacroBoxes kaal consumed={macros.consumed} targets={macros.targets} />
-        ) : (
-          <div style={{ padding: '1rem', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Nog geen voedingsdoel ingesteld.</div>
-        )}
-
-        {meal && (
-          <button
-            onClick={() => setCurrentView && setCurrentView('meal')}
-            style={{
-              width: '100%', marginTop: hasTarget ? (isMobile ? '0.9rem' : '1rem') : 0,
-              textAlign: 'left', cursor: 'pointer', padding: 0,
-              background: 'rgba(255,255,255,0.025)',
-              border: '1px solid rgba(255,255,255,0.05)',
-              borderRadius: 12, overflow: 'hidden',
-              display: 'flex', alignItems: 'stretch', minWidth: 0,
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <div style={{
-              width: isMobile ? 78 : 90, alignSelf: 'stretch', flexShrink: 0,
-              background: `url(${meal.img}) center/cover`,
-              position: 'relative', overflow: 'hidden',
-            }}>
-              <div style={{
-                position: 'absolute', inset: 0, pointerEvents: 'none',
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.8) 100%)',
-              }} />
-              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: isMobile ? '0 5px 5px' : '0 6px 6px' }}>
-                <div style={{
-                  fontSize: isMobile ? '0.6rem' : '0.66rem', fontWeight: 900, color: '#fff',
-                  letterSpacing: '-0.01em', lineHeight: 1.1,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-                }}>
-                  {meal.slot || 'Volgende'}
-                </div>
-                {meal.time && (
-                  <div style={{
-                    fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800,
-                    color: 'rgba(255,255,255,0.75)', lineHeight: 1.2, marginTop: 1,
-                    textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-                  }}>
-                    {meal.time}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div style={{
-              flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: isMobile ? '0.45rem 0.6rem 0.45rem 0.7rem' : '0.55rem 0.8rem 0.55rem 0.95rem',
-            }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: isMobile ? '0.9rem' : '0.98rem', fontWeight: 800, color: '#fff',
-                  lineHeight: 1.2, letterSpacing: '-0.015em', marginBottom: 4,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {meal.name}
-                </div>
-                <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '0.7rem', overflow: 'hidden' }}>
-                  {[
-                    { val: meal.kcal, label: 'kcal' },
-                    { val: meal.eiwit, label: 'E' },
-                    { val: meal.koolh, label: 'K' },
-                    { val: meal.vet, label: 'V' },
-                  ].filter(m => m.val > 0).map(m => (
-                    <div key={m.label} style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                      <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{m.val}</span>
-                      <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>{m.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <ChevronRight size={16} color="rgba(255,255,255,0.25)" style={{ flexShrink: 0 }} />
-            </div>
-          </button>
-        )}
-      </div>
-
-      {/* Kopje boven de kaart in plaats van erop: op de foto moest het
-          concurreren met het beeld, hier leest het als de titel van de
-          sectie die het is. */}
-      {/* Ruimte tussen voeding en de trainingskaart; de koppen erboven zijn
-          eruit, het beeld zegt genoeg. */}
-      <div style={{ height: isMobile ? '1.5rem' : '1.75rem' }} />
 
       {/* ── Workout-card: foto over de volle breedte, alles op één regel ──
           Was een blok van 140 hoog met de naam onderin en een gouden

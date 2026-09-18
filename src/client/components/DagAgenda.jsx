@@ -190,6 +190,102 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [laden, dag, weekAnker, roosterHoogte])
 
+  // Wat er op deze dag is gelogd. Eén query per dag; bij het afvinken werken
+  // we de lijst hier lokaal bij, zodat de ringen meteen meebewegen.
+  const dagIso = datum ? toIsoDate(datum) : null
+  useEffect(() => {
+    if (!client?.id || !db?.supabase || !dagIso) return
+    let weg = false
+    db.supabase
+      .from('consumed_meals')
+      .select('id, meal_id, meal_type, meal_name, calories, protein, carbs, fat, source')
+      .eq('client_id', client.id)
+      .gte('consumed_at', `${dagIso}T00:00:00`)
+      .lt('consumed_at', `${dagIso}T23:59:59`)
+      .then(({ data, error }) => {
+        if (weg || error) return
+        zetGelogd(data || [])
+      })
+    return () => { weg = true }
+  }, [db, client?.id, dagIso])
+
+  const zetGelogd = (rijen) => {
+    const som = { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    const perSlot = {}
+    rijen.forEach(r => {
+      som.calories += Number(r.calories) || 0
+      som.protein += parseFloat(r.protein) || 0
+      som.carbs += parseFloat(r.carbs) || 0
+      som.fat += parseFloat(r.fat) || 0
+      // Een plan-maaltijd herkennen we aan het meal_id; is dat leeg, dan aan
+      // het type (ontbijt, lunch). Losse logs vallen hierbuiten en tellen
+      // alleen in de totalen mee.
+      if (r.source === 'plan_check') perSlot[r.meal_id || `type:${r.meal_type}`] = r.id
+    })
+    setVerbruikt({
+      calories: Math.round(som.calories), protein: Math.round(som.protein),
+      carbs: Math.round(som.carbs), fat: Math.round(som.fat),
+    })
+    setGelogd(perSlot)
+  }
+
+  const sleutelVan = (blok) => blok.sourceId || `type:${String(blok.meta?.slot || '').replace(/\d+$/, '')}`
+
+  // Afvinken vanuit de agenda schrijft dezelfde rij als de maaltijdpagina:
+  // consumed_meals met source 'plan_check'. Anders zou het vinkje hier niet
+  // meetellen in de macro's daar, en andersom.
+  const wisselAfgerond = async (blok) => {
+    if (!client?.id || !db?.supabase || !dagIso) return
+    const sleutel = sleutelVan(blok)
+    const bestaandeId = gelogd[sleutel]
+    const macro = {
+      calories: Math.round(Number(blok.meta?.kcal) || 0),
+      protein: Math.round(Number(blok.meta?.protein) || 0),
+      carbs: Math.round(Number(blok.meta?.carbs) || 0),
+      fat: Math.round(Number(blok.meta?.fat) || 0),
+    }
+
+    if (bestaandeId) {
+      setGelogd(prev => { const kopie = { ...prev }; delete kopie[sleutel]; return kopie })
+      setVerbruikt(prev => ({
+        calories: prev.calories - macro.calories, protein: prev.protein - macro.protein,
+        carbs: prev.carbs - macro.carbs, fat: prev.fat - macro.fat,
+      }))
+      const { error } = await db.supabase.from('consumed_meals').delete().eq('id', bestaandeId)
+      if (error) console.error('Afvinken ongedaan maken mislukt:', error)
+      return
+    }
+
+    setGelogd(prev => ({ ...prev, [sleutel]: 'bezig' }))
+    setVerbruikt(prev => ({
+      calories: prev.calories + macro.calories, protein: prev.protein + macro.protein,
+      carbs: prev.carbs + macro.carbs, fat: prev.fat + macro.fat,
+    }))
+    const nuIso = toIsoDate(new Date()) === dagIso ? new Date() : new Date(`${dagIso}T12:00:00`)
+    const { data, error } = await db.supabase.from('consumed_meals').insert({
+      client_id: client.id,
+      meal_name: blok.sublabel || blok.label || 'Maaltijd',
+      meal_id: blok.sourceId || null,
+      meal_type: String(blok.meta?.slot || '').replace(/\d+$/, '') || null,
+      ...macro,
+      amount: 1,
+      per_unit: 'portion',
+      consumed_at: nuIso.toISOString(),
+      source: 'plan_check',
+      log_count: 1,
+    }).select().single()
+    if (error) {
+      console.error('Afvinken mislukt:', error)
+      setGelogd(prev => { const kopie = { ...prev }; delete kopie[sleutel]; return kopie })
+      setVerbruikt(prev => ({
+        calories: prev.calories - macro.calories, protein: prev.protein - macro.protein,
+        carbs: prev.carbs - macro.carbs, fat: prev.fat - macro.fat,
+      }))
+      return
+    }
+    setGelogd(prev => ({ ...prev, [sleutel]: data.id }))
+  }
+
   const verzet = (richting) => {
     const i = DAYS.indexOf(dag)
     const n = i + richting
@@ -217,8 +313,8 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
         display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
         paddingBottom: isMobile ? 8 : 10,
       }}>
-        <button onClick={() => verzet(-1)} aria-label="Vorige dag" style={pijl}>
-          <ChevronLeft size={16} strokeWidth={2.6} />
+        <button onClick={() => verzet(-1)} aria-label="Vorige dag" style={pijlKnop}>
+          <ChevronLeft size={18} strokeWidth={3} />
         </button>
         <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
           <div style={{
@@ -231,10 +327,18 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
             {datum ? datum.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' }) : ''}
           </div>
         </div>
-        <button onClick={() => verzet(1)} aria-label="Volgende dag" style={pijl}>
-          <ChevronRight size={16} strokeWidth={2.6} />
+        <button onClick={() => verzet(1)} aria-label="Volgende dag" style={pijlKnop}>
+          <ChevronRight size={18} strokeWidth={3} />
         </button>
       </div>
+
+      {/* De dagtotalen horen bij de dag die je bekijkt, dus staan ze onder de
+          datum en niet los boven de agenda. */}
+      {doelen && doelen.calories > 0 && (
+        <div style={{ flexShrink: 0, paddingBottom: isMobile ? 10 : 12 }}>
+          <MacroBoxes kaal consumed={verbruikt} targets={doelen} />
+        </div>
+      )}
 
       {/* Rooster */}
       <div
@@ -301,7 +405,16 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
           )}
 
           {blokken.map(b => (
-            <Blok key={b.id} blok={b} isMobile={isMobile} pxVan={pxVan} uurHoogte={uurHoogte} onOpen={onOpen} />
+            <Blok
+              key={b.id}
+              blok={b}
+              isMobile={isMobile}
+              pxVan={pxVan}
+              uurHoogte={uurHoogte}
+              onOpen={onOpen}
+              afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
+              onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+            />
           ))}
         </div>
       </div>
@@ -326,7 +439,7 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
 // tekstregels is maar hetzelfde spul op een tijdlijn. De rest (slaap, werk,
 // supplementen) blijft een rustige regel: dat hoef je alleen te zien, niet te
 // lezen.
-function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen }) {
+function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAfronden = null }) {
   const top = pxVan(blok.start)
   // Ondergrens per soort. Een maaltijd duurt in het plan een kwartier; op
   // ware grootte is dat een streepje. Hij krijgt daarom de ruimte van een half
@@ -343,7 +456,10 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen }) {
 
   const soort = isMaaltijd ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || '')
   const naam = blok.sublabel || (isMaaltijd ? null : blok.label)
-  const klikbaar = !!onOpen && (isMaaltijd || isTraining)
+  // De kaart zelf is geen knop meer bij een maaltijd: daar zitten twee
+  // handelingen op (afronden en openen), en dan is "ergens op de kaart tikken"
+  // een gok.
+  const klikbaar = !!onOpen && isTraining
 
   // Hoeveel past erin? De kaart met foto vanaf een halfuurhoogte, het
   // slot-label op de foto zodra daar plek voor is, de macro's pas als het blok
@@ -363,7 +479,7 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen }) {
     borderRadius: 10,
     overflow: 'hidden',
     zIndex: achter ? 0 : 2,
-    opacity: blok.meta?.placeholder ? 0.6 : 1,
+    opacity: blok.meta?.placeholder ? 0.6 : (afgerond ? 0.72 : 1),
     cursor: klikbaar ? 'pointer' : 'default',
     textAlign: 'left',
     padding: 0,
@@ -412,16 +528,38 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen }) {
           flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center',
           padding: metMacros ? (isMobile ? '6px 8px' : '8px 10px') : '3px 8px', gap: 3,
         }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{
               flex: 1, minWidth: 0,
-              fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 900, color: '#fff',
+              fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 900,
+              color: afgerond ? 'rgba(255,255,255,0.45)' : '#fff',
+              textDecoration: afgerond ? 'line-through' : 'none',
               letterSpacing: '-0.015em', lineHeight: 1.2,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {naam || soort}
             </span>
             <span style={tijdStempel}>{tijd(blok.start)}</span>
+            {onAfronden && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onAfronden() }}
+                title={afgerond ? 'Toch niet gegeten' : 'Afronden'}
+                aria-label={afgerond ? 'Afvinken ongedaan maken' : 'Afronden'}
+                style={{ ...kaartKnop, color: afgerond ? '#10b981' : '#fff' }}
+              >
+                <Check size={14} strokeWidth={3.2} />
+              </button>
+            )}
+            {onOpen && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onOpen(blok) }}
+                title="Open in je maaltijdplan"
+                aria-label="Open in je maaltijdplan"
+                style={kaartKnop}
+              >
+                <Pijl size={14} strokeWidth={3.2} />
+              </button>
+            )}
           </div>
           {metMacros && macros.length > 0 && (
             <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', overflow: 'hidden' }}>
@@ -501,15 +639,25 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen }) {
   )
 }
 
+const kaartKnop = {
+  width: 22, height: 22, padding: 0, flexShrink: 0,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  background: 'transparent', border: 'none',
+  color: '#fff', cursor: 'pointer',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+
 const tijdStempel = {
   flexShrink: 0, fontSize: '0.58rem', fontWeight: 800,
   color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums',
 }
 
-const pijl = {
-  width: 30, height: 30, padding: 0, flexShrink: 0, borderRadius: 9,
+// Kale iconen: een vakje eromheen maakte er drie knoppen van naast een kop
+// die zelf al een kop is.
+const pijlKnop = {
+  width: 30, height: 30, padding: 0, flexShrink: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-  color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+  background: 'transparent', border: 'none',
+  color: '#fff', cursor: 'pointer',
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
