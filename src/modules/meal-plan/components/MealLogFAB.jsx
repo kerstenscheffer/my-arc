@@ -10,9 +10,12 @@ import { Plus } from 'lucide-react'
 export default function MealLogFAB({ onClick, isMobile: propMobile }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
   const size = isMobile ? 76 : 84
+  // Boven de navigatiebalk (op 22, ~50 hoog) én boven de video-balk die daar
+  // vlak boven verschijnt (op 70, ~70 hoog). Daaronder viel de knop er half
+  // achter zodra er een video langskwam.
   // De floating nav-bar zit op bottom:30 + ~62px hoog → we plaatsen de FAB
   // erboven met wat ademruimte zodat ze niet aan elkaar plakken.
-  const bottom = isMobile ? 110 : 110
+  const bottom = isMobile ? 152 : 158
 
   return (
     <button
