@@ -18,20 +18,14 @@
 //   · "Elke <dag>"      → het plan zelf: maaltijdtijd in week_structure,
 //                         training/slaap/werk in client_agenda_blocks.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, CalendarOff, RotateCcw, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { recurringIdFor, DAY_LABELS_NL_LONG } from '../../modules/client-agenda/ClientAgendaService'
+import TijdWiel from './TijdWiel'
+import { STAP, tijdTekst as tijd } from './tijdHelpers'
 
 const LIJN = 'rgba(255,255,255,0.08)'
-const STAP = 5                       // minuten per klik van het wiel
-const REGEL = 40                     // hoogte van één regel in het wiel
-const AANTAL = (24 * 60) / STAP      // 288 tijden, 00:00 t/m 23:55
-
-const tijd = (min) => {
-  const m = ((min % 1440) + 1440) % 1440
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-}
 
 const DUREN = [15, 30, 45, 60, 90, 120]
 
@@ -50,38 +44,11 @@ export default function BlokTijdSheet({
   const [bereik, setBereik] = useState(null)    // bewust leeg: je kiest zelf
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
-  const wielRef = useRef(null)
-  const scrollTimer = useRef(null)
-
-  // Het wiel begint op de huidige tijd — ook als je via 'terug' opnieuw op
-  // deze stap komt, want dan is hij net opnieuw gemonteerd.
-  useEffect(() => {
-    if (stap !== 'tijd') return
-    const el = wielRef.current
-    if (!el) return
-    const id = requestAnimationFrame(() => { el.scrollTop = (start / STAP) * REGEL })
-    return () => cancelAnimationFrame(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stap])
-
   useEffect(() => {
     const opToets = (e) => { if (e.key === 'Escape') onSluit?.() }
     window.addEventListener('keydown', opToets)
     return () => window.removeEventListener('keydown', opToets)
   }, [onSluit])
-
-  // Pas vastklikken als het scrollen stilligt; anders staat er tijdens het
-  // draaien elke frame een ander getal en flikkert de hele sheet mee.
-  const opScroll = () => {
-    if (scrollTimer.current) clearTimeout(scrollTimer.current)
-    scrollTimer.current = setTimeout(() => {
-      const el = wielRef.current
-      if (!el) return
-      const i = Math.max(0, Math.min(AANTAL - 1, Math.round(el.scrollTop / REGEL)))
-      setStart(i * STAP)
-    }, 90)
-  }
-  useEffect(() => () => { if (scrollTimer.current) clearTimeout(scrollTimer.current) }, [])
 
   const eind = (start + duur) % 1440
   const soort = blok.type === 'meal' ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || 'Blok')
@@ -210,53 +177,9 @@ export default function BlokTijdSheet({
               </span>
             </div>
 
-            {/* Het wiel. Scroll-snap doet het werk; de band in het midden wijst
-                aan welke regel telt. */}
-            <div style={{ position: 'relative', marginBottom: '0.9rem' }}>
-              <div
-                ref={wielRef}
-                onScroll={opScroll}
-                style={{
-                  height: REGEL * 5, overflowY: 'auto',
-                  scrollSnapType: 'y mandatory',
-                  WebkitOverflowScrolling: 'touch',
-                  maskImage: 'linear-gradient(180deg, transparent 0%, #000 28%, #000 72%, transparent 100%)',
-                  WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 28%, #000 72%, transparent 100%)',
-                }}
-              >
-                <div style={{ paddingTop: REGEL * 2, paddingBottom: REGEL * 2 }}>
-                  {Array.from({ length: AANTAL }, (_, i) => {
-                    const m = i * STAP
-                    const actief = m === start
-                    return (
-                      <div
-                        key={m}
-                        onClick={() => {
-                          const el = wielRef.current
-                          if (el) el.scrollTo({ top: i * REGEL, behavior: 'smooth' })
-                          setStart(m)
-                        }}
-                        style={{
-                          height: REGEL, scrollSnapAlign: 'center',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: actief ? '1.05rem' : '0.9rem',
-                          fontWeight: actief ? 900 : 700,
-                          color: actief ? '#fff' : 'rgba(255,255,255,0.3)',
-                          fontVariantNumeric: 'tabular-nums', cursor: 'pointer',
-                          transition: 'color 0.15s ease',
-                        }}
-                      >
-                        {tijd(m)}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              <div aria-hidden style={{
-                position: 'absolute', left: 0, right: 0, top: REGEL * 2, height: REGEL,
-                borderTop: `1px solid ${LIJN}`, borderBottom: `1px solid ${LIJN}`,
-                pointerEvents: 'none',
-              }} />
+            {/* Het wiel is gedeeld met je dagindeling: overal dezelfde beweging. */}
+            <div style={{ marginBottom: '0.9rem' }}>
+              <TijdWiel waarde={start} onKies={setStart} />
             </div>
 
             <div style={{ marginBottom: '1rem' }}>

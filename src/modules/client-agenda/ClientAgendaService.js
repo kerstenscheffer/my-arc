@@ -1320,6 +1320,55 @@ export class ClientAgendaService {
     return true
   }
 
+  // ── Vaste tijden: dezelfde wijziging over meerdere dagen ──
+  //
+  // De klant zet in zijn dagindeling één tijd voor de hele week. Per dag een
+  // losse aanroep doen betekent voor maaltijden zeven keer hetzelfde plan
+  // lezen en schrijven, en dan is de laatste schrijver de enige die telt.
+  // Daarom hier: één keer lezen, alle dagen aanpassen, één keer wegschrijven.
+  async zetMaaltijdtijdAlleDagen({ mealPlanId, slot, newStartMin, dagen = DAYS }) {
+    if (!mealPlanId || !slot) throw new Error('mealPlanId en slot vereist')
+    const { data: plan, error: loadErr } = await this.supabase
+      .from('client_meal_plans')
+      .select('week_structure')
+      .eq('id', mealPlanId)
+      .single()
+    if (loadErr) throw loadErr
+
+    const ws = plan?.week_structure || {}
+    const timing = minutesToTimeStr(newStartMin).slice(0, 5)
+    let geraakt = 0
+    dagen.forEach(day => {
+      if (!ws[day] || !ws[day][slot]) return
+      ws[day][slot] = { ...ws[day][slot], timing }
+      geraakt++
+    })
+    if (geraakt === 0) return 0
+
+    const { error: saveErr } = await this.supabase
+      .from('client_meal_plans')
+      .update({ week_structure: ws, updated_at: new Date().toISOString() })
+      .eq('id', mealPlanId)
+    if (saveErr) throw saveErr
+    return geraakt
+  }
+
+  // Eén soort blok (slaap, werk, training) op een reeks dagen zetten.
+  // perDag: { monday: dbId|null, ... } — alleen de dagen die erin staan worden
+  // aangeraakt. Een dag met een id wordt bijgewerkt, een dag zonder krijgt een
+  // nieuwe rij. Dagen die er niet in staan blijven zoals ze waren.
+  async zetVastBlok({ clientId, type, label, sublabel = null, color = null, startMin, endMin, perDag }) {
+    const uit = []
+    for (const [day, dbId] of Object.entries(perDag || {})) {
+      const rij = await this.upsertBlock({
+        id: dbId || null, clientId, day, type, label, sublabel, color,
+        startMin, endMin,
+      })
+      uit.push(rij)
+    }
+    return uit
+  }
+
   // Mapping dag-naam → workoutKey in week_structure. Bron: clients.workout_schedule.
   // Voorbeeld: { monday: 'pull_a', tuesday: 'push_a', ... }
   // Geeft zowel de expliciete koppeling (weekdag -> schema-dag) als de
