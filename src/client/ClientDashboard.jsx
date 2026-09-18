@@ -360,7 +360,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       {/* ── Floating Bottom Nav — verbergen in focus-mode (bv. workout-dropdown open) ── */}
       {!focusMode && <nav style={{
         position: 'fixed',
-        bottom: 30,
+        bottom: 22,
         left: isMobile ? 10 : '50%',
         right: isMobile ? 10 : 'auto',
         transform: isMobile ? 'none' : 'translateX(-50%)',
@@ -369,9 +369,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 22,
-        boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.04)',
-        padding: isMobile ? '0.5rem 0.3rem' : '0.6rem 0.5rem',
+        borderRadius: 18,
+        boxShadow: '0 14px 40px rgba(0,0,0,0.6)',
+        padding: isMobile ? '0.3rem 0.25rem' : '0.35rem 0.4rem',
         // 101: net boven het uitgeklapte workout-scherm (100), zodat je
         // vanuit een training nog van tab kunt wisselen.
         zIndex: 101,
@@ -394,28 +394,30 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 3,
-                  padding: isMobile ? '0.35rem 0.05rem' : '0.45rem 0.15rem',
-                  background: isActive ? `${theme.primary}14` : 'transparent',
+                  gap: 2,
+                  padding: isMobile ? '0.28rem 0.05rem' : '0.32rem 0.15rem',
+                  // Actief is wit, niet de kleur van de pagina. Vijf tabs in
+                  // vijf kleuren maakte van de balk een stoplicht.
+                  background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
                   border: 'none',
-                  borderRadius: 14,
+                  borderRadius: 12,
                   cursor: 'pointer',
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: 44,
+                  minHeight: 38,
                   minWidth: 36,
                   transition: 'background 0.15s ease',
                 }}
               >
                 <item.Icon
-                  size={isMobile ? 20 : 22}
-                  color={isActive ? theme.primary : 'rgba(255, 255, 255, 0.42)'}
-                  strokeWidth={isActive ? 2.5 : 1.9}
+                  size={isMobile ? 17 : 19}
+                  color={isActive ? '#fff' : 'rgba(255, 255, 255, 0.4)'}
+                  strokeWidth={isActive ? 2.8 : 2}
                 />
                 <span style={{
-                  fontSize: isMobile ? '0.52rem' : '0.58rem',
-                  fontWeight: isActive ? 800 : 600,
-                  color: isActive ? theme.primary : 'rgba(255, 255, 255, 0.35)',
+                  fontSize: isMobile ? '0.5rem' : '0.55rem',
+                  fontWeight: isActive ? 900 : 700,
+                  color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.35)',
                   letterSpacing: '-0.01em',
                   lineHeight: 1,
                 }}>
@@ -431,24 +433,24 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             aria-expanded={meerOpen}
             style={{
               flex: 1,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              padding: isMobile ? '0.35rem 0.05rem' : '0.45rem 0.15rem',
-              background: (meerOpen || meerActief) ? 'rgba(255,215,0,0.08)' : 'transparent',
-              border: 'none', borderRadius: 14,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              padding: isMobile ? '0.28rem 0.05rem' : '0.32rem 0.15rem',
+              background: (meerOpen || meerActief) ? 'rgba(255,255,255,0.1)' : 'transparent',
+              border: 'none', borderRadius: 12,
               cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              minHeight: 44, minWidth: 36,
+              minHeight: 38, minWidth: 36,
               transition: 'background 0.15s ease',
             }}
           >
             <MoreHorizontal
-              size={isMobile ? 20 : 22}
-              color={(meerOpen || meerActief) ? '#FFD700' : 'rgba(255, 255, 255, 0.42)'}
-              strokeWidth={(meerOpen || meerActief) ? 2.5 : 1.9}
+              size={isMobile ? 17 : 19}
+              color={(meerOpen || meerActief) ? '#fff' : 'rgba(255, 255, 255, 0.4)'}
+              strokeWidth={(meerOpen || meerActief) ? 2.8 : 2}
             />
             <span style={{
-              fontSize: isMobile ? '0.52rem' : '0.58rem',
-              fontWeight: (meerOpen || meerActief) ? 800 : 600,
-              color: (meerOpen || meerActief) ? '#FFD700' : 'rgba(255, 255, 255, 0.35)',
+              fontSize: isMobile ? '0.5rem' : '0.55rem',
+              fontWeight: (meerOpen || meerActief) ? 900 : 700,
+              color: (meerOpen || meerActief) ? '#fff' : 'rgba(255, 255, 255, 0.35)',
               letterSpacing: '-0.01em', lineHeight: 1,
             }}>
               Meer
