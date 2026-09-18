@@ -876,15 +876,16 @@ export default function ClientHome({ client, db, setCurrentView }) {
     <div style={{ minHeight: '100vh', paddingBottom: isMobile ? '9rem' : '6rem', background: '#0a0a0a' }}>
       <WelcomeSection client={client} />
 
-      {/* Vandaag-overzicht: training, macro's over, water, volgende call. */}
-      <div style={{ marginTop: isMobile ? '3.5rem' : '4.5rem' }}>
-        <TodayCard client={client} db={db} setCurrentView={setCurrentView} isMobile={isMobile} />
+      {/* Video-slider (coach-video's met show_in_slider) — direct onder de
+          kop: het is het eerste wat je van je coach te zien krijgt. */}
+      <div style={{ marginTop: isMobile ? '1.1rem' : '1.4rem' }}>
+        <HomeVideoSlider client={client} />
       </div>
 
-      {/* Video-slider (coach-video's met show_in_slider) */}
+      {/* Vandaag-overzicht: training, macro's over, water, volgende call. */}
       <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
-          <HomeVideoSlider client={client} />
+        <div style={{ marginTop: isMobile ? '2.75rem' : '3.5rem' }}>
+          <TodayCard client={client} db={db} setCurrentView={setCurrentView} isMobile={isMobile} />
         </div>
       </FadeOnScroll>
 

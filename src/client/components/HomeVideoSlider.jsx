@@ -77,8 +77,9 @@ export default function HomeVideoSlider({ client }) {
           width: '100%',
           borderRadius: 14,
           overflow: 'hidden',
-          background: '#171717',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          background: '#111',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 10px 28px rgba(0,0,0,0.45)',
         }}
       >
         {/* Aspect-ratio container (16:9) */}
@@ -109,7 +110,7 @@ export default function HomeVideoSlider({ client }) {
           {/* Donker gradient onderaan voor leesbare tekst */}
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(180deg, transparent 0%, transparent 45%, rgba(0,0,0,0.85) 100%)',
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 35%, rgba(0,0,0,0.55) 68%, rgba(0,0,0,0.92) 100%)',
             pointerEvents: 'none',
           }} />
 
@@ -118,15 +119,17 @@ export default function HomeVideoSlider({ client }) {
             position: 'absolute',
             top: '50%', left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: isMobile ? 56 : 68,
-            height: isMobile ? 56 : 68,
+            width: isMobile ? 52 : 62,
+            height: isMobile ? 52 : 62,
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-            boxShadow: '0 8px 22px rgba(255,215,0,0.5), 0 2px 8px rgba(0,0,0,0.5)',
+            // Wit, zoals elke hoofdactie in de app. De gouden gloed trok de
+            // aandacht naar de knop in plaats van naar de video.
+            background: '#fff',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'none',
           }}>
-            <Play size={isMobile ? 24 : 30} color="#0a0a0a" strokeWidth={2.8} fill="#0a0a0a" style={{ marginLeft: 3 }} />
+            <Play size={isMobile ? 21 : 26} color="#0a0a0a" strokeWidth={2.8} fill="#0a0a0a" style={{ marginLeft: 3 }} />
           </div>
 
           {/* Titel + categorie onderaan */}
@@ -137,17 +140,18 @@ export default function HomeVideoSlider({ client }) {
             color: '#fff',
           }}>
             <div style={{
-              fontSize: '0.58rem', fontWeight: 800,
-              color: '#FFD700', opacity: 0.9,
-              textTransform: 'uppercase', letterSpacing: '0.1em',
-              marginBottom: 3,
+              fontSize: '0.52rem', fontWeight: 800,
+              color: 'rgba(255,255,255,0.55)',
+              textTransform: 'uppercase', letterSpacing: '0.09em',
+              marginBottom: 4,
+              textShadow: '0 2px 6px rgba(0,0,0,0.8)',
             }}>
-              Bericht van je coach
+              Van je coach
             </div>
             <div style={{
-              fontSize: isMobile ? '0.95rem' : '1.05rem',
+              fontSize: isMobile ? '0.92rem' : '1rem',
               fontWeight: 900,
-              letterSpacing: '-0.015em',
+              letterSpacing: '-0.02em',
               lineHeight: 1.2,
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -164,12 +168,12 @@ export default function HomeVideoSlider({ client }) {
         {items.length > 1 && items.length <= 8 && (
           <div style={{
             position: 'absolute',
-            bottom: 6, left: '50%',
+            bottom: 8, left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex', gap: 5,
             padding: '4px 8px',
             borderRadius: 999,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(0,0,0,0.35)',
             backdropFilter: 'blur(6px)',
           }}>
             {items.map((_, i) => (
@@ -177,7 +181,7 @@ export default function HomeVideoSlider({ client }) {
                 width: i === activeIdx ? 14 : 5,
                 height: 5,
                 borderRadius: 999,
-                background: i === activeIdx ? '#FFD700' : 'rgba(255,255,255,0.45)',
+                background: i === activeIdx ? '#fff' : 'rgba(255,255,255,0.35)',
                 transition: 'width 0.25s ease, background 0.25s ease',
               }} />
             ))}
