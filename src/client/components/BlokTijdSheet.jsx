@@ -7,17 +7,20 @@
 // scrollen, en je hebt precies één ding nodig — een andere begintijd. Het wiel
 // is dezelfde beweging als een wekker zetten.
 //
-// Twee soorten wijziging, en dat verschil is het halve verhaal:
-//   · "Alleen vandaag"  → client_agenda_overrides, één datum. Het plan van de
+// Waarom twee stappen en niet één scherm: eerst was alles tegelijk zichtbaar —
+// wiel, duur, geldigheid, knop — en dan staat de zwaarste vraag (verander je
+// vandaag of je hele plan?) onderaan als bijzaak. Nu kies je eerst de tijd, en
+// pas daarna waarvoor hij geldt.
+//
+// Die tweede vraag is het halve verhaal:
+//   · "Alleen deze dag"  → client_agenda_overrides, één datum. Het plan van de
 //                         coach blijft staan; morgen is alles weer als het was.
 //   · "Elke <dag>"      → het plan zelf: maaltijdtijd in week_structure,
 //                         training/slaap/werk in client_agenda_blocks.
-// Standaard staat hij op vandaag: een dag waarop het anders liep hoort je plan
-// niet te herschrijven.
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, CalendarOff, RotateCcw } from 'lucide-react'
+import { X, CalendarOff, RotateCcw, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { recurringIdFor, DAY_LABELS_NL_LONG } from '../../modules/client-agenda/ClientAgendaService'
 
 const LIJN = 'rgba(255,255,255,0.08)'
@@ -41,22 +44,25 @@ export default function BlokTijdSheet({
     const d = b.end >= b.start ? b.end - b.start : (24 * 60 - b.start) + b.end
     return Math.max(STAP, d)
   }
+  const [stap, setStap] = useState('tijd')      // 'tijd' → 'bereik'
   const [start, setStart] = useState(() => Math.round(blok.start / STAP) * STAP)
   const [duur, setDuur] = useState(() => duurVan(blok))
-  const [bereik, setBereik] = useState('vandaag')
+  const [bereik, setBereik] = useState(null)    // bewust leeg: je kiest zelf
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
   const wielRef = useRef(null)
   const scrollTimer = useRef(null)
 
-  // Het wiel begint op de huidige tijd van het blok.
+  // Het wiel begint op de huidige tijd — ook als je via 'terug' opnieuw op
+  // deze stap komt, want dan is hij net opnieuw gemonteerd.
   useEffect(() => {
+    if (stap !== 'tijd') return
     const el = wielRef.current
     if (!el) return
     const id = requestAnimationFrame(() => { el.scrollTop = (start / STAP) * REGEL })
     return () => cancelAnimationFrame(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [stap])
 
   useEffect(() => {
     const opToets = (e) => { if (e.key === 'Escape') onSluit?.() }
@@ -83,6 +89,7 @@ export default function BlokTijdSheet({
   const recurringId = recurringIdFor(blok)
   const verzet = blok.start !== start || duurVan(blok) !== duur
   const isOverschreven = !!blok.meta?.isOverridden
+  const dagNaam = DAY_LABELS_NL_LONG[blok.day]?.toLowerCase() || 'week'
 
   const doe = async (fn) => {
     setBezig(true); setFout(null)
@@ -119,6 +126,8 @@ export default function BlokTijdSheet({
     clientId: client.id, dateIso: dagIso, recurringId,
   }))
 
+  const opTijd = stap === 'tijd'
+
   return createPortal(
     <div
       onClick={onSluit}
@@ -145,8 +154,13 @@ export default function BlokTijdSheet({
           boxShadow: '0 -20px 60px rgba(0,0,0,0.7)',
         }}
       >
-        {/* Kop */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: '0.9rem' }}>
+        {/* Kop. Op stap twee staat links de weg terug. */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: '0.75rem' }}>
+          {!opTijd && (
+            <button onClick={() => setStap('tijd')} aria-label="Terug" style={{ ...kaal, marginLeft: -6 }}>
+              <ChevronLeft size={19} strokeWidth={3} />
+            </button>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: '0.58rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
@@ -166,162 +180,234 @@ export default function BlokTijdSheet({
           </button>
         </div>
 
-        {/* De nieuwe tijd, groot. Dit is waar je naar kijkt terwijl je draait. */}
-        <div style={{ textAlign: 'center', marginBottom: '0.4rem' }}>
-          <span style={{
-            fontSize: '2.1rem', fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
-          }}>
-            {tijd(start)}
-          </span>
-          <span style={{
-            marginLeft: 8, fontSize: '0.8rem', fontWeight: 800,
-            color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums',
-          }}>
-            tot {tijd(eind)}
-          </span>
+        {/* Waar je bent: twee streepjes, meer heeft een flow van twee stappen
+            niet nodig. */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: '0.9rem' }}>
+          {['tijd', 'bereik'].map(s => (
+            <span key={s} style={{
+              flex: 1, height: 2, borderRadius: 2,
+              background: (s === 'tijd' || !opTijd) ? '#fff' : 'rgba(255,255,255,0.12)',
+              transition: 'background 0.2s ease',
+            }} />
+          ))}
         </div>
 
-        {/* Het wiel. Scroll-snap doet het werk; de band in het midden wijst aan
-            welke regel telt. */}
-        <div style={{ position: 'relative', marginBottom: '0.9rem' }}>
-          <div
-            ref={wielRef}
-            onScroll={opScroll}
-            style={{
-              height: REGEL * 5, overflowY: 'auto',
-              scrollSnapType: 'y mandatory',
-              WebkitOverflowScrolling: 'touch',
-              maskImage: 'linear-gradient(180deg, transparent 0%, #000 28%, #000 72%, transparent 100%)',
-              WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 28%, #000 72%, transparent 100%)',
-            }}
-          >
-            <div style={{ paddingTop: REGEL * 2, paddingBottom: REGEL * 2 }}>
-              {Array.from({ length: AANTAL }, (_, i) => {
-                const m = i * STAP
-                const actief = m === start
-                return (
-                  <div
-                    key={m}
-                    onClick={() => {
-                      const el = wielRef.current
-                      if (el) el.scrollTo({ top: i * REGEL, behavior: 'smooth' })
-                      setStart(m)
-                    }}
+        {/* ── Stap 1: hoe laat, en hoe lang ── */}
+        {opTijd && (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '0.4rem' }}>
+              <span style={{
+                fontSize: '2.1rem', fontWeight: 900, color: '#fff',
+                letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+              }}>
+                {tijd(start)}
+              </span>
+              <span style={{
+                marginLeft: 8, fontSize: '0.8rem', fontWeight: 800,
+                color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums',
+              }}>
+                tot {tijd(eind)}
+              </span>
+            </div>
+
+            {/* Het wiel. Scroll-snap doet het werk; de band in het midden wijst
+                aan welke regel telt. */}
+            <div style={{ position: 'relative', marginBottom: '0.9rem' }}>
+              <div
+                ref={wielRef}
+                onScroll={opScroll}
+                style={{
+                  height: REGEL * 5, overflowY: 'auto',
+                  scrollSnapType: 'y mandatory',
+                  WebkitOverflowScrolling: 'touch',
+                  maskImage: 'linear-gradient(180deg, transparent 0%, #000 28%, #000 72%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 28%, #000 72%, transparent 100%)',
+                }}
+              >
+                <div style={{ paddingTop: REGEL * 2, paddingBottom: REGEL * 2 }}>
+                  {Array.from({ length: AANTAL }, (_, i) => {
+                    const m = i * STAP
+                    const actief = m === start
+                    return (
+                      <div
+                        key={m}
+                        onClick={() => {
+                          const el = wielRef.current
+                          if (el) el.scrollTo({ top: i * REGEL, behavior: 'smooth' })
+                          setStart(m)
+                        }}
+                        style={{
+                          height: REGEL, scrollSnapAlign: 'center',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: actief ? '1.05rem' : '0.9rem',
+                          fontWeight: actief ? 900 : 700,
+                          color: actief ? '#fff' : 'rgba(255,255,255,0.3)',
+                          fontVariantNumeric: 'tabular-nums', cursor: 'pointer',
+                          transition: 'color 0.15s ease',
+                        }}
+                      >
+                        {tijd(m)}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <div aria-hidden style={{
+                position: 'absolute', left: 0, right: 0, top: REGEL * 2, height: REGEL,
+                borderTop: `1px solid ${LIJN}`, borderBottom: `1px solid ${LIJN}`,
+                pointerEvents: 'none',
+              }} />
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={kopje}>Duur</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {DUREN.map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDuur(d)}
                     style={{
-                      height: REGEL, scrollSnapAlign: 'center',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: actief ? '1.05rem' : '0.9rem',
-                      fontWeight: actief ? 900 : 700,
-                      color: actief ? '#fff' : 'rgba(255,255,255,0.3)',
-                      fontVariantNumeric: 'tabular-nums', cursor: 'pointer',
-                      transition: 'color 0.15s ease',
+                      ...chip,
+                      background: duur === d ? '#fff' : 'transparent',
+                      color: duur === d ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                      borderColor: duur === d ? '#fff' : LIJN,
                     }}
                   >
-                    {tijd(m)}
-                  </div>
+                    {d < 60 ? `${d} min` : `${d / 60} uur`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Stap 2: waarvoor geldt dit ── */}
+        {!opTijd && (
+          <>
+            {/* Wat je zojuist koos, klein en terug te draaien. */}
+            <button onClick={() => setStap('tijd')} style={{
+              width: '100%', marginBottom: '1rem', padding: '0.6rem 0.8rem',
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(255,255,255,0.04)', border: `1px solid ${LIJN}`,
+              borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <span style={{
+                flex: 1, textAlign: 'left',
+                fontSize: '1.05rem', fontWeight: 900, color: '#fff',
+                letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
+              }}>
+                {tijd(start)}
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>
+                  tot {tijd(eind)}
+                </span>
+              </span>
+              <span style={{ fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)' }}>
+                Wijzigen
+              </span>
+            </button>
+
+            <div style={kopje}>Geldt dit voor</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              {[
+                {
+                  id: 'vandaag',
+                  titel: 'Alleen deze dag',
+                  uitleg: 'Morgen staat je plan er weer zoals je coach het zette.',
+                },
+                {
+                  id: 'altijd',
+                  titel: `Elke ${dagNaam}`,
+                  uitleg: 'Past je plan aan, ook voor de weken hierna.',
+                },
+              ].map(k => {
+                const aan = bereik === k.id
+                return (
+                  <button
+                    key={k.id}
+                    onClick={() => setBereik(k.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                      padding: '0.7rem 0.8rem', borderRadius: 12,
+                      background: aan ? 'rgba(255,255,255,0.08)' : 'transparent',
+                      border: `1px solid ${aan ? 'rgba(255,255,255,0.5)' : LIJN}`,
+                      cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <span style={{
+                      width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: aan ? '#fff' : 'transparent',
+                      border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.25)'}`,
+                    }}>
+                      {aan && <Check size={13} strokeWidth={3.4} color="#0a0a0a" />}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{
+                        display: 'block', fontSize: '0.86rem', fontWeight: 900,
+                        color: '#fff', letterSpacing: '-0.015em',
+                      }}>
+                        {k.titel}
+                      </span>
+                      <span style={{
+                        display: 'block', fontSize: '0.66rem', fontWeight: 700,
+                        color: 'rgba(255,255,255,0.35)', marginTop: 2, lineHeight: 1.35,
+                      }}>
+                        {k.uitleg}
+                      </span>
+                    </span>
+                  </button>
                 )
               })}
             </div>
-          </div>
-          <div aria-hidden style={{
-            position: 'absolute', left: 0, right: 0, top: REGEL * 2, height: REGEL,
-            borderTop: `1px solid ${LIJN}`, borderBottom: `1px solid ${LIJN}`,
-            pointerEvents: 'none',
-          }} />
-        </div>
-
-        {/* Hoe lang het duurt. */}
-        <div style={{ marginBottom: '0.9rem' }}>
-          <div style={kopje}>Duur</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {DUREN.map(d => (
-              <button
-                key={d}
-                onClick={() => setDuur(d)}
-                style={{
-                  ...chip,
-                  background: duur === d ? '#fff' : 'transparent',
-                  color: duur === d ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
-                  borderColor: duur === d ? '#fff' : LIJN,
-                }}
-              >
-                {d < 60 ? `${d} min` : `${d / 60} uur`}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Eenmalig of voorgoed. */}
-        <div style={{ marginBottom: '0.9rem' }}>
-          <div style={kopje}>Geldt voor</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[
-              { id: 'vandaag', label: 'Alleen deze dag' },
-              { id: 'altijd', label: `Elke ${DAY_LABELS_NL_LONG[blok.day]?.toLowerCase() || 'week'}` },
-            ].map(k => (
-              <button
-                key={k.id}
-                onClick={() => setBereik(k.id)}
-                style={{
-                  ...chip, flex: 1, minHeight: 38,
-                  background: bereik === k.id ? '#fff' : 'transparent',
-                  color: bereik === k.id ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
-                  borderColor: bereik === k.id ? '#fff' : LIJN,
-                }}
-              >
-                {k.label}
-              </button>
-            ))}
-          </div>
-          <div style={{
-            fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
-            marginTop: 6, lineHeight: 1.4,
-          }}>
-            {bereik === 'vandaag'
-              ? 'Morgen staat je plan er weer zoals je coach het zette.'
-              : 'Past je plan aan, ook voor de weken hierna.'}
-          </div>
-        </div>
+          </>
+        )}
 
         {fout && (
-          <div style={{
-            fontSize: '0.7rem', fontWeight: 800, color: '#ef4444',
-            marginBottom: '0.6rem',
-          }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444', marginBottom: '0.6rem' }}>
             {fout}
           </div>
         )}
 
+        {/* De knop. Op stap één brengt hij je verder, op stap twee slaat hij op. */}
         <button
-          onClick={bewaar}
-          disabled={bezig || !verzet}
+          onClick={() => (opTijd ? setStap('bereik') : bewaar())}
+          disabled={bezig || (opTijd ? !verzet : !bereik)}
           style={{
             width: '100%', minHeight: 46, borderRadius: 12, border: 'none',
-            background: verzet ? '#fff' : 'rgba(255,255,255,0.12)',
-            color: verzet ? '#0a0a0a' : 'rgba(255,255,255,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: (opTijd ? verzet : bereik) ? '#fff' : 'rgba(255,255,255,0.12)',
+            color: (opTijd ? verzet : bereik) ? '#0a0a0a' : 'rgba(255,255,255,0.4)',
             fontSize: '0.85rem', fontWeight: 900, letterSpacing: '-0.01em',
-            cursor: verzet && !bezig ? 'pointer' : 'default', fontFamily: 'inherit',
-            opacity: bezig ? 0.6 : 1,
+            cursor: (opTijd ? verzet : bereik) && !bezig ? 'pointer' : 'default',
+            fontFamily: 'inherit', opacity: bezig ? 0.6 : 1,
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          {bezig ? 'Bezig…' : verzet ? `Verzetten naar ${tijd(start)}` : 'Kies een andere tijd'}
+          {bezig ? 'Bezig…'
+            : opTijd
+              ? (verzet ? <>Verder <ChevronRight size={16} strokeWidth={3} /></> : 'Kies een andere tijd')
+              : (bereik ? `Verzetten naar ${tijd(start)}` : 'Kies er een')}
         </button>
 
-        {/* Weg voor vandaag, of terug naar wat de coach had gezet. */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-          <button onClick={slaOver} disabled={bezig} style={stilleKnop}>
-            <CalendarOff size={13} strokeWidth={2.8} />
-            Deze dag overslaan
-          </button>
-          {isOverschreven && (
-            <button onClick={zetTerug} disabled={bezig} style={stilleKnop}>
-              <RotateCcw size={13} strokeWidth={2.8} />
-              Terug naar plan
+        {/* Weg voor vandaag, of terug naar wat de coach had gezet. Hoort bij de
+            eerste stap: het zijn andere antwoorden op dezelfde vraag, geen
+            vervolg erop. */}
+        {opTijd && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button onClick={slaOver} disabled={bezig} style={stilleKnop}>
+              <CalendarOff size={13} strokeWidth={2.8} />
+              Deze dag overslaan
             </button>
-          )}
-        </div>
+            {isOverschreven && (
+              <button onClick={zetTerug} disabled={bezig} style={stilleKnop}>
+                <RotateCcw size={13} strokeWidth={2.8} />
+                Terug naar plan
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>,
     document.body
