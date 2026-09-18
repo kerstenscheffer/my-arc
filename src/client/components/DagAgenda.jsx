@@ -27,6 +27,7 @@ import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foo
 import { workoutFoto } from './workoutFoto'
 import { verzetDag as verzetDagHelper } from './dagNavigatie'
 import MacroBoxes from './MacroBoxes'
+import BlokTijdSheet from './BlokTijdSheet'
 
 const LIJN = 'rgba(255,255,255,0.07)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.04)'
@@ -126,6 +127,10 @@ export default function DagAgenda({
   // hoe de dag verdeeld is, en dat is pas nuttig op een heel scherm.
   const [weergave, setWeergave] = useState('lijst')
   const [volledig, setVolledig] = useState(false)
+  // Welk blok staat er in de tijd-sheet, en een teller om de week opnieuw op
+  // te halen zodra er iets verzet is.
+  const [bewerk, setBewerk] = useState(null)
+  const [versie, setVersie] = useState(0)
   const roosterRef = useRef(null)
 
   useEffect(() => {
@@ -137,7 +142,7 @@ export default function DagAgenda({
       .catch(e => console.error('Dagagenda laden mislukt:', e))
       .finally(() => { if (!weg) setLaden(false) })
     return () => { weg = true }
-  }, [service, client?.id, weekAnker])
+  }, [service, client?.id, weekAnker, versie])
 
   // Doelen staan op de klant en veranderen niet per dag.
   useEffect(() => {
@@ -450,6 +455,7 @@ export default function DagAgenda({
               onOpen={onOpen}
               afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
               onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+              onTijd={() => setBewerk(b)}
               bezig={toonNuLijn && nuMin >= b.start && nuMin < b.end}
             />
           ))}
@@ -531,10 +537,25 @@ export default function DagAgenda({
               onOpen={onOpen}
               afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
               onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+              onTijd={() => setBewerk(b)}
             />
           ))}
         </div>
       </div>
+      )}
+
+      {/* Tijd verzetten: dezelfde sheet vanuit de lijst en vanuit het rooster. */}
+      {bewerk && dagIso && (
+        <BlokTijdSheet
+          blok={bewerk}
+          client={client}
+          service={service}
+          dagIso={dagIso}
+          mealPlanId={data?.mealPlan?.id || null}
+          isMobile={isMobile}
+          onSluit={() => setBewerk(null)}
+          onKlaar={() => { setBewerk(null); setVersie(v => v + 1) }}
+        />
       )}
 
       {!isVandaag && (
@@ -577,7 +598,7 @@ export default function DagAgenda({
 // tekstregels is maar hetzelfde spul op een tijdlijn. De rest (slaap, werk,
 // supplementen) blijft een rustige regel: dat hoef je alleen te zien, niet te
 // lezen.
-function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAfronden = null }) {
+function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAfronden = null, onTijd = null }) {
   const top = pxVan(blok.start)
   // Ondergrens per soort. Een maaltijd duurt in het plan een kwartier; op
   // ware grootte is dat een streepje. Hij krijgt daarom de ruimte van een half
@@ -680,7 +701,7 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
             }}>
               {naam || soort}
             </span>
-            <span style={tijdStempel}>{tijd(blok.start)}</span>
+            <TijdStempel blok={blok} onTijd={onTijd} />
             {onAfronden && (
               <button
                 onClick={(e) => { e.stopPropagation(); onAfronden() }}
@@ -745,7 +766,7 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
             }}>
               {naam || 'Training'}
             </span>
-            <span style={{ ...tijdStempel, color: 'rgba(255,255,255,0.6)' }}>{tijd(blok.start)}</span>
+            <TijdStempel blok={blok} onTijd={onTijd} kleur="rgba(255,255,255,0.6)" />
             {onOpen && (
               <>
                 <button
@@ -795,15 +816,39 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
       }}>
         {naam || soort}
       </span>
-      <span style={tijdStempel}>{tijd(blok.start)}</span>
+      <TijdStempel blok={blok} onTijd={onTijd} />
     </Wrapper>
+  )
+}
+
+// De begintijd in het rooster, als knop. Zelfde afspraak als in de lijst:
+// waar de tijd staat, kun je hem verzetten.
+function TijdStempel({ blok, onTijd, kleur }) {
+  if (!onTijd) {
+    return <span style={kleur ? { ...tijdStempel, color: kleur } : tijdStempel}>{tijd(blok.start)}</span>
+  }
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onTijd() }}
+      title="Tijd aanpassen"
+      style={{
+        ...tijdStempel,
+        ...(kleur ? { color: kleur } : null),
+        padding: 0, background: 'transparent', border: 'none', fontFamily: 'inherit',
+        cursor: 'pointer', textDecoration: 'underline',
+        textDecorationColor: 'rgba(255,255,255,0.25)', textUnderlineOffset: 3,
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {tijd(blok.start)}
+    </button>
   )
 }
 
 // Eén regel in de lijst: streep, naam, tijden rechts. Loopt het blok nu, dan
 // is de streep vol wit in plaats van doorzichtig — dat is het enige verschil
 // dat je nodig hebt om te zien waar je bent.
-function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, bezig }) {
+function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezig }) {
   const isMaaltijd = blok.type === 'meal'
   const isTraining = blok.type === 'training'
   const Icoon = ICOON[blok.type] || Calendar
@@ -866,14 +911,32 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, bezig }) {
           knoppen. Zonder dat schoven de tijden per regel op: een blok zonder
           knoppen duwde ze naar rechts en een maaltijd met twee knoppen naar
           links, en dan staat er geen kolom meer. */}
-      <div style={{ flexShrink: 0, width: 44, textAlign: 'right', lineHeight: 1.25 }}>
-        <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+      {/* De tijd is de knop: tikken opent het wiel waarmee je hem verzet.
+          Een apart potloodje erbij maakte de regel drukker dan de agenda
+          waar hij op lijkt. */}
+      <button
+        onClick={onTijd || undefined}
+        disabled={!onTijd}
+        title={onTijd ? 'Tijd aanpassen' : undefined}
+        style={{
+          flexShrink: 0, width: 44, padding: 0, textAlign: 'right', lineHeight: 1.25,
+          background: 'transparent', border: 'none', fontFamily: 'inherit',
+          cursor: onTijd ? 'pointer' : 'default',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <div style={{
+          fontSize: '0.74rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums',
+          textDecoration: onTijd ? 'underline' : 'none',
+          textDecorationColor: 'rgba(255,255,255,0.25)',
+          textUnderlineOffset: 3,
+        }}>
           {tijd(blok.start)}
         </div>
         <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', fontVariantNumeric: 'tabular-nums' }}>
           {tijd(blok.end)}
         </div>
-      </div>
+      </button>
 
       <div style={{
         flexShrink: 0, width: 50,
