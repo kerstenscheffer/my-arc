@@ -19,6 +19,7 @@ import videoService from '../../modules/videos/VideoService'
 import fileService from '../../modules/videos/FileService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
 import { extractYouTubeId, getYouTubeThumbnail } from '../../modules/videos/utils/youtubeHelpers'
+import { zetVideoBalkHoogte, VIDEO_BALK } from './videoBalkHoogte'
 
 // De twee knoppen op de balk: kaal en wit, zoals overal.
 const balkKnop = {
@@ -48,6 +49,10 @@ export default function VideoTeaser({
   // hij weg tot de volgende keer dat je de app opent. Bewust niet bewaard:
   // een video die je wegklikt hoort niet voorgoed te verdwijnen.
   const [dicht, setDicht] = useState(false)
+  // Heb je hem zelf teruggehaald, dan blijft hij staan tot je hem weer
+  // wegduwt. Zonder dit zette het tijdslot van hieronder hem meteen weer dicht
+  // en leek het knopje kapot.
+  const [handmatig, setHandmatig] = useState(false)
   const timers = useRef([])
 
   // Wat er langskomt hangt af van waar je bent. Op home de video's die de
@@ -88,13 +93,13 @@ export default function VideoTeaser({
   // onderbreking. Op de andere pagina's ben je ergens mee bezig; daar komt hij
   // even langs en gaat weer weg.
   useEffect(() => {
-    if (dicht || speler || items.length === 0) return
-    if (vast) {
-      timers.current.forEach(clearTimeout)
-      timers.current = []
-      setOpen(!dicht)
-      return
-    }
+    timers.current.forEach(clearTimeout)
+    timers.current = []
+
+    if (dicht || speler || items.length === 0) { setOpen(false); return }
+    // Op home, of nadat je hem zelf hebt opengeklikt: gewoon laten staan.
+    if (vast || handmatig) { setOpen(true); return }
+
     setOpen(false)
     const plan = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); return t }
 
@@ -114,7 +119,22 @@ export default function VideoTeaser({
       timers.current.forEach(clearTimeout)
       timers.current = []
     }
-  }, [items.length, speler, vast, dicht])
+  }, [items.length, speler, vast, dicht, handmatig])
+
+  // Het knopje staat er zodra de balk niet open is — ook als hij vanzelf is
+  // ingezakt. Anders had je na twintig seconden geen enkele manier meer om de
+  // video terug te halen.
+  const knopZichtbaar = items.length > 0 && !open && !speler
+
+  // Doorgeven wat we onderin innemen, zodat de zwevende knoppen meeschuiven.
+  useEffect(() => {
+    zetVideoBalkHoogte(
+      items.length === 0 ? VIDEO_BALK.weg
+        : open ? VIDEO_BALK.open
+        : VIDEO_BALK.knop
+    )
+    return () => zetVideoBalkHoogte(VIDEO_BALK.weg)
+  }, [items.length, open])
 
   if (items.length === 0) return null
 
@@ -252,7 +272,7 @@ export default function VideoTeaser({
         )}
 
         <button
-          onClick={() => { setOpen(false); setDicht(true) }}
+          onClick={() => { setHandmatig(false); setDicht(true); setOpen(false) }}
           title="Wegschuiven"
           aria-label="Wegschuiven"
           style={{ ...balkKnop, marginRight: 4 }}
@@ -261,11 +281,12 @@ export default function VideoTeaser({
         </button>
       </div>
 
-      {/* Weggeschoven blijft dit knopje staan, rechts boven de balk. Het komt
+      {/* Is de balk weg — weggeklikt of vanzelf ingezakt — dan blijft dit
+          knopje staan, rechts boven de onderbalk. Het komt
           omhoog zodra de balk eronder verdwijnt en zakt er weer in als je hem
           terughaalt — vandaar de vertraging op de ene en niet op de andere. */}
       <button
-        onClick={() => { setDicht(false); setOpen(true) }}
+        onClick={() => { setDicht(false); setHandmatig(true); setOpen(true) }}
         title="Video van je coach"
         aria-label="Video van je coach"
         style={{
@@ -280,10 +301,10 @@ export default function VideoTeaser({
           border: '1px solid rgba(255,255,255,0.12)',
           color: '#fff', cursor: 'pointer',
           boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
-          transform: dicht ? 'translateY(0) scale(1)' : 'translateY(14px) scale(0.6)',
-          opacity: dicht ? 1 : 0,
-          pointerEvents: dicht ? 'auto' : 'none',
-          transition: dicht
+          transform: knopZichtbaar ? 'translateY(0) scale(1)' : 'translateY(14px) scale(0.6)',
+          opacity: knopZichtbaar ? 1 : 0,
+          pointerEvents: knopZichtbaar ? 'auto' : 'none',
+          transition: knopZichtbaar
             ? 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.16s, opacity 0.22s ease 0.16s'
             : 'transform 0.22s ease, opacity 0.16s ease',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',

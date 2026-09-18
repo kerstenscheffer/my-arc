@@ -6,16 +6,15 @@
 
 import React from 'react'
 import { Plus } from 'lucide-react'
+import { useOnderMarge } from '../../../client/components/videoBalkHoogte'
 
 export default function MealLogFAB({ onClick, isMobile: propMobile }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
   const size = isMobile ? 76 : 84
-  // Boven de navigatiebalk (op 22, ~50 hoog) én boven de video-balk die daar
-  // vlak boven verschijnt (op 70, ~70 hoog). Daaronder viel de knop er half
-  // achter zodra er een video langskwam.
-  // De floating nav-bar zit op bottom:30 + ~62px hoog → we plaatsen de FAB
-  // erboven met wat ademruimte zodat ze niet aan elkaar plakken.
-  const bottom = isMobile ? 152 : 158
+  // Boven de navigatiebalk (op 22, ~62 hoog) met wat lucht ertussen. Komt de
+  // video-balk omhoog, dan schuift deze knop mee omhoog en zakt hij daarna
+  // weer terug — vast op de hoogste stand stond hij raar hoog te zweven.
+  const bottom = useOnderMarge(isMobile ? 96 : 102)
 
   return (
     <button
@@ -38,7 +37,7 @@ export default function MealLogFAB({ onClick, isMobile: propMobile }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexDirection: 'column',
         gap: 0,
-        transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+        transition: 'transform 0.18s ease, box-shadow 0.18s ease, bottom 0.34s cubic-bezier(0.22, 1, 0.36, 1)',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'scale(1.05)'

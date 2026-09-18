@@ -13,13 +13,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Minus } from 'lucide-react'
+import { useOnderMarge } from './videoBalkHoogte'
 
 const STAP_ML = 100
 const STANDAARD_DOEL_L = 3
 
 const vandaag = () => new Date().toISOString().split('T')[0]
 
-export default function WaterFles({ client, db, isMobile = false, onderMarge = 130 }) {
+// onderMarge is de afstand zonder video-balk; komt die omhoog, dan schuift de
+// fles mee.
+export default function WaterFles({ client, db, isMobile = false, onderMarge = 96 }) {
+  const onder = useOnderMarge(onderMarge)
   const [ml, setMl] = useState(0)
   const [doelMl, setDoelMl] = useState(STANDAARD_DOEL_L * 1000)
   const [geladen, setGeladen] = useState(false)
@@ -100,7 +104,8 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 1
     <div style={{
       position: 'fixed',
       right: isMobile ? 10 : 16,
-      bottom: `calc(${onderMarge}px + env(safe-area-inset-bottom, 0px))`,
+      bottom: `calc(${onder}px + env(safe-area-inset-bottom, 0px))`,
+      transition: 'bottom 0.34s cubic-bezier(0.22, 1, 0.36, 1)',
       zIndex: 95,
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
     }}>

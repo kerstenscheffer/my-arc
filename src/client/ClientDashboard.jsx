@@ -362,7 +362,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           binnenkrijgt. Zweeft rechts, want je tikt hem aan terwijl je met iets
           anders bezig bent. */}
       {!ingebed && !focusMode && currentView === 'meal' && client && (
-        <WaterFles client={client} db={db} isMobile={isMobile} onderMarge={isMobile ? 152 : 158} />
+        <WaterFles client={client} db={db} isMobile={isMobile} onderMarge={isMobile ? 96 : 102} />
       )}
 
       {/* ── Video-teaser: komt af en toe boven de balk omhoog en zakt weer in.
