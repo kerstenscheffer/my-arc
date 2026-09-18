@@ -8,7 +8,9 @@ import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 import { getBronMeta } from '../utils/youtubeHelpers'
 
-const GOLD = '#FFD700'
+// Wit is het accent, zoals in de rest van de app. Stond hier op goud: met
+// gekleurde vlakken voor elke keuze werd dit venster een stoplicht.
+const GOLD = '#fff'
 
 // Pagina's matchen ClientDashboard — zelfde set als de edit-modal. Een video
 // met een pagina in default_pages verschijnt AUTOMATISCH bij alle clients (ook
@@ -147,18 +149,18 @@ export default function VideoUploadModal({
     display: 'block',
     fontSize: '0.4rem',
     fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.3)',
+    color: 'rgba(255, 255, 255, 0.35)',
     textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    marginBottom: '0.4rem'
+    letterSpacing: '0.09em',
+    marginBottom: '0.35rem'
   }
 
   const inputStyle = {
     width: '100%',
-    padding: '0.6rem 0.75rem',
-    background: '#000',
+    padding: '0.55rem 0.7rem',
+    background: 'rgba(255, 255, 255, 0.04)',
     border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderRadius: '6px',
+    borderRadius: '10px',
     color: '#fff',
     fontSize: isMobile ? '0.85rem' : '0.9rem',
     fontWeight: '600',
@@ -171,7 +173,8 @@ export default function VideoUploadModal({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
+        background: 'rgba(0, 0, 0, 0.82)',
+        backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
         zIndex: 10000,
         display: 'flex',
         alignItems: isMobile ? 'flex-end' : 'center',
@@ -184,10 +187,10 @@ export default function VideoUploadModal({
         style={{
           background: '#0a0a0a',
           width: '100%',
-          maxWidth: isMobile ? '100%' : '560px',
-          maxHeight: isMobile ? '92vh' : '88vh',
-          borderRadius: isMobile ? '12px 12px 0 0' : '12px',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
+          maxWidth: isMobile ? '100%' : '480px',
+          maxHeight: isMobile ? '92vh' : '85vh',
+          borderRadius: isMobile ? '16px 16px 0 0' : '16px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -202,35 +205,31 @@ export default function VideoUploadModal({
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
           flexShrink: 0
         }}>
-          <div style={{ flex: 1 }}>
-            <div style={{
-              fontSize: isMobile ? '0.4rem' : '0.45rem',
-              fontWeight: '700',
-              color: 'rgba(255, 255, 255, 0.2)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              marginBottom: '0.2rem'
-            }}>
-              Video Library
-            </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: isMobile ? '0.95rem' : '1.05rem',
-              fontWeight: '800',
+              fontWeight: 900,
               color: '#fff',
-              letterSpacing: '-0.01em'
+              letterSpacing: '-0.025em'
             }}>
               Nieuwe video
+            </div>
+            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+              {voorinvulling?.is_personal
+                ? 'Persoonlijk, voor één klant'
+                : 'Titel en link zijn genoeg om te beginnen'}
             </div>
           </div>
           <button
             onClick={onClose}
             style={{
-              width: '32px',
-              height: '32px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-              borderRadius: '8px',
-              color: 'rgba(255, 255, 255, 0.4)',
+              width: '30px',
+              height: '30px',
+              flexShrink: 0,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '9px',
+              color: 'rgba(255, 255, 255, 0.6)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -239,7 +238,7 @@ export default function VideoUploadModal({
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
 
@@ -254,7 +253,7 @@ export default function VideoUploadModal({
         >
           {/* ── TITEL ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
             <label style={labelStyle}>Titel *</label>
@@ -269,7 +268,7 @@ export default function VideoUploadModal({
 
           {/* ── YOUTUBE URL ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
             <label style={{
@@ -292,7 +291,7 @@ export default function VideoUploadModal({
 
           {/* ── BESCHRIJVING ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
             <label style={labelStyle}>Beschrijving</label>
@@ -312,7 +311,7 @@ export default function VideoUploadModal({
 
           {/* ── MIJN CATEGORIE (custom) ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
             <label style={{
@@ -358,7 +357,7 @@ export default function VideoUploadModal({
 
           {/* ── TAG / LEGACY CATEGORY ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
             <label style={labelStyle}>Type / Tag</label>
@@ -377,7 +376,7 @@ export default function VideoUploadModal({
 
           {/* ── THUMBNAIL ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
             <label style={{
@@ -524,7 +523,7 @@ export default function VideoUploadModal({
 
           {/* ── VOOR WIE? — Iedereen vs specifieke klant(en) ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
             <label style={labelStyle}>Voor wie is deze video?</label>
@@ -598,7 +597,7 @@ export default function VideoUploadModal({
                       onClick={() => toggleClient(c.id)}
                       style={{
                         width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
-                        padding: '0.5rem 0.65rem', background: on ? 'rgba(255,215,0,0.1)' : 'transparent',
+                        padding: '0.5rem 0.65rem', background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
                         border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
                         cursor: 'pointer', textAlign: 'left',
                         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -653,7 +652,7 @@ export default function VideoUploadModal({
           {audience === 'everyone' && (<>
           {/* ── STANDAARD ZICHTBAAR OP (default_pages) ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
             borderLeft: formData.default_pages.length > 0 ? `3px solid ${GOLD}` : '3px solid transparent',
             transition: 'border-left-color 0.2s ease'
@@ -710,7 +709,7 @@ export default function VideoUploadModal({
 
           {/* ── IN HOME-SLIDER? ── */}
           <div style={{
-            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
             borderLeft: formData.show_in_slider ? `3px solid ${GOLD}` : '3px solid transparent',
             transition: 'border-left-color 0.2s ease'
@@ -753,18 +752,17 @@ export default function VideoUploadModal({
             style={{
               flex: 1,
               padding: '0.625rem',
-              background: 'transparent',
+              background: 'rgba(255, 255, 255, 0.04)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '6px',
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: '0.7rem',
-              fontWeight: '700',
+              borderRadius: '10px',
+              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: '0.8rem',
+              fontWeight: 900,
               cursor: uploading ? 'not-allowed' : 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              minHeight: '42px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
+              minHeight: '44px',
+              letterSpacing: '-0.01em'
             }}
           >
             Annuleer
@@ -775,24 +773,20 @@ export default function VideoUploadModal({
             style={{
               flex: 2,
               padding: '0.625rem',
-              background: uploading || !formData.title || !formData.video_url
-                ? 'rgba(255, 215, 0, 0.2)'
-                : GOLD,
+              background: '#fff',
+              opacity: (uploading || !formData.title || !formData.video_url) ? 0.35 : 1,
               border: 'none',
-              borderRadius: '6px',
-              color: uploading || !formData.title || !formData.video_url
-                ? 'rgba(0, 0, 0, 0.4)'
-                : '#000',
-              fontSize: '0.7rem',
-              fontWeight: '800',
+              borderRadius: '10px',
+              color: '#0a0a0a',
+              fontSize: '0.8rem',
+              fontWeight: 900,
               cursor: uploading || !formData.title || !formData.video_url
                 ? 'not-allowed'
                 : 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              minHeight: '42px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
+              minHeight: '44px',
+              letterSpacing: '-0.01em',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
