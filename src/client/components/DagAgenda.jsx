@@ -105,6 +105,9 @@ export default function DagAgenda({
   weekAnker: weekAnkerProp = null,
   onVerzetDag = null,
   toonKop = true,
+  // Op home staan de macro's niet in de agenda: die horen op de maaltijdpagina,
+  // en twee plekken met hetzelfde getal is er één te veel.
+  toonMacros = true,
 }) {
   const service = useMemo(() => new ClientAgendaService(db?.supabase || db), [db])
   const [eigenWeekAnker, setEigenWeekAnker] = useState(() => getMondayOf(new Date()))
@@ -378,7 +381,7 @@ export default function DagAgenda({
 
       {/* De dagtotalen horen bij de dag die je bekijkt, dus staan ze onder de
           datum en niet los boven de agenda. */}
-      {doelen && doelen.calories > 0 && (
+      {toonMacros && doelen && doelen.calories > 0 && (
         <div style={{ flexShrink: 0, paddingBottom: isMobile ? 10 : 12 }}>
           <MacroBoxes kaal consumed={verbruikt} targets={doelen} />
         </div>

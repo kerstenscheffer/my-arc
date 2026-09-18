@@ -927,6 +927,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
               weekAnker={dagStand.weekAnker}
               onVerzetDag={verzetAgendaDag}
               toonKop={false}
+              toonMacros={false}
               onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
             />
           </div>

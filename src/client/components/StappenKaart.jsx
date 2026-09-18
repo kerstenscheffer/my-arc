@@ -74,26 +74,30 @@ export default function StappenKaart({ client, db, isMobile = false }) {
 
   return (
     <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+      {/* Doorschijnend in plaats van massief wit: een volle witte kaart trok
+          de hele pagina naar zich toe terwijl dit één getal is. */}
       <div style={{
-        background: '#fff', borderRadius: 16,
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.09)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: 16,
         padding: isMobile ? '0.85rem 1rem' : '1rem 1.15rem',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Footprints size={16} color="#0a0a0a" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+          <Footprints size={16} color="rgba(255,255,255,0.5)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: '0.56rem', fontWeight: 900, color: 'rgba(10,10,10,0.45)',
+              fontSize: '0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
               textTransform: 'uppercase', letterSpacing: '0.1em',
             }}>
               Stappen vandaag
             </div>
             <div style={{
-              fontSize: isMobile ? '1.5rem' : '1.7rem', fontWeight: 900, color: '#0a0a0a',
+              fontSize: isMobile ? '1.5rem' : '1.7rem', fontWeight: 900, color: '#fff',
               letterSpacing: '-0.03em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
             }}>
               {nl(stand)}
-              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(10,10,10,0.35)', marginLeft: 6 }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', marginLeft: 6 }}>
                 van {nl(doel)}
               </span>
             </div>
@@ -105,7 +109,8 @@ export default function StappenKaart({ client, db, isMobile = false }) {
             style={{
               width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: '#0a0a0a', border: 'none', color: '#fff', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
+              color: '#fff', cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
@@ -116,11 +121,11 @@ export default function StappenKaart({ client, db, isMobile = false }) {
         {/* De balk van vandaag. */}
         <div style={{
           height: 6, borderRadius: 3, marginTop: '0.7rem',
-          background: 'rgba(10,10,10,0.08)', overflow: 'hidden',
+          background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
         }}>
           <div style={{
             width: `${pct}%`, height: '100%',
-            background: gehaald ? '#10b981' : '#0a0a0a',
+            background: gehaald ? '#10b981' : '#fff',
             transition: 'width 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
           }} />
         </div>
@@ -136,18 +141,18 @@ export default function StappenKaart({ client, db, isMobile = false }) {
                   title={`${d.iso}: ${nl(d.steps)} stappen`}
                   style={{
                     height: 24, borderRadius: 4, overflow: 'hidden',
-                    background: 'rgba(10,10,10,0.06)',
+                    background: 'rgba(255,255,255,0.06)',
                     display: 'flex', alignItems: 'flex-end',
                   }}
                 >
                   <div style={{
                     width: '100%', height: `${h}%`,
-                    background: d.steps >= doel ? '#10b981' : laatste ? '#0a0a0a' : 'rgba(10,10,10,0.35)',
+                    background: d.steps >= doel && doel > 0 ? '#10b981' : laatste ? '#fff' : 'rgba(255,255,255,0.3)',
                   }} />
                 </div>
                 <div style={{
                   marginTop: 2, fontSize: '0.5rem', fontWeight: 900,
-                  color: laatste ? 'rgba(10,10,10,0.6)' : 'rgba(10,10,10,0.25)',
+                  color: laatste ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)',
                   textTransform: 'uppercase',
                 }}>
                   {d.dag}
