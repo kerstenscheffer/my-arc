@@ -65,20 +65,20 @@ const ONDERWERPEN = [
   },
 ]
 
-// Eerst kijken aan welke pagina's het hangt; staat dat leeg, dan naar de
-// categorie van de video. Van de achttien video's hebben er elf geen pagina
-// maar wel een categorie ("Meal Systeem", "Workouts Loggen"), en die zouden
-// anders allemaal in de restbak belanden — precies de hoop waar dit venster
-// vanaf moest.
+// De categorie beslist, en pas als die niets zegt de pagina's waaraan het
+// hangt. Andersom kan niet: een video als "Meal pagina uitgelegd" hangt aan de
+// meal-pagina (daar hoort hij ook langs te komen) maar gaat over de app, en
+// dan wil je hem onder App uitleg kunnen zetten. De categorie is het enige
+// waarmee de coach dat kan sturen zonder de pagina-koppeling op te geven.
 const onderwerpVan = ({ default_pages, categorie }) => {
-  const paginas = Array.isArray(default_pages) ? default_pages : []
-  const opPagina = ONDERWERPEN.find(o => o.paginas.some(p => paginas.includes(p)))
-  if (opPagina) return opPagina.id
   const naam = zonderAccenten(categorie)
   if (naam) {
     const opNaam = ONDERWERPEN.find(o => o.woorden.some(w => naam.includes(w)))
     if (opNaam) return opNaam.id
   }
+  const paginas = Array.isArray(default_pages) ? default_pages : []
+  const opPagina = ONDERWERPEN.find(o => o.paginas.some(p => paginas.includes(p)))
+  if (opPagina) return opPagina.id
   return 'overig'
 }
 
