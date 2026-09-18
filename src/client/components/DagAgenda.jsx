@@ -212,7 +212,7 @@ export default function DagAgenda({
   // staat de nu-lijn een derde vanaf de bovenkant in beeld; anders begint de
   // dag bij het eerste blok. Zonder dit kijk je 's avonds naar je ontbijt.
   useEffect(() => {
-    if (laden) return
+    if (laden || weergave !== 'rooster') return
     const el = roosterRef.current
     if (!el) return
     const doel = toonNuLijn
@@ -224,7 +224,7 @@ export default function DagAgenda({
     })
     return () => cancelAnimationFrame(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [laden, dag, weekAnker, roosterHoogte])
+  }, [laden, dag, weekAnker, roosterHoogte, weergave, volledig])
 
   // Wat er op deze dag is gelogd. Eén query per dag; bij het afvinken werken
   // we de lijst hier lokaal bij, zodat de ringen meteen meebewegen.

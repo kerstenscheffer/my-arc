@@ -154,6 +154,7 @@ function WelcomeSection({ client, datum, onVerzet, isVandaag }) {
 
       <div style={{
         padding: isMobile ? '0.1rem 1rem 0' : '0.25rem 1.5rem 0',
+        textAlign: 'center',
       }}>
         <div style={{
           fontSize: isMobile ? '1.35rem' : '1.6rem',
@@ -163,7 +164,7 @@ function WelcomeSection({ client, datum, onVerzet, isVandaag }) {
         </div>
         <div style={{
           marginTop: 5,
-          display: 'flex', alignItems: 'center', gap: 4,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
           fontSize: isMobile ? '0.72rem' : '0.78rem',
           fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '-0.01em',
         }}>
