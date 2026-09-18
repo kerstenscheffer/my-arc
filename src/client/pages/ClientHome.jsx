@@ -108,51 +108,50 @@ function WelcomeSection({ client }) {
     }
   }
 
+  // Zelfde kop als de maaltijd- en workout-pagina: eerst de foto over de
+  // volle breedte, daaronder de tekst in bold wit. De gouden dag met het
+  // datum-pilletje is weg; die schreeuwde harder dan waar het over ging.
   return (
-    <div style={{
-      position: 'sticky', top: 0, zIndex: 50,
-      background: 'rgba(10,10,10,0.92)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      paddingTop: 'env(safe-area-inset-top, 0)',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
-    }}>
+    <div>
       <div style={{
-        padding: isMobile ? '0.85rem 1rem' : '1rem 1.5rem',
-        textAlign: 'center',
+        position: 'relative', width: '100%',
+        // Vaste verhouding van het beeld (1200x600), dus er wordt niets
+        // bijgesneden en de hoogte klopt op elk scherm.
+        aspectRatio: '2 / 1',
+        maxHeight: isMobile ? 230 : 300,
+        overflow: 'hidden',
       }}>
-        {/* Dag + datum-pill + traject-week (bold wit) */}
         <div style={{
-          fontSize: isMobile ? '1.2rem' : '1.35rem',
-          fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em',
-          lineHeight: 1.1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 8,
-        }}>
-          {dayName}
-          <span style={{
-            fontSize: '0.62rem', fontWeight: 800,
-            color: 'rgba(0,0,0,0.85)', background: '#FFD700',
-            padding: '2px 7px', borderRadius: 4,
-            letterSpacing: '0.04em', textTransform: 'uppercase',
-          }}>
-            {dateLabel}
-          </span>
-          {curWeek != null && (
-            <span style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
-              week {curWeek}{weeksTotal != null && `/${weeksTotal}`}
-            </span>
-          )}
-        </div>
+          position: 'absolute', inset: 0,
+          backgroundImage: 'url(/home-hero.jpg)',
+          backgroundSize: 'cover', backgroundPosition: 'center',
+        }} />
+        {/* Onderin doodlopen in het zwart van de pagina. */}
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          height: '38%', pointerEvents: 'none',
+          background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.75) 55%, #0a0a0a 100%)',
+        }} />
+      </div>
 
-        {/* Begroeting + naam */}
+      <div style={{
+        padding: isMobile ? '0.1rem 1rem 0' : '0.25rem 1.5rem 0',
+      }}>
         <div style={{
-          marginTop: 6,
-          fontSize: isMobile ? '0.92rem' : '1rem',
-          fontWeight: 700,
-          color: 'rgba(255,255,255,0.75)',
-          letterSpacing: '-0.01em',
+          fontSize: isMobile ? '1.35rem' : '1.6rem',
+          fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1,
         }}>
-          {getGreeting()}, <span style={{ color: '#fff', fontWeight: 900 }}>{firstName}</span>
+          {getGreeting()}, {firstName}
+        </div>
+        <div style={{
+          marginTop: 5,
+          fontSize: isMobile ? '0.72rem' : '0.78rem',
+          fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '-0.01em',
+        }}>
+          {dayName.toLowerCase()} {dateLabel}
+          {curWeek != null && (
+            <> · week {curWeek}{weeksTotal != null && `/${weeksTotal}`}</>
+          )}
         </div>
       </div>
     </div>
