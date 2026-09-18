@@ -179,8 +179,8 @@ function Nulmeting({ metingen, isMobile }) {
   return (
     <div style={{ marginBottom: '1.25rem' }}>
       <div style={{
-        fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
-        textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.6rem',
+        fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+        textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: '0.5rem',
       }}>
         Nulmeting
       </div>
@@ -191,6 +191,7 @@ function Nulmeting({ metingen, isMobile }) {
           <div key={m.id} style={{
             marginBottom: '0.7rem', padding: isMobile ? '0.7rem' : '0.8rem 0.9rem',
             background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 12,
           }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: '0.6rem' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>{datum(m.measured_at)}</span>
@@ -204,7 +205,7 @@ function Nulmeting({ metingen, isMobile }) {
                 const w = m[v.veld]
                 const delta = vorige && w != null && vorige[v.veld] != null ? w - vorige[v.veld] : null
                 return (
-                  <div key={v.veld} style={{ textAlign: 'center', padding: '0.5rem 0.2rem', background: 'rgba(255,255,255,0.03)' }}>
+                  <div key={v.veld} style={{ textAlign: 'center', padding: '0.5rem 0.2rem', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
                     <div style={{ fontSize: '1.25rem', fontWeight: 900, color: w == null ? 'rgba(255,255,255,0.2)' : '#fff', lineHeight: 1 }}>
                       {w ?? '—'}
                     </div>
@@ -547,7 +548,7 @@ const TYPE_NL = {
   slaap: 'Slaap', training: 'Training',
 }
 
-function WeekInTekst({ client, isMobile }) {
+function WeekInTekst({ client }) {
   const ws = client?.work_schedule
   const heeftWeek = ws && typeof ws === 'object' && Object.keys(ws).length > 0
 
@@ -566,27 +567,24 @@ function WeekInTekst({ client, isMobile }) {
   return (
     <div style={{ marginTop: '1rem' }}>
       <div style={{
-        fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: GREEN, marginBottom: '0.6rem',
+        fontSize: '0.52rem', fontWeight: 800, letterSpacing: '0.09em',
+        textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: '0.5rem',
       }}>
         Wat is ingevuld
       </div>
 
       <div style={{
-        display: 'flex', flexDirection: 'column', gap: 1,
-        background: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
+        borderTop: '1px solid rgba(255,255,255,0.05)',
       }}>
         {losseAntwoorden.map(r => (
-          <div key={r.vraag} style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '0.7rem 0.9rem', background: '#111' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{r.vraag}</span>
+          <div key={r.vraag} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{r.vraag}</span>
             <span style={{
-              fontSize: '0.92rem', fontWeight: r.antwoord ? 800 : 600,
-              color: r.antwoord ? '#fff' : 'rgba(255,255,255,0.3)',
-              fontStyle: r.antwoord ? 'normal' : 'italic',
+              fontSize: '0.8rem', fontWeight: r.antwoord ? 700 : 600,
+              color: r.antwoord ? '#fff' : 'rgba(255,255,255,0.25)',
+              fontStyle: r.antwoord ? 'normal' : 'italic', lineHeight: 1.4,
             }}>
-              <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 700 }}>Antwoord: </span>
               {r.antwoord || 'niet ingevuld'}
             </span>
           </div>
@@ -602,12 +600,11 @@ function WeekInTekst({ client, isMobile }) {
             gezien.add(k); return true
           })
           return (
-            <div key={d} style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '0.7rem 0.9rem', background: '#111' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+            <div key={d} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
                 Hoe ziet {DAG_NL[d].toLowerCase()} eruit?
               </span>
-              <span style={{ fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 800, color: '#fff', lineHeight: 1.5 }}>
-                <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 700 }}>Antwoord: </span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff', lineHeight: 1.45 }}>
                 {items.map((it, i) => (
                   <span key={i}>
                     {i > 0 && <span style={{ color: 'rgba(255,255,255,0.3)' }}> · </span>}
@@ -620,8 +617,8 @@ function WeekInTekst({ client, isMobile }) {
         })}
 
         {!heeftWeek && (
-          <div style={{ padding: '0.7rem 0.9rem', background: '#111', fontSize: '0.85rem', fontWeight: 600, fontStyle: 'italic', color: 'rgba(255,255,255,0.3)' }}>
-            Weekindeling niet ingevuld — werk, slaap en training zijn niet doorgegeven.
+          <div style={{ padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.78rem', fontWeight: 600, fontStyle: 'italic', color: 'rgba(255,255,255,0.25)' }}>
+            Weekindeling niet ingevuld, werk, slaap en training zijn niet doorgegeven.
           </div>
         )}
       </div>
@@ -672,25 +669,23 @@ function renderSections(sections, data, toonLeeg = true) {
     <div key={section.title} style={{ marginBottom: '1.5rem' }}>
       <div
         style={{
-          fontSize: '0.7rem',
-          fontWeight: '700',
-          letterSpacing: '0.08em',
+          fontSize: '0.52rem',
+          fontWeight: 800,
+          letterSpacing: '0.09em',
           textTransform: 'uppercase',
-          color: GREEN,
-          marginBottom: '0.6rem'
+          color: 'rgba(255,255,255,0.35)',
+          marginBottom: '0.5rem'
         }}
       >
         {section.title}
       </div>
+      {/* Rijen met een haarlijn ertussen in plaats van kaartjes in een kaart:
+          een intake is een lijst antwoorden, geen verzameling vakjes. */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: '1px',
-          background: 'rgba(255,255,255,0.06)',
-          borderRadius: '10px',
-          overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.06)'
+          display: 'flex',
+          flexDirection: 'column',
+          borderTop: '1px solid rgba(255,255,255,0.05)'
         }}
       >
         {/* Vraag boven, antwoord eronder. Stond eerder als label links en
@@ -700,33 +695,35 @@ function renderSections(sections, data, toonLeeg = true) {
           <div
             key={row.label}
             style={{
-              display: 'flex', flexDirection: 'column', gap: 3,
-              padding: '0.7rem 0.9rem',
-              background: '#111'
+              display: 'flex', flexDirection: 'column', gap: 2,
+              padding: '0.6rem 0',
+              borderBottom: '1px solid rgba(255,255,255,0.05)'
             }}
           >
             <span
               style={{
-                fontSize: '0.82rem',
+                fontSize: '0.7rem',
                 fontWeight: 700,
-                color: 'rgba(255,255,255,0.5)',
+                color: 'rgba(255,255,255,0.4)',
                 lineHeight: 1.35,
               }}
             >
               {row.vraag}
             </span>
+            {/* Het woord "Antwoord:" ervoor is weg: dat de regel eronder het
+                antwoord is, zie je aan de opmaak. */}
             <span
               style={{
-                fontSize: '0.92rem',
-                color: row.value ? '#fff' : 'rgba(255,255,255,0.3)',
-                fontWeight: row.value ? 800 : 600,
+                fontSize: '0.8rem',
+                color: row.value ? '#fff' : 'rgba(255,255,255,0.25)',
+                fontWeight: row.value ? 700 : 600,
                 fontStyle: row.value ? 'normal' : 'italic',
                 wordBreak: 'break-word',
                 whiteSpace: 'pre-wrap',
                 letterSpacing: '-0.01em',
+                lineHeight: 1.4,
               }}
             >
-              <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 700 }}>Antwoord: </span>
               {row.value || 'niet ingevuld'}
             </span>
           </div>
@@ -914,9 +911,9 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#0d0d0d',
+          background: '#0a0a0a',
           borderRadius: isMobile ? '0' : '16px',
-          border: '1px solid rgba(16,185,129,0.25)',
+          border: '1px solid rgba(255,255,255,0.08)',
           width: '100%',
           maxWidth: '560px',
           height: isMobile ? '100%' : 'auto',
@@ -933,23 +930,26 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '1.1rem 1.25rem',
-            borderBottom: '1px solid rgba(255,255,255,0.08)'
+            padding: isMobile ? '0.85rem 1rem' : '0.95rem 1.15rem',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            flexShrink: 0
           }}
         >
-          <div>
-            <div style={{ fontSize: '1.05rem', fontWeight: '700', color: '#fff' }}>Intake</div>
-            <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>{fullName}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>Intake</div>
+            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{fullName}</div>
           </div>
           <button
             onClick={onClose}
+            aria-label="Sluiten"
             style={{
               background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '8px',
-              color: '#fff',
-              width: '40px',
-              height: '40px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '9px',
+              color: 'rgba(255,255,255,0.6)',
+              width: '30px',
+              height: '30px',
+              flexShrink: 0,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -958,7 +958,7 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <X size={22} />
+            <X size={15} />
           </button>
         </div>
 
@@ -967,8 +967,11 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
           style={{
             display: 'flex',
             gap: '0.4rem',
-            padding: '0.75rem 1.25rem 0',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            padding: isMobile ? '0.6rem 1rem 0' : '0.65rem 1.15rem 0',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            // Zonder dit knijpt de kolom de balk plat zodra de inhoud lang is;
+            // met vijf tabs was daar niets meer van te lezen.
+            flexShrink: 0,
             // Vijf tabs passen op een smal scherm niet naast elkaar; dan
             // schuift de balk in plaats van dat de labels afbreken.
             overflowX: 'auto',
@@ -992,18 +995,20 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
                   padding: '0.6rem 0.4rem',
                   background: 'transparent',
                   border: 'none',
-                  borderBottom: active ? `2px solid ${GREEN}` : '2px solid transparent',
-                  color: active ? GREEN : 'rgba(255,255,255,0.55)',
-                  fontSize: isMobile ? '0.78rem' : '0.85rem',
-                  fontWeight: active ? '700' : '500',
+                  // Wit is het accent, groen betekent "binnen" (het vinkje).
+                  borderBottom: active ? '2px solid #fff' : '2px solid transparent',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.4)',
+                  fontSize: isMobile ? '0.72rem' : '0.78rem',
+                  fontWeight: active ? 900 : 700,
+                  letterSpacing: '-0.01em',
                   cursor: 'pointer',
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent'
                 }}
               >
-                <Icon size={16} />
+                <Icon size={14} />
                 {tab.label}
-                {tab.done && <CheckCircle2 size={13} color={GREEN} />}
+                {tab.done && <CheckCircle2 size={12} color={GREEN} />}
               </button>
             )
           })}
@@ -1035,9 +1040,9 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
                 style={{
                   width: '100%', marginBottom: '0.85rem',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  padding: '0.6rem', border: 'none', borderRadius: 0,
+                  minHeight: 44, padding: '0 0.9rem', border: 'none', borderRadius: 10,
                   background: '#fff', color: '#0a0a0a',
-                  fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+                  fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit',
                   cursor: 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
@@ -1055,7 +1060,7 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
                 isMobile={isMobile}
                 viewerRole="coach"
               />
-              <WeekInTekst client={client} isMobile={isMobile} />
+              <WeekInTekst client={client} />
             </div>
           )}
           {activeTab === 'plan' && (
