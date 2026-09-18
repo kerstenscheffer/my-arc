@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2 } from 'lucide-react'
+import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
@@ -696,6 +696,11 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   }
 
 
+  // Twee sets van twaalf of meer: dan is het gewicht te licht geworden. De
+  // vraag naar de uitvoering staat er bewust bij — twaalf slordige reps zijn
+  // geen reden om te verzwaren.
+  const tipZwaarder = loggedSets.filter(s => (Number(s?.reps) || 0) >= 12).length >= 2
+
   const lastSet = loggedSets.length > 0 ? loggedSets[loggedSets.length - 1] : null
   const editingSet = editingIndex !== null ? loggedSets[editingIndex] : null
 
@@ -1027,6 +1032,26 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 />
               )
             })}
+
+            {tipZwaarder && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                margin: isMobile ? '0.9rem 1rem 0' : '1rem 1.25rem 0',
+                padding: isMobile ? '0.6rem 0.7rem' : '0.7rem 0.85rem',
+                borderRadius: 12,
+                background: 'rgba(255,215,0,0.07)',
+                border: '1px solid rgba(255,215,0,0.25)',
+              }}>
+                <TrendingUp size={15} strokeWidth={2.6} color="#FFD700" style={{ flexShrink: 0 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
+                }}>
+                  2 sets van 12+ met perfecte uitvoering gedaan?{' '}
+                  <span style={{ color: '#FFD700', fontWeight: 900 }}>Ga omhoog in gewicht.</span>
+                </span>
+              </div>
+            )}
 
             {/* Tijdens de rust staat de timer op de plek van de knoppen, dus
                 direct onder de vorige sessie en direct bóven je gelogde sets.
