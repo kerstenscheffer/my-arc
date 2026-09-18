@@ -1,20 +1,29 @@
 // src/modules/steps/telefoonStappen.js
 //
-// De stappen van de telefoon zelf ophalen — als dat kan.
+// Stappen uit Apple Health (iOS) of Health Connect (Android), via
+// capacitor-health.
 //
-// Vandaag kan het niet: er zit geen health-plugin in de app. Dit bestand is de
-// plek waar die straks landt, zodat de rest van de stappenteller nu al werkt en
-// er later niets aan de UI hoeft te veranderen: is er een bron, dan vult hij de
-// dag automatisch; is die er niet, dan tikt de klant zijn stand zelf in.
+// Twee dingen die dit bestand bewust regelt:
 //
-// Wat er nog moet gebeuren voor automatisch tellen op iOS:
-//   1. een health-plugin installeren (HealthKit) en `npx cap sync ios`
-//   2. in Xcode de HealthKit-capability aanzetten voor de App-target
-//   3. NSHealthShareUsageDescription in Info.plist ("om je stappen te tonen…")
-//   4. testen op een écht toestel — de simulator heeft geen stappen
-// Android leest hetzelfde via Health Connect.
+// 1. Toestemming vragen doen we niet bij het opstarten. Apple keurt apps af die
+//    ongevraagd een health-popup in je gezicht duwen, en terecht: de klant moet
+//    weten waarvoor hij tekent. De koppeling zit daarom achter een knop in de
+//    stappen-modal.
+// 2. HealthKit vertelt niet of je leesrechten hebt — dat is zelf privacygevoelig
+//    ("deze app weet dat je geen hartslag deelt"). checkHealthPermissions geeft
+//    op iOS dus niets bruikbaars terug. We onthouden de koppeling daarom zelf in
+//    localStorage en lezen gewoon: geen toestemming = nul stappen, en dan blijft
+//    staan wat de klant zelf invulde.
 //
-// Zolang stap 1 niet gebeurd is, geeft alles hier netjes null terug.
+// Nog te doen buiten de code om (eenmalig, in Xcode):
+//   · HealthKit-capability aanzetten op de App-target — en HealthKit aanvinken
+//     voor de App ID in het Apple Developer-portaal, anders faalt het signen.
+//   · testen op een écht toestel; de simulator heeft geen stappen.
+// De twee Info.plist-teksten staan er al in.
+
+import { Health } from 'capacitor-health'
+
+const ONTHOUD_SLEUTEL = 'myarc_stappen_health_gekoppeld'
 
 // Draaien we in de app-schil of in een browser?
 export const isNative = () => {
@@ -25,75 +34,76 @@ export const isNative = () => {
   }
 }
 
-// De plugin-namen waar de bekende health-plugins zich onder registreren. We
-// zoeken op naam in plaats van te importeren, zodat een ontbrekende plugin geen
-// build-fout is maar gewoon "geen bron".
-const KANDIDATEN = ['Health', 'HealthKit', 'CapacitorHealthkit', 'HealthConnect']
-
-const plugin = () => {
-  if (!isNative()) return null
-  const p = window?.Capacitor?.Plugins || {}
-  for (const naam of KANDIDATEN) {
-    if (p[naam]) return { naam, api: p[naam] }
-  }
-  return null
-}
-
-export const heeftTelefoonBron = () => !!plugin()
-
-// Toestemming vragen. Geeft false als er geen bron is, of als de klant nee zegt.
-export async function vraagToestemming() {
-  const p = plugin()
-  if (!p) return false
+// Is er een health-bron op dit toestel? Op Android is dit false als Health
+// Connect niet geïnstalleerd is.
+export async function heeftTelefoonBron() {
+  if (!isNative()) return false
   try {
-    const fn = p.api.requestAuthorization || p.api.requestPermissions || p.api.requestHealthPermissions
-    if (!fn) return false
-    await fn.call(p.api, { read: ['steps'], all: [], write: [] })
-    return true
+    const { available } = await Health.isHealthAvailable()
+    return !!available
   } catch (e) {
-    console.warn('Stappen-toestemming geweigerd of niet beschikbaar:', e?.message || e)
+    console.warn('Health niet beschikbaar:', e?.message || e)
     return false
   }
 }
 
-// Het aantal stappen van vandaag, of null als we het niet kunnen weten.
-// De plugins verschillen in hun antwoordvorm; we pakken het eerste getal dat
-// een dagtotaal kan zijn en rekenen nergens op.
-export async function stappenVanVandaag() {
-  const p = plugin()
-  if (!p) return null
-  const start = new Date(); start.setHours(0, 0, 0, 0)
-  const eind = new Date()
+// Heeft de klant de koppeling eerder aangezet? Zie de uitleg hierboven: dit is
+// onze eigen administratie, niet die van HealthKit.
+export const isGekoppeld = () => {
   try {
-    const fn = p.api.queryAggregated || p.api.querySampleType || p.api.queryHKitSampleType || p.api.query
-    if (!fn) return null
-    const res = await fn.call(p.api, {
-      startDate: start.toISOString(),
-      endDate: eind.toISOString(),
-      dataType: 'steps',
-      sampleName: 'stepCount',
-      bucket: 'day',
-      limit: 0,
-    })
-    const getal = pakGetal(res)
-    return Number.isFinite(getal) ? Math.round(getal) : null
-  } catch (e) {
-    console.warn('Stappen van de telefoon lezen mislukt:', e?.message || e)
-    return null
+    return localStorage.getItem(ONTHOUD_SLEUTEL) === 'ja'
+  } catch {
+    return false
   }
 }
 
-// Zoekt in het antwoord naar het dagtotaal. Bewust ruim: de ene plugin geeft
-// { value }, de andere { resultData: [{ value }] } of een lijst samples.
-function pakGetal(res) {
-  if (res == null) return NaN
-  if (typeof res === 'number') return res
-  if (Array.isArray(res)) return res.reduce((s, r) => s + (Number(r?.value ?? r?.count ?? 0) || 0), 0)
-  if (typeof res === 'object') {
-    if (Number.isFinite(Number(res.value))) return Number(res.value)
-    for (const sleutel of ['resultData', 'data', 'samples', 'result']) {
-      if (res[sleutel] != null) return pakGetal(res[sleutel])
-    }
+const onthoud = (ja) => {
+  try {
+    if (ja) localStorage.setItem(ONTHOUD_SLEUTEL, 'ja')
+    else localStorage.removeItem(ONTHOUD_SLEUTEL)
+  } catch { /* private mode: dan vraagt hij het de volgende keer opnieuw */ }
+}
+
+// De koppeling aanzetten. Geeft het aantal stappen van vandaag terug als het
+// lukte, en null als er geen bron is of de klant nee zegt.
+export async function koppel() {
+  if (!(await heeftTelefoonBron())) return null
+  try {
+    await Health.requestHealthPermissions({ permissions: ['READ_STEPS'] })
+  } catch (e) {
+    console.warn('Toestemming voor stappen geweigerd:', e?.message || e)
+    return null
   }
-  return NaN
+  // Of de klant ja zei weten we niet zeker (zie boven), dus we proberen te
+  // lezen. Komt daar een getal uit, dan staat de koppeling.
+  const n = await stappenVanVandaag()
+  onthoud(n != null)
+  return n
+}
+
+export const ontkoppel = () => onthoud(false)
+
+// Het aantal stappen van vandaag, of null als we het niet kunnen weten.
+export async function stappenVanVandaag() {
+  if (!(await heeftTelefoonBron())) return null
+  const start = new Date(); start.setHours(0, 0, 0, 0)
+  const eind = new Date()
+  try {
+    const res = await Health.queryAggregated({
+      // iOS wil fractionele seconden in de datum; toISOString levert die.
+      startDate: start.toISOString(),
+      endDate: eind.toISOString(),
+      dataType: 'steps',
+      bucket: 'day',
+    })
+    const rijen = res?.aggregatedData || []
+    if (!rijen.length) return 0
+    // Eén emmer van één dag, maar over de dagrand (of bij tijdzonegedoe) kan
+    // het er meer zijn; optellen is dan het juiste antwoord.
+    const totaal = rijen.reduce((s, r) => s + (Number(r?.value) || 0), 0)
+    return Math.round(totaal)
+  } catch (e) {
+    console.warn('Stappen lezen mislukt:', e?.message || e)
+    return null
+  }
 }

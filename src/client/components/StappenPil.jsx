@@ -12,9 +12,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Footprints, X, Pencil } from 'lucide-react'
+import { Footprints, X, Pencil, Smartphone, Check } from 'lucide-react'
 import StappenService, { STANDAARD_DOEL, vandaagIso } from '../../modules/steps/StappenService'
-import { heeftTelefoonBron, stappenVanVandaag, vraagToestemming } from '../../modules/steps/telefoonStappen'
+import {
+  heeftTelefoonBron, isGekoppeld, koppel, stappenVanVandaag,
+} from '../../modules/steps/telefoonStappen'
 
 const nl = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n || 0))
 const kort = (n) => (n >= 10000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : nl(n))
@@ -38,13 +40,13 @@ export default function StappenPil({ client, db, isMobile = false }) {
 
   useEffect(() => { laad() }, [laad])
 
-  // Telt de telefoon mee, dan is zijn stand de waarheid van vandaag.
+  // Is Apple Health gekoppeld, dan is zijn stand de waarheid van vandaag.
+  // Zonder koppeling gebeurt hier niets — geen popup bij het opstarten.
   useEffect(() => {
-    if (!client?.id || !heeftTelefoonBron()) return
+    if (!client?.id || !isGekoppeld()) return
     let weg = false
     ;(async () => {
-      const ok = await vraagToestemming()
-      if (!ok || weg) return
+      if (!(await heeftTelefoonBron()) || weg) return
       const n = await stappenVanVandaag()
       if (weg || n == null) return
       await StappenService.bewaar(db, client.id, n, { source: 'telefoon' })
@@ -53,6 +55,23 @@ export default function StappenPil({ client, db, isMobile = false }) {
     })()
     return () => { weg = true }
   }, [db, client?.id, laad])
+
+  // Kan er gekoppeld worden op dit toestel? Alleen dan tonen we de knop.
+  const [bron, setBron] = useState(false)
+  useEffect(() => {
+    let weg = false
+    heeftTelefoonBron().then(b => { if (!weg) setBron(b) })
+    return () => { weg = true }
+  }, [])
+
+  const koppelNu = async () => {
+    const n = await koppel()
+    if (n == null) return false
+    await StappenService.bewaar(db, client.id, n, { source: 'telefoon' })
+      .catch(e => console.error('Stappen van telefoon opslaan mislukt:', e))
+    laad()
+    return true
+  }
 
   if (!klaar || !client?.id) return null
 
@@ -102,6 +121,8 @@ export default function StappenPil({ client, db, isMobile = false }) {
           week={week}
           doel={doel}
           isMobile={isMobile}
+          bron={bron}
+          onKoppel={koppelNu}
           onSluit={() => setOpen(false)}
           onBewaar={async (n, iso) => {
             setWeek(w => w.map(d => d.iso === iso ? { ...d, steps: n, source: 'handmatig' } : d))
@@ -120,8 +141,10 @@ export default function StappenPil({ client, db, isMobile = false }) {
 
 // De week: wat er staat, en de mogelijkheid om een dag bij te werken. Ook
 // gisteren, want je vult je stappen zelden op tijd in.
-function WeekModal({ week, doel, isMobile, onSluit, onBewaar }) {
+function WeekModal({ week, doel, isMobile, bron, onKoppel, onSluit, onBewaar }) {
   const [bewerk, setBewerk] = useState(null)   // { iso, tekst }
+  const [koppelen, setKoppelen] = useState(false)
+  const [gekoppeld, setGekoppeld] = useState(() => isGekoppeld())
 
   useEffect(() => {
     const opToets = (e) => { if (e.key === 'Escape') (bewerk ? setBewerk(null) : onSluit()) }
@@ -252,6 +275,34 @@ function WeekModal({ week, doel, isMobile, onSluit, onBewaar }) {
           <Pencil size={14} strokeWidth={3} />
           Stappen van vandaag invullen
         </button>
+
+        {/* Apple Health. Pas hier vragen we toestemming: op de homepagina zou
+            dat een popup zijn die uit de lucht komt vallen. */}
+        {bron && (
+          <button
+            onClick={async () => {
+              if (gekoppeld) return
+              setKoppelen(true)
+              const ok = await onKoppel()
+              setKoppelen(false)
+              setGekoppeld(ok)
+            }}
+            disabled={gekoppeld || koppelen}
+            style={{
+              width: '100%', minHeight: 40, marginTop: 8, borderRadius: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              background: 'transparent',
+              border: `1px solid ${gekoppeld ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'}`,
+              color: gekoppeld ? '#10b981' : 'rgba(255,255,255,0.6)',
+              fontSize: '0.72rem', fontWeight: 800, fontFamily: 'inherit',
+              cursor: gekoppeld ? 'default' : 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {gekoppeld ? <Check size={13} strokeWidth={3} /> : <Smartphone size={13} strokeWidth={2.8} />}
+            {koppelen ? 'Bezig…' : gekoppeld ? 'Apple Health is gekoppeld' : 'Automatisch uit Apple Health'}
+          </button>
+        )}
 
         {bewerk && (
           <Invoer
