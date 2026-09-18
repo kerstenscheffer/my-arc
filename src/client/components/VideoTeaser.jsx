@@ -135,36 +135,6 @@ export default function VideoTeaser({
     setSpeler(huidig.item)
   }
 
-  // Weggeschoven: alleen een klein video-icoon boven de balk, zodat je hem
-  // terug kunt halen. Zonder dat was hij weg tot de volgende keer dat je de
-  // app opent, en dan weet je niet meer dat er iets voor je klaarstond.
-  if (dicht) {
-    return (
-      <button
-        onClick={() => { setDicht(false); setOpen(true) }}
-        title="Video van je coach"
-        aria-label="Video van je coach"
-        style={{
-          position: 'fixed',
-          bottom: onderMarge + 6,
-          left: isMobile ? 14 : '50%',
-          transform: isMobile ? 'none' : 'translateX(-50%)',
-          zIndex: 100,
-          width: 38, height: 38, padding: 0, borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(10,10,10,0.92)',
-          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          color: '#fff', cursor: 'pointer',
-          boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <Video size={17} strokeWidth={2.6} />
-      </button>
-    )
-  }
-
   return (
     <>
       <div
@@ -174,12 +144,15 @@ export default function VideoTeaser({
           left: isMobile ? 10 : '50%',
           right: isMobile ? 10 : 'auto',
           // Schuift van onder de balk vandaan omhoog, en zakt er weer achter.
+          // Iets kleiner terwijl hij zakt: dat leest als wegschuiven ónder de
+          // balk in plaats van er recht achter verdwijnen.
           transform: isMobile
-            ? (open ? 'translateY(0)' : 'translateY(120%)')
-            : `translateX(-50%) ${open ? 'translateY(0)' : 'translateY(120%)'}`,
+            ? (open ? 'translateY(0) scale(1)' : 'translateY(115%) scale(0.96)')
+            : `translateX(-50%) ${open ? 'translateY(0) scale(1)' : 'translateY(115%) scale(0.96)'}`,
+          transformOrigin: 'bottom center',
           width: isMobile ? 'auto' : 'min(680px, calc(100vw - 32px))',
           opacity: open ? 1 : 0,
-          transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease',
+          transition: 'transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease',
           pointerEvents: open ? 'auto' : 'none',
           zIndex: 100,
           overflow: 'hidden',
@@ -274,6 +247,37 @@ export default function VideoTeaser({
           <ChevronDown size={18} strokeWidth={3} />
         </button>
       </div>
+
+      {/* Weggeschoven blijft dit knopje staan, rechts boven de balk. Het komt
+          omhoog zodra de balk eronder verdwijnt en zakt er weer in als je hem
+          terughaalt — vandaar de vertraging op de ene en niet op de andere. */}
+      <button
+        onClick={() => { setDicht(false); setOpen(true) }}
+        title="Video van je coach"
+        aria-label="Video van je coach"
+        style={{
+          position: 'fixed',
+          bottom: onderMarge + 6,
+          right: isMobile ? 14 : 'calc(50% - min(340px, 50vw - 16px) + 14px)',
+          zIndex: 100,
+          width: 40, height: 40, padding: 0, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(10,10,10,0.92)',
+          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: '#fff', cursor: 'pointer',
+          boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
+          transform: dicht ? 'translateY(0) scale(1)' : 'translateY(14px) scale(0.6)',
+          opacity: dicht ? 1 : 0,
+          pointerEvents: dicht ? 'auto' : 'none',
+          transition: dicht
+            ? 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.16s, opacity 0.22s ease 0.16s'
+            : 'transform 0.22s ease, opacity 0.16s ease',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <Video size={18} strokeWidth={2.6} />
+      </button>
 
       {speler && (
         <VideoPlayerModal
