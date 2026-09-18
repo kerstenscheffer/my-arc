@@ -384,7 +384,6 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         }}>
           {navItems.map(item => {
             const isActive = currentView === item.id
-            const theme = pageThemes[item.id]
             return (
               <button
                 key={item.id}
