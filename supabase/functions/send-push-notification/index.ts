@@ -76,29 +76,47 @@ async function sendApns(
   }
 
   const jwt = await buildApnsJwt(teamId, keyId, p8Key);
-  const url = `https://api.push.apple.com/3/device/${token}`;
 
   const payload = {
     aps: { alert: { title, body }, sound: "default", badge: 1 },
     ...data,
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      authorization: `bearer ${jwt}`,
-      "apns-topic": bundleId,
-      "apns-push-type": "alert",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  // Een build die via Xcode op je toestel staat levert een sandbox-token; de
+  // App Store/TestFlight-build een productie-token. Ze werken alleen op hun
+  // eigen host, dus bij BadDeviceToken proberen we de andere. Met APNS_HOST
+  // ("production" of "sandbox") kun je dat vastzetten.
+  const HOSTS: Record<string, string> = {
+    production: "https://api.push.apple.com",
+    sandbox: "https://api.sandbox.push.apple.com",
+  };
+  const forced = Deno.env.get("APNS_HOST");
+  const hosts = forced && HOSTS[forced]
+    ? [HOSTS[forced]]
+    : [HOSTS.production, HOSTS.sandbox];
 
-  if (!res.ok) {
+  let lastError = "";
+  for (const host of hosts) {
+    const res = await fetch(`${host}/3/device/${token}`, {
+      method: "POST",
+      headers: {
+        authorization: `bearer ${jwt}`,
+        "apns-topic": bundleId,
+        "apns-push-type": "alert",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) return { ok: true };
+
     const text = await res.text();
-    return { ok: false, error: `APNs ${res.status}: ${text}` };
+    lastError = `APNs ${res.status} (${host.includes("sandbox") ? "sandbox" : "production"}): ${text}`;
+    // Alleen doorgaan naar de andere host als het toestel daar thuishoort.
+    if (!text.includes("BadDeviceToken")) break;
   }
-  return { ok: true };
+
+  return { ok: false, error: lastError };
 }
 
 serve(async (req) => {
