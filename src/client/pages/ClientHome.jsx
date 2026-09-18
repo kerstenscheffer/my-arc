@@ -898,7 +898,13 @@ export default function ClientHome({ client, db, setCurrentView }) {
             Jouw dag
           </div>
           <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-            <DagAgenda client={client} db={db} isMobile={isMobile} hoogte={isMobile ? 480 : 580} />
+            <DagAgenda
+              client={client}
+              db={db}
+              isMobile={isMobile}
+              hoogte={isMobile ? 520 : 620}
+              onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
+            />
           </div>
         </div>
       </FadeOnScroll>
