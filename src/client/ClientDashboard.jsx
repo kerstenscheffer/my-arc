@@ -366,6 +366,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           isMobile={isMobile}
           onderMarge={isMobile ? 86 : 92}
           vast={currentView === 'home'}
+          pagina={currentView}
         />
       )}
 

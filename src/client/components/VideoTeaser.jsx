@@ -13,8 +13,10 @@
 // pas na een week gebruik iets zinnigs over kunt zeggen.
 
 import { useEffect, useRef, useState } from 'react'
-import { Play, X, ChevronDown } from 'lucide-react'
+import { Play, X, ChevronDown, FileText } from 'lucide-react'
 import clientVideoService from '../../modules/videos/ClientVideoService'
+import videoService from '../../modules/videos/VideoService'
+import fileService from '../../modules/videos/FileService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
 import { extractYouTubeId, getYouTubeThumbnail } from '../../modules/videos/utils/youtubeHelpers'
 
@@ -24,7 +26,7 @@ const WACHT_EERSTE_MS = 6000
 const ZICHTBAAR_MS = 16000
 const PAUZE_MS = 3 * 60 * 1000
 
-export default function VideoTeaser({ client, isMobile = false, onderMarge = 86, vast = false }) {
+export default function VideoTeaser({ client, isMobile = false, onderMarge = 86, vast = false, pagina = 'home' }) {
   const [items, setItems] = useState([])
   const [index, setIndex] = useState(0)
   const [open, setOpen] = useState(false)      // schuift hij in beeld?
@@ -36,20 +38,38 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
   const [dicht, setDicht] = useState(false)
   const timers = useRef([])
 
+  // Wat er langskomt hangt af van waar je bent. Op home de video's die de
+  // coach in de slider heeft gezet — algemene dingen. Op een pagina met een
+  // onderwerp (maaltijden, training) wat áán die pagina hangt: de video's die
+  // erop staan én de PDF's, want die horen bij dezelfde uitleg.
   useEffect(() => {
     if (!client?.id) return
     let gestopt = false
+    setIndex(0)
     ;(async () => {
       try {
-        const coachId = client.coach_id || client.trainer_id
-        const vids = await clientVideoService.getSliderVideos(coachId)
-        if (!gestopt) setItems(vids || [])
+        if (vast) {
+          const coachId = client.coach_id || client.trainer_id
+          const vids = await clientVideoService.getSliderVideos(coachId)
+          if (!gestopt) setItems((vids || []).map(v => ({ soort: 'video', sleutel: v.id, item: v, titel: v.video?.title })))
+          return
+        }
+        const [vids, files] = await Promise.all([
+          videoService.getVideosForPage(client.id, pagina),
+          fileService.listForPage(pagina).catch(() => []),
+        ])
+        if (gestopt) return
+        setItems([
+          ...(vids || []).map(v => ({ soort: 'video', sleutel: v.id, item: v, titel: v.video?.title })),
+          ...(files || []).map(f => ({ soort: 'bestand', sleutel: `f-${f.id}`, item: f, titel: f.title })),
+        ])
       } catch (e) {
         console.error('Video-teaser laden mislukt:', e)
+        if (!gestopt) setItems([])
       }
     })()
     return () => { gestopt = true }
-  }, [client?.id, client?.coach_id, client?.trainer_id])
+  }, [client?.id, client?.coach_id, client?.trainer_id, pagina, vast])
 
   // Twee gedragingen. Op home staat hij gewoon open: daar ben je aan het
   // rondkijken, dus een video die blijft staan is een aanbod en geen
@@ -86,9 +106,19 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
 
   if (weg || items.length === 0) return null
 
-  const huidig = items[index]
-  const vId = extractYouTubeId(huidig?.video?.video_url)
-  const thumb = (vId ? getYouTubeThumbnail(vId, 'hqdefault') : null) || huidig?.video?.thumbnail_url || null
+  const huidig = items[index] || items[0]
+  const isBestand = huidig?.soort === 'bestand'
+  const vId = isBestand ? null : extractYouTubeId(huidig?.item?.video?.video_url)
+  const thumb = isBestand
+    ? (huidig?.item?.preview_url || null)
+    : ((vId ? getYouTubeThumbnail(vId, 'hqdefault') : null) || huidig?.item?.video?.thumbnail_url || null)
+  const openHuidig = () => {
+    if (isBestand) {
+      window.open(huidig.item.file_url, '_blank', 'noopener')
+      return
+    }
+    setSpeler(huidig.item)
+  }
 
   return (
     <>
@@ -116,7 +146,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
         }}
       >
         <button
-          onClick={() => setSpeler(huidig)}
+          onClick={openHuidig}
           style={{
             flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
             background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
@@ -131,10 +161,12 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
             display: 'block',
           }}>
             <span style={{
-              position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)',
+              position: 'absolute', inset: 0, background: thumb ? 'rgba(0,0,0,0.35)' : 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Play size={16} color="#fff" fill="#fff" strokeWidth={0} />
+              {isBestand
+                ? <FileText size={16} color="#fff" strokeWidth={2.4} />
+                : <Play size={16} color="#fff" fill="#fff" strokeWidth={0} />}
             </span>
           </span>
 
@@ -144,7 +176,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
               fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)',
               textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 2,
             }}>
-              Van je coach
+              {isBestand ? 'Van je coach · PDF' : 'Van je coach'}
             </span>
             <span style={{
               display: 'block',
@@ -152,7 +184,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
               letterSpacing: '-0.015em', lineHeight: 1.2,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
-              {huidig?.video?.title || 'Nieuwe video'}
+              {huidig?.titel || (isBestand ? 'Document' : 'Nieuwe video')}
             </span>
           </span>
         </button>
