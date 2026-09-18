@@ -851,7 +851,11 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, bezig }) {
         )}
       </div>
 
-      <div style={{ flexShrink: 0, textAlign: 'right', lineHeight: 1.25 }}>
+      {/* Vaste breedte voor de tijden, en daarnaast een vast vak voor de
+          knoppen. Zonder dat schoven de tijden per regel op: een blok zonder
+          knoppen duwde ze naar rechts en een maaltijd met twee knoppen naar
+          links, en dan staat er geen kolom meer. */}
+      <div style={{ flexShrink: 0, width: 44, textAlign: 'right', lineHeight: 1.25 }}>
         <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
           {tijd(blok.start)}
         </div>
@@ -860,26 +864,31 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, bezig }) {
         </div>
       </div>
 
-      {onAfronden && (
-        <button
-          onClick={onAfronden}
-          title={afgerond ? 'Toch niet gegeten' : 'Afronden'}
-          aria-label={afgerond ? 'Afvinken ongedaan maken' : 'Afronden'}
-          style={{ ...kaartKnop, color: afgerond ? '#10b981' : '#fff' }}
-        >
-          <Check size={15} strokeWidth={3.2} />
-        </button>
-      )}
-      {onOpen && (isMaaltijd || isTraining) && (
-        <button
-          onClick={() => onOpen(blok)}
-          title={isTraining ? 'Open je schema' : 'Open in je maaltijdplan'}
-          aria-label={isTraining ? 'Open je schema' : 'Open in je maaltijdplan'}
-          style={kaartKnop}
-        >
-          {isTraining ? <Play size={14} strokeWidth={3.2} fill="#fff" /> : <Pijl size={15} strokeWidth={3.2} />}
-        </button>
-      )}
+      <div style={{
+        flexShrink: 0, width: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
+      }}>
+        {onAfronden && (
+          <button
+            onClick={onAfronden}
+            title={afgerond ? 'Toch niet gegeten' : 'Afronden'}
+            aria-label={afgerond ? 'Afvinken ongedaan maken' : 'Afronden'}
+            style={{ ...kaartKnop, color: afgerond ? '#10b981' : '#fff' }}
+          >
+            <Check size={15} strokeWidth={3.2} />
+          </button>
+        )}
+        {onOpen && (isMaaltijd || isTraining) && (
+          <button
+            onClick={() => onOpen(blok)}
+            title={isTraining ? 'Open je schema' : 'Open in je maaltijdplan'}
+            aria-label={isTraining ? 'Open je schema' : 'Open in je maaltijdplan'}
+            style={kaartKnop}
+          >
+            {isTraining ? <Play size={14} strokeWidth={3.2} fill="#fff" /> : <Pijl size={15} strokeWidth={3.2} />}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
