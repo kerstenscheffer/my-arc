@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, List,
-  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill,
+  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal,
 } from 'lucide-react'
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
@@ -28,6 +28,7 @@ import { workoutFoto } from './workoutFoto'
 import { verzetDag as verzetDagHelper } from './dagNavigatie'
 import MacroBoxes from './MacroBoxes'
 import BlokTijdSheet from './BlokTijdSheet'
+import DagindelingModal from './DagindelingModal'
 
 const LIJN = 'rgba(255,255,255,0.07)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.04)'
@@ -130,6 +131,7 @@ export default function DagAgenda({
   // Welk blok staat er in de tijd-sheet, en een teller om de week opnieuw op
   // te halen zodra er iets verzet is.
   const [bewerk, setBewerk] = useState(null)
+  const [dagindeling, setDagindeling] = useState(false)
   const [versie, setVersie] = useState(0)
   const roosterRef = useRef(null)
 
@@ -418,6 +420,16 @@ export default function DagAgenda({
             </button>
           ))}
         </div>
+        {/* Naar het vaste frame van je week: slaap, werk, training, eten.
+            Hier verzet je één dag; daar zet je wat elke week geldt. */}
+        <button
+          onClick={() => setDagindeling(true)}
+          title="Mijn dagindeling"
+          aria-label="Mijn dagindeling"
+          style={{ ...pijlKnop, width: 28, height: 28 }}
+        >
+          <SlidersHorizontal size={15} strokeWidth={3} />
+        </button>
         <button
           onClick={() => setVolledig(v => !v)}
           title={volledig ? 'Sluiten' : 'Op het hele scherm'}
@@ -555,6 +567,17 @@ export default function DagAgenda({
           isMobile={isMobile}
           onSluit={() => setBewerk(null)}
           onKlaar={() => { setBewerk(null); setVersie(v => v + 1) }}
+        />
+      )}
+
+      {dagindeling && (
+        <DagindelingModal
+          client={client}
+          db={db}
+          service={service}
+          isMobile={isMobile}
+          onSluit={() => setDagindeling(false)}
+          onGewijzigd={() => setVersie(v => v + 1)}
         />
       )}
 

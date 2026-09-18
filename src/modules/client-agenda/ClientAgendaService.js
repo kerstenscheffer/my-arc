@@ -1309,6 +1309,14 @@ export class ClientAgendaService {
     if (!ws[day] || !ws[day][slot]) {
       throw new Error(`Slot ${day}.${slot} bestaat niet in dit meal-plan`)
     }
+    // Een slot is meestal een object met de maaltijd erin, maar in oudere
+    // plannen staat er alleen het meal-id als string. Spreid je daar een
+    // object overheen, dan wordt de verwijzing naar de maaltijd een rij
+    // losse letters en is de maaltijd uit het plan verdwenen. Twaalf van de
+    // zestig plannen hebben die vorm nog.
+    if (typeof ws[day][slot] !== 'object' || Array.isArray(ws[day][slot])) {
+      throw new Error('Deze maaltijd heeft in dit plan nog geen eigen tijd; laat je coach het plan opnieuw opslaan')
+    }
     const newTiming = `${String(Math.floor(newStartMin / 60)).padStart(2, '0')}:${String(newStartMin % 60).padStart(2, '0')}`
     ws[day][slot] = { ...ws[day][slot], timing: newTiming }
 
@@ -1339,8 +1347,12 @@ export class ClientAgendaService {
     const timing = minutesToTimeStr(newStartMin).slice(0, 5)
     let geraakt = 0
     dagen.forEach(day => {
-      if (!ws[day] || !ws[day][slot]) return
-      ws[day][slot] = { ...ws[day][slot], timing }
+      const huidig = ws[day]?.[slot]
+      // Zie updateMealTiming: een slot dat als losse string is opgeslagen
+      // overleeft een object-spread niet. Die slaan we over in plaats van
+      // hem te slopen.
+      if (!huidig || typeof huidig !== 'object' || Array.isArray(huidig)) return
+      ws[day][slot] = { ...huidig, timing }
       geraakt++
     })
     if (geraakt === 0) return 0
