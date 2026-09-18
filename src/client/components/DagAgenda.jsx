@@ -144,6 +144,24 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
   const nuMin = nu.getHours() * 60 + nu.getMinutes()
   const toonNuLijn = isVandaag && nuMin >= van && nuMin <= tot
 
+  // Bij binnenkomst meteen op het juiste moment staan: is het vandaag, dan
+  // staat de nu-lijn een derde vanaf de bovenkant in beeld; anders begint de
+  // dag bij het eerste blok. Zonder dit kijk je 's avonds naar je ontbijt.
+  useEffect(() => {
+    if (laden) return
+    const el = roosterRef.current
+    if (!el) return
+    const doel = toonNuLijn
+      ? pxVan(nuMin) - el.clientHeight * 0.33
+      : (blokken.length ? pxVan(Math.min(...blokken.map(b => b.start))) - 12 : 0)
+    // Na het renderen van het rooster, anders is scrollHeight nog de oude.
+    const id = requestAnimationFrame(() => {
+      el.scrollTop = Math.max(0, doel)
+    })
+    return () => cancelAnimationFrame(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [laden, dag, weekAnker, roosterHoogte])
+
   const verzet = (richting) => {
     const i = DAYS.indexOf(dag)
     const n = i + richting
