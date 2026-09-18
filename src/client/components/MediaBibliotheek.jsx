@@ -28,24 +28,34 @@ const zonderAccenten = (t) => String(t || '').toLowerCase()
 // pagina's waaraan de coach zijn video's al hangt (default_pages), dus er valt
 // niets extra's in te stellen. Wat nergens bij hoort komt onder "Overig"
 // terecht — liever een restbak dan een video die nergens meer te vinden is.
+// Stockfoto's van Unsplash, met een vaste foto per onderwerp. Geen foto's van
+// de coach zelf: die horen bij zijn eigen berichten, niet als plaatje boven een
+// categorie.
+const FOTO = {
+  app: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&h=450&fit=crop&q=80',
+  workout: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&h=450&fit=crop&q=80',
+  meal: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=450&fit=crop&q=80',
+  tracking: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=600&h=450&fit=crop&q=80',
+}
+
 const ONDERWERPEN = [
   {
-    id: 'app', label: 'App uitleg', foto: '/intro-coach.jpg',
+    id: 'app', label: 'App uitleg', foto: FOTO.app,
     paginas: ['home', 'profile', 'calls'],
     woorden: ['app', 'uitleg', 'start'],
   },
   {
-    id: 'workout', label: 'Workout', foto: '/intro-workout.jpg',
+    id: 'workout', label: 'Workout', foto: FOTO.workout,
     paginas: ['workout'],
     woorden: ['workout', 'training', 'oefening', 'loggen'],
   },
   {
-    id: 'meal', label: 'Voeding', foto: '/intro-meal.jpg',
+    id: 'meal', label: 'Voeding', foto: FOTO.meal,
     paginas: ['meal', 'boodschappen'],
     woorden: ['meal', 'voeding', 'maaltijd', 'eten', 'boodschappen'],
   },
   {
-    id: 'tracking', label: 'Tracking', foto: '/transformatie-1.png',
+    id: 'tracking', label: 'Tracking', foto: FOTO.tracking,
     paginas: ['tracking'],
     woorden: ['tracking', 'progressie', 'foto', 'gewicht', 'meting'],
   },
