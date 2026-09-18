@@ -9,6 +9,10 @@
 // zag je nergens. Hier staat alles, met de dingen van de pagina waar je
 // vandaan komt bovenaan.
 //
+// Wél met een grens (sep 2026): je ziet de algemene video's — die aan een
+// pagina hangen — plus wat persoonlijk aan jou is toegewezen. Een video die
+// de coach voor één klant klaarzet, blijft bij die klant.
+//
 // Zoeken op titel, filteren op soort en categorie. Een video opent in de
 // speler, een PDF in een nieuw tabblad.
 
@@ -93,22 +97,37 @@ export default function MediaBibliotheek({
   const coachId = client?.coach_id || client?.trainer_id
 
   useEffect(() => {
-    if (!coachId || !db?.supabase) return
+    if (!coachId || !client?.id || !db?.supabase) return
     let weg = false
     setLaden(true)
     ;(async () => {
       try {
-        const [v, f] = await Promise.all([
-          db.supabase.from('coach_videos')
-            .select('*, video_category:video_categories(id, name, color)')
-            .eq('coach_id', coachId).eq('is_active', true)
-            .order('created_at', { ascending: false }),
+        // Welke video's zijn persoonlijk aan déze klant toegewezen?
+        const { data: toewijzingen } = await db.supabase
+          .from('video_assignments').select('video_id').eq('client_id', client.id)
+        const eigenIds = [...new Set((toewijzingen || []).map(a => a.video_id).filter(Boolean))]
+
+        const videoSelect = '*, video_category:video_categories(id, name, color)'
+        const basis = () => db.supabase.from('coach_videos')
+          .select(videoSelect).eq('coach_id', coachId).eq('is_active', true)
+
+        const [algemeen, eigen, f] = await Promise.all([
+          // Algemeen: alles wat aan een pagina hangt, dat is voor iedereen.
+          basis().not('default_pages', 'is', null).not('default_pages', 'eq', '{}'),
+          // Persoonlijk: alleen wat aan jou is toegewezen.
+          eigenIds.length ? basis().in('id', eigenIds) : Promise.resolve({ data: [] }),
           db.supabase.from('coach_files')
             .select('*').eq('coach_id', coachId).eq('is_active', true)
             .order('created_at', { ascending: false }),
         ])
         if (weg) return
-        setVideos(v.data || [])
+
+        // Samenvoegen zonder dubbelen; nieuwste bovenaan.
+        const perId = new Map()
+        for (const v of [...(algemeen.data || []), ...(eigen.data || [])]) perId.set(v.id, v)
+        setVideos([...perId.values()].sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        ))
         setBestanden(f.data || [])
       } catch (e) {
         console.error('Bibliotheek laden mislukt:', e)
@@ -117,7 +136,7 @@ export default function MediaBibliotheek({
       }
     })()
     return () => { weg = true }
-  }, [db, coachId])
+  }, [db, coachId, client?.id])
 
   // De teller op de knop in de zijbalk: alles bij elkaar.
   useEffect(() => {
