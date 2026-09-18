@@ -148,13 +148,6 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
           volle hoogte met het moment en de tijd erop, de naam en de macro's
           ernaast. */}
       <div>
-        <div style={{
-          fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
-          letterSpacing: '-0.025em', marginBottom: isMobile ? '0.5rem' : '0.6rem',
-        }}>
-          Voeding vandaag
-        </div>
-
         {macros == null ? (
           <div style={{ padding: '1rem', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>…</div>
         ) : hasTarget ? (
@@ -241,14 +234,9 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
       {/* Kopje boven de kaart in plaats van erop: op de foto moest het
           concurreren met het beeld, hier leest het als de titel van de
           sectie die het is. */}
-      <div style={{
-        fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
-        letterSpacing: '-0.025em',
-        marginTop: isMobile ? '1.75rem' : '2rem',
-        marginBottom: isMobile ? '0.5rem' : '0.6rem',
-      }}>
-        Training vandaag
-      </div>
+      {/* Ruimte tussen voeding en de trainingskaart; de koppen erboven zijn
+          eruit, het beeld zegt genoeg. */}
+      <div style={{ height: isMobile ? '1.5rem' : '1.75rem' }} />
 
       {/* ── Workout-card: foto over de volle breedte, alles op één regel ──
           Was een blok van 140 hoog met de naam onderin en een gouden

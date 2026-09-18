@@ -22,7 +22,11 @@ import {
 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
+import ClientAgendaView from '../../modules/client-agenda/ClientAgendaView'
 import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
+
+// Zondag = 0 in JavaScript; de agenda werkt met Engelse dagnamen.
+const DAG_SLEUTELS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
 // Klein gouden section-header, identiek aan het patroon op de workout-pagina.
 function SectionLabel({ icon: Icon, label, isMobile }) {
@@ -880,6 +884,43 @@ export default function ClientHome({ client, db, setCurrentView }) {
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '4.5rem' : '5.5rem' }}>
           <ActionItems client={client} db={db} />
+        </div>
+      </FadeOnScroll>
+
+      {/* ── PROEF: de dag van vandaag als agenda ──────────────────────────
+          Dezelfde agenda als aan de coach-kant, maar teruggebracht tot één
+          dag en zonder bewerkknoppen (viewerRole="client"). Staat bewust
+          onderaan: zo kun je kijken of het werkt zonder dat het de pagina
+          overneemt. Bevalt het, dan kan het naar boven en kunnen de losse
+          trainings- en maaltijdkaarten erin opgaan. */}
+      <FadeOnScroll>
+        <div style={{ marginTop: isMobile ? '4.5rem' : '5.5rem' }}>
+          <div style={{
+            padding: isMobile ? '0 1rem' : '0 1.5rem',
+            marginBottom: isMobile ? '0.55rem' : '0.7rem',
+            fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
+            letterSpacing: '-0.025em',
+          }}>
+            Jouw dag
+          </div>
+          <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+            <div style={{
+              // Vaste hoogte: de agenda vult de ruimte die hij krijgt en
+              // scrollt intern naar de late uren. Zonder hoogte zou hij zijn
+              // minimum van 900 pixels pakken en de pagina uit elkaar trekken.
+              height: isMobile ? 460 : 560,
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 14, overflow: 'hidden',
+            }}>
+              <ClientAgendaView
+                client={client}
+                db={db}
+                isMobile={isMobile}
+                viewerRole="client"
+                singleDay={DAG_SLEUTELS[new Date().getDay()]}
+              />
+            </div>
+          </div>
         </div>
       </FadeOnScroll>
 
