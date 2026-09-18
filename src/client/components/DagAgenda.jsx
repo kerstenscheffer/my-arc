@@ -329,7 +329,9 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
   const inhoud = (
     <div style={{
       display: 'flex', flexDirection: 'column', minHeight: 0,
-      height: volledig ? '100%' : (hoogte || '100%'),
+      // De lijst groeit mee met de dag; het rooster krijgt een vaste hoogte en
+      // scrolt intern, anders wordt de pagina een tijdbalk van twee meter.
+      height: volledig ? '100%' : (weergave === 'rooster' ? (hoogte || '100%') : 'auto'),
     }}>
       {/* Kop: pijltjes om de dag heen, en alleen een weg-terug-knop als je
           niet op vandaag staat. Een weekkiezer heeft een klant niet nodig. */}
