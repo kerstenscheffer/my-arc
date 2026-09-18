@@ -129,6 +129,9 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
   const meal = (nextMeal && nextMeal !== 'none') ? {
     name: nextMeal.meal_name || nextMeal.name || 'Maaltijd',
     kcal: Math.round(nextMeal.calories || 0),
+    eiwit: Math.round(nextMeal.protein || 0),
+    koolh: Math.round(nextMeal.carbs || 0),
+    vet: Math.round(nextMeal.fat || 0),
     slot: nextMeal.timeSlot || '',
     time: (() => { const h = Math.floor(nextMeal.plannedTime || 0); const m = Math.round(((nextMeal.plannedTime || 0) - h) * 60); return `${h}:${String(m).padStart(2, '0')}` })(),
     img: resolveFoodImage(nextMeal, { size: 160 }),
@@ -208,33 +211,101 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
         </div>
       </div>
 
-      {/* ── Voeding — volgende maaltijd + 4 macro-vakken ── */}
-      <div style={{ marginTop: '1.1rem' }}>
-        {/* Volgende maaltijd uit het plan */}
-        {meal && (
-          <button
-            onClick={() => setCurrentView && setCurrentView('meal')}
-            style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '0.6rem 0.7rem', display: 'flex', alignItems: 'center', gap: '0.7rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <div style={{ width: 52, height: 52, borderRadius: 10, flexShrink: 0, backgroundImage: `url(${meal.img})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.08)' }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,215,0,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
-                Volgende{meal.slot ? ` · ${meal.slot}` : ''}
-              </div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.name}</div>
-              <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>{meal.time} · {meal.kcal} kcal</div>
-            </div>
-            <ChevronRight size={18} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
-          </button>
-        )}
+      {/* ── Voeding — eerst waar je staat, dan wat er aan komt ──
+          De vier ringen stonden onder de volgende maaltijd, elk in een eigen
+          kadertje. Nu staan ze bovenaan en zonder kaders (variant `kaal`,
+          dezelfde als op de maaltijdpagina), en daaronder de volgende
+          maaltijd in de vorm van de maaltijdkaarten daar: foto links over de
+          volle hoogte met het moment en de tijd erop, de naam en de macro's
+          ernaast. */}
+      <div style={{ marginTop: isMobile ? '1.75rem' : '2rem' }}>
+        <div style={{
+          fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
+          letterSpacing: '-0.025em', marginBottom: isMobile ? '0.5rem' : '0.6rem',
+        }}>
+          Voeding vandaag
+        </div>
 
-        {/* 4 macro-vakken naast elkaar (kcal / koolh / eiwit / vet) */}
         {macros == null ? (
           <div style={{ padding: '1rem', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>…</div>
         ) : hasTarget ? (
-          <MacroBoxes consumed={macros.consumed} targets={macros.targets} style={{ marginTop: meal ? '0.7rem' : 0 }} />
+          <MacroBoxes kaal consumed={macros.consumed} targets={macros.targets} />
         ) : (
           <div style={{ padding: '1rem', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Nog geen voedingsdoel ingesteld.</div>
+        )}
+
+        {meal && (
+          <button
+            onClick={() => setCurrentView && setCurrentView('meal')}
+            style={{
+              width: '100%', marginTop: hasTarget ? (isMobile ? '0.9rem' : '1rem') : 0,
+              textAlign: 'left', cursor: 'pointer', padding: 0,
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(255,255,255,0.05)',
+              borderRadius: 12, overflow: 'hidden',
+              display: 'flex', alignItems: 'stretch', minWidth: 0,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <div style={{
+              width: isMobile ? 78 : 90, alignSelf: 'stretch', flexShrink: 0,
+              background: `url(${meal.img}) center/cover`,
+              position: 'relative', overflow: 'hidden',
+            }}>
+              <div style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.8) 100%)',
+              }} />
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: isMobile ? '0 5px 5px' : '0 6px 6px' }}>
+                <div style={{
+                  fontSize: isMobile ? '0.6rem' : '0.66rem', fontWeight: 900, color: '#fff',
+                  letterSpacing: '-0.01em', lineHeight: 1.1,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+                }}>
+                  {meal.slot || 'Volgende'}
+                </div>
+                {meal.time && (
+                  <div style={{
+                    fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800,
+                    color: 'rgba(255,255,255,0.75)', lineHeight: 1.2, marginTop: 1,
+                    textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+                  }}>
+                    {meal.time}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{
+              flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: isMobile ? '0.45rem 0.6rem 0.45rem 0.7rem' : '0.55rem 0.8rem 0.55rem 0.95rem',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: isMobile ? '0.9rem' : '0.98rem', fontWeight: 800, color: '#fff',
+                  lineHeight: 1.2, letterSpacing: '-0.015em', marginBottom: 4,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {meal.name}
+                </div>
+                <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '0.7rem', overflow: 'hidden' }}>
+                  {[
+                    { val: meal.kcal, label: 'kcal' },
+                    { val: meal.eiwit, label: 'E' },
+                    { val: meal.koolh, label: 'K' },
+                    { val: meal.vet, label: 'V' },
+                  ].filter(m => m.val > 0).map(m => (
+                    <div key={m.label} style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                      <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{m.val}</span>
+                      <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>{m.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <ChevronRight size={16} color="rgba(255,255,255,0.25)" style={{ flexShrink: 0 }} />
+            </div>
+          </button>
         )}
       </div>
 
