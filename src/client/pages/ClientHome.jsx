@@ -864,18 +864,13 @@ export default function ClientHome({ client, db, setCurrentView }) {
     <div style={{ minHeight: '100vh', paddingBottom: isMobile ? '9rem' : '6rem', background: '#0a0a0a' }}>
       <WelcomeSection client={client} />
 
-      {/* Video-slider (coach-video's met show_in_slider) — direct onder de
-          kop: het is het eerste wat je van je coach te zien krijgt. */}
-      <div style={{ marginTop: isMobile ? '1.1rem' : '1.4rem' }}>
-        <HomeVideoSlider client={client} />
-      </div>
-
       {/* ── De dag als agenda ─────────────────────────────────────────────
           Eigen component (DagAgenda), los van het coach-gereedschap. Dit is
           waar de dag staat: de macro's, de maaltijden met hun afrondknop en
-          de training met zijn startknop. Daarom vlak onder de video's. */}
+          de training met zijn startknop. Daarom bovenaan, direct onder de
+          begroeting. */}
       <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '1.75rem' : '2.25rem' }}>
+        <div style={{ marginTop: isMobile ? '1.1rem' : '1.4rem' }}>
           <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
             <DagAgenda
               client={client}
@@ -885,6 +880,14 @@ export default function ClientHome({ client, db, setCurrentView }) {
               onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
             />
           </div>
+        </div>
+      </FadeOnScroll>
+
+      {/* Video's van je coach. Onder de dag: eerst wat je moet doen, dan wat
+          er te kijken valt. */}
+      <FadeOnScroll>
+        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
+          <HomeVideoSlider client={client} />
         </div>
       </FadeOnScroll>
 
