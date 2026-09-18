@@ -15,12 +15,13 @@
 //   - blokken lezen als kaarten: bold wit, tijd rechts, kleur alleen als streep
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, ChevronLeft, ChevronRight, Utensils, Dumbbell, Moon, Briefcase, Pill } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Utensils, Dumbbell, Moon, Briefcase, Pill } from 'lucide-react'
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
 } from '../../modules/client-agenda/ClientAgendaService'
 import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
 import { workoutFoto } from './workoutFoto'
+import MacroBoxes from './MacroBoxes'
 
 const LIJN = 'rgba(255,255,255,0.07)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.04)'
@@ -95,6 +96,12 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
   const [data, setData] = useState(null)
   const [laden, setLaden] = useState(true)
   const [nu, setNu] = useState(() => new Date())
+  // Wat er op de getoonde dag al is afgevinkt (sleutel = slot), plus de
+  // dagtotalen. Beide uit consumed_meals: dat is wat de maaltijdpagina ook
+  // optelt, dus de ringen hier en daar zeggen hetzelfde.
+  const [gelogd, setGelogd] = useState({})
+  const [verbruikt, setVerbruikt] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 })
+  const [doelen, setDoelen] = useState(null)
   const roosterRef = useRef(null)
 
   useEffect(() => {
@@ -107,6 +114,27 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
       .finally(() => { if (!weg) setLaden(false) })
     return () => { weg = true }
   }, [service, client?.id, weekAnker])
+
+  // Doelen staan op de klant en veranderen niet per dag.
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    let weg = false
+    db.supabase
+      .from('clients')
+      .select('target_calories, target_protein, target_carbs, target_fat')
+      .eq('id', client.id)
+      .single()
+      .then(({ data }) => {
+        if (weg || !data) return
+        setDoelen({
+          calories: data.target_calories || 0,
+          protein: data.target_protein || 0,
+          carbs: data.target_carbs || 0,
+          fat: data.target_fat || 0,
+        })
+      })
+    return () => { weg = true }
+  }, [db, client?.id])
 
   // De nu-lijn hoeft niet op de seconde te kloppen; elke minuut is genoeg.
   useEffect(() => {
