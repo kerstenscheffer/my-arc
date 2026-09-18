@@ -136,8 +136,9 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
           transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease',
           pointerEvents: open ? 'auto' : 'none',
           zIndex: 100,
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: 6,
+          overflow: 'hidden',
+          display: 'flex', alignItems: 'center',
+          minHeight: 58,
           background: 'rgba(10,10,10,0.92)',
           backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
           border: '1px solid rgba(255,255,255,0.1)',
@@ -145,36 +146,51 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
           boxShadow: '0 14px 40px rgba(0,0,0,0.6)',
         }}
       >
+        {/* De thumbnail vult de linkerhelft en loopt naar rechts dood in het
+            zwart van de balk; de tekst ligt er half overheen. Zelfde truc als
+            de koppen elders in de app — het beeld hoort bij de tekst in plaats
+            van ernaast te staan. */}
+        {thumb && (
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: '52%',
+            backgroundImage: `url(${thumb})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
+          }} />
+        )}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'linear-gradient(90deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.25) 18%, rgba(10,10,10,0.8) 44%, rgba(10,10,10,0.97) 62%, rgba(10,10,10,1) 100%)',
+        }} />
+
         <button
           onClick={openHuidig}
           style={{
-            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
-            background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
+            position: 'relative', flex: 1, minWidth: 0,
+            display: 'flex', alignItems: 'center', gap: 8,
+            paddingLeft: thumb ? '24%' : '0.8rem',
+            paddingRight: '0.4rem', paddingTop: 8, paddingBottom: 8,
+            background: 'transparent', border: 'none', textAlign: 'left',
             cursor: 'pointer', fontFamily: 'inherit',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
           <span style={{
-            position: 'relative', flexShrink: 0,
-            width: 74, height: 44, borderRadius: 10, overflow: 'hidden',
-            background: thumb ? `url(${thumb}) center/cover` : 'rgba(255,255,255,0.06)',
-            display: 'block',
+            flexShrink: 0, width: 26, height: 26, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span style={{
-              position: 'absolute', inset: 0, background: thumb ? 'rgba(0,0,0,0.35)' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {isBestand
-                ? <FileText size={16} color="#fff" strokeWidth={2.4} />
-                : <Play size={16} color="#fff" fill="#fff" strokeWidth={0} />}
-            </span>
+            {isBestand
+              ? <FileText size={13} color="#fff" strokeWidth={2.6} />
+              : <Play size={12} color="#fff" fill="#fff" strokeWidth={0} style={{ marginLeft: 1 }} />}
           </span>
 
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{
               display: 'block',
-              fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)',
+              fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)',
               textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 2,
+              textShadow: '0 1px 6px rgba(0,0,0,0.9)',
             }}>
               {isBestand ? 'Van je coach · PDF' : 'Van je coach'}
             </span>
@@ -183,6 +199,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
               fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 900, color: '#fff',
               letterSpacing: '-0.015em', lineHeight: 1.2,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              textShadow: '0 1px 8px rgba(0,0,0,0.95)',
             }}>
               {huidig?.titel || (isBestand ? 'Document' : 'Nieuwe video')}
             </span>
@@ -197,10 +214,11 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86,
           title={vast ? 'Wegschuiven' : 'Niet meer tonen'}
           aria-label={vast ? 'Wegschuiven' : 'Niet meer tonen'}
           style={{
-            flexShrink: 0, width: 28, height: 28, padding: 0,
+            position: 'relative',
+            flexShrink: 0, width: 32, height: 32, padding: 0, marginRight: 4,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'transparent', border: 'none',
-            color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
