@@ -12,9 +12,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Moon, Briefcase, Dumbbell, Utensils, ChevronRight, Trash2 } from 'lucide-react'
+import { X, Moon, Briefcase, Dumbbell, Utensils, ChevronRight, Trash2, Plus, Calendar } from 'lucide-react'
 import {
-  ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf,
+  ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf,
 } from '../../modules/client-agenda/ClientAgendaService'
 import TijdWiel from './TijdWiel'
 import { tijdTekst } from './tijdHelpers'
@@ -89,6 +89,33 @@ export default function DagindelingModal({ client, db, service: serviceProp, isM
   // ── Werk en training: per dag, want die verschillen per dag ──
   const werkDagen = blokkenVan('work')
   const trainingDagen = blokkenVan('training')
+
+  const eigenBlokken = DAYS.flatMap(dag => (perDag[dag] || [])
+    .filter(b => b.type === 'custom' && !b.meta?.wrapHalf)
+    .map(blok => ({ dag, blok })))
+
+  // Uit de week halen: een eigen rij gaat weg, een blok uit je intake krijgt
+  // een verborgen rij die hem dooft. Zie verbergBlok in de service.
+  const haalWeg = (type, dag, blok) => () => service.verbergBlok({
+    clientId: client.id, dbId: blok?.dbId || null,
+    day: dag, type,
+    label: blok?.label || type,
+    sublabel: blok?.sublabel || null,
+    startMin: blok?.meta?.fullStart ?? blok?.start ?? 0,
+    endMin: blok?.meta?.fullEnd ?? blok?.end ?? 0,
+  })
+
+  // Toevoegen: hetzelfde blok op de dagen die je aanvinkt.
+  const voegToe = (type, standaardLabel) => async (start, eind, dagen, naam) => {
+    if (!dagen?.length) throw new Error('Kies minstens één dag')
+    const ids = {}
+    dagen.forEach(d => { ids[d] = null })
+    await service.zetVastBlok({
+      clientId: client.id, type,
+      label: (naam || '').trim() || standaardLabel,
+      startMin: start, endMin: eind % 1440, perDag: ids,
+    })
+  }
 
   const bewaarDagBlok = (type, dag, blok) => async (start, eind) => {
     await service.zetVastBlok({
@@ -221,18 +248,28 @@ export default function DagindelingModal({ client, db, service: serviceProp, isM
         {!laden && (
           <>
             {/* Slaap */}
-            <div style={kopje}>Slaap</div>
+            <SectieKop titel="Slaap" opNieuw={slaap ? null : () => setBewerk({
+              sleutel: 'slaap-nieuw', titel: 'Slaap', start: 23 * 60, eind: 7 * 60, metEind: true,
+              bewaar: bewaarSlaap,
+            })} />
             {slaap ? (
               rij('slaap', Moon, 'Elke nacht', 'Geldt voor alle dagen',
                 `${tijdTekst(slaapStart)} – ${tijdTekst(slaapEind)}`,
                 () => setBewerk({
                   sleutel: 'slaap', titel: 'Slaap', start: slaapStart, eind: slaapEind, metEind: true,
                   bewaar: bewaarSlaap,
+                  verwijder: async () => {
+                    for (const { dag, blok } of slaapDagen) await haalWeg('sleep', dag, blok)()
+                  },
                 }))
             ) : <Leeg tekst="Nog geen slaaptijd bekend" />}
 
             {/* Werk */}
-            <div style={kopje}>Werk</div>
+            <SectieKop titel="Werk" opNieuw={() => setBewerk({
+              sleutel: 'werk-nieuw', titel: 'Werk toevoegen', start: 9 * 60, eind: 17 * 60,
+              metEind: true, dagen: [], naam: 'Werk',
+              bewaar: voegToe('work', 'Werk'),
+            })} />
             {werkDagen.length === 0 && <Leeg tekst="Geen werkuren in je week" />}
             {werkDagen.map(({ dag, blok }) => {
               const s = blok.meta?.fullStart ?? blok.start
@@ -243,12 +280,16 @@ export default function DagindelingModal({ client, db, service: serviceProp, isM
                   sleutel: `werk-${dag}`, titel: `Werk — ${DAY_LABELS_NL_LONG[dag].toLowerCase()}`,
                   start: s, eind: e, metEind: true,
                   bewaar: bewaarDagBlok('work', dag, blok),
-                  verwijder: blok.dbId ? () => service.deleteBlock(blok.dbId) : null,
+                  verwijder: haalWeg('work', dag, blok),
                 }))
             })}
 
             {/* Training */}
-            <div style={kopje}>Training</div>
+            <SectieKop titel="Training" opNieuw={() => setBewerk({
+              sleutel: 'training-nieuw', titel: 'Training toevoegen', start: 17 * 60, eind: 18 * 60,
+              metEind: true, dagen: [], naam: 'Training',
+              bewaar: voegToe('training', 'Training'),
+            })} />
             {trainingDagen.length === 0 && <Leeg tekst="Geen trainingen ingepland" />}
             {trainingDagen.map(({ dag, blok }) => rij(
               `training-${dag}`, Dumbbell, DAY_LABELS_NL_LONG[dag], blok.sublabel || blok.label,
@@ -257,11 +298,31 @@ export default function DagindelingModal({ client, db, service: serviceProp, isM
                 sleutel: `training-${dag}`, titel: `Training — ${DAY_LABELS_NL_LONG[dag].toLowerCase()}`,
                 start: blok.start, eind: blok.end, metEind: true,
                 bewaar: bewaarDagBlok('training', dag, blok),
+                verwijder: haalWeg('training', dag, blok),
+              })
+            ))}
+
+            {/* Eigen blokken: alles wat niet uit je plan komt maar wel je dag
+                vult — college, reistijd, een vaste afspraak. */}
+            <SectieKop titel="Eigen blokken" opNieuw={() => setBewerk({
+              sleutel: 'eigen-nieuw', titel: 'Blok toevoegen', start: 12 * 60, eind: 13 * 60,
+              metEind: true, dagen: [], naam: '',
+              bewaar: voegToe('custom', 'Eigen blok'),
+            })} />
+            {eigenBlokken.length === 0 && <Leeg tekst="Nog niets van jezelf toegevoegd" />}
+            {eigenBlokken.map(({ dag, blok }) => rij(
+              `eigen-${blok.dbId || blok.id}`, Calendar, blok.label || 'Eigen blok', DAY_LABELS_NL_LONG[dag],
+              `${tijdTekst(blok.start)} – ${tijdTekst(blok.end)}`,
+              () => setBewerk({
+                sleutel: `eigen-${blok.dbId}`, titel: blok.label || 'Eigen blok',
+                start: blok.start, eind: blok.end, metEind: true,
+                bewaar: bewaarDagBlok('custom', dag, blok),
+                verwijder: haalWeg('custom', dag, blok),
               })
             ))}
 
             {/* Maaltijden */}
-            <div style={kopje}>Maaltijden</div>
+            <SectieKop titel="Maaltijden" />
             {maaltijdSlots.length === 0 && <Leeg tekst="Nog geen maaltijdplan" />}
             {maaltijdSlots.map(m => rij(
               `meal-${m.slot}`, Utensils, m.label, 'Elke dag van je plan',
@@ -272,6 +333,12 @@ export default function DagindelingModal({ client, db, service: serviceProp, isM
                 bewaar: bewaarMaaltijd(m.slot),
               })
             ))}
+            <div style={{
+              padding: '0.5rem 0 0', fontSize: '0.64rem', fontWeight: 700,
+              color: 'rgba(255,255,255,0.25)', lineHeight: 1.4,
+            }}>
+              Maaltijden komen uit je plan. Eentje overslaan doe je per dag in je agenda.
+            </div>
           </>
         )}
       </div>
@@ -286,7 +353,7 @@ export default function DagindelingModal({ client, db, service: serviceProp, isM
           bezig={bezig}
           fout={fout}
           onSluit={() => { setBewerk(null); setFout(null) }}
-          onBewaar={(start, eind) => voerUit(() => bewerk.bewaar(start, eind))}
+          onBewaar={(start, eind, dagen, naam) => voerUit(() => bewerk.bewaar(start, eind, dagen, naam))}
           onVerwijder={bewerk.verwijder ? () => voerUit(bewerk.verwijder) : null}
         />
       )}
@@ -295,12 +362,21 @@ export default function DagindelingModal({ client, db, service: serviceProp, isM
   )
 }
 
-function TijdEditor({ titel, start, eind, metEind, isMobile, bezig, fout, onSluit, onBewaar, onVerwijder }) {
+function TijdEditor({
+  titel, start, eind, metEind, dagen: dagenProp = null, naam: naamProp = null,
+  isMobile, bezig, fout, onSluit, onBewaar, onVerwijder,
+}) {
   const [begin, setBegin] = useState(start)
   const [einde, setEinde] = useState(eind ?? (start + 60) % 1440)
   const [kant, setKant] = useState('begin')
+  // Alleen bij toevoegen: op welke dagen komt dit blok, en hoe heet het.
+  const nieuw = Array.isArray(dagenProp)
+  const [dagen, setDagen] = useState(dagenProp || [])
+  const [naam, setNaam] = useState(naamProp || '')
   const duur = duurVan(begin, einde)
-  const gewijzigd = begin !== start || (metEind && einde !== eind)
+  const gewijzigd = nieuw
+    ? dagen.length > 0
+    : (begin !== start || (metEind && einde !== eind))
 
   // Schuif je de begintijd op, dan schuift het einde mee: je wilt meestal een
   // blok verplaatsen, niet oprekken. Het einde zelf zetten kan daarna nog.
@@ -403,6 +479,52 @@ function TijdEditor({ titel, start, eind, metEind, isMobile, bezig, fout, onSlui
           </div>
         )}
 
+        {nieuw && (
+          <>
+            {naamProp !== null && (
+              <div style={{ marginBottom: '0.8rem' }}>
+                <div style={kopjeKlein}>Naam</div>
+                <input
+                  value={naam}
+                  onChange={(e) => setNaam(e.target.value)}
+                  placeholder="Bijvoorbeeld: college"
+                  style={{
+                    width: '100%', minHeight: 40, padding: '0 0.7rem',
+                    background: 'rgba(255,255,255,0.04)', border: `1px solid ${LIJN}`,
+                    borderRadius: 10, color: '#fff', fontFamily: 'inherit',
+                    fontSize: '0.82rem', fontWeight: 800, outline: 'none',
+                  }}
+                />
+              </div>
+            )}
+            <div style={{ marginBottom: '0.9rem' }}>
+              <div style={kopjeKlein}>Op welke dagen</div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {DAYS.map(d => {
+                  const aan = dagen.includes(d)
+                  return (
+                    <button
+                      key={d}
+                      onClick={() => setDagen(v => aan ? v.filter(x => x !== d) : [...v, d])}
+                      style={{
+                        flex: 1, minHeight: 34, borderRadius: 9,
+                        background: aan ? '#fff' : 'transparent',
+                        border: `1px solid ${aan ? '#fff' : LIJN}`,
+                        color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
+                        fontSize: '0.66rem', fontWeight: 900, fontFamily: 'inherit',
+                        cursor: 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      {DAY_LABELS_NL[d]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
         {fout && (
           <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444', marginBottom: '0.6rem' }}>
             {fout}
@@ -410,7 +532,7 @@ function TijdEditor({ titel, start, eind, metEind, isMobile, bezig, fout, onSlui
         )}
 
         <button
-          onClick={() => onBewaar(begin, einde)}
+          onClick={() => onBewaar(begin, einde, dagen, naam)}
           disabled={bezig || !gewijzigd}
           style={{
             width: '100%', minHeight: 46, borderRadius: 12, border: 'none',
@@ -422,7 +544,9 @@ function TijdEditor({ titel, start, eind, metEind, isMobile, bezig, fout, onSlui
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          {bezig ? 'Bezig…' : gewijzigd ? 'Opslaan voor elke week' : 'Kies een andere tijd'}
+          {bezig ? 'Bezig…'
+            : nieuw ? (dagen.length ? `Toevoegen op ${dagen.length} ${dagen.length === 1 ? 'dag' : 'dagen'}` : 'Kies een dag')
+            : gewijzigd ? 'Opslaan voor elke week' : 'Kies een andere tijd'}
         </button>
 
         {onVerwijder && (
@@ -439,6 +563,31 @@ function TijdEditor({ titel, start, eind, metEind, isMobile, bezig, fout, onSlui
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+// Kop van een sectie, met de plus die erbij hoort. De knop staat bij het
+// onderwerp waar je iets aan toevoegt — niet als losse knop onderaan, want dan
+// moet je hem eerst vertellen waar hij heen moet.
+function SectieKop({ titel, opNieuw = null }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      marginTop: '1.1rem', marginBottom: 2,
+    }}>
+      <span style={{ ...kopje, marginTop: 0, marginBottom: 0, flex: 1 }}>{titel}</span>
+      {opNieuw && (
+        <button onClick={opNieuw} title={`${titel} toevoegen`} aria-label={`${titel} toevoegen`} style={{
+          width: 26, height: 26, padding: 0, borderRadius: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(255,255,255,0.06)', border: `1px solid ${LIJN}`,
+          color: '#fff', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          <Plus size={14} strokeWidth={3} />
+        </button>
+      )}
     </div>
   )
 }
@@ -465,6 +614,11 @@ const kopje = {
   fontSize: '0.58rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
   textTransform: 'uppercase', letterSpacing: '0.1em',
   marginTop: '1.1rem', marginBottom: 2,
+}
+
+const kopjeKlein = {
+  fontSize: '0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
+  textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 5,
 }
 
 const rijStijl = {

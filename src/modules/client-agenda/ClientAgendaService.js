@@ -409,12 +409,16 @@ export class ClientAgendaService {
       // Het schema bepaalt WELKE workout er die dag staat; het agenda-blok
       // levert alleen de TIJD. Bij meerdere rijen houden we daarom die met de
       // naam die het schema noemt, en anders de laatst bijgewerkte.
+      // Verborgen rijen tellen wel mee voor "er is al een rij" (en doven zo
+      // de placeholder), maar doen niet mee aan de keuze welke rij je ziet.
+      // Anders kaapt een weggehaalde training de plek van de echte.
+      const zichtbareTrainingen = dbTrainings.filter(r => !r.hidden)
       const teTonenTrainingen = (() => {
-        if (!showDbTrainings || dbTrainings.length <= 1) return dbTrainings
-        if (!canResolveWorkouts || !dayWorkout) return dbTrainings
-        const past = dbTrainings.filter(r =>
+        if (!showDbTrainings || zichtbareTrainingen.length <= 1) return zichtbareTrainingen
+        if (!canResolveWorkouts || !dayWorkout) return zichtbareTrainingen
+        const past = zichtbareTrainingen.filter(r =>
           (r.sublabel || '').trim().toLowerCase() === String(workoutTitle || '').trim().toLowerCase())
-        const keuze = past.length ? past : [...dbTrainings].sort((a, b) =>
+        const keuze = past.length ? past : [...zichtbareTrainingen].sort((a, b) =>
           new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))
         return [keuze[0]]
       })()
@@ -423,6 +427,7 @@ export class ClientAgendaService {
         if (trainingStartByDay[day] == null || min < trainingStartByDay[day]) trainingStartByDay[day] = min
       }
       if (showDbTrainings) teTonenTrainingen.forEach(row => {
+        if (row.hidden) return
         const dedupeKey = `${row.start_time}|${row.end_time}|${row.sublabel || ''}`
         if (seenTraining.has(dedupeKey)) return
         seenTraining.add(dedupeKey)
@@ -596,6 +601,10 @@ export class ClientAgendaService {
       const dbSleep = customByDayType[day].sleep
       if (dbSleep.length > 0) {
         dbSleep.forEach(row => {
+          // Verborgen rij = uit de week gehaald. Hij telt wel mee voor de
+          // check hierboven, want juist daardoor komt de placeholder uit de
+          // intake niet terug.
+          if (row.hidden) return
           const start = timeStrToMinutes(row.start_time)
           const end = timeStrToMinutes(row.end_time)
           const base = {
@@ -659,6 +668,7 @@ export class ClientAgendaService {
       const dbWork = customByDayType[day].work
       if (dbWork.length > 0) {
         dbWork.forEach(row => {
+          if (row.hidden) return
           const start = timeStrToMinutes(row.start_time)
           const end = timeStrToMinutes(row.end_time)
           const baseBlock = {
@@ -708,6 +718,7 @@ export class ClientAgendaService {
     // ── Custom blokken (vrij invulbaar) ──
     DAYS.forEach(day => {
       customByDayType[day].custom.forEach(row => {
+        if (row.hidden) return
         const start = timeStrToMinutes(row.start_time)
         const end = timeStrToMinutes(row.end_time)
         const baseBlock = {
@@ -1379,6 +1390,27 @@ export class ClientAgendaService {
       uit.push(rij)
     }
     return uit
+  }
+
+  // Een blok uit de week halen. Zit er een eigen rij achter, dan verdwijnt
+  // die; komt het blok uit de intake, dan is er niets om weg te gooien en
+  // leggen we een verborgen rij neer die de placeholder van die dag dooft.
+  async verbergBlok({ clientId, day, type, label, sublabel = null, startMin, endMin, dbId = null }) {
+    if (dbId) return this.deleteBlock(dbId)
+    const { error } = await this.supabase
+      .from('client_agenda_blocks')
+      .insert({
+        client_id: clientId,
+        day, type,
+        label: label || (type[0].toUpperCase() + type.slice(1)),
+        sublabel,
+        start_time: minutesToTimeStr(startMin ?? 0),
+        end_time: minutesToTimeStr((endMin ?? 0) % (24 * 60)),
+        hidden: true,
+        updated_at: new Date().toISOString(),
+      })
+    if (error) throw error
+    return true
   }
 
   // Mapping dag-naam → workoutKey in week_structure. Bron: clients.workout_schedule.
