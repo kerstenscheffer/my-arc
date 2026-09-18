@@ -30,7 +30,10 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
         position: 'fixed',
         right: 0,
         ...(plek === 'rechtsboven'
-          ? { top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 10 : 16}px)` }
+          // Onder de statusbalk én onder de bovenrand van de pagina: op de
+          // klantpagina's begint daar de herofoto, en daar bovenop plakken
+          // leest als een knop op de foto.
+          ? { top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 64 : 76}px)` }
           : { bottom: 'calc(120px + env(safe-area-inset-bottom, 0px))' }),
         // Smal randje tegen de zijkant: alleen iconen, geen labels en geen
         // kader per knop. Met tekst eronder was het een blok van 60px breed
