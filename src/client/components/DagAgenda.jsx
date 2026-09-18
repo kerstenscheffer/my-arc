@@ -281,7 +281,11 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen
 // lezen.
 function Blok({ blok, isMobile, pxVan, onOpen }) {
   const top = pxVan(blok.start)
-  const hoogte = Math.max(26, pxVan(blok.end) - top)
+  // Ondergrens per soort: een maaltijd van een kwartier is 27 pixels hoog en
+  // daar past geen kaart in. Maaltijden en trainingen krijgen daarom altijd
+  // genoeg hoogte voor hun foto; de tijd in de kaart blijft de echte tijd.
+  const minHoogte = (blok.type === 'meal' || blok.type === 'training') ? 56 : 26
+  const hoogte = Math.max(minHoogte, pxVan(blok.end) - top)
   const achter = !!blok._achter
   const isMaaltijd = blok.type === 'meal'
   const isTraining = blok.type === 'training'
@@ -291,9 +295,10 @@ function Blok({ blok, isMobile, pxVan, onOpen }) {
   const naam = blok.sublabel || (isMaaltijd ? null : blok.label)
   const klikbaar = !!onOpen && (isMaaltijd || isTraining)
 
-  // Hoeveel past erin? Onder de 54 pixels is er alleen plek voor één regel;
-  // dan vervalt de foto en staat alles naast elkaar.
-  const ruim = hoogte >= 54
+  // Hoeveel past erin? Boven de 74 pixels ook de macro's eronder; daaronder
+  // de kaart met alleen de naam.
+  const ruim = hoogte >= 56
+  const metMacros = hoogte >= 74
 
   const buiten = {
     position: 'absolute',
@@ -332,7 +337,7 @@ function Blok({ blok, isMobile, pxVan, onOpen }) {
     return (
       <Wrapper {...wrapperProps} title={titel} style={{ ...buiten, display: 'flex', alignItems: 'stretch' }}>
         <div style={{
-          width: Math.min(96, Math.max(58, hoogte)), flexShrink: 0, alignSelf: 'stretch',
+          width: Math.min(92, Math.max(52, hoogte)), flexShrink: 0, alignSelf: 'stretch',
           background: foto ? `url(${foto}) center/cover` : 'rgba(255,255,255,0.05)',
           position: 'relative',
         }}>
@@ -364,7 +369,7 @@ function Blok({ blok, isMobile, pxVan, onOpen }) {
             </span>
             <span style={tijdStempel}>{tijd(blok.start)}</span>
           </div>
-          {macros.length > 0 && (
+          {metMacros && macros.length > 0 && (
             <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', overflow: 'hidden' }}>
               {macros.map(m => (
                 <span key={m.label} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
