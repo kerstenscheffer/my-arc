@@ -16,7 +16,7 @@ import NotificationWidget from '../modules/notifications/NotificationWidget'
 import PWAUpdateBanner from '../components/PWAUpdateBanner'
 import ClientFAQModal from '../modules/faq/ClientFAQModal'
 import ChallengeProgressTab from '../modules/challenge-monitor/ChallengeProgressTab'
-import PageVideoWidget from '../modules/videos/PageVideoWidget'
+import MediaBibliotheek from './components/MediaBibliotheek'
 import WidgetSidebar from '../components/WidgetSidebar'
 import VideoTeaser from './components/VideoTeaser'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
@@ -534,12 +534,13 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         onOpenChange={(o) => setWidgetOpen(o ? 'vragen' : null)}
       />
 
-      {/* Centrale video-widget — pageContext volgt huidige view, vervangt
-          de per-pagina varianten (die wel blijven bestaan voor backward
-          compat, maar in deze controlled mode tonen ze geen floating tab). */}
+      {/* Bibliotheek: alle video's en PDF's van de coach, met wat aan deze
+          pagina hangt bovenaan. Verving PageVideoWidget, die alleen toonde wat
+          aan de huidige pagina hing — een video van de workout-pagina was
+          daardoor onvindbaar zodra je ergens anders zat. */}
       {client && (
-        <PageVideoWidget
-          client={client} db={db} pageContext={currentView}
+        <MediaBibliotheek
+          client={client} db={db} pageContext={currentView} isMobile={isMobile}
           open={widgetOpen === 'video'}
           onOpenChange={(o) => setWidgetOpen(o ? 'video' : null)}
           onCountChange={setCount('video')}
@@ -560,7 +561,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           // Vragen zit nu in het Meer-menu op de onderbalk; twee ingangen
           // naar hetzelfde venster maakte de zijbalk onnodig lang.
           {
-            id: 'video', label: 'Video', Icon: PlayCircle, color: '#FFD700',
+            id: 'video', label: 'Bibliotheek', Icon: PlayCircle, color: '#FFD700',
             active: widgetOpen === 'video', badge: widgetCounts.video,
             onClick: () => setWidgetOpen(o => o === 'video' ? null : 'video'),
           },
