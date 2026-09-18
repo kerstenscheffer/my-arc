@@ -1,7 +1,7 @@
 // src/modules/videos/CoachVideoTab.jsx
 // v3.0 — Netflix categorie rijen + nieuwe filters (custom categorie + page filter)
 import React, { useState, useEffect } from 'react'
-import { Video, Plus, FolderPlus, ChevronDown, ChevronUp, GraduationCap, Search, X, MoreHorizontal, Send, Pencil, Trash2 } from 'lucide-react'
+import { Video, Plus, FolderPlus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GraduationCap, Search, X, MoreHorizontal, Send, Pencil, Trash2 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import videoService from './VideoService'
 import CoachFileManager from './CoachFileManager'
@@ -73,6 +73,7 @@ export default function CoachVideoTab({ clients = [], db }) {
 
   // Custom categories
   const [customCategories, setCustomCategories] = useState([])
+  const [sectie, setSectie] = useState(null)   // null = het overzicht
   const [coachId, setCoachId] = useState(null)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
 
@@ -244,8 +245,40 @@ export default function CoachVideoTab({ clients = [], db }) {
     || (a.title || '').localeCompare(b.title || '')
   )
 
-  const totalCount = filteredVideos.length
   const isFilteringActive = searchQuery || selectedCategoryId !== 'all' || selectedPage !== 'all'
+
+  // Secties: één kaart per categorie, plus de cursussen en wat geen categorie
+  // heeft. Zonder dit stond de hele bibliotheek uitgeklapt op één pagina —
+  // achttien video's en alle cursussen onder elkaar.
+  const secties = [
+    ...(courses.length > 0
+      ? [{ id: 'cursussen', label: 'Cursussen', aantal: courses.length,
+           thumb: courses.map(c => c.thumbnail_url || videoService.getThumbnailUrl(videos.find(v => v.id === (c.videoIds || [])[0]) || {})).find(Boolean) }]
+      : []),
+    ...customCategories.map(c => {
+      const erin = videos.filter(v => v.category_id === c.id)
+      return {
+        id: c.id, label: c.name, aantal: erin.length,
+        thumb: erin.map(v => videoService.getThumbnailUrl(v)).find(Boolean),
+      }
+    }),
+    ...(() => {
+      const zonder = videos.filter(v => !v.category_id)
+      return zonder.length > 0
+        ? [{ id: 'uncategorized', label: 'Zonder categorie', aantal: zonder.length,
+             thumb: zonder.map(v => videoService.getThumbnailUrl(v)).find(Boolean) }]
+        : []
+    })(),
+  ]
+
+  const sectieLabel = secties.find(x => x.id === sectie)?.label
+  const videosVanSectie = sectie === 'uncategorized'
+    ? gesorteerdeVideos.filter(v => !v.category_id)
+    : (sectie && sectie !== 'cursussen')
+      ? gesorteerdeVideos.filter(v => v.category_id === sectie)
+      : gesorteerdeVideos
+  // Zoeken gaat door alles heen; zonder zoekterm blijf je in je sectie.
+  const toonOverzicht = !sectie && !isFilteringActive
 
   return (
     <div style={{
@@ -446,10 +479,98 @@ export default function CoachVideoTab({ clients = [], db }) {
         <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700 }}>
           Video's laden...
         </div>
+      ) : toonOverzicht ? (
+        /* Overzicht: één kaart per sectie. Klik je er een aan, dan staat die
+           inhoud eronder — in plaats van alles tegelijk op één pagina. */
+        secties.length === 0 ? (
+          <EmptyState
+            isFiltering={false}
+            onUpload={() => setShowUploadModal(true)}
+            onResetFilters={() => {}}
+            isMobile={isMobile}
+          />
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: isMobile ? '0.6rem' : '0.75rem',
+          }}>
+            {secties.map(sec => (
+              <button
+                key={sec.id}
+                onClick={() => setSectie(sec.id)}
+                style={{
+                  position: 'relative', overflow: 'hidden',
+                  aspectRatio: '16 / 10', padding: 0,
+                  borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)',
+                  background: '#141414', cursor: 'pointer', fontFamily: 'inherit',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {sec.thumb && (
+                  <span style={{
+                    position: 'absolute', inset: 0,
+                    backgroundImage: `url(${sec.thumb})`,
+                    backgroundSize: 'cover', backgroundPosition: 'center',
+                    opacity: 0.85,
+                  }} />
+                )}
+                <span style={{
+                  position: 'absolute', inset: 0,
+                  background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.6) 55%, rgba(0,0,0,0.92) 100%)',
+                }} />
+                <span style={{
+                  position: 'absolute', left: 0, right: 0, bottom: 0,
+                  padding: isMobile ? '0.65rem 0.7rem' : '0.8rem 0.85rem',
+                  display: 'flex', alignItems: 'flex-end', gap: 6, textAlign: 'left',
+                }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{
+                      display: 'block',
+                      fontSize: isMobile ? '0.88rem' : '0.98rem', fontWeight: 900, color: '#fff',
+                      letterSpacing: '-0.02em', lineHeight: 1.2,
+                      textShadow: '0 2px 10px rgba(0,0,0,0.85)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {sec.label}
+                    </span>
+                    <span style={{
+                      display: 'block', marginTop: 2,
+                      fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)',
+                      textTransform: 'uppercase', letterSpacing: '0.08em',
+                      textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+                    }}>
+                      {sec.id === 'cursussen'
+                        ? `${sec.aantal} cursus${sec.aantal === 1 ? '' : 'sen'}`
+                        : `${sec.aantal} video${sec.aantal === 1 ? '' : "'s"}`}
+                    </span>
+                  </span>
+                  <ChevronRight size={16} color="#fff" strokeWidth={3} style={{ flexShrink: 0, marginBottom: 2 }} />
+                </span>
+              </button>
+            ))}
+          </div>
+        )
       ) : (
         <>
-          {/* Cursussen: uitklapbaar, video's eronder */}
-          {courses.length > 0 && (
+          {/* Terug naar de secties */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.75rem' }}>
+            <button
+              onClick={() => { setSectie(null); setSearchQuery(''); setSelectedCategoryId('all'); setSelectedPage('all') }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                minHeight: 34, padding: '0 0.7rem 0 0.5rem',
+                background: 'transparent', border: 'none',
+                color: '#fff', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              <ChevronLeft size={16} strokeWidth={3} />
+              {sectieLabel || 'Alle video\'s'}
+            </button>
+          </div>
+
+          {sectie === 'cursussen' && courses.length > 0 && (
             <CourseList
               courses={courses}
               videos={videos}
@@ -467,51 +588,50 @@ export default function CoachVideoTab({ clients = [], db }) {
             />
           )}
 
-          {/* Losse video's — één lijst */}
-          {filteredVideos.length === 0 ? (
-            <EmptyState
-              isFiltering={isFilteringActive}
-              onUpload={() => setShowUploadModal(true)}
-              onResetFilters={() => {
-                setSearchQuery('')
-                setSelectedCategoryId('all')
-                setSelectedPage('all')
-              }}
-              isMobile={isMobile}
-            />
-          ) : (
-            <div>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                padding: '0 0.5rem 0.4rem',
-                fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)',
-              }}>
-                {isFilteringActive ? `${totalCount} van ${videos.length} video's` : `${totalCount} video's`}
+          {sectie !== 'cursussen' && (
+            videosVanSectie.length === 0 ? (
+              <EmptyState
+                isFiltering={isFilteringActive}
+                onUpload={() => setShowUploadModal(true)}
+                onResetFilters={() => {
+                  setSearchQuery('')
+                  setSelectedCategoryId('all')
+                  setSelectedPage('all')
+                }}
+                isMobile={isMobile}
+              />
+            ) : (
+              <div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  padding: '0 0.5rem 0.4rem',
+                  fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)',
+                }}>
+                  {videosVanSectie.length} van {videos.length} video's
+                </div>
+                {/* Raster in plaats van regels over de volle breedte. Op een
+                    telefoon blijft het één regel per video. */}
+                <div style={isMobile
+                  ? { borderTop: '1px solid rgba(255,255,255,0.06)' }
+                  : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}
+                >
+                  {videosVanSectie.map(v => (
+                    <VideoRow
+                      key={v.id}
+                      video={v}
+                      categorieNaam={categorieNaamVan(v)}
+                      aantalKlanten={assignCounts[v.id] || 0}
+                      onAssign={() => { setSelectedVideo(v); setShowVisibilityModal(true) }}
+                      onManage={() => { setManagingVideo(v); setShowManageModal(true) }}
+                      onEdit={() => { setEditingVideo(v); setShowEditModal(true) }}
+                      onDelete={() => handleDeleteVideo(v)}
+                      isMobile={isMobile}
+                      vorm={isMobile ? 'regel' : 'kaart'}
+                    />
+                  ))}
+                </div>
               </div>
-              {/* Raster in plaats van regels over de volle breedte: daar stond
-                  de titel links en de knoppen een halve meter verderop. Op een
-                  telefoon blijft het één regel per video, want daar is de
-                  breedte toch niet het probleem. */}
-              <div style={isMobile
-                ? { borderTop: '1px solid rgba(255,255,255,0.06)' }
-                : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}
-              >
-                {gesorteerdeVideos.map(v => (
-                  <VideoRow
-                    key={v.id}
-                    video={v}
-                    categorieNaam={categorieNaamVan(v)}
-                    aantalKlanten={assignCounts[v.id] || 0}
-                    onAssign={() => { setSelectedVideo(v); setShowVisibilityModal(true) }}
-                    onManage={() => { setManagingVideo(v); setShowManageModal(true) }}
-                    onEdit={() => { setEditingVideo(v); setShowEditModal(true) }}
-                    onDelete={() => handleDeleteVideo(v)}
-                    isMobile={isMobile}
-                    vorm={isMobile ? 'regel' : 'kaart'}
-                  />
-                ))}
-              </div>
-            </div>
+            )
           )}
         </>
       )}
@@ -674,12 +794,11 @@ function CourseList({
   onAssign, onVisibility, onEdit, onDelete,
   onVideoAssign, onVideoManage, onVideoEdit, onVideoDelete, isMobile,
 }) {
-  // Alles staat open. Eén cursus tegelijk betekende dat je bij elke cursus
-  // eerst moest klikken om te zien wat erin zat, en dat is precies wat je van
-  // dit scherm wil weten. Dichtklappen kan nog steeds per cursus.
-  const [dicht, setDicht] = useState(() => new Set())
+  // Dicht bij binnenkomst. In de cursus-sectie staan de cursussen onder
+  // elkaar; ze allemaal opengeklapt tonen maakte er weer één lange lap van.
+  const [open_, setOpen_] = useState(() => new Set())
   const [menuId, setMenuId] = useState(null)
-  const wisselOpen = (id) => setDicht(prev => {
+  const wisselOpen = (id) => setOpen_(prev => {
     const kopie = new Set(prev)
     if (kopie.has(id)) kopie.delete(id); else kopie.add(id)
     return kopie
@@ -712,7 +831,7 @@ function CourseList({
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         {courses.map(course => {
-          const open = !dicht.has(course.id)
+          const open = open_.has(course.id)
           const thumb = thumbFor(course)
           const cursusVideos = open
             ? (course.videoIds || []).map(id => videos.find(v => v.id === id)).filter(Boolean)
