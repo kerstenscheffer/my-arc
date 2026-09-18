@@ -3363,43 +3363,42 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         ;(data || []).forEach(l => leadMap.set(l.id, l))
       }
 
-      const rxBatches = []
-      const movBatches = []
+      // Reacties en verplaatsingen per brok leads. Gepagineerd: een brok van
+      // 300 leads heeft al gauw meer dan 1000 verplaatsingen (gemiddeld vijf
+      // per lead, plus de dagelijkse stil-sectie-sprongen), en PostgREST kapt
+      // een request zonder range af op 1000 rijen. Dat gebeurde stil: de
+      // afgekapte helft bevatte juist de recente stappen, waardoor "Call
+      // ingepland" van tien leads terugviel naar één.
+      const reactiesPerLead = new Map()
+      const movPerLead = new Map()
       for (let i = 0; i < leadIds.length; i += 300) {
         const chunk = leadIds.slice(i, i + 300)
-        rxBatches.push(this.db.supabase
-          .from('lead_reaction_events')
-          .select('lead_id, delta, created_at')
-          .in('lead_id', chunk)
-          .gt('delta', 0))
-        movBatches.push(this.db.supabase
-          .from('lead_movements')
-          .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at')
-          .in('lead_id', chunk))
-      }
-      const [rxResults, movResults] = await Promise.all([
-        Promise.all(rxBatches),
-        Promise.all(movBatches),
-      ])
-
-      const reactiesPerLead = new Map()
-      rxResults.forEach(({ data }) => {
-        ;(data || []).forEach(ev => {
+        const [rxRijen, movRijen] = await Promise.all([
+          this._fetchAllRows(() => this.db.supabase
+            .from('lead_reaction_events')
+            .select('id, lead_id, delta, created_at')
+            .in('lead_id', chunk)
+            .gt('delta', 0)
+            .order('id', { ascending: true })),
+          this._fetchAllRows(() => this.db.supabase
+            .from('lead_movements')
+            .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at')
+            .in('lead_id', chunk)
+            .order('id', { ascending: true })),
+        ])
+        rxRijen.forEach(ev => {
           if (!ev.created_at) return
           const lijst = reactiesPerLead.get(ev.lead_id) || []
           lijst.push(ev.created_at)
           reactiesPerLead.set(ev.lead_id, lijst)
         })
-      })
-      const movPerLead = new Map()
-      movResults.forEach(({ data }) => {
-        ;(data || []).forEach(m => {
+        movRijen.forEach(m => {
           if (!m.moved_at) return
           const lijst = movPerLead.get(m.lead_id) || []
           lijst.push(m)
           movPerLead.set(m.lead_id, lijst)
         })
-      })
+      }
 
       const stageKeywords = [
         { key: 'callProposed',  words: ['voorgesteld', 'voorstel'] },
