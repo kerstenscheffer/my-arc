@@ -23,6 +23,7 @@ import {
 import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
 import DagAgenda from '../components/DagAgenda'
+import StappenKaart from '../components/StappenKaart'
 import { vandaagStand, verzetDag } from '../components/dagNavigatie'
 import { dateForDay } from '../../modules/client-agenda/ClientAgendaService'
 import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
@@ -929,6 +930,14 @@ export default function ClientHome({ client, db, setCurrentView }) {
               onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
             />
           </div>
+        </div>
+      </FadeOnScroll>
+
+      {/* Stappen van vandaag: een dagding waar je 's avonds nog iets aan kunt
+          doen, dus niet achter een tabblad. */}
+      <FadeOnScroll>
+        <div style={{ marginTop: isMobile ? '1.6rem' : '2rem' }}>
+          <StappenKaart client={client} db={db} isMobile={isMobile} />
         </div>
       </FadeOnScroll>
 
