@@ -413,15 +413,14 @@ export default function CoachFileManager({ coachId }) {
               style={{
                 minHeight: 50,
                 padding: '0.7rem',
-                background: '#fff', opacity: uploading ? 0.4 : 1,
+                background: '#fff',
                 border: 'none', borderRadius: 12,
                 color: '#0a0a0a',
                 fontSize: '0.88rem', fontWeight: 900,
-                textTransform: 'uppercase', letterSpacing: '0.04em',
+                letterSpacing: '-0.01em',
                 cursor: uploading ? 'wait' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: (!uploadDraft.file || !uploadDraft.title.trim()) ? 0.5 : 1,
-
+                opacity: (uploading || !uploadDraft.file || !uploadDraft.title.trim()) ? 0.4 : 1,
               }}
             >
               <Upload size={16} strokeWidth={2.5} />
