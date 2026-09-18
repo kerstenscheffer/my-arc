@@ -14,7 +14,6 @@
 // navigatie en de tiles voegden alleen duplicaat-navigatie toe zonder content.
 
 import TodayCard from "../components/TodayCard"
-import HomeVideoSlider from "../components/HomeVideoSlider"
 import React, { useState, useEffect } from 'react'
 import {
   Calendar, Coffee, Sun, Moon, Target, Clock,
@@ -930,14 +929,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
               onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
             />
           </div>
-        </div>
-      </FadeOnScroll>
-
-      {/* Video's van je coach. Onder de dag: eerst wat je moet doen, dan wat
-          er te kijken valt. */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
-          <HomeVideoSlider client={client} />
         </div>
       </FadeOnScroll>
 

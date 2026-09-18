@@ -18,6 +18,7 @@ import ClientFAQModal from '../modules/faq/ClientFAQModal'
 import ChallengeProgressTab from '../modules/challenge-monitor/ChallengeProgressTab'
 import PageVideoWidget from '../modules/videos/PageVideoWidget'
 import WidgetSidebar from '../components/WidgetSidebar'
+import VideoTeaser from './components/VideoTeaser'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import ClientAgendaView from '../modules/client-agenda/ClientAgendaView'
@@ -355,6 +356,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.3) 30%, rgba(10,10,10,0.7) 58%, rgba(10,10,10,0.94) 80%, #0a0a0a 100%)',
           }}
         />
+      )}
+
+      {/* ── Video-teaser: komt af en toe boven de balk omhoog en zakt weer in.
+             Verbergen in focus-mode, net als de balk zelf. ── */}
+      {!focusMode && (
+        <VideoTeaser client={client} isMobile={isMobile} onderMarge={isMobile ? 86 : 92} />
       )}
 
       {/* ── Floating Bottom Nav — verbergen in focus-mode (bv. workout-dropdown open) ── */}
