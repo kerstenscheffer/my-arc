@@ -10,23 +10,11 @@ import { Play, Phone, ChevronRight } from 'lucide-react'
 import MacroBoxes from './MacroBoxes'
 import AIMealPlanService from '../../modules/meal-plan/AIMealPlanService'
 import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
+import { workoutFoto } from './workoutFoto'
 
 const todayYMD = () => new Date().toISOString().split('T')[0]
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-const WORKOUT_IMAGES = {
-  push: 'https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?w=1200&h=500&fit=crop&q=85',
-  pull: 'https://images.unsplash.com/photo-1605296867424-35fc25c9212a?w=1200&h=500&fit=crop&q=85',
-  legs: 'https://images.unsplash.com/photo-1567598508481-65985588e295?w=1200&h=500&fit=crop&q=85',
-  default: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200&h=500&fit=crop&q=85',
-}
-const pickWorkoutImg = (name) => {
-  const n = (name || '').toLowerCase()
-  if (/push|duw|borst|chest|press/.test(n)) return WORKOUT_IMAGES.push
-  if (/pull|trek|rug|back|lat/.test(n)) return WORKOUT_IMAGES.pull
-  if (/leg|been|quad|squat|hamstring|glute/.test(n)) return WORKOUT_IMAGES.legs
-  return WORKOUT_IMAGES.default
-}
 
 export default function TodayCard({ client, db, setCurrentView, isMobile }) {
   const [training, setTraining] = useState(null)   // null=laden; { rest:true } | { name, focus }
@@ -112,7 +100,7 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
 
   const goWorkout = () => setCurrentView && setCurrentView('workout')
   const isRest = training && training.rest
-  const workoutImg = training && !isRest ? pickWorkoutImg(training.name) : null
+  const workoutImg = training && !isRest ? workoutFoto(training.name) : null
 
   const hasTarget = macros && macros.targets.calories > 0
 

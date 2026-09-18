@@ -19,9 +19,16 @@ import { Calendar, ChevronLeft, ChevronRight, Utensils, Dumbbell, Moon, Briefcas
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
 } from '../../modules/client-agenda/ClientAgendaService'
+import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foodImageFallback'
+import { workoutFoto } from './workoutFoto'
 
 const LIJN = 'rgba(255,255,255,0.07)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.04)'
+
+// Hoogte van één uur. Met een raster dat zich in een vaste hoogte propte werd
+// een maaltijd van een kwartier een streepje van acht pixels; daar past geen
+// foto en geen naam in. Nu bepaalt het uur de hoogte en scrolt de dag.
+const UUR_HOOGTE = { mobiel: 108, desktop: 124 }
 
 const ICOON = {
   meal: Utensils,
@@ -80,7 +87,7 @@ function verdeelInKolommen(blokken) {
   return [...achter, ...uit]
 }
 
-export default function DagAgenda({ client, db, isMobile = false, hoogte }) {
+export default function DagAgenda({ client, db, isMobile = false, hoogte, onOpen }) {
   const service = useMemo(() => new ClientAgendaService(db?.supabase || db), [db])
   const [weekAnker, setWeekAnker] = useState(() => getMondayOf(new Date()))
   const [dag, setDag] = useState(() => dagSleutelVan(new Date()))
@@ -125,7 +132,9 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte }) {
   }, [blokken])
 
   const spanMin = Math.max(60, tot - van)
-  const pctVan = (min) => ((Math.max(van, Math.min(tot, min)) - van) / spanMin) * 100
+  const uurHoogte = isMobile ? UUR_HOOGTE.mobiel : UUR_HOOGTE.desktop
+  const roosterHoogte = (spanMin / 60) * uurHoogte
+  const pxVan = (min) => ((Math.max(van, Math.min(tot, min)) - van) / 60) * uurHoogte
   const uren = []
   for (let u = Math.ceil(van / 60); u <= Math.floor(tot / 60); u++) uren.push(u)
 
@@ -190,10 +199,10 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte }) {
         }}
       >
         {/* Tijdas */}
-        <div style={{ width: isMobile ? 34 : 40, flexShrink: 0, position: 'relative' }}>
+        <div style={{ width: isMobile ? 34 : 40, flexShrink: 0, position: 'relative', height: roosterHoogte }}>
           {uren.map(u => (
             <div key={u} style={{
-              position: 'absolute', top: `${pctVan(u * 60)}%`, left: 0, right: 4,
+              position: 'absolute', top: pxVan(u * 60), left: 0, right: 4,
               transform: 'translateY(-50%)',
               fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.25)',
               textAlign: 'right', fontVariantNumeric: 'tabular-nums',
@@ -204,17 +213,17 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte }) {
         </div>
 
         {/* Dagkolom */}
-        <div style={{ flex: 1, minWidth: 0, position: 'relative', minHeight: isMobile ? 520 : 620 }}>
+        <div style={{ flex: 1, minWidth: 0, position: 'relative', height: roosterHoogte }}>
           {uren.map(u => (
             <div key={u} style={{
-              position: 'absolute', top: `${pctVan(u * 60)}%`, left: 0, right: 0,
+              position: 'absolute', top: pxVan(u * 60), left: 0, right: 0,
               borderTop: `1px solid ${LIJN_ZACHT}`,
             }} />
           ))}
 
           {toonNuLijn && (
             <div style={{
-              position: 'absolute', top: `${pctVan(nuMin)}%`, left: 0, right: 0,
+              position: 'absolute', top: pxVan(nuMin), left: 0, right: 0,
               height: 0, borderTop: '1px solid rgba(255,255,255,0.5)', zIndex: 6,
             }}>
               <span style={{
@@ -226,7 +235,7 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte }) {
 
           {laden && (
             <div style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 40,
               fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
             }}>
               Dag laden…
@@ -236,7 +245,7 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte }) {
           {!laden && blokken.length === 0 && (
             <div style={{
               position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 6,
+              alignItems: 'center', justifyContent: 'flex-start', gap: 6, paddingTop: 40,
               color: 'rgba(255,255,255,0.3)',
             }}>
               <Calendar size={18} />
@@ -245,7 +254,7 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte }) {
           )}
 
           {blokken.map(b => (
-            <Blok key={b.id} blok={b} isMobile={isMobile} pctVan={pctVan} />
+            <Blok key={b.id} blok={b} isMobile={isMobile} pxVan={pxVan} onOpen={onOpen} />
           ))}
         </div>
       </div>
@@ -265,68 +274,177 @@ export default function DagAgenda({ client, db, isMobile = false, hoogte }) {
   )
 }
 
-// Eén blok. Kleur zit alleen in de streep links; de tekst is wit, zodat een
-// dag met zes blokken niet als een kleurenkaart leest.
-function Blok({ blok, isMobile, pctVan }) {
-  const top = pctVan(blok.start)
-  const hoogte = Math.max(2.4, pctVan(blok.end) - top)
-  const Icoon = ICOON[blok.type] || Calendar
+// Eén blok. Maaltijden en trainingen krijgen hun eigen kaart — dezelfde vorm
+// als op de maaltijd- en workout-pagina — zodat de agenda niet een rooster met
+// tekstregels is maar hetzelfde spul op een tijdlijn. De rest (slaap, werk,
+// supplementen) blijft een rustige regel: dat hoef je alleen te zien, niet te
+// lezen.
+function Blok({ blok, isMobile, pxVan, onOpen }) {
+  const top = pxVan(blok.start)
+  const hoogte = Math.max(26, pxVan(blok.end) - top)
   const achter = !!blok._achter
-  const kort = (blok.end - blok.start) < 40
+  const isMaaltijd = blok.type === 'meal'
+  const isTraining = blok.type === 'training'
+  const Icoon = ICOON[blok.type] || Calendar
 
-  const soort = blok.type === 'meal' ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || '')
-  const naam = blok.sublabel || (blok.type === 'meal' ? null : blok.label)
+  const soort = isMaaltijd ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || '')
+  const naam = blok.sublabel || (isMaaltijd ? null : blok.label)
+  const klikbaar = !!onOpen && (isMaaltijd || isTraining)
 
-  return (
-    <div
-      title={`${soort}${naam ? ` — ${naam}` : ''}\n${tijd(blok.start)}–${tijd(blok.end)}`}
-      style={{
-        position: 'absolute',
-        top: `${top}%`, height: `${hoogte}%`,
-        left: achter ? 0 : `calc(${((blok._kolom || 0) / (blok._kolommen || 1)) * 100}% + 4px)`,
-        width: achter ? '100%' : `calc(${100 / (blok._kolommen || 1)}% - 8px)`,
-        minHeight: 22,
-        background: achter ? `${blok.color}26` : '#141414',
-        border: `1px solid ${achter ? `${blok.color}59` : 'rgba(255,255,255,0.07)'}`,
-        borderLeft: `3px solid ${blok.color}`,
-        borderRadius: 8,
-        overflow: 'hidden',
-        zIndex: achter ? 0 : 2,
-        display: 'flex', alignItems: kort ? 'center' : 'flex-start',
-        gap: 6,
-        padding: isMobile ? '4px 7px' : '6px 9px',
-        opacity: blok.meta?.placeholder ? 0.6 : 1,
-      }}
-    >
-      <Icoon size={11} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, marginTop: kort ? 0 : 2 }} />
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+  // Hoeveel past erin? Onder de 54 pixels is er alleen plek voor één regel;
+  // dan vervalt de foto en staat alles naast elkaar.
+  const ruim = hoogte >= 54
+
+  const buiten = {
+    position: 'absolute',
+    top, height: hoogte,
+    left: achter ? 0 : `calc(${((blok._kolom || 0) / (blok._kolommen || 1)) * 100}% + 4px)`,
+    width: achter ? '100%' : `calc(${100 / (blok._kolommen || 1)}% - 8px)`,
+    background: achter ? `${blok.color}26` : '#141414',
+    border: `1px solid ${achter ? `${blok.color}59` : 'rgba(255,255,255,0.07)'}`,
+    borderLeft: `3px solid ${blok.color}`,
+    borderRadius: 10,
+    overflow: 'hidden',
+    zIndex: achter ? 0 : 2,
+    opacity: blok.meta?.placeholder ? 0.6 : 1,
+    cursor: klikbaar ? 'pointer' : 'default',
+    textAlign: 'left',
+    padding: 0,
+    fontFamily: 'inherit',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+  }
+
+  const titel = `${soort}${naam ? ` — ${naam}` : ''}\n${tijd(blok.start)}–${tijd(blok.end)}`
+  const Wrapper = klikbaar ? 'button' : 'div'
+  const wrapperProps = klikbaar ? { onClick: () => onOpen(blok) } : {}
+
+  // ── Maaltijd: foto links, naam en macro's ernaast ──
+  if (isMaaltijd && ruim) {
+    const foto = resolveFoodImage({ image_url: blok.meta?.image_url, name: naam })
+      || foodImageFallback(naam, blok.meta?.slot, 200)
+    const macros = [
+      { val: blok.meta?.kcal, label: 'kcal' },
+      { val: blok.meta?.protein, label: 'E' },
+      { val: blok.meta?.carbs, label: 'K' },
+      { val: blok.meta?.fat, label: 'V' },
+    ].filter(m => Number(m.val) > 0)
+    return (
+      <Wrapper {...wrapperProps} title={titel} style={{ ...buiten, display: 'flex', alignItems: 'stretch' }}>
+        <div style={{
+          width: Math.min(96, Math.max(58, hoogte)), flexShrink: 0, alignSelf: 'stretch',
+          background: foto ? `url(${foto}) center/cover` : 'rgba(255,255,255,0.05)',
+          position: 'relative',
+        }}>
           <div style={{
-            fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.015em', lineHeight: 1.2,
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.75) 100%)',
+          }} />
+          <span style={{
+            position: 'absolute', left: 6, right: 4, bottom: 4,
+            fontSize: '0.56rem', fontWeight: 900, color: '#fff',
+            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
-            {naam || soort}
-          </div>
-          {!kort && naam && soort && (
-            <div style={{
-              fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
-              textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2,
+            {soort}
+          </span>
+        </div>
+        <div style={{
+          flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          padding: isMobile ? '6px 8px' : '8px 10px', gap: 3,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{
+              flex: 1, minWidth: 0,
+              fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.015em', lineHeight: 1.2,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
-              {soort}
+              {naam || soort}
+            </span>
+            <span style={tijdStempel}>{tijd(blok.start)}</span>
+          </div>
+          {macros.length > 0 && (
+            <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', overflow: 'hidden' }}>
+              {macros.map(m => (
+                <span key={m.label} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{Math.round(m.val)}</span>
+                  <span style={{ fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>{m.label}</span>
+                </span>
+              ))}
             </div>
           )}
         </div>
-        <span style={{
-          flexShrink: 0, fontSize: '0.58rem', fontWeight: 800,
-          color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums',
+      </Wrapper>
+    )
+  }
+
+  // ── Training: foto als achtergrond, naam eroverheen ──
+  if (isTraining && ruim) {
+    return (
+      <Wrapper {...wrapperProps} title={titel} style={{ ...buiten, display: 'block', position: 'absolute' }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${workoutFoto(naam || soort)})`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 55%, rgba(0,0,0,0.85) 100%)',
+        }} />
+        <div style={{
+          position: 'relative', height: '100%',
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          padding: isMobile ? '6px 9px' : '8px 11px',
         }}>
-          {tijd(blok.start)}
-        </span>
-      </div>
-    </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{
+              flex: 1, minWidth: 0,
+              fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.02em', lineHeight: 1.15,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+            }}>
+              {naam || 'Training'}
+            </span>
+            <span style={{ ...tijdStempel, color: 'rgba(255,255,255,0.6)' }}>{tijd(blok.start)}</span>
+          </div>
+          <span style={{
+            fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)',
+            textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 2,
+            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+          }}>
+            Training
+          </span>
+        </div>
+      </Wrapper>
+    )
+  }
+
+  // ── De rest: één rustige regel ──
+  return (
+    <Wrapper {...wrapperProps} title={titel} style={{
+      ...buiten,
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: isMobile ? '4px 8px' : '6px 10px',
+    }}>
+      <Icoon size={11} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
+      <span style={{
+        flex: 1, minWidth: 0,
+        fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 900, color: '#fff',
+        letterSpacing: '-0.015em',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {naam || soort}
+      </span>
+      <span style={tijdStempel}>{tijd(blok.start)}</span>
+    </Wrapper>
   )
+}
+
+const tijdStempel = {
+  flexShrink: 0, fontSize: '0.58rem', fontWeight: 800,
+  color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums',
 }
 
 const pijl = {
