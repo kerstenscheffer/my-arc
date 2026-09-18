@@ -13,7 +13,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { BASELINE_VRAGEN } from '../../../modules/public-intake/baselineVragen'
-import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays, ExternalLink, FileText, GripVertical, Minus, Maximize2 } from 'lucide-react'
+import { X, User, Utensils, Dumbbell, Clock, CalendarDays, ExternalLink, FileText, GripVertical, Minus, Maximize2, ChevronDown } from 'lucide-react'
 import { useModalHost } from '../../ModalHost'
 import useZwevendVenster from '../../../components/useZwevendVenster'
 import ClientAgendaView from '../../../modules/client-agenda/ClientAgendaView'
@@ -751,9 +751,6 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
     ingeklapt, setIngeklapt, herstel, vensterStijl, sleepHandvat, formaatHandvat,
   } = useZwevendVenster({ isMobile, standaard: { w: 560, h: 720 } })
   const [activeTab, setActiveTab] = useState('part1')
-  // Alleen om het groene vinkje op de Plan-tab te kunnen zetten zonder dat je
-  // de tab hebt geopend. De inhoud laadt de tab zelf.
-  const [heeftPlan, setHeeftPlan] = useState(false)
   const [training, setTraining] = useState(null)
   const [clientTraining, setClientTraining] = useState(null)
   const [loadingTraining, setLoadingTraining] = useState(true)
@@ -762,21 +759,6 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
   // Meetmomenten: nieuwste eerst, zodat een hermeting bovenaan staat en de
   // intake-nulmeting eronder — precies zoals je ze wil vergelijken.
   const [metingen, setMetingen] = useState([])
-  useEffect(() => {
-    if (!client?.id || !db?.supabase) return
-    let weg = false
-    db.supabase
-      .from('client_plan_proposals')
-      .select('id')
-      .eq('client_id', client.id)
-      .limit(1)
-      .then(({ data, error }) => {
-        if (weg || error) return
-        setHeeftPlan((data || []).length > 0)
-      })
-    return () => { weg = true }
-  }, [db, client?.id])
-
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
     let weg = false
@@ -888,15 +870,15 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
     : null
 
   const tabs = [
-    { id: 'part1', label: 'Persoonlijk', icon: User, done: client?.intake_completed },
-    { id: 'part2', label: 'Voeding', icon: Utensils, done: np?.completed || client?.intake_completed },
-    { id: 'part3', label: 'Training', icon: Dumbbell, done: training?.workout_completed || (hasTrainingData && client?.intake_completed) },
+    { id: 'part1', label: 'Persoonlijk', icon: User },
+    { id: 'part2', label: 'Voeding', icon: Utensils },
+    { id: 'part3', label: 'Training', icon: Dumbbell },
     // Het eindplaatje: werk, slaap, training en maaltijden in één week.
     // Dit is waar de losse antwoorden op uitkomen, dus het hoort hier.
-    { id: 'agenda', label: 'Agenda', icon: CalendarDays, done: false },
+    { id: 'agenda', label: 'Agenda', icon: CalendarDays },
     // Geen intake-deel maar de uitkomst ervan: wat er besproken is en wat het
     // plan wordt.
-    { id: 'plan', label: 'Plan', icon: FileText, done: heeftPlan }
+    { id: 'plan', label: 'Plan', icon: FileText }
   ]
 
   const fullName = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'Client'
@@ -921,16 +903,60 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 8,
-            padding: isMobile ? '0.85rem 1rem' : '0.7rem 0.85rem',
+            padding: isMobile ? '0.6rem 0.8rem' : '0.55rem 0.75rem',
             borderBottom: '1px solid rgba(255,255,255,0.05)',
             flexShrink: 0,
             ...(sleepHandvat.style || {})
           }}
         >
           {!isMobile && <GripVertical size={13} color="rgba(255,255,255,0.2)" style={{ flexShrink: 0 }} />}
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>Intake</div>
-            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</div>
+          {/* Titel, naam en het tabblad staan op één regel; de tabbalk eronder
+              kostte een hele rij voor iets waar je één keer op klikt. */}
+          <div style={{
+            minWidth: 0, flex: 1,
+            display: 'flex', alignItems: 'baseline', gap: 6,
+            whiteSpace: 'nowrap', overflow: 'hidden',
+          }}>
+            <span style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em', flexShrink: 0 }}>
+              Intake
+            </span>
+            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {fullName}
+            </span>
+          </div>
+
+          {/* Tabkeuze als dropdown. Het vinkje per tab is weg: dat je de
+              intake hebt ingevuld zie je aan de antwoorden zelf. */}
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+              height: 26, padding: '0 0.45rem', borderRadius: 7,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              cursor: 'pointer',
+            }}
+          >
+            {(() => {
+              const Icon = (tabs.find(t => t.id === activeTab) || tabs[0]).icon
+              return <Icon size={12} color="#fff" style={{ flexShrink: 0 }} />
+            })()}
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              aria-label="Kies een onderdeel"
+              style={{
+                background: 'transparent', border: 'none', outline: 'none',
+                color: '#fff', fontSize: '0.72rem', fontWeight: 800,
+                fontFamily: 'inherit', cursor: 'pointer', padding: 0,
+                appearance: 'none', WebkitAppearance: 'none',
+              }}
+            >
+              {tabs.map(tab => (
+                <option key={tab.id} value={tab.id} style={{ background: '#0a0a0a' }}>{tab.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={11} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
           </div>
           {!isMobile && (
             <button
@@ -963,58 +989,6 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
 
         {!ingeklapt && (
         <>
-        {/* Tabs */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.4rem',
-            padding: isMobile ? '0.6rem 1rem 0' : '0.65rem 1.15rem 0',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-            // Zonder dit knijpt de kolom de balk plat zodra de inhoud lang is;
-            // met vijf tabs was daar niets meer van te lezen.
-            flexShrink: 0,
-            // Vijf tabs passen op een smal scherm niet naast elkaar; dan
-            // schuift de balk in plaats van dat de labels afbreken.
-            overflowX: 'auto',
-            scrollbarWidth: 'none'
-          }}
-        >
-          {tabs.map((tab) => {
-            const Icon = tab.icon
-            const active = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  flex: '1 0 auto',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  padding: '0.6rem 0.4rem',
-                  background: 'transparent',
-                  border: 'none',
-                  // Wit is het accent, groen betekent "binnen" (het vinkje).
-                  borderBottom: active ? '2px solid #fff' : '2px solid transparent',
-                  color: active ? '#fff' : 'rgba(255,255,255,0.4)',
-                  fontSize: isMobile ? '0.72rem' : '0.78rem',
-                  fontWeight: active ? 900 : 700,
-                  letterSpacing: '-0.01em',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                <Icon size={14} />
-                {tab.label}
-                {tab.done && <CheckCircle2 size={12} color={GREEN} />}
-              </button>
-            )
-          })}
-        </div>
-
         {/* Content */}
         <div
           style={{
@@ -1065,12 +1039,7 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
             </div>
           )}
           {activeTab === 'plan' && (
-            <PlanVoorstelTab
-              db={db}
-              client={client}
-              isMobile={isMobile}
-              onBestaatChange={setHeeftPlan}
-            />
+            <PlanVoorstelTab db={db} client={client} isMobile={isMobile} />
           )}
           {activeTab === 'part1' && (
             <>
