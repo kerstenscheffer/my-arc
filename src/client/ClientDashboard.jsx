@@ -361,7 +361,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       {/* ── Video-teaser: komt af en toe boven de balk omhoog en zakt weer in.
              Verbergen in focus-mode, net als de balk zelf. ── */}
       {!focusMode && (
-        <VideoTeaser client={client} isMobile={isMobile} onderMarge={isMobile ? 86 : 92} />
+        <VideoTeaser
+          client={client}
+          isMobile={isMobile}
+          onderMarge={isMobile ? 86 : 92}
+          vast={currentView === 'home'}
+        />
       )}
 
       {/* ── Floating Bottom Nav — verbergen in focus-mode (bv. workout-dropdown open) ── */}

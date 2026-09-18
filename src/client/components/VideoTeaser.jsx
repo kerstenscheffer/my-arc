@@ -13,23 +13,27 @@
 // pas na een week gebruik iets zinnigs over kunt zeggen.
 
 import { useEffect, useRef, useState } from 'react'
-import { Play, X } from 'lucide-react'
+import { Play, X, ChevronDown } from 'lucide-react'
 import clientVideoService from '../../modules/videos/ClientVideoService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
 import { extractYouTubeId, getYouTubeThumbnail } from '../../modules/videos/utils/youtubeHelpers'
 
 // Hoe lang na binnenkomst de eerste verschijnt, hoe lang hij blijft staan, en
 // hoe lang het daarna stil is voor de volgende.
-const WACHT_EERSTE_MS = 3000
+const WACHT_EERSTE_MS = 6000
 const ZICHTBAAR_MS = 16000
 const PAUZE_MS = 3 * 60 * 1000
 
-export default function VideoTeaser({ client, isMobile = false, onderMarge = 86 }) {
+export default function VideoTeaser({ client, isMobile = false, onderMarge = 86, vast = false }) {
   const [items, setItems] = useState([])
   const [index, setIndex] = useState(0)
   const [open, setOpen] = useState(false)      // schuift hij in beeld?
   const [speler, setSpeler] = useState(null)   // welke video speelt
   const [weg, setWeg] = useState(false)        // weggeklikt voor deze sessie
+  // Op home blijft hij staan; heb je hem daar naar beneden geduwd, dan blijft
+  // hij weg tot de volgende keer dat je de app opent. Bewust niet bewaard:
+  // een video die je wegklikt hoort niet voorgoed te verdwijnen.
+  const [dicht, setDicht] = useState(false)
   const timers = useRef([])
 
   useEffect(() => {
@@ -39,7 +43,6 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86 
       try {
         const coachId = client.coach_id || client.trainer_id
         const vids = await clientVideoService.getSliderVideos(coachId)
-        console.log('[video-teaser] coach', coachId, '->', (vids || []).length, 'video(s)')
         if (!gestopt) setItems(vids || [])
       } catch (e) {
         console.error('Video-teaser laden mislukt:', e)
@@ -48,14 +51,22 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86 
     return () => { gestopt = true }
   }, [client?.id, client?.coach_id, client?.trainer_id])
 
-  // De cyclus: wachten, tonen, inzakken, wachten. Loopt door zolang de
-  // component leeft; de speler zet hem stil (dan kijk je al).
+  // Twee gedragingen. Op home staat hij gewoon open: daar ben je aan het
+  // rondkijken, dus een video die blijft staan is een aanbod en geen
+  // onderbreking. Op de andere pagina's ben je ergens mee bezig; daar komt hij
+  // even langs en gaat weer weg.
   useEffect(() => {
     if (weg || speler || items.length === 0) return
+    if (vast) {
+      timers.current.forEach(clearTimeout)
+      timers.current = []
+      setOpen(!dicht)
+      return
+    }
+    setOpen(false)
     const plan = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); return t }
 
     const toon = () => {
-      console.log('[video-teaser] tonen')
       setOpen(true)
       plan(() => {
         setOpen(false)
@@ -71,7 +82,7 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86 
       timers.current.forEach(clearTimeout)
       timers.current = []
     }
-  }, [items.length, weg, speler])
+  }, [items.length, weg, speler, vast, dicht])
 
   if (weg || items.length === 0) return null
 
@@ -147,9 +158,12 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86 
         </button>
 
         <button
-          onClick={() => { setOpen(false); setWeg(true) }}
-          title="Niet meer tonen"
-          aria-label="Niet meer tonen"
+          onClick={() => {
+            setOpen(false)
+            if (vast) setDicht(true); else setWeg(true)
+          }}
+          title={vast ? 'Wegschuiven' : 'Niet meer tonen'}
+          aria-label={vast ? 'Wegschuiven' : 'Niet meer tonen'}
           style={{
             flexShrink: 0, width: 28, height: 28, padding: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -158,14 +172,14 @@ export default function VideoTeaser({ client, isMobile = false, onderMarge = 86 
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <X size={15} strokeWidth={2.8} />
+          {vast ? <ChevronDown size={17} strokeWidth={3} /> : <X size={15} strokeWidth={2.8} />}
         </button>
       </div>
 
       {speler && (
         <VideoPlayerModal
           item={speler}
-          onClose={() => { setSpeler(null); setOpen(false) }}
+          onClose={() => { setSpeler(null); if (!vast) setOpen(false) }}
         />
       )}
     </>
