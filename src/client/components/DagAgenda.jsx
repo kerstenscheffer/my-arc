@@ -798,11 +798,15 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, bezig }) {
   const Icoon = ICOON[blok.type] || Calendar
   const soort = isMaaltijd ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || '')
   const naam = blok.sublabel || (isMaaltijd ? null : blok.label)
+  const foto = isMaaltijd
+    ? (resolveFoodImage({ image_url: blok.meta?.image_url, name: naam }) || foodImageFallback(naam, blok.meta?.slot, 200))
+    : isTraining ? workoutFoto(naam || soort)
+    : null
 
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: isMobile ? '0.6rem 0' : '0.7rem 0',
+      padding: isMobile ? '0.55rem 0' : '0.65rem 0',
       borderBottom: `1px solid ${LIJN_ZACHT}`,
       opacity: afgerond ? 0.6 : 1,
     }}>
@@ -811,7 +815,20 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, bezig }) {
         background: bezig ? '#fff' : 'rgba(255,255,255,0.3)',
         minHeight: 26,
       }} />
-      <Icoon size={12} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+
+      {/* Maaltijd en training krijgen hun foto mee; de rest een icoon. Een
+          regel met een bord eten ernaast herken je sneller dan een regel met
+          een vorkje. */}
+      {foto ? (
+        <span style={{
+          width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, flexShrink: 0,
+          borderRadius: 8, overflow: 'hidden',
+          background: `url(${foto}) center/cover`,
+          border: '1px solid rgba(255,255,255,0.08)',
+        }} />
+      ) : (
+        <Icoon size={12} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+      )}
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
