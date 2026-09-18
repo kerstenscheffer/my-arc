@@ -1,7 +1,7 @@
 // src/modules/notifications/CoachNotificationBell.jsx
 // Simple notification bell for CoachHub - reads coach_notifications table
 import { useState, useEffect, useRef } from 'react'
-import { Bell, X, Check, ChevronRight, AlertCircle, FileText, Utensils, LifeBuoy, ClipboardCheck, PlayCircle } from 'lucide-react'
+import { Bell, X, Check, ChevronRight } from 'lucide-react'
 import { geleden } from '../../utils/tijd'
 
 export default function CoachNotificationBell({ db, isMobile, onNavigate, open: openProp, onOpenChange, onCountChange }) {
@@ -92,31 +92,6 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
       console.error('❌ Mark all read failed:', err)
     }
   }
-
-  const getIcon = (type) => {
-    switch (type) {
-      case 'intake_completed': return <FileText size={14} />
-      case 'checkin_completed': return <ClipboardCheck size={14} />
-      case 'plan_ready': return <Utensils size={14} />
-      case 'action_required': return <AlertCircle size={14} />
-      case 'support_message': return <LifeBuoy size={14} />
-      case 'video_watched': return <PlayCircle size={14} />
-      default: return <Bell size={14} />
-    }
-  }
-
-  const getIconColor = (type) => {
-    switch (type) {
-      case 'intake_completed': return '#C9A55A'
-      case 'checkin_completed': return '#FFD700'
-      case 'plan_ready': return '#10b981'
-      case 'action_required': return '#f59e0b'
-      case 'support_message': return '#FFD700'
-      case 'video_watched': return '#10b981'
-      default: return 'rgba(255,255,255,0.5)'
-    }
-  }
-
 
   return (
     <>
@@ -277,26 +252,10 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
                     transition: 'background 0.15s ease'
                   }}
                 >
-                  {/* Icon */}
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '8px',
-                    background: `${getIconColor(notif.type)}15`,
-                    border: `1px solid ${getIconColor(notif.type)}30`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    color: getIconColor(notif.type)
-                  }}>
-                    {getIcon(notif.type)}
-                  </div>
-
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontSize: '0.75rem',
+                      fontSize: '0.82rem',
                       fontWeight: notif.read_status ? 600 : 800,
                       color: notif.read_status ? 'rgba(255,255,255,0.5)' : '#fff',
                       lineHeight: 1.3,
@@ -305,8 +264,8 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
                       {notif.title}
                     </div>
                     <div style={{
-                      fontSize: '0.65rem',
-                      color: 'rgba(255,255,255,0.3)',
+                      fontSize: '0.74rem',
+                      color: 'rgba(255,255,255,0.55)',
                       lineHeight: 1.35,
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
@@ -326,9 +285,9 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
                     flexShrink: 0
                   }}>
                     <span style={{
-                      fontSize: '0.55rem',
+                      fontSize: '0.7rem',
                       fontWeight: 600,
-                      color: 'rgba(255,255,255,0.2)'
+                      color: 'rgba(255,255,255,0.4)'
                     }}>
                       {geleden(notif.created_at)}
                     </span>

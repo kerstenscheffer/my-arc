@@ -56,6 +56,10 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
         const Icon = btn.Icon
         const isActive = !!btn.active
         const accent = btn.color || GOLD
+        // Goud op een teller is decoratie, geen signaal: wit leest rustiger en
+        // valt net zo goed op. Kleuren die wél iets zeggen (rood voor issues,
+        // paars voor ideeën) blijven staan.
+        const badgeKleur = accent === GOLD ? '#fff' : accent
         return (
           <React.Fragment key={btn.id}>
             {i > 0 && (
@@ -91,7 +95,7 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
                   position: 'absolute', top: 3, right: 3,
                   minWidth: 15, height: 15, padding: '0 3px',
                   borderRadius: 8,
-                  background: accent, color: '#000',
+                  background: badgeKleur, color: '#000',
                   fontSize: '0.52rem', fontWeight: 900,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   lineHeight: 1,
