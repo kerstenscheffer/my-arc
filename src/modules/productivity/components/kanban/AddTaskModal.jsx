@@ -314,6 +314,32 @@ export default function AddTaskModal({
             {titleError && <p style={{ margin: '0.4rem 0 0', color: '#ef4444', fontSize: '0.65rem', fontWeight: 700 }}>Titel is verplicht</p>}
           </div>
 
+          {/* Sectie — mobiel-only shortcut zodat de keuze bovenaan zichtbaar is
+              vóór de stappen, want op smal scherm staat de rechterkolom (met
+              de volledige Keuzevakken) pas ná de stappen-lijst. */}
+          {isMobile && (
+            <div style={{ padding: '0 1rem 0.65rem' }}>
+              <select
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+                style={{
+                  width: '100%', padding: '0.5rem 0.7rem',
+                  background: sectionId ? 'rgba(255,215,0,0.07)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${sectionId ? 'rgba(255,215,0,0.22)' : 'rgba(255,255,255,0.1)'}`,
+                  borderRadius: 8,
+                  color: sectionId ? '#FFD700' : 'rgba(255,255,255,0.45)',
+                  fontSize: '0.8rem', fontWeight: 800, outline: 'none', fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">Sectie: Niet toegewezen</option>
+                {sections.filter(s2 => s2.id !== 'unassigned').map(s2 => (
+                  <option key={s2.id} value={s2.id}>{s2.title}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Gepland-melding uit de agenda. */}
           {agendaPreset && (
             <div style={{
@@ -340,7 +366,7 @@ export default function AddTaskModal({
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
               }}>
                 <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', minWidth: 18 }}>{i + 1}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.3 }}>{step.text}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.875rem' : '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4 }}>{step.text}</span>
                 <button
                   onClick={() => handleDeleteStep(step.id)}
                   style={{ padding: 4, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation' }}
@@ -381,18 +407,21 @@ export default function AddTaskModal({
           {/* Twee keuzevakken naast elkaar, zoals materiaal en instellingen in
               de log-modal: label klein erboven, waarde eronder. */}
           <div style={{ display: 'flex', gap: isMobile ? '0.6rem' : '0.8rem', padding: isMobile ? '0 1rem 0.75rem' : '0 1.15rem 0.85rem' }}>
-            <Keuzevak Icon={Layers} label="Sectie" isMobile={isMobile}>
-              <select
-                value={sectionId}
-                onChange={(e) => setSectionId(e.target.value)}
-                style={keuzeSelect}
-              >
-                <option value="">Niet toegewezen</option>
-                {sections.filter(s2 => s2.id !== 'unassigned').map(s2 => (
-                  <option key={s2.id} value={s2.id}>{s2.title}</option>
-                ))}
-              </select>
-            </Keuzevak>
+            {/* Sectie verborgen op mobiel — staat al bovenaan als shortcut */}
+            {!isMobile && (
+              <Keuzevak Icon={Layers} label="Sectie" isMobile={isMobile}>
+                <select
+                  value={sectionId}
+                  onChange={(e) => setSectionId(e.target.value)}
+                  style={keuzeSelect}
+                >
+                  <option value="">Niet toegewezen</option>
+                  {sections.filter(s2 => s2.id !== 'unassigned').map(s2 => (
+                    <option key={s2.id} value={s2.id}>{s2.title}</option>
+                  ))}
+                </select>
+              </Keuzevak>
+            )}
             <Keuzevak Icon={Flag} label="Prioriteit" isMobile={isMobile}>
               <select
                 value={formData.priority}
