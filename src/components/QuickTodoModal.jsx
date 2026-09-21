@@ -14,7 +14,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../coach/ModalHost'
-import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Play, Minus, Maximize2 } from 'lucide-react'
+import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Minus, Maximize2 } from 'lucide-react'
 import useZwevendVenster from './useZwevendVenster'
 import ProductivityService from '../modules/productivity/ProductivityService'
 
@@ -37,7 +37,10 @@ const DUR_FILTERS = [
   { key: 'gt60', label: '60m+', test: (m) => m > 60 },
 ]
 
-export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivity, isMobile, onStartTask, activeTaskId }) {
+// onStartTask/activeTaskId komen nog binnen van de aanroeper maar worden hier
+// niet meer gebruikt: de start-knop is van de regel af. De timer start je in
+// Productiviteit zelf.
+export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivity, isMobile }) {
   const modalHost = useModalHost()
   const {
     ingeklapt, setIngeklapt, herstel, vensterStijl, sleepHandvat, formaatHandvat,
@@ -201,14 +204,16 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
       title="Verplaats naar sectie"
       aria-label="Sectie"
       style={{
-        flexShrink: 0, maxWidth: 104,
-        height: 24, padding: '0 0.35rem', borderRadius: 6,
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-        color: t.section_id ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.3)',
-        fontSize: '0.6rem', fontWeight: 800, fontFamily: 'inherit',
+        // Kaal: alleen de tekst. Een vakje eromheen maakte er een derde knop
+        // van naast twee knoppen die al een knop zijn.
+        flexShrink: 0, maxWidth: 110,
+        height: 22, padding: 0, border: 'none', background: 'transparent',
+        color: t.section_id ? '#fff' : 'rgba(255,255,255,0.35)',
+        fontSize: '0.64rem', fontWeight: 900, fontFamily: 'inherit',
+        letterSpacing: '-0.01em',
         outline: 'none', cursor: 'pointer',
         appearance: 'none', WebkitAppearance: 'none',
-        textOverflow: 'ellipsis',
+        textOverflow: 'ellipsis', textAlign: 'right',
       }}
     >
       <option value="" style={{ background: '#111' }}>Niet gepland</option>
@@ -288,6 +293,14 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     color: active ? color : 'rgba(255,255,255,0.45)', fontSize: '0.56rem', fontWeight: 800,
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
+
+  // Kale knoppen op een regel: bold wit, klein en dicht op elkaar.
+  const regelKnop = {
+    flexShrink: 0, width: 24, height: 24, padding: 0, borderRadius: 6,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
 
   const kopKnop = {
     width: 26, height: 26, flexShrink: 0, borderRadius: 7, padding: 0,
@@ -520,28 +533,14 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                           {t.title}
                         </span>
                       </div>
-                      {/* Rij 2: sectie + duur + actieknoppen */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      {/* Rij 2: sectie + de twee acties, dicht op elkaar. */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <SectieKeuze t={t} />
-                        {t.estimated_minutes ? (
-                          <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
-                        ) : null}
-                        {onStartTask && (
-                          activeTaskId === t.id ? (
-                            <span title="Bezig" style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '0.15rem 0.4rem', borderRadius: 6, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10b981', fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase' }}>
-                              <Play size={9} fill="#10b981" /> Bezig
-                            </span>
-                          ) : (
-                            <button onClick={() => { onStartTask(t); onClose && onClose() }} title="Start" style={{ width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(16,185,129,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', flexShrink: 0 }}>
-                              <Play size={13} />
-                            </button>
-                          )
-                        )}
-                        <button onClick={() => startEdit(t)} title="Bewerken" style={{ width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', flexShrink: 0 }}>
-                          <Pencil size={13} />
+                        <button onClick={() => startEdit(t)} title="Bewerken" aria-label="Bewerken" style={regelKnop}>
+                          <Pencil size={14} strokeWidth={2.8} />
                         </button>
-                        <button onClick={() => remove(t)} title="Verwijderen" style={{ width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', flexShrink: 0 }}>
-                          <Trash2 size={14} />
+                        <button onClick={() => remove(t)} title="Verwijderen" aria-label="Verwijderen" style={regelKnop}>
+                          <Trash2 size={14} strokeWidth={2.8} />
                         </button>
                       </div>
                     </div>
@@ -556,26 +555,16 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                       </span>
 
                       <SectieKeuze t={t} />
-                      {t.estimated_minutes ? (
-                        <span style={{ flexShrink: 0, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
-                      ) : null}
-                      {onStartTask && (
-                        activeTaskId === t.id ? (
-                          <span title="Bezig" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '0.15rem 0.4rem', borderRadius: 6, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10b981', fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase' }}>
-                            <Play size={9} fill="#10b981" /> Bezig
-                          </span>
-                        ) : (
-                          <button onClick={() => { onStartTask(t); onClose && onClose() }} title="Mee bezig — start deze task" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(16,185,129,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                            <Play size={13} />
-                          </button>
-                        )
-                      )}
-                      <button onClick={() => startEdit(t)} title="Bewerken" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                        <Pencil size={13} />
-                      </button>
-                      <button onClick={() => remove(t)} title="Verwijderen" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                        <Trash2 size={14} />
-                      </button>
+                      {/* De twee acties horen bij elkaar, dus staan ze tegen
+                          elkaar aan en niet in de rij-spatiëring. */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                        <button onClick={() => startEdit(t)} title="Bewerken" aria-label="Bewerken" style={regelKnop}>
+                          <Pencil size={14} strokeWidth={2.8} />
+                        </button>
+                        <button onClick={() => remove(t)} title="Verwijderen" aria-label="Verwijderen" style={regelKnop}>
+                          <Trash2 size={14} strokeWidth={2.8} />
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>
