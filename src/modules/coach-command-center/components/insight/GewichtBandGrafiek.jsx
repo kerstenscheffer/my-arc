@@ -72,6 +72,15 @@ function Kaartje({ active, payload, label }) {
 // pas lopen. Zelfde opzet als de set-tabel in het oefening-logboek.
 const KOLOMMEN = '4.4rem 1fr 3.4rem 3.2rem 1fr'
 
+// De vier kolommen onder de melding. Bold en wit: dit zijn de cijfers waarop
+// je besluit of je bijstuurt, dus ze horen leesbaar te zijn zonder te turen.
+const regel = {
+  display: 'grid', gridTemplateColumns: '3.4rem 1fr 3.6rem 2.8rem',
+  gap: '0 0.5rem', alignItems: 'center',
+  fontSize: '0.72rem', fontWeight: 900,
+  fontVariantNumeric: 'tabular-nums',
+}
+
 // Week-op-week in cijfers. Een grafiek laat zien hoe het loopt; een tabel laat
 // zien wat er staat — en dat is wat je nodig hebt als je moet besluiten of je
 // bijstuurt.
@@ -450,12 +459,12 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
             </defs>
             <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis
-              dataKey="label" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.3)' }}
-              axisLine={false} tickLine={false} minTickGap={24}
+              dataKey="label" tick={{ fontSize: 10, fill: '#fff', fontWeight: 800 }}
+              axisLine={false} tickLine={false} minTickGap={28}
             />
             <YAxis
-              domain={[min, max]} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.3)' }}
-              axisLine={false} tickLine={false} width={34}
+              domain={[min, max]} tick={{ fontSize: 10, fill: '#fff', fontWeight: 800 }}
+              axisLine={false} tickLine={false} width={38}
             />
             <Tooltip content={<Kaartje />} cursor={{ stroke: 'rgba(255,255,255,0.25)' }} />
             {/* Het vlak tussen te snel en te langzaam. */}
@@ -540,22 +549,28 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
             </div>
           )}
 
+          {/* De weken waar dit oordeel op rust, als tabelletje. Stond als
+              grijze doorlopende regel; dat las niemand. Nu vier kolommen,
+              bold wit, met alleen de status in kleur. */}
           {(model.weken || []).length > 1 && (
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 7,
-              fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
-              fontVariantNumeric: 'tabular-nums',
-            }}>
+            <div style={{ marginTop: 9 }}>
+              <div style={{ ...regel, color: 'rgba(255,255,255,0.35)', fontSize: '0.58rem', letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 3 }}>
+                <span>Week</span>
+                <span style={{ textAlign: 'right' }}>Trend</span>
+                <span style={{ textAlign: 'right' }}>Δ</span>
+                <span style={{ textAlign: 'right' }}>Weeg</span>
+              </div>
               {model.weken.slice(-3).map(w => (
-                <span key={w.week} style={{ color: STATUS_KLEUR[w.status] || 'rgba(255,255,255,0.35)' }}>
-                  wk {w.week}: {w.trend} kg
-                  {w.verschil != null && (
-                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>
-                      {' '}({w.verschil > 0 ? '+' : ''}{w.verschil})
-                    </span>
-                  )}
-                  <span style={{ color: 'rgba(255,255,255,0.25)' }}>{' · '}{w.metingen}×</span>
-                </span>
+                <div key={w.week} style={{ ...regel, paddingTop: 4, paddingBottom: 4 }}>
+                  <span style={{ color: STATUS_KLEUR[w.status] || '#fff' }}>wk {w.week}</span>
+                  <span style={{ textAlign: 'right', color: '#fff' }}>{w.trend} kg</span>
+                  <span style={{ textAlign: 'right', color: w.verschil == null ? 'rgba(255,255,255,0.3)' : (STATUS_KLEUR[w.status] || '#fff') }}>
+                    {w.verschil == null ? '—' : `${w.verschil > 0 ? '+' : ''}${w.verschil}`}
+                  </span>
+                  <span style={{ textAlign: 'right', color: w.metingen >= 5 ? '#fff' : '#f59e0b' }}>
+                    {w.metingen}×
+                  </span>
+                </div>
               ))}
             </div>
           )}
