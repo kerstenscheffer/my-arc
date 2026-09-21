@@ -194,23 +194,38 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     ...sections.map(s => ({ id: s.id, title: s.title, color: s.color || 'rgba(255,255,255,0.6)' })),
   ]
 
+  // Secties als strook bovenaan in plaats van een kolom links. Die kolom at
+  // een derde van de breedte op, en dat is precies de ruimte waarin de titel
+  // van een to-do moet passen: op een telefoon zag je "Dagdoel: 2 onboarding
+  // v…" en had je niets aan de lijst.
   const railBtn = (item) => {
     const active = filter === item.id
+    const n = countFor(item.id)
     return (
       <button key={item.id} onClick={() => setFilter(item.id)} title={item.title}
         style={{
-          display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-          padding: '0.5rem 0.55rem', borderRadius: 8, marginBottom: 3,
-          background: active ? 'rgba(255,215,0,0.12)' : 'transparent',
-          border: `1px solid ${active ? 'rgba(255,215,0,0.35)' : 'transparent'}`,
-          cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+          padding: '0.34rem 0.6rem', borderRadius: 999, minHeight: 30,
+          background: active ? '#fff' : 'rgba(255,255,255,0.05)',
+          border: `1px solid ${active ? '#fff' : 'rgba(255,255,255,0.09)'}`,
+          cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
         {item.Icon
-          ? <item.Icon size={13} color={active ? GOLD : 'rgba(255,255,255,0.5)'} style={{ flexShrink: 0 }} />
-          : <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: item.color }} />}
-        <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: active ? 800 : 600, color: active ? GOLD : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-        {countFor(item.id) > 0 && (
-          <span style={{ flexShrink: 0, fontSize: '0.58rem', fontWeight: 800, color: active ? GOLD : 'rgba(255,255,255,0.35)' }}>{countFor(item.id)}</span>
+          ? <item.Icon size={12} color={active ? '#0a0a0a' : 'rgba(255,255,255,0.5)'} style={{ flexShrink: 0 }} />
+          : <span style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: item.color }} />}
+        <span style={{
+          fontSize: '0.72rem', fontWeight: active ? 900 : 700,
+          color: active ? '#0a0a0a' : 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap',
+        }}>
+          {item.title}
+        </span>
+        {n > 0 && (
+          <span style={{
+            fontSize: '0.58rem', fontWeight: 900,
+            color: active ? 'rgba(10,10,10,0.5)' : 'rgba(255,255,255,0.35)',
+          }}>
+            {n}
+          </span>
         )}
       </button>
     )
@@ -251,16 +266,19 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
           </button>
         </div>
 
-        {/* Body: sectie-rail links + add/lijst rechts */}
+        {/* Secties: één strook die zijwaarts scrollt. */}
+        <div style={{
+          display: 'flex', gap: 5, flexShrink: 0,
+          padding: '0.6rem 0.85rem',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+        }}>
+          {railItems.map(railBtn)}
+        </div>
+
+        {/* Body: de lijst krijgt nu de hele breedte. */}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-
-          {/* Sectie-rail */}
-          <div style={{ width: isMobile ? 118 : 150, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '0.6rem 0.5rem', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <div style={{ fontSize: '0.52rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', padding: '0 0.35rem 0.4rem' }}>Secties</div>
-            {railItems.map(railBtn)}
-          </div>
-
-          {/* Add + lijst */}
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             {/* Quick-add */}
             <div style={{ padding: '0.75rem 0.85rem 0.55rem', flexShrink: 0 }}>
@@ -422,7 +440,10 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
                         <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
                           style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
-                        <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', lineHeight: 1.3 }}>
+                        <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600, cursor: 'pointer', lineHeight: 1.3,
+                          // Twee regels in plaats van afkappen: de titel is het
+                          // enige waaraan je een to-do herkent.
+                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {t.title}
                           {filter === 'all' && t.section_id && (
                             <span style={{ marginLeft: 6, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
@@ -460,7 +481,8 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                       {/* Prioriteit-stip */}
                       <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
                         style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
-                      <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                      <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, cursor: 'pointer', lineHeight: 1.35,
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {t.title}
                         {filter === 'all' && t.section_id && (
                           <span style={{ marginLeft: 6, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
