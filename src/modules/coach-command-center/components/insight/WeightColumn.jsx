@@ -10,6 +10,7 @@ import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
 import FasePaneel from './FasePaneel'
 import GewichtBandGrafiek from './GewichtBandGrafiek'
 import MetingenTabel from './MetingenTabel'
+import DoelenMacrosPaneel from './DoelenMacrosPaneel'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
@@ -57,6 +58,9 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // Teller: gaat omhoog als je in de fase-dropdown '+ Nieuwe fase' kiest. Het
   // formulier zelf blijft in FasePaneel wonen.
   const [nieuweFase, setNieuweFase] = React.useState(0)
+  // Doel en macro's: dicht bij binnenkomst, want je opent deze kolom om te
+  // kijken. Pas als de band zegt dat er iets moet veranderen klap je 'm open.
+  const [toonDoelen, setToonDoelen] = React.useState(false)
 
   const circumFields = [
     { key: 'waist_cm', label: 'Buik' }, { key: 'bicep_cm', label: 'Arm' },
@@ -116,6 +120,19 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
             isMobile={isMobile}
           />
         )}
+        {/* Bijsturen. Staat direct onder het oordeel, want dat is de zin waar
+            je op handelt: 'twee weken te snel → 100-200 kcal eraf'. */}
+        <Uitklap
+          label="Doelen & macro's"
+          extra={client?.target_calories ? `${Math.round(client.target_calories)} kcal` : 'nog niet gezet'}
+          open={toonDoelen}
+          onKlik={() => setToonDoelen(v => !v)}
+          isMobile={isMobile}
+        />
+        {toonDoelen && (
+          <DoelenMacrosPaneel client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile} />
+        )}
+
         {/* De cijfers achter de grafiek. Eén tabel met eigen knoppen voor
             week/dag en de periode — de uitklapper 'Alle metingen' met zijn
             eigen week/dag-knop is daarin opgegaan. */}
