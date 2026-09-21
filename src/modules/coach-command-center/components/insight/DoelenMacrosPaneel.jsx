@@ -484,39 +484,47 @@ export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobil
             </button>
           </div>
         )}
-        <DoelRegel client={client} isMobile={isMobile} onSave={handleFieldSave} />
-        <E label="Doelgewicht"  value={client.target_weight ? parseFloat(client.target_weight).toFixed(1) : null} field="target_weight" type="number" suffix=" kg" />
-        <E label="Deadline"     value={client.goal_deadline ? client.goal_deadline.split('T')[0] : null} field="goal_deadline" />
-
-        {/* Streefgewicht-rekenaar via huidig/doel bodyfat%. Aanname: vetvrije
-            massa blijft gelijk. Coach kan resultaat met één klik in
-            target_weight zetten — dat voedt vervolgens MacroRulesBlock. */}
-        <BodyFatTargetCalculator client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile} />
-
-        {/* Het hart van de doelen-tab: maintenance, tekort, macro-targets
-            en projectie naar het traject-einde. Voorheen apart in 'macros'. */}
+        {/* ── Sturen ──
+            Het rekenwerk: onderhoud, tekort en de knop om de macro's te
+            herberekenen. Wat hij nu volgt staat er als ringen boven. */}
         <MacroRulesBlock client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile} />
 
-        {/* Deze twee voeden de rekenaars hierboven, dus die blijven staan.
-            Heette "Wk afval", wat voor een bulker nergens op slaat; het teken
-            hoeft niet te kloppen, de richting komt uit het primaire doel. */}
-        <E label="Doel vet %"   value={client.target_body_fat} field="target_body_fat" type="number" suffix="%" />
-        <E label="Weekdoel"     value={client.weekly_weight_goal} field="weekly_weight_goal" type="number" suffix=" kg/wk" />
+        {/* ── De horizon ──
+            Doelgewicht, deadline en het primaire doel veranderen zelden en
+            sturen niets van week tot week. Ze stonden tussen de cijfers waar je
+            wél op stuurt; nu staan ze hieronder, dicht.
 
+            Het weekdoel stond hier ook als los veld — dat is nu het tempo van
+            de fase, één regel hoger in de kolom. Twee plekken voor hetzelfde
+            getal is een klant die op twee tempo's staat. */}
         <button
           onClick={() => setMeerDoelVelden(v => !v)}
           style={{
             width: '100%', padding: isMobile ? '0.55rem 0.85rem' : '0.6rem 1rem',
             display: 'flex', alignItems: 'center', gap: 6,
-            background: 'none', border: 'none', borderBottom: `1px solid ${C.borderItem}`,
+            background: 'none', border: 'none',
+            borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.borderItem}`,
             color: '#fff', fontFamily: 'inherit',
-            fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', textAlign: 'left',
+            fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', textAlign: 'left',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
-          {meerDoelVelden ? 'Minder velden ▴' : 'Meer velden ▾'}
+          <span style={{ flex: 1 }}>Doel & horizon</span>
+          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)' }}>
+            {client?.target_weight ? `${parseFloat(client.target_weight).toFixed(1)} kg` : 'geen doelgewicht'}
+          </span>
+          <span style={{ color: 'rgba(255,255,255,0.4)' }}>{meerDoelVelden ? '▴' : '▾'}</span>
         </button>
 
         {meerDoelVelden && (<>
+          <DoelRegel client={client} isMobile={isMobile} onSave={handleFieldSave} />
+          <E label="Doelgewicht"  value={client.target_weight ? parseFloat(client.target_weight).toFixed(1) : null} field="target_weight" type="number" suffix=" kg" />
+          <E label="Deadline"     value={client.goal_deadline ? client.goal_deadline.split('T')[0] : null} field="goal_deadline" />
+          <E label="Doel vet %"   value={client.target_body_fat} field="target_body_fat" type="number" suffix="%" />
+
+          {/* Streefgewicht uit vetpercentage. Aanname: vetvrije massa blijft
+              gelijk. Eén klik zet de uitkomst in het doelgewicht. */}
+          <BodyFatTargetCalculator client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile} />
+
           <E label="Tijdlijn"     value={client.goal_timeline}  field="goal_timeline" />
           <E label="Urgentie"     value={client.goal_urgency}   field="goal_urgency" options={['low', 'moderate', 'high', 'extreme']} />
           <E label="Motivatie"    value={client.motivation}     field="motivation" />

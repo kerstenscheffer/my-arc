@@ -28,8 +28,6 @@ export default function MacroRulesBlock({ client, db, onClientUpdate, isMobile }
   // ze expliciet bevestigt.
   const [pendingMacros, setPendingMacros] = useState(null)
   // Handmatig bijgestelde macro's. null = toon gewoon wat er op de klant staat.
-  const [macroDraft, setMacroDraft] = useState(null)
-  const [macrosOpslaan, setMacrosOpslaan] = useState(false)
   // Handmatige doel-kcal invoer: coach kan de berekende doel-kcal overschrijven,
   // waarna de macro's uit die kcal worden herberekend.
   const [editingKcal, setEditingKcal] = useState(false)
@@ -387,68 +385,15 @@ export default function MacroRulesBlock({ client, db, onClientUpdate, isMobile }
       onClientUpdate?.(payload)
       await logClientChanges({ db, clientId: client.id, before, after: payload, source: 'confirm_macros' })
       setPendingMacros(null)
-      setMacroDraft(null)
       setSurplusDraft(null); setEditingS(false)
     } catch (e) { console.error('confirm macros', e) }
     setBusy(null)
   }
 
-  // ── Handmatig bijstellen van de macro's ───────────────────────────────
-  // Koolhydraten zijn de sluitpost: eiwit en vet volgen uit lichaamsgewicht en
-  // wat overblijft van het kcal-budget gaat naar koolhydraten. Verhoog je het
-  // vet, dan zakken de koolhydraten mee zodat het totaal gelijk blijft — dat
-  // is precies hoe je het met de hand ook zou doen.
-  const herberekenMacros = (veld, ruw, basis) => {
-    const n = Math.max(0, parseInt(ruw) || 0)
-    const m = { ...basis, [veld]: n }
-
-    if (veld === 'target_carbs') {
-      // Zet je de koolhydraten zélf, dan is er niets meer om mee te schuiven:
-      // het totaal volgt uit de drie macro's.
-      m.target_calories = Math.round(m.target_protein * 4 + m.target_carbs * 4 + m.target_fat * 9)
-      return m
-    }
-
-    const rest = m.target_calories - (m.target_protein * 4 + m.target_fat * 9)
-    if (rest < 0) {
-      // Eiwit + vet passen niet binnen het budget. Koolhydraten kunnen niet
-      // negatief, dus die gaan op 0 en het totaal wordt opgetrokken naar wat
-      // er werkelijk in zit.
-      m.target_carbs = 0
-      m.target_calories = Math.round(m.target_protein * 4 + m.target_fat * 9)
-    } else {
-      m.target_carbs = Math.round(rest / 4)
-    }
-    return m
-  }
-
-  const bewaarMacros = async (m) => {
-    if (!db?.supabase || !client?.id || !m) return
-    setMacrosOpslaan(true)
-    try {
-      const payload = {
-        target_calories: m.target_calories,
-        target_protein: m.target_protein,
-        target_carbs: m.target_carbs,
-        target_fat: m.target_fat,
-        manual_macro_targets: true,
-      }
-      const before = pickTrackedFields(client)
-      await db.supabase.from('clients').update(payload).eq('id', client.id)
-      onClientUpdate?.(payload)
-      await logClientChanges({ db, clientId: client.id, before, after: payload, source: 'macro_handmatig' })
-    } catch (e) { console.error('bewaar macros', e) }
-    setMacrosOpslaan(false)
-  }
-
-  // Zelfde vertraging als bij de TDEE: typen in een veld mag niet per
-  // toetsaanslag schrijven.
-  React.useEffect(() => {
-    if (!macroDraft) return
-    const t = setTimeout(() => { bewaarMacros(macroDraft) }, 800)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [macroDraft])
+  // Het handmatig bijstellen van de vier macro's zat hier (met koolhydraten als
+  // sluitpost en een vertraagde opslag). Dat doet MacroRingen nu, boven dit
+  // paneel: zelfde rekenregel, maar met een wiel en één opslaan-knop in plaats
+  // van vier velden die vanzelf wegschrijven.
 
   // ── Render helpers ────────────────────────────────────────────────────
   const row = (label, val, color = C.text) => (
@@ -1121,72 +1066,10 @@ export default function MacroRulesBlock({ client, db, onClientUpdate, isMobile }
         )
       })()}
 
-      {/* ── Macro-targets — direct bewerkbaar ────────────────────────────
-          Stond als zwevend kaartje met marge, ronde hoeken en vier omkaderde
-          vakken die alleen lazen. Wilde je één waarde bijstellen, dan moest je
-          eerst "Bereken macro's" klikken en daarna in de voorbeeldweergave
-          typen. Nu vier velden die je meteen aanpast; koolhydraten schuiven
-          mee zodat het kcal-totaal klopt. */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        borderTop: `1px solid ${C.border}`,
-        borderBottom: `1px solid ${C.border}`,
-      }}>
-        {[
-          { label: 'Kcal',  veld: 'target_calories', eenheid: '' },
-          { label: 'Eiwit', veld: 'target_protein',  eenheid: 'g' },
-          { label: 'Koolh', veld: 'target_carbs',    eenheid: 'g' },
-          { label: 'Vet',   veld: 'target_fat',      eenheid: 'g' },
-        ].map((m, i) => {
-          const huidig = macroDraft || {
-            target_calories: Math.round(client?.target_calories) || 0,
-            target_protein:  Math.round(client?.target_protein)  || 0,
-            target_carbs:    Math.round(client?.target_carbs)    || 0,
-            target_fat:      Math.round(client?.target_fat)      || 0,
-          }
-          // Koolhydraten zijn de sluitpost en veranderen vanzelf mee; dat
-          // maken we zichtbaar door ze iets te dimmen.
-          const sluitpost = m.veld === 'target_carbs'
-          return (
-            <div key={m.veld} style={{
-              padding: isMobile ? '0.5rem 0.4rem' : '0.55rem 0.6rem',
-              borderRight: i < 3 ? `1px solid ${C.borderItem}` : 'none',
-              display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0,
-              opacity: macrosOpslaan ? 0.55 : 1, transition: 'opacity 0.2s ease',
-            }}>
-              <span style={{
-                fontSize: '0.72rem', fontWeight: 800,
-                color: sluitpost ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.55)',
-                letterSpacing: '-0.01em',
-              }}>
-                {m.label}{sluitpost ? ' ·' : ''}
-              </span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, minWidth: 0 }}>
-                <input
-                  type="number"
-                  value={huidig[m.veld] || 0}
-                  onChange={(e) => setMacroDraft(herberekenMacros(m.veld, e.target.value, huidig))}
-                  onClick={(e) => e.target.select()}
-                  style={{
-                    width: '100%', minWidth: 0,
-                    background: 'none', border: 'none', outline: 'none', padding: 0,
-                    color: '#fff', fontFamily: 'inherit',
-                    fontSize: isMobile ? '1.15rem' : '1.3rem',
-                    fontWeight: 900, letterSpacing: '-0.02em',
-                  }}
-                />
-                {m.eenheid && (
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
-                    {m.eenheid}
-                  </span>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
+      {/* Hier stonden vier invulvakken met kcal, eiwit, koolhydraten en vet.
+          Die staan nu als ringen boven dit paneel (MacroRingen), met een wiel
+          en één opslaan-knop. Twee plekken die dezelfde vier velden schrijven
+          is vragen om een klant die op twee verschillende macro's zit. */}
 
       {/* ── Projectie: waar je uitkomt met huidige instellingen ──
           Gebruikt expliciet het OPGESLAGEN tekort, niet het rule-default
@@ -1208,6 +1091,10 @@ export default function MacroRulesBlock({ client, db, onClientUpdate, isMobile }
 // eindig je op X kg; vergelijk dat met je target_weight; wat nodig is
 // voor exacte doel-hit.
 function ProjectionPanel({ client, currentWeight, liveSurplus, isMobile }) {
+  // Zonder doelgewicht en einddatum valt er niets te projecteren. Dan stond
+  // hier een kop met drie streepjes en de regel 'vul gewicht, doelgewicht en
+  // deadline in' — een half paneel dat alleen maar ruimte kost in een kolom
+  // waar je juist snel wil kunnen kijken.
   const w = parseFloat(currentWeight)
   const targetW = parseFloat(client?.target_weight)
 
@@ -1224,6 +1111,8 @@ function ProjectionPanel({ client, currentWeight, liveSurplus, isMobile }) {
   const daysLeft = deadline ? Math.max(0, Math.round((deadline - today) / 86400000)) : null
 
   const hasAll = Number.isFinite(w) && Number.isFinite(targetW) && daysLeft != null
+  // Valt er niets te projecteren, dan ook geen paneel. Zie de uitleg boven.
+  if (!hasAll) return null
 
   // Eind-gewicht met huidig surplus.
   // surplus < 0 = cut → end weight < current
