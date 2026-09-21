@@ -15,17 +15,18 @@
 // de kleur in deze tabel en de kleur van de lijn kunnen niet uit elkaar lopen.
 
 import { useMemo, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import {
   maakConfig, trendReeks, weekBeoordelingen, STATUS_TEKST, STATUS_KLEUR,
 } from '../../../weight-tracker/utils/coachingBand'
 
 const PERIODES = [
-  { id: 'fase', label: 'Fase' },
-  { id: '2w', label: '2 wk', dagen: 14 },
-  { id: '4w', label: '4 wk', dagen: 28 },
-  { id: '2m', label: '2 mnd', dagen: 61 },
-  { id: '4m', label: '4 mnd', dagen: 122 },
-  { id: '6m', label: '6 mnd', dagen: 183 },
+  { id: 'fase', label: 'Fase', lang: 'Deze fase' },
+  { id: '2w', label: '2 wk', lang: 'Laatste 2 weken', dagen: 14 },
+  { id: '4w', label: '4 wk', lang: 'Laatste 4 weken', dagen: 28 },
+  { id: '2m', label: '2 mnd', lang: 'Laatste 2 maanden', dagen: 61 },
+  { id: '4m', label: '4 mnd', lang: 'Laatste 4 maanden', dagen: 122 },
+  { id: '6m', label: '6 mnd', lang: 'Laatste 6 maanden', dagen: 183 },
 ]
 
 const datumKort = (d) => {
@@ -49,15 +50,40 @@ const KOLOMMEN = {
   dag: '5.5rem 5rem 4rem 5rem',
 }
 
-const knop = (aan) => ({
-  minHeight: 26, padding: '0 0.55rem', borderRadius: 999, flexShrink: 0,
-  background: aan ? '#fff' : 'transparent',
-  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
-  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
-  fontSize: '0.66rem', fontWeight: 900, fontFamily: 'inherit',
-  cursor: 'pointer', whiteSpace: 'nowrap',
-  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-})
+// Negen pillen naast elkaar waren negen dingen om te lezen voor twee keuzes.
+// Nu twee koppen die zelf de keuze zijn: je leest wat er staat, en je klikt
+// erop om het te veranderen.
+function Keuze({ waarde, opties, onKies }) {
+  const huidig = opties.find(o => o.id === waarde) || opties[0]
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      <span style={{
+        fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em',
+      }}>
+        {huidig?.label}
+      </span>
+      <ChevronDown size={13} strokeWidth={3} color="rgba(255,255,255,0.5)" />
+      {/* De echte select ligt onzichtbaar over de tekst: zo krijg je het
+          keuzemenu van het toestel zelf, zonder dat het scherm er een vakje
+          bij krijgt. */}
+      <select
+        value={waarde}
+        onChange={(e) => onKies(e.target.value)}
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          opacity: 0, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none',
+          border: 'none', background: 'transparent', fontFamily: 'inherit',
+        }}
+      >
+        {opties.map(o => (
+          <option key={o.id} value={o.id} style={{ background: '#0a0a0a', color: '#fff' }}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </span>
+  )
+}
 
 export default function MetingenTabel({ client, history, fase, isMobile }) {
   const [weergave, setWeergave] = useState('week')     // 'week' | 'dag'
@@ -121,18 +147,18 @@ export default function MetingenTabel({ client, history, fase, isMobile }) {
       borderTop: '1px solid rgba(255,255,255,0.06)',
     }}>
       {/* Bediening: wat voor rijen, en over welke periode. */}
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-        {[{ id: 'week', label: 'Week' }, { id: 'dag', label: 'Dag' }].map(w => (
-          <button key={w.id} onClick={() => setWeergave(w.id)} style={knop(weergave === w.id)}>
-            {w.label}
-          </button>
-        ))}
-        <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)', margin: '0 3px' }} />
-        {PERIODES.filter(p => p.id !== 'fase' || fase).map(p => (
-          <button key={p.id} onClick={() => setPeriode(p.id)} style={knop(periode === p.id)}>
-            {p.label}
-          </button>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <Keuze
+          waarde={weergave}
+          opties={[{ id: 'week', label: 'Per week' }, { id: 'dag', label: 'Per dag' }]}
+          onKies={setWeergave}
+        />
+        <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 900 }}>·</span>
+        <Keuze
+          waarde={periode}
+          opties={PERIODES.filter(p => p.id !== 'fase' || fase).map(p => ({ id: p.id, label: p.lang || p.label }))}
+          onKies={setPeriode}
+        />
       </div>
 
       {model.leeg ? (
