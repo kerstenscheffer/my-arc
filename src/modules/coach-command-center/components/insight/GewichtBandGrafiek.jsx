@@ -409,6 +409,29 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
                 {raad.tekst}
               </div>
             )}
+
+            {/* De weken waar dat oordeel op rust. Zonder deze cijfers moet je
+                de coach op zijn blauwe ogen geloven; met deze regel zie je
+                meteen waar 'twee weken te snel' vandaan komt. */}
+            {(model.weken || []).length > 1 && (
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6,
+                fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {model.weken.slice(-3).map(w => (
+                  <span key={w.week} style={{ color: STATUS_KLEUR[w.status] || 'rgba(255,255,255,0.35)' }}>
+                    wk {w.week}: {w.trend} kg
+                    {w.verschil != null && (
+                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        {' '}({w.verschil > 0 ? '+' : ''}{w.verschil})
+                      </span>
+                    )}
+                    <span style={{ color: 'rgba(255,255,255,0.25)' }}>{' · '}{w.metingen}×</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

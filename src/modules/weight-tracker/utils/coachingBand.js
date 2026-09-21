@@ -241,14 +241,33 @@ export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
   const weken = [...perWeek.keys()].sort((a, b) => a - b)
   let vorige = null
   let buiten = 0
+  let vorigeTrend = null
   return weken.map(n => {
     const r = perWeek.get(n)
     const oordeel = beoordeel(r.trend, r.metingen, weekFractie(r.datum, startDatum, config.venster_dagen), startGewicht, config)
     const afwijkend = oordeel.status === 'TE_SNEL' || oordeel.status === 'TE_LANGZAAM'
-    if (!afwijkend) buiten = 0
-    else buiten = (oordeel.status === vorige) ? buiten + 1 : 1
-    vorige = afwijkend ? oordeel.status : null
-    return { week: n, ...r, ...oordeel, wekenBuiten: afwijkend ? buiten : 0 }
+
+    if (afwijkend) {
+      buiten = (oordeel.status === vorige) ? buiten + 1 : 1
+      vorige = oordeel.status
+    } else if (oordeel.status === 'OP_KOERS') {
+      // Terug in de band: de teller mag weer op nul.
+      buiten = 0
+      vorige = null
+    }
+    // Een week zonder genoeg metingen (of de eerste week) zegt niets. Die zet
+    // de teller niet terug op nul — anders wist één week slecht wegen een
+    // probleem uit dat er gewoon nog is — maar telt ook niet mee als tweede
+    // week. Hij wordt overgeslagen.
+
+    // Verschil met de vorige week, op de trend. Dit is het getal waar de
+    // coach op stuurt: "week 37 +0,9, week 38 +0,9".
+    const verschil = (Number.isFinite(r.trend) && Number.isFinite(vorigeTrend))
+      ? Math.round((r.trend - vorigeTrend) * 100) / 100
+      : null
+    if (Number.isFinite(r.trend)) vorigeTrend = r.trend
+
+    return { week: n, ...r, ...oordeel, verschil, wekenBuiten: afwijkend ? buiten : 0 }
   })
 }
 
