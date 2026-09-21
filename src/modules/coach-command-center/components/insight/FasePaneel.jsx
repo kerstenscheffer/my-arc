@@ -16,7 +16,7 @@ import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/uti
 const vandaag = () => new Date().toISOString().split('T')[0]
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export default function FasePaneel({ client, db, history, isMobile, onFaseChange, onActieveFase }) {
+export default function FasePaneel({ client, db, history, isMobile, onFaseChange, onActieveFase, onFases }) {
   const [fases, setFases] = useState([])
   const [laden, setLaden] = useState(true)
   const [nieuw, setNieuw] = useState(null)
@@ -35,6 +35,9 @@ export default function FasePaneel({ client, db, history, isMobile, onFaseChange
     // De statistiekbalk rekent "sinds start" vanaf deze fase, dus die moet
     // 'm kennen. Eén plek die laadt, één plek die doorgeeft.
     onActieveFase?.((data || [])[0] || null)
+    // De coaching-band tekent ook de fases die al voorbij zijn, dus die heeft
+    // de hele lijst nodig. Eén plek die laadt, één plek die doorgeeft.
+    onFases?.(data || [])
     setLaden(false)
   }
   useEffect(() => { laad() }, [client?.id, db])

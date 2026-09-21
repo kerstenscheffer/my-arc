@@ -24,6 +24,9 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // Actieve fase, aangeleverd door FasePaneel. Bepaalt vanaf wanneer
   // "sinds start" telt.
   const [actieveFase, setActieveFase] = React.useState(null)
+  // Alle fases, voor de band: daar kun je ook terugkijken naar een cut van
+  // vorig kwartaal.
+  const [alleFases, setAlleFases] = React.useState([])
   const ZICHTBAAR = 3
 
   // Week-op-week: groepeer logs per kalenderweek (maandag-start), gemiddelde
@@ -97,11 +100,12 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           isMobile={isMobile}
           onFaseChange={onClientUpdate}
           onActieveFase={setActieveFase}
+          onFases={setAlleFases}
         />
         {/* De band: waar het gewicht hoort te lopen, en of dat gebeurt. Staat
             boven de cijfers, want dit is de vraag die je als eerste stelt. */}
         {history.length > 0 && (
-          <GewichtBandGrafiek client={client} history={history} fase={actieveFase} isMobile={isMobile} />
+          <GewichtBandGrafiek client={client} history={history} fase={actieveFase} fases={alleFases} isMobile={isMobile} />
         )}
         {history.length > 0 && <WeightStatsGrid stats={weightData?.stats || {}} client={client} fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }} history={history} isMobile={isMobile} coachingPlan={coachingPlan} fase={actieveFase} volleBreedte toonHuidig />}
         {history.length > 0 && (
