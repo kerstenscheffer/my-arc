@@ -11,6 +11,7 @@ import FasePaneel from './FasePaneel'
 import GewichtBandGrafiek from './GewichtBandGrafiek'
 import MetingenTabel from './MetingenTabel'
 import DoelenMacrosPaneel from './DoelenMacrosPaneel'
+import SlaapInsight from './SlaapInsight'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
@@ -140,6 +141,11 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
             voorstel={voorstel} onVoorstelWeg={() => setVoorstel(null)}
           />
         )}
+
+        {/* Slaap hoort bij gewicht: een week slecht slapen laat de weegschaal
+            stijgen zonder dat er aan het eten iets veranderd is, en dan zoek je
+            in de verkeerde hoek. Verschijnt alleen als de klant logt. */}
+        <SlaapInsight db={db} client={client} isMobile={isMobile} />
 
         {/* De cijfers achter de grafiek. Eén tabel met eigen knoppen voor
             week/dag en de periode — de uitklapper 'Alle metingen' met zijn

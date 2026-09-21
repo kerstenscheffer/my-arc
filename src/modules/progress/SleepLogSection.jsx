@@ -49,6 +49,10 @@ function weekStart() {
 export default function SleepLogSection({ client, db, isMobile }) {
   const m = isMobile
   const [logs, setLogs] = useState([])
+  // Hoe ver je terugkijkt. Deze week is wat je meestal wil zien; alles is voor
+  // als je met de klant naar een patroon zoekt ("het gaat altijd mis op
+  // zondag").
+  const [alles, setAlles] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showTips, setShowTips] = useState(false)
@@ -64,13 +68,14 @@ export default function SleepLogSection({ client, db, isMobile }) {
       .from('sleep_logs')
       .select('*')
       .eq('client_id', client.id)
-      .gte('log_date', weekStart())
+      .gte('log_date', alles ? '2000-01-01' : weekStart())
       .order('log_date', { ascending: false })
+      .limit(alles ? 90 : 14)
     setLogs(data || [])
     setLoading(false)
   }
 
-  useEffect(() => { laad() }, [client?.id])
+  useEffect(() => { laad() }, [client?.id, alles])
 
   const reset = () => { setHours(''); setStruggles(''); setNotes(''); setError(null) }
 
@@ -150,6 +155,19 @@ export default function SleepLogSection({ client, db, isMobile }) {
         </div>
       </div>
 
+      <button
+        onClick={() => setAlles(v => !v)}
+        style={{
+          alignSelf: 'flex-start', marginBottom: '0.5rem',
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          fontFamily: 'inherit', fontSize: m ? '0.68rem' : '0.72rem', fontWeight: 800,
+          color: 'rgba(255,255,255,0.4)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {alles ? 'Alleen deze week' : 'Eerdere nachten'}
+      </button>
+
       {loading ? (
         <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)' }}>Laden...</div>
       ) : logs.length === 0 ? (
@@ -161,13 +179,28 @@ export default function SleepLogSection({ client, db, isMobile }) {
           {logs.map(log => (
             <div key={log.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: m ? '0.6rem 0.75rem' : '0.7rem 0.9rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: m ? '0.92rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
                     {log.hours_slept ? `${log.hours_slept} uur` : '—'}
                   </span>
                   <span style={{ fontSize: m ? '0.66rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
                     {formatDate(log.log_date)}
                   </span>
+                  {/* De tijden zeggen iets wat het aantal uren niet zegt: zeven
+                      uur van elf tot zes is iets anders dan van twee tot negen. */}
+                  {(log.bedtime || log.wake_time) && (
+                    <span style={{ fontSize: m ? '0.64rem' : '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
+                      {String(log.bedtime || '—').slice(0, 5)} → {String(log.wake_time || '—').slice(0, 5)}
+                    </span>
+                  )}
+                  {log.quality != null && (
+                    <span style={{
+                      fontSize: '0.62rem', fontWeight: 900,
+                      color: log.quality >= 7 ? '#10b981' : log.quality >= 5 ? '#f59e0b' : '#ef4444',
+                    }}>
+                      {log.quality}/10
+                    </span>
+                  )}
                 </div>
                 {log.struggles && (
                   <div style={{ fontSize: m ? '0.66rem' : '0.7rem', color: 'rgba(255,255,255,0.5)', marginTop: 3, fontStyle: 'italic' }}>
