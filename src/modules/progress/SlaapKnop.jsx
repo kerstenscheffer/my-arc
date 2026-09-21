@@ -16,7 +16,20 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Moon, X, Check } from 'lucide-react'
+import { Moon, X, Check, Trash2, Lightbulb } from 'lucide-react'
+
+// Overgenomen uit het oude slaapblok op de pagina. Dat blok is weg; deze tips
+// waren het enige eraan dat niet in dit blad zat.
+const TIPS = [
+  'Ga elke dag op dezelfde tijd naar bed én sta op dezelfde tijd op — ook in het weekend.',
+  'Houd je slaapkamer koel: 17–19 °C is ideaal voor diepe slaap.',
+  'Zorg voor volledige duisternis. Gebruik een slaapmasker of verduisteringsgordijnen.',
+  'Geen schermen binnen 45 minuten voor bedtijd — blauw licht remt melatonine.',
+  "Neem 's avonds een warme douche: de afkoeling daarna versnelt het inslapen.",
+  'Eet je laatste maaltijd 2–3 uur voor bedtijd.',
+  'Kom zodra je wekker gaat meteen uit bed — snoozen verstoort je ritme.',
+  'Ga binnen 30 minuten na het opstaan naar buiten voor daglicht.',
+]
 
 const vandaagIso = () => {
   const d = new Date()
@@ -41,6 +54,14 @@ const veld = {
   fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
 }
 
+const linkKnop = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 800,
+  color: 'rgba(255,255,255,0.45)',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+
 const kopje = {
   fontSize: '0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
   textTransform: 'uppercase', letterSpacing: '0.11em', marginBottom: 6,
@@ -57,6 +78,11 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
   const [alGelogd, setAlGelogd] = useState(false)
+  // Eerdere nachten, in hetzelfde blad. Het losse slaapblok op de pagina is
+  // weg; terugkijken hoort bij hetzelfde moment als loggen.
+  const [eerdere, setEerdere] = useState([])
+  const [toonEerdere, setToonEerdere] = useState(false)
+  const [toonTips, setToonTips] = useState(false)
 
   // Al gelogd vannacht? Dan kleurt de knop groen en vult het blad zich met wat
   // er staat, zodat je 'm bijwerkt in plaats van er een tweede naast te zetten.
@@ -80,6 +106,30 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
       })
     return () => { weg = true }
   }, [db, client?.id])
+
+  // De lijst halen we pas op als je hem opent: meestal kom je hier om te
+  // loggen, niet om terug te kijken.
+  useEffect(() => {
+    if (!toonEerdere || !client?.id || !db?.supabase) return
+    let weg = false
+    db.supabase
+      .from('sleep_logs')
+      .select('id, log_date, bedtime, wake_time, hours_slept, quality, struggles')
+      .eq('client_id', client.id)
+      .order('log_date', { ascending: false })
+      .limit(30)
+      .then(({ data }) => { if (!weg) setEerdere(data || []) })
+    return () => { weg = true }
+  }, [toonEerdere, db, client?.id])
+
+  const verwijder = async (id) => {
+    const vorige = eerdere
+    setEerdere(e => e.filter(x => x.id !== id))
+    const { error } = await db.supabase.from('sleep_logs').delete().eq('id', id)
+    if (error) { setEerdere(vorige); return }
+    if (id && vandaagIso() === vorige.find(x => x.id === id)?.log_date) setAlGelogd(false)
+    onOpgeslagen?.()
+  }
 
   const berekend = useMemo(() => urenTussen(bed, opstaan), [bed, opstaan])
   const urenWaarde = urenAangeraakt && uren !== '' ? parseFloat(String(uren).replace(',', '.')) : berekend
@@ -267,6 +317,65 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
               <Check size={16} strokeWidth={3} />
               {bezig ? 'Opslaan…' : alGelogd ? 'Bijwerken' : 'Opslaan'}
             </button>
+
+            <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
+              <button onClick={() => { setToonEerdere(v => !v); setToonTips(false) }} style={linkKnop}>
+                {toonEerdere ? 'Verberg nachten' : 'Eerdere nachten'}
+              </button>
+              <button onClick={() => { setToonTips(v => !v); setToonEerdere(false) }} style={linkKnop}>
+                <Lightbulb size={12} strokeWidth={2.8} /> Beter slapen
+              </button>
+            </div>
+
+            {toonTips && (
+              <ul style={{
+                margin: '8px 0 0', padding: '0 0 0 1rem',
+                fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5,
+              }}>
+                {TIPS.map(t => <li key={t} style={{ marginBottom: 3 }}>{t}</li>)}
+              </ul>
+            )}
+
+            {toonEerdere && (
+              <div style={{ marginTop: 8 }}>
+                {eerdere.length === 0 ? (
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', padding: '0.5rem 0' }}>
+                    Nog geen nachten gelogd.
+                  </div>
+                ) : eerdere.map(n => (
+                  <div key={n.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '0.45rem 0', borderTop: '1px solid rgba(255,255,255,0.05)',
+                    fontSize: '0.74rem', fontWeight: 800, color: '#fff',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    <span style={{ width: 62, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>
+                      {new Date(`${n.log_date}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                    </span>
+                    <span style={{ width: 52 }}>{n.hours_slept != null ? `${n.hours_slept} u` : '—'}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.35)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {n.bedtime ? `${String(n.bedtime).slice(0, 5)} → ${String(n.wake_time || '').slice(0, 5)}` : ''}
+                      {n.struggles ? ` · ${n.struggles}` : ''}
+                    </span>
+                    {n.quality != null && (
+                      <span style={{
+                        flexShrink: 0, fontWeight: 900,
+                        color: n.quality >= 7 ? '#10b981' : n.quality >= 5 ? '#f59e0b' : '#ef4444',
+                      }}>
+                        {n.quality}
+                      </span>
+                    )}
+                    <button onClick={() => verwijder(n.id)} aria-label="Verwijderen" style={{
+                      width: 26, height: 26, flexShrink: 0, padding: 0, borderRadius: 7,
+                      background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                    }}>
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <style>{`
               @keyframes slaapOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }

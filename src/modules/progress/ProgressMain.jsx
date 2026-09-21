@@ -15,7 +15,6 @@ import SlaapKnop from './SlaapKnop'
 import BeforeAfterCard from './components/BeforeAfterCard'
 import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
-import SleepLogSection from './SleepLogSection'
 import { useChallenge } from '../../hooks/useChallenge'
 
 // Coach-tip bovenaan de tracking pagina — foto links, vaste boodschap rechts.
@@ -384,9 +383,10 @@ export default function ProgressMain({ db, client }) {
               op deze pagina toch al doet. */}
           <CheckinHistoryCard db={db} client={client} isMobile={isMobile} />
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-            <SleepLogSection client={client} db={db} isMobile={isMobile} />
-          </div>
+          {/* Het slaapblok met zijn eigen fotokop stond hier. Loggen en
+              terugkijken zitten nu allebei in het blad achter de maan-knop
+              linksonder; een tweede plek met dezelfde lijst maakte de pagina
+              alleen langer. */}
         </div>
       )}
 
