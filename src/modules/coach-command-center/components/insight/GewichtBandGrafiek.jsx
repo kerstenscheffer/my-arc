@@ -84,11 +84,29 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
     }))
   }, [fases])
 
-  const actief = gekozen === 'alles'
+  const actief = (gekozen === 'alles' || gekozen === 'daarvoor')
     ? null
     : (perFase.find(f => f.id === gekozen) || fase)
 
+  // Metingen van vóór de eerste fase. Daar is nooit een tempo voor afgesproken,
+  // dus daar hoort geen band bij — maar je wilt er wel naar kunnen kijken. Bij
+  // ks10k zijn dat 117 wegingen van maart tot september.
+  const eersteStart = perFase[0]?.started_on ? String(perFase[0].started_on).slice(0, 10) : null
+  const heeftDaarvoor = !!eersteStart && (history || []).some(e => String(e?.date || '').slice(0, 10) < eersteStart)
+
   const model = useMemo(() => {
+    // ── Vóór de eerste fase: wel de lijn, geen band ──
+    if (gekozen === 'daarvoor' && eersteStart) {
+      const voor = (history || []).filter(e => String(e?.date || '').slice(0, 10) < eersteStart)
+      const reeksVoor = trendReeks(voor)
+      if (reeksVoor.length === 0) return { leeg: true, config: maakConfig(client, null) }
+      return {
+        config: maakConfig(client, null),
+        punten: reeksVoor.map(r => ({ datum: r.datum, label: kort(r.datum), meting: r.meting, trend: r.trend })),
+        zonderBand: true, leeg: false,
+      }
+    }
+
     // ── Alle fases achter elkaar ──
     // Elke meting krijgt de band van de fase waarin hij valt. Zo zie je een cut
     // en de build erna in één lijn, elk met hun eigen tempo, in plaats van één
@@ -159,7 +177,7 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
     const weken = weekBeoordelingen(reeks, startGewicht, startDatum, config)
     const laatste = weken[weken.length - 1] || null
     return { config, punten, weken, laatste, startGewicht, startDatum, herijkt, leeg: false }
-  }, [client, history, actief, gekozen, perFase, fase])
+  }, [client, history, actief, gekozen, perFase, fase, eersteStart])
 
   if (model.leeg) {
     return (
@@ -206,7 +224,7 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
 
       {/* Terugkijken: elke fase heeft zijn eigen band, dus je kiest er één —
           of je legt ze achter elkaar. */}
-      {perFase.length > 1 && (
+      {(perFase.length > 1 || (perFase.length === 1 && heeftDaarvoor)) && (
         <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 6, marginBottom: 2 }}>
           {[...perFase].reverse().map((f, i) => {
             const aan = (gekozen === null && i === 0) || gekozen === f.id
@@ -228,6 +246,23 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
               </button>
             )
           })}
+          {heeftDaarvoor && (
+            <button
+              onClick={() => setGekozen('daarvoor')}
+              title="Wegingen van vóór de eerste fase"
+              style={{
+                flexShrink: 0, minHeight: 24, padding: '0 0.5rem', borderRadius: 999,
+                background: gekozen === 'daarvoor' ? '#fff' : 'transparent',
+                border: `1px solid ${gekozen === 'daarvoor' ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                color: gekozen === 'daarvoor' ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
+                fontSize: '0.62rem', fontWeight: 900, fontFamily: 'inherit',
+                cursor: 'pointer', whiteSpace: 'nowrap',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Daarvoor
+            </button>
+          )}
           <button
             onClick={() => setGekozen('alles')}
             style={{
@@ -252,7 +287,11 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
           padding: '0.5rem 0.6rem', borderRadius: 8,
           background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
         }}>
-          {model.alles ? (
+          {model.zonderBand ? (
+            <>Wegingen van vóór de eerste vastgelegde fase. Er is toen geen tempo afgesproken, dus er is ook geen
+            band om tegen af te meten — je ziet alleen de trend en de losse metingen. Wil je hier wel een oordeel
+            over, leg die periode dan alsnog als fase vast.</>
+          ) : model.alles ? (
             <>Alle fases achter elkaar. Elke meting wordt afgemeten tegen de band van de fase waarin hij valt,
             dus een cut en de build erna hebben elk hun eigen tempo. Het oordeel staat hier niet: dat hoort bij
             één fase.</>
@@ -323,7 +362,7 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
 
       {/* Het oordeel in één regel, plus wat je ermee zou doen. Alleen bij één
           fase: over een reeks fases heen is 'op koers' betekenisloos. */}
-      {laatste && !model.alles && (
+      {laatste && !model.alles && !model.zonderBand && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 8,
           marginTop: 8, padding: '0.55rem 0.7rem', borderRadius: 10,
