@@ -1,5 +1,49 @@
 // api/stripe-webhook.js
+import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+
+// Het 2-termijnen-plan van de 6 weken challenge. Stripe kent geen abonnement
+// dat "twee keer int en dan stopt", dus dat zetten we hier: bij het afrekenen
+// leggen we meteen de einddatum vast, en na de tweede betaling zeggen we het
+// nog een keer op. Twee onafhankelijke stops, want een gemiste webhook mag
+// geen derde afschrijving worden.
+const PLAN_2X = '6-week-challenge-2x';
+const DRIE_WEKEN = 21 * 24 * 60 * 60;
+
+async function stopNaTweedeTermijn(session) {
+  const subId = session.subscription;
+  if (!subId) return;
+  try {
+    const sub = await stripe.subscriptions.retrieve(subId);
+    // Eerste periode eindigt over drie weken; dan volgt de tweede incasso.
+    // Een uur vóór het einde van die tweede periode zetten we hem stop, zodat
+    // er geen derde factuur meer aangemaakt wordt.
+    const einde = (sub.current_period_end || 0) + DRIE_WEKEN - 3600;
+    await stripe.subscriptions.update(subId, {
+      cancel_at: einde,
+      metadata: { ...(sub.metadata || {}), plan: PLAN_2X, termijnen: '2' },
+    });
+    console.log('2-termijnen: stop gezet op', new Date(einde * 1000).toISOString());
+  } catch (e) {
+    console.error('2-termijnen: stop zetten mislukt:', e.message);
+  }
+}
+
+async function stopAlsTweedeBetaling(invoice) {
+  const subId = invoice.subscription;
+  if (!subId || invoice.billing_reason !== 'subscription_cycle') return;
+  try {
+    const sub = await stripe.subscriptions.retrieve(subId);
+    if (sub.metadata?.plan !== PLAN_2X) return;
+    if (sub.cancel_at_period_end || sub.status === 'canceled') return;
+    await stripe.subscriptions.cancel(subId);
+    console.log('2-termijnen: tweede betaling binnen, abonnement gestopt', subId);
+  } catch (e) {
+    console.error('2-termijnen: opzeggen na tweede betaling mislukt:', e.message);
+  }
+}
 
 // Service key komt uit Vercel env (SUPABASE_SERVICE_KEY). De oude key
 // stond hier hardcoded; na het zetten van de env var moet die geroteerd
@@ -23,6 +67,9 @@ export default async function handler(req, res) {
       // Payment events
       case 'checkout.session.completed':
         await handleCheckoutCompleted(event.data.object);
+        if (event.data.object?.metadata?.plan === PLAN_2X) {
+          await stopNaTweedeTermijn(event.data.object);
+        }
         break;
       
       case 'payment_intent.succeeded':
@@ -44,6 +91,7 @@ export default async function handler(req, res) {
       
       case 'invoice.payment_succeeded':
         await handleInvoicePaymentSucceeded(event.data.object);
+        await stopAlsTweedeBetaling(event.data.object);
         break;
       
       case 'invoice.payment_failed':

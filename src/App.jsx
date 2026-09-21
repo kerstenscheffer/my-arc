@@ -276,6 +276,12 @@ function App() {
     return <SixWeekChallengeCheckout />
   }
 
+  // Zelfde challenge, in twee termijnen: nu €148,50 en over 3 weken nog eens.
+  // Zelfde pagina, andere Stripe-prijs.
+  if (currentPath === '/6-week-checkout-2x' || currentPath === '/6week-checkout-2x') {
+    return <SixWeekChallengeCheckout termijnen />
+  }
+
   // 16-weken checkout, maandelijks — €125/mnd abonnement.
   if (currentPath === '/16-week-monthly-checkout' || currentPath === '/16week-monthly-checkout') {
     return <SixteenWeekMonthlyCheckout />

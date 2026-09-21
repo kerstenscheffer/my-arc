@@ -5,6 +5,11 @@
 // nav-dots rechts. Alleen de prijs, de kop en het offer-scherm verschillen.
 //
 // Stripe: /api/create-checkout-session (one-time), plan '6-week-challenge'.
+//
+// Twee varianten, één pagina. Met `termijnen` erop staat dezelfde tekst op
+// /6week-checkout-2x, maar reken je in twee keer af: nu en over drie weken.
+// Alles wat tussen de varianten verschilt staat in VARIANT hieronder, zodat de
+// tekst niet op twee plekken uit elkaar gaat lopen.
 
 import { useState, useEffect, useRef } from 'react'
 import { Star, Lock, Mail, User, Phone, ChevronDown, Compass, ListChecks, Target, CheckCircle2, HelpCircle, Clock, BadgeEuro } from 'lucide-react'
@@ -19,6 +24,33 @@ const PRICE = 297
 // `payment` mode but passed a recurring price"), waardoor elke afrekening
 // stukliep. Dit id hoort bij hetzelfde product, maar dan one_time.
 const STRIPE_PRICE_ID = 'price_1UFdw6J3V4uXn1OkvJicc73b'
+
+// Twee termijnen van €148,50: een abonnement dat elke 3 weken int en na de
+// tweede incasso stopt (zie de stripe-webhook; die zet de stop). Abonnementen
+// kunnen bij Stripe niet met iDEAL, dus deze variant is kaart-only.
+const TERMIJN_BEDRAG = 148.5
+const STRIPE_PRICE_ID_2X = 'price_1UI2xdJ3V4uXn1OkOVZpVKTr'
+
+const VARIANT = {
+  eenmalig: {
+    plan: '6-week-challenge',
+    priceId: STRIPE_PRICE_ID,
+    mode: 'payment',
+    cancelPath: '/6week-checkout',
+    knop: `Start Nu · €${PRICE}`,
+    balkKnop: `Maak investering · €${PRICE}`,
+    prijsRegel: null,
+  },
+  termijnen: {
+    plan: '6-week-challenge-2x',
+    priceId: STRIPE_PRICE_ID_2X,
+    mode: 'subscription',
+    cancelPath: '/6week-checkout-2x',
+    knop: `Start Nu · 2 × €${String(TERMIJN_BEDRAG).replace('.', ',')}`,
+    balkKnop: `In 2 termijnen · €${PRICE}`,
+    prijsRegel: `2 termijnen van €${String(TERMIJN_BEDRAG).replace('.', ',')} — de eerste nu, de tweede over 3 weken. Samen €${PRICE}, verder niets. Betalen met kaart.`,
+  },
+}
 
 // Same Stripe publishable key as the other checkouts.
 const STRIPE_PK = 'pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54'
@@ -196,7 +228,8 @@ function TrustpilotBadge({ size = 'sm', style }) {
   )
 }
 
-export default function SixWeekChallengeCheckout() {
+export default function SixWeekChallengeCheckout({ termijnen = false }) {
+  const variant = termijnen ? VARIANT.termijnen : VARIANT.eenmalig
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -290,15 +323,16 @@ export default function SixWeekChallengeCheckout() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plan: '6-week-challenge',
+          plan: variant.plan,
           price: PRICE,
-          ...(STRIPE_PRICE_ID ? { priceId: STRIPE_PRICE_ID } : {}),
+          priceId: variant.priceId,
+          mode: variant.mode,
           email: email.trim(),
           name: name.trim(),
           phone: phone.trim(),
           // Na betaling meteen door naar de intake, niet naar /success.
           successPath: '/myintake',
-          cancelPath: '/6week-checkout',
+          cancelPath: variant.cancelPath,
         }),
       })
       const data = await res.json()
@@ -568,8 +602,23 @@ export default function SixWeekChallengeCheckout() {
                   letterSpacing: '0.01em', fontFamily: 'inherit',
                 }}
               >
-                {loading ? 'Even geduld...' : 'Start Nu · €297'}
+                {loading ? 'Even geduld...' : variant.knop}
               </button>
+
+              {/* Alleen bij termijnen: wat je precies betaalt en wanneer. Dit
+                  hoort vlak bij de knop te staan, niet in de kleine lettertjes. */}
+              {variant.prijsRegel && (
+                <div style={{
+                  marginTop: '0.7rem', padding: isMobile ? '0.65rem 0.8rem' : '0.75rem 0.9rem',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10,
+                  fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, textAlign: 'center',
+                }}>
+                  {variant.prijsRegel}
+                </div>
+              )}
 
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -699,7 +748,7 @@ export default function SixWeekChallengeCheckout() {
           fontFamily: 'inherit',
         }}
       >
-        Maak investering · €{PRICE} <ChevronDown size={16} strokeWidth={3} />
+        {variant.balkKnop} <ChevronDown size={16} strokeWidth={3} />
       </button>
 
       {/* ══ Nav-dots — zoals /16week ══ */}
