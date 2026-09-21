@@ -305,6 +305,37 @@ export const STATUS_TEKST = {
   GEEN_DATA: 'Nog geen data',
 }
 
+// Het gemeten tempo in kilo's per week: de helling van een rechte lijn door de
+// metingen van de afgelopen twee weken.
+//
+// Waarom een helling en geen "deze week min vorige week": dat verschil kantelt
+// compleet door één uitschieter, en in de eerste dagen van een week vergelijk
+// je één ochtend met een volle week. Een helling gebruikt alles wat er ligt en
+// trekt zich van een losse gekke dag weinig aan.
+export function tempoPerWeek(history, dagenTerug = 14) {
+  const grens = new Date()
+  grens.setDate(grens.getDate() - dagenTerug)
+  const punten = (history || [])
+    .map(e => ({ t: new Date(`${String(e?.date || '').slice(0, 10)}T00:00:00`).getTime(), w: parseFloat(e?.weight) }))
+    .filter(p => Number.isFinite(p.w) && Number.isFinite(p.t) && p.t >= grens.getTime())
+    .sort((a, b) => a.t - b.t)
+  if (punten.length < 3) return null
+
+  const eerste = punten[0].t
+  const x = punten.map(p => (p.t - eerste) / (7 * dagInMs))   // in weken
+  const y = punten.map(p => p.w)
+  const n = x.length
+  const gemX = x.reduce((s, v) => s + v, 0) / n
+  const gemY = y.reduce((s, v) => s + v, 0) / n
+  let teller = 0, noemer = 0
+  for (let i = 0; i < n; i++) {
+    teller += (x[i] - gemX) * (y[i] - gemY)
+    noemer += (x[i] - gemX) ** 2
+  }
+  if (noemer === 0) return null
+  return { kgPerWeek: Math.round((teller / noemer) * 100) / 100, metingen: n }
+}
+
 // Hoe ver zit de trend buiten de band, gemeten in bandbreedtes? 0 = keurig
 // binnen, 1 = een hele bandbreedte ernaast. Dat is de maat voor de kleur van de
 // lijn: dezelfde 0,4 kg betekent iets anders bij een cut van 1 kg per week dan

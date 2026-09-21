@@ -6,6 +6,9 @@ import React, { useState, useMemo } from 'react'
 import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
+import {
+  maakConfig, trendReeks, tempoPerWeek, weekFractie, lijnenOpWeek, ernstVan, kleurVoorErnst,
+} from '../utils/coachingBand'
 
 const PERIODES = [
   { id: '30d', label: '30 dagen' },
@@ -123,7 +126,6 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
     ? new Date(startDatum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
     : null
 
-  const weekChange = (cur && prev) ? parseFloat((cur.avg - prev.avg).toFixed(1)) : null
   
   // ═══ Chart data with optional plan line ═══
   // Twee modi voor de plan-lijn (rode lijn):
@@ -326,6 +328,28 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
     ? new Date(laatsteMeting.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
     : null
 
+  // ── Trend, tempo en de afstand tot het plan ──
+  //
+  // Dit verving 'deze week' tegen 'vorige week'. Dat was appels met peren: op
+  // maandag staat er één ochtendweging tegenover het gemiddelde van zes dagen,
+  // en dagruis van twee kilo maakt daar zomaar een halve kilo 'aankomst' van.
+  const binnenFase = fase?.started_on
+    ? (history || []).filter(e => String(e?.date || '').slice(0, 10) >= String(fase.started_on).slice(0, 10))
+    : history
+  const trendReeksData = trendReeks(binnenFase)
+  const laatsteTrend = trendReeksData[trendReeksData.length - 1] || null
+  const tempo = tempoPerWeek(binnenFase, 14)
+
+  // Waar hoort hij nu te zitten volgens de fase, en hoeveel scheelt dat?
+  const bandConfig = maakConfig(client, fase)
+  const bandStart = fase?.start_gewicht ? Number(fase.start_gewicht) : null
+  const bandLijnen = (laatsteTrend && bandStart)
+    ? lijnenOpWeek(weekFractie(laatsteTrend.datum, fase.started_on, bandConfig.venster_dagen), bandStart, bandConfig)
+    : null
+  const opPlan = (laatsteTrend && bandLijnen) ? Math.round((laatsteTrend.trend - bandLijnen.doel) * 10) / 10 : null
+  const bandErnst = (laatsteTrend && bandLijnen) ? ernstVan(laatsteTrend.trend, bandLijnen) : null
+  const bandKleur = kleurVoorErnst(bandErnst)
+
   return (
     <div>
       {/* ═══ WEEKCIJFERS — één regel als tabel: verticale lijntjes ertussen,
@@ -343,23 +367,33 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             color: '#fff',
           }] : []),
           {
-            label: 'Deze week',
-            sub: cur ? `${cur.count} meting${cur.count === 1 ? '' : 'en'}` : 'geen meting',
-            val: cur ? `${cur.avg}` : '—',
+            label: 'Trend',
+            sub: laatsteTrend ? `${laatsteTrend.metingen} van 7 dagen` : 'geen meting',
+            val: laatsteTrend?.trend != null ? `${laatsteTrend.trend}` : '—',
             color: '#fff',
           },
           {
+            label: 'Tempo',
+            sub: fase?.week_doel_kg != null
+              ? `doel ${Number(fase.week_doel_kg) > 0 ? '+' : ''}${Number(fase.week_doel_kg)}/wk`
+              : (tempo ? `over ${tempo.metingen} metingen` : '—'),
+            val: tempo ? `${tempo.kgPerWeek > 0 ? '+' : ''}${tempo.kgPerWeek}` : '—',
+            eenheid: '/wk',
+            color: tempo ? bandKleur : 'rgba(255,255,255,0.4)',
+          },
+          ...(fase ? [{
+            label: 'Op plan',
+            sub: opPlan !== null
+              ? (Math.abs(opPlan) < 0.05 ? 'precies op plan' : `${opPlan > 0 ? 'boven' : 'onder'} de plan-lijn`)
+              : 'nog geen trend',
+            val: opPlan !== null ? `${opPlan > 0 ? '+' : ''}${opPlan}` : '—',
+            color: opPlan !== null ? bandKleur : 'rgba(255,255,255,0.4)',
+          }] : [{
             label: 'Vorige week',
             sub: prev ? `${prev.count} meting${prev.count === 1 ? '' : 'en'}` : 'geen meting',
             val: prev ? `${prev.avg}` : '—',
             color: '#fff',
-          },
-          {
-            label: 'Verschil',
-            sub: weekChange !== null ? 'week op week' : '—',
-            val: weekChange !== null ? `${weekChange > 0 ? '+' : ''}${weekChange}` : '—',
-            color: weekChange !== null ? weightGoalColor(weekChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)',
-          },
+          }]),
           {
             label: fase ? 'Sinds fase' : 'Sinds start',
             sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen start',
@@ -388,7 +422,9 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               whiteSpace: 'nowrap',
             }}>
               {s2.val}
-              <span style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800, opacity: 0.5, marginLeft: 2 }}>kg</span>
+              <span style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800, opacity: 0.5, marginLeft: 2 }}>
+                {s2.eenheid ? `kg${s2.eenheid}` : 'kg'}
+              </span>
             </div>
             <div style={{
               fontSize: isMobile ? '0.58rem' : '0.62rem', fontWeight: 700,
