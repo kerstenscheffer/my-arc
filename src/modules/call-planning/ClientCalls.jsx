@@ -82,9 +82,18 @@ export default function ClientCalls({ clientInfo }) {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    // Ruimte bovenin en opzij. Op een telefoon geeft het dashboard deze pagina
+    // geen padding mee, dus begon de kop tegen de bovenrand — precies waar de
+    // challenge-pil (linksboven) en de meldingsknop (rechtsboven) zweven, en dan
+    // staat er een trofee dwars door 'Coaching calls'.
+    <div style={{
+      maxWidth: 900, margin: '0 auto',
+      padding: isMobile
+        ? 'calc(env(safe-area-inset-top, 0px) + 62px) 1rem 2rem'
+        : '0 0 2rem',
+    }}>
 
-      <div style={{ padding: isMobile ? '0.75rem 0 1rem' : '1rem 0 1.25rem' }}>
+      <div style={{ padding: isMobile ? '0 0 1rem' : '1rem 0 1.25rem' }}>
         <h1 style={{
           fontSize: isMobile ? '1.35rem' : '1.6rem', fontWeight: 900, color: '#fff',
           margin: 0, letterSpacing: '-0.03em',
