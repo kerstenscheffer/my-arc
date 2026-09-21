@@ -21,7 +21,9 @@ const PERIODES = [
 // gebruikt: daar is dit de bovenste balk van de sectie en hoort hij tegen de
 // randen te staan, met het huidige gewicht als eerste cel. Op de klantpagina
 // blijft het een zwevend kaartje binnen de bestaande opmaak.
-export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null }) {
+// `toonGrafiek` uit: de coach-kant heeft zijn eigen band-grafiek en zet dit
+// verloop achter een knop. De klant-kant laat hem gewoon staan.
+export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 
@@ -441,7 +443,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           "Bekijk week progressie"-toggle van WeightHistory. */}
 
       {/* ═══ GRAFIEK — met een tijdfilter erboven ═══ */}
-      {chartData.length > 0 && (
+      {toonGrafiek && chartData.length > 0 && (
         <div style={{ margin: isMobile ? '3rem 0.5rem 0' : '3.5rem 0.75rem 0' }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',

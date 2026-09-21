@@ -296,55 +296,14 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
 
   return (
     <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.75rem' : '0.625rem 1rem 0.875rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <Scale size={12} color="rgba(255,255,255,0.4)" strokeWidth={2.6} />
-        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', flex: 1 }}>
-          Coaching-band
-        </span>
-        {/* Grafiek of cijfers. Een lijn laat zien hoe het loopt, een tabel wat
-            er staat — en dat tweede lees je sneller als je moet besluiten of je
-            bijstuurt. */}
-        <div style={{ display: 'flex', gap: 3, marginRight: 2 }}>
-          {[{ id: 'grafiek', label: 'Grafiek' }, { id: 'tabel', label: 'Tabel' }].map(k => {
-            const aan = weergave === k.id
-            return (
-              <button
-                key={k.id}
-                onClick={() => setWeergave(k.id)}
-                style={{
-                  minHeight: 22, padding: '0 0.45rem', borderRadius: 999,
-                  background: aan ? '#fff' : 'transparent',
-                  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.45)',
-                  fontSize: '0.6rem', fontWeight: 900, fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {k.label}
-              </button>
-            )
-          })}
-        </div>
-        <button
-          onClick={() => setUitleg(v => !v)}
-          title="Hoe deze band werkt"
-          aria-label="Uitleg"
-          style={{
-            width: 22, height: 22, padding: 0, borderRadius: 6,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)',
-            cursor: 'pointer', touchAction: 'manipulation',
-          }}
-        >
-          <Info size={12} />
-        </button>
-      </div>
-
-      {/* Terugkijken: elke fase heeft zijn eigen band, dus je kiest er één —
+      {/* Geen kop 'Coaching-band' meer: die stond boven een grafiek die al
+          duidelijk maakt wat hij is, in een kolom die al over gewicht gaat. De
+          keuzes staan op één regel. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+        {/* Terugkijken: elke fase heeft zijn eigen band, dus je kiest er één —
           of je legt ze achter elkaar. */}
       {(perFase.length > 1 || (perFase.length === 1 && heeftDaarvoor)) && (
-        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 6, marginBottom: 2 }}>
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', flexShrink: 1, minWidth: 0 }}>
           {[...perFase].reverse().map((f, i) => {
             const aan = (gekozen === null && i === 0) || gekozen === f.id
             return (
@@ -398,6 +357,46 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
           </button>
         </div>
       )}
+        <span style={{ flex: 1 }} />
+        {/* Grafiek of cijfers. Een lijn laat zien hoe het loopt, een tabel wat
+            er staat — en dat tweede lees je sneller als je moet besluiten of je
+            bijstuurt. */}
+        <div style={{ display: 'flex', gap: 3, marginRight: 2 }}>
+          {[{ id: 'grafiek', label: 'Grafiek' }, { id: 'tabel', label: 'Tabel' }].map(k => {
+            const aan = weergave === k.id
+            return (
+              <button
+                key={k.id}
+                onClick={() => setWeergave(k.id)}
+                style={{
+                  minHeight: 22, padding: '0 0.45rem', borderRadius: 999,
+                  background: aan ? '#fff' : 'transparent',
+                  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.45)',
+                  fontSize: '0.6rem', fontWeight: 900, fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {k.label}
+              </button>
+            )
+          })}
+        </div>
+        <button
+          onClick={() => setUitleg(v => !v)}
+          title="Hoe deze band werkt"
+          aria-label="Uitleg"
+          style={{
+            width: 22, height: 22, padding: 0, borderRadius: 6,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)',
+            cursor: 'pointer', touchAction: 'manipulation',
+          }}
+        >
+          <Info size={12} />
+        </button>
+      </div>
 
       {uitleg && (
         <div style={{
@@ -498,56 +497,71 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
       </div>
       )}
 
-      {/* Het oordeel in één regel, plus wat je ermee zou doen. Alleen bij één
+      {/* Het oordeel. Eén ding groot en wit — dat is waar je naar kijkt — en
+          daaronder wat je ermee doet. De grijze regels eronder zijn de cijfers
+          waar het op rust; die lees je alleen als je twijfelt. Alleen bij één
           fase: over een reeks fases heen is 'op koers' betekenisloos. */}
       {laatste && !model.alles && !model.zonderBand && (
         <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 8,
-          marginTop: 8, padding: '0.55rem 0.7rem', borderRadius: 10,
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+          marginTop: 10, padding: isMobile ? '0.7rem 0.8rem' : '0.8rem 0.9rem',
+          borderRadius: 12,
+          background: kleur === '#10b981' ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${kleur}55`,
         }}>
-          <span style={{
-            flexShrink: 0, marginTop: 3, width: 7, height: 7, borderRadius: '50%', background: kleur,
-          }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#fff' }}>
+          <div style={{
+            display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap',
+          }}>
+            <span style={{
+              fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900,
+              color: kleur, letterSpacing: '-0.02em',
+            }}>
               {STATUS_TEKST[laatste.status] || '—'}
-              <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
-                {' · week '}{laatste.week}
-                {laatste.wekenBuiten > 1 ? ` · ${laatste.wekenBuiten} weken op rij` : ''}
-              </span>
-            </div>
-            {raad && (
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 1.4 }}>
-                {raad.tekst}
-              </div>
-            )}
-
-            {/* De weken waar dat oordeel op rust. Zonder deze cijfers moet je
-                de coach op zijn blauwe ogen geloven; met deze regel zie je
-                meteen waar 'twee weken te snel' vandaan komt. */}
-            {(model.weken || []).length > 1 && (
-              <div style={{
-                display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6,
-                fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
-                fontVariantNumeric: 'tabular-nums',
+            </span>
+            {laatste.wekenBuiten > 1 && (
+              <span style={{
+                fontSize: '0.64rem', fontWeight: 900, color: '#0a0a0a',
+                background: kleur, borderRadius: 999, padding: '0.1rem 0.4rem',
               }}>
-                {model.weken.slice(-3).map(w => (
-                  <span key={w.week} style={{ color: STATUS_KLEUR[w.status] || 'rgba(255,255,255,0.35)' }}>
-                    wk {w.week}: {w.trend} kg
-                    {w.verschil != null && (
-                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>
-                        {' '}({w.verschil > 0 ? '+' : ''}{w.verschil})
-                      </span>
-                    )}
-                    <span style={{ color: 'rgba(255,255,255,0.25)' }}>{' · '}{w.metingen}×</span>
-                  </span>
-                ))}
-              </div>
+                {laatste.wekenBuiten} weken op rij
+              </span>
             )}
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)' }}>
+              week {laatste.week}
+            </span>
           </div>
+
+          {raad && (
+            <div style={{
+              fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 800,
+              color: '#fff', marginTop: 4, lineHeight: 1.35,
+            }}>
+              {raad.tekst}
+            </div>
+          )}
+
+          {(model.weken || []).length > 1 && (
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 7,
+              fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {model.weken.slice(-3).map(w => (
+                <span key={w.week} style={{ color: STATUS_KLEUR[w.status] || 'rgba(255,255,255,0.35)' }}>
+                  wk {w.week}: {w.trend} kg
+                  {w.verschil != null && (
+                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      {' '}({w.verschil > 0 ? '+' : ''}{w.verschil})
+                    </span>
+                  )}
+                  <span style={{ color: 'rgba(255,255,255,0.25)' }}>{' · '}{w.metingen}×</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
+
     </div>
   )
 }

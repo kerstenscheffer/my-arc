@@ -4,7 +4,7 @@
 // Props: { client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery }
 // ============================================
 import React from 'react'
-import { Scale, Target, Ruler, Camera, Download, Maximize2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Ruler, Camera, Download, Maximize2, ChevronDown, ChevronUp } from 'lucide-react'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
 import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
 import { weightGoalColor } from '../../../weight-tracker/utils/weightGoalColor'
@@ -12,6 +12,35 @@ import FasePaneel from './FasePaneel'
 import GewichtBandGrafiek from './GewichtBandGrafiek'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
+
+// Eén regel die een blok open- en dichtklapt. Zelfde vorm voor elk blok, zodat
+// je aan de rand van de kolom ziet wat er nog meer is zonder dat het in beeld
+// staat.
+function Uitklap({ label, extra, open, onKlik, isMobile }) {
+  return (
+    <button
+      onClick={onKlik}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+        padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem',
+        background: 'transparent', border: 'none',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <span style={{ flex: 1, fontSize: '0.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
+        {label}
+      </span>
+      {extra && (
+        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)' }}>{extra}</span>
+      )}
+      {open
+        ? <ChevronUp size={15} strokeWidth={3} color="#fff" />
+        : <ChevronDown size={15} strokeWidth={3} color="#fff" />}
+    </button>
+  )
+}
 
 export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate }) {
   const history = weightData?.history || []
@@ -27,6 +56,11 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // Alle fases, voor de band: daar kun je ook terugkijken naar een cut van
   // vorig kwartaal.
   const [alleFases, setAlleFases] = React.useState([])
+  // Wat er standaard dicht staat. De band en de cijfers zijn waar je naar
+  // kijkt; het verloop en de losse logs zijn om iets op te zoeken, en die
+  // maakten de kolom onleesbaar.
+  const [toonVerloop, setToonVerloop] = React.useState(false)
+  const [toonLogs, setToonLogs] = React.useState(false)
   const ZICHTBAAR = 3
 
   // Week-op-week: groepeer logs per kalenderweek (maandag-start), gemiddelde
@@ -56,6 +90,10 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
       .map((w, i) => ({ ...w, diff: i > 0 ? Math.round((w.avg - weeks[i - 1].avg) * 10) / 10 : null }))
       .reverse()
   }, [history])
+  const laatsteLabel = history[0]?.date
+    ? `laatst ${formatDate(history[0].date)}`
+    : null
+
   const circumFields = [
     { key: 'waist_cm', label: 'Buik' }, { key: 'bicep_cm', label: 'Arm' },
     { key: 'chest_cm', label: 'Borst' }, { key: 'thigh_cm', label: 'Bovenbeen' }
@@ -69,27 +107,9 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-        <Scale size={14} color="#fff" />
-        <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Gewicht & Body</span>
-        {/* Doelgewicht stond in een eigen blok onder de kop, samen met het
-            huidige gewicht. Huidig zit nu in de statistiekbalk; het doel is
-            één regel en past hier achter de titel. */}
-        {client.target_weight && (
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'baseline', gap: '0.3rem', flexShrink: 0 }}>
-            <Target size={12} color="rgba(255,255,255,0.45)" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
-              {parseFloat(client.target_weight).toFixed(1)} kg
-            </span>
-            {client.goal_deadline && (
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
-                {formatDate(client.goal_deadline)}
-              </span>
-            )}
-          </span>
-        )}
-      </div>
-
+      {/* De kop 'Gewicht & Body' stond boven een kolom waar alles al over
+          gewicht gaat, en het doelgewicht ernaast stuurde niets — dat is nu de
+          horizon in de band. Allebei weg: de fase-regel is de eerste regel. */}
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {/* Fase bovenaan: die bepaalt hoe je de cijfers eronder moet lezen.
             +0,1 kg is goed nieuws in een build en slecht in een cut. */}
@@ -101,14 +121,40 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           onFaseChange={onClientUpdate}
           onActieveFase={setActieveFase}
           onFases={setAlleFases}
+          toonOordeel={false}
         />
         {/* De band: waar het gewicht hoort te lopen, en of dat gebeurt. Staat
             boven de cijfers, want dit is de vraag die je als eerste stelt. */}
         {history.length > 0 && (
           <GewichtBandGrafiek client={client} history={history} fase={actieveFase} fases={alleFases} isMobile={isMobile} />
         )}
-        {history.length > 0 && <WeightStatsGrid stats={weightData?.stats || {}} client={client} fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }} history={history} isMobile={isMobile} coachingPlan={coachingPlan} fase={actieveFase} volleBreedte toonHuidig />}
         {history.length > 0 && (
+          <WeightStatsGrid
+            stats={weightData?.stats || {}} client={client}
+            fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }}
+            history={history} isMobile={isMobile} coachingPlan={coachingPlan}
+            fase={actieveFase} volleBreedte toonHuidig toonGrafiek={toonVerloop}
+          />
+        )}
+        {history.length > 0 && (
+          <Uitklap
+            label="Verloop"
+            extra={`${history.length} metingen`}
+            open={toonVerloop}
+            onKlik={() => setToonVerloop(v => !v)}
+            isMobile={isMobile}
+          />
+        )}
+        {history.length > 0 && (
+          <Uitklap
+            label="Alle metingen"
+            extra={laatsteLabel}
+            open={toonLogs}
+            onKlik={() => setToonLogs(v => !v)}
+            isMobile={isMobile}
+          />
+        )}
+        {history.length > 0 && toonLogs && (
           <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',

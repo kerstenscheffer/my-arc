@@ -16,7 +16,10 @@ import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/uti
 const vandaag = () => new Date().toISOString().split('T')[0]
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export default function FasePaneel({ client, db, history, isMobile, onFaseChange, onActieveFase, onFases }) {
+// `toonOordeel` staat uit zodra de coaching-band eronder hangt: die zegt
+// hetzelfde, met de cijfers erbij. Twee meldingen over dezelfde week maken de
+// kolom drukker zonder dat er iets bij komt.
+export default function FasePaneel({ client, db, history, isMobile, onFaseChange, onActieveFase, onFases, toonOordeel = true }) {
   const [fases, setFases] = useState([])
   const [laden, setLaden] = useState(true)
   const [nieuw, setNieuw] = useState(null)
@@ -121,17 +124,20 @@ export default function FasePaneel({ client, db, history, isMobile, onFaseChange
     <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: p }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: huidige || nieuw ? '0.6rem' : 0 }}>
         <Flag size={14} color="#fff" />
-        <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Fase</span>
-
-        {huidige && !nieuw && (
+        {huidige && !nieuw ? (
           <>
-            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
+            <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
               {DOELEN[huidige.doel]?.label || huidige.doel}
             </span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>
               sinds {datumNL(huidige.started_on)}
+              {huidige.week_doel_kg != null && Number(huidige.week_doel_kg) !== 0
+                ? ` · ${Number(huidige.week_doel_kg) > 0 ? '+' : ''}${Number(huidige.week_doel_kg)} kg/wk`
+                : ''}
             </span>
           </>
+        ) : (
+          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Fase</span>
         )}
 
         <span style={{ flex: 1 }} />
@@ -148,7 +154,7 @@ export default function FasePaneel({ client, db, history, isMobile, onFaseChange
       </div>
 
       {/* Oordeel: ligt de klant op schema? */}
-      {huidige && !nieuw && oordeel && (
+      {toonOordeel && huidige && !nieuw && oordeel && (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
           <span style={{
             fontSize: '0.8rem', fontWeight: 900,
