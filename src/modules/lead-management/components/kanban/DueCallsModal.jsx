@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass, ChevronRight } from 'lucide-react'
+import SaleForm from './SaleForm'
 
 const LIJN = 'rgba(255,255,255,0.08)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.05)'
@@ -57,6 +58,9 @@ function CallRegel({ dc, onOutcome }) {
   const [stap, setStap] = useState(dc.denktNa ? 'gevoerd' : 1)
   const [verzetten, setVerzetten] = useState(false)
   const [denkt, setDenkt] = useState(false)
+  // Sale: het bedrag hoort bij dezelfde handeling, dus vragen we het hier en
+  // niet in een tweede venster dat er overheen springt.
+  const [sale, setSale] = useState(false)
   const [datum, setDatum] = useState(dc.callDate || new Date().toISOString().split('T')[0])
   const [tijd, setTijd] = useState(dc.callTime || new Date().toTimeString().slice(0, 5))
   const overEenWeek = () => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0] }
@@ -103,9 +107,18 @@ function CallRegel({ dc, onOutcome }) {
         </div>
       )}
 
-      {open && stap === 'gevoerd' && !denkt && (
+      {open && stap === 'gevoerd' && sale && (
+        <SaleForm
+          leadName={dc.leadName}
+          compact
+          onCancel={() => setSale(false)}
+          onSave={(gegevens) => onOutcome(dc, 'sale', { sale: gegevens })}
+        />
+      )}
+
+      {open && stap === 'gevoerd' && !denkt && !sale && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button style={knop('#fff')} onClick={() => onOutcome(dc, 'sale')}><Trophy size={13} strokeWidth={3} /> Sale</button>
+          <button style={knop('#fff')} onClick={() => setSale(true)}><Trophy size={13} strokeWidth={3} /> Sale</button>
           <button style={knop('#ef4444')} onClick={() => onOutcome(dc, 'saleLost')}><XCircle size={13} strokeWidth={3} /> Verloren</button>
           <button style={knop('#eab308')} onClick={() => setDenkt(true)}><Hourglass size={13} strokeWidth={3} /> Denkt na</button>
         </div>
@@ -113,7 +126,7 @@ function CallRegel({ dc, onOutcome }) {
 
       {/* Denkt erover na: de call telt als gevoerd, de lead blijft staan en
           komt op de gekozen datum vanzelf weer bovenaan deze lijst. */}
-      {open && stap === 'gevoerd' && denkt && (
+      {open && stap === 'gevoerd' && denkt && !sale && (
         <div>
           <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>
             Wanneer kom je hierop terug?

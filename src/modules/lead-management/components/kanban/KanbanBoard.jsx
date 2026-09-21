@@ -1435,13 +1435,29 @@ export default function KanbanBoard({
       if (kind === 'sale') target = sections.find(s => s.id !== 'unassigned' && isSaleSectionTitle(s.title))
       else if (kind === 'saleLost') target = sections.find(s => s.id !== 'unassigned' && isSaleLostSectionTitle(s.title))
       else if (kind === 'noShow') target = sections.find(s => s.id !== 'unassigned' && /no.?show/i.test(s.title || ''))
-      if (target) await handleMoveLeadToSection(lead, dc.sectionId, target.id)
+      // De call-lijst vraagt het bedrag meteen zelf; dan hoeft het losse
+      // sale-venster er niet overheen te komen.
+      const metBedrag = kind === 'sale' && extra.sale
+      if (target) await handleMoveLeadToSection(lead, dc.sectionId, target.id, metBedrag)
       else console.warn('Geen doel-sectie gevonden voor uitkomst:', kind)
+      if (metBedrag) {
+        const { value, paymentType, durationMonths, partnerSharePct, reservation, saleKind, challenge } = extra.sale
+        if (value != null) {
+          try {
+            await leadService.setMovementOrderValue(
+              dc.leadId, value, paymentType, durationMonths, partnerSharePct, reservation,
+              { saleKind, challenge },
+            )
+          } catch (e) { console.error('Omzet opslaan mislukt:', e) }
+        }
+      }
       setStatsRefreshKey(k => k + 1)
     } catch (e) { console.error('due call outcome failed:', e) }
   }
 
-  const handleMoveLeadToSection = async (lead, fromSectionId, targetSectionId) => {
+  // `zonderSaleVenster`: de bedragen zijn al gevraagd (bv. in de call-lijst),
+  // dus het losse sale-venster hoeft er niet nog eens overheen.
+  const handleMoveLeadToSection = async (lead, fromSectionId, targetSectionId, zonderSaleVenster = false) => {
     if (!targetSectionId || targetSectionId === fromSectionId) return
     const targetSectionObj = sections.find(s => s.id === targetSectionId)
     if (targetSectionObj && isScheduledSectionTitle(targetSectionObj.title)) {
@@ -1462,7 +1478,7 @@ export default function KanbanBoard({
       setTimeout(() => setHighlightedLeadId(null), 2000)
       loadActivityData()
       const tgt = sections.find(s => s.id === targetSectionId)
-      if (tgt && isSaleSectionTitle(tgt.title)) setSaleModalLead({ id: lead.id, name: leadFullName(lead) })
+      if (tgt && isSaleSectionTitle(tgt.title) && !zonderSaleVenster) setSaleModalLead({ id: lead.id, name: leadFullName(lead) })
       // Call afgewezen → open de reden-modal.
       if (tgt && isRejectedSectionTitle(tgt.title)) setRejectionLead({ id: lead.id, name: leadFullName(lead) })
       // Sale verloren → open de objectie-modal.
@@ -2450,11 +2466,16 @@ export default function KanbanBoard({
           isMobile={isMobile}
           leadName={saleModalLead.name}
           onClose={() => setSaleModalLead(null)}
-          onSave={async ({ value, paymentType, durationMonths, partnerSharePct, reservation }) => {
+          onSave={async ({ value, paymentType, durationMonths, partnerSharePct, reservation, saleKind, challenge }) => {
             const lead = saleModalLead
             setSaleModalLead(null)
             if (value != null && lead?.id) {
-              try { await leadService.setMovementOrderValue(lead.id, value, paymentType, durationMonths, partnerSharePct, reservation) } catch (e) { console.error('Omzet opslaan mislukt:', e) }
+              try {
+                await leadService.setMovementOrderValue(
+                  lead.id, value, paymentType, durationMonths, partnerSharePct, reservation,
+                  { saleKind, challenge },
+                )
+              } catch (e) { console.error('Omzet opslaan mislukt:', e) }
               setStatsRefreshKey(k => k + 1)
             }
           }}

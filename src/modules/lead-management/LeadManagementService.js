@@ -2447,7 +2447,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // aangeroepen wanneer een lead naar een sale-sectie is verplaatst.
   // `reservation` is optioneel: { isReservation, amount, dueDate }. Zonder dat
   // veld verandert er niets aan het bestaande gedrag.
-  async setMovementOrderValue(leadId, orderValue, paymentType = null, durationMonths = null, partnerSharePct = undefined, reservation = undefined) {
+  async setMovementOrderValue(leadId, orderValue, paymentType = null, durationMonths = null, partnerSharePct = undefined, reservation = undefined, sale = undefined) {
     try {
       const { data: rows } = await this.db.supabase
         .from('lead_movements').select('id')
@@ -2456,6 +2456,20 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const movId = rows?.[0]?.id
       if (!movId) return { error: 'geen movement gevonden' }
       const patch = { order_value: orderValue }
+      // Soort sale. 'challenge' is money-back-geld: het staat op de rekening
+      // maar de klant kan het terugvragen, dus het telt pas als omzet zodra de
+      // status op 'behouden' staat — en er gaat tot die tijd geen commissie
+      // overheen. Zie de omzet- en partnerberekeningen verderop.
+      if (sale !== undefined && sale) {
+        if (sale.saleKind) patch.sale_kind = sale.saleKind
+        if (sale.saleKind === 'challenge') {
+          patch.challenge_status = sale.challenge?.status || 'open'
+          patch.challenge_deadline = sale.challenge?.deadline || null
+        } else if (sale.saleKind === 'coaching') {
+          patch.challenge_status = null
+          patch.challenge_deadline = null
+        }
+      }
       // Betaalwijze (vooruitbetaald/maandelijks) + looptijd, zodat we later de
       // cashflow kunnen berekenen (wanneer komt hoeveel binnen).
       if (paymentType !== undefined) patch.payment_type = paymentType
@@ -2627,9 +2641,14 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       const { data } = await this.db.supabase
         .from('lead_movements')
-        .select('order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date')
+        .select('order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status')
         .not('order_value', 'is', null)
         .is('reverted_at', null)
+        // Teruggegeven challenge-geld is nooit binnengekomen; dat hoort niet in
+        // een cashflow-overzicht. Openstaand challenge-geld staat er wel in —
+        // het stáát op de rekening — maar telt niet mee voor de uitbetaling aan
+        // de partner (zie getPartnerPayouts).
+        .or('challenge_status.is.null,challenge_status.neq.terugbetaald')
       const sales = (data || []).map(r => ({
         total: Number(r.order_value) || 0,
         type: r.payment_type || 'prepaid',
@@ -2794,10 +2813,14 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const [{ data: saleRows }, { data: paidRows }] = await Promise.all([
         this.db.supabase
           .from('lead_movements')
-          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date')
+          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status')
           .not('order_value', 'is', null)
           .not('partner_share_pct', 'is', null)
-          .is('reverted_at', null),
+          .is('reverted_at', null)
+          // Challenge-geld dat nog terug kan: daar gaat geen commissie over.
+          // Is de challenge afgerond als 'behouden', dan is het gewoon omzet en
+          // telt hij hier wél mee.
+          .or('sale_kind.eq.coaching,challenge_status.eq.behouden'),
         // Geen coach-filter: RLS geeft je eigen rijen + die van teamgenoten
         // (de owner zet de betaal-status; teamleden lezen 'm mee).
         this.db.supabase
