@@ -75,8 +75,12 @@ const KOLOMMEN = '4.4rem 1fr 3.4rem 3.2rem 1fr'
 // De vier kolommen onder de melding. Bold en wit: dit zijn de cijfers waarop
 // je besluit of je bijstuurt, dus ze horen leesbaar te zijn zonder te turen.
 const weekRegel = {
-  display: 'grid', gridTemplateColumns: '3.4rem 1fr 3.6rem 2.8rem',
-  gap: '0 0.5rem', alignItems: 'center',
+  // Vaste kolombreedtes en géén 1fr: in een brede kolom trok die de tabel uit
+  // elkaar tot de trend aan de rechterrand hing, een halve meter van het
+  // weeknummer. Vier smalle kolommen die bij elkaar blijven staan lees je in
+  // één oogopslag.
+  display: 'grid', gridTemplateColumns: '3.4rem 5rem 4rem 3rem',
+  gap: '0 0.9rem', alignItems: 'center', maxWidth: 'max-content',
   fontSize: '0.72rem', fontWeight: 900,
   fontVariantNumeric: 'tabular-nums',
 }
