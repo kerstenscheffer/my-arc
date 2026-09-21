@@ -87,11 +87,22 @@ export function maakConfig(client, fase = null, overrides = {}) {
       const rem = startGewicht * ((kwetsbaar ? STANDAARD.snelste_pct_lean_of_ouder : STANDAARD.snelste_pct) / 100)
       snelKg = Math.min(snelKg, rem)
     }
+
+    // Zelf ingestelde grenzen winnen — ook van de rem. Bij de ene klant wil je
+    // scherper sturen dan bij de andere, en soms bewust sneller dan de
+    // standaard toelaat. Wie dat invult weet wat hij doet; de app hoort dat
+    // niet stilletjes terug te draaien.
+    const eigenMin = Number(fase.tempo_min_kg)
+    const eigenMax = Number(fase.tempo_max_kg)
+    const handmatig = (Number.isFinite(eigenMin) && eigenMin > 0) || (Number.isFinite(eigenMax) && eigenMax > 0)
+
     return {
-      ...STANDAARD, richting, kwetsbaar,
+      ...STANDAARD, richting, kwetsbaar, handmatig,
       tempoKg,
-      traagKg: Math.max(0, tempoKg * STANDAARD.traag_factor - STANDAARD.marge_kg),
-      snelKg,
+      traagKg: (Number.isFinite(eigenMin) && eigenMin >= 0)
+        ? eigenMin
+        : Math.max(0, tempoKg * STANDAARD.traag_factor - STANDAARD.marge_kg),
+      snelKg: (Number.isFinite(eigenMax) && eigenMax > 0) ? eigenMax : snelKg,
       faseLabel: fase.doel,
       doelGewicht: Number(fase.doel_gewicht) || null,
       ...overrides,

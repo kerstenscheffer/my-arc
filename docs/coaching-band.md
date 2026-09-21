@@ -32,6 +32,13 @@ Bij een build van +0,40 kg/week is de band dus ongeveer **+0,10 tot +0,80 kg per
 week**. Die 0,1 kg speling is er omdat ook een 7-daags gemiddelde nog ruis
 bevat; zonder die marge wordt een rustig tempo een band waar niemand in past.
 
+**Zelf instellen.** Wil je bij deze klant scherper sturen, of juist bewust
+sneller dan de standaard toelaat, vul dan `tempo_min_kg` en `tempo_max_kg` in op
+de fase (de velden "Tempo minstens/hoogstens" in het fase-formulier). Die winnen
+van de berekende marge én van de veiligheidsrem hieronder — wie ze invult weet
+wat hij doet, en dan hoort de app dat niet stilletjes terug te draaien. Leeg
+laten = de app rekent het zelf uit.
+
 **Veiligheidsrem bij een cut:** nooit sneller dan 1% van het lichaamsgewicht per
 week, en 0,75% bij iemand die lean is (< 12% vet) of ouder dan 45. Die rem gaat
 boven het afgesproken tempo: spreek je 1,2 kg per week af op 100 kg, dan legt de

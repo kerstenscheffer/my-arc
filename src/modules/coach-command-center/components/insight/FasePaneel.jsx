@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { Flag, Plus, Check, X } from 'lucide-react'
 import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/utils/fase'
+import { maakConfig } from '../../../weight-tracker/utils/coachingBand'
 
 const vandaag = () => new Date().toISOString().split('T')[0]
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -57,6 +58,23 @@ export default function FasePaneel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNieuw])
 
+  // Wat de band wordt met wat er nu in het formulier staat. Zonder dit vul je
+  // een tempo in en zie je pas na opslaan wat er als 'te snel' gaat gelden.
+  const grenzenTekst = (() => {
+    if (!nieuw) return ''
+    const c = maakConfig(client, {
+      doel: nieuw.doel,
+      week_doel_kg: nieuw.week_doel_kg,
+      start_gewicht: nieuw.start_gewicht,
+      tempo_min_kg: nieuw.tempo_min_kg,
+      tempo_max_kg: nieuw.tempo_max_kg,
+    })
+    if (c.richting === 'stabiel' || !Number.isFinite(c.traagKg)) return ''
+    const teken = c.richting === 'aankomen' ? '+' : '−'
+    return `Band: ${teken}${c.traagKg.toFixed(2)} tot ${teken}${c.snelKg.toFixed(2)} kg per week`
+      + (c.handmatig ? ' (zelf ingesteld)' : '')
+  })()
+
   const huidige = fases[0] || null
   const oordeel = huidige ? beoordeelFase(huidige, history) : null
 
@@ -78,6 +96,8 @@ export default function FasePaneel({
       start_gewicht: laatsteGewicht || '',
       week_doel_kg: huidige?.doel === 'cut' ? '0.25' : '-0.5',
       doel_gewicht: '',
+      tempo_min_kg: '',
+      tempo_max_kg: '',
     })
   }
 
@@ -101,6 +121,10 @@ export default function FasePaneel({
         start_gewicht: nieuw.start_gewicht ? Number(nieuw.start_gewicht) : null,
         week_doel_kg: nieuw.week_doel_kg ? Number(nieuw.week_doel_kg) : null,
         doel_gewicht: nieuw.doel_gewicht ? Number(nieuw.doel_gewicht) : null,
+        // Leeg = de app rekent de band zelf uit. Altijd positief opslaan; de
+        // richting komt uit `doel`.
+        tempo_min_kg: nieuw.tempo_min_kg ? Math.abs(Number(nieuw.tempo_min_kg)) : null,
+        tempo_max_kg: nieuw.tempo_max_kg ? Math.abs(Number(nieuw.tempo_max_kg)) : null,
       }
       const { error } = await db.supabase.from('client_phases').insert(rij)
       if (error) throw error
@@ -216,6 +240,26 @@ export default function FasePaneel({
             <Veld label="Doelgewicht" type="number" suffix="kg" waarde={nieuw.doel_gewicht}
               zet={v => setNieuw(n => ({ ...n, doel_gewicht: v }))} isMobile={isMobile} optioneel />
           </div>
+
+          {/* Hoeveel afwijking van dat tempo je goedvindt. Leeg laten mag: dan
+              rekent de app het zelf uit (de helft tot 1,75 keer het tempo, bij
+              een cut afgetopt op 1% van het lichaamsgewicht per week). Bij de
+              ene klant wil je scherper sturen dan bij de andere, en soms wil je
+              bewust sneller dan die rem toelaat. */}
+          {nieuw.doel !== 'recomp' && nieuw.doel !== 'maintain' && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <Veld label="Tempo minstens" type="number" suffix="kg/wk" stap="0.05" waarde={nieuw.tempo_min_kg}
+                zet={v => setNieuw(n => ({ ...n, tempo_min_kg: v }))} isMobile={isMobile} optioneel />
+              <Veld label="Tempo hoogstens" type="number" suffix="kg/wk" stap="0.05" waarde={nieuw.tempo_max_kg}
+                zet={v => setNieuw(n => ({ ...n, tempo_max_kg: v }))} isMobile={isMobile} optioneel />
+              <span style={{
+                flex: 1, minWidth: 150, fontSize: '0.66rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.3)', lineHeight: 1.4, paddingBottom: 6,
+              }}>
+                {grenzenTekst}
+              </span>
+            </div>
+          )}
 
           {fout && <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#ef4444' }}>{fout}</div>}
 
