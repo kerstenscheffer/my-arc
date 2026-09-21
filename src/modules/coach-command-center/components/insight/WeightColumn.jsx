@@ -136,6 +136,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
         {toonDoelen && (
           <DoelenMacrosPaneel
             client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile}
+            fase={actieveFase}
             voorstel={voorstel} onVoorstelWeg={() => setVoorstel(null)}
           />
         )}

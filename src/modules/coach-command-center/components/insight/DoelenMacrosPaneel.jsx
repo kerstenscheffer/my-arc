@@ -16,6 +16,7 @@ import { logClientChanges, pickTrackedFields } from '../../utils/clientChangeLog
 import { C } from './insightTokens'
 import EditableRow from './EditableRow'
 import MacroRulesBlock from './MacroRulesBlock'
+import MacroRingen from './MacroRingen'
 
 const DOEL_OPTIES = [
   { value: 'cut',      label: 'Afvallen (cut)' },
@@ -358,7 +359,13 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
   )
 }
 
-export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobile, voorstel = null, onVoorstelWeg }) {
+// Welk primair doel hoort bij welke fase. De fase is de afspraak; het primaire
+// doel is wat de macro-regels en de kleuren in de app ermee doen. Die twee uit
+// elkaar laten lopen betekent een build-klant die overal rood kleurt omdat het
+// systeem denkt dat hij aan het afvallen is.
+const DOEL_BIJ_FASE = { cut: 'cut', build: 'bulk', recomp: 'recomp', maintain: 'maintain' }
+
+export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobile, fase = null, voorstel = null, onVoorstelWeg }) {
   const [meerDoelVelden, setMeerDoelVelden] = useState(false)
   const [bezigVoorstel, setBezigVoorstel] = useState(false)
 
@@ -401,6 +408,12 @@ export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobil
     } catch (e) { console.error('❌ Save error:', e) }
   }
 
+  // Loopt het primaire doel uit de pas met de fase? Niet stilletjes
+  // rechttrekken: een schrijfactie bij het openen van een kaart is precies wat
+  // je niet wil. Wel laten zien, met een knop ernaast.
+  const hoortBij = fase?.doel ? DOEL_BIJ_FASE[fase.doel] : null
+  const scheef = hoortBij && normalizeGoal(client?.primary_goal) !== hoortBij
+
   const E = ({ label, value, field, type, options, suffix }) => (
     <EditableRow label={label} value={value} field={field} type={type} options={options}
       suffix={suffix} isMobile={isMobile} onSave={handleFieldSave} />
@@ -408,6 +421,11 @@ export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobil
 
   return (
     <div>
+      {/* Wat er nu op het bord van de klant staat. Eerst kijken, dan pas
+          rekenen: negen van de tien keer open je dit paneel om te zien wat hij
+          volgt, niet om iets te veranderen. */}
+      <MacroRingen client={client} isMobile={isMobile} />
+
       {voorstel ? (
         <div style={{
           margin: isMobile ? '0.6rem 0.85rem' : '0.7rem 1rem',
@@ -442,6 +460,30 @@ export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobil
       ) : null}
         {/* Primair doel staat bovenaan zodat het MacroRulesBlock-paneel
             er meteen op kan reageren (de modus stuurt de regels). */}
+        {/* Het primaire doel volgt de fase. Staat er iets anders, dan is dat
+            een restant van vóór de fase — één klik om het gelijk te trekken. */}
+        {scheef && (
+          <div style={{
+            margin: isMobile ? '0 0.85rem 0.6rem' : '0 1rem 0.7rem',
+            padding: '0.6rem 0.7rem', borderRadius: 10,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
+            display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          }}>
+            <span style={{ flex: 1, minWidth: 140, fontSize: '0.72rem', fontWeight: 800, color: '#f59e0b', lineHeight: 1.4 }}>
+              De fase is {fase.doel}, maar het primaire doel staat op iets anders. De macro-regels en de kleuren volgen het primaire doel.
+            </span>
+            <button
+              onClick={() => handleFieldSave('primary_goal', hoortBij)}
+              style={{
+                minHeight: 30, padding: '0 0.6rem', borderRadius: 8, border: 'none',
+                background: '#f59e0b', color: '#0a0a0a', fontSize: '0.72rem', fontWeight: 900,
+                fontFamily: 'inherit', cursor: 'pointer',
+              }}
+            >
+              Gelijktrekken
+            </button>
+          </div>
+        )}
         <DoelRegel client={client} isMobile={isMobile} onSave={handleFieldSave} />
         <E label="Doelgewicht"  value={client.target_weight ? parseFloat(client.target_weight).toFixed(1) : null} field="target_weight" type="number" suffix=" kg" />
         <E label="Deadline"     value={client.goal_deadline ? client.goal_deadline.split('T')[0] : null} field="goal_deadline" />
