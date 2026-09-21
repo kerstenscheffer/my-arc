@@ -27,6 +27,47 @@ const kort = (d) => {
   } catch { return d }
 }
 
+// Eigen tooltip. De standaard van recharts kleurt elke regel naar de kleur van
+// zijn lijn — en die zijn hier grijs tot bijna zwart, dus onleesbaar op een
+// donkere achtergrond. Hij toonde bovendien de x-waarde van de puntjes als
+// extra regel ("Weging: 5 mei kg").
+function Kaartje({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const van = (sleutel) => payload.find(p => p.dataKey === sleutel)?.value
+  const trend = van('trend')
+  const meting = van('meting')
+  const band = van('band')
+  const doel = van('doel')
+
+  const regel = (naam, waarde, dik = false) => waarde == null ? null : (
+    <div key={naam} style={{
+      display: 'flex', justifyContent: 'space-between', gap: 14,
+      fontSize: '0.7rem', fontWeight: dik ? 900 : 700,
+      color: dik ? '#fff' : 'rgba(255,255,255,0.5)',
+      marginTop: 2,
+    }}>
+      <span>{naam}</span>
+      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{waarde}</span>
+    </div>
+  )
+
+  return (
+    <div style={{
+      background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: 10, padding: '0.5rem 0.65rem',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+    }}>
+      <div style={{ fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', marginBottom: 2 }}>
+        {label}
+      </div>
+      {regel('7-daags gemiddelde', trend != null ? `${trend} kg` : null, true)}
+      {regel('Weging', meting != null ? `${meting} kg` : null)}
+      {regel('Streeftempo', doel != null ? `${doel} kg` : null)}
+      {regel('Band', Array.isArray(band) && band[0] !== band[1] ? `${band[0]} – ${band[1]} kg` : null)}
+    </div>
+  )
+}
+
 export default function GewichtBandGrafiek({ client, history, isMobile }) {
   const [uitleg, setUitleg] = useState(false)
 
@@ -127,19 +168,7 @@ export default function GewichtBandGrafiek({ client, history, isMobile }) {
               domain={[min, max]} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.3)' }}
               axisLine={false} tickLine={false} width={34}
             />
-            <Tooltip
-              contentStyle={{
-                background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 10, fontSize: '0.72rem', fontWeight: 700,
-              }}
-              labelStyle={{ color: 'rgba(255,255,255,0.5)', fontWeight: 800 }}
-              formatter={(waarde, naam) => {
-                if (naam === 'band') return [`${waarde[0]} – ${waarde[1]} kg`, 'Band']
-                if (naam === 'trend') return [`${waarde} kg`, '7-daags gemiddelde']
-                if (naam === 'doel') return [`${waarde} kg`, 'Streeftempo']
-                return [`${waarde} kg`, 'Weging']
-              }}
-            />
+            <Tooltip content={<Kaartje />} cursor={{ stroke: 'rgba(255,255,255,0.25)' }} />
             {/* Het vlak tussen te snel en te langzaam. */}
             <Area
               dataKey="band" stroke="none" fill="rgba(255,255,255,0.07)"
