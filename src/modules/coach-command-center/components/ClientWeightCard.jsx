@@ -276,26 +276,18 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // zodat je niet hoeft te schakelen tussen twee manieren van lezen.
   const kaartStats = [
     {
-      label: 'Tempo nu',
+      label: 'Tempo nu', kort: 'Nu',
       val: tempoNu != null ? `${tempoNu > 0 ? '+' : ''}${tempoNu}` : '—',
-      eenheid: 'kg/wk',
-      sub: 'deze week',
       color: tempoKleur(tempoNu),
     },
     {
-      label: 'Tempo fase',
+      label: 'Tempo fase', kort: 'Fase',
       val: tempoFase != null ? `${tempoFase > 0 ? '+' : ''}${tempoFase}` : '—',
-      eenheid: 'kg/wk',
-      sub: fase?.week_doel_kg != null
-        ? `doel ${Number(fase.week_doel_kg) > 0 ? '+' : ''}${Number(fase.week_doel_kg)}/wk`
-        : 'gemiddeld',
       color: tempoKleur(tempoFase),
     },
     {
-      label: fase ? 'Sinds fase' : 'Sinds start',
+      label: fase ? 'Sinds fase' : 'Sinds start', kort: 'Sinds',
       val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
-      eenheid: 'kg',
-      sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen start',
       color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)',
     },
   ]
@@ -525,19 +517,38 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         padding: isMobile ? '0 0.7rem 0.4rem' : '0 0.8rem 0.45rem',
         gap: isMobile ? '0.6rem' : '0.8rem',
       }}>
-        {/* Hier stond 'Verschil' en 'Sinds start'. Die cijfers staan nu
-            onderaan de kaart, groter en met uitleg eronder; twee keer dezelfde
-            getallen op één kaart is ruis. De uitklap met alle weekcijfers zit
-            nu achter de knop hieronder. */}
-        <button
-          onClick={() => setStatsExpanded(v => !v)}
-          title="Toon alle weekcijfers"
-          style={{
-            ...platteKnop, color: 'rgba(255,255,255,0.35)', fontSize: '0.66rem',
-          }}
-        >
-          {statsExpanded ? 'Minder' : 'Weekcijfers'}
-        </button>
+        {/* De drie cijfers en de knoppen op één regel. Ze stonden als blok
+            onder de kaart met een uitleg-regel eronder ('deze week',
+            'gemiddeld'); dat maakte elke kaart twee regels hoger en dwong de
+            kolommen breder dan nodig. Het label zegt het al. */}
+        {!isInactive && (
+          <button
+            onClick={() => setStatsExpanded(v => !v)}
+            title="Toon alle weekcijfers"
+            style={{
+              display: 'flex', alignItems: 'baseline', gap: isMobile ? '0.5rem' : '0.7rem',
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              fontFamily: 'inherit', flexShrink: 1, minWidth: 0, overflow: 'hidden',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {kaartStats.map(st => (
+              <span key={st.label} style={{
+                display: 'inline-flex', alignItems: 'baseline', gap: '0.2rem', whiteSpace: 'nowrap',
+              }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>
+                  {st.kort}
+                </span>
+                <span style={{
+                  fontSize: '0.88rem', fontWeight: 900, color: st.color, lineHeight: 1,
+                  fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {st.val}
+                </span>
+              </span>
+            ))}
+          </button>
+        )}
 
         {/* De drie acties zijn één blok. Los van elkaar waren het drie
             flex-items, en dan brak op een smalle kaart alleen de ⋯ af naar
@@ -641,51 +652,6 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
               </div>
       )}
 
-      {/* ── De drie cijfers onderaan, over de volle breedte van de kaart ──
-          Label boven het getal, eenheid klein ernaast, uitleg eronder. Zelfde
-          opmaak als de balk in de gewicht-kolom van Coach Insight: dezelfde
-          getallen horen er hetzelfde uit te zien, anders lees je ze twee keer
-          verkeerd. */}
-      {!isInactive && (
-        <div style={{
-          marginTop: 'auto',
-          display: 'flex', alignItems: 'stretch',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-        }}>
-          {kaartStats.map((st, i) => (
-            <div key={st.label} style={{
-              flex: 1, minWidth: 0,
-              padding: isMobile ? '0.4rem 0.5rem' : '0.45rem 0.6rem',
-              borderRight: i < kaartStats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-              display: 'flex', flexDirection: 'column', gap: 2,
-            }}>
-              <div style={{
-                fontSize: isMobile ? '0.6rem' : '0.64rem', fontWeight: 900, color: '#fff',
-                letterSpacing: '-0.01em',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {st.label}
-              </div>
-              <div style={{
-                fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: st.color,
-                lineHeight: 1, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
-                whiteSpace: 'nowrap',
-              }}>
-                {st.val}
-                <span style={{ fontSize: '0.55rem', fontWeight: 800, opacity: 0.55, marginLeft: 2 }}>
-                  {st.eenheid}
-                </span>
-              </div>
-              <div style={{
-                fontSize: '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.32)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {st.sub}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
       </div>
 
       {/* ── MODALS ── */}

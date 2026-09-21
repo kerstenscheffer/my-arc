@@ -437,7 +437,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           )}
 
           {/* CLIENT CARDS */}
-          <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem' }}>
+          <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem' }}>
             {filteredClients.map(client => (
               <ClientWeightCard
                 key={client.id}
