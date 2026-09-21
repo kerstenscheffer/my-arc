@@ -82,7 +82,8 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   const allWeeks = getAllWeeks()
   const thisWeekData = getCalendarWeekAvg(0)
   const lastWeekData = getCalendarWeekAvg(-1)
-  const cur  = thisWeekData.avg !== null ? thisWeekData : null
+  // Alleen nog voor de 'vorige week'-cel bij klanten zonder fase; de balk
+  // rekent verder met de trend en het tempo.
   const prev = lastWeekData.avg !== null ? lastWeekData : null
 
   // "Sinds start" telt vanaf het begin van de huidige fase, niet vanaf de
