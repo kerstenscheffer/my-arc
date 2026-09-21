@@ -11,12 +11,13 @@ import {
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
   RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, Wallet, PhoneOff, XCircle, Check, Ban, Trash2,
-  Table as TableIcon, Filter,
+  Table as TableIcon, Filter, Gift,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import CallProposalsModal from './CallProposalsModal'
 import { Venster, VensterKop, VensterVoet, Knop } from '../../../components/arc-ui'
 import GrowthChart from './GrowthChart'
+import ChallengePaneel from './ChallengePaneel'
 import { KPI_STATS, kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
 
 const GOLD = '#FFD700'
@@ -1468,11 +1469,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               {[
                 { id: 'omzet', label: 'Omzet', Icon: TrendingUp, color: '#22c55e' },
                 { id: 'payout', label: 'Uitbetalen', Icon: Users, color: '#FFD700' },
+                // Challenge-geld staat hier naast de omzet en niet erin: het is
+                // nog niet van ons.
+                { id: 'challenge', label: 'Challenges', Icon: Gift, color: '#a855f7' },
               ].map(t => {
                 const active = revTab === t.id
                 return (
                   <button key={t.id} onClick={() => setRevTab(t.id)}
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.5rem', borderRadius: 9, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 800,
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0.5rem 0.35rem', borderRadius: 9, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800,
                       background: active ? `${t.color}22` : 'rgba(255,255,255,0.03)',
                       border: `1px solid ${active ? t.color + '80' : 'rgba(255,255,255,0.08)'}`,
                       color: active ? t.color : 'rgba(255,255,255,0.55)' }}>
@@ -1484,6 +1488,12 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
               {revLoading ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>Laden…</div>
+              ) : revTab === 'challenge' ? (
+                <ChallengePaneel
+                  leadService={leadService}
+                  coachId={coachId}
+                  onGewijzigd={openRevenuePanel}
+                />
               ) : revTab === 'omzet' ? (
                 (!revenue || revenue.saleCount === 0) ? (
                   <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', lineHeight: 1.5 }}>

@@ -2800,6 +2800,94 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // ── CHALLENGES ──────────────────────────────────────────────────────────
+  // Money-back-geld dat nog open staat. Zolang een challenge 'open' is telt hij
+  // niet als omzet en gaat er geen commissie overheen; pas als je hem afrondt
+  // weet je of het geld van ons is.
+  async getChallenges(coachId, alleen = 'open') {
+    try {
+      let q = this.db.supabase
+        .from('lead_movements')
+        .select('id, lead_id, lead_name, order_value, partner_share_pct, moved_at, challenge_status, challenge_deadline, to_section_id, to_section_title')
+        .eq('sale_kind', 'challenge')
+        .is('reverted_at', null)
+        .order('challenge_deadline', { ascending: true, nullsFirst: false })
+      if (alleen && alleen !== 'alle') q = q.eq('challenge_status', alleen)
+      if (coachId) q = q.eq('coach_id', coachId)
+      const { data, error } = await q
+      if (error) throw error
+      const vandaag = new Date().toISOString().split('T')[0]
+      return (data || []).map(r => ({
+        movementId: r.id,
+        leadId: r.lead_id,
+        leadName: r.lead_name || 'Lead',
+        bedrag: Number(r.order_value) || 0,
+        pct: r.partner_share_pct != null ? Number(r.partner_share_pct) : null,
+        status: r.challenge_status || 'open',
+        deadline: r.challenge_deadline || null,
+        verlopen: !!r.challenge_deadline && r.challenge_deadline < vandaag,
+        sectionId: r.to_section_id,
+        sectionTitle: r.to_section_title,
+        gestart: r.moved_at,
+      }))
+    } catch (e) {
+      console.error('getChallenges failed:', e)
+      return []
+    }
+  }
+
+  // Een challenge afronden. 'behouden' = het geld is van ons (telt vanaf nu mee
+  // in omzet én uitbetaling), 'terugbetaald' = teruggegeven, valt overal uit.
+  async setChallengeStatus(movementId, status) {
+    try {
+      const { data, error } = await this.db.supabase
+        .from('lead_movements')
+        .update({ challenge_status: status })
+        .eq('id', movementId)
+        .select('id')
+      if (error) throw error
+      if (!data || data.length === 0) return { error: 'niets bijgewerkt (geen rechten op deze rij?)' }
+      return { ok: true }
+    } catch (e) {
+      console.error('setChallengeStatus failed:', e)
+      return { error: e.message }
+    }
+  }
+
+  // De challenge is doorgezet naar een vervolgtraject. Dat is een nieuwe sale
+  // naast de challenge — niet een verhoging ervan, want dan raak je kwijt wat
+  // er oorspronkelijk voor de challenge betaald is. De challenge zelf gaat op
+  // 'behouden': de klant vraagt zijn geld niet meer terug.
+  async registreerVervolgtraject(challenge, { value, partnerSharePct = null, paymentType = 'prepaid', durationMonths = 1 } = {}) {
+    try {
+      const bedrag = Number(value)
+      if (!challenge?.movementId || isNaN(bedrag) || bedrag <= 0) return { error: 'bedrag ontbreekt' }
+      const { data: { user } = {} } = await this.db.supabase.auth.getUser()
+      const { error: insErr } = await this.db.supabase.from('lead_movements').insert({
+        lead_id: challenge.leadId,
+        from_section_id: challenge.sectionId || null,
+        from_section_title: challenge.sectionTitle || null,
+        to_section_id: challenge.sectionId || null,
+        to_section_title: challenge.sectionTitle || null,
+        lead_name: challenge.leadName,
+        coach_id: user?.id || null,
+        outcome_type: 'upsell',
+        order_value: bedrag,
+        payment_type: paymentType,
+        duration_months: paymentType === 'monthly' ? Math.max(1, Number(durationMonths) || 1) : 1,
+        partner_share_pct: partnerSharePct != null ? Number(partnerSharePct) : null,
+        sale_kind: 'coaching',
+      })
+      if (insErr) throw insErr
+      const res = await this.setChallengeStatus(challenge.movementId, 'behouden')
+      if (res?.error) return res
+      return { ok: true }
+    } catch (e) {
+      console.error('registreerVervolgtraject failed:', e)
+      return { error: e.message }
+    }
+  }
+
   // ── PARTNER-UITBETALING ─────────────────────────────────────────────────
   // Berekent per maand wat er aan de partner (bv. Marcel) toekomt: van elke
   // sale met een partner_share_pct wordt dat % van de maand-cashflow genomen

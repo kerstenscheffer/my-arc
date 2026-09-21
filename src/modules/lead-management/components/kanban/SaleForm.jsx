@@ -61,7 +61,7 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
   const maandenNum = Math.max(1, parseInt(maanden, 10) || 0)
   const perMaand = (!isNaN(totaal) && betaalwijze === 'monthly' && maandenNum > 0) ? totaal / maandenNum : null
   const pct = Math.min(100, Math.max(0, parseFloat(String(partnerPct).replace(',', '.')) || 0))
-  const partnerDeel = (!isNaN(totaal) && pct > 0 && !isChallenge) ? totaal * (pct / 100) : null
+  const partnerDeel = (!isNaN(totaal) && pct > 0) ? totaal * (pct / 100) : null
   const resNum = parseFloat(String(aanbetaling).replace(',', '.'))
   const rest = (!isNaN(totaal) && !isNaN(resNum)) ? totaal - resNum : null
 
@@ -76,8 +76,10 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
       saleKind: soort,
       paymentType: betaalwijze,
       durationMonths: betaalwijze === 'monthly' ? Math.max(1, parseInt(maanden, 10) || 12) : 1,
-      // Over challenge-geld gaat geen commissie: dat kan nog terug moeten.
-      partnerSharePct: isChallenge ? null : (pct > 0 ? pct : null),
+      // Het percentage leggen we ook bij een challenge vast: er gaat nu niets
+      // uit (dat regelt de status), maar als hij straks behouden wordt moet
+      // bekend zijn welk deel de partner toekomt.
+      partnerSharePct: pct > 0 ? pct : null,
       challenge: isChallenge ? { status: 'open', deadline } : null,
       reservation: {
         isReservation: reservering,
@@ -146,9 +148,7 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
         )}
       </div>
 
-      {/* Partner-aandeel: alleen bij echt betaalde coaching. */}
-      {!isChallenge && (
-        <div>
+      <div>
           <div style={kopje}>Aandeel {partnerName}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Users size={14} color="rgba(255,255,255,0.4)" strokeWidth={2.6} />
@@ -161,8 +161,12 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
               %{partnerDeel != null ? ` · ${euro(partnerDeel)}` : ''}
             </span>
           </div>
+          {isChallenge && (
+            <div style={{ marginTop: 5, fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
+              Gaat pas uit als je de challenge afrondt als behouden.
+            </div>
+          )}
         </div>
-      )}
 
       {/* Aanbetaling: het bedrag blijft de volledige waarde; dit legt vast wat
           er nu binnen is en wanneer de rest komt. */}
