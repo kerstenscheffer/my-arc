@@ -11,12 +11,14 @@ import { useModalHost } from '../../../coach/ModalHost'
 import {
   TrendingDown, TrendingUp,
   MessageCircle, Power, MoreHorizontal, Trash2,
-  BarChart3, BookOpen, Pause, CheckCircle2, Circle
+  BarChart3, Pause, CheckCircle2, Circle
 } from 'lucide-react'
 import DeleteClientModal from './DeleteClientModal'
 import ClientInsightModal from './ClientInsightModal'
-import CoachingLogModal from './CoachingLogModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
+import {
+  maakConfig, trendReeks, weekBeoordelingen, weekFractie, kleurVoorErnst, tempoOordeel,
+} from '../../weight-tracker/utils/coachingBand'
 
 // Platte actieknop: geen vlak, geen rand — alleen icoon + woord. Drie
 // omkaderde knoppen naast elkaar maakten de kaart onrustig.
@@ -52,7 +54,6 @@ const GOAL_LABELS = {
 export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange }) {
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
-  const [showLog, setShowLog]           = useState(false)
 
   // Handmatige kleur van de streep links. null = laat de berekening z'n werk
   // doen. Lokaal bijgehouden zodat de kaart meteen omslaat bij een klik.
@@ -244,6 +245,61 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // #0a0a0a met een subtiele goud-rand — geen gradients, niet druk.
   const cardBorderLeft = `3px solid ${urgencyColor}`
 
+  // Tempo nu en tempo fase, uit dezelfde rekenmodule als de gewichtsgrafiek in
+  // Coach Insight. Twee verschillende vragen: wat deed hij déze week, en wat is
+  // het gemiddelde sinds de start van de fase. Ze kunnen tegengesteld staan —
+  // een uitschieter in week 1 laat het fasegemiddelde nog weken hoog staan.
+  const bandConfig = maakConfig(client, fase)
+  const bandReeks = trendReeks(faseHistory)
+  const laatsteTrend = bandReeks[bandReeks.length - 1] || null
+  const bandWeken = (fase?.start_gewicht && fase?.started_on)
+    ? weekBeoordelingen(bandReeks, Number(fase.start_gewicht), fase.started_on, bandConfig)
+    : []
+  const laatsteWeek = bandWeken[bandWeken.length - 1] || null
+  const tempoNu = laatsteWeek?.verschil ?? null
+  const wekenSinds = (laatsteTrend && fase?.started_on)
+    ? weekFractie(laatsteTrend.datum, fase.started_on, bandConfig.venster_dagen)
+    : null
+  const tempoFase = (laatsteTrend && basisGewicht != null && wekenSinds > 0.5)
+    ? Math.round(((laatsteTrend.trend - basisGewicht) / wekenSinds) * 100) / 100
+    : null
+
+  const tempoKleur = (waarde) => {
+    if (waarde == null || !fase) return 'rgba(255,255,255,0.4)'
+    const oordeel = tempoOordeel(waarde, bandConfig)
+    if (!oordeel) return '#fff'
+    return kleurVoorErnst(oordeel === 'OP_KOERS' ? 0 : 0.7)
+  }
+
+  // De drie cijfers onder aan de kaart. Label boven het getal, eenheid klein
+  // ernaast, uitleg eronder — zelfde opmaak als de balk in de gewicht-kolom,
+  // zodat je niet hoeft te schakelen tussen twee manieren van lezen.
+  const kaartStats = [
+    {
+      label: 'Tempo nu',
+      val: tempoNu != null ? `${tempoNu > 0 ? '+' : ''}${tempoNu}` : '—',
+      eenheid: 'kg/wk',
+      sub: 'deze week',
+      color: tempoKleur(tempoNu),
+    },
+    {
+      label: 'Tempo fase',
+      val: tempoFase != null ? `${tempoFase > 0 ? '+' : ''}${tempoFase}` : '—',
+      eenheid: 'kg/wk',
+      sub: fase?.week_doel_kg != null
+        ? `doel ${Number(fase.week_doel_kg) > 0 ? '+' : ''}${Number(fase.week_doel_kg)}/wk`
+        : 'gemiddeld',
+      color: tempoKleur(tempoFase),
+    },
+    {
+      label: fase ? 'Sinds fase' : 'Sinds start',
+      val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
+      eenheid: 'kg',
+      sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen start',
+      color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)',
+    },
+  ]
+
   // Kerncijfers op de kaartregel: alleen wat je in één blik wilt zien.
   // "Deze week" en "Vorige week" zitten in de uitklap; het huidige gewicht
   // staat al bovenaan de kaart.
@@ -333,7 +389,34 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       overflow: 'hidden', position: 'relative',
       transition: 'all 0.2s ease', transform: 'translateZ(0)',
       opacity: isInactive ? 0.55 : 1,
+      // Foto links over de volle hoogte, inhoud rechts. De kaart staat in een
+      // raster, dus alle kaarten in een rij worden even hoog en de stroken
+      // lopen gelijk.
+      display: 'flex', alignItems: 'stretch',
     }}>
+
+      {/* Foto-strook. Een tiende van de breedte: genoeg om een gezicht te
+          herkennen, niet zoveel dat het een fotoalbum wordt. Geen foto →
+          initialen op dezelfde plek, zodat de kaarten uitgelijnd blijven. */}
+      <div style={{
+        width: '10%', minWidth: isMobile ? 44 : 52, flexShrink: 0,
+        background: client.profile_photo_url
+          ? `url(${client.profile_photo_url}) center/cover`
+          : 'rgba(255,255,255,0.05)',
+        borderRight: '1px solid rgba(255,255,255,0.08)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {!client.profile_photo_url && (
+          <span style={{
+            fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: 900,
+            color: 'rgba(255,255,255,0.3)', letterSpacing: '-0.02em',
+          }}>
+            {`${(client.first_name || '')[0] || ''}${(client.last_name || '')[0] || ''}`.toUpperCase() || '?'}
+          </span>
+        )}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
 
       {/* Klikzone over de gekleurde rand. De rand zelf is 3 pixels — daar
           mik je niet op. Deze strook is breed genoeg om te raken en blijft
@@ -408,27 +491,6 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         padding: isMobile ? '0.6rem 0.85rem 0.5rem' : '0.7rem 1rem 0.55rem',
         gap: isMobile ? '0.5rem' : '0.625rem',
       }}>
-        {/* Profielfoto uit de intake. Geen foto → initialen, zodat de kaarten
-            dezelfde hoogte en uitlijning houden. */}
-        <div style={{
-          width: isMobile ? 34 : 38, height: isMobile ? 34 : 38, flexShrink: 0,
-          borderRadius: '50%', overflow: 'hidden',
-          background: client.profile_photo_url
-            ? `url(${client.profile_photo_url}) center/cover`
-            : 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: isInactive ? 0.45 : 1,
-        }}>
-          {!client.profile_photo_url && (
-            <span style={{
-              fontSize: isMobile ? '0.72rem' : '0.8rem', fontWeight: 900,
-              color: 'rgba(255,255,255,0.35)', letterSpacing: '-0.02em',
-            }}>
-              {`${(client.first_name || '')[0] || ''}${(client.last_name || '')[0] || ''}`.toUpperCase() || '?'}
-            </span>
-          )}
-        </div>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem', overflow: 'hidden' }}>
           <h3 style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
             {client.first_name} {client.last_name}
@@ -533,11 +595,11 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f59e0b' }}>{dagenGeleden}d</span>
           )}
         </button>
-        <button onClick={() => setShowLog(true)} style={platteKnop}>
-          <BookOpen size={13} /> Log
-        </button>
-        <button onClick={() => setShowInsight(true)} style={platteKnop}>
-          <BarChart3 size={13} /> Inz
+        {/* De log-knop is weg: het logboek open je vanuit het inzichtvenster,
+            en twee knoppen met tekst maakten deze regel vol. Inzicht is nog
+            alleen het icoon — dat is de knop die je altijd gebruikt. */}
+        <button onClick={() => setShowInsight(true)} title="Inzicht" aria-label="Inzicht" style={platteKnop}>
+          <BarChart3 size={15} />
         </button>
         <div>
           <button ref={menuKnopRef} onClick={() => (showMenu ? setShowMenu(false) : openMenu())} style={{ ...platteKnop, color: showMenu ? '#fff' : 'rgba(255,255,255,0.5)' }}>
@@ -600,6 +662,53 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
               </div>
       )}
 
+      {/* ── De drie cijfers onderaan, over de volle breedte van de kaart ──
+          Label boven het getal, eenheid klein ernaast, uitleg eronder. Zelfde
+          opmaak als de balk in de gewicht-kolom van Coach Insight: dezelfde
+          getallen horen er hetzelfde uit te zien, anders lees je ze twee keer
+          verkeerd. */}
+      {!isInactive && (
+        <div style={{
+          marginTop: 'auto',
+          display: 'flex', alignItems: 'stretch',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          {kaartStats.map((st, i) => (
+            <div key={st.label} style={{
+              flex: 1, minWidth: 0,
+              padding: isMobile ? '0.5rem 0.55rem' : '0.55rem 0.7rem',
+              borderRight: i < kaartStats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              display: 'flex', flexDirection: 'column', gap: 2,
+            }}>
+              <div style={{
+                fontSize: isMobile ? '0.6rem' : '0.64rem', fontWeight: 900, color: '#fff',
+                letterSpacing: '-0.01em',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {st.label}
+              </div>
+              <div style={{
+                fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: st.color,
+                lineHeight: 1, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
+              }}>
+                {st.val}
+                <span style={{ fontSize: '0.55rem', fontWeight: 800, opacity: 0.55, marginLeft: 2 }}>
+                  {st.eenheid}
+                </span>
+              </div>
+              <div style={{
+                fontSize: '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.32)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {st.sub}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      </div>
+
       {/* ── MODALS ── */}
       {showDelete && (
         <DeleteClientModal db={db} client={client} isMobile={isMobile}
@@ -637,16 +746,6 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         modalHost
       )}
 
-      {showLog && createPortal(
-        <CoachingLogModal
-          client={client}
-          db={db}
-          coachId={coachId}
-          isMobile={isMobile}
-          onClose={() => setShowLog(false)}
-        />,
-        modalHost
-      )}
     </div>
   )
 }
