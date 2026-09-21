@@ -169,6 +169,16 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
     }))
   }, [fases])
 
+  const actief = (gekozen === 'alles' || gekozen === 'daarvoor')
+    ? null
+    : (perFase.find(f => f.id === gekozen) || fase)
+
+  // Metingen van vóór de eerste fase. Daar is nooit een tempo voor afgesproken,
+  // dus daar hoort geen band bij — maar je wilt er wel naar kunnen kijken. Bij
+  // ks10k zijn dat 117 wegingen van maart tot september.
+  const eersteStart = perFase[0]?.started_on ? String(perFase[0].started_on).slice(0, 10) : null
+  const heeftDaarvoor = !!eersteStart && (history || []).some(e => String(e?.date || '').slice(0, 10) < eersteStart)
+
   // Wat er in de fase-dropdown staat: de lopende fase, wat eraan voorafging, en
   // onderaan de knop om er een te beginnen.
   const faseOpties = useMemo(() => {
@@ -185,15 +195,6 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
     return lijst
   }, [perFase, heeftDaarvoor, onNieuweFase])
 
-  const actief = (gekozen === 'alles' || gekozen === 'daarvoor')
-    ? null
-    : (perFase.find(f => f.id === gekozen) || fase)
-
-  // Metingen van vóór de eerste fase. Daar is nooit een tempo voor afgesproken,
-  // dus daar hoort geen band bij — maar je wilt er wel naar kunnen kijken. Bij
-  // ks10k zijn dat 117 wegingen van maart tot september.
-  const eersteStart = perFase[0]?.started_on ? String(perFase[0].started_on).slice(0, 10) : null
-  const heeftDaarvoor = !!eersteStart && (history || []).some(e => String(e?.date || '').slice(0, 10) < eersteStart)
 
   const model = useMemo(() => {
     // ── Vóór de eerste fase: wel de lijn, geen band ──
