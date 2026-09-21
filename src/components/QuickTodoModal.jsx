@@ -3,12 +3,19 @@
 // Elke to-do is een ECHTE productivity-taak (productivity_tasks), dus 'ie
 // verschijnt meteen in de kanban. Afvinken hier = afvinken in het systeem.
 //
-// Links een sectie-rail (Alles / Inbox / jouw kanban-secties, bv. Marketing,
-// Coaching): filtert de lijst én bepaalt in welke sectie een nieuwe to-do landt.
+// Bovenin een sectie-strook (Alles / Niet gepland / jouw kanban-secties, bv.
+// Marketing, Coaching): filtert de lijst én bepaalt in welke sectie een nieuwe
+// to-do landt.
+//
+// Dit is een zwevend venster, geen modaal scherm: je kunt de pagina erachter
+// gewoon blijven gebruiken, het venster verslepen aan de kop, groter maken aan
+// de hoek en inklappen tot alleen de balk. Zelfde gedrag als het logboek in
+// Coach Command — je zet je to-do's er vaak náást, niet ervoor.
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../coach/ModalHost'
-import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Play } from 'lucide-react'
+import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Play, Minus, Maximize2 } from 'lucide-react'
+import useZwevendVenster from './useZwevendVenster'
 import ProductivityService from '../modules/productivity/ProductivityService'
 
 const GOLD = '#FFD700'
@@ -32,6 +39,9 @@ const DUR_FILTERS = [
 
 export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivity, isMobile, onStartTask, activeTaskId }) {
   const modalHost = useModalHost()
+  const {
+    ingeklapt, setIngeklapt, herstel, vensterStijl, sleepHandvat, formaatHandvat,
+  } = useZwevendVenster({ isMobile, standaard: { w: 560, h: 660 } })
   const [svc] = useState(() => new ProductivityService(db.supabase))
   const [tasks, setTasks] = useState([])
   const [sections, setSections] = useState([])
@@ -239,33 +249,56 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
 
+  const kopKnop = {
+    width: 26, height: 26, flexShrink: 0, borderRadius: 7, padding: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+    color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+
   const fieldLabel = { fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.35)', marginBottom: '0.4rem' }
 
   const modal = (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 10000,
-        background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
-        padding: isMobile ? 0 : '1rem',
-      }}
-    >
       <div style={{
-        background: '#111', border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: isMobile ? '16px 16px 0 0' : '16px',
-        width: isMobile ? '100%' : '560px', maxHeight: isMobile ? '85vh' : '80vh',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        ...vensterStijl,
+        background: '#111',
+        border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+        borderRadius: isMobile ? 0 : 16,
+        // Zonder gedimde achtergrond is de schaduw wat het venster van de
+        // pagina eronder scheidt.
+        boxShadow: isMobile ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
       }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          <ListTodo size={18} color={GOLD} />
-          <span style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: '#fff', flex: 1 }}>To-do's</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', minHeight: 32, minWidth: 32, alignItems: 'center', justifyContent: 'center' }}>
-            <X size={18} />
+        {/* Kop; op desktop tevens het handvat om te verslepen. */}
+        <div
+          {...sleepHandvat}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.45rem',
+            padding: isMobile ? '0.85rem 1rem' : '0.6rem 0.75rem',
+            borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
+            ...(sleepHandvat.style || {}),
+          }}
+        >
+          {!isMobile && <GripVertical size={13} color="rgba(255,255,255,0.2)" style={{ flexShrink: 0 }} />}
+          <ListTodo size={17} color={GOLD} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: isMobile ? '1rem' : '1rem', fontWeight: 900, color: '#fff', flex: 1, letterSpacing: '-0.02em' }}>To-do's</span>
+          {!isMobile && (
+            <button onClick={() => setIngeklapt(v => !v)} title={ingeklapt ? 'Uitklappen' : 'Inklappen'} aria-label={ingeklapt ? 'Uitklappen' : 'Inklappen'} style={kopKnop}>
+              <Minus size={13} />
+            </button>
+          )}
+          {!isMobile && (
+            <button onClick={herstel} title="Terug naar het midden" aria-label="Terug naar het midden" style={kopKnop}>
+              <Maximize2 size={13} />
+            </button>
+          )}
+          <button onClick={onClose} aria-label="Sluiten" style={kopKnop}>
+            <X size={14} />
           </button>
         </div>
 
+        {!ingeklapt && (
+        <>
         {/* Secties: één strook die zijwaarts scrollt. */}
         <div style={{
           display: 'flex', gap: 5, flexShrink: 0,
@@ -525,15 +558,35 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
             Open in Productiviteit <ArrowRight size={14} />
           </button>
         </div>
+        </>
+        )}
+
+        {formaatHandvat && !ingeklapt && (
+          <div
+            {...formaatHandvat}
+            style={{
+              position: 'absolute', bottom: 0, right: 0,
+              width: 16, height: 16, cursor: 'se-resize',
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: 3,
+            }}
+          >
+            <div style={{
+              width: 8, height: 8,
+              borderRight: '2px solid rgba(255,255,255,0.15)',
+              borderBottom: '2px solid rgba(255,255,255,0.15)',
+            }} />
+          </div>
+        )}
       </div>
-    </div>
   )
 
   // Toevoeg-modal: vraagt prioriteit + duur (+ sectie) bij een nieuwe to-do.
   const addModal = addModalOpen && (
     <div
       onClick={() => { if (!busy) setAddModalOpen(false) }}
-      style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1rem' }}
+      // Boven het zwevende venster: dat zit zelf al bijna op de hoogste laag,
+      // dus een zIndex van tienduizend zou hierachter vallen.
+      style={{ position: 'fixed', inset: 0, zIndex: 2147483200, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1rem' }}
     >
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.1)', borderRadius: isMobile ? '16px 16px 0 0' : 16, width: '100%', maxWidth: isMobile ? '100%' : 380, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
