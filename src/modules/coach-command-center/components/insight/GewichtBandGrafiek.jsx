@@ -13,7 +13,7 @@
 
 import { useMemo, useState } from 'react'
 import {
-  ComposedChart, Area, Line, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ComposedChart, Area, Line, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import { Scale, Info } from 'lucide-react'
 import {
@@ -68,14 +68,25 @@ function Kaartje({ active, payload, label }) {
   )
 }
 
-export default function GewichtBandGrafiek({ client, history, isMobile }) {
+export default function GewichtBandGrafiek({ client, history, fase = null, isMobile }) {
   const [uitleg, setUitleg] = useState(false)
 
   const model = useMemo(() => {
-    const config = maakConfig(client)
-    const reeks = trendReeks(history)
+    const config = maakConfig(client, fase)
+    // Binnen een fase telt alleen wat er ná de start van die fase gemeten is.
+    // Anders trekt een cut van drie maanden geleden de band van een build
+    // scheef.
+    const binnenFase = fase?.started_on
+      ? (history || []).filter(e => String(e?.date || '').slice(0, 10) >= String(fase.started_on).slice(0, 10))
+      : history
+    const reeks = trendReeks(binnenFase)
     if (reeks.length === 0) return { config, leeg: true }
-    const { startGewicht, startDatum, herijkt } = bepaalStart(client, reeks)
+
+    // De fase levert het nulpunt; zonder fase zoeken we het in de metingen.
+    const uitFase = fase?.start_gewicht && fase?.started_on
+      ? { startGewicht: Number(fase.start_gewicht), startDatum: fase.started_on, herijkt: false }
+      : null
+    const { startGewicht, startDatum, herijkt } = uitFase || bepaalStart(client, reeks)
     if (!Number.isFinite(startGewicht)) return { config, leeg: true }
 
     const punten = reeks.map(r => {
@@ -96,7 +107,7 @@ export default function GewichtBandGrafiek({ client, history, isMobile }) {
     const weken = weekBeoordelingen(reeks, startGewicht, startDatum, config)
     const laatste = weken[weken.length - 1] || null
     return { config, punten, weken, laatste, startGewicht, startDatum, herijkt, leeg: false }
-  }, [client, history])
+  }, [client, history, fase])
 
   if (model.leeg) {
     return (
@@ -148,10 +159,16 @@ export default function GewichtBandGrafiek({ client, history, isMobile }) {
           padding: '0.5rem 0.6rem', borderRadius: 8,
           background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
         }}>
-          Het grijze vlak is het tempo dat we willen zien: tussen {config.traagste_pct}% en {config.snelste_pct}% van
-          het startgewicht per week{config.kwetsbaar ? ' (strenger, want lean of ouder)' : ''}. De stippellijn is het
-          streeftempo van {config.streeftempo_pct}%. De dikke lijn is het 7-daags gemiddelde — daar gaat het oordeel
-          over. De puntjes zijn losse wegingen; daar beoordelen we nooit op.
+          {config.richting === 'stabiel' ? (
+            <>Het doel is stilstand, dus dit is een behoudstrook van een halve procent om het startgewicht.
+            De weegschaal zegt hier weinig: beoordeel op kracht, omvang en foto's.</>
+          ) : (
+            <>Het grijze vlak is het tempo dat we willen zien: tussen {config.traagKg.toFixed(2)} en {config.snelKg.toFixed(2)} kg
+            per week{config.kwetsbaar ? ' (afgetopt, want lean of ouder)' : ''}. De stippellijn is het afgesproken
+            tempo van {config.tempoKg.toFixed(2)} kg per week{fase?.doel ? ` uit de ${fase.doel}-fase` : ''}. De dikke
+            lijn is het 7-daags gemiddelde — daar gaat het oordeel over. De puntjes zijn losse wegingen; daar
+            beoordelen we nooit op.</>
+          )}
           {model.herijkt && ' Startgewicht is herijkt op de eerste betrouwbare weektrend.'}
         </div>
       )}
@@ -184,6 +201,18 @@ export default function GewichtBandGrafiek({ client, history, isMobile }) {
               dataKey="trend" stroke="#fff" strokeWidth={2.4} dot={false}
               isAnimationActive={false} connectNulls
             />
+            {/* Het doelgewicht van de fase is een horizon, geen plan: het zegt
+                waar deze fase ongeveer ophoudt, niet hoe snel je er hoort te
+                komen. Vandaar een streep en geen lijn die meeloopt. */}
+            {Number.isFinite(config.doelGewicht) && config.doelGewicht > 0 && (
+              <ReferenceLine
+                y={config.doelGewicht} stroke="rgba(16,185,129,0.5)" strokeDasharray="2 4"
+                label={{
+                  value: `horizon ${config.doelGewicht}`, position: 'insideBottomRight',
+                  fill: 'rgba(16,185,129,0.65)', fontSize: 9, fontWeight: 800,
+                }}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
