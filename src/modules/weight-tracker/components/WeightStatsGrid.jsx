@@ -8,6 +8,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { weightGoalColor } from '../utils/weightGoalColor'
 import {
   maakConfig, trendReeks, tempoPerWeek, weekFractie, lijnenOpWeek, ernstVan, kleurVoorErnst,
+  weekBeoordelingen, tempoOordeel,
 } from '../utils/coachingBand'
 
 const PERIODES = [
@@ -352,41 +353,78 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   const bandErnst = (laatsteTrend && bandLijnen) ? ernstVan(laatsteTrend.trend, bandLijnen) : null
   const bandKleur = kleurVoorErnst(bandErnst)
 
+  // Twee tempo's, want ze beantwoorden verschillende vragen:
+  //   nu    — wat deed hij déze week? Daar stuur je op bij.
+  //   fase  — wat is het gemiddelde sinds de start? Dat zegt of de afspraak
+  //           over de hele rit gehaald wordt.
+  const weekOordelen = (bandStart && fase?.started_on)
+    ? weekBeoordelingen(trendReeksData, bandStart, fase.started_on, bandConfig)
+    : []
+  const laatsteWeek = weekOordelen[weekOordelen.length - 1] || null
+  const tempoNu = laatsteWeek?.verschil ?? null
+  const tempoNuKleur = tempoNu == null ? 'rgba(255,255,255,0.4)'
+    : kleurVoorErnst(tempoOordeel(tempoNu, bandConfig) === 'OP_KOERS' ? 0 : 0.7)
+
+  const wekenSinds = (laatsteTrend && fase?.started_on)
+    ? weekFractie(laatsteTrend.datum, fase.started_on, bandConfig.venster_dagen)
+    : null
+  const tempoFase = (laatsteTrend && bandStart && wekenSinds > 0.5)
+    ? Math.round(((laatsteTrend.trend - bandStart) / wekenSinds) * 100) / 100
+    : (tempo ? tempo.kgPerWeek : null)
+
+  // Weeknummer voor het label bij het gemiddelde ("Gemiddeld w38").
+  const weekNummer = (() => {
+    if (!laatsteTrend?.datum) return null
+    const d = new Date(`${laatsteTrend.datum}T00:00:00`)
+    const doel = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+    const dag = doel.getUTCDay() || 7
+    doel.setUTCDate(doel.getUTCDate() + 4 - dag)
+    const jaarStart = new Date(Date.UTC(doel.getUTCFullYear(), 0, 1))
+    return Math.ceil((((doel - jaarStart) / 86400000) + 1) / 7)
+  })()
+
   return (
     <div>
       {/* ═══ WEEKCIJFERS — één regel als tabel: verticale lijntjes ertussen,
             geen vakken. Het doel-blok dat hier stond is eruit; het doel staat
             al als lijn in de grafiek. ═══ */}
       <div style={{
-        display: 'flex', alignItems: 'stretch',
+        display: 'flex', alignItems: 'stretch', flexWrap: 'wrap',
         margin: volleBreedte ? 0 : (isMobile ? '0 1rem' : '0 1.5rem'),
       }}>
         {[
           ...(toonHuidig ? [{
-            label: 'Huidig',
+            label: 'Huidig gew.',
             sub: laatsteDatum || 'geen meting',
             val: laatsteGewicht != null ? `${laatsteGewicht}` : '—',
             color: '#fff',
           }] : []),
           {
-            label: 'Trend',
+            label: weekNummer ? `Gemiddeld w${weekNummer}` : 'Gemiddeld',
             sub: laatsteTrend ? `${laatsteTrend.metingen} van 7 dagen` : 'geen meting',
             val: laatsteTrend?.trend != null ? `${laatsteTrend.trend}` : '—',
             color: '#fff',
           },
+          ...(fase ? [{
+            label: 'Tempo nu',
+            sub: 'deze week',
+            val: tempoNu != null ? `${tempoNu > 0 ? '+' : ''}${tempoNu}` : '—',
+            eenheid: '/wk',
+            color: tempoNuKleur,
+          }] : []),
           {
-            label: 'Tempo',
+            label: fase ? 'Tempo fase' : 'Tempo',
             sub: fase?.week_doel_kg != null
               ? `doel ${Number(fase.week_doel_kg) > 0 ? '+' : ''}${Number(fase.week_doel_kg)}/wk`
               : (tempo ? `over ${tempo.metingen} metingen` : '—'),
-            val: tempo ? `${tempo.kgPerWeek > 0 ? '+' : ''}${tempo.kgPerWeek}` : '—',
+            val: tempoFase != null ? `${tempoFase > 0 ? '+' : ''}${tempoFase}` : '—',
             eenheid: '/wk',
-            color: tempo ? bandKleur : 'rgba(255,255,255,0.4)',
+            color: tempoFase != null ? bandKleur : 'rgba(255,255,255,0.4)',
           },
           ...(fase ? [{
-            label: 'Op plan',
+            label: opPlan != null && opPlan < 0 ? 'Onder plan' : 'Boven plan',
             sub: opPlan !== null
-              ? (Math.abs(opPlan) < 0.05 ? 'precies op plan' : `${opPlan > 0 ? 'boven' : 'onder'} de plan-lijn`)
+              ? (Math.abs(opPlan) < 0.05 ? 'precies op plan' : 'verschil met de lijn')
               : 'nog geen trend',
             val: opPlan !== null ? `${opPlan > 0 ? '+' : ''}${opPlan}` : '—',
             color: opPlan !== null ? bandKleur : 'rgba(255,255,255,0.4)',
@@ -404,15 +442,15 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           },
         ].map((s2, i, arr) => (
           <div key={i} style={{
-            flex: 1, minWidth: 0,
+            flex: 1, minWidth: isMobile ? '33%' : 96,
             padding: isMobile ? '0.5rem 0.35rem' : '0.6rem 0.6rem',
             borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
             display: 'flex', flexDirection: 'column', gap: 3,
           }}>
             <div style={{
-              fontSize: isMobile ? '0.58rem' : '0.62rem',
-              fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-              textTransform: 'uppercase', letterSpacing: '0.06em',
+              fontSize: isMobile ? '0.62rem' : '0.66rem',
+              fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.01em',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {s2.label}
