@@ -388,6 +388,15 @@ function embedUrl(url) {
   return m ? `https://www.youtube.com/embed/${m[1]}?autoplay=1&rel=0&playsinline=1&fs=0` : null
 }
 
+// De voorvertoning van een YouTube-video. Een coach die een filmpje aan een
+// oefening hangt hoeft er zo geen los plaatje bij te zoeken: de thumbnail komt
+// uit de link zelf. Werkt ook voor shorts en youtu.be-links.
+function youtubeThumb(url) {
+  if (!url) return null
+  const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/)
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null
+}
+
 // ========== MAIN MODAL ==========
 export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768 }) {
   const [loggedSets, setLoggedSets] = useState([])
@@ -713,12 +722,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // De coachvideo gaat vóór; anders de fallback. Bij 241 van de 249 oefeningen
   // is die fallback een YouTube-zóéklink en geen filmpje — die kan niet in een
   // iframe, dus daar opent de knop YouTube meteen in een nieuw tabblad.
-  const videoBron = media?.video_url || media?.fallback_video_url || null
+  // De video van het schema-item gaat voor: dat is wat de coach bij déze
+  // oefening in dit plan heeft gezet.
+  const videoBron = exercise.video_url || media?.video_url || media?.fallback_video_url || null
   // Shorts zijn staand (9:16). In de liggende fotostrook werd zo'n video tot
   // een streepje geperst — dat is wat je zag toen je op play drukte.
   const isShort = !!videoBron && /youtube\.com\/shorts\//.test(videoBron)
   const videoEmbed = embedUrl(videoBron)
   const heeftVideo = !!videoBron
+  // Het beeld boven het scherm. Een eigen thumbnail van de coach gaat voor,
+  // dan de foto uit de oefeningtabel, en anders leiden we 'm af uit de
+  // YouTube-link. Een thumbnail invullen is dus nergens verplicht — vroeger
+  // verdween bij een oefening zonder foto het hele blok, play-knop en al.
+  const poster = exercise.thumbnail_url || media?.thumbnail_url || media?.image_url || youtubeThumb(videoBron) || null
 
   // Spiergroep uit het schema (week_structure noemt het primairSpieren),
   // anders uit de oefeningtabel (daar heet de kolom primair_spieren).
@@ -751,7 +767,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
           foto wel. De sluit-knop en de video liggen op de foto, zodat de
           titelregel alleen tekst is. */}
       <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        {media?.image_url && (
+        {(poster || heeftVideo) && (
           <div style={{
             position: 'relative', width: '100%',
             // Tijdens het afspelen krijgt het vak de vorm van de video: staand
@@ -784,12 +800,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 // kreeg je een zwarte speler met alleen de knoppen.
                 style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: '#000' }}
               />
-            ) : (
+            ) : poster ? (
               <img
-                src={media.image_url} alt=""
+                src={poster} alt=""
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 onError={e => { e.currentTarget.style.display = 'none' }}
               />
+            ) : (
+              // Geen plaatje, wel een filmpje: een rustig vlak waar de
+              // play-knop op staat. Beter dan niets tonen.
+              <div style={{
+                width: '100%', height: '100%',
+                background: 'linear-gradient(135deg, #171717 0%, #0a0a0a 100%)',
+              }} />
             )}
             {/* Verloop naar beneden zodat de titel eronder niet tegen een
                 harde rand aan komt te staan. */}
@@ -937,8 +960,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 {editingIndex !== null && <span style={{ color: '#FFD700', fontSize: '0.62em', fontWeight: 800 }}>set {editingIndex + 1}</span>}
               </div>
             </div>
-            {/* Zonder foto staat de sluit-knop hier, anders ligt hij op de foto. */}
-            {!media?.image_url && (
+            {/* Zonder beeld staat de sluit-knop hier, anders ligt hij op de foto. */}
+            {!(poster || heeftVideo) && (
               <button onClick={onClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                 <X size={isMobile ? 18 : 20} strokeWidth={2.4} />
               </button>
