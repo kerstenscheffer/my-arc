@@ -196,9 +196,14 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
 
   // Y-as: net iets ruimer dan wat er te zien is, zodat de band niet tegen de
   // rand plakt.
-  const waarden = punten.flatMap(p => [p.meting, p.trend, p.band[0], p.band[1]]).filter(Number.isFinite)
-  const min = Math.floor(Math.min(...waarden) - 1)
-  const max = Math.ceil(Math.max(...waarden) + 1)
+  // Niet elk punt heeft een band: vóór de eerste fase is er geen tempo
+  // afgesproken, en in de alles-weergave vallen die punten er ook tussen.
+  // Zonder deze controle knalde de grafiek erop stuk.
+  const waarden = punten
+    .flatMap(p => [p.meting, p.trend, ...(Array.isArray(p.band) ? p.band : [])])
+    .filter(Number.isFinite)
+  const min = waarden.length ? Math.floor(Math.min(...waarden) - 1) : 0
+  const max = waarden.length ? Math.ceil(Math.max(...waarden) + 1) : 100
 
   return (
     <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.75rem' : '0.625rem 1rem 0.875rem' }}>
