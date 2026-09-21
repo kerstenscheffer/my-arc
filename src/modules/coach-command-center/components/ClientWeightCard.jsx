@@ -16,9 +16,6 @@ import {
 import DeleteClientModal from './DeleteClientModal'
 import ClientInsightModal from './ClientInsightModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
-import {
-  maakConfig, trendReeks, weekBeoordelingen, weekFractie, kleurVoorErnst, tempoOordeel,
-} from '../../weight-tracker/utils/coachingBand'
 
 // Platte actieknop: geen vlak, geen rand — alleen icoon + woord. Drie
 // omkaderde knoppen naast elkaar maakten de kaart onrustig.
@@ -245,48 +242,20 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // #0a0a0a met een subtiele goud-rand — geen gradients, niet druk.
   const cardBorderLeft = `3px solid ${urgencyColor}`
 
-  // Tempo nu en tempo fase, uit dezelfde rekenmodule als de gewichtsgrafiek in
-  // Coach Insight. Twee verschillende vragen: wat deed hij déze week, en wat is
-  // het gemiddelde sinds de start van de fase. Ze kunnen tegengesteld staan —
-  // een uitschieter in week 1 laat het fasegemiddelde nog weken hoog staan.
-  const bandConfig = maakConfig(client, fase)
-  const bandReeks = trendReeks(faseHistory)
-  const laatsteTrend = bandReeks[bandReeks.length - 1] || null
-  const bandWeken = (fase?.start_gewicht && fase?.started_on)
-    ? weekBeoordelingen(bandReeks, Number(fase.start_gewicht), fase.started_on, bandConfig)
-    : []
-  const laatsteWeek = bandWeken[bandWeken.length - 1] || null
-  const tempoNu = laatsteWeek?.verschil ?? null
-  const wekenSinds = (laatsteTrend && fase?.started_on)
-    ? weekFractie(laatsteTrend.datum, fase.started_on, bandConfig.venster_dagen)
-    : null
-  const tempoFase = (laatsteTrend && basisGewicht != null && wekenSinds > 0.5)
-    ? Math.round(((laatsteTrend.trend - basisGewicht) / wekenSinds) * 100) / 100
-    : null
-
-  const tempoKleur = (waarde) => {
-    if (waarde == null || !fase) return 'rgba(255,255,255,0.4)'
-    const oordeel = tempoOordeel(waarde, bandConfig)
-    if (!oordeel) return '#fff'
-    return kleurVoorErnst(oordeel === 'OP_KOERS' ? 0 : 0.7)
-  }
-
-  // De drie cijfers onder aan de kaart. Label boven het getal, eenheid klein
-  // ernaast, uitleg eronder — zelfde opmaak als de balk in de gewicht-kolom,
-  // zodat je niet hoeft te schakelen tussen twee manieren van lezen.
+  // De cijfers op de kaartregel. Terug naar het weekgemiddelde tegenover vorige
+  // week en het verschil sinds de start: dat is wat je in de lijst wilt zien.
+  // Tempo nu en tempo fase stonden hier even, maar die horen bij de grafiek —
+  // daar staat de band erbij die zegt of dat tempo goed is. Op een kaart in een
+  // lijst is een tempo zonder band alleen maar een getal.
   const kaartStats = [
     {
-      label: 'Tempo nu', kort: 'Nu',
-      val: tempoNu != null ? `${tempoNu > 0 ? '+' : ''}${tempoNu}` : '—',
-      color: tempoKleur(tempoNu),
+      label: 'Verschil', kort: 'Verschil',
+      val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—',
+      color: weekDiff !== null ? weightGoalColor(weekDiff, doelBron) : 'rgba(255,255,255,0.4)',
     },
     {
-      label: 'Tempo fase', kort: 'Fase',
-      val: tempoFase != null ? `${tempoFase > 0 ? '+' : ''}${tempoFase}` : '—',
-      color: tempoKleur(tempoFase),
-    },
-    {
-      label: fase ? 'Sinds fase' : 'Sinds start', kort: 'Sinds',
+      label: fase ? 'Sinds start fase' : 'Sinds start',
+      kort: fase ? 'Sinds fase' : 'Sinds start',
       val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
       color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)',
     },
@@ -545,6 +514,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
                 }}>
                   {st.val}
                 </span>
+                <span style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>kg</span>
               </span>
             ))}
           </button>
