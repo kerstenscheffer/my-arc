@@ -18,6 +18,10 @@
 //
 // Dit bestand doet geen database en geen UI: pure rekenkunde, zodat de
 // coach-grafiek en (later) de klant-grafiek niet uit elkaar kunnen lopen.
+//
+// De afspraken zelf — wanneer stuur je bij, en waarmee — staan in
+// docs/coaching-band.md. Dat document is de bron; deze code volgt het. Wijzigt
+// de regel, wijzig daar eerst.
 
 export const STANDAARD = {
   streeftempo_pct: 0.6,   // gewenst tempo, % van startgewicht per week
