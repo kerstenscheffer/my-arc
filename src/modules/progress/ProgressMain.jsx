@@ -8,10 +8,10 @@ import ProgressPhotos from '../progress-photos/ProgressPhotos'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
 import WeightProgressRing from '../weight-tracker/components/WeightProgressRing'
 import WeightStatsGrid from '../weight-tracker/components/WeightStatsGrid'
-import WeightHistory from '../weight-tracker/components/WeightHistory'
 import CircumferenceMeasurements from '../weight-tracker/components/CircumferenceMeasurements'
 import RecentProgressPhotos from './components/RecentProgressPhotos'
 import CheckinHistoryCard from './components/CheckinHistoryCard'
+import SlaapKnop from './SlaapKnop'
 import BeforeAfterCard from './components/BeforeAfterCard'
 import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
@@ -204,6 +204,10 @@ export default function ProgressMain({ db, client }) {
     <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', overflow: 'hidden', paddingBottom: isMobile ? '5rem' : '2rem' }}>
       {isInChallenge && challengeData && <ProgressChallengeSidebar challengeData={challengeData} isMobile={isMobile} />}
 
+      {/* Je nacht loggen. Links zwevend, zodat het 's ochtends één tik is en
+          niet een halve pagina scrollen. */}
+      <SlaapKnop client={client} db={db} isMobile={isMobile} onderMarge={isMobile ? 96 : 102} onOpgeslagen={loadAllData} />
+
       {/* Toast */}
       {message && (
         <div style={{
@@ -268,6 +272,14 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
+      {/* Omtrekken horen bij het gewicht: de weegschaal staat stil terwijl de
+          taille krimpt, en dat zie je alleen als die twee bij elkaar staan. */}
+      {!photosOpen && (
+        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          <CircumferenceMeasurements weightService={weightService} clientId={client?.id} isMobile={isMobile} onSave={loadAllData} />
+        </div>
+      )}
+
       {/* ═══ ZONE 3: FOTO-KNOP — TodaysWorkoutCard-stijl: foto-banner bovenaan,
             info-rij eronder, gouden cirkel-chevron rechts ═══ */}
       {!photosOpen && (() => {
@@ -276,16 +288,9 @@ export default function ProgressMain({ db, client }) {
         const bannerUrl =
           (recentPhotos.find(p => p.photo_url) || {}).photo_url
           || 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=400&fit=crop&q=80'
-        const photoH = isMobile ? 240 : 320
-        // Front-foto's op tijd (oud → nieuw). Bij 2+ tonen we een before/after
-        // preview: LINKS de laatste front-foto, RECHTS de eerste.
-        const frontPhotos = recentPhotos
-          .filter(p => (p.metadata?.subtype || '').toLowerCase() === 'front' && p.photo_url)
-          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-        const hasBeforeAfter = frontPhotos.length >= 2
-        const leftPhoto = hasBeforeAfter ? frontPhotos[frontPhotos.length - 1] : null  // laatste
-        const rightPhoto = hasBeforeAfter ? frontPhotos[0] : null                       // eerste
-        const baLabel = { position: 'absolute', top: 6, fontSize: isMobile ? '0.5rem' : '0.55rem', fontWeight: 900, letterSpacing: '0.08em', padding: '0.1rem 0.4rem', borderRadius: 5 }
+        // Hier stond een eigen before/after-opmaak (twee foto's naast elkaar met
+        // labels). Die tekent BeforeAfterCard zelf al; wat hier overbleef waren
+        // vier variabelen die nergens meer heen gingen.
         return (
           <div
             onClick={() => setPhotosOpen(true)}
@@ -297,16 +302,17 @@ export default function ProgressMain({ db, client }) {
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            {/* Branded 4:5 before/after-kaart als preview (MA-overlay + maand-labels) */}
-            <div style={{ maxWidth: isMobile ? '100%' : 420, margin: '0 auto', marginBottom: isMobile ? '0.65rem' : '0.85rem' }}>
-              <BeforeAfterCard bare client={client} db={db} isMobile={isMobile} fallbackUrl={bannerUrl} />
-            </div>
-
-            {/* Info-rij — label + titel + meta links, gouden chevron-cirkel rechts */}
+            {/* Foto links, tekst en knop rechts. De preview besloeg eerst de
+                hele breedte met de tekst eronder; dat is een halve schermhoogte
+                voor een knop. Nu staat hij ernaast en zie je in één blik waar
+                je op drukt. */}
             <div style={{
               display: 'flex', alignItems: 'center',
-              gap: isMobile ? '0.6rem' : '0.85rem',
+              gap: isMobile ? '0.75rem' : '1rem',
             }}>
+              <div style={{ width: isMobile ? 120 : 150, flexShrink: 0 }}>
+                <BeforeAfterCard bare client={client} db={db} isMobile={isMobile} fallbackUrl={bannerUrl} />
+              </div>
               <div style={{
                 flex: 1, minWidth: 0,
                 display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -371,20 +377,13 @@ export default function ProgressMain({ db, client }) {
             Volgorde: histograaf bovenaan, daarna omtrekken. */}
       {!photosOpen && (
         <div style={{ marginTop: isMobile ? '4.25rem' : '5.25rem' }}>
-          <div>
-            <WeightHistory history={weightHistory} isMobile={isMobile} maxItems={200} />
-          </div>
-          {/* Direct onder de grafiek: je eigen check-ins teruglezen. Ze horen
-              bij het terugkijken dat je hier toch al doet. */}
-          <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
-            <CheckinHistoryCard db={db} client={client} isMobile={isMobile} />
-          </div>
-          <div style={{
-            marginTop: isMobile ? '4rem' : '5rem',
-            borderTop: '1px solid rgba(255,255,255,0.04)',
-          }}>
-            <CircumferenceMeasurements weightService={weightService} clientId={client?.id} isMobile={isMobile} onSave={loadAllData} />
-          </div>
+          {/* De lijst met alle weeglogs stond hier. Die staat al in het verloop
+              hierboven, en tweehonderd regels onder een grafiek leest niemand. */}
+
+          {/* Je eigen check-ins teruglezen — hoort bij het terugkijken dat je
+              op deze pagina toch al doet. */}
+          <CheckinHistoryCard db={db} client={client} isMobile={isMobile} />
+
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
             <SleepLogSection client={client} db={db} isMobile={isMobile} />
           </div>
