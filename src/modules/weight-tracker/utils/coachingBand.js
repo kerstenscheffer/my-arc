@@ -199,27 +199,35 @@ export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
 export function advies(laatste, config) {
   if (!laatste) return null
   const ingrijpen = laatste.wekenBuiten >= config.weken_voor_ingrijpen
-  switch (laatste.status) {
-    case 'ONVOLDOENDE_DATA':
-      return { toon: 'wacht', tekst: `Maar ${laatste.metingen} van de 7 dagen gewogen — te weinig voor een oordeel.` }
-    case 'OP_KOERS':
-      return { toon: 'goed', tekst: 'Op koers. Niets veranderen.' }
-    case 'TE_LANGZAAM':
-      return ingrijpen
-        ? { toon: 'let_op', tekst: 'Twee weken te langzaam. Check eerst de trouw (logt hij echt alles?); klopt dat, dan 100-200 kcal eraf óf meer stappen — niet allebei.' }
-        : { toon: 'kijk', tekst: 'Eén week te langzaam. Nog even aankijken.' }
-    case 'TE_SNEL':
-      return ingrijpen
-        ? {
-          toon: 'let_op',
-          tekst: config.kwetsbaar
-            ? 'Twee weken te snel, en deze klant is lean of ouder: 150-250 kcal erbij, en check de eiwitinname.'
-            : 'Twee weken te snel. 150-250 kcal erbij om spierverlies te voorkomen.',
-        }
-        : { toon: 'kijk', tekst: 'Eén week te snel. Nog even aankijken.' }
-    default:
-      return null
+  const aankomen = config.richting === 'aankomen'
+
+  if (laatste.status === 'ONVOLDOENDE_DATA') {
+    return { toon: 'wacht', tekst: `Maar ${laatste.metingen} van de 7 dagen gewogen — te weinig voor een oordeel.` }
   }
+  if (laatste.status === 'OP_KOERS') {
+    return { toon: 'goed', tekst: 'Op koers. Niets veranderen.' }
+  }
+  if (!ingrijpen) {
+    return { toon: 'kijk', tekst: `Eén week ${laatste.status === 'TE_SNEL' ? 'te snel' : 'te langzaam'}. Nog even aankijken.` }
+  }
+
+  // Welke kant je bijstuurt hangt af van de richting, niet van de status. Te
+  // snel afvallen kost spiermassa (dus eten erbij); te snel aankomen is vooral
+  // vet (dus eten eraf). Dat zijn tegengestelde adviezen bij dezelfde status.
+  if (laatste.status === 'TE_SNEL') {
+    return aankomen
+      ? { toon: 'let_op', tekst: 'Twee weken te snel aangekomen. Dit wordt vooral vet: 100-200 kcal eraf, of meer stappen — niet allebei.' }
+      : {
+        toon: 'let_op',
+        tekst: config.kwetsbaar
+          ? 'Twee weken te snel, en deze klant is lean of ouder: 150-250 kcal erbij, en check de eiwitinname.'
+          : 'Twee weken te snel. 150-250 kcal erbij om spierverlies te voorkomen.',
+      }
+  }
+  // TE_LANGZAAM
+  return aankomen
+    ? { toon: 'let_op', tekst: 'Twee weken te langzaam aangekomen. Check of hij zijn calorieën haalt; zo ja, 150-250 kcal erbij.' }
+    : { toon: 'let_op', tekst: 'Twee weken te langzaam. Check eerst de trouw (logt hij echt alles?); klopt dat, dan 100-200 kcal eraf óf meer stappen — niet allebei.' }
 }
 
 export const STATUS_TEKST = {
