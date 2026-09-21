@@ -15,7 +15,8 @@ import { useMemo, useState } from 'react'
 import {
   ComposedChart, Area, Line, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
-import { Scale, Info } from 'lucide-react'
+import { Info } from 'lucide-react'
+import KopKeuze from './KopKeuze'
 import {
   maakConfig, trendReeks, bepaalStart, weekFractie, lijnenOpWeek,
   weekBeoordelingen, advies, ernstVan, kleurVoorErnst, STATUS_TEKST, STATUS_KLEUR,
@@ -151,7 +152,7 @@ function WeekTabel({ weken, startDatum, isMobile }) {
   )
 }
 
-export default function GewichtBandGrafiek({ client, history, fase = null, fases = [], isMobile }) {
+export default function GewichtBandGrafiek({ client, history, fase = null, fases = [], onNieuweFase = null, isMobile }) {
   const [uitleg, setUitleg] = useState(false)
   const [weergave, setWeergave] = useState('grafiek')   // 'grafiek' | 'tabel'
   // Welke fase staat er in beeld. null = de lopende fase (of, zonder fases, de
@@ -167,6 +168,22 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
       eindigt: f.ended_on || lijst[i + 1]?.started_on || null,
     }))
   }, [fases])
+
+  // Wat er in de fase-dropdown staat: de lopende fase, wat eraan voorafging, en
+  // onderaan de knop om er een te beginnen.
+  const faseOpties = useMemo(() => {
+    const omgekeerd = [...perFase].reverse()
+    const lijst = omgekeerd.length > 0
+      ? omgekeerd.map((f, i) => ({
+        id: i === 0 ? 'nu' : f.id,
+        label: `${(f.doel || 'fase')[0].toUpperCase()}${(f.doel || 'fase').slice(1)} · ${kort(f.started_on)}`,
+      }))
+      : [{ id: 'nu', label: 'Geen fase' }]
+    if (heeftDaarvoor) lijst.push({ id: 'daarvoor', label: 'Daarvoor' })
+    if (perFase.length > 1) lijst.push({ id: 'alles', label: 'Alle fases' })
+    if (onNieuweFase) lijst.push({ id: 'nieuw', label: '+ Nieuwe fase' })
+    return lijst
+  }, [perFase, heeftDaarvoor, onNieuweFase])
 
   const actief = (gekozen === 'alles' || gekozen === 'daarvoor')
     ? null
@@ -296,93 +313,26 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
 
   return (
     <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.75rem' : '0.625rem 1rem 0.875rem' }}>
-      {/* Geen kop 'Coaching-band' meer: die stond boven een grafiek die al
-          duidelijk maakt wat hij is, in een kolom die al over gewicht gaat. De
-          keuzes staan op één regel. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-        {/* Terugkijken: elke fase heeft zijn eigen band, dus je kiest er één —
-          of je legt ze achter elkaar. */}
-      {(perFase.length > 1 || (perFase.length === 1 && heeftDaarvoor)) && (
-        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', flexShrink: 1, minWidth: 0 }}>
-          {[...perFase].reverse().map((f, i) => {
-            const aan = (gekozen === null && i === 0) || gekozen === f.id
-            return (
-              <button
-                key={f.id}
-                onClick={() => setGekozen(f.id)}
-                style={{
-                  flexShrink: 0, minHeight: 24, padding: '0 0.5rem', borderRadius: 999,
-                  background: aan ? '#fff' : 'transparent',
-                  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
-                  fontSize: '0.62rem', fontWeight: 900, fontFamily: 'inherit',
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {(f.doel || 'fase')}{i === 0 ? ' · nu' : ` · ${kort(f.started_on)}`}
-              </button>
-            )
-          })}
-          {heeftDaarvoor && (
-            <button
-              onClick={() => setGekozen('daarvoor')}
-              title="Wegingen van vóór de eerste fase"
-              style={{
-                flexShrink: 0, minHeight: 24, padding: '0 0.5rem', borderRadius: 999,
-                background: gekozen === 'daarvoor' ? '#fff' : 'transparent',
-                border: `1px solid ${gekozen === 'daarvoor' ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                color: gekozen === 'daarvoor' ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
-                fontSize: '0.62rem', fontWeight: 900, fontFamily: 'inherit',
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Daarvoor
-            </button>
-          )}
-          <button
-            onClick={() => setGekozen('alles')}
-            style={{
-              flexShrink: 0, minHeight: 24, padding: '0 0.5rem', borderRadius: 999,
-              background: gekozen === 'alles' ? '#fff' : 'transparent',
-              border: `1px solid ${gekozen === 'alles' ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-              color: gekozen === 'alles' ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
-              fontSize: '0.62rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: 'pointer', whiteSpace: 'nowrap',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            Alles
-          </button>
-        </div>
-      )}
+      {/* Eén regel voor alles wat je hier kunt kiezen: welke fase je bekijkt
+          (met onderin de knop voor een nieuwe) en of je de lijn of de cijfers
+          wilt. De losse fase-regel bovenaan de kolom is hierin opgegaan. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <KopKeuze
+          groot
+          waarde={gekozen || (perFase.find(f => f.id === fase?.id) ? fase.id : 'nu')}
+          opties={faseOpties}
+          onKies={(id) => {
+            if (id === 'nieuw') { onNieuweFase?.(); return }
+            setGekozen(id === 'nu' ? null : id)
+          }}
+        />
+        <KopKeuze
+          waarde={weergave}
+          opties={[{ id: 'grafiek', label: 'Grafiek' }, { id: 'tabel', label: 'Tabel' }]}
+          onKies={setWeergave}
+          kleur="rgba(255,255,255,0.65)"
+        />
         <span style={{ flex: 1 }} />
-        {/* Grafiek of cijfers. Een lijn laat zien hoe het loopt, een tabel wat
-            er staat — en dat tweede lees je sneller als je moet besluiten of je
-            bijstuurt. */}
-        <div style={{ display: 'flex', gap: 3, marginRight: 2 }}>
-          {[{ id: 'grafiek', label: 'Grafiek' }, { id: 'tabel', label: 'Tabel' }].map(k => {
-            const aan = weergave === k.id
-            return (
-              <button
-                key={k.id}
-                onClick={() => setWeergave(k.id)}
-                style={{
-                  minHeight: 22, padding: '0 0.45rem', borderRadius: 999,
-                  background: aan ? '#fff' : 'transparent',
-                  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.45)',
-                  fontSize: '0.6rem', fontWeight: 900, fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {k.label}
-              </button>
-            )
-          })}
-        </div>
         <button
           onClick={() => setUitleg(v => !v)}
           title="Hoe deze band werkt"

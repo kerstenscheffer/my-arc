@@ -54,6 +54,9 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // kijkt; het verloop en de losse logs zijn om iets op te zoeken, en die
   // maakten de kolom onleesbaar.
   const [toonVerloop, setToonVerloop] = React.useState(false)
+  // Teller: gaat omhoog als je in de fase-dropdown '+ Nieuwe fase' kiest. Het
+  // formulier zelf blijft in FasePaneel wonen.
+  const [nieuweFase, setNieuweFase] = React.useState(0)
 
   const circumFields = [
     { key: 'waist_cm', label: 'Buik' }, { key: 'bicep_cm', label: 'Arm' },
@@ -83,6 +86,8 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           onActieveFase={setActieveFase}
           onFases={setAlleFases}
           toonOordeel={false}
+          toonKop={false}
+          openNieuw={nieuweFase}
         />
         {/* De cijfers eerst: huidig, trend, tempo, op plan. Dat is de
             samenvatting; de band eronder laat zien hoe die cijfers lopen. */}
@@ -105,7 +110,11 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
         )}
         {/* De band: waar het gewicht hoort te lopen, en of dat gebeurt. */}
         {history.length > 0 && (
-          <GewichtBandGrafiek client={client} history={history} fase={actieveFase} fases={alleFases} isMobile={isMobile} />
+          <GewichtBandGrafiek
+            client={client} history={history} fase={actieveFase} fases={alleFases}
+            onNieuweFase={() => setNieuweFase(n => n + 1)}
+            isMobile={isMobile}
+          />
         )}
         {/* De cijfers achter de grafiek. Eén tabel met eigen knoppen voor
             week/dag en de periode — de uitklapper 'Alle metingen' met zijn

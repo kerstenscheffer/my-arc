@@ -15,7 +15,7 @@
 // de kleur in deze tabel en de kleur van de lijn kunnen niet uit elkaar lopen.
 
 import { useMemo, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import KopKeuze from './KopKeuze'
 import {
   maakConfig, trendReeks, weekBeoordelingen, STATUS_TEKST, STATUS_KLEUR,
 } from '../../../weight-tracker/utils/coachingBand'
@@ -48,41 +48,6 @@ const dagNaam = (d) => {
 const KOLOMMEN = {
   week: '3.4rem 5rem 4rem 3rem 1fr',
   dag: '5.5rem 5rem 4rem 5rem',
-}
-
-// Negen pillen naast elkaar waren negen dingen om te lezen voor twee keuzes.
-// Nu twee koppen die zelf de keuze zijn: je leest wat er staat, en je klikt
-// erop om het te veranderen.
-function Keuze({ waarde, opties, onKies }) {
-  const huidig = opties.find(o => o.id === waarde) || opties[0]
-  return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-      <span style={{
-        fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em',
-      }}>
-        {huidig?.label}
-      </span>
-      <ChevronDown size={13} strokeWidth={3} color="rgba(255,255,255,0.5)" />
-      {/* De echte select ligt onzichtbaar over de tekst: zo krijg je het
-          keuzemenu van het toestel zelf, zonder dat het scherm er een vakje
-          bij krijgt. */}
-      <select
-        value={waarde}
-        onChange={(e) => onKies(e.target.value)}
-        style={{
-          position: 'absolute', inset: 0, width: '100%', height: '100%',
-          opacity: 0, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none',
-          border: 'none', background: 'transparent', fontFamily: 'inherit',
-        }}
-      >
-        {opties.map(o => (
-          <option key={o.id} value={o.id} style={{ background: '#0a0a0a', color: '#fff' }}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </span>
-  )
 }
 
 export default function MetingenTabel({ client, history, fase, isMobile }) {
@@ -148,13 +113,13 @@ export default function MetingenTabel({ client, history, fase, isMobile }) {
     }}>
       {/* Bediening: wat voor rijen, en over welke periode. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        <Keuze
+        <KopKeuze
           waarde={weergave}
           opties={[{ id: 'week', label: 'Per week' }, { id: 'dag', label: 'Per dag' }]}
           onKies={setWeergave}
         />
         <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 900 }}>·</span>
-        <Keuze
+        <KopKeuze
           waarde={periode}
           opties={PERIODES.filter(p => p.id !== 'fase' || fase).map(p => ({ id: p.id, label: p.lang || p.label }))}
           onKies={setPeriode}

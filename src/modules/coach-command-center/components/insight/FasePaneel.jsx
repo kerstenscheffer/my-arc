@@ -19,7 +19,13 @@ const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric',
 // `toonOordeel` staat uit zodra de coaching-band eronder hangt: die zegt
 // hetzelfde, met de cijfers erbij. Twee meldingen over dezelfde week maken de
 // kolom drukker zonder dat er iets bij komt.
-export default function FasePaneel({ client, db, history, isMobile, onFaseChange, onActieveFase, onFases, toonOordeel = true }) {
+// `toonKop` uit: de fase-regel is verhuisd naar de balk boven de grafiek, waar
+// hij een dropdown is. Dit paneel toont dan alleen nog het formulier, en dat
+// opent van buitenaf via `openNieuw` (een teller die omhoog gaat).
+export default function FasePaneel({
+  client, db, history, isMobile, onFaseChange, onActieveFase, onFases,
+  toonOordeel = true, toonKop = true, openNieuw = 0,
+}) {
   const [fases, setFases] = useState([])
   const [laden, setLaden] = useState(true)
   const [nieuw, setNieuw] = useState(null)
@@ -44,6 +50,12 @@ export default function FasePaneel({ client, db, history, isMobile, onFaseChange
     setLaden(false)
   }
   useEffect(() => { laad() }, [client?.id, db])
+
+  // Van buitenaf een nieuwe fase beginnen (knop in de dropdown hierboven).
+  useEffect(() => {
+    if (openNieuw > 0) startNieuw()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openNieuw])
 
   const huidige = fases[0] || null
   const oordeel = huidige ? beoordeelFase(huidige, history) : null
@@ -117,11 +129,15 @@ export default function FasePaneel({ client, db, history, isMobile, onFaseChange
   }
 
   if (laden) return null
+  // Zonder kop en zonder open formulier valt er niets te tekenen; dan ook geen
+  // lege strook met een randje.
+  if (!toonKop && !nieuw) return null
 
   const p = isMobile ? '0.7rem 0.75rem' : '0.8rem 1rem'
 
   return (
     <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: p }}>
+      {toonKop && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: huidige || nieuw ? '0.6rem' : 0 }}>
         <Flag size={14} color="#fff" />
         {huidige && !nieuw ? (
@@ -152,6 +168,7 @@ export default function FasePaneel({ client, db, history, isMobile, onFaseChange
           }}><Plus size={12} /> Nieuwe fase</button>
         )}
       </div>
+      )}
 
       {/* Oordeel: ligt de klant op schema? */}
       {toonOordeel && huidige && !nieuw && oordeel && (
