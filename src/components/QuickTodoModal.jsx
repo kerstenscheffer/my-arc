@@ -178,6 +178,46 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     setEditingId(null)
   }
 
+  // Sectie wisselen vanaf de regel zelf. Dat was alleen te doen door de to-do
+  // open te klappen en te bewerken; nu is het één keer kiezen. Optimistisch,
+  // want anders springt de regel pas een halve seconde later naar zijn nieuwe
+  // sectie en klik je er intussen nog eens naast.
+  const zetSectie = async (t, sectieId) => {
+    const nieuw = sectieId || null
+    if ((t.section_id || null) === nieuw) return
+    setTasks(prev => prev.map(x => x.id === t.id ? { ...x, section_id: nieuw } : x))
+    try {
+      await svc.updateTask(t.id, { section_id: nieuw })
+    } catch (e) { console.error('QuickTodo sectie wisselen:', e); load() }
+  }
+
+  // Het dropdownje op een regel. Toont waar de to-do nu staat; kiezen
+  // verplaatst hem meteen.
+  const SectieKeuze = ({ t }) => (
+    <select
+      value={t.section_id || ''}
+      onChange={(e) => zetSectie(t, e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      title="Verplaats naar sectie"
+      aria-label="Sectie"
+      style={{
+        flexShrink: 0, maxWidth: 104,
+        height: 24, padding: '0 0.35rem', borderRadius: 6,
+        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+        color: t.section_id ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.3)',
+        fontSize: '0.6rem', fontWeight: 800, fontFamily: 'inherit',
+        outline: 'none', cursor: 'pointer',
+        appearance: 'none', WebkitAppearance: 'none',
+        textOverflow: 'ellipsis',
+      }}
+    >
+      <option value="" style={{ background: '#111' }}>Niet gepland</option>
+      {sections.map(sec => (
+        <option key={sec.id} value={sec.id} style={{ background: '#111' }}>{sec.title}</option>
+      ))}
+    </select>
+  )
+
   // Zichtbare to-do's: eerst sectie-filter, dan prio- en tijd-filter.
   const durTest = DUR_FILTERS.find(d => d.key === durFilter)?.test
   const visible = tasks.filter(t => {
@@ -478,15 +518,11 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                           // enige waaraan je een to-do herkent.
                           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {t.title}
-                          {filter === 'all' && t.section_id && (
-                            <span style={{ marginLeft: 6, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                              {sections.find(s => s.id === t.section_id)?.title || ''}
-                            </span>
-                          )}
                         </span>
                       </div>
-                      {/* Rij 2: duur + actieknoppen */}
+                      {/* Rij 2: sectie + duur + actieknoppen */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <SectieKeuze t={t} />
                         {t.estimated_minutes ? (
                           <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
                         ) : null}
@@ -517,12 +553,9 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                       <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, cursor: 'pointer', lineHeight: 1.35,
                         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {t.title}
-                        {filter === 'all' && t.section_id && (
-                          <span style={{ marginLeft: 6, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                            {sections.find(s => s.id === t.section_id)?.title || ''}
-                          </span>
-                        )}
                       </span>
+
+                      <SectieKeuze t={t} />
                       {t.estimated_minutes ? (
                         <span style={{ flexShrink: 0, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
                       ) : null}
