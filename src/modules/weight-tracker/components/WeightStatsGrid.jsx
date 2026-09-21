@@ -80,7 +80,6 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   }
 
   const allWeeks = getAllWeeks()
-  const thisWeekData = getCalendarWeekAvg(0)
   const lastWeekData = getCalendarWeekAvg(-1)
   // Alleen nog voor de 'vorige week'-cel bij klanten zonder fase; de balk
   // rekent verder met de trend en het tempo.
