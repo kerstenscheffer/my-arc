@@ -1,105 +1,147 @@
 // src/modules/lead-management/components/kanban/DueCallsModal.jsx
-// Pop-up bij het openen van het lead-systeem met de ingeplande calls waarvan
-// datum+tijd voorbij zijn en die nog niet zijn afgehandeld. 2-staps per call:
+//
+// Alle ingeplande calls op één plek: wat af te handelen is, en wat er nog
+// aankomt. Per call twee stappen:
 //   Stap 1: Gevoerd / Niet gevoerd
-//   Stap 2: (gevoerd) Sale / Sale verloren · (niet gevoerd) No show / Verplaatst
+//   Stap 2: (gevoerd) Sale / Sale verloren / Denkt na
+//           (niet gevoerd) No show / Afgezegd / Verplaatst
 // Elke keuze bubbelt via onOutcome(dc, kind, extra) naar de KanbanBoard.
+//
+// Waarom ook de calls die nog moeten komen: een gesprek dat vandaag doorging
+// maar morgen pas in de agenda staat, kwam nergens terug. Die lead bleef dan
+// eeuwig "ingepland" staan terwijl hij allang klant of afgewezen was. Ze staan
+// apart onder een kop, want ze vragen niet om actie — ze mogen alleen niet
+// onvindbaar zijn.
+
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass } from 'lucide-react'
+import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass, ChevronRight } from 'lucide-react'
 
-const inp = (flex) => ({ flex, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a1a', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box' })
-const chip = (color) => ({ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.6rem', borderRadius: 9, border: `1px solid ${color}55`, background: `${color}18`, color, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' })
+const LIJN = 'rgba(255,255,255,0.08)'
+const LIJN_ZACHT = 'rgba(255,255,255,0.05)'
 
-function DueCallItem({ dc, onOutcome }) {
-  // Een lead die "denkt erover na" heeft de call al gevoerd. Die hoeft die
-  // stap niet nog eens: meteen de sale-of-niet keuze.
-  const [step, setStep] = useState(dc.denktNa ? 'h' : 1)
-  const [reschedule, setReschedule] = useState(false)
+const veld = (flex) => ({
+  flex, minHeight: 38, padding: '0 0.6rem', borderRadius: 9,
+  border: `1px solid ${LIJN}`, background: 'rgba(255,255,255,0.04)',
+  color: '#fff', fontSize: '0.82rem', fontWeight: 700, fontFamily: 'inherit',
+  boxSizing: 'border-box', outline: 'none',
+})
+
+// Kale knop: tekst in de kleur van de betekenis, geen gekleurd vlak. Zes
+// gevulde blokjes naast elkaar lazen als een waarschuwing.
+const knop = (kleur) => ({
+  flex: 1, minWidth: 92, minHeight: 38,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+  padding: '0 0.6rem', borderRadius: 10,
+  border: `1px solid ${kleur === '#fff' ? 'rgba(255,255,255,0.25)' : kleur + '55'}`,
+  background: 'transparent', color: kleur,
+  fontWeight: 900, fontSize: '0.78rem', fontFamily: 'inherit',
+  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+})
+
+const datumTekst = (dc) => {
+  try {
+    return new Date(`${dc.callDate}T${dc.callTime || '00:00'}:00`).toLocaleString('nl-NL', {
+      day: 'numeric', month: 'short',
+      hour: dc.callTime ? '2-digit' : undefined, minute: dc.callTime ? '2-digit' : undefined,
+    })
+  } catch { return dc.callDate }
+}
+
+function CallRegel({ dc, onOutcome }) {
+  // Een lead die "denkt erover na" heeft de call al gevoerd; die stap slaan we
+  // over. Een call die nog moet komen begint dicht: je wilt hem zien staan,
+  // niet per ongeluk afhandelen.
+  const [open, setOpen] = useState(!dc.toekomstig)
+  const [stap, setStap] = useState(dc.denktNa ? 'gevoerd' : 1)
+  const [verzetten, setVerzetten] = useState(false)
   const [denkt, setDenkt] = useState(false)
-  const [date, setDate] = useState(dc.callDate || new Date().toISOString().split('T')[0])
-  const [time, setTime] = useState(dc.callTime || new Date().toTimeString().slice(0, 5))
-  // Standaard een week vooruit — dat is de gebruikelijke bedenktijd.
+  const [datum, setDatum] = useState(dc.callDate || new Date().toISOString().split('T')[0])
+  const [tijd, setTijd] = useState(dc.callTime || new Date().toTimeString().slice(0, 5))
   const overEenWeek = () => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0] }
   const [denkDatum, setDenkDatum] = useState(dc.followupDate || overEenWeek())
 
-  const fmt = () => {
-    try {
-      return new Date(`${dc.callDate}T${dc.callTime || '00:00'}:00`).toLocaleString('nl-NL', {
-        day: 'numeric', month: 'short',
-        hour: dc.callTime ? '2-digit' : undefined, minute: dc.callTime ? '2-digit' : undefined,
-      })
-    } catch { return dc.callDate }
-  }
-
   return (
-    <div style={{ padding: '0.85rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Phone size={14} color="#06b6d4" />
+    <div style={{ padding: '0.7rem 1rem', borderBottom: `1px solid ${LIJN_ZACHT}` }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+          textAlign: 'left', fontFamily: 'inherit',
+          marginBottom: open ? 10 : 0,
+        }}
+      >
+        <Phone size={13} color="rgba(255,255,255,0.4)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 800, color: '#fff', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dc.leadName || 'Lead'}</div>
-          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)' }}>
-            Call was: {fmt()}
+          <div style={{
+            fontWeight: 900, color: '#fff', fontSize: '0.88rem', letterSpacing: '-0.015em',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {dc.leadName || 'Lead'}
+          </div>
+          <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+            {dc.toekomstig ? 'Staat op' : 'Call was'} {datumTekst(dc)}
             {dc.denktNa && (
-              <span style={{ color: '#eab308', fontWeight: 800 }}>
+              <span style={{ color: '#eab308' }}>
                 {' · denkt na'}{dc.followupDate ? ` tot ${new Date(dc.followupDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
               </span>
             )}
           </div>
         </div>
-      </div>
+        <ChevronRight
+          size={15} strokeWidth={3} color="rgba(255,255,255,0.3)"
+          style={{ flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.18s ease' }}
+        />
+      </button>
 
-      {step === 1 && (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={chip('#10b981')} onClick={() => setStep('h')}><Check size={14} /> Gevoerd</button>
-          <button style={chip('#ef4444')} onClick={() => setStep('n')}><XCircle size={14} /> Niet gevoerd</button>
+      {open && stap === 1 && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button style={knop('#10b981')} onClick={() => setStap('gevoerd')}><Check size={13} strokeWidth={3} /> Gevoerd</button>
+          <button style={knop('#ef4444')} onClick={() => setStap('niet')}><XCircle size={13} strokeWidth={3} /> Niet gevoerd</button>
         </div>
       )}
 
-      {step === 'h' && !denkt && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={chip('#FFD700')} onClick={() => onOutcome(dc, 'sale')}><Trophy size={14} /> Sale</button>
-          <button style={chip('#ef4444')} onClick={() => onOutcome(dc, 'saleLost')}><XCircle size={14} /> Sale verloren</button>
-          <button style={chip('#eab308')} onClick={() => setDenkt(true)}><Hourglass size={14} /> Denkt erover na</button>
+      {open && stap === 'gevoerd' && !denkt && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button style={knop('#fff')} onClick={() => onOutcome(dc, 'sale')}><Trophy size={13} strokeWidth={3} /> Sale</button>
+          <button style={knop('#ef4444')} onClick={() => onOutcome(dc, 'saleLost')}><XCircle size={13} strokeWidth={3} /> Verloren</button>
+          <button style={knop('#eab308')} onClick={() => setDenkt(true)}><Hourglass size={13} strokeWidth={3} /> Denkt na</button>
         </div>
       )}
 
       {/* Denkt erover na: de call telt als gevoerd, de lead blijft staan en
-          komt op de gekozen datum vanzelf weer in deze lijst. */}
-      {step === 'h' && denkt && (
+          komt op de gekozen datum vanzelf weer bovenaan deze lijst. */}
+      {open && stap === 'gevoerd' && denkt && (
         <div>
-          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>
+          <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>
             Wanneer kom je hierop terug?
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <input type="date" value={denkDatum} onChange={e => setDenkDatum(e.target.value)} style={inp(1)} />
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button style={chip('#eab308')} onClick={() => onOutcome(dc, 'thinking', { followupDate: denkDatum || null })}>
-              <Hourglass size={14} /> Opslaan
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input type="date" value={denkDatum} onChange={e => setDenkDatum(e.target.value)} style={veld(2)} />
+            <button style={knop('#eab308')} onClick={() => onOutcome(dc, 'thinking', { followupDate: denkDatum || null })}>
+              Opslaan
             </button>
-            <button style={{ ...chip('rgba(255,255,255,0.4)'), flex: 0.5 }} onClick={() => setDenkt(false)}>Terug</button>
+            <button style={{ ...knop('rgba(255,255,255,0.45)'), flex: 0, minWidth: 64 }} onClick={() => setDenkt(false)}>Terug</button>
           </div>
         </div>
       )}
 
-      {step === 'n' && !reschedule && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={chip('#f97316')} onClick={() => onOutcome(dc, 'noShow')}><UserX size={14} /> No show</button>
-          <button style={chip('#a855f7')} onClick={() => onOutcome(dc, 'afgezegd')}><CalendarX size={14} /> Afgezegd</button>
-          <button style={chip('#06b6d4')} onClick={() => setReschedule(true)}><CalendarClock size={14} /> Verplaatst</button>
+      {open && stap === 'niet' && !verzetten && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button style={knop('#f97316')} onClick={() => onOutcome(dc, 'noShow')}><UserX size={13} strokeWidth={3} /> No show</button>
+          <button style={knop('#a855f7')} onClick={() => onOutcome(dc, 'afgezegd')}><CalendarX size={13} strokeWidth={3} /> Afgezegd</button>
+          <button style={knop('#06b6d4')} onClick={() => setVerzetten(true)}><CalendarClock size={13} strokeWidth={3} /> Verplaatst</button>
         </div>
       )}
 
-      {step === 'n' && reschedule && (
-        <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp(2)} />
-            <input type="time" value={time} onChange={e => setTime(e.target.value)} style={inp(1)} />
-          </div>
-          <button style={{ ...chip('#06b6d4'), width: '100%' }} onClick={() => onOutcome(dc, 'reschedule', { callDate: date || null, callTime: time || null })}>
-            <CalendarClock size={14} /> Opnieuw inplannen
+      {open && stap === 'niet' && verzetten && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={veld(2)} />
+          <input type="time" value={tijd} onChange={e => setTijd(e.target.value)} style={veld(1)} />
+          <button style={knop('#06b6d4')} onClick={() => onOutcome(dc, 'reschedule', { callDate: datum || null, callTime: tijd || null })}>
+            <CalendarClock size={13} strokeWidth={3} /> Inplannen
           </button>
         </div>
       )}
@@ -107,27 +149,87 @@ function DueCallItem({ dc, onOutcome }) {
   )
 }
 
+function Kop({ tekst, aantal }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '0.6rem 1rem 0.35rem',
+      fontSize: '0.56rem', fontWeight: 900, letterSpacing: '0.12em',
+      textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)',
+    }}>
+      {tekst}
+      <span style={{ color: 'rgba(255,255,255,0.2)' }}>{aantal}</span>
+    </div>
+  )
+}
+
 export default function DueCallsModal({ dueCalls, onOutcome, onClose }) {
   const modalHost = useModalHost()
-  const list = dueCalls || []
+  const lijst = dueCalls || []
+  const teDoen = lijst.filter(c => !c.toekomstig)
+  const komtNog = lijst.filter(c => c.toekomstig)
+
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ background: '#0d0d0d', border: '1px solid rgba(6,182,212,0.35)', borderRadius: 14, width: '100%', maxWidth: 420, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <CalendarClock size={16} color="#06b6d4" />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, color: '#fff' }}>Openstaande call{list.length === 1 ? '' : 's'}</div>
-            <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)' }}>Hoe ging de call? · {list.length} open</div>
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100000,
+        background: 'rgba(0,0,0,0.8)',
+        backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+      }}
+    >
+      <div style={{
+        background: '#0a0a0a', border: `1px solid ${LIJN}`, borderRadius: 18,
+        width: '100%', maxWidth: 440, maxHeight: '86vh',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        boxShadow: '0 24px 70px rgba(0,0,0,0.8)',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          padding: '0.9rem 1rem', borderBottom: `1px solid ${LIJN}`, flexShrink: 0,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+              Ingeplande calls
+            </div>
+            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+              {teDoen.length} af te handelen · {komtNog.length} komt nog
+            </div>
           </div>
-          <button onClick={onClose} title="Later" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+          <button onClick={onClose} title="Later" aria-label="Sluiten" style={{
+            width: 30, height: 30, flexShrink: 0, borderRadius: 8,
+            background: 'transparent', border: 'none', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <X size={17} strokeWidth={3} />
+          </button>
         </div>
+
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {list.length === 0 ? (
-            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem' }}>
-              🎉 Geen openstaande calls — alles is afgehandeld.
+          {lijst.length === 0 ? (
+            <div style={{
+              padding: '2.5rem 1rem', textAlign: 'center',
+              color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem', fontWeight: 700,
+            }}>
+              Geen ingeplande calls.
             </div>
           ) : (
-            list.map(dc => <DueCallItem key={dc.movementId} dc={dc} onOutcome={onOutcome} />)
+            <>
+              {teDoen.length > 0 && (
+                <>
+                  <Kop tekst="Af te handelen" aantal={teDoen.length} />
+                  {teDoen.map(dc => <CallRegel key={dc.movementId} dc={dc} onOutcome={onOutcome} />)}
+                </>
+              )}
+              {komtNog.length > 0 && (
+                <>
+                  <Kop tekst="Komt nog" aantal={komtNog.length} />
+                  {komtNog.map(dc => <CallRegel key={dc.movementId} dc={dc} onOutcome={onOutcome} />)}
+                </>
+              )}
+            </>
           )}
         </div>
       </div>

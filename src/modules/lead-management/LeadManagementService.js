@@ -1040,22 +1040,41 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       for (const [leadId, mv] of latestByLead) {
         if (currentSection.get(leadId) !== mv.to_section_id) continue
         const denktNa = mv.outcome_type === 'thinking'
+        let toekomstig = false
         if (denktNa) {
           // Call is gevoerd, de lead denkt na. Pas tonen vanaf de afgesproken
           // datum — behalve als de coach de lijst zelf opent.
-          if (!toonToekomstig && mv.followup_date && mv.followup_date > vandaag) continue
+          if (mv.followup_date && mv.followup_date > vandaag) {
+            if (!toonToekomstig) continue
+            toekomstig = true
+          }
         } else {
           const dt = new Date(`${mv.call_date}T${mv.call_time || '23:59'}:00`)
-          if (isNaN(dt.getTime()) || dt > now) continue
+          if (isNaN(dt.getTime())) continue
+          // Staat de call nog in de toekomst, dan hoort hij niet in de
+          // automatische pop-up ("hoe ging de call?"). Opent de coach de lijst
+          // zelf, dan wil hij wél elke geplande call zien: een gesprek dat
+          // vandaag doorging maar morgen in de agenda staat is anders
+          // onvindbaar, en dan blijft die lead eeuwig 'ingepland'.
+          if (dt > now) {
+            if (!toonToekomstig) continue
+            toekomstig = true
+          }
         }
         due.push({
           movementId: mv.id, leadId, leadName: mv.lead_name,
           sectionId: mv.to_section_id, sectionTitle: mv.to_section_title,
           callDate: mv.call_date, callTime: mv.call_time,
           denktNa, followupDate: mv.followup_date || null,
+          toekomstig,
         })
       }
-      due.sort((a, b) => `${a.callDate}${a.callTime || ''}`.localeCompare(`${b.callDate}${b.callTime || ''}`))
+      // Eerst wat af te handelen is (oudste bovenaan), daarna wat nog komt
+      // (eerstvolgende bovenaan).
+      due.sort((a, b) => {
+        if (a.toekomstig !== b.toekomstig) return a.toekomstig ? 1 : -1
+        return `${a.callDate}${a.callTime || ''}`.localeCompare(`${b.callDate}${b.callTime || ''}`)
+      })
       return due
     } catch (e) {
       console.error('getDueScheduledCalls failed:', e)

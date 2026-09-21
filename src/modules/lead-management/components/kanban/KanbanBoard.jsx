@@ -1841,13 +1841,15 @@ export default function KanbanBoard({
                 position: 'relative',
                 width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'transparent', border: 'none',
-                color: dueCalls.length > 0 ? '#FFD700' : 'rgba(255,255,255,0.65)',
+                color: dueCalls.some(c => !c.toekomstig) ? '#FFD700' : 'rgba(255,255,255,0.65)',
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
               <Phone size={16} />
-              {dueCalls.length > 0 && (
-                <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 14, height: 14, background: '#ef4444', color: '#fff', borderRadius: 7, padding: '0 3px', fontSize: '0.52rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dueCalls.length}</span>
+              {/* De badge telt alleen wat om actie vraagt; de calls die nog
+                  moeten komen staan wel in de lijst maar zijn geen alarm. */}
+              {dueCalls.filter(c => !c.toekomstig).length > 0 && (
+                <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 14, height: 14, background: '#ef4444', color: '#fff', borderRadius: 7, padding: '0 3px', fontSize: '0.52rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dueCalls.filter(c => !c.toekomstig).length}</span>
               )}
             </button>
 
