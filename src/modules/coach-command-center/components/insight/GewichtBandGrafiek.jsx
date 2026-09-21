@@ -72,19 +72,6 @@ function Kaartje({ active, payload, label }) {
 // pas lopen. Zelfde opzet als de set-tabel in het oefening-logboek.
 const KOLOMMEN = '4.4rem 1fr 3.4rem 3.2rem 1fr'
 
-// De vier kolommen onder de melding. Bold en wit: dit zijn de cijfers waarop
-// je besluit of je bijstuurt, dus ze horen leesbaar te zijn zonder te turen.
-const weekRegel = {
-  // Vaste kolombreedtes en géén 1fr: in een brede kolom trok die de tabel uit
-  // elkaar tot de trend aan de rechterrand hing, een halve meter van het
-  // weeknummer. Vier smalle kolommen die bij elkaar blijven staan lees je in
-  // één oogopslag.
-  display: 'grid', gridTemplateColumns: '3.4rem 5rem 4rem 3rem',
-  gap: '0 0.9rem', alignItems: 'center', maxWidth: 'max-content',
-  fontSize: '0.72rem', fontWeight: 900,
-  fontVariantNumeric: 'tabular-nums',
-}
-
 // Week-op-week in cijfers. Een grafiek laat zien hoe het loopt; een tabel laat
 // zien wat er staat — en dat is wat je nodig hebt als je moet besluiten of je
 // bijstuurt.
@@ -553,31 +540,6 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
             </div>
           )}
 
-          {/* De weken waar dit oordeel op rust, als tabelletje. Stond als
-              grijze doorlopende regel; dat las niemand. Nu vier kolommen,
-              bold wit, met alleen de status in kleur. */}
-          {(model.weken || []).length > 1 && (
-            <div style={{ marginTop: 9 }}>
-              <div style={{ ...weekRegel, color: 'rgba(255,255,255,0.35)', fontSize: '0.58rem', letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 3 }}>
-                <span>Week</span>
-                <span style={{ textAlign: 'right' }}>Trend</span>
-                <span style={{ textAlign: 'right' }}>Δ</span>
-                <span style={{ textAlign: 'right' }}>Weeg</span>
-              </div>
-              {model.weken.slice(-3).map(w => (
-                <div key={w.week} style={{ ...weekRegel, paddingTop: 4, paddingBottom: 4 }}>
-                  <span style={{ color: STATUS_KLEUR[w.status] || '#fff' }}>wk {w.week}</span>
-                  <span style={{ textAlign: 'right', color: '#fff' }}>{w.trend} kg</span>
-                  <span style={{ textAlign: 'right', color: w.verschil == null ? 'rgba(255,255,255,0.3)' : (STATUS_KLEUR[w.status] || '#fff') }}>
-                    {w.verschil == null ? '—' : `${w.verschil > 0 ? '+' : ''}${w.verschil}`}
-                  </span>
-                  <span style={{ textAlign: 'right', color: w.metingen >= 5 ? '#fff' : '#f59e0b' }}>
-                    {w.metingen}×
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 

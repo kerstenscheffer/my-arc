@@ -7,9 +7,9 @@ import React from 'react'
 import { Ruler, Camera, Download, Maximize2, ChevronDown, ChevronUp } from 'lucide-react'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
 import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
-import { weightGoalColor } from '../../../weight-tracker/utils/weightGoalColor'
 import FasePaneel from './FasePaneel'
 import GewichtBandGrafiek from './GewichtBandGrafiek'
+import MetingenTabel from './MetingenTabel'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
@@ -44,12 +44,6 @@ function Uitklap({ label, extra, open, onKlik, isMobile }) {
 
 export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate }) {
   const history = weightData?.history || []
-  // 'dag' = dag-op-dag logs · 'week' = week-op-week gemiddelden + verschil
-  const [weightView, setWeightView] = React.useState('dag')
-  // Standaard alleen de drie meest recente regels. De volledige lijst stond
-  // eerder als scrollvak van 280px in de sectie — dat is veel regels voor iets
-  // waar je meestal alleen de laatste paar van wil zien.
-  const [alleMetingen, setAlleMetingen] = React.useState(false)
   // Actieve fase, aangeleverd door FasePaneel. Bepaalt vanaf wanneer
   // "sinds start" telt.
   const [actieveFase, setActieveFase] = React.useState(null)
@@ -60,39 +54,6 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // kijkt; het verloop en de losse logs zijn om iets op te zoeken, en die
   // maakten de kolom onleesbaar.
   const [toonVerloop, setToonVerloop] = React.useState(false)
-  const [toonLogs, setToonLogs] = React.useState(false)
-  const ZICHTBAAR = 3
-
-  // Week-op-week: groepeer logs per kalenderweek (maandag-start), gemiddelde
-  // per week + verschil t.o.v. de week ervoor. Nieuwste week bovenaan.
-  const weeklyAverages = React.useMemo(() => {
-    if (!history || history.length === 0) return []
-    const mondayOf = (date) => {
-      const d = new Date(date); const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day
-      d.setDate(d.getDate() + diff); d.setHours(0, 0, 0, 0)
-      return d.toISOString().split('T')[0]
-    }
-    const map = {}
-    history.forEach(e => {
-      const w = parseFloat(e.weight)
-      if (!Number.isFinite(w)) return
-      const wk = mondayOf(e.date)
-      if (!map[wk]) map[wk] = []
-      map[wk].push(w)
-    })
-    const weeks = Object.keys(map).sort().map(wk => {
-      const arr = map[wk]
-      const avg = Math.round((arr.reduce((t, v) => t + v, 0) / arr.length) * 10) / 10
-      const end = new Date(wk); end.setDate(end.getDate() + 6)
-      return { start: wk, end: end.toISOString().split('T')[0], avg, count: arr.length }
-    })
-    return weeks
-      .map((w, i) => ({ ...w, diff: i > 0 ? Math.round((w.avg - weeks[i - 1].avg) * 10) / 10 : null }))
-      .reverse()
-  }, [history])
-  const laatsteLabel = history[0]?.date
-    ? `laatst ${formatDate(history[0].date)}`
-    : null
 
   const circumFields = [
     { key: 'waist_cm', label: 'Buik' }, { key: 'bicep_cm', label: 'Arm' },
@@ -146,114 +107,11 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
         {history.length > 0 && (
           <GewichtBandGrafiek client={client} history={history} fase={actieveFase} fases={alleFases} isMobile={isMobile} />
         )}
+        {/* De cijfers achter de grafiek. Eén tabel met eigen knoppen voor
+            week/dag en de periode — de uitklapper 'Alle metingen' met zijn
+            eigen week/dag-knop is daarin opgegaan. */}
         {history.length > 0 && (
-          <Uitklap
-            label="Alle metingen"
-            extra={laatsteLabel}
-            open={toonLogs}
-            onKlik={() => setToonLogs(v => !v)}
-            isMobile={isMobile}
-          />
-        )}
-        {history.length > 0 && toonLogs && (
-          <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              marginBottom: '0.375rem',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em' }}>
-                  Gewicht
-                </span>
-                {client.weekly_weight_goal != null && client.weekly_weight_goal !== '' && Number(client.weekly_weight_goal) !== 0 && (
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, padding: '0.05rem 0.25rem', letterSpacing: '-0.01em' }}>
-                    doel {Number(client.weekly_weight_goal) > 0 ? '+' : ''}{Number(client.weekly_weight_goal)}/wk
-                  </span>
-                )}
-              </div>
-              {/* Selectie: dag-op-dag of week-op-week */}
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 5, overflow: 'hidden' }}>
-                {[{ id: 'dag', label: 'Dag' }, { id: 'week', label: 'Week' }].map(opt => {
-                  const active = weightView === opt.id
-                  return (
-                    <button key={opt.id} onClick={(e) => { e.stopPropagation(); setWeightView(opt.id) }}
-                      style={{ padding: '0.15rem 0.5rem', background: active ? 'rgba(255,255,255,0.16)' : 'transparent', border: 'none', color: active ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '-0.01em', cursor: 'pointer', touchAction: 'manipulation' }}>
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* DAG-OP-DAG — alle metingen scrollbaar */}
-            {weightView === 'dag' && (
-              <div>
-                {(alleMetingen ? history : history.slice(0, ZICHTBAAR)).map((e, idx) => {
-                  // history is nieuwste-eerst → vorige meting (chronologisch) = idx+1
-                  const prev = history[idx + 1]
-                  const delta = prev && Number.isFinite(e.weight) && Number.isFinite(prev.weight)
-                    ? Math.round((e.weight - prev.weight) * 10) / 10 : null
-                  const deltaColor = delta === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(delta, client)
-                  return (
-                  <div key={`${e.date}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{formatDate(e.date)}</span>
-                      {e.is_friday_weighin && <span style={{ fontSize: '0.72rem', padding: '0.05rem 0.2rem', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', color: '#fff', fontWeight: '700' }}>VR</span>}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem' }}>
-                      <span style={{ fontSize: idx === 0 ? '0.85rem' : '0.78rem', fontWeight: idx === 0 ? 900 : 700, color: '#fff', opacity: idx === 0 ? 1 : 0.75 }}>{e.weight.toFixed(1)} kg</span>
-                      {delta !== null && delta !== 0 && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: deltaColor, minWidth: 34, textAlign: 'right' }}>{delta > 0 ? '+' : ''}{delta}</span>}
-                    </div>
-                  </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* WEEK-OP-WEEK — gemiddelde per week + verschil t.o.v. vorige week */}
-            {weightView === 'week' && (
-              <div>
-                {weeklyAverages.length === 0 ? (
-                  <div style={{ padding: '0.75rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.72rem' }}>Onvoldoende data</div>
-                ) : (alleMetingen ? weeklyAverages : weeklyAverages.slice(0, ZICHTBAAR)).map((w, idx) => {
-                  const diffColor = w.diff === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(w.diff, client)
-                  return (
-                    <div key={w.start} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{formatDate(w.start)} – {formatDate(w.end)}</span>
-                        <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>{w.count} meting{w.count === 1 ? '' : 'en'}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem' }}>
-                        <span style={{ fontSize: idx === 0 ? '0.88rem' : '0.8rem', fontWeight: 900, color: '#fff', opacity: idx === 0 ? 1 : 0.75 }}>{w.avg.toFixed(1)} kg</span>
-                        {w.diff !== null && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: diffColor, minWidth: 38, textAlign: 'right' }}>{w.diff > 0 ? '+' : ''}{w.diff}</span>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Uitklapper. Toont hoeveel er nog achter zit, zodat je niet hoeft
-                te gokken of het de moeite waard is. */}
-            {(() => {
-              const totaal = weightView === 'week' ? weeklyAverages.length : history.length
-              if (totaal <= ZICHTBAAR) return null
-              return (
-                <button
-                  onClick={() => setAlleMetingen(v => !v)}
-                  style={{
-                    width: '100%', marginTop: '0.4rem', padding: '0.4rem 0',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-                    background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                    fontSize: '0.78rem', fontWeight: 900, color: '#fff',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}>
-                  {alleMetingen ? 'Toon minder' : `Alle ${totaal} tonen`}
-                  {alleMetingen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-              )
-            })()}
-          </div>
+          <MetingenTabel client={client} history={history} fase={actieveFase} isMobile={isMobile} />
         )}
         {circumData?.latest && (
           <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
