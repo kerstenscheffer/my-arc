@@ -1,32 +1,47 @@
 // src/modules/call-planning/ClientCalls.jsx
-// v6.0 - Blue theme, full visual treatment, single booking action
-// No call flow/journey — just a clean styled page to book a call with Kersten
+//
+// Een call plannen met je coach. Twee soorten, want dat is de vraag die je
+// jezelf stelt voor je een moment kiest: even bijsturen, of ergens echt
+// doorheen? Die keuze staat hier vóór de agenda, niet erin verstopt.
+//
+// Elke soort is zijn eigen Calendly-event; de duur staat daar vast. Zet je hier
+// een andere tijd neer dan in Calendly, dan wint Calendly en klopt deze pagina
+// niet meer — dus de tekst hier is de omschrijving, de link is de waarheid.
 
 import useIsMobile from '../../hooks/useIsMobile'
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Calendar, X, ExternalLink, Phone, Clock, Video, ArrowRight } from 'lucide-react'
+import { Calendar, X, ExternalLink, Clock, Video, ArrowRight, Zap, MessageSquare } from 'lucide-react'
 
-const BLUE = {
-  primary: '#3b82f6',
-  dark: '#2563eb',
-  light: '#60a5fa',
-  border: 'rgba(59, 130, 246, 0.15)',
-  borderActive: 'rgba(59, 130, 246, 0.3)',
-  bg: 'rgba(59, 130, 246, 0.06)',
-  glow: 'rgba(59, 130, 246, 0.2)'
-}
+const LIJN = 'rgba(255,255,255,0.08)'
+const LIJN_ZACHT = 'rgba(255,255,255,0.05)'
 
-const CALENDLY_LINK = 'https://calendly.com/kerstenscheffer/kennismaking-doelstelling-call'
+const SOORTEN = [
+  {
+    id: 'kort',
+    titel: 'Korte call',
+    duur: '30 min',
+    omschrijving: 'Snelle check-in + bijsturing',
+    Icoon: Zap,
+    link: 'https://calendly.com/kerstenscheffer/60m-check-in-call-clone',
+  },
+  {
+    id: 'lang',
+    titel: 'Lange call',
+    duur: '60 min',
+    omschrijving: 'Diepere check-in + problemen oplossen',
+    Icoon: MessageSquare,
+    link: 'https://calendly.com/kerstenscheffer/kennismaking-doelstelling-call',
+  },
+]
 
-export default function ClientCalls({ db, clientInfo }) {
-  const [showBooking, setShowBooking] = useState(false)
-  const [bookingUrl, setBookingUrl] = useState('')
+export default function ClientCalls({ clientInfo }) {
+  const [boeking, setBoeking] = useState(null)   // { soort, url }
   const isMobile = useIsMobile()
 
-  // ─── Body scroll lock ───
+  // De pagina eronder mag niet meescrollen zolang de agenda openstaat.
   useEffect(() => {
-    if (!showBooking) return
+    if (!boeking) return
     const scrollY = window.scrollY
     document.body.style.position = 'fixed'
     document.body.style.top = `-${scrollY}px`
@@ -37,7 +52,7 @@ export default function ClientCalls({ db, clientInfo }) {
       document.documentElement.style.height = '100%'
     }
     return () => {
-      const saved = document.body.style.top
+      const bewaard = document.body.style.top
       document.body.style.position = ''
       document.body.style.top = ''
       document.body.style.width = ''
@@ -46,254 +61,148 @@ export default function ClientCalls({ db, clientInfo }) {
         document.documentElement.style.overflow = ''
         document.documentElement.style.height = ''
       }
-      window.scrollTo(0, parseInt(saved || '0') * -1)
+      window.scrollTo(0, parseInt(bewaard || '0') * -1)
     }
-  }, [showBooking, isMobile])
+  }, [boeking, isMobile])
 
-  // ─── Build Calendly URL ───
-  const openBooking = () => {
+  useEffect(() => {
+    const opToets = (e) => { if (e.key === 'Escape') setBoeking(null) }
+    window.addEventListener('keydown', opToets)
+    return () => window.removeEventListener('keydown', opToets)
+  }, [])
+
+  const open = (soort) => {
     const email = encodeURIComponent(clientInfo?.email || '')
-    const name = encodeURIComponent(`${clientInfo?.first_name || ''} ${clientInfo?.last_name || ''}`.trim())
-    const sep = CALENDLY_LINK.includes('?') ? '&' : '?'
-    const url = `${CALENDLY_LINK}${sep}hide_landing_page_details=1&hide_gdpr_banner=1&background_color=1a1a1a&text_color=ffffff&primary_color=3b82f6&email=${email}&name=${name}`
-    setBookingUrl(url)
-    setShowBooking(true)
+    const naam = encodeURIComponent(`${clientInfo?.first_name || ''} ${clientInfo?.last_name || ''}`.trim())
+    const sep = soort.link.includes('?') ? '&' : '?'
+    const url = `${soort.link}${sep}hide_landing_page_details=1&hide_gdpr_banner=1`
+      + `&background_color=0a0a0a&text_color=ffffff&primary_color=ffffff`
+      + `&email=${email}&name=${naam}`
+    setBoeking({ soort, url })
   }
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+    <div style={{ maxWidth: 900, margin: '0 auto' }}>
 
-      {/* ═══ HEADER ═══ */}
-      <div style={{
-        padding: isMobile ? '0.75rem 0' : '1rem 0',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-      }}>
+      <div style={{ padding: isMobile ? '0.75rem 0 1rem' : '1rem 0 1.25rem' }}>
         <h1 style={{
-          fontSize: isMobile ? '1.25rem' : '1.5rem',
-          fontWeight: '800',
-          color: '#fff',
-          margin: 0,
-          letterSpacing: '-0.02em'
+          fontSize: isMobile ? '1.35rem' : '1.6rem', fontWeight: 900, color: '#fff',
+          margin: 0, letterSpacing: '-0.03em',
         }}>
-          Coaching Calls
+          Coaching calls
         </h1>
         <p style={{
-          fontSize: isMobile ? '0.65rem' : '0.7rem',
-          color: 'rgba(255, 255, 255, 0.25)',
-          margin: '0.15rem 0 0 0',
-          fontWeight: '600'
+          fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 700,
+          color: 'rgba(255,255,255,0.35)', margin: '0.3rem 0 0',
         }}>
-          Plan een call in met je coach
+          Waar heb je nu wat aan?
         </p>
       </div>
 
-      {/* PageVideoWidget gemigreerd naar centrale WidgetSidebar in ClientDashboard. */}
-
-      {/* ═══ CALL BOOKING CARD ═══ */}
+      {/* Twee soorten naast elkaar op een breed scherm, onder elkaar op een
+          telefoon. Even zwaar in beeld: het is een keuze, geen aanbeveling. */}
       <div style={{
-        marginTop: isMobile ? '0.25rem' : '0.5rem',
-        background: '#0a0a0a',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
-        borderRadius: isMobile ? '10px' : '12px',
-        overflow: 'hidden',
-        transform: 'translateZ(0)'
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+        gap: isMobile ? 10 : 12,
       }}>
-        {/* Top accent line */}
-        <div style={{
-          height: '2px',
-          background: `linear-gradient(90deg, transparent 0%, ${BLUE.primary} 50%, transparent 100%)`,
-          opacity: 0.4
-        }} />
-
-        {/* Card header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-        }}>
-          <div style={{
-            width: isMobile ? '30px' : '34px',
-            height: isMobile ? '30px' : '34px',
-            borderRadius: '8px',
-            background: BLUE.bg,
-            border: `1px solid ${BLUE.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginRight: isMobile ? '0.6rem' : '0.75rem',
-            flexShrink: 0
-          }}>
-            <Phone size={isMobile ? 14 : 16} color={BLUE.primary} strokeWidth={2.5} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              fontWeight: '700',
-              color: '#fff'
-            }}>
-              Plan een coaching call met Kersten
-            </div>
-          </div>
-        </div>
-
-        {/* Info rows — flush stat bar style */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-        }}>
-          <InfoCol
-            icon={<Clock size={12} color={BLUE.light} />}
-            label="DUUR"
-            value="30 min"
-            isMobile={isMobile}
-            borderRight
-          />
-          <InfoCol
-            icon={<Video size={12} color={BLUE.light} />}
-            label="LOCATIE"
-            value="Zoom"
-            isMobile={isMobile}
-            borderRight
-          />
-          <InfoCol
-            icon={<Calendar size={12} color={BLUE.light} />}
-            label="WANNEER"
-            value="Jij kiest"
-            isMobile={isMobile}
-          />
-        </div>
-
-        {/* Description */}
-        <div style={{
-          padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-        }}>
-          <p style={{
-            fontSize: isMobile ? '0.72rem' : '0.78rem',
-            color: 'rgba(255, 255, 255, 0.35)',
-            margin: 0,
-            lineHeight: 1.5,
-            fontWeight: '500'
-          }}>
-            Kies een moment dat jou uitkomt. Na het inplannen ontvang je automatisch een Zoom link via e-mail.
-          </p>
-        </div>
-
-        {/* CTA button row */}
-        <div style={{
-          padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem'
-        }}>
-          <button
-            onClick={openBooking}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.75rem' : '0.875rem',
-              background: BLUE.primary,
-              border: 'none',
-              borderRadius: '8px',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              cursor: 'pointer',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '800',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              minHeight: '48px',
-              transition: 'all 0.2s ease',
-              transform: 'translateZ(0)'
-            }}
-            onTouchStart={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(0.98)' }}
-            onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(1)' }}
-          >
-            <Calendar size={16} strokeWidth={2.5} />
-            Call Inplannen
-            <ArrowRight size={16} strokeWidth={2.5} />
-          </button>
-        </div>
+        {SOORTEN.map(soort => (
+          <SoortKaart key={soort.id} soort={soort} isMobile={isMobile} onKies={() => open(soort)} />
+        ))}
       </div>
 
-      {/* ═══ BOOKING MODAL — Calendly embed via createPortal ═══ */}
-      {showBooking && createPortal(
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        marginTop: isMobile ? '0.9rem' : '1.1rem',
+        padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
+        background: 'rgba(255,255,255,0.03)',
+        border: `1px solid ${LIJN_ZACHT}`,
+        borderRadius: 12,
+      }}>
+        <Video size={14} color="rgba(255,255,255,0.4)" strokeWidth={2.4} style={{ flexShrink: 0 }} />
+        <span style={{
+          fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 700,
+          color: 'rgba(255,255,255,0.35)', lineHeight: 1.45,
+        }}>
+          Kies een moment dat jou uitkomt. Na het inplannen krijg je automatisch een Zoom-link via e-mail.
+        </span>
+      </div>
+
+      {boeking && createPortal(
         <div
-          onClick={() => setShowBooking(false)}
+          onClick={() => setBoeking(null)}
           style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0, 0, 0, 0.92)',
-            zIndex: 9999,
-            display: 'flex', flexDirection: 'column',
-            animation: 'fadeIn 0.2s ease'
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
+            zIndex: 9999, display: 'flex', flexDirection: 'column',
+            animation: 'fadeIn 0.2s ease',
           }}
         >
-          {/* Header */}
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
-              borderBottom: `1px solid ${BLUE.border}`,
-              flexShrink: 0
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              padding: isMobile
+                ? 'calc(env(safe-area-inset-top, 0px) + 0.75rem) 1rem 0.75rem'
+                : '1rem 1.5rem',
+              borderBottom: `1px solid ${LIJN}`, flexShrink: 0,
             }}
           >
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={{
-                fontSize: isMobile ? '0.5rem' : '0.55rem',
-                fontWeight: '700', color: BLUE.primary,
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-                marginBottom: '0.1rem'
-              }}>Call inplannen</div>
-              <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff' }}>
-                Coaching Call met Kersten
+                fontSize: '0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
+                textTransform: 'uppercase', letterSpacing: '0.12em',
+              }}>
+                {boeking.soort.duur} · {boeking.soort.omschrijving}
+              </div>
+              <div style={{
+                fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 900, color: '#fff',
+                letterSpacing: '-0.02em', marginTop: 2,
+              }}>
+                {boeking.soort.titel}
               </div>
             </div>
             <button
-              onClick={() => setShowBooking(false)}
+              onClick={() => setBoeking(null)}
+              aria-label="Sluiten"
               style={{
-                width: '36px', height: '36px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '8px',
-                color: 'rgba(255, 255, 255, 0.4)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 38, height: 38, flexShrink: 0, borderRadius: 10,
+                background: 'rgba(255,255,255,0.05)', border: `1px solid ${LIJN}`,
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                minHeight: '44px', minWidth: '44px'
               }}
             >
-              <X size={18} />
+              <X size={18} strokeWidth={3} />
             </button>
           </div>
 
-          {/* Calendly iframe — dark bg, email prefilled */}
           <div onClick={(e) => e.stopPropagation()} style={{ flex: 1, overflow: 'hidden' }}>
             <iframe
-              src={bookingUrl}
-              style={{ width: '100%', height: '100%', border: 'none', background: '#1a1a1a' }}
-              title="Calendly Scheduling"
+              src={boeking.url}
+              style={{ width: '100%', height: '100%', border: 'none', background: '#0a0a0a' }}
+              title="Calendly"
               loading="lazy"
             />
           </div>
 
-          {/* Fallback link */}
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              padding: isMobile ? '0.6rem 1rem' : '0.75rem 1.5rem',
-              borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0
+              padding: isMobile
+                ? '0.6rem 1rem calc(env(safe-area-inset-bottom, 0px) + 0.6rem)'
+                : '0.75rem 1.5rem',
+              borderTop: `1px solid ${LIJN_ZACHT}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}
           >
             <a
-              href={bookingUrl}
+              href={boeking.url}
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                display: 'flex', alignItems: 'center', gap: '0.3rem',
-                color: 'rgba(255, 255, 255, 0.25)',
-                fontSize: isMobile ? '0.65rem' : '0.7rem',
-                fontWeight: '600', textDecoration: 'none'
+                display: 'flex', alignItems: 'center', gap: 5,
+                color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontWeight: 800,
+                textDecoration: 'none',
               }}
             >
               <ExternalLink size={12} />
@@ -311,40 +220,68 @@ export default function ClientCalls({ db, clientInfo }) {
   )
 }
 
-
-// ─── INFO COLUMN (flush stat bar) ───
-function InfoCol({ icon, label, value, isMobile, borderRight }) {
+function SoortKaart({ soort, isMobile, onKies }) {
+  const { Icoon } = soort
   return (
-    <div style={{
-      flex: 1,
-      padding: isMobile ? '0.5rem 0.6rem' : '0.6rem 0.75rem',
-      borderRight: borderRight ? '1px solid rgba(255, 255, 255, 0.04)' : 'none',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '0.2rem'
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '0.25rem'
-      }}>
-        {icon}
+    <button
+      onClick={onKies}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'stretch', textAlign: 'left',
+        padding: isMobile ? '0.9rem 1rem' : '1.1rem 1.15rem',
+        background: 'rgba(255,255,255,0.04)',
+        border: `1px solid ${LIJN}`,
+        borderRadius: 16, cursor: 'pointer', fontFamily: 'inherit',
+        transition: 'background 0.18s ease, border-color 0.18s ease',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+        e.currentTarget.style.borderColor = LIJN
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icoon size={15} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0 }} />
         <span style={{
-          fontSize: isMobile ? '0.4rem' : '0.45rem',
-          fontWeight: '700',
-          color: 'rgba(255, 255, 255, 0.15)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em'
+          flex: 1, fontSize: isMobile ? '1rem' : '1.05rem', fontWeight: 900,
+          color: '#fff', letterSpacing: '-0.02em',
         }}>
-          {label}
+          {soort.titel}
+        </span>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '0.2rem 0.5rem', borderRadius: 999,
+          background: 'rgba(255,255,255,0.08)',
+          fontSize: '0.64rem', fontWeight: 900, color: '#fff',
+          fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+        }}>
+          <Clock size={10} strokeWidth={3} />
+          {soort.duur}
         </span>
       </div>
-      <div style={{
-        fontSize: isMobile ? '0.8rem' : '0.88rem',
-        fontWeight: '800',
-        color: '#fff',
-        letterSpacing: '-0.01em'
+
+      <p style={{
+        margin: '0.5rem 0 0.9rem',
+        fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 700,
+        color: 'rgba(255,255,255,0.45)', lineHeight: 1.45,
       }}>
-        {value}
-      </div>
-    </div>
+        {soort.omschrijving}
+      </p>
+
+      <span style={{
+        marginTop: 'auto',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        minHeight: 44, borderRadius: 12,
+        background: '#fff', color: '#0a0a0a',
+        fontSize: '0.82rem', fontWeight: 900, letterSpacing: '-0.01em',
+      }}>
+        <Calendar size={14} strokeWidth={3} />
+        Inplannen
+        <ArrowRight size={14} strokeWidth={3} />
+      </span>
+    </button>
   )
 }
