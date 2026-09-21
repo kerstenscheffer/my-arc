@@ -417,9 +417,9 @@ export default function AgendaView({
                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                 padding: '0.45rem 0.55rem',
                 background: isArmed ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.03)',
-                border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.05)',
+                border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.08)',
                 borderLeft: `3px solid ${color}`,
-                borderRadius: 6,
+                borderRadius: 0,
                 cursor: sleepbaar ? 'grab' : 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
@@ -644,14 +644,14 @@ export default function AgendaView({
           top: `${(h - START_HOUR) * HOUR_PX}px`,
           left: 0, right: 0,
           height: '0px',
-          borderTop: '1px dashed rgba(255,255,255,0.05)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
         }}>
           <span style={{
             position: 'absolute',
             top: '-7px', left: '-44px',
-            fontSize: '0.6rem',
-            color: 'rgba(255,255,255,0.3)',
-            fontWeight: '600',
+            fontSize: '0.62rem',
+            color: 'rgba(255,255,255,0.45)',
+            fontWeight: '700',
             width: '38px',
             textAlign: 'right',
           }}>
@@ -693,9 +693,9 @@ export default function AgendaView({
             background: isCoaching
               ? `${color}26`
               : 'repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 6px, rgba(255,255,255,0.05) 6px 12px)',
-            border: isCoaching ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.06)',
-            borderLeft: isCoaching ? `3px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
-            borderRadius: '4px',
+            border: isCoaching ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.08)',
+            borderLeft: isCoaching ? `3px solid ${color}` : '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 0,
             padding: height >= 26 ? '0.2rem 0.4rem' : '0.1rem',
             color: isCoaching ? '#cbd5e1' : 'rgba(255,255,255,0.45)',
             fontSize: '0.65rem', fontWeight: '700',
@@ -818,11 +818,11 @@ export default function AgendaView({
           right: maxCols > 1 ? `calc(${(maxCols - 1 - col) * (100 / maxCols)}% + 2px)` : '3px',
           height: `${Math.max(effectiveDur, 22)}px`,
           background: isCompletedBlock
-            ? 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.08) 100%)'
-            : `linear-gradient(135deg, ${color}cc 0%, ${color}aa 100%)`,
-          border: isCompletedBlock ? '1px solid rgba(16,185,129,0.55)' : `1px solid ${color}bb`,
+            ? 'rgba(16,185,129,0.15)'
+            : '#161616',
+          border: isCompletedBlock ? `1px solid rgba(16,185,129,0.4)` : '1px solid rgba(255,255,255,0.09)',
           borderLeft: `3px solid ${isCompletedBlock ? '#10b981' : color}`,
-          borderRadius: '6px',
+          borderRadius: 0,
           padding: effectiveDur < 30 ? '0.15rem 0.4rem' : '0.3rem 0.5rem',
           color: '#fff',
           fontSize: effectiveDur < 30 ? '0.6rem' : '0.7rem',
@@ -948,7 +948,7 @@ export default function AgendaView({
     <div style={{
       display: 'flex', flexDirection: 'column',
       background: '#0a0a0a',
-      minHeight: '600px',
+      minHeight: `${GRID_HEIGHT + 120}px`,
     }}>
       {/* ── Mobile compact day header (replaces separate week-nav + day tabs) ── */}
       {isMobile && (
@@ -1011,7 +1011,7 @@ export default function AgendaView({
       {!isMobile && <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0.625rem 1rem',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
         gap: '0.5rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -1020,7 +1020,7 @@ export default function AgendaView({
             disabled={isCurrentWeek}
             style={{
               ...navBtnStyle,
-              width: 'auto', padding: '0 0.75rem', borderRadius: 999,
+              width: 'auto', padding: '0 0.75rem', borderRadius: 0,
               opacity: isCurrentWeek ? 0.45 : 1,
               fontSize: '0.68rem', fontWeight: 800,
               background: isCurrentWeek ? 'rgba(255,255,255,0.04)' : '#fff',
@@ -1082,7 +1082,7 @@ export default function AgendaView({
               minHeight: 30, padding: '0 0.75rem',
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 999,
+              borderRadius: 0,
               color: 'rgba(255,255,255,0.7)',
               fontSize: '0.68rem', fontWeight: 800,
               cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
@@ -1150,8 +1150,10 @@ export default function AgendaView({
           {!isMobile && <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${visibleDays.length}, 1fr)`,
-            gap: '4px',
-            marginBottom: '0.5rem',
+            gap: 0,
+            marginBottom: 0,
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderBottom: 0,
             minWidth: `${visibleDays.length * 90}px`,
           }}>
             {visibleDays.map(day => {
@@ -1166,20 +1168,23 @@ export default function AgendaView({
                   style={{
                     textAlign: 'center',
                     padding: '0.4rem 0.25rem',
-                    borderRadius: '6px',
-                    background: isToday ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isToday ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                    borderRadius: 0,
+                    background: isToday ? 'rgba(16,185,129,0.06)' : 'rgba(0,0,0,0.3)',
+                    borderBottom: `1px solid rgba(255,255,255,0.08)`,
+                    borderRight: `1px solid rgba(255,255,255,0.08)`,
                     color: isToday ? '#10b981' : '#fff',
-                    fontSize: '0.7rem',
-                    fontWeight: '800',
-                    letterSpacing: '0.02em',
+                    fontSize: '0.72rem',
+                    fontWeight: '900',
+                    letterSpacing: '0.01em',
+                    textTransform: 'uppercase',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
                   }}
                 >
-                  <span>{isMobile ? day.label : day.short}</span>
+                  <span style={{ opacity: isToday ? 1 : 0.7 }}>{isMobile ? day.label : day.short}</span>
                   <span style={{
-                    fontSize: '0.6rem', fontWeight: 600,
+                    fontSize: '0.6rem', fontWeight: 700,
                     color: isToday ? '#10b981' : 'rgba(255,255,255,0.45)',
+                    textTransform: 'none',
                   }}>
                     {dateNum}
                   </span>
@@ -1193,7 +1198,8 @@ export default function AgendaView({
             position: 'relative',
             display: 'grid',
             gridTemplateColumns: `repeat(${visibleDays.length}, 1fr)`,
-            gap: '4px',
+            gap: 0,
+            border: '1px solid rgba(255,255,255,0.08)',
             minWidth: isMobile ? 'auto' : `${visibleDays.length * 90}px`,
             height: `${GRID_HEIGHT}px`,
           }}>
@@ -1254,12 +1260,11 @@ export default function AgendaView({
                     position: 'relative',
                     background: isOverDay
                       ? 'rgba(16,185,129,0.04)'
-                      : 'rgba(255,255,255,0.015)',
-                    border: `1px solid ${isOverDay ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.04)'}`,
-                    borderRadius: '6px',
+                      : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${isOverDay ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: 0,
                     overflow: 'hidden',
                     cursor: 'crosshair',
-                    backgroundImage: `repeating-linear-gradient(to bottom, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent ${HOUR_PX / 6}px)`,
                     // Sta verticaal pannen expliciet toe — zonder dit
                     // claimt de tap-handler de gesture op iOS en blijft
                     // de scroll plakken.
@@ -1299,7 +1304,7 @@ const navBtnStyle = {
   width: 30, height: 30,
   background: 'rgba(255,255,255,0.05)',
   border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 9,
+  borderRadius: 0,
   color: 'rgba(255,255,255,0.65)',
   cursor: 'pointer',
   fontFamily: 'inherit',
