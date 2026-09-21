@@ -346,11 +346,14 @@ export function advies(laatste, config) {
   // Welke kant je bijstuurt hangt af van de richting, niet van de status. Te
   // snel afvallen kost spiermassa (dus eten erbij); te snel aankomen is vooral
   // vet (dus eten eraf). Dat zijn tegengestelde adviezen bij dezelfde status.
+  // `kcal` is de stap die we voorstellen, in kcal per dag, met het teken erin.
+  // Het midden van de bandbreedte uit de richtlijn: daar begin je mee, en na
+  // twee weken meten weet je of het genoeg was.
   if (laatste.status === 'TE_SNEL') {
     return aankomen
-      ? { toon: 'let_op', tekst: 'Twee weken te snel aangekomen. Dit wordt vooral vet: 100-200 kcal eraf, of meer stappen — niet allebei.' }
+      ? { toon: 'let_op', kcal: -150, tekst: 'Twee weken te snel aangekomen. Dit wordt vooral vet: 100-200 kcal eraf, of meer stappen — niet allebei.' }
       : {
-        toon: 'let_op',
+        toon: 'let_op', kcal: 200,
         tekst: config.kwetsbaar
           ? 'Twee weken te snel, en deze klant is lean of ouder: 150-250 kcal erbij, en check de eiwitinname.'
           : 'Twee weken te snel. 150-250 kcal erbij om spierverlies te voorkomen.',
@@ -358,8 +361,20 @@ export function advies(laatste, config) {
   }
   // TE_LANGZAAM
   return aankomen
-    ? { toon: 'let_op', tekst: 'Twee weken te langzaam aangekomen. Check of hij zijn calorieën haalt; zo ja, 150-250 kcal erbij.' }
-    : { toon: 'let_op', tekst: 'Twee weken te langzaam. Check eerst de trouw (logt hij echt alles?); klopt dat, dan 100-200 kcal eraf óf meer stappen — niet allebei.' }
+    ? { toon: 'let_op', kcal: 200, tekst: 'Twee weken te langzaam aangekomen. Check of hij zijn calorieën haalt; zo ja, 150-250 kcal erbij.' }
+    : { toon: 'let_op', kcal: -150, tekst: 'Twee weken te langzaam. Check eerst de trouw (logt hij echt alles?); klopt dat, dan 100-200 kcal eraf óf meer stappen — niet allebei.' }
+}
+
+// Van weektempo naar dagelijks tekort of surplus.
+//
+// Een kilo lichaamsvet is ruwweg 7700 kcal, dus een kilo per week is 1100 kcal
+// per dag. Bij een build klopt die som maar half — je bouwt ook spier en dat
+// kost minder — maar als startpunt voor het gesprek is hij bruikbaar, en de
+// coach past hem toch aan.
+export const kcalPerWeektempo = (kgPerWeek) => {
+  const n = Number(kgPerWeek)
+  if (!Number.isFinite(n) || n === 0) return 0
+  return Math.round((n * 7700 / 7) / 25) * 25
 }
 
 export const STATUS_TEKST = {

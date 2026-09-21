@@ -152,7 +152,9 @@ function WeekTabel({ weken, startDatum, isMobile }) {
   )
 }
 
-export default function GewichtBandGrafiek({ client, history, fase = null, fases = [], onNieuweFase = null, isMobile }) {
+export default function GewichtBandGrafiek({
+  client, history, fase = null, fases = [], onNieuweFase = null, onBijsturen = null, isMobile,
+}) {
   const [uitleg, setUitleg] = useState(false)
   const [weergave, setWeergave] = useState('grafiek')   // 'grafiek' | 'tabel'
   // Welke fase staat er in beeld. null = de lopende fase (of, zonder fases, de
@@ -489,6 +491,24 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
             }}>
               {raad.tekst}
             </div>
+          )}
+
+          {/* Van oordeel naar handeling in één klik. Zet niets vast: het opent
+              het macro-paneel met dit voorstel klaar, jij bevestigt. */}
+          {raad?.kcal && onBijsturen && (
+            <button
+              onClick={() => onBijsturen(raad.kcal)}
+              style={{
+                marginTop: 8, minHeight: 34, padding: '0 0.7rem', borderRadius: 9,
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                background: '#fff', border: 'none', color: '#0a0a0a',
+                fontSize: '0.74rem', fontWeight: 900, fontFamily: 'inherit',
+                cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Macro's bijstellen · {raad.kcal > 0 ? '+' : ''}{raad.kcal} kcal
+            </button>
           )}
 
           {/* Waar hij staat is iets anders dan hoe hard hij gaat. Loopt iemand

@@ -358,8 +358,35 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
   )
 }
 
-export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobile }) {
+export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobile, voorstel = null, onVoorstelWeg }) {
   const [meerDoelVelden, setMeerDoelVelden] = useState(false)
+  const [bezigVoorstel, setBezigVoorstel] = useState(false)
+
+  // Het voorstel uit de coaching-band: zoveel kcal erbij of eraf. Toepassen
+  // verandert alleen het tekort; de macro's herberekent de coach daarna zelf
+  // met de knop in het paneel hieronder. Automatisch doorrekenen zou een
+  // wijziging op de borden van de klant zetten die niemand heeft gezien.
+  const huidigSurplus = Number.isFinite(parseFloat(client?.surplus)) ? parseFloat(client.surplus) : 0
+  // clients.surplus is een integer in de database; een halve kcal weigert
+  // PostgREST en dan faalt de hele update.
+  const nieuwSurplus = Math.round(huidigSurplus + (Number(voorstel) || 0))
+
+  const pasVoorstelToe = async () => {
+    if (!db?.supabase || !client?.id || !voorstel) return
+    setBezigVoorstel(true)
+    try {
+      const before = pickTrackedFields(client)
+      const { error } = await db.supabase.from('clients').update({ surplus: nieuwSurplus }).eq('id', client.id)
+      if (error) throw error
+      onClientUpdate?.({ surplus: nieuwSurplus })
+      await logClientChanges({ db, clientId: client.id, before, after: { surplus: nieuwSurplus }, source: 'coaching_band_voorstel' })
+      onVoorstelWeg?.()
+    } catch (e) {
+      console.error('Voorstel toepassen mislukt:', e)
+    } finally {
+      setBezigVoorstel(false)
+    }
+  }
 
   // Zelfde opslagpad als de gegevens-tab: één veld tegelijk, met een regel in
   // het logboek zodat later terug te zien is wie wat wanneer veranderde.
@@ -381,6 +408,38 @@ export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobil
 
   return (
     <div>
+      {voorstel ? (
+        <div style={{
+          margin: isMobile ? '0.6rem 0.85rem' : '0.7rem 1rem',
+          padding: '0.7rem 0.8rem', borderRadius: 12,
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.18)',
+        }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff' }}>
+            Voorstel uit de gewichtsgrafiek
+          </div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.4 }}>
+            Tekort van {huidigSurplus > 0 ? '+' : ''}{huidigSurplus} naar {nieuwSurplus > 0 ? '+' : ''}{nieuwSurplus} kcal per dag.
+            Daarna zelf de macro's herberekenen hieronder.
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button onClick={pasVoorstelToe} disabled={bezigVoorstel} style={{
+              minHeight: 34, padding: '0 0.7rem', borderRadius: 9, border: 'none',
+              background: '#fff', color: '#0a0a0a', fontSize: '0.74rem', fontWeight: 900,
+              fontFamily: 'inherit', cursor: 'pointer', opacity: bezigVoorstel ? 0.6 : 1,
+            }}>
+              {bezigVoorstel ? 'Bezig…' : 'Tekort aanpassen'}
+            </button>
+            <button onClick={onVoorstelWeg} style={{
+              minHeight: 34, padding: '0 0.7rem', borderRadius: 9,
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+              color: 'rgba(255,255,255,0.5)', fontSize: '0.74rem', fontWeight: 800,
+              fontFamily: 'inherit', cursor: 'pointer',
+            }}>
+              Niet nu
+            </button>
+          </div>
+        </div>
+      ) : null}
         {/* Primair doel staat bovenaan zodat het MacroRulesBlock-paneel
             er meteen op kan reageren (de modus stuurt de regels). */}
         <DoelRegel client={client} isMobile={isMobile} onSave={handleFieldSave} />

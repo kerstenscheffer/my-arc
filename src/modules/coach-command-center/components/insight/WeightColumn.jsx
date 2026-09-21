@@ -61,6 +61,9 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // Doel en macro's: dicht bij binnenkomst, want je opent deze kolom om te
   // kijken. Pas als de band zegt dat er iets moet veranderen klap je 'm open.
   const [toonDoelen, setToonDoelen] = React.useState(false)
+  // Het voorstel uit de band: hoeveel kcal erbij of eraf. Wordt getoond boven
+  // het macro-paneel, en pas toegepast als je erop drukt.
+  const [voorstel, setVoorstel] = React.useState(null)
 
   const circumFields = [
     { key: 'waist_cm', label: 'Buik' }, { key: 'bicep_cm', label: 'Arm' },
@@ -117,6 +120,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           <GewichtBandGrafiek
             client={client} history={history} fase={actieveFase} fases={alleFases}
             onNieuweFase={() => setNieuweFase(n => n + 1)}
+            onBijsturen={(kcal) => { setVoorstel(kcal); setToonDoelen(true) }}
             isMobile={isMobile}
           />
         )}
@@ -130,7 +134,10 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           isMobile={isMobile}
         />
         {toonDoelen && (
-          <DoelenMacrosPaneel client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile} />
+          <DoelenMacrosPaneel
+            client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile}
+            voorstel={voorstel} onVoorstelWeg={() => setVoorstel(null)}
+          />
         )}
 
         {/* De cijfers achter de grafiek. Eén tabel met eigen knoppen voor

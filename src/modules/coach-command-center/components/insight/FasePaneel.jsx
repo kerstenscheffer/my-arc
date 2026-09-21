@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react'
 import { Flag, Plus, Check, X } from 'lucide-react'
 import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/utils/fase'
-import { maakConfig } from '../../../weight-tracker/utils/coachingBand'
+import { maakConfig, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'
 
 const vandaag = () => new Date().toISOString().split('T')[0]
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -98,6 +98,9 @@ export default function FasePaneel({
       doel_gewicht: '',
       tempo_min_kg: '',
       tempo_max_kg: '',
+      // Het tekort of surplus dat bij dit weektempo hoort. Voorstel, geen wet:
+      // de coach ziet het staan en past het aan voordat hij opslaat.
+      surplus: String(kcalPerWeektempo(huidige?.doel === 'cut' ? 0.25 : -0.5)),
     })
   }
 
@@ -137,6 +140,11 @@ export default function FasePaneel({
           : nieuw.doel === 'cut' ? 'fat_loss'
           : nieuw.doel === 'recomp' ? 'recomp' : 'maintenance',
         weekly_weight_goal: rij.week_doel_kg,
+        // Het tekort voedt de macro-berekening. Leeg laten zou de oude waarde
+        // van een vorige fase laten staan, en dan rekent het macro-paneel nog
+        // met de cut terwijl de build begonnen is.
+        ...(nieuw.surplus !== '' && Number.isFinite(Number(nieuw.surplus))
+          ? { surplus: Math.round(Number(nieuw.surplus)) } : {}),
         start_weight: rij.start_gewicht,
         ...(rij.doel_gewicht ? { target_weight: rij.doel_gewicht, goal_weight: rij.doel_gewicht } : {}),
       }
@@ -235,8 +243,16 @@ export default function FasePaneel({
               zet={v => setNieuw(n => ({ ...n, started_on: v }))} isMobile={isMobile} />
             <Veld label="Startgewicht" type="number" suffix="kg" waarde={nieuw.start_gewicht}
               zet={v => setNieuw(n => ({ ...n, start_gewicht: v }))} isMobile={isMobile} />
+            {/* Tempo en tekort horen bij elkaar: verander je het tempo, dan
+                schuift het voorgestelde tekort mee. Heb je het tekort zelf al
+                aangeraakt, dan blijft het staan. */}
             <Veld label="Per week" type="number" suffix="kg" stap="0.05" waarde={nieuw.week_doel_kg}
-              zet={v => setNieuw(n => ({ ...n, week_doel_kg: v }))} isMobile={isMobile} />
+              zet={v => setNieuw(n => ({
+                ...n, week_doel_kg: v,
+                surplus: n.surplusAangeraakt ? n.surplus : String(kcalPerWeektempo(v)),
+              }))} isMobile={isMobile} />
+            <Veld label="Tekort/surplus" type="number" suffix="kcal/dag" stap="25" waarde={nieuw.surplus}
+              zet={v => setNieuw(n => ({ ...n, surplus: v, surplusAangeraakt: true }))} isMobile={isMobile} />
             <Veld label="Doelgewicht" type="number" suffix="kg" waarde={nieuw.doel_gewicht}
               zet={v => setNieuw(n => ({ ...n, doel_gewicht: v }))} isMobile={isMobile} optioneel />
           </div>
