@@ -13,11 +13,17 @@
 // kcal of vijf gram. Zo doe je "iets minder" in één beweging, zonder het hele
 // getal opnieuw te typen.
 //
-// Wijzigingen blijven eerst staan als concept; pas de opslaan-knop schrijft ze
-// weg, in één keer. Bewust geen herberekening van de rest — verander je de
-// kcal, dan blijven de grammen staan tot je ze zelf bijwerkt of het paneel
-// hieronder laat doorrekenen. Automatisch meerekenen zet drie getallen op het
-// bord van de klant terwijl je er één aanraakte.
+// De vier getallen hangen aan elkaar, en dat rekenen we meteen door:
+//
+//   kcal aangepast        → koolhydraten vangen het verschil op. Eiwit en vet
+//                           zijn regels per kilo lichaamsgewicht; die horen
+//                           niet te bewegen omdat je een paar honderd kcal
+//                           bijstelt.
+//   eiwit of vet aangepast → kcal schuift mee (de som van de macro's).
+//   koolhydraten aangepast → kcal schuift mee.
+//
+// Alles blijft eerst concept; pas de opslaan-knop schrijft het weg, in één
+// keer. Zo staat er nooit een halve wijziging op het bord van de klant.
 
 import { useState } from 'react'
 import { Flame, Egg, Wheat, Droplet, Check, X } from 'lucide-react'
@@ -113,6 +119,23 @@ export default function MacroRingen({ client, db, onClientUpdate, isMobile }) {
   const [openVeld, setOpenVeld] = useState(null)
 
   const opKlant = Object.fromEntries(RINGEN.map(r => [r.veld, Math.round(Number(client?.[r.veld]) || 0)]))
+
+  // Eén draai aan een wiel, en wat daaruit volgt voor de rest.
+  const herbereken = (veld, nieuw, huidig) => {
+    const set = { ...huidig, [veld]: nieuw }
+    if (veld === 'target_calories') {
+      // Koolhydraten zijn de restpost: wat er overblijft na eiwit en vet.
+      // Onder nul kan niet — dan is het kcal-doel simpelweg te laag voor deze
+      // eiwit- en vetregels, en blijven de koolhydraten op nul staan.
+      const rest = nieuw - set.target_protein * 4 - set.target_fat * 9
+      set.target_carbs = Math.max(0, Math.round(rest / 4))
+    } else {
+      set.target_calories = Math.round(
+        set.target_protein * 4 + set.target_carbs * 4 + set.target_fat * 9
+      )
+    }
+    return set
+  }
   const waarden = { ...opKlant, ...concept }
   const gewijzigd = RINGEN.filter(r => concept[r.veld] != null && concept[r.veld] !== opKlant[r.veld])
 
@@ -216,7 +239,16 @@ export default function MacroRingen({ client, db, onClientUpdate, isMobile }) {
             min={open.min} max={open.max} stap={open.stap}
             eenheid={open.eenheid === 'kcal' ? 'kcal' : 'g'}
             kleur={open.kleur}
-            onKies={(v) => setConcept(c => ({ ...c, [open.veld]: v }))}
+            onKies={(v) => setConcept(c => {
+              const huidig = { ...opKlant, ...c }
+              const set = herbereken(open.veld, v, huidig)
+              // Alleen wat echt anders is dan wat er op de klant staat blijft
+              // als concept staan; anders zou een heen-en-weer-draai vier
+              // 'wijzigingen' opleveren die niets veranderen.
+              return Object.fromEntries(
+                Object.entries(set).filter(([k, val]) => val !== opKlant[k])
+              )
+            })}
           />
         </div>
       )}
