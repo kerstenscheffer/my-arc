@@ -112,7 +112,21 @@ startgewicht, en beoordelen op kracht, omvang en foto's.
   bewust — tempo omhoog binnen de band, of de datum opschuiven. Laat het niet
   onbesproken.
 
-## 7. Waar dit in de app staat
+## 7. Van oordeel naar handeling
+
+De melding onder de grafiek heeft een knop: **Macro's bijstellen · −150 kcal**.
+Die opent het doelen-paneel met een voorstel — het tekort van bijvoorbeeld −600
+naar −750 — en pas als je op *Tekort aanpassen* drukt verandert er iets. De
+macro's zelf herbereken je daarna met de knop in dat paneel. Nergens gebeurt
+iets automatisch: een wijziging die niemand heeft gezien staat wel op het bord
+van de klant.
+
+Bij het starten van een fase rekent het formulier het bijbehorende tekort voor:
+een kilo lichaamsvet is ruwweg 7700 kcal, dus een kilo per week is 1100 kcal per
+dag. Bij −0,5 kg/week stelt hij −550 voor. Verander je het tempo, dan schuift
+dat voorstel mee — tenzij je het tekort zelf al hebt aangeraakt.
+
+## 8. Waar dit in de app staat
 
 | Wat | Waar |
 |---|---|
