@@ -41,7 +41,21 @@ Een eindgewicht (`doel_gewicht`) stuurt niets. Op de weegschaal zie je niet of
 +8 kg spier of vet is; alleen het tempo zegt dat. Het staat als horizon in de
 grafiek en verder nergens.
 
-## 3. Wanneer grijp je in
+## 3. Tempo of stand?
+
+Twee verschillende vragen, en ze kunnen tegengesteld antwoorden:
+
+- **Tempo** — hoeveel schoof de trend deze week op ten opzichte van vorige week?
+  Dat is waar je op bijstuurt: te hard gegaan betekent minder eten.
+- **Stand** — waar ligt de trend ten opzichte van de band? Dat zegt of de
+  afspraak nog klopt.
+
+Loopt iemand in week 1 een kilo uit, dan ligt zijn trend daarna wekenlang boven
+de band terwijl hij intussen keurig op tempo zit. Dan is er niets te minderen;
+hooguit schuif je de lijn bij. Het oordeel in de app gaat daarom over het tempo,
+met de stand als regel eronder ("staat 0,9 kg boven de plan-lijn").
+
+## 4. Wanneer grijp je in
 
 > **Twee weken op rij buiten de band, met genoeg metingen. Dan pas.**
 
@@ -56,7 +70,7 @@ grafiek en verder nergens.
 Voorbeeld: week 37 komt uit op +0,9 kg en week 38 ook, terwijl er +0,4 is
 afgesproken. Dat zijn twee volle weken boven de band → bijsturen.
 
-## 4. Wat je doet als je bijstuurt
+## 5. Wat je doet als je bijstuurt
 
 **Te snel bij een cut** (gewicht zakt harder dan de band)
 1. 150-250 kcal per dag erbij. Dit kost anders spiermassa.
@@ -79,7 +93,7 @@ tempo bijkomt is vooral vet.
 **Recomp en behoud** → niet op de weegschaal sturen. Een strook van ±0,4% om het
 startgewicht, en beoordelen op kracht, omvang en foto's.
 
-## 5. Randgevallen
+## 6. Randgevallen
 
 - **Sprong van meer dan 1,5 kg** in de trend week-op-week: eerst context vragen
   (zout, koolhydraten, reis, slaap, alcohol, cyclus). Verander niets op zo'n
@@ -91,7 +105,7 @@ startgewicht, en beoordelen op kracht, omvang en foto's.
   bewust — tempo omhoog binnen de band, of de datum opschuiven. Laat het niet
   onbesproken.
 
-## 6. Waar dit in de app staat
+## 7. Waar dit in de app staat
 
 | Wat | Waar |
 |---|---|

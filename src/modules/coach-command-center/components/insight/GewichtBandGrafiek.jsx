@@ -540,6 +540,22 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
             </div>
           )}
 
+          {/* Waar hij staat is iets anders dan hoe hard hij gaat. Loopt iemand
+              in week 1 een kilo uit, dan ligt zijn trend daarna wekenlang boven
+              de band terwijl het tempo allang weer klopt. Het oordeel gaat over
+              het tempo; deze regel vertelt de stand erbij. */}
+          {laatste.vanPlan != null && Math.abs(laatste.vanPlan) >= 0.3 && (
+            <div style={{
+              fontSize: '0.7rem', fontWeight: 800, marginTop: 3,
+              color: STATUS_KLEUR[laatste.stand] || 'rgba(255,255,255,0.4)',
+            }}>
+              Staat {Math.abs(laatste.vanPlan)} kg {laatste.vanPlan > 0 ? 'boven' : 'onder'} de plan-lijn
+              {laatste.stand !== laatste.status && laatste.status === 'OP_KOERS'
+                ? ' — het tempo klopt weer, de achterstand van eerder niet.'
+                : ''}
+            </div>
+          )}
+
         </div>
       )}
 

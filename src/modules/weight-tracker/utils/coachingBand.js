@@ -236,6 +236,25 @@ export function beoordeel(trendWaarde, metingen, n, startGewicht, config) {
 // weken achter elkaar dezelfde afwijking al speelt. Die teller is het hele
 // punt van de ruisfilter: één week ernaast is observeren, twee weken is
 // ingrijpen.
+// Het tempo van deze week zelf: hoeveel de trend opschoof ten opzichte van de
+// week ervoor, afgemeten tegen dezelfde grenzen per week.
+//
+// Dit is iets anders dan waar de trend stáát. Loopt iemand in week 1 een kilo
+// te hard uit, dan ligt zijn trend daarna wekenlang boven de band terwijl hij
+// intussen keurig op tempo zit. Dat gaf "te snel · 2 weken op rij" bij een week
+// van +0,23 — een advies om te minderen terwijl er niets te minderen viel.
+//
+// Regel sindsdien: het tempo bepaalt of je bijstuurt, de stand bepaalt of je
+// de lijn moet bijstellen.
+export function tempoOordeel(verschil, config) {
+  if (verschil == null || config.richting === 'stabiel') return null
+  const teken = config.richting === 'aankomen' ? 1 : -1
+  const gemeten = verschil * teken          // vooruitgang in de goede richting
+  if (gemeten < config.traagKg) return 'TE_LANGZAAM'
+  if (gemeten > config.snelKg) return 'TE_SNEL'
+  return 'OP_KOERS'
+}
+
 export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
   const perWeek = new Map()
   reeks.forEach(r => {
@@ -248,14 +267,28 @@ export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
   let vorigeTrend = null
   return weken.map(n => {
     const r = perWeek.get(n)
-    const oordeel = beoordeel(r.trend, r.metingen, weekFractie(r.datum, startDatum, config.venster_dagen), startGewicht, config)
-    const afwijkend = oordeel.status === 'TE_SNEL' || oordeel.status === 'TE_LANGZAAM'
+    // Waar de trend staat ten opzichte van de band. Dit tekent de grafiek.
+    const stand = beoordeel(r.trend, r.metingen, weekFractie(r.datum, startDatum, config.venster_dagen), startGewicht, config)
+
+    // Verschil met de vorige week, op de trend. Dit is het getal waar de coach
+    // op stuurt: "week 37 +0,9, week 38 +0,9".
+    const verschil = (Number.isFinite(r.trend) && Number.isFinite(vorigeTrend))
+      ? Math.round((r.trend - vorigeTrend) * 100) / 100
+      : null
+    if (Number.isFinite(r.trend)) vorigeTrend = r.trend
+
+    // Het oordeel dat in de tabel staat en de teller voedt, gaat over het
+    // tempo. Kunnen we dat niet bepalen (eerste week, te weinig metingen), dan
+    // valt hij terug op de stand.
+    const tempo = (r.metingen >= config.min_metingen) ? tempoOordeel(verschil, config) : null
+    const status = tempo || stand.status
+    const afwijkend = status === 'TE_SNEL' || status === 'TE_LANGZAAM'
 
     if (afwijkend) {
-      buiten = (oordeel.status === vorige) ? buiten + 1 : 1
-      vorige = oordeel.status
-    } else if (oordeel.status === 'OP_KOERS') {
-      // Terug in de band: de teller mag weer op nul.
+      buiten = (status === vorige) ? buiten + 1 : 1
+      vorige = status
+    } else if (status === 'OP_KOERS') {
+      // Terug op tempo: de teller mag weer op nul.
       buiten = 0
       vorige = null
     }
@@ -264,14 +297,13 @@ export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
     // probleem uit dat er gewoon nog is — maar telt ook niet mee als tweede
     // week. Hij wordt overgeslagen.
 
-    // Verschil met de vorige week, op de trend. Dit is het getal waar de
-    // coach op stuurt: "week 37 +0,9, week 38 +0,9".
-    const verschil = (Number.isFinite(r.trend) && Number.isFinite(vorigeTrend))
-      ? Math.round((r.trend - vorigeTrend) * 100) / 100
+    // Hoeveel de trend van de plan-lijn af zit. Niet het oordeel, wel het
+    // verhaal erachter.
+    const vanPlan = (Number.isFinite(r.trend) && stand.lijnen)
+      ? Math.round((r.trend - stand.lijnen.doel) * 10) / 10
       : null
-    if (Number.isFinite(r.trend)) vorigeTrend = r.trend
 
-    return { week: n, ...r, ...oordeel, verschil, wekenBuiten: afwijkend ? buiten : 0 }
+    return { week: n, ...r, ...stand, status, stand: stand.status, verschil, vanPlan, wekenBuiten: afwijkend ? buiten : 0 }
   })
 }
 
