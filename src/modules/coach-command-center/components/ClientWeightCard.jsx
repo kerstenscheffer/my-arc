@@ -300,22 +300,6 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     },
   ]
 
-  // Kerncijfers op de kaartregel: alleen wat je in één blik wilt zien.
-  // "Deze week" en "Vorige week" zitten in de uitklap; het huidige gewicht
-  // staat al bovenaan de kaart.
-  const kernStats = [
-    {
-      label: 'Verschil',
-      val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—',
-      color: weekDiff !== null ? weightGoalColor(weekDiff, doelBron) : 'rgba(255,255,255,0.4)',
-    },
-    {
-      label: fase ? 'Sinds start fase' : 'Sinds start',
-      val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
-      color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)',
-    },
-  ]
-
   // Aanwezigheid van de rij is het vinkje, dus afvinken is invoegen en
   // ongedaan maken is verwijderen.
   //
@@ -488,8 +472,8 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       {/* ── ROW 1 — naam · doel  |  gewicht · datum, alles op één regel ── */}
       <div style={{
         display: 'flex', alignItems: 'center',
-        padding: isMobile ? '0.6rem 0.85rem 0.5rem' : '0.7rem 1rem 0.55rem',
-        gap: isMobile ? '0.5rem' : '0.625rem',
+        padding: isMobile ? '0.45rem 0.7rem 0.3rem' : '0.5rem 0.8rem 0.35rem',
+        gap: isMobile ? '0.4rem' : '0.5rem',
       }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem', overflow: 'hidden' }}>
           <h3 style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
@@ -537,28 +521,23 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           dat mag het, het heeft al een eigen overflow. */}
       <div style={{
         display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap',
-        rowGap: '0.45rem',
-        padding: isMobile ? '0 0.85rem 0.6rem' : '0 1rem 0.65rem',
-        gap: isMobile ? '0.7rem' : '1rem',
+        rowGap: '0.35rem',
+        padding: isMobile ? '0 0.7rem 0.4rem' : '0 0.8rem 0.45rem',
+        gap: isMobile ? '0.6rem' : '0.8rem',
       }}>
-        {!isInactive && !statsExpanded && (
-          <button onClick={() => setStatsExpanded(true)}
-            title="Toon alle weekcijfers"
-            style={{
-              display: 'flex', alignItems: 'baseline', gap: isMobile ? '0.55rem' : '0.75rem',
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              fontFamily: 'inherit', flexShrink: 1, minWidth: 0, overflow: 'hidden',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-            {kernStats.map((st, i) => (
-              <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.25rem', whiteSpace: 'nowrap' }}>
-                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{st.label}</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 900, color: st.color, lineHeight: 1 }}>{st.val}</span>
-                <span style={{ fontSize: '0.55rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>kg</span>
-              </span>
-            ))}
-          </button>
-        )}
+        {/* Hier stond 'Verschil' en 'Sinds start'. Die cijfers staan nu
+            onderaan de kaart, groter en met uitleg eronder; twee keer dezelfde
+            getallen op één kaart is ruis. De uitklap met alle weekcijfers zit
+            nu achter de knop hieronder. */}
+        <button
+          onClick={() => setStatsExpanded(v => !v)}
+          title="Toon alle weekcijfers"
+          style={{
+            ...platteKnop, color: 'rgba(255,255,255,0.35)', fontSize: '0.66rem',
+          }}
+        >
+          {statsExpanded ? 'Minder' : 'Weekcijfers'}
+        </button>
 
         {/* De drie acties zijn één blok. Los van elkaar waren het drie
             flex-items, en dan brak op een smalle kaart alleen de ⋯ af naar
@@ -676,7 +655,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           {kaartStats.map((st, i) => (
             <div key={st.label} style={{
               flex: 1, minWidth: 0,
-              padding: isMobile ? '0.5rem 0.55rem' : '0.55rem 0.7rem',
+              padding: isMobile ? '0.4rem 0.5rem' : '0.45rem 0.6rem',
               borderRight: i < kaartStats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
               display: 'flex', flexDirection: 'column', gap: 2,
             }}>
