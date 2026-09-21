@@ -68,8 +68,92 @@ function Kaartje({ active, payload, label }) {
   )
 }
 
+// De kolommen van de weektabel, op één plek zodat koprij en rijen niet uit de
+// pas lopen. Zelfde opzet als de set-tabel in het oefening-logboek.
+const KOLOMMEN = '4.4rem 1fr 3.4rem 3.2rem 1fr'
+
+// Week-op-week in cijfers. Een grafiek laat zien hoe het loopt; een tabel laat
+// zien wat er staat — en dat is wat je nodig hebt als je moet besluiten of je
+// bijstuurt.
+function WeekTabel({ weken, startDatum, isMobile }) {
+  const bereik = (n) => {
+    const van = new Date(`${String(startDatum).slice(0, 10)}T00:00:00`)
+    van.setDate(van.getDate() + n * 7)
+    const tot = new Date(van)
+    tot.setDate(tot.getDate() + 6)
+    const f = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+    return `${f(van)} – ${f(tot)}`
+  }
+
+  const kop = {
+    display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem', alignItems: 'center',
+    padding: isMobile ? '0.5rem 0 0.35rem' : '0.6rem 0 0.4rem',
+    fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.3)',
+    textTransform: 'uppercase', letterSpacing: '0.07em',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={kop}>
+        <span>Week</span>
+        <span>Trend</span>
+        <span style={{ textAlign: 'right' }}>Δ</span>
+        <span style={{ textAlign: 'right' }}>Weeg</span>
+        <span style={{ textAlign: 'right' }}>Oordeel</span>
+      </div>
+      {[...weken].reverse().map(w => {
+        const kleur = STATUS_KLEUR[w.status] || 'rgba(255,255,255,0.35)'
+        return (
+          <div key={w.week} style={{
+            display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem', alignItems: 'center',
+            padding: '0.45rem 0',
+            borderBottom: '1px solid rgba(255,255,255,0.04)',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff' }}>
+              wk {w.week}
+            </span>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff' }}>
+              {w.trend != null ? `${w.trend} kg` : '—'}
+              <span style={{
+                display: isMobile ? 'none' : 'inline',
+                fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.25)', marginLeft: 6,
+              }}>
+                {bereik(w.week)}
+              </span>
+            </span>
+            <span style={{
+              textAlign: 'right', fontSize: '0.72rem', fontWeight: 900,
+              color: w.verschil == null ? 'rgba(255,255,255,0.25)' : kleur,
+            }}>
+              {w.verschil == null ? '—' : `${w.verschil > 0 ? '+' : ''}${w.verschil}`}
+            </span>
+            <span style={{
+              textAlign: 'right', fontSize: '0.7rem', fontWeight: 800,
+              // Onder de vijf metingen is een week geen oordeel waard; dat hoor
+              // je aan deze kolom te zien zonder de uitleg te lezen.
+              color: w.metingen >= 5 ? 'rgba(255,255,255,0.45)' : '#f59e0b',
+            }}>
+              {w.metingen}×
+            </span>
+            <span style={{
+              textAlign: 'right', fontSize: '0.64rem', fontWeight: 900, color: kleur,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {STATUS_TEKST[w.status] || '—'}
+              {w.wekenBuiten > 1 ? ` ${w.wekenBuiten}×` : ''}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function GewichtBandGrafiek({ client, history, fase = null, fases = [], isMobile }) {
   const [uitleg, setUitleg] = useState(false)
+  const [weergave, setWeergave] = useState('grafiek')   // 'grafiek' | 'tabel'
   // Welke fase staat er in beeld. null = de lopende fase (of, zonder fases, de
   // hele reeks). 'alles' = de hele geschiedenis met alle fases achter elkaar.
   const [gekozen, setGekozen] = useState(null)
@@ -217,6 +301,31 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
         <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', flex: 1 }}>
           Coaching-band
         </span>
+        {/* Grafiek of cijfers. Een lijn laat zien hoe het loopt, een tabel wat
+            er staat — en dat tweede lees je sneller als je moet besluiten of je
+            bijstuurt. */}
+        <div style={{ display: 'flex', gap: 3, marginRight: 2 }}>
+          {[{ id: 'grafiek', label: 'Grafiek' }, { id: 'tabel', label: 'Tabel' }].map(k => {
+            const aan = weergave === k.id
+            return (
+              <button
+                key={k.id}
+                onClick={() => setWeergave(k.id)}
+                style={{
+                  minHeight: 22, padding: '0 0.45rem', borderRadius: 999,
+                  background: aan ? '#fff' : 'transparent',
+                  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.45)',
+                  fontSize: '0.6rem', fontWeight: 900, fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {k.label}
+              </button>
+            )
+          })}
+        </div>
         <button
           onClick={() => setUitleg(v => !v)}
           title="Hoe deze band werkt"
@@ -319,6 +428,9 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
         </div>
       )}
 
+      {weergave === 'tabel' && (model.weken || []).length > 0 ? (
+        <WeekTabel weken={model.weken} startDatum={model.startDatum} isMobile={isMobile} />
+      ) : (
       <div style={{ width: '100%', height: isMobile ? 190 : 230 }}>
         <ResponsiveContainer>
           <ComposedChart data={punten} margin={{ top: 6, right: 6, bottom: 0, left: -18 }}>
@@ -384,6 +496,7 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      )}
 
       {/* Het oordeel in één regel, plus wat je ermee zou doen. Alleen bij één
           fase: over een reeks fases heen is 'op koers' betekenisloos. */}
