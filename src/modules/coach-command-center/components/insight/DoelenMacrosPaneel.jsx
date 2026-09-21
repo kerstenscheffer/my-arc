@@ -424,7 +424,7 @@ export default function DoelenMacrosPaneel({ client, db, onClientUpdate, isMobil
       {/* Wat er nu op het bord van de klant staat. Eerst kijken, dan pas
           rekenen: negen van de tien keer open je dit paneel om te zien wat hij
           volgt, niet om iets te veranderen. */}
-      <MacroRingen client={client} isMobile={isMobile} />
+      <MacroRingen client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile} />
 
       {voorstel ? (
         <div style={{
