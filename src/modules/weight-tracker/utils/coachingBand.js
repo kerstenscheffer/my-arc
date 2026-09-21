@@ -305,6 +305,30 @@ export const STATUS_TEKST = {
   GEEN_DATA: 'Nog geen data',
 }
 
+// Hoe ver zit de trend buiten de band, gemeten in bandbreedtes? 0 = keurig
+// binnen, 1 = een hele bandbreedte ernaast. Dat is de maat voor de kleur van de
+// lijn: dezelfde 0,4 kg betekent iets anders bij een cut van 1 kg per week dan
+// bij een build van 0,25.
+export function ernstVan(trend, lijnen) {
+  if (!Number.isFinite(trend) || !lijnen) return null
+  const hoog = Math.max(lijnen.traag, lijnen.snel)
+  const laag = Math.min(lijnen.traag, lijnen.snel)
+  const buiten = trend > hoog ? trend - hoog : (trend < laag ? laag - trend : 0)
+  if (buiten === 0) return 0
+  const breedte = Math.max(0.2, hoog - laag)
+  return Math.min(1, buiten / breedte)
+}
+
+// Groen binnen de band, daarbuiten oplopend van oranje naar rood.
+export function kleurVoorErnst(ernst) {
+  if (ernst == null) return 'rgba(255,255,255,0.75)'
+  if (ernst <= 0) return '#10b981'
+  const van = [245, 158, 11]   // amber
+  const naar = [239, 68, 68]   // rood
+  const m = van.map((v, i) => Math.round(v + (naar[i] - v) * ernst))
+  return `rgb(${m[0]}, ${m[1]}, ${m[2]})`
+}
+
 export const STATUS_KLEUR = {
   OP_KOERS: '#10b981',
   TE_VROEG: 'rgba(255,255,255,0.35)',

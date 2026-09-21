@@ -18,7 +18,7 @@ import {
 import { Scale, Info } from 'lucide-react'
 import {
   maakConfig, trendReeks, bepaalStart, weekFractie, lijnenOpWeek,
-  weekBeoordelingen, advies, STATUS_TEKST, STATUS_KLEUR,
+  weekBeoordelingen, advies, ernstVan, kleurVoorErnst, STATUS_TEKST, STATUS_KLEUR,
 } from '../../../weight-tracker/utils/coachingBand'
 
 const kort = (d) => {
@@ -128,6 +128,7 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
           datum: r.datum, label: kort(r.datum), meting: r.meting, trend: r.trend,
           doel: Math.round(l.doel * 10) / 10,
           band: [Math.round(Math.min(l.traag, l.snel) * 10) / 10, Math.round(Math.max(l.traag, l.snel) * 10) / 10],
+          ernst: ernstVan(r.trend, l),
         }
       })
       return {
@@ -171,6 +172,7 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
         trend: r.trend,
         doel: Math.round(l.doel * 10) / 10,
         band: [Math.round(laag * 10) / 10, Math.round(hoog * 10) / 10],
+        ernst: ernstVan(r.trend, l),
       }
     })
 
@@ -191,6 +193,9 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
   }
 
   const { config, punten, laatste } = model
+  // Eén gradient-id per weergave: twee grafieken op één pagina zouden anders
+  // elkaars verloop gebruiken.
+  const kleurId = `${client?.id || 'x'}-${gekozen || 'nu'}`
   const raad = advies(laatste, config)
   const kleur = STATUS_KLEUR[laatste?.status] || 'rgba(255,255,255,0.35)'
 
@@ -317,6 +322,21 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
       <div style={{ width: '100%', height: isMobile ? 190 : 230 }}>
         <ResponsiveContainer>
           <ComposedChart data={punten} margin={{ top: 6, right: 6, bottom: 0, left: -18 }}>
+            {/* De trendlijn kleurt mee: groen zolang hij in de band ligt, en
+                daarbuiten oplopend van oranje naar rood naarmate hij er verder
+                vanaf zit. Eén lijn met een verloop per meetpunt — twintig losse
+                lijnstukjes tekenen zou hetzelfde doen maar vier keer zo traag. */}
+            <defs>
+              <linearGradient id={`trend-${kleurId}`} x1="0" y1="0" x2="1" y2="0">
+                {punten.map((p, i) => (
+                  <stop
+                    key={p.datum}
+                    offset={punten.length > 1 ? `${(i / (punten.length - 1)) * 100}%` : '0%'}
+                    stopColor={kleurVoorErnst(p.ernst)}
+                  />
+                ))}
+              </linearGradient>
+            </defs>
             <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis
               dataKey="label" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.3)' }}
@@ -339,7 +359,7 @@ export default function GewichtBandGrafiek({ client, history, fase = null, fases
             {/* Losse wegingen: puntjes, geen lijn. */}
             <Scatter dataKey="meting" fill="rgba(255,255,255,0.3)" shape="circle" r={2} isAnimationActive={false} />
             <Line
-              dataKey="trend" stroke="#fff" strokeWidth={2.4} dot={false}
+              dataKey="trend" stroke={`url(#trend-${kleurId})`} strokeWidth={2.6} dot={false}
               isAnimationActive={false} connectNulls
             />
             {/* Waar een nieuwe fase begint. */}
