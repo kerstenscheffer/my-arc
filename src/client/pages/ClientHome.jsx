@@ -4,7 +4,6 @@
 //   1) (challenge-stand zit nu in de zwevende ChallengeProgressTab)
 //   2) WelcomeSection (datum + naam)
 //   3) GoalCard — primaire doelstelling van de client
-//   4) ActionItems — afgesproken acties tussen coach en client
 //
 // Het weekdoel-blok (WeekGoalStatus) is van de pagina af: het gewicht en de
 // weekgemiddelden staan op de tracking-pagina, hier stond het een tweede keer.
@@ -17,7 +16,7 @@ import TodayCard from "../components/TodayCard"
 import React, { useState, useEffect } from 'react'
 import {
   Calendar, Coffee, Sun, Moon, Target, Clock,
-  CheckCircle2, Circle, Phone, MessageCircle, Sparkles,
+  Sparkles,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -640,235 +639,6 @@ function GoalCard({ client, currentWeight }) {
 }
 
 
-// ============================================
-// ACTION ITEMS
-// ============================================
-function ActionItems({ client, db }) {
-  const isMobile = useIsMobile()
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showCompleted, setShowCompleted] = useState(false)
-
-  useEffect(() => {
-    if (!client?.id || !db?.supabase) return
-    let cancelled = false
-    const load = async () => {
-      setLoading(true)
-      const { data, error } = await db.supabase
-        .from('client_action_items')
-        .select('*')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (!cancelled) {
-        if (error) console.error('Load action items failed:', error)
-        setItems(data || [])
-        setLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [client?.id, db])
-
-  const toggle = async (item) => {
-    const nextStatus = item.status === 'done' ? 'open' : 'done'
-    const nextCompleted = nextStatus === 'done' ? new Date().toISOString() : null
-    // Optimistic update
-    setItems(prev => prev.map(i => i.id === item.id
-      ? { ...i, status: nextStatus, completed_at: nextCompleted }
-      : i))
-    const { error } = await db.supabase
-      .from('client_action_items')
-      .update({ status: nextStatus, completed_at: nextCompleted })
-      .eq('id', item.id)
-    if (error) {
-      console.error('Toggle action item failed:', error)
-      // Rollback
-      setItems(prev => prev.map(i => i.id === item.id ? item : i))
-    }
-  }
-
-  const open = items.filter(i => i.status !== 'done')
-  const done = items.filter(i => i.status === 'done')
-  const pct = items.length > 0 ? Math.round((done.length / items.length) * 100) : 0
-  const klaar = items.length > 0 && open.length === 0
-
-  if (loading) return null
-  // Sectie pas tonen als er actie-items zijn (anders is'ie lege ruimte).
-  if (items.length === 0) return null
-
-  const formatDate = (iso) => {
-    if (!iso) return ''
-    try {
-      const d = new Date(iso)
-      const today = new Date(); today.setHours(0,0,0,0)
-      const yest = new Date(today); yest.setDate(today.getDate() - 1)
-      const dDay = new Date(d); dDay.setHours(0,0,0,0)
-      if (dDay.getTime() === today.getTime()) return 'Vandaag'
-      if (dDay.getTime() === yest.getTime()) return 'Gisteren'
-      return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-    } catch { return '' }
-  }
-
-  return (
-    <div>
-      {/* Kop in dezelfde vorm als "Voeding vandaag" en "Training vandaag":
-          bold wit, met rechts hoe ver je bent in plaats van een gouden pil. */}
-      <div style={{
-        padding: isMobile ? '0 1rem' : '0 1.5rem',
-        marginBottom: isMobile ? '0.55rem' : '0.7rem',
-        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-        gap: 10,
-      }}>
-        <span style={{
-          fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
-          letterSpacing: '-0.025em',
-        }}>
-          Acties deze week
-        </span>
-        <span style={{
-          flexShrink: 0,
-          fontSize: '0.7rem', fontWeight: 800,
-          color: klaar ? '#10b981' : 'rgba(255,255,255,0.4)',
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          {done.length}/{items.length} gedaan
-        </span>
-      </div>
-
-      {/* Dunne balk: één blik en je weet of er nog iets ligt. */}
-      <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem', marginBottom: isMobile ? '0.7rem' : '0.85rem' }}>
-        <div style={{ height: 3, background: 'rgba(255,255,255,0.07)', borderRadius: 2 }}>
-          <div style={{
-            width: `${pct}%`, height: '100%', borderRadius: 2,
-            background: klaar ? '#10b981' : '#fff',
-            transition: 'width 0.3s ease',
-          }} />
-        </div>
-      </div>
-
-      {/* Rijen met een haarlijn ertussen in plaats van kaartjes in een kaart:
-          het is een lijstje om af te vinken, geen verzameling vakjes. */}
-      <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-      <div>
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          {open.map(item => (
-            <ActionRow key={item.id} item={item} onToggle={toggle} isMobile={isMobile} formatDate={formatDate} />
-          ))}
-          {open.length === 0 && (
-            <div style={{
-              padding: '0.8rem 0', fontSize: '0.8rem', fontWeight: 700,
-              color: '#10b981',
-            }}>
-              Alles afgevinkt.
-            </div>
-          )}
-        </div>
-
-        {done.length > 0 && (
-          <div style={{ marginTop: '0.7rem', paddingTop: '0.6rem' }}>
-            <button
-              onClick={() => setShowCompleted(v => !v)}
-              style={{
-                background: 'transparent', border: 'none', padding: 0,
-                fontSize: '0.7rem', fontWeight: 800,
-                color: 'rgba(255,255,255,0.55)',
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}
-            >
-              {showCompleted ? '−' : '+'} {done.length} afgerond
-            </button>
-            {showCompleted && (
-              <div style={{ marginTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                {done.map(item => (
-                  <ActionRow key={item.id} item={item} onToggle={toggle} isMobile={isMobile} formatDate={formatDate} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      </div>
-    </div>
-  )
-}
-
-function ActionRow({ item, onToggle, isMobile, formatDate }) {
-  const done = item.status === 'done'
-  const SourceIcon = ({ source }) => {
-    const s = (source || '').toLowerCase()
-    if (s === 'call') return <Phone size={11} strokeWidth={2.4} />
-    if (s === 'whatsapp') return <MessageCircle size={11} strokeWidth={2.4} />
-    return null
-  }
-  return (
-    <button
-      onClick={() => onToggle(item)}
-      style={{
-        display: 'flex', alignItems: 'flex-start', gap: 10,
-        padding: '0.7rem 0',
-        background: 'transparent',
-        border: 'none',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        cursor: 'pointer',
-        textAlign: 'left',
-        width: '100%',
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <div style={{
-        width: 22, height: 22, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginTop: 1,
-      }}>
-        {done
-          ? <CheckCircle2 size={19} color="#10b981" strokeWidth={2.4} />
-          : <Circle size={19} color="rgba(255,255,255,0.3)" strokeWidth={2} />}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: isMobile ? '0.85rem' : '0.9rem',
-          fontWeight: 700,
-          color: done ? 'rgba(255,255,255,0.45)' : '#fff',
-          textDecoration: done ? 'line-through' : 'none',
-          lineHeight: 1.35,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-        }}>
-          {item.text}
-        </div>
-        {(item.source || item.created_at || item.due_date) && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            marginTop: 4,
-            fontSize: '0.66rem', fontWeight: 700,
-            color: 'rgba(255,255,255,0.4)',
-          }}>
-            {item.source && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                <SourceIcon source={item.source} />
-                {item.source}
-              </span>
-            )}
-            {item.created_at && (
-              <span style={{ opacity: 0.7 }}>
-                {formatDate(item.created_at)}
-              </span>
-            )}
-            {item.due_date && !done && (
-              <span style={{ color: '#fff', fontWeight: 800 }}>
-                · uiterlijk {formatDate(item.due_date)}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    </button>
-  )
-}
 
 // ============================================
 // MAIN CLIENT HOME
@@ -953,12 +723,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
         </div>
       </FadeOnScroll>
 
-
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '4.5rem' : '5.5rem' }}>
-          <ActionItems client={client} db={db} />
-        </div>
-      </FadeOnScroll>
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
