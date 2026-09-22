@@ -311,18 +311,21 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       ? (voornaam ? v.vraag.replace('{naam}', voornaam) : v.vraag.replace(', {naam}', ''))
       : v.vraag
     return (
-      <div key={v.id} style={{ marginBottom: '3vh' }}>
-        <div style={{ fontSize: isMobile ? 17 : 21, fontWeight: 800, color: '#fff' }}>
+      // Eén vraag per scherm, dus die hoort in het midden te staan en niet
+      // tegen de bovenrand met een half scherm leegte eronder. Het blok blijft
+      // smal (560px) zodat een vraag van twee regels leesbaar blijft.
+      <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
+        <div style={{ fontSize: isMobile ? 19 : 23, fontWeight: 800, color: '#fff' }}>
           {vraagTekst}
         </div>
         {v.hulp && (
-          <div style={{ color: GRIJS, fontSize: 14, fontWeight: 700, marginTop: '0.6vh' }}>
+          <div style={{ color: GRIJS, fontSize: 14, fontWeight: 700, marginTop: '0.8vh' }}>
             {v.hulp}
           </div>
         )}
 
         {(v.type === 'aantal' || v.type === 'aantal-van') && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: '1.4vh', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: '2.2vh', flexWrap: 'wrap' }}>
             <select
               value={waarde ?? ''}
               onChange={e => updateField(v.id, e.target.value === '' ? null : Number(e.target.value))}
@@ -353,7 +356,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         )}
 
         {v.type === 'keuze' && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: '1.4vh' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: '2.2vh' }}>
             {v.opties.map(o => (
               <button key={o} type="button" onClick={() => updateField(v.id, waarde === o ? null : o)}
                 style={keuzeStijl(waarde === o)}>
@@ -364,7 +367,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         )}
 
         {v.type === 'schaal' && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: '1.4vh' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: '2.2vh' }}>
             {SCHAAL.map(n => (
               <button key={n} type="button" onClick={() => updateField(v.id, n)}
                 style={keuzeStijl(waarde === n, 52)}>
@@ -381,8 +384,8 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
             style={{
               background: KAART, border: `1px solid ${RAND}`, borderRadius: 10,
               color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
-              padding: 14, width: '100%', minHeight: 110, marginTop: '1.4vh',
-              resize: 'vertical', lineHeight: 1.5, outline: 'none',
+              padding: 14, width: '100%', minHeight: 110, marginTop: '2.2vh',
+              resize: 'vertical', lineHeight: 1.5, outline: 'none', textAlign: 'left',
             }}
           />
         )}
@@ -393,7 +396,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // ── Laden ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100%', padding: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
           width: 44, height: 44,
           border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff',
@@ -407,7 +410,11 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // ── Al ingevuld deze week ─────────────────────────────────────────────
   if (submitted) {
     return (
-      <div style={{ padding: isMobile ? '2.5rem 1rem' : '3rem', textAlign: 'center' }}>
+      <div style={{
+        minHeight: '100%', boxSizing: 'border-box',
+        padding: isMobile ? '2.5rem 1rem' : '3rem', textAlign: 'center',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      }}>
         <CheckCircle size={isMobile ? 48 : 56} color="#fff" style={{ marginBottom: '1.25rem' }} />
         <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.75rem', fontWeight: 900, color: '#fff', marginBottom: '0.75rem', letterSpacing: '-0.02em' }}>
           Check-in verstuurd
@@ -431,8 +438,11 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     <div style={{
       color: '#fff', fontWeight: 700, lineHeight: 1.4,
       padding: isMobile ? '1.25rem 1rem 2rem' : '1.5rem 1.5rem 2rem',
-      maxWidth: 820, margin: '0 auto',
-      display: 'flex', flexDirection: 'column', minHeight: isMobile ? '60vh' : 420,
+      maxWidth: 820, margin: '0 auto', boxSizing: 'border-box',
+      // Vult de hoogte van de modal, zodat de vraag in het midden kan staan en
+      // de knoppen onderaan. Zonder dit zakte alles naar de bovenrand.
+      display: 'flex', flexDirection: 'column',
+      minHeight: isMobile ? '100%' : 'max(100%, 420px)',
     }}>
       {/* Voortgang */}
       <div style={{ marginBottom: '2.5vh' }}>
@@ -449,8 +459,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         </div>
       </div>
 
-      {/* De vraag */}
-      <div style={{ flex: 1 }}>
+      {/* De vraag — midden op de pagina */}
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '2vh 0',
+      }}>
         {renderVeld(vraag)}
       </div>
 
