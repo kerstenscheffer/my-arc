@@ -13,6 +13,7 @@ import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
+import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
 
 // Kopknop: kaal icoon, geen vak eromheen. Vier omkaderde knoppen met tekst
 // namen de halve kopregel in; als icoon met tooltip is het even duidelijk en
@@ -234,7 +235,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               }}
             >
               <div style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', flexShrink: 0 }}>
+                  <span className={PRIVE} style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', flexShrink: 0 }}>
                     {effectiveClient.first_name} {effectiveClient.last_name}
                   </span>
                   {effectiveClient.target_weight && (
@@ -307,7 +308,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 padding: '0.4rem 0.6rem', borderBottom: '1px solid rgba(255,255,255,0.06)',
                 display: 'flex', alignItems: 'center', gap: '0.1rem', flexShrink: 0
               }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '0.3rem' }}>
+                <span className={PRIVE} style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '0.3rem' }}>
                   {effectiveClient.first_name} {effectiveClient.last_name}
                 </span>
                 <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{ ...kopKnop(), width: 34, height: 34 }}>
@@ -482,7 +483,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem' }}>
               <div>
                 <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color: '#fff' }}>Alle foto's</div>
-                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>{effectiveClient.first_name} · {photos.length} foto's</div>
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}><span className={PRIVE}>{effectiveClient.first_name}</span> · {photos.length} foto's</div>
               </div>
               <button onClick={() => setShowGallery(false)} aria-label="Sluiten" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
                 <X size={20} />
@@ -506,7 +507,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                           {day.items.map(({ p, idx }) => (
                             <div key={p.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
                               <div onClick={() => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }} style={{ aspectRatio: '3 / 4', cursor: 'pointer' }}>
-                                <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                <img className={PRIVE_FOTO} src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0.35rem 0.45rem' }}>
                                 <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.photo_type || 'foto'}</span>
@@ -542,7 +543,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           }}>
             <X size={18} />
           </button>
-          <img onClick={e => e.stopPropagation()} src={photos[selectedPhotoIndex]?.photo_url} alt=""
+          <img className={PRIVE_FOTO} onClick={e => e.stopPropagation()} src={photos[selectedPhotoIndex]?.photo_url} alt=""
             style={{ maxWidth: '90vw', maxHeight: '75vh', borderRadius: '8px', objectFit: 'contain' }} />
           {photos.length > 1 && (
             <>
@@ -573,7 +574,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '0.4rem', marginTop: '0.75rem', overflowX: 'auto', maxWidth: '92vw', padding: '0.25rem', WebkitOverflowScrolling: 'touch' }}>
               {photos.map((p, idx) => (
                 <div key={p.id} onClick={() => setSelectedPhotoIndex(idx)} style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: idx === selectedPhotoIndex ? '2px solid #fff' : '2px solid rgba(255,255,255,0.15)', opacity: idx === selectedPhotoIndex ? 1 : 0.6 }}>
-                  <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img className={PRIVE_FOTO} src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               ))}
             </div>

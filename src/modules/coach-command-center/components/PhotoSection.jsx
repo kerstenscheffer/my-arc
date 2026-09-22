@@ -1,6 +1,7 @@
 // PhotoSection.jsx - Foto sectie component voor Command Center
 import React, { useState } from 'react'
 import { Camera, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { PRIVE_FOTO } from '../utils/privacyModus'
 
 export default function PhotoSection({ client, photoData, isMobile }) {
   const [photoModalOpen, setPhotoModalOpen] = useState(false)
@@ -76,7 +77,7 @@ export default function PhotoSection({ client, photoData, isMobile }) {
                   position: 'relative'
                 }}
               >
-                <img 
+                <img className={PRIVE_FOTO} 
                   src={photo.photo_url} 
                   alt={`Progress ${idx + 1}`}
                   style={{
@@ -224,7 +225,7 @@ export default function PhotoSection({ client, photoData, isMobile }) {
               position: 'relative'
             }}
           >
-            <img 
+            <img className={PRIVE_FOTO} 
               src={progressPhotos[selectedPhotoIndex]?.photo_url}
               alt={`Progress foto ${selectedPhotoIndex + 1}`}
               style={{
@@ -331,7 +332,7 @@ export default function PhotoSection({ client, photoData, isMobile }) {
                     flexShrink: 0
                   }}
                 >
-                  <img 
+                  <img className={PRIVE_FOTO} 
                     src={photo.photo_url}
                     alt={`Thumb ${idx + 1}`}
                     style={{

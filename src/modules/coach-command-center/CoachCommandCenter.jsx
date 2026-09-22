@@ -2,13 +2,14 @@
 // CoachCommandCenter.jsx - v3.5
 // + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus } from 'lucide-react'
+import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, EyeOff } from 'lucide-react'
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
 import CoachVideoFeedback from '../video-feedback/CoachVideoFeedback'
 import AddClientModal from './components/AddClientModal'
 import { naloopGrens } from '../challenge-monitor/challengeEisen'
+import { PRIVE, zetPrivacy, herstelPrivacy } from './utils/privacyModus'
 
 export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onNavigateTab, onOpenMealPanel, onOpenWorkoutPanel }) {
   const isMobile = window.innerWidth <= 768
@@ -26,6 +27,10 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   const [showAddClient, setShowAddClient] = useState(false)
   const [journeyClient, setJourneyClient] = useState(null)
   const [coachId, setCoachId] = useState(null)
+  // Namen en foto's verbergen om je scherm te kunnen delen. De stand van de
+  // vorige keer komt terug, zie privacyModus.js.
+  const [prive, setPrive] = useState(false)
+  useEffect(() => { setPrive(herstelPrivacy()) }, [])
   // Dropdown-stijl: dik wit, geen accentkleur. Vervangt de gekleurde
   // filterpillen die eerder een eigen rij innamen.
   const selectStijl = {
@@ -256,7 +261,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           <button onClick={() => setJourneyClient(null)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.75rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: '0.8rem' }}>
             <ArrowLeft size={14} /> Terug
           </button>
-          <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: '600' }}>{journeyClient.first_name} {journeyClient.last_name}</span>
+          <span className={PRIVE} style={{ color: '#fff', fontSize: '0.85rem', fontWeight: '600' }}>{journeyClient.first_name} {journeyClient.last_name}</span>
         </div>
         <ClientJourneyTimeline
           db={db}
@@ -349,6 +354,22 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             </button>
           )}
         </div>
+
+        {/* Scherm delen: namen en foto's eruit, cijfers erin. Het oog dicht
+            betekent dat er nu iets verborgen is. */}
+        <button onClick={() => { const nieuw = !prive; setPrive(nieuw); zetPrivacy(nieuw) }}
+          title={prive ? 'Namen en foto\'s weer tonen' : "Namen en foto's verbergen (scherm delen)"}
+          aria-label="Namen en foto's verbergen"
+          style={{
+            flexShrink: 0, width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: prive ? '#fff' : 'rgba(255,255,255,0.05)',
+            border: prive ? 'none' : '1px solid rgba(255,255,255,0.1)',
+            color: prive ? '#000' : 'rgba(255,255,255,0.7)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+          {prive ? <EyeOff size={15} strokeWidth={2.4} /> : <Eye size={15} strokeWidth={2.4} />}
+        </button>
 
         <button onClick={() => setActiveView(activeView === 'video' ? 'clients' : 'video')}
           title={activeView === 'video' ? 'Terug naar klanten' : 'Video-feedback'}

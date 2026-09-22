@@ -4,6 +4,7 @@
 // deactiveer). Gradients eruit → solide #0a0a0a.
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
 // In split screen mag een modal niet het hele scherm afdekken maar alleen de
 // helft waar de tab in staat. useModalHost geeft die helft terug; buiten split
 // screen gewoon document.body, dus daar verandert er niets.
@@ -343,7 +344,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       {/* Foto-strook. Een tiende van de breedte: genoeg om een gezicht te
           herkennen, niet zoveel dat het een fotoalbum wordt. Geen foto →
           initialen op dezelfde plek, zodat de kaarten uitgelijnd blijven. */}
-      <div style={{
+      <div className={PRIVE_FOTO} style={{
         width: '10%', minWidth: isMobile ? 44 : 52, flexShrink: 0,
         background: client.profile_photo_url
           ? `url(${client.profile_photo_url}) center/cover`
@@ -352,7 +353,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {!client.profile_photo_url && (
-          <span style={{
+          <span className={PRIVE} style={{
             fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: 900,
             color: 'rgba(255,255,255,0.3)', letterSpacing: '-0.02em',
           }}>
@@ -437,7 +438,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         gap: isMobile ? '0.4rem' : '0.5rem',
       }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem', overflow: 'hidden' }}>
-          <h3 style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
+          <h3 className={PRIVE} style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
             {client.first_name} {client.last_name}
           </h3>
           {/* Doel achter de naam i.p.v. op een eigen regel eronder. */}
