@@ -1,10 +1,52 @@
 // src/modules/lead-management/components/StartCampaignModal.jsx
 // Kies welke outreach-campagne je start. Daarna verschijnt op elke lead-card
 // een campagne-DM-knop die het campagne-bericht kopieert + het profiel opent.
-import { useState, useEffect } from 'react'
+//
+// De hele regel is de startknop: starten is wat je hier in negen van de tien
+// gevallen komt doen, dus dat mag geen klein knopje naast drie andere zijn.
+// Bewerken zit achter het potlood, verwijderen binnen het bewerk-venster —
+// een rij van vier icoontjes per campagne leest als een dashboard, niet als
+// een keuze.
+//
+// De cijfers staan achter één schakelaar bovenin in plaats van een knop per
+// campagne: getCampaignBreakdown haalt ze tóch in één keer voor alle
+// campagnes op. Eén klik toont ze dus overal, en zolang je ze niet opvraagt
+// blijft het openen van dit scherm licht.
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
-import { X, Megaphone, Send, Check, Plus, Pencil, Trash2, BarChart2 } from 'lucide-react'
+import { X, Megaphone, Send, Plus, Pencil, Search, BarChart2 } from 'lucide-react'
+
+const LIJN = 'rgba(255,255,255,0.09)'
+const LIJN_ZACHT = 'rgba(255,255,255,0.06)'
+
+// Vanaf dit aantal campagnes verschijnt het zoekveld; daaronder scroll je
+// sneller dan je typt.
+const ZOEK_VANAF = 6
+
+const PLATFORMS = ['instagram', 'linkedin', 'facebook', 'tiktok', 'whatsapp', 'e-mail', 'anders']
+
+const veld = {
+  width: '100%', boxSizing: 'border-box', minHeight: 42,
+  padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.04)',
+  border: `1px solid ${LIJN}`, borderRadius: 10, color: '#fff',
+  fontSize: '0.88rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none',
+}
+
+const knopWit = (uit) => ({
+  flex: 2, minHeight: 42, borderRadius: 10, border: 'none',
+  background: uit ? 'rgba(255,255,255,0.25)' : '#fff', color: '#000',
+  fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit',
+  cursor: uit ? 'not-allowed' : 'pointer', opacity: uit ? 0.55 : 1,
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+})
+
+const knopKaal = {
+  flex: 1, minHeight: 42, borderRadius: 10,
+  background: 'transparent', border: `1px solid ${LIJN}`,
+  color: 'rgba(255,255,255,0.6)', fontSize: '0.82rem', fontWeight: 800,
+  fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation',
+}
 
 export default function StartCampaignModal({ leadService, coachId, isMobile = false, onSelect, onClose }) {
   const modalHost = useModalHost()
@@ -13,28 +55,30 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', platform: 'instagram', messageText: '' })
+  const [zoek, setZoek] = useState('')
   // Inline bewerken van een bestaande campagne (naam + bericht).
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({ name: '', messageText: '' })
   const [editSaving, setEditSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   const startEdit = (c) => {
     setEditingId(c.id)
     setEditForm({ name: c.name || '', messageText: c.message_text || '' })
   }
-  const [deletingId, setDeletingId] = useState(null)
 
-  // Cijfers per campagne. getCampaignBreakdown haalt álle campagne-leads op met
-  // hun reacties en funnel-stappen — te zwaar om te doen bij het openen van dit
-  // scherm, terwijl je meestal gewoon een campagne wilt starten. Daarom pas bij
-  // de eerste keer uitvouwen, en dan één keer voor alle campagnes tegelijk.
-  const [openStats, setOpenStats] = useState(null)
+  // Cijfers. getCampaignBreakdown haalt álle campagne-leads op met hun reacties
+  // en funnel-stappen — te zwaar om te doen bij het openen van dit scherm,
+  // terwijl je meestal gewoon een campagne wilt starten. Daarom pas op verzoek,
+  // en dan in één keer voor alle campagnes.
+  const [cijfersAan, setCijfersAan] = useState(false)
   const [stats, setStats] = useState(null)
   const [statsLaden, setStatsLaden] = useState(false)
 
-  const wisselStats = async (campagneId) => {
-    setOpenStats(v => (v === campagneId ? null : campagneId))
-    if (stats || statsLaden) return
+  const wisselCijfers = async () => {
+    const aan = !cijfersAan
+    setCijfersAan(aan)
+    if (!aan || stats || statsLaden) return
     setStatsLaden(true)
     try {
       const { campaigns: rijen } = await leadService.getCampaignBreakdown(coachId)
@@ -45,6 +89,7 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
     }
     setStatsLaden(false)
   }
+
   const handleDelete = async (c) => {
     if (deletingId) return
     // Leads met deze campagne-tag: hun tag valt weg (ON DELETE SET NULL), de
@@ -73,6 +118,7 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
         .delete()
         .eq('id', c.id)
       if (error) throw error
+      setEditingId(null)
       await load()
     } catch (e) { console.error('Campagne verwijderen mislukt:', e); alert('Verwijderen mislukt.') }
     finally { setDeletingId(null) }
@@ -123,169 +169,161 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
     finally { setSaving(false) }
   }
 
+  const zichtbaar = useMemo(() => {
+    const q = zoek.trim().toLowerCase()
+    if (!q) return campaigns
+    return campaigns.filter(c => `${c.name || ''} ${c.platform || ''} ${c.message_text || ''}`.toLowerCase().includes(q))
+  }, [campaigns, zoek])
+
   return createPortal(
     <div
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: '100%', maxWidth: 540, maxHeight: isMobile ? '90vh' : '82vh', display: 'flex', flexDirection: 'column', background: '#111', border: '1px solid rgba(168,85,247,0.28)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden' }}
+        style={{ width: '100%', maxWidth: 540, maxHeight: isMobile ? '90vh' : '82vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', border: `1px solid ${LIJN}`, borderRadius: isMobile ? '18px 18px 0 0' : 18, overflow: 'hidden', boxShadow: '0 24px 70px rgba(0,0,0,0.8)' }}
       >
-        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? 'calc(0.8rem + env(safe-area-inset-top)) 0.9rem 0.7rem' : '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.5)' }}>
-          <Megaphone size={17} color="#a855f7" />
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: isMobile ? 'calc(0.9rem + env(safe-area-inset-top)) 1rem 0.8rem' : '1rem', borderBottom: `1px solid ${LIJN}` }}>
+          <Megaphone size={17} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>Start een campagne</div>
-            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.62rem', marginTop: 1 }}>Kies welke je uitvoert — dan krijgt elke lead-card een DM-knop.</div>
+            <div style={{ color: '#fff', fontWeight: 900, fontSize: '1rem', letterSpacing: '-0.02em' }}>Campagnes</div>
+            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.72rem', fontWeight: 700, marginTop: 1 }}>
+              Tik een campagne aan om te starten
+            </div>
           </div>
-          <button onClick={onClose} title="Sluiten" style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><X size={16} /></button>
+          <button
+            onClick={wisselCijfers}
+            title="Cijfers van alle campagnes tonen"
+            style={{
+              flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5,
+              minHeight: 32, padding: '0 0.6rem', borderRadius: 9,
+              background: cijfersAan ? '#fff' : 'transparent',
+              border: `1px solid ${cijfersAan ? '#fff' : LIJN}`,
+              color: cijfersAan ? '#000' : 'rgba(255,255,255,0.65)',
+              fontSize: '0.72rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            <BarChart2 size={13} strokeWidth={2.8} /> Cijfers
+          </button>
+          <button onClick={onClose} title="Sluiten" aria-label="Sluiten" style={{ width: 32, height: 32, borderRadius: 9, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><X size={17} strokeWidth={3} /></button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0.85rem' }}>
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {/* Nieuwe campagne — inline maak-formulier */}
           {creating ? (
-            <div style={{ padding: '0.85rem', borderRadius: 12, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.28)', marginBottom: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>Nieuwe campagne</div>
+            <div style={{ padding: '0.9rem 1rem', borderBottom: `1px solid ${LIJN}`, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>Nieuwe campagne</div>
               <input
-                value={form.name}
+                value={form.name} autoFocus
                 onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Naam (bv. Lidl gids)"
-                style={{ width: '100%', padding: '0.55rem 0.65rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none' }}
+                style={veld}
               />
-              <input
+              <select
                 value={form.platform}
                 onChange={(e) => setForm(f => ({ ...f, platform: e.target.value }))}
-                placeholder="Platform (bv. instagram)"
-                style={{ width: '100%', padding: '0.55rem 0.65rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none' }}
-              />
+                style={{ ...veld, cursor: 'pointer' }}
+              >
+                {PLATFORMS.map(p => <option key={p} value={p} style={{ background: '#111' }}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+              </select>
               <textarea
                 value={form.messageText}
                 onChange={(e) => setForm(f => ({ ...f, messageText: e.target.value }))}
                 placeholder="Bericht… gebruik {{ name }} voor de naam"
                 rows={4}
-                style={{ width: '100%', padding: '0.55rem 0.65rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
+                style={{ ...veld, fontWeight: 600, resize: 'vertical', lineHeight: 1.45 }}
               />
+              <NaamHint />
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => { setCreating(false); setForm({ name: '', platform: 'instagram', messageText: '' }) }}
-                  style={{ flex: 1, padding: '0.55rem', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>Annuleer</button>
+                <button onClick={() => { setCreating(false); setForm({ name: '', platform: 'instagram', messageText: '' }) }} style={knopKaal}>Annuleer</button>
                 <button onClick={handleCreate} disabled={!form.name.trim() || !form.messageText.trim() || saving}
-                  style={{ flex: 1, padding: '0.55rem', borderRadius: 9, background: 'rgba(168,85,247,0.2)', border: '1px solid rgba(168,85,247,0.5)', color: '#a855f7', fontSize: '0.75rem', fontWeight: 800, cursor: (!form.name.trim() || !form.messageText.trim() || saving) ? 'not-allowed' : 'pointer', opacity: (!form.name.trim() || !form.messageText.trim() || saving) ? 0.5 : 1 }}>
+                  style={knopWit(!form.name.trim() || !form.messageText.trim() || saving)}>
                   {saving ? 'Opslaan…' : 'Aanmaken & starten'}
                 </button>
               </div>
             </div>
           ) : (
             <button onClick={() => setCreating(true)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.6rem', marginBottom: '0.85rem', borderRadius: 10, background: 'rgba(168,85,247,0.1)', border: '1px dashed rgba(168,85,247,0.45)', color: '#a855f7', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}>
-              <Plus size={15} /> Nieuwe campagne
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                padding: '0.8rem 1rem', borderBottom: `1px solid ${LIJN}`,
+                background: 'transparent', border: 'none', borderRadius: 0,
+                color: '#fff', fontSize: '0.86rem', fontWeight: 800, fontFamily: 'inherit',
+                cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation',
+              }}>
+              <Plus size={16} strokeWidth={3} /> Nieuwe campagne
             </button>
           )}
 
-          {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>Laden…</div>
-          ) : campaigns.length === 0 ? (
-            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', lineHeight: 1.5 }}>
-              Nog geen campagnes. Maak er eerst een aan in de Analytics-tab (met een bericht-tekst).
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {campaigns.map(c => {
-                const noMsg = !c.message_text
-                const isEditing = editingId === c.id
-
-                // ─── BEWERK-MODUS ───
-                if (isEditing) {
-                  return (
-                    <div key={c.id} style={{ padding: '0.75rem 0.85rem', borderRadius: 11, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.3)', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#a855f7' }}>Campagne bewerken</div>
-                      <input
-                        value={editForm.name}
-                        onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
-                        placeholder="Naam"
-                        style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none' }}
-                      />
-                      <textarea
-                        value={editForm.messageText}
-                        onChange={(e) => setEditForm(f => ({ ...f, messageText: e.target.value }))}
-                        placeholder="Bericht… gebruik {{ name }} voor de naam"
-                        rows={5}
-                        style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
-                      />
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => setEditingId(null)}
-                          style={{ flex: 1, padding: '0.55rem', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>Annuleer</button>
-                        <button onClick={handleUpdate} disabled={!editForm.name.trim() || !editForm.messageText.trim() || editSaving}
-                          style={{ flex: 1, padding: '0.55rem', borderRadius: 9, background: 'rgba(168,85,247,0.2)', border: '1px solid rgba(168,85,247,0.5)', color: '#a855f7', fontSize: '0.75rem', fontWeight: 800, cursor: (!editForm.name.trim() || !editForm.messageText.trim() || editSaving) ? 'not-allowed' : 'pointer', opacity: (!editForm.name.trim() || !editForm.messageText.trim() || editSaving) ? 0.5 : 1 }}>
-                          {editSaving ? 'Opslaan…' : 'Opslaan'}
-                        </button>
-                      </div>
-                    </div>
-                  )
-                }
-
-                // ─── NORMALE WEERGAVE ───
-                return (
-                  <div
-                    key={c.id}
-                    style={{
-                      width: '100%', padding: '0.75rem 0.85rem', borderRadius: 11,
-                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                      opacity: noMsg ? 0.7 : 1,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: c.message_text ? '0.5rem' : 0 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {c.name || 'Naamloze campagne'}{c.variant_tag ? ` · ${c.variant_tag}` : ''}
-                        </div>
-                        <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
-                          {c.platform || 'instagram'}{c.purpose ? ` · ${c.purpose}` : ''}
-                        </div>
-                      </div>
-                      {/* Cijfers-knop */}
-                      <button onClick={() => wisselStats(c.id)} title="Cijfers van deze campagne"
-                        style={{ flexShrink: 0, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: openStats === c.id ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${openStats === c.id ? 'rgba(168,85,247,0.5)' : 'rgba(255,255,255,0.12)'}`, color: openStats === c.id ? '#a855f7' : 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-                        <BarChart2 size={13} />
-                      </button>
-                      {/* Bewerk-knop */}
-                      <button onClick={() => startEdit(c)} title="Bericht bewerken"
-                        style={{ flexShrink: 0, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-                        <Pencil size={13} />
-                      </button>
-                      {/* Verwijder-knop */}
-                      <button onClick={() => handleDelete(c)} disabled={deletingId === c.id} title="Campagne verwijderen"
-                        style={{ flexShrink: 0, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', cursor: deletingId === c.id ? 'wait' : 'pointer', opacity: deletingId === c.id ? 0.5 : 1 }}>
-                        <Trash2 size={13} />
-                      </button>
-                      {/* Start-knop */}
-                      <button onClick={() => !noMsg && onSelect(c)} disabled={noMsg}
-                        title={noMsg ? 'Deze campagne heeft geen bericht-tekst' : `Start ${c.name}`}
-                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.32rem 0.65rem', borderRadius: 8, fontSize: '0.62rem', fontWeight: 800, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.4)', color: '#a855f7', cursor: noMsg ? 'not-allowed' : 'pointer', opacity: noMsg ? 0.5 : 1 }}>
-                        <Send size={11} /> Start
-                      </button>
-                    </div>
-                    {openStats === c.id && (
-                      <CampagneCijfers
-                        laden={statsLaden}
-                        rij={stats?.get(c.id)}
-                        leadsFallback={c.auto_leads ?? 0}
-                      />
-                    )}
-                    {c.message_text && (
-                      <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '0.5rem 0.6rem' }}>
-                        {c.message_text}
-                      </div>
-                    )}
-                    {noMsg && <div style={{ fontSize: '0.62rem', color: 'rgba(239,68,68,0.7)', fontWeight: 700, marginTop: 4 }}>Geen bericht-tekst — klik op het potlood om er een toe te voegen.</div>}
-                  </div>
-                )
-              })}
+          {!loading && campaigns.length >= ZOEK_VANAF && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 1rem', borderBottom: `1px solid ${LIJN}` }}>
+              <Search size={14} color="rgba(255,255,255,0.35)" strokeWidth={2.8} style={{ flexShrink: 0 }} />
+              <input
+                value={zoek} onChange={e => setZoek(e.target.value)} placeholder="Zoek campagne…"
+                style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.86rem', fontWeight: 700, fontFamily: 'inherit' }}
+              />
+              {zoek && <button onClick={() => setZoek('')} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 2, display: 'flex' }}><X size={14} /></button>}
             </div>
           )}
-          <div style={{ marginTop: '0.85rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-            <Check size={12} style={{ flexShrink: 0, marginTop: 2 }} />
-            Gebruik <b style={{ color: 'rgba(255,255,255,0.55)' }}>{'{{ name }}'}</b> in je bericht — dat wordt automatisch de naam/handle van de lead. ([naam] en {'{first_name}'} werken ook.)
-          </div>
+
+          {loading ? (
+            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', fontWeight: 700 }}>Laden…</div>
+          ) : campaigns.length === 0 ? (
+            <div style={{ padding: '2.5rem 1.25rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.6 }}>
+              Nog geen campagnes.<br />Maak er hierboven een aan.
+            </div>
+          ) : zichtbaar.length === 0 ? (
+            <div style={{ padding: '2.5rem 1.25rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', fontWeight: 700 }}>
+              Geen campagne gevonden voor “{zoek}”.
+            </div>
+          ) : (
+            zichtbaar.map(c => (
+              editingId === c.id ? (
+                <div key={c.id} style={{ padding: '0.9rem 1rem', borderBottom: `1px solid ${LIJN_ZACHT}`, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>Campagne bewerken</div>
+                  <input
+                    value={editForm.name}
+                    onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Naam"
+                    style={veld}
+                  />
+                  <textarea
+                    value={editForm.messageText}
+                    onChange={(e) => setEditForm(f => ({ ...f, messageText: e.target.value }))}
+                    placeholder="Bericht… gebruik {{ name }} voor de naam"
+                    rows={5}
+                    style={{ ...veld, fontWeight: 600, resize: 'vertical', lineHeight: 1.45 }}
+                  />
+                  <NaamHint />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setEditingId(null)} style={knopKaal}>Annuleer</button>
+                    <button onClick={handleUpdate} disabled={!editForm.name.trim() || !editForm.messageText.trim() || editSaving}
+                      style={knopWit(!editForm.name.trim() || !editForm.messageText.trim() || editSaving)}>
+                      {editSaving ? 'Opslaan…' : 'Opslaan'}
+                    </button>
+                  </div>
+                  {/* Verwijderen hoort bij bewerken, niet bij kiezen: in de lijst
+                      stond het naast de startknop en dat is te dicht op elkaar. */}
+                  <button onClick={() => handleDelete(c)} disabled={deletingId === c.id}
+                    style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', padding: '0.3rem 0', color: '#ef4444', fontSize: '0.76rem', fontWeight: 800, fontFamily: 'inherit', cursor: deletingId === c.id ? 'wait' : 'pointer', opacity: deletingId === c.id ? 0.5 : 1 }}>
+                    {deletingId === c.id ? 'Verwijderen…' : 'Campagne verwijderen'}
+                  </button>
+                </div>
+              ) : (
+                <CampagneRegel
+                  key={c.id}
+                  c={c}
+                  cijfersAan={cijfersAan}
+                  statsLaden={statsLaden}
+                  rij={stats?.get(c.id)}
+                  onStart={() => onSelect(c)}
+                  onEdit={() => startEdit(c)}
+                />
+              )
+            ))
+          )}
         </div>
       </div>
     </div>,
@@ -293,62 +331,101 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
   )
 }
 
+function NaamHint() {
+  return (
+    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+      <b style={{ color: 'rgba(255,255,255,0.7)' }}>{'{{ name }}'}</b> wordt de naam van de lead. ([naam] en {'{first_name}'} werken ook.)
+    </div>
+  )
+}
+
+// Eén campagne. De regel zelf start hem; het potlood opent het bewerk-venster.
+function CampagneRegel({ c, cijfersAan, statsLaden, rij, onStart, onEdit }) {
+  const geenBericht = !c.message_text
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${LIJN_ZACHT}` }}>
+      <button
+        onClick={() => !geenBericht && onStart()}
+        disabled={geenBericht}
+        title={geenBericht ? 'Deze campagne heeft geen bericht-tekst' : `Start ${c.name}`}
+        style={{
+          flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
+          padding: '0.8rem 0.5rem 0.8rem 1rem', background: 'transparent', border: 'none',
+          textAlign: 'left', fontFamily: 'inherit',
+          cursor: geenBericht ? 'not-allowed' : 'pointer', opacity: geenBericht ? 0.55 : 1,
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0 }}>
+            <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {c.name || 'Naamloze campagne'}{c.variant_tag ? ` · ${c.variant_tag}` : ''}
+            </span>
+            <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+              {c.platform || 'instagram'}{c.purpose ? ` · ${c.purpose}` : ''}
+            </span>
+          </div>
+
+          {geenBericht ? (
+            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#f87171', marginTop: 3 }}>
+              Geen bericht — open het potlood om er een toe te voegen.
+            </div>
+          ) : (
+            <div style={{
+              fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45,
+              marginTop: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+              overflow: 'hidden', wordBreak: 'break-word',
+            }}>
+              {c.message_text}
+            </div>
+          )}
+
+          {cijfersAan && <CampagneCijfers laden={statsLaden} rij={rij} leadsFallback={c.auto_leads ?? 0} />}
+        </div>
+        <Send size={15} strokeWidth={2.8} color="rgba(255,255,255,0.75)" style={{ flexShrink: 0 }} />
+      </button>
+      <button onClick={onEdit} title="Campagne bewerken" aria-label="Campagne bewerken"
+        style={{ flexShrink: 0, width: 46, background: 'transparent', border: 'none', borderLeft: `1px solid ${LIJN_ZACHT}`, color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+        <Pencil size={14} strokeWidth={2.6} />
+      </button>
+    </div>
+  )
+}
+
 // Cijfers van één campagne. Alles gemeten ná het moment dat het
 // campagne-bericht de deur uitging (campaign_message_sent_at), zodat een
 // reactie van vóór de campagne het cijfer niet opblaast.
 function CampagneCijfers({ laden, rij, leadsFallback }) {
-  if (laden && !rij) {
-    return (
-      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', padding: '0.3rem 0 0.55rem' }}>
-        Cijfers ophalen…
-      </div>
-    )
-  }
+  const stil = { fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 6 }
+  if (laden && !rij) return <div style={stil}>Cijfers ophalen…</div>
 
   const totaal = rij?.total ?? leadsFallback
-  if (!totaal) {
-    return (
-      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', padding: '0.3rem 0 0.55rem' }}>
-        Nog geen leads aan deze campagne gekoppeld.
-      </div>
-    )
-  }
+  if (!totaal) return <div style={stil}>Nog geen leads gekoppeld.</div>
 
   const pct = (n) => (totaal > 0 ? `${Math.round((n / totaal) * 1000) / 10}%` : '—')
   const st = rij?.stages || { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 }
   const vakken = [
-    { label: 'Leads',       waarde: totaal,               titel: 'Leads met deze campagne als bron.' },
-    { label: 'Reacties',    waarde: st.replied,           sub: pct(st.replied),       titel: 'Leads die reageerden nádat het campagne-bericht verstuurd was.' },
-    { label: 'Voorgesteld', waarde: st.callProposed,      sub: pct(st.callProposed),  titel: 'Leads aan wie je daarna een call voorstelde.' },
-    { label: 'Ingepland',   waarde: st.callScheduled,     sub: pct(st.callScheduled), titel: 'Leads die daarna een call inplanden.' },
-    { label: 'Sales',       waarde: st.sale,              sub: pct(st.sale),          titel: 'Leads die daarna klant werden.' },
-    { label: 'Follow-ups',  waarde: rij?.followupCount ?? 0,                           titel: 'Opvolg-berichten die je naar leads van deze campagne stuurde.' },
+    { label: 'Leads',       waarde: totaal,                 titel: 'Leads met deze campagne als bron.' },
+    { label: 'Reacties',    waarde: st.replied,       sub: pct(st.replied),       titel: 'Leads die reageerden nádat het campagne-bericht verstuurd was.' },
+    { label: 'Voorgesteld', waarde: st.callProposed,  sub: pct(st.callProposed),  titel: 'Leads aan wie je daarna een call voorstelde.' },
+    { label: 'Ingepland',   waarde: st.callScheduled, sub: pct(st.callScheduled), titel: 'Leads die daarna een call inplanden.' },
+    { label: 'Sales',       waarde: st.sale,          sub: pct(st.sale),          titel: 'Leads die daarna klant werden.' },
+    { label: 'Follow-ups',  waarde: rij?.followupCount ?? 0,                      titel: 'Opvolg-berichten die je naar leads van deze campagne stuurde.' },
   ]
 
   const laatst = rij?.lastSentAt ? new Date(rij.lastSentAt) : null
   const uren = laatst ? (Date.now() - laatst.getTime()) / 3600000 : null
 
   return (
-    <div style={{
-      margin: '0 0 0.55rem', padding: '0.55rem 0.6rem', borderRadius: 9,
-      background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.22)',
-    }}>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))', gap: 6,
-      }}>
+    <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${LIJN_ZACHT}` }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
         {vakken.map(v => (
-          <div key={v.label} title={v.titel} style={{ textAlign: 'center', minWidth: 0 }}>
-            <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
-              {v.waarde}
-            </div>
-            <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)', letterSpacing: '0.02em', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {v.label}
-            </div>
-            {v.sub && (
-              <div style={{ fontSize: '0.58rem', fontWeight: 800, color: '#a855f7', fontVariantNumeric: 'tabular-nums' }}>
-                {v.sub}
-              </div>
-            )}
+          <div key={v.label} title={v.titel} style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{v.waarde}</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+              {v.label}{v.sub ? ` · ${v.sub}` : ''}
+            </span>
           </div>
         ))}
       </div>
@@ -358,15 +435,10 @@ function CampagneCijfers({ laden, rij, leadsFallback }) {
           dat je de campagne een uur geleden verstuurde. Alles hierboven meet
           vanaf dat moment — een reactie van vóór de campagne telt niet mee. */}
       {laatst && (
-        <div style={{
-          marginTop: 7, paddingTop: 6, borderTop: '1px solid rgba(168,85,247,0.18)',
-          fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.42)', lineHeight: 1.4,
-        }}>
+        <div style={{ marginTop: 5, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', lineHeight: 1.45 }}>
           {rij.sentCount} verstuurd · laatste{' '}
-          {uren < 24
-            ? `${Math.max(1, Math.round(uren))} uur geleden`
-            : laatst.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-          . Alles hierboven telt pas vanaf dat bericht.
+          {uren < 24 ? `${Math.max(1, Math.round(uren))} uur geleden` : laatst.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+          . Alles hierboven telt vanaf dat bericht.
         </div>
       )}
     </div>
