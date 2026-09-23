@@ -25,6 +25,16 @@ import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hour
 import SaleForm from './SaleForm'
 import { SaleLostReasonForm } from './SaleLostReasonModal'
 
+// Waarom een lead een call afzegt. Zelfde soort lijstje als bij een verloren
+// sale: vijf antwoorden die je echt hoort, plus ruimte om het zelf te typen.
+const AFZEG_REDENEN = [
+  'Kwam iets tussen',
+  'Te druk / geen tijd',
+  'Twijfelt over coaching',
+  'Geld komt nu niet uit',
+  'Ziek',
+]
+
 const LIJN = 'rgba(255,255,255,0.08)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.05)'
 
@@ -63,6 +73,7 @@ function CallRegel({ dc, onOutcome }) {
   const [open, setOpen] = useState(!dc.toekomstig)
   const [stap, setStap] = useState(dc.denktNa ? 'gevoerd' : 1)
   const [verzetten, setVerzetten] = useState(false)
+  const [afgezegd, setAfgezegd] = useState(false)
   const [denkt, setDenkt] = useState(false)
   // Sale: het bedrag hoort bij dezelfde handeling, dus vragen we het hier en
   // niet in een tweede venster dat er overheen springt.
@@ -158,15 +169,25 @@ function CallRegel({ dc, onOutcome }) {
         </div>
       )}
 
-      {open && stap === 'niet' && !verzetten && (
+      {open && stap === 'niet' && afgezegd && (
+        <SaleLostReasonForm
+          compact
+          vraag={`Waarom zegde ${dc.leadName || 'deze lead'} af?`}
+          opties={AFZEG_REDENEN}
+          onBack={() => setAfgezegd(false)}
+          onSave={(reason) => onOutcome(dc, 'afgezegd', { reason })}
+        />
+      )}
+
+      {open && stap === 'niet' && !verzetten && !afgezegd && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={knop('#f97316')} onClick={() => onOutcome(dc, 'noShow')}><UserX size={13} strokeWidth={3} /> No show</button>
-          <button style={knop('#a855f7')} onClick={() => onOutcome(dc, 'afgezegd')}><CalendarX size={13} strokeWidth={3} /> Afgezegd</button>
+          <button style={knop('#a855f7')} onClick={() => setAfgezegd(true)}><CalendarX size={13} strokeWidth={3} /> Afgezegd</button>
           <button style={knop('#06b6d4')} onClick={() => setVerzetten(true)}><CalendarClock size={13} strokeWidth={3} /> Verplaatst</button>
         </div>
       )}
 
-      {open && stap === 'niet' && verzetten && (
+      {open && stap === 'niet' && verzetten && !afgezegd && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <input type="date" value={datum} onChange={e => setDatum(e.target.value)} style={veld(2)} />
           <input type="time" value={tijd} onChange={e => setTijd(e.target.value)} style={veld(1)} />

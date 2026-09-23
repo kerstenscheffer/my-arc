@@ -1433,7 +1433,7 @@ export default function KanbanBoard({
       if (kind === 'afgezegd') {
         // Lead heeft de call afgezegd → call annuleren (telt niet als no-show)
         // en terug naar "Call voorgesteld" zodat je 'm opnieuw kunt inplannen.
-        const resAfg = await leadService.cancelScheduledCall(dc.movementId)
+        const resAfg = await leadService.cancelScheduledCall(dc.movementId, extra.reason || null)
         if (!meldMislukt(resAfg, dc)) return
         const proposed = sections.find(s => s.id !== 'unassigned' && /voorgesteld|voorstel/i.test(s.title || ''))
         if (proposed) await handleMoveLeadToSection(lead, dc.sectionId, proposed.id)

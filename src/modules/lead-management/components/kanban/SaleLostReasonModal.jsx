@@ -26,12 +26,14 @@ const chip = (active) => ({
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })
 
-// De reden-keuze zelf. Eén component, twee plekken — als los venster na het
-// slepen naar "Sale verloren", en direct in de call-lijst na "Verloren", zodat
-// daar geen tweede venster overheen springt.
+// De reden-keuze zelf. Eén component, meerdere plekken — als los venster na
+// het slepen naar "Sale verloren", en in de call-lijst na "Verloren" of na
+// "Afgezegd", zodat daar geen tweede venster overheen springt.
 //   onSave(reason)  — reason is null bij "Overslaan"
 //   onBack          — optioneel; toont een "Terug"-knop i.p.v. alleen overslaan
-export function SaleLostReasonForm({ leadName, onSave, onBack, compact = false }) {
+//   vraag / opties  — andere vraag met andere antwoorden (bv. een afzegging)
+export function SaleLostReasonForm({ leadName, onSave, onBack, compact = false, vraag, opties }) {
+  const lijst = opties || PRESET_REASONS
   const [selected, setSelected] = useState(null)
   const [other, setOther] = useState('')
   const leeg = !selected && !other.trim()
@@ -49,10 +51,10 @@ export function SaleLostReasonForm({ leadName, onSave, onBack, compact = false }
   return (
     <div>
       <label style={{ display: 'block', fontSize: compact ? '0.66rem' : '0.8rem', fontWeight: compact ? 700 : 600, color: compact ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.6)', marginBottom: compact ? 6 : 10 }}>
-        Wat was de objectie bij {leadName || 'deze lead'}?
+        {vraag || `Wat was de objectie bij ${leadName || 'deze lead'}?`}
       </label>
       <div style={{ display: 'grid', gap: compact ? 6 : 8, marginBottom: compact ? '0.6rem' : '0.9rem' }}>
-        {PRESET_REASONS.map(r => (
+        {lijst.map(r => (
           <div key={r} onClick={() => { setSelected(r); setOther('') }} style={chip(selected === r)}>{r}</div>
         ))}
         <div onClick={() => setSelected('__other__')} style={chip(selected === '__other__')}>Anders…</div>

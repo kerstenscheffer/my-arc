@@ -1155,10 +1155,17 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // Ingeplande call geannuleerd (lead heeft afgezegd). call_happened=false zodat
   // 'ie van de due-lijst af is, + outcome_type='cancelled' zodat de no-show-stat
   // 'm NIET meetelt (afzeggen ≠ niet komen opdagen).
-  async cancelScheduledCall(movementId) {
+  // `reden` is optioneel: waarom de lead afzegde. Hij landt op de call-rij
+  // zelf, niet op de verplaatsing erna — daar hoort hij, want het gaat over
+  // deze afspraak.
+  async cancelScheduledCall(movementId, reden = null) {
     try {
       return await this.schrijfCallUitkomst(movementId,
-        { call_happened: false, outcome_type: 'cancelled' }, 'cancelScheduledCall')
+        {
+          call_happened: false,
+          outcome_type: 'cancelled',
+          ...(reden ? { rejection_reason: reden } : {}),
+        }, 'cancelScheduledCall')
     } catch (e) {
       console.error('cancelScheduledCall failed:', e)
       return { success: false, error: e.message }
