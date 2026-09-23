@@ -1,15 +1,20 @@
 // src/pages/SixteenWeekCheckout.jsx
 // Checkout op /16-week-checkout — EENMALIG €497, 16 weken / 4 maanden traject.
-// Duplicaat van TwelveWeekCheckout.jsx (zelfde opmaak/copy), andere prijs.
 //
-// Opmaak + copy zijn overgenomen van /16week (src/sales-call-16week/):
-// full-screen snap-secties op #0a0a0a, hero → 3 losse pijler-schermen → offer
-// → formulier, met nav-dots rechts.
+// Opmaak en beeld zijn die van /16week: de banner met de titel erop, de drie
+// iconen die schermvullende vensters openen, en de investering met de reviews.
+// Wat van de checkout blijft: de prijs, de garantie en het afrekenen. De
+// gegevens vraagt een blad dat openschuift, niet een formulier dat altijd
+// openstaat.
 //
 // Stripe: /api/create-checkout-session (one-time), plan '16-week-program'.
+//
+// Bewust een kopie van /16week en geen gedeelde component: die pagina mag
+// hierdoor niet stukgaan, en de twee lopen uit elkaar zodra de copy per
+// pagina verandert.
 
-import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown } from 'lucide-react'
+import { useState, useEffect, useRef, Fragment } from 'react'
+import { Star, Lock, Mail, User, Phone, ChevronDown, X, Compass, ListChecks, Target, HelpCircle, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, ClipboardCheck, LineChart, SlidersHorizontal, Video } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 497
@@ -21,12 +26,20 @@ const STRIPE_PRICE_ID = 'price_1U6oNiJ3V4uXn1Okl1DG5TDD'
 // Same Stripe publishable key as the other checkouts.
 const STRIPE_PK = 'pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54'
 
+// Wat er op de investering-sectie staat. Dit is het bedrag dat je hier ook
+// écht afrekent — op /16week staat een ander bedrag.
+const INVESTERING = { bedrag: `€${PRICE}`, periode: 'eenmalig · 4 maanden traject' }
+
 const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
-const BG = '#0a0a0a'
+// Puur zwart: de fades in de banners lopen naar #000, dus elke andere
+// donkergrijze tint geeft een zichtbare rand rond het beeld.
+const BG = '#000000'
 
-// Hero(0) + 3 pijlers(1-3) + offer(4) + formulier(5).
-const SECTION_COUNT = 6
+// Offer(0) + formulier(1). Het hero-scherm is weg: je komt hier met een
+// beslissing in je hoofd, dus je begint bij het aanbod. Trustpilot en de
+// transformaties staan verderop, bij de reviews onder het formulier.
+const SECTION_COUNT = 2
 
 const REVIEWS = [
   { name: 'Hessel', date: 'dec 2025', text: 'Kersten begreep het meteen! Na een uitgebreide 0-meting kreeg ik een plan op maat. Van 79,8 naar 74,4 in 8 weken. Als jij je aan het plan houdt geeft Kersten altijd de volle 100%!' },
@@ -40,44 +53,500 @@ const REVIEWS = [
 // Transformatie-reviews (before/after) met resultaat-tekst.
 const TRANSFORMATIONS = [
   { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
-  { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
+  { src: '/review-transformatie-2-16week.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
+// De slider draait reviews en transformatiefoto's door elkaar, zodat de
+// foto's meeschuiven in plaats van er als los blok boven te staan.
+const SLIDES = REVIEWS.flatMap((review, i) => {
+  const foto = i === 1 ? TRANSFORMATIONS[0] : i === 3 ? TRANSFORMATIONS[1] : null
+  return foto ? [{ soort: 'review', ...review }, { soort: 'foto', ...foto }] : [{ soort: 'review', ...review }]
+})
+
 // De 3 pijlers — copy gelijk aan /16week (OfferPilarenSection).
-const PILAREN = [
+// ── De methode: schermvullend, één pijler per slide ─────────────────────────
+//
+// Drie pijlers zijn drie verhalen; in een lijstje van drie regels lees je ze
+// als opsomming. Als slide krijgt elke pijler het hele scherm: foto, wat het
+// is, en wat we concreet gaan doen.
+const PIJLERS = [
   {
-    category: 'Voeding',
-    title: 'Weet Wat Je Eet Systeem',
-    subtitle: 'Een aanpak die bij jou past — ook op verjaardagen, feestjes en vakanties.',
-    bullets: [
-      { label: 'Weten wat je eet', text: 'vaste structuur in de app, zonder rekenen' },
-      { label: 'Flexibel', text: 'meedoen met etentjes, een biertje, vakantie — inbouwen, niet wegstrepen' },
+    // Op dit beeld staan de titel en de kernwoorden al; die laten we dan ook
+    // weg uit de tekst eronder, anders staat alles er twee keer.
+    foto: '/methode/voeding-slide.jpg',
+    beeldVult: true,
+    // De titel staat op dit beeld, dus de pagina zet er geen tweede boven.
+    titelInBeeld: true,
+    kop: 'Weet wat je eet',
+    zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
+    doen: [
+      { Icon: ClipboardList, kop: 'Structuur',     tekst: 'Plan staat klaar. Nul denkwerk.' },
+      { Icon: Utensils,      kop: 'Keuze',         tekst: '500 gerechten in jouw plan.' },
+      { Icon: PartyPopper,   kop: 'Flexibiliteit', tekst: 'Etentjes leren we mee omgaan.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',     tekst: 'Weten dat het klopt.' },
     ],
-    images: ['/sales-screenshots/eten.png', '/sales-screenshots/meedoen.png'],
   },
   {
-    category: 'Training',
-    title: 'Elke Training Telt Methode',
-    subtitle: 'Schema op maat, uitleg per oefening, feedback op jouw uitvoering.',
-    bullets: [
-      { label: 'Effectief', text: 'workouts onder een uur, thuis of in de gym' },
-      { label: 'Begeleiding', text: "uitlegvideo's + persoonlijke bijsturing" },
+    foto: '/methode/training-slide.jpg',
+    beeldVult: true,
+    titelInBeeld: true,
+    kop: 'Elke training telt',
+    zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
+    doen: [
+      { Icon: ClipboardList, kop: 'Schema',           tekst: 'Jouw dagen, locatie, niveau.' },
+      { Icon: Crosshair,     kop: 'Focus',            tekst: 'Alleen wat telt.' },
+      { Icon: TrendingUp,    kop: 'Resultaatgericht', tekst: 'Zie dat het werkt.' },
+      { Icon: ShieldCheck,   kop: 'Zekerheid',        tekst: 'Hoe, hoeveel, welke. Nooit twijfelen.' },
     ],
-    images: ['/sales-screenshots/trainen.png'],
   },
   {
-    category: 'Begeleiding',
-    title: 'Coach In Jouw Corner',
-    subtitle: 'Ik kijk meerdere keren per week met je mee — we zien allebei dat het werkt.',
-    bullets: [
-      { label: 'Wekelijkse check-in call', text: 'toegang tot mijn agenda' },
-      { label: 'Snel bereikbaar', text: 'via de app' },
-      { label: 'Ik kijk mee', text: "gewicht, kracht en foto's — progressie zwart-op-wit" },
-      { label: 'Accountability', text: 'je hoeft het niet alleen te doen — ik hou je scherp en op koers' },
+    foto: '/methode/begeleiding-slide.jpg',
+    beeldVult: true,
+    titelInBeeld: true,
+    kop: 'Coach in jouw corner',
+    zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
+    doen: [
+      { Icon: LineChart,          kop: 'Cijfers',   tekst: 'Kijk dagelijks mee, stuur op data.' },
+      { Icon: SlidersHorizontal,  kop: 'Bijsturen', tekst: 'Stilstaan is geen optie.' },
+      { Icon: ClipboardCheck,     kop: 'Check-in',  tekst: 'Wat liep vast, wat gaat anders.' },
+      { Icon: Video,              kop: 'Weekcall',  tekst: 'Wat werkt, wat niet.' },
     ],
-    images: ['/sales-screenshots/coach.png', '/sales-screenshots/tracking.png'],
   },
 ]
+
+function MethodeSlider({ isMobile, onClose, onBetaal, knopLabel }) {
+  const [i, setI] = useState(0)
+  const raakX = useRef(null)
+  const p = PIJLERS[i]
+  const naar = (n) => setI(Math.max(0, Math.min(PIJLERS.length - 1, n)))
+
+  useEffect(() => {
+    const toets = (e) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft') setI(v => Math.max(0, v - 1))
+      // Pijl naar rechts en Enter doen hetzelfde: verder, en op de laatste
+      // slide sluiten.
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        setI(v => {
+          if (v >= PIJLERS.length - 1) { onClose(); return v }
+          return v + 1
+        })
+      }
+    }
+    window.addEventListener('keydown', toets)
+    return () => window.removeEventListener('keydown', toets)
+  }, [onClose])
+
+  return (
+    <div
+      // Klikken in het venster gaat naar de volgende slide; knoppen en
+      // bolletjes vangen hun eigen klik af.
+      onClick={(e) => {
+        if (e.target.closest('button')) return
+        if (i >= PIJLERS.length - 1) onClose()
+        else naar(i + 1)
+      }}
+      onTouchStart={(e) => { raakX.current = e.touches[0].clientX }}
+      onTouchEnd={(e) => {
+        if (raakX.current == null) return
+        const verschil = e.changedTouches[0].clientX - raakX.current
+        if (Math.abs(verschil) > 50) naar(i + (verschil < 0 ? 1 : -1))
+        raakX.current = null
+      }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: BG, color: '#fff',
+        display: 'flex', flexDirection: 'column',
+        animation: 'bladWaas 0.2s ease',
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      }}
+    >
+      {/* Foto over de volle breedte, met de kop er half overheen. */}
+      {/* Beeld met tekst erop krijgt een vaste verhouding van 16:5, zodat wat
+          je exporteert ook precies is wat je ziet: geen bijsnijden, geen zwarte
+          balken. De gewone foto's blijven een band met vaste hoogte. */}
+      <div style={{
+        position: 'relative', width: '100%', flexShrink: 0,
+        ...(p.beeldVult
+          ? { aspectRatio: '49 / 15' }   // 1960x600, exact de verhouding van het beeld
+          : { height: isMobile ? '34vh' : 'min(46vh, 460px)' }),
+      }}>
+        <div key={p.foto} style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${p.foto})`,
+          backgroundSize: 'cover',
+          // Staat de tekst op het beeld, dan houden we de onderkant vast: daar
+          // staat de titel. Bijsnijden gebeurt dan bovenin.
+          backgroundPosition: p.beeldVult ? 'center bottom' : 'center',
+          backgroundRepeat: 'no-repeat',
+          animation: 'pijlerIn 0.35s ease',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          // Beeld dat zelf al tekst draagt laten we helemaal met rust: geen
+          // fade, anders vreet die de onderste regel op. De gewone foto's
+          // lopen wel naar zwart, daar staat de kop overheen.
+          background: p.beeldVult
+            ? `linear-gradient(180deg, rgba(0,0,0,0) 86%, ${BG} 100%)`
+            : `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 30%, rgba(0,0,0,0.8) 72%, ${BG} 100%)`,
+        }} />
+        <button
+          onClick={onClose}
+          aria-label="Sluiten"
+          style={{
+            position: 'absolute', top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 12 : 20}px)`,
+            right: isMobile ? 12 : 20,
+            width: 40, height: 40, padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 12, color: '#fff', cursor: 'pointer',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <X size={18} strokeWidth={2.8} />
+        </button>
+      </div>
+
+      {/* Tekst: wat het is, en wat we gaan doen. */}
+      <div style={{
+        flex: 1, minHeight: 0, overflowY: 'auto',
+        padding: isMobile ? '0 1.25rem 6rem' : '0 2rem 6.5rem',
+      }}>
+        <div style={{
+          maxWidth: 1100, width: '100%', margin: '0 auto', position: 'relative',
+          marginTop: p.beeldVult ? (isMobile ? '2.5rem' : '4.5rem') : (isMobile ? -18 : -28),
+        }}>
+          {/* Het label 'PIJLER x VAN 3' blijft weg als het beeld al tekst
+              draagt; de titel staat er altijd, zodat elke slide op de pagina
+              zelf zijn kop heeft. */}
+          {!p.beeldVult && (
+            <div style={{
+              fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
+              letterSpacing: '0.16em', color: GOLD, marginBottom: isMobile ? 8 : 12,
+            }}>
+              PIJLER {i + 1} VAN {PIJLERS.length}
+            </div>
+          )}
+          {!p.titelInBeeld && (
+            <div style={{
+              fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900,
+              letterSpacing: '-0.03em', lineHeight: 1.08,
+              textShadow: '0 2px 14px rgba(0,0,0,0.85)',
+            }}>
+              <span style={{ color: GOLD }}>{i + 1}. </span>
+              {p.kop}
+            </div>
+          )}
+          {!p.beeldVult && (
+            <p style={{
+              margin: `${isMobile ? 10 : 14}px 0 ${isMobile ? '1.4rem' : '2rem'}`,
+              fontSize: isMobile ? '0.95rem' : '1.2rem', fontWeight: 600,
+              color: 'rgba(255,255,255,0.65)', lineHeight: 1.45,
+            }}>
+              {p.zin}
+            </p>
+          )}
+
+          {/* Zelfde opzet als het eerste scherm: gelijke kolommen met het
+              icoon boven een bold wit woord, en de zin eronder. Zo leest elke
+              slide hetzelfde als de knoppenrij op de homeslide. */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${p.doen.length}, 1fr)`,
+            gap: isMobile ? '1.75rem 1rem' : '3.5rem',
+            width: '100%',
+            maxWidth: isMobile ? '100%' : 1250,
+            margin: '0 auto',
+          }}>
+            {p.doen.map((regel) => (
+              <div key={regel.kop || regel.tekst} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: isMobile ? 9 : 16, textAlign: 'center',
+              }}>
+                <regel.Icon size={isMobile ? 32 : 60} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.95rem' : '1.45rem', fontWeight: 900,
+                  color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15,
+                }}>
+                  {regel.kop || regel.tekst}
+                </span>
+                {regel.kop && regel.tekst && (
+                  <span style={{
+                    fontSize: isMobile ? '0.82rem' : '1.05rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.55)', lineHeight: 1.4,
+                  }}>
+                    {regel.tekst}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bladeren doe je met de pijltjestoetsen, Enter, een klik in het
+          venster of een swipe. De enige knop onderin is die naar de
+          betaling — die blijft staan, zodat je niet eerst terug hoeft. */}
+      <button
+        onClick={onBetaal}
+        style={{
+          position: 'absolute',
+          left: '50%',
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '1.25rem' : '1.75rem'})`,
+          transform: 'translateX(-50%)',
+          zIndex: 5,
+          display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+          padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem',
+          borderRadius: 999, border: 'none',
+          background: '#fff', color: '#000',
+          fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 24px rgba(255,255,255,0.12)',
+          letterSpacing: '0.01em', whiteSpace: 'nowrap', fontFamily: 'inherit',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {knopLabel}
+      </button>
+    </div>
+  )
+}
+
+// ── De voorwaarden: schermvullend, zelfde opzet als de methode-slides ──────
+//
+// De garantie stond al op de oude prijs-sectie: geen succesvolle
+// transformatie, investering terug. Hier staat wat er van jou verwacht wordt
+// om er aanspraak op te maken. Alle drie, niet één van de drie.
+const GARANTIE_KAARTEN = [
+  { Icon: Target,          kop: 'Je volgt het plan' },
+  { Icon: ClipboardCheck,  kop: 'Je vult je check-ins in' },
+  { Icon: Video,           kop: 'Je bent op de weekcall' },
+]
+
+function VoorwaardenVenster({ isMobile, onClose, onBetaal, knopLabel }) {
+  useEffect(() => {
+    const toets = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', toets)
+    return () => window.removeEventListener('keydown', toets)
+  }, [onClose])
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: BG, color: '#fff',
+        display: 'flex', flexDirection: 'column',
+        animation: 'bladWaas 0.2s ease',
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      }}
+    >
+      {/* Banner met de titel erop, net als bij de methode. */}
+      <div style={{
+        position: 'relative', width: '100%', flexShrink: 0,
+        // Geen maxHeight: die maakte het vak lager dan de verhouding van de
+        // foto, waardoor cover de bovenkant eraf sneed.
+        ...({ aspectRatio: '49 / 15' }),
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'url(/voorwaarden-banner.jpg)',
+          backgroundSize: 'cover', backgroundPosition: 'center bottom',
+        }} />
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          height: '14%', pointerEvents: 'none',
+          background: `linear-gradient(180deg, rgba(0,0,0,0) 0%, ${BG} 100%)`,
+        }} />
+        <button
+          onClick={onClose}
+          aria-label="Sluiten"
+          style={{
+            position: 'absolute', top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 12 : 20}px)`,
+            right: isMobile ? 12 : 20,
+            width: 40, height: 40, padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 12, color: '#fff', cursor: 'pointer',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <X size={18} strokeWidth={2.8} />
+        </button>
+      </div>
+
+      <div style={{
+        flex: 1, minHeight: 0, overflowY: 'auto',
+        padding: isMobile ? '0 1.25rem 1.5rem' : '0 2rem 2.5rem',
+      }}>
+        <div style={{
+          maxWidth: 1250, width: '100%', margin: '0 auto',
+          marginTop: isMobile ? '0.5rem' : '0.75rem',
+          // Kolom over de volle hoogte, zodat de slotzin onderaan het scherm
+          // kan staan in plaats van vlak onder de iconen.
+          minHeight: '100%', display: 'flex', flexDirection: 'column',
+        }}>
+          {/* Hiërarchie: de belofte staat groot bovenaan, daarna wat we van
+              je vragen, dan de slotzin. */}
+          <div style={{
+            fontSize: isMobile ? '1.75rem' : '2.8rem', fontWeight: 900,
+            letterSpacing: '-0.035em', lineHeight: 1.1, textAlign: 'center',
+            maxWidth: 820, margin: '0 auto',
+          }}>
+            Geen transformatie, <span style={{ color: GOLD }}>je investering terug</span>.
+          </div>
+
+          {/* Eén regel: de drie dingen die we van je vragen, met 'en'
+              ertussen. Zelfde vorm als de knoppen op het eerste scherm:
+              icoon boven een bold wit woord. */}
+          {/* Een streep in plaats van een kopje: hij scheidt de zin van de
+              drie voorwaarden zonder zelf gelezen te willen worden. */}
+          <div style={{
+            width: isMobile ? 120 : 180, height: 1,
+            margin: `${isMobile ? '1.25rem' : '1.75rem'} auto 0`,
+            background: 'rgba(255,255,255,0.35)',
+          }} />
+
+          <div style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: 'center', justifyContent: 'center',
+            gap: isMobile ? '0.9rem' : '2.75rem',
+            marginTop: isMobile ? '1rem' : '1.25rem',
+          }}>
+            {GARANTIE_KAARTEN.map((g, n) => (
+              <Fragment key={g.kop}>
+                {n > 0 && (
+                  <span style={{
+                    fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800,
+                    color: 'rgba(255,255,255,0.25)', alignSelf: isMobile ? 'center' : 'flex-start',
+                    marginTop: isMobile ? 0 : 14,
+                  }}>
+                    of
+                  </span>
+                )}
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: isMobile ? 7 : 10, textAlign: 'center',
+                  width: isMobile ? '100%' : 300,
+                }}>
+                  <g.Icon size={isMobile ? 24 : 34} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                  <span style={{
+                    fontSize: isMobile ? '0.9rem' : '1.15rem', fontWeight: 900,
+                    color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
+                    whiteSpace: isMobile ? 'normal' : 'nowrap',
+                  }}>
+                    {g.kop}
+                  </span>
+                </div>
+              </Fragment>
+            ))}
+          </div>
+
+          <p style={{
+            margin: `${isMobile ? '2rem' : '3rem'} auto ${isMobile ? '0.5rem' : '1rem'}`,
+            marginTop: 'auto',
+            maxWidth: 900, width: '100%', textAlign: 'center',
+            paddingTop: isMobile ? '1.25rem' : '1.75rem',
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+            fontSize: isMobile ? '1.2rem' : '1.75rem', fontWeight: 900,
+            color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.25,
+          }}>
+            {/* Eén regel: afbreken haalt de klap uit de zin. */}
+            <span style={{ whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+              Doe je dat 16 weken lang, dan sta je er anders bij. Of je krijgt je geld terug.
+            </span>
+          </p>
+
+          {/* Vanaf hier hoef je niet terug te bladeren: de knop staat eronder. */}
+          <button
+            onClick={onBetaal}
+            style={{
+              width: '100%', maxWidth: 420,
+              margin: `${isMobile ? '1.25rem' : '1.5rem'} auto 0`,
+              minHeight: isMobile ? 54 : 60, borderRadius: 14, border: 'none',
+              background: '#fff', color: '#000',
+              fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+              letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 24px rgba(255,255,255,0.14)',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {knopLabel}
+          </button>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Blad dat vanaf de onderkant openschuift ──────────────────────────────────
+// Zelfde vorm als het blad in het log-scherm van de app: de pagina erachter
+// vervaagt, het blad komt van onderen omhoog en groeit mee met zijn inhoud tot
+// 80% van het scherm. Bewust lokaal en niet geïmporteerd uit de app-modules:
+// dit is een publieke verkooppagina die op zichzelf moet staan.
+function Blad({ open, titel, onClose, isMobile, children }) {
+  if (!open) return null
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(0,0,0,0.82)',
+        backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+        // Op telefoon schuift hij van onder in beeld, op desktop staat hij
+        // midden op het scherm: daar is onderaan plakken alleen maar ver weg.
+        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
+        padding: isMobile ? 0 : '2rem',
+        animation: 'bladWaas 0.2s ease',
+      }}
+    >
+      <div style={{
+        width: '100%', maxWidth: 520,
+        background: BG,
+        borderRadius: isMobile ? '18px 18px 0 0' : 18,
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderBottom: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
+        maxHeight: isMobile ? '80vh' : '84vh',
+        display: 'flex', flexDirection: 'column',
+        animation: `${isMobile ? 'bladOmhoog' : 'bladIn'} 0.28s cubic-bezier(0.22, 1, 0.36, 1)`,
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: isMobile ? '1rem 1.15rem' : '1.1rem 1.35rem',
+          borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0,
+        }}>
+          <span style={{ fontSize: isMobile ? '1rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
+            {titel}
+          </span>
+          <button
+            onClick={onClose}
+            aria-label="Sluit"
+            style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              fontSize: '1rem', fontWeight: 700, fontFamily: 'inherit', lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        <div style={{
+          flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          padding: isMobile ? '0.9rem 1.15rem' : '1rem 1.35rem',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)',
+          textAlign: 'left',
+        }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── Trustpilot-badge — identiek aan /16week ──────────────────────────────────
 function TrustpilotBadge({ size = 'sm', style }) {
@@ -101,145 +570,30 @@ function TrustpilotBadge({ size = 'sm', style }) {
   )
 }
 
-// ── Pijler-scherm — één pijler per volledig scherm (zoals /16week) ───────────
-function PijlerSection({ isMobile, index }) {
-  const p = PILAREN[index]
-  // Om en om links/rechts op desktop voor ritme tussen de schermen.
-  const imgFirst = index % 2 === 0
-
-  return (
-    <section style={{
-      scrollSnapAlign: 'start',
-      minHeight: isMobile ? '100dvh' : '100vh',
-      background: BG,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: isMobile ? '4rem 1.25rem' : '5.5rem 2rem',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      {/* Subtiele gouden glow */}
-      <div style={{
-        position: 'absolute', top: '50%', left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '600px', height: '600px',
-        background: 'radial-gradient(circle, rgba(255,186,9,0.04) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* Accentlijn bovenaan */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
-        background: `linear-gradient(90deg, transparent, ${GOLD}30, transparent)`,
-      }} />
-
-      <div style={{ maxWidth: '960px', width: '100%', position: 'relative', zIndex: 2 }}>
-        {/* Methode-eyebrow — continuïteit tussen de 3 pijler-schermen */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '2.25rem' }}>
-          <span style={{
-            fontSize: isMobile ? '0.55rem' : '0.58rem', fontWeight: 800, letterSpacing: '0.15em',
-            color: 'rgba(255,255,255,0.5)',
-          }}>MY ARC-METHODE · {index + 1}/{PILAREN.length}</span>
-        </div>
-
-        <div style={{
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : (imgFirst ? 'row-reverse' : 'row'),
-          alignItems: 'center',
-          gap: isMobile ? '1.75rem' : '3rem',
-        }}>
-          {/* Beeld-kolom */}
-          <div style={{
-            flex: isMobile ? 'none' : '0 0 42%',
-            maxWidth: isMobile ? '72%' : '42%',
-            width: isMobile ? '72%' : undefined,
-            margin: isMobile ? '0 auto' : undefined,
-            display: 'flex',
-            gap: isMobile ? '0.5rem' : '0.65rem',
-            alignItems: 'center', justifyContent: 'center',
-          }}>
-            {p.images.map((src) => (
-              <div key={src} style={{ flex: 1, minWidth: 0, borderRadius: '14px', overflow: 'hidden', filter: 'drop-shadow(0 12px 26px rgba(0,0,0,0.55))' }}>
-                <img
-                  src={src}
-                  alt={p.title}
-                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                  style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Tekst-kolom */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{
-              fontSize: isMobile ? '1.55rem' : '2.35rem',
-              fontWeight: 900, color: '#fff', margin: `0 0 ${isMobile ? '0.6rem' : '0.75rem'}`,
-              lineHeight: 1.12, letterSpacing: '-0.02em',
-            }}>
-              <span style={{ display: 'block', fontSize: isMobile ? '0.75rem' : '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '0.04em', marginBottom: '0.25rem' }}>
-                PIJLER {index + 1}: {p.category.toUpperCase()}
-              </span>
-              {p.title}
-            </h3>
-
-            <p style={{
-              margin: `0 0 ${isMobile ? '0.85rem' : '1.1rem'}`,
-              fontSize: isMobile ? '0.95rem' : '1.1rem',
-              fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
-            }}>{p.subtitle}</p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.55rem' : '0.65rem' }}>
-              {p.bullets.map((b, j) => (
-                <div key={j} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
-                  <span style={{ flexShrink: 0, marginTop: isMobile ? 7 : 8, width: 6, height: 6, borderRadius: '50%', background: GOLD }} />
-                  <p style={{ margin: 0, fontSize: isMobile ? '0.9rem' : '1rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, fontWeight: 500 }}>
-                    <span style={{ color: '#fff', fontWeight: 800 }}>{b.label}:</span> {b.text}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 export default function SixteenWeekCheckout() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // De gegevens staan in een blad dat openschuift, niet permanent op de pagina.
+  const [formOpen, setFormOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [current, setCurrent] = useState(0)
   const scrollRef = useRef(null)
   const containerRef = useRef(null)
   const offerRef = useRef(null)
   const formRef = useRef(null)
-  // Zwevende "Investering"-knop: zichtbaar tot je de offer-sectie bereikt.
-  const [showInvestBtn, setShowInvestBtn] = useState(true)
+  // Wat er onder de twee knoppen openklapt: 'methode', 'voorwaarden' of niets.
+  const [open, setOpen] = useState(null)
+  // Volledig scherm: handig als je de pagina op een groot scherm laat zien.
+  const [volledig, setVolledig] = useState(false)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
-  }, [])
-
-  useEffect(() => {
-    const target = offerRef.current
-    const root = containerRef.current
-    if (!target || !root) return
-    const obs = new IntersectionObserver(
-      ([entry]) => setShowInvestBtn(!entry.isIntersecting),
-      { root, threshold: 0.15 }
-    )
-    obs.observe(target)
-    return () => obs.disconnect()
   }, [])
 
   // Actieve sectie bijhouden voor de nav-dots.
@@ -261,7 +615,6 @@ export default function SixteenWeekCheckout() {
     return () => observer.disconnect()
   }, [])
 
-  const scrollToOffer = () => offerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   // Basis voor elke sectie: één scherm hoog, inhoud verticaal gecentreerd.
@@ -271,7 +624,7 @@ export default function SixteenWeekCheckout() {
     background: BG,
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    padding: isMobile ? '3.5rem 1.25rem' : '5rem 2rem',
+    padding: isMobile ? '3.5rem 1.25rem' : '4rem 3rem',
     position: 'relative',
   }
 
@@ -302,6 +655,17 @@ export default function SixteenWeekCheckout() {
       el.removeEventListener('touchend', resume)
     }
   }, [])
+
+  useEffect(() => {
+    const kijk = () => setVolledig(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', kijk)
+    return () => document.removeEventListener('fullscreenchange', kijk)
+  }, [])
+
+  const wisselVolledig = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.()
+    else document.documentElement.requestFullscreen?.().catch(() => {})
+  }
 
   const handleCheckout = async () => {
     if (!name || !email) {
@@ -337,7 +701,7 @@ export default function SixteenWeekCheckout() {
     }
   }
 
-  const doubledReviews = [...REVIEWS, ...REVIEWS]
+  const doubledSlides = [...SLIDES, ...SLIDES]
 
   return (
     <div style={{ background: BG }}>
@@ -355,234 +719,281 @@ export default function SixteenWeekCheckout() {
         }}
       >
 
-        {/* ══ SCHERM 1: HERO ══ */}
-        <section style={{ ...screen, padding: isMobile ? '3rem 0' : '4.5rem 0' }}>
-          <img
-            src="/ma-logo-header.png"
-            alt="MY ARC"
-            style={{
-              width: isMobile ? 104 : 132, height: 'auto',
-              marginBottom: isMobile ? '1rem' : '1.25rem',
-              flexShrink: 0,
-            }}
-          />
+        {/* ══ SCHERM 1: OFFER ══ */}
+        <section ref={offerRef} style={{ ...screen, textAlign: 'center', padding: 0, justifyContent: 'flex-start' }}>
+          {/* Foto bovenaan die onderin dood loopt in het zwart; de kop valt er
+              net overheen. Zelfde truc als de koppen in de app. */}
+          {/* Het vak heeft dezelfde verhouding als de foto (1200x600, dus 2:1),
+              want anders sneed cover er op desktop meer dan de helft af: een
+              venster van 1440 breed en 300 hoog is 4,8:1. Op desktop begrenzen
+              we de breedte, zodat de hoogte binnen het scherm blijft. */}
+          {/* Op desktop loopt de foto van rand tot rand; de hoogte is
+              begrensd zodat de kop eronder nog in beeld valt. Op telefoon
+              houden we de echte 2:1-verhouding aan, daar past hij precies. */}
+          {/* De herofoto draagt het logo en de titel al, dus die staan niet
+              meer als tekst in de pagina. Vaste verhouding 49:15 (1960x600),
+              zodat er niets wordt bijgesneden. */}
+          <div style={{
+            position: 'relative', width: '100%',
+            margin: 0,
+            aspectRatio: '49 / 15',
+            flexShrink: 0,
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: 'url(/16week-hero.jpg)',
+              backgroundSize: 'cover', backgroundPosition: 'center center',
+            }} />
+            {/* Klein randje naar zwart onderaan, zodat de foto niet met een
+                harde lijn eindigt. */}
+            <div style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0,
+              height: '14%', pointerEvents: 'none',
+              background: `linear-gradient(180deg, rgba(0,0,0,0) 0%, ${BG} 100%)`,
+            }} />
+          </div>
 
           <div style={{
-            textAlign: 'center',
-            padding: `0 ${isMobile ? '1rem' : '2rem'}`,
-            maxWidth: '900px',
-            marginBottom: isMobile ? '1.5rem' : '1.75rem',
+            maxWidth: isMobile ? 520 : 1100, width: '100%',
+            // Negatieve marge: de kop schuift over de onderkant van de foto,
+            // maar houdt afstand tot het beeld.
+            marginTop: isMobile ? '1.5rem' : '2.5rem',
+            padding: isMobile ? `0 1.25rem 3.5rem` : `0 2rem 4rem`,
+            position: 'relative', zIndex: 2,
           }}>
-            <h1 style={{
-              fontWeight: 900, lineHeight: 1.1, margin: 0,
-              letterSpacing: '-0.02em', color: '#fff',
-              fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
-            }}>
-              In 16 weken in shape komen,<br />met de MY ARC methode.
-            </h1>
-          </div>
+            {/* Logo en kop stonden hier; die staan nu op de herofoto zelf. */}
 
-          {/* Transformaties — onder de titel, bewust klein (titel domineert) */}
-          <div style={{ width: isMobile ? '70%' : '100%', maxWidth: isMobile ? '100%' : 532, margin: '0 auto' }}>
-            <div style={{ display: 'flex', gap: isMobile ? '0.4rem' : '0.65rem' }}>
-              {TRANSFORMATIONS.map((t) => (
-                <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <div style={{ borderRadius: '9px', overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
-                    <img
-                      src={t.src}
-                      alt={t.caption}
-                      onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                      style={{ width: '100%', height: 'auto', display: 'block' }}
-                    />
-                  </div>
-                  <p style={{ margin: 0, fontSize: isMobile ? '0.5rem' : '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', lineHeight: 1.25, textAlign: 'center' }}>
-                    {t.caption}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <TrustpilotBadge style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }} />
-        </section>
-
-        {/* ══ SCHERM 2-4: DE 3 PIJLERS ══ */}
-        <PijlerSection isMobile={isMobile} index={0} />
-        <PijlerSection isMobile={isMobile} index={1} />
-        <PijlerSection isMobile={isMobile} index={2} />
-
-        {/* ══ SCHERM 5: OFFER — ongewijzigd ══ */}
-        <section ref={offerRef} style={{ ...screen, textAlign: 'center' }}>
-          <div style={{ maxWidth: 520, width: '100%' }}>
-            {/* Prijs — eenmalig €497 */}
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
-              <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€497</span>
-            </div>
-            <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
-              Eenmalig · <span style={{ color: '#fff', fontWeight: 800 }}>4 maanden traject</span>
-            </div>
-
-            {/* Garantie — zelfde regel en opmaak als /16week */}
-            <p style={{
-              margin: isMobile ? '1.5rem auto 0' : '1.75rem auto 0',
-              maxWidth: 480, textAlign: 'center',
-              fontSize: isMobile ? '0.9rem' : '1.05rem',
-              fontWeight: 700, color: '#fff', lineHeight: 1.4, letterSpacing: '-0.01em',
-            }}>
-              Geen succesvolle transformatie?{' '}
-              <span style={{ color: GOLD }}>Krijg je investering terug.</span>
-            </p>
-
-            {/* Knop naar het formulier (afrekenen) */}
-            <button onClick={scrollToForm} style={{
-              marginTop: isMobile ? '1.85rem' : '2.25rem',
-              display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-              padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem', borderRadius: 999, border: 'none',
-              background: '#fff', color: '#000',
-              fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(255,255,255,0.15)', letterSpacing: '0.01em',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              fontFamily: 'inherit',
-            }}>
-              Ik wil starten <ChevronDown size={16} strokeWidth={3} />
-            </button>
-          </div>
-        </section>
-
-        {/* ══ SCHERM 6: FORMULIER + REVIEWS ══ */}
-        <section ref={formRef} style={{ ...screen, justifyContent: 'center' }}>
-          <div style={{ maxWidth: 520, width: '100%' }}>
+            {/* Twee knoppen: de methode en de voorwaarden. Geen omlijnde
+                vakken meer maar een icoon met het woord eronder; het scherm
+                oogde te druk met alles in een container. */}
+            {/* Drie gelijke kolommen, samen ongeveer zo breed als de titel op
+                het beeld erboven. */}
             <div style={{
-              borderRadius: isMobile ? 16 : 18,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.02)',
-              padding: isMobile ? '1.5rem 1.25rem' : '1.75rem 1.5rem',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: isMobile ? '0.75rem' : '1.5rem',
+              width: '100%',
+              maxWidth: isMobile ? '100%' : 980,
+              margin: `${isMobile ? 0 : '1.5rem'} auto 0`,
+            }}>
+              {[
+                { id: 'methode', label: 'De methode', Icon: Compass },
+                { id: 'voorwaarden', label: 'De voorwaarden', Icon: ListChecks },
+                { id: 'waarom', label: 'Waarom 16 weken?', Icon: HelpCircle },
+              ].map((k) => {
+                const aan = open === k.id
+                return (
+                  <button
+                    key={k.id}
+                    onClick={() => setOpen(aan ? null : k.id)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: isMobile ? 9 : 18,
+                      padding: 0, border: 'none', background: 'transparent',
+                      color: '#fff', opacity: aan ? 1 : 0.9,
+                      fontSize: isMobile ? '0.75rem' : '1.4rem', fontWeight: 900,
+                      letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+                      fontFamily: 'inherit', cursor: 'pointer',
+                      transition: 'opacity 0.15s ease',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <k.Icon size={isMobile ? 32 : 68} strokeWidth={2.6} color="#fff" />
+                    {k.label}
+                  </button>
+                )
+              })}
+            </div>
+
+          </div>
+        </section>
+
+        {/* ══ SCHERM 2: GARANTIES + REVIEWS ══ */}
+        <section ref={formRef} style={{ ...screen, justifyContent: 'center' }}>
+          <div style={{ maxWidth: isMobile ? 520 : 1000, width: '100%' }}>
+            {/* Op desktop staan de garanties en de knop naast elkaar; op
+                telefoon onder elkaar. Zo blijft de sectie op een breed scherm
+                gevuld in plaats van een smalle kolom in het midden. */}
+            <div style={{
+              display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'center',
+              gap: isMobile ? 0 : '3rem',
+            }}>
+            <div style={{
+              margin: isMobile ? '0 auto 1.75rem' : 0,
+              flex: 1, minWidth: 0,
+              maxWidth: isMobile ? 480 : 560, width: '100%', textAlign: 'left',
             }}>
               <div style={{
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: 800, color: '#fff', marginBottom: '1rem',
-              }}>Jouw gegevens</div>
+                fontSize: isMobile ? '0.6rem' : '0.7rem', fontWeight: 800,
+                letterSpacing: '0.15em', color: GOLD,
+                marginBottom: isMobile ? '0.6rem' : '0.85rem',
+                textAlign: isMobile ? 'center' : 'left',
+              }}>
+                DE INVESTERING
+              </div>
 
-              {[
-                { icon: User,  value: name,  set: setName,  placeholder: 'Je naam',                      type: 'text' },
-                { icon: Mail,  value: email, set: setEmail, placeholder: 'Je e-mailadres',               type: 'email' },
-                { icon: Phone, value: phone, set: setPhone, placeholder: 'Je telefoonnummer (optioneel)', type: 'tel' },
-              ].map((field, idx) => (
-                <div key={idx} style={{
-                  display: 'flex', alignItems: 'center', gap: '0.6rem',
-                  padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
-                  borderRadius: 12,
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  background: 'rgba(255,255,255,0.05)',
-                  marginBottom: '0.6rem',
+              {/* Het bedrag is het grootste op deze sectie; de periode staat
+                  er klein naast zodat er geen twijfel is waarvoor het geldt. */}
+              <div style={{
+                display: 'flex', alignItems: 'baseline', gap: isMobile ? '0.6rem' : '0.85rem',
+                justifyContent: isMobile ? 'center' : 'flex-start',
+                marginBottom: isMobile ? '0.9rem' : '1.1rem',
+              }}>
+                <span style={{
+                  fontSize: isMobile ? '2.4rem' : '3.2rem', fontWeight: 900, color: '#fff',
+                  lineHeight: 1, letterSpacing: '-0.03em',
                 }}>
-                  <field.icon size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
-                  <input
-                    type={field.type}
-                    placeholder={field.placeholder}
-                    value={field.value}
-                    onChange={e => field.set(e.target.value)}
-                    style={{
-                      flex: 1, background: 'none', border: 'none', outline: 'none',
-                      color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem',
-                      fontWeight: 500, fontFamily: 'inherit',
-                    }}
+                  {INVESTERING.bedrag}
+                </span>
+                <span style={{
+                  fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.55)',
+                }}>
+                  {INVESTERING.periode}
+                </span>
+              </div>
+
+              {/* Wat er in zit — dezelfde drie pijlers als in de methode, maar
+                  in één regel elk. Wie doorklikt ziet ze uitgebreid. */}
+              {[
+                { Icon: Utensils,  tekst: 'Voedingsplan in de app, 500 gerechten, etentjes ingebouwd.' },
+                { Icon: Crosshair, tekst: "Trainingsschema op maat, met uitlegvideo's per oefening." },
+                { Icon: Video,     tekst: 'Wekelijkse call en dagelijks meekijken op je cijfers.' },
+              ].map((r, i) => (
+                <div key={r.tekst} style={{
+                  display: 'flex', gap: '0.7rem',
+                  alignItems: 'center', justifyContent: isMobile ? 'center' : 'flex-start',
+                  padding: isMobile ? '0.6rem 0' : '0.8rem 0',
+                  borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  {/* Zelfde stijl als de drie knoppen: bold en wit. */}
+                  <r.Icon
+                    size={isMobile ? 20 : 22} strokeWidth={2.4}
+                    style={{ flexShrink: 0, color: '#fff' }}
                   />
+                  <span style={{
+                    fontSize: isMobile ? '0.82rem' : '0.95rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
+                    textAlign: isMobile ? 'center' : 'left',
+                  }}>{r.tekst}</span>
                 </div>
               ))}
 
-              {error && (
-                <div style={{
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  color: '#ef4444', fontWeight: 600,
-                  marginBottom: '0.75rem', marginTop: '0.25rem',
-                }}>{error}</div>
-              )}
-
-              <button
-                onClick={handleCheckout}
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '1rem' : '1.1rem',
-                  borderRadius: 12, border: 'none',
-                  background: loading ? 'rgba(255,255,255,0.4)' : '#fff',
-                  color: '#000',
-                  fontSize: isMobile ? '0.9rem' : '0.95rem',
-                  fontWeight: 900,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  marginTop: '0.5rem', minHeight: 52,
-                  boxShadow: loading ? 'none' : '0 4px 20px rgba(255,255,255,0.15)',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  letterSpacing: '0.01em', fontFamily: 'inherit',
-                }}
-              >
-                {loading ? 'Even geduld...' : 'Start Nu · €497'}
-              </button>
-
+              {/* De garantie die al op de oude prijs-sectie stond. */}
               <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: '0.4rem', marginTop: '0.85rem',
+                marginTop: isMobile ? '0.9rem' : '1.1rem',
+                fontSize: isMobile ? '0.9rem' : '1.05rem', fontWeight: 800,
+                color: '#fff', lineHeight: 1.35, letterSpacing: '-0.015em',
+                textAlign: isMobile ? 'center' : 'left',
               }}>
-                <Lock size={12} color="rgba(255,255,255,0.25)" />
-                <span style={{
-                  fontSize: isMobile ? '0.65rem' : '0.7rem',
-                  color: 'rgba(255,255,255,0.25)', fontWeight: 500,
-                }}>Veilig betalen via Stripe · SSL beveiligd</span>
+                Geen succesvolle transformatie?{' '}
+                <span style={{ color: GOLD }}>Je investering terug.</span>
               </div>
             </div>
 
-            {/* ══ Reviews — samen met het formulier op dit scherm ══ */}
-            <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>
-              <TrustpilotBadge style={{ marginBottom: isMobile ? '0.85rem' : '1rem' }} />
+            {/* Geen formulier hier: één knop naar de checkout. */}
+            <div style={{ flexShrink: 0, width: isMobile ? '100%' : 300 }}>
+              <button
+                onClick={() => setFormOpen(true)}
+                style={{
+                  width: '100%', minHeight: isMobile ? 56 : 62, borderRadius: 14, border: 'none',
+                  background: '#fff', color: '#000',
+                  fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900,
+                  letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: '0 4px 24px rgba(255,255,255,0.14)',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Start Nu · €{PRICE}
+              </button>
+            </div>
+            </div>
+
+            {/* ══ Reviews en transformaties ══ */}
+            <div style={{ marginTop: isMobile ? '1.5rem' : '2rem' }}>
+              <TrustpilotBadge style={{ margin: isMobile ? '0.75rem 0' : '0.9rem 0' }} />
 
               <div
                 ref={scrollRef}
                 style={{
-                  display: 'flex', gap: isMobile ? '0.75rem' : '1rem',
+                  display: 'flex', gap: isMobile ? '0.6rem' : '0.75rem',
                   overflow: 'hidden', cursor: 'grab',
-                  marginLeft: isMobile ? '-1.25rem' : '-2rem',
-                  marginRight: isMobile ? '-1.25rem' : '-2rem',
-                  paddingLeft: isMobile ? '1.25rem' : '2rem',
-                  paddingRight: isMobile ? '1.25rem' : '2rem',
+                  marginLeft: isMobile ? '-1.25rem' : '-3rem',
+                  marginRight: isMobile ? '-1.25rem' : '-3rem',
+                  paddingLeft: isMobile ? '1.25rem' : '3rem',
+                  paddingRight: isMobile ? '1.25rem' : '3rem',
                 }}
               >
-                {doubledReviews.map((review, idx) => (
+                {doubledSlides.map((slide, idx) => (
                   <div key={idx} style={{
-                    minWidth: isMobile ? 240 : 280, maxWidth: isMobile ? 240 : 280,
-                    padding: isMobile ? '0.85rem 1rem' : '1rem 1.15rem',
-                    borderRadius: 12,
+                    minWidth: isMobile ? 200 : 230, maxWidth: isMobile ? 200 : 230,
+                    padding: slide.soort === 'foto'
+                      ? (isMobile ? '0.45rem' : '0.5rem')
+                      : (isMobile ? '0.7rem 0.8rem' : '0.75rem 0.9rem'),
+                    borderRadius: 10,
                     border: '1px solid rgba(255,255,255,0.06)',
                     background: 'rgba(255,255,255,0.02)',
                     flexShrink: 0,
+                    display: 'flex', flexDirection: 'column',
                   }}>
-                    <div style={{ display: 'flex', gap: 2, marginBottom: '0.5rem' }}>
-                      {[1,2,3,4,5].map(s => (
-                        <Star key={s} size={11} fill={TP_GREEN} color={TP_GREEN} strokeWidth={0} />
-                      ))}
-                    </div>
-                    <p style={{
-                      fontSize: isMobile ? '0.7rem' : '0.75rem',
-                      color: 'rgba(255,255,255,0.45)', fontWeight: 500,
-                      lineHeight: 1.5, marginBottom: '0.6rem',
-                      display: '-webkit-box', WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                    }}>{review.text}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <div style={{
-                          width: 24, height: 24, borderRadius: '50%',
-                          background: '#fff', border: `1px solid ${TP_GREEN}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.6rem', fontWeight: 800, color: TP_GREEN,
-                        }}>{review.name.charAt(0)}</div>
-                        <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
-                          {review.name}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>{review.date}</span>
-                    </div>
+                    {slide.soort === 'foto' ? (
+                      <>
+                        {/* Contain en een maximum: de before/after-collage mag
+                            niet bijgesneden worden, maar ook de slider niet
+                            drie keer zo hoog maken als een review. */}
+                        <div style={{ borderRadius: 9, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+                          <img
+                            src={slide.src}
+                            alt={slide.caption}
+                            draggable={false}
+                            onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                            style={{
+                              maxWidth: '100%', maxHeight: isMobile ? 120 : 140,
+                              width: 'auto', height: 'auto', display: 'block',
+                            }}
+                          />
+                        </div>
+                        <p style={{
+                          margin: '0.5rem 0 0',
+                          fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 700,
+                          color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, textAlign: 'center',
+                        }}>
+                          {slide.caption}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', gap: 2, marginBottom: '0.5rem' }}>
+                          {[1,2,3,4,5].map(ster => (
+                            <Star key={ster} size={11} fill={TP_GREEN} color={TP_GREEN} strokeWidth={0} />
+                          ))}
+                        </div>
+                        <p style={{
+                          fontSize: isMobile ? '0.7rem' : '0.72rem',
+                          color: 'rgba(255,255,255,0.45)', fontWeight: 500,
+                          lineHeight: 1.45, marginBottom: '0.5rem',
+                          display: '-webkit-box', WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                        }}>{slide.text}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <div style={{
+                              width: 20, height: 20, borderRadius: '50%',
+                              background: '#fff', border: `1px solid ${TP_GREEN}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.6rem', fontWeight: 800, color: TP_GREEN,
+                            }}>{slide.name.charAt(0)}</div>
+                            <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                              {slide.name}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>{slide.date}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -591,6 +1002,58 @@ export default function SixteenWeekCheckout() {
         </section>
 
       </div>
+
+      {/* Zwevende knop naar het formulier: staat onderaan het scherm in
+          plaats van in de tekst, en verdwijnt zodra je bij het formulier bent
+          of een blad opent. */}
+      <button
+        onClick={scrollToForm}
+        style={{
+          position: 'fixed',
+          left: '50%',
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '1.25rem' : '1.75rem'})`,
+          transform: 'translateX(-50%)',
+          zIndex: 90,
+          opacity: current === 0 && !open ? 1 : 0,
+          pointerEvents: current === 0 && !open ? 'auto' : 'none',
+          transition: 'opacity 0.25s ease',
+          display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+          padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem',
+          borderRadius: 999, border: 'none',
+          background: '#fff', color: '#000',
+          fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 24px rgba(255,255,255,0.12)',
+          letterSpacing: '0.01em', whiteSpace: 'nowrap',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          fontFamily: 'inherit',
+        }}
+      >
+        Maak investering · €{PRICE} <ChevronDown size={16} strokeWidth={3} />
+      </button>
+
+      {/* Volledig scherm — linksboven, zodat hij nergens overheen valt. */}
+      <button
+        onClick={wisselVolledig}
+        title={volledig ? 'Volledig scherm verlaten' : 'Volledig scherm'}
+        aria-label={volledig ? 'Volledig scherm verlaten' : 'Volledig scherm'}
+        style={{
+          position: 'fixed',
+          left: isMobile ? 10 : 20,
+          top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 10 : 20}px)`,
+          zIndex: 120,
+          width: 36, height: 36, padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.45)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          borderRadius: 10,
+          color: 'rgba(255,255,255,0.8)',
+          cursor: 'pointer', fontFamily: 'inherit',
+          backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {volledig ? <Minimize2 size={16} strokeWidth={2.6} /> : <Maximize2 size={16} strokeWidth={2.6} />}
+      </button>
 
       {/* ══ Nav-dots — zoals /16week ══ */}
       <div style={{
@@ -626,26 +1089,157 @@ export default function SixteenWeekCheckout() {
         ))}
       </div>
 
-      {/* ══ Zwevende "Investering"-knop — ongewijzigd ══ */}
-      {showInvestBtn && (
-        <button onClick={scrollToOffer} style={{
-          position: 'fixed', bottom: isMobile ? 18 : 26, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 50, display: 'flex', alignItems: 'center', gap: '0.4rem',
-          padding: isMobile ? '0.75rem 1.4rem' : '0.85rem 1.7rem', borderRadius: 999,
-          border: '1.5px solid rgba(255,255,255,0.85)',
-          background: 'rgba(255,255,255,0.1)', color: '#fff',
-          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-          fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 900, cursor: 'pointer',
-          boxShadow: '0 6px 24px rgba(0,0,0,0.35)', letterSpacing: '0.01em',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          fontFamily: "'DM Sans', -apple-system, sans-serif",
-        }}>
-          Investering hier <ChevronDown size={16} strokeWidth={3} />
-        </button>
+      {/* De methode — schermvullend, één pijler per slide. */}
+      {open === 'methode' && (
+        <MethodeSlider
+          isMobile={isMobile}
+          onClose={() => setOpen(null)}
+          onBetaal={() => { setOpen(null); setTimeout(scrollToForm, 60) }}
+          knopLabel={`Maak investering · €${PRICE}`}
+        />
       )}
 
+      {/* De voorwaarden — schermvullend, zelfde opzet als de methode-slides. */}
+      {open === 'voorwaarden' && (
+        <VoorwaardenVenster
+          isMobile={isMobile}
+          onClose={() => setOpen(null)}
+          onBetaal={() => { setOpen(null); setTimeout(scrollToForm, 60) }}
+          knopLabel={`Maak investering · €${PRICE}`}
+        />
+      )}
+
+
+      {/* Jouw gegevens — schuift van onderen open zodra je op de knop drukt. */}
+      <Blad open={formOpen} titel="Jouw gegevens" onClose={() => setFormOpen(false)} isMobile={isMobile}>
+        {[
+          { icon: User,  value: name,  set: setName,  placeholder: 'Je naam',                       type: 'text' },
+          { icon: Mail,  value: email, set: setEmail, placeholder: 'Je e-mailadres',                type: 'email' },
+          { icon: Phone, value: phone, set: setPhone, placeholder: 'Je telefoonnummer (optioneel)', type: 'tel' },
+        ].map((field, idx) => (
+          <div key={idx} style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: isMobile ? '0.8rem 0.9rem' : '0.85rem 1rem',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.18)',
+            background: 'rgba(255,255,255,0.05)',
+            marginBottom: '0.6rem',
+          }}>
+            <field.icon size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
+            <input
+              type={field.type}
+              placeholder={field.placeholder}
+              value={field.value}
+              onChange={e => field.set(e.target.value)}
+              style={{
+                flex: 1, minWidth: 0, background: 'none', border: 'none', outline: 'none',
+                color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem',
+                fontWeight: 600, fontFamily: 'inherit',
+              }}
+            />
+          </div>
+        ))}
+
+        {error && (
+          <div style={{
+            fontSize: isMobile ? '0.8rem' : '0.85rem',
+            color: '#ef4444', fontWeight: 700,
+            marginBottom: '0.75rem', marginTop: '0.25rem',
+          }}>{error}</div>
+        )}
+
+        <button
+          onClick={handleCheckout}
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: isMobile ? '1rem' : '1.1rem',
+            borderRadius: 12, border: 'none',
+            background: loading ? 'rgba(255,255,255,0.4)' : '#fff',
+            color: '#000',
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            fontWeight: 900,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            transition: 'all 0.3s ease',
+            marginTop: '0.5rem', minHeight: 54,
+            boxShadow: loading ? 'none' : '0 4px 20px rgba(255,255,255,0.15)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            letterSpacing: '0.01em', fontFamily: 'inherit',
+          }}
+        >
+          {loading ? 'Even geduld...' : `Start Nu · €${PRICE}`}
+        </button>
+
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '0.4rem', marginTop: '0.85rem',
+        }}>
+          <Lock size={13} color="rgba(255,255,255,0.35)" />
+          <span style={{
+            fontSize: isMobile ? '0.72rem' : '0.76rem',
+            color: 'rgba(255,255,255,0.35)', fontWeight: 600,
+          }}>Veilig betalen via Stripe · SSL beveiligd</span>
+        </div>
+      </Blad>
+
+      {/* Waarom doe ik dit — foto rechts, twee redenen links. */}
+      <Blad open={open === 'waarom'} titel="Waarom 16 weken?" onClose={() => setOpen(null)} isMobile={isMobile}>
+        <div style={{
+          position: 'relative',
+          margin: isMobile ? '-0.9rem -1.15rem 0' : '-1rem -1.35rem 0',
+          minHeight: isMobile ? 250 : 290,
+          display: 'flex', alignItems: 'center',
+        }}>
+          <div style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0, width: '46%',
+            backgroundImage: 'url(/waarom-kersten.jpg)',
+            backgroundSize: 'cover', backgroundPosition: 'center top',
+          }} />
+          {/* Fade naar links, zodat de tekst over de foto heen kan lopen. */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(270deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.45) 18%, rgba(0,0,0,0.88) 38%, #000 54%)',
+          }} />
+          <div style={{
+            position: 'relative', zIndex: 1, width: '100%',
+            paddingLeft: isMobile ? '1.15rem' : '1.35rem',
+            paddingRight: isMobile ? '40%' : '42%',
+            paddingTop: isMobile ? '1.1rem' : '1.35rem',
+            paddingBottom: isMobile ? '1.1rem' : '1.35rem',
+          }}>
+            {[
+              'In zes weken laat ik je zien dat de aanpak werkt. In zestien weken staat er iets wat blijft: een lichaam dat je herkent en gewoontes die je zonder mij volhoudt.',
+              'Vier maanden is lang genoeg om door de weken heen te komen waarin het tegenzit. Precies daar leer je het meest, en precies daar haken de meeste mannen alleen af.',
+            ].map((tekst, i) => (
+              <div key={i} style={{
+                display: 'flex', gap: '0.6rem', alignItems: 'baseline',
+                padding: isMobile ? '0.7rem 0' : '0.8rem 0',
+                borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+              }}>
+                <span style={{
+                  flexShrink: 0,
+                  fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: GOLD,
+                }}>{i + 1}.</span>
+                <span style={{
+                  fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, letterSpacing: '-0.01em',
+                  textShadow: '0 1px 8px rgba(0,0,0,0.9)',
+                }}>{tekst}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Blad>
+
       <style>{`
+        /* @import moet als eerste regel staan, anders negeert de browser 'm
+           en valt het lettertype terug op de systeemfont. */
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+        @keyframes bladWaas { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes bladOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes bladIn { from { transform: translateY(14px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes pijlerIn { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: none; } }
         body { overflow: hidden; }
         ::-webkit-scrollbar { display: none; }
       `}</style>

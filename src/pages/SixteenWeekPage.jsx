@@ -159,7 +159,7 @@ function MethodeSlider({ isMobile, onClose }) {
           balken. De gewone foto's blijven een band met vaste hoogte. */}
       <div style={{
         position: 'relative', width: '100%', flexShrink: 0,
-        ...(p.beeldVult && !isMobile
+        ...(p.beeldVult
           ? { aspectRatio: '49 / 15' }   // 1960x600, exact de verhouding van het beeld
           : { height: isMobile ? '34vh' : 'min(46vh, 460px)' }),
       }}>
@@ -316,7 +316,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
         position: 'relative', width: '100%', flexShrink: 0,
         // Geen maxHeight: die maakte het vak lager dan de verhouding van de
         // foto, waardoor cover de bovenkant eraf sneed.
-        ...(isMobile ? { height: '30vh' } : { aspectRatio: '49 / 15' }),
+        ...({ aspectRatio: '49 / 15' }),
       }}>
         <div style={{
           position: 'absolute', inset: 0,
