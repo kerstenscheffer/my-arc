@@ -787,6 +787,10 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
             marginTop: isMobile ? '1.5rem' : '2.5rem',
             padding: isMobile ? `0 1.25rem 3.5rem` : `0 2rem 4rem`,
             position: 'relative', zIndex: 2,
+            // Op telefoon bleef onder de foto een half scherm zwart over met de
+            // drie keuzes als klein rijtje bovenin. Het blok vult nu de rest van
+            // het scherm en zet ze in het midden.
+            ...(isMobile ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' } : null),
           }}>
             {/* Logo en kop stonden hier; die staan nu op de herofoto zelf. */}
 
@@ -797,8 +801,8 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
                 het beeld erboven. */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: isMobile ? '0.75rem' : '1.5rem',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+              gap: isMobile ? '2.5rem' : '1.5rem',
               width: '100%',
               maxWidth: isMobile ? '100%' : 980,
               margin: `${isMobile ? 0 : '1.5rem'} auto 0`,
@@ -815,17 +819,17 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
                     onClick={() => setOpen(aan ? null : k.id)}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      gap: isMobile ? 9 : 18,
+                      gap: isMobile ? 14 : 18,
                       padding: 0, border: 'none', background: 'transparent',
                       color: '#fff', opacity: aan ? 1 : 0.9,
-                      fontSize: isMobile ? '0.75rem' : '1.4rem', fontWeight: 900,
+                      fontSize: isMobile ? '1.15rem' : '1.4rem', fontWeight: 900,
                       letterSpacing: '-0.01em', whiteSpace: 'nowrap',
                       fontFamily: 'inherit', cursor: 'pointer',
                       transition: 'opacity 0.15s ease',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <k.Icon size={isMobile ? 32 : 68} strokeWidth={2.6} color="#fff" />
+                    <k.Icon size={isMobile ? 56 : 68} strokeWidth={2.6} color="#fff" />
                     {k.label}
                   </button>
                 )
