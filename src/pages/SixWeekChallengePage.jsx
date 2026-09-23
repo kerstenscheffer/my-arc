@@ -884,7 +884,6 @@ export default function SixWeekChallengePage() {
                   }}>{r.tekst}</span>
                 </div>
               ))}
-            </div>
               <p style={{
                 margin: `${isMobile ? '0.9rem' : '1.1rem'} 0 0`,
                 fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
@@ -893,6 +892,7 @@ export default function SixWeekChallengePage() {
               }}>
                 Mijn doel is gratis laten zien dat het werkt, niet om geld te verdienen aan de borg.
               </p>
+            </div>
 
 
             {/* Geen formulier hier: één knop naar de checkout. */}
