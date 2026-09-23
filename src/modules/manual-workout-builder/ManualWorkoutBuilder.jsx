@@ -331,15 +331,18 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   }
 
   // Leegmaken: reset het hele plan naar leeg om vers te beginnen. Met bevestiging.
+  // Gebruikt history.reset zodat ook de undo-stack gewist wordt — anders brengt
+  // Ctrl+Z het oude plan terug en voelt het alsof je niet echt opnieuw bent begonnen.
   const clearPlan = () => {
     if (workoutPlan.days.length === 0 && !workoutPlan.name) return
     if (!confirm('Hele plan leegmaken? Alle dagen en oefeningen worden gewist.')) return
-    setWorkoutPlan({
+    history.reset({
       name: '', description: '', primary_goal: 'muscle_gain',
       experience_level: 'intermediate', split_type: 'custom',
       days_per_week: 0, equipment: [], days: []
     })
     setSelectedSchemaId(null)
+    setLocalClient(null)
     setActiveDay(null)
   }
 
