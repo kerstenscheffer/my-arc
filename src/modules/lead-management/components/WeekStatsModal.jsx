@@ -176,6 +176,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [revTab, setRevTab] = useState('omzet') // 'omzet' | 'payout'
   // Toegezegd-lijst dichtgeklapt: het bedrag is het nieuws, de namen zijn detail.
   const [toegezegdOpen, setToegezegdOpen] = useState(false)
+  // Hetzelfde voor de geboekte sales onder het totaal.
+  const [salesOpen, setSalesOpen] = useState(false)
   // Welk stuk van de maandreeks in beeld staat; 0 = rond deze maand.
   const [maandOffset, setMaandOffset] = useState(0)
   // Doel-omzet per maand: de rode stippellijn in de grafiek.
@@ -1703,11 +1705,48 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                         <div style={getal}>{revenue.activeMonthly}</div>
                         <div style={label}>Actieve plannen</div>
                       </div>
-                      <div>
-                        <div style={getal}>{eur(revenue.totalBooked)}</div>
+                      {/* Het totaal klapt open naar de sales zelf: bij een
+                          getal van vijf cijfers wil je kunnen zien waar het
+                          vandaan komt. */}
+                      <button
+                        onClick={() => setSalesOpen(v => !v)}
+                        style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                      >
+                        <div style={{ ...getal, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {eur(revenue.totalBooked)}
+                          <ChevronDown
+                            size={isMobile ? 18 : 22} strokeWidth={3} color="rgba(255,255,255,0.45)"
+                            style={{ transform: salesOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }}
+                          />
+                        </div>
                         <div style={label}>Geboekt · {revenue.saleCount} sales</div>
-                      </div>
+                      </button>
                     </div>
+
+                    {salesOpen && (
+                      <div style={{ padding: '0.25rem 0 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        {(revenue.sales || []).length === 0 ? (
+                          <div style={{ padding: '0.75rem 0', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+                            Nog geen betaalde sales.
+                          </div>
+                        ) : (revenue.sales || []).map((v, i) => (
+                          <div key={`${v.naam}-${i}`} style={{
+                            display: 'flex', alignItems: 'baseline', gap: 12,
+                            padding: '0.65rem 0', borderTop: '1px solid rgba(255,255,255,0.07)',
+                          }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: '1rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {v.naam}
+                            </span>
+                            <span style={{ flexShrink: 0, fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
+                              {new Date(v.datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                              {v.type === 'monthly' && v.maanden > 1 ? ` · ${v.maanden}× p/m` : ''}
+                              {v.challenge ? ' · challenge' : ''}
+                            </span>
+                            <span style={{ flexShrink: 0, fontSize: '1rem', fontWeight: 900, color: '#fff' }}>{eur(v.bedrag)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Toegezegd, nog niet binnen — dichtgeklapt. Het bedrag is
                         het nieuws; wie het zijn lees je alleen als je 'm opent. */}

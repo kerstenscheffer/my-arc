@@ -2838,10 +2838,23 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         toegezegd: openstaand
           .sort((a, b) => b.date - a.date)
           .map(s => ({ naam: s.naam, bedrag: Math.round(s.total), datum: s.date.toISOString() })),
+        // De geboekte sales zelf, zodat je onder het totaal kunt uitklappen
+        // wie het zijn. Nieuwste eerst.
+        sales: sales
+          .slice()
+          .sort((a, b) => b.date - a.date)
+          .map(s => ({
+            naam: s.naam,
+            bedrag: Math.round(s.total),
+            datum: s.date.toISOString(),
+            type: s.type,
+            maanden: s.months,
+            challenge: !!s.challenge,
+          })),
       }
     } catch (error) {
       console.error('❌ getRevenueProjection failed:', error)
-      return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0, toegezegdTotaal: 0, toegezegdAantal: 0, toegezegd: [] }
+      return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0, toegezegdTotaal: 0, toegezegdAantal: 0, toegezegd: [], sales: [] }
     }
   }
 
