@@ -160,7 +160,9 @@ export default function OutreachLoggerModal({ coachId, isMobile, onClose }) {
           .from('outreach_sends')
           .upsert(
             { campaign_id: campaignId, coach_id: coachId, send_date: today, count: Math.max(0, parseInt(count, 10) || 0) },
-            { onConflict: 'campaign_id,send_date' }
+            // De coach hoort in de sleutel: sinds campagnes van het team zijn,
+            // loggen twee coaches op dezelfde dag op dezelfde campagne.
+            { onConflict: 'campaign_id,coach_id,send_date' }
           )
         if (error) throw error
         // Re-sum lifetime sends locally so the funnel is up-to-date.
