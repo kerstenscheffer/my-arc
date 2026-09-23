@@ -2719,7 +2719,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       const { data } = await this.db.supabase
         .from('lead_movements')
-        .select('order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status')
+        .select('order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, lead_name')
         .not('order_value', 'is', null)
         .is('reverted_at', null)
         // Teruggegeven challenge-geld is nooit binnengekomen; dat hoort niet in
@@ -2727,8 +2727,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // het stáát op de rekening — maar telt niet mee voor de uitbetaling aan
         // de partner (zie getPartnerPayouts).
         .or('challenge_status.is.null,challenge_status.neq.terugbetaald')
-      const sales = (data || []).map(r => ({
+      // Een ja is nog geen geld. Sales waarvan de betaling nog moet komen
+      // (payment_received = false, en geen reservering waarbij al iets binnen
+      // is) horen niet in een cashflow-overzicht: ze staan apart als
+      // "toegezegd", zodat je ziet wat je nog moet ophalen zonder dat het je
+      // omzet opblaast.
+      const alles = (data || []).map(r => ({
         total: Number(r.order_value) || 0,
+        betaald: r.payment_received === true || r.is_reservation === true,
+        naam: r.lead_name || 'Lead',
         type: r.payment_type || 'prepaid',
         months: Math.max(1, Number(r.duration_months) || 1),
         date: new Date(r.moved_at),
@@ -2740,6 +2747,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
         restDatum: (r.is_reservation && r.payment_due_date) ? new Date(r.payment_due_date) : null,
       })).filter(s => s.total > 0 && !isNaN(s.date?.getTime?.()))
+
+      const sales = alles.filter(s => s.betaald)
+      const openstaand = alles.filter(s => !s.betaald)
 
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)
@@ -2800,10 +2810,23 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         })
       }
 
-      return { mrr: Math.round(mrr), activeMonthly, totalBooked: Math.round(totalBooked), months, saleCount: sales.length }
+      return {
+        mrr: Math.round(mrr),
+        activeMonthly,
+        totalBooked: Math.round(totalBooked),
+        months,
+        saleCount: sales.length,
+        // Toegezegd, nog niet binnen. Nergens in de bedragen hierboven
+        // meegeteld — dit is de lijst die je nog moet ophalen.
+        toegezegdTotaal: Math.round(openstaand.reduce((a, s) => a + s.total, 0)),
+        toegezegdAantal: openstaand.length,
+        toegezegd: openstaand
+          .sort((a, b) => b.date - a.date)
+          .map(s => ({ naam: s.naam, bedrag: Math.round(s.total), datum: s.date.toISOString() })),
+      }
     } catch (error) {
       console.error('❌ getRevenueProjection failed:', error)
-      return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0 }
+      return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0, toegezegdTotaal: 0, toegezegdAantal: 0, toegezegd: [] }
     }
   }
 
@@ -2979,7 +3002,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const [{ data: saleRows }, { data: paidRows }] = await Promise.all([
         this.db.supabase
           .from('lead_movements')
-          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status')
+          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received')
           .not('order_value', 'is', null)
           .not('partner_share_pct', 'is', null)
           .is('reverted_at', null)
@@ -3003,7 +3026,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         naam: r.lead_name || null,
         reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
         restDatum: (r.is_reservation && r.payment_due_date) ? new Date(r.payment_due_date) : null,
-      })).filter(s => s.total > 0 && s.pct > 0 && !isNaN(s.date?.getTime?.()))
+        // Net als bij de omzet: over een ja waarvan het geld nog moet komen
+        // reken je geen commissie af. Komt de betaling binnen, dan verschijnt
+        // hij vanzelf in de maand waarin dat gebeurde.
+        betaald: r.payment_received === true || r.is_reservation === true,
+      })).filter(s => s.total > 0 && s.pct > 0 && s.betaald && !isNaN(s.date?.getTime?.()))
 
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)

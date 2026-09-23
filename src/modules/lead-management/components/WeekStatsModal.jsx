@@ -1450,42 +1450,73 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           </div>
         </div>
       )}
+      {/* Geld-hub: schermvullend. Dit is geen pop-up waar je even iets
+          bevestigt maar een scherm waar je in werkt — drie tabbladen, tabellen
+          en maandrijen passen niet in een venster van 560 breed. */}
       {showRevenue && (
         <div
-          onClick={() => setShowRevenue(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 2147483560, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2147483560,
+            background: '#0a0a0a', color: '#fff',
+            display: 'flex', flexDirection: 'column',
+            animation: 'geldHubIn 0.18s ease',
+          }}
         >
+          <style>{`@keyframes geldHubIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }`}</style>
           <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 560, maxHeight: isMobile ? '92vh' : '85vh', display: 'flex', flexDirection: 'column', background: '#111', border: '1px solid rgba(34,197,94,0.25)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden' }}
+            style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 1100, margin: '0 auto' }}
           >
-            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? 'calc(0.7rem + env(safe-area-inset-top)) 0.9rem 0.7rem' : '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.5)' }}>
-              <TrendingUp size={17} color="#22c55e" />
-              <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>Omzet & uitbetalen</div>
-              <button onClick={() => setShowRevenue(false)} title="Sluiten" style={iconBtn}><X size={16} /></button>
+            <div style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
+              padding: isMobile ? 'calc(0.9rem + env(safe-area-inset-top, 0px)) 1rem 0.8rem' : '1.1rem 1.5rem 0.9rem',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(10,10,10,0.94)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            }}>
+              <TrendingUp size={20} color={GOLD} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: '#fff', fontWeight: 900, fontSize: isMobile ? '1.05rem' : '1.25rem', letterSpacing: '-0.02em' }}>
+                  Omzet & uitbetalen
+                </div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                  Wat er binnen is, wat er nog moet komen, en wat eruit gaat
+                </div>
+              </div>
+              <button onClick={() => setShowRevenue(false)} title="Sluiten" aria-label="Sluiten" style={{
+                width: 40, height: 40, flexShrink: 0, borderRadius: 12,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}><X size={19} strokeWidth={2.8} /></button>
             </div>
             {/* Tab-schakelaar: Omzet ↔ Uitbetalen */}
-            <div style={{ flexShrink: 0, display: 'flex', gap: 6, padding: '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ flexShrink: 0, display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               {[
-                { id: 'omzet', label: 'Omzet', Icon: TrendingUp, color: '#22c55e' },
-                { id: 'payout', label: 'Uitbetalen', Icon: Users, color: '#FFD700' },
+                { id: 'omzet', label: 'Omzet', Icon: TrendingUp },
+                { id: 'payout', label: 'Uitbetalen', Icon: Users },
                 // Challenge-geld staat hier naast de omzet en niet erin: het is
                 // nog niet van ons.
-                { id: 'challenge', label: 'Challenges', Icon: Gift, color: '#a855f7' },
+                { id: 'challenge', label: 'Challenges', Icon: Gift },
               ].map(t => {
                 const active = revTab === t.id
                 return (
                   <button key={t.id} onClick={() => setRevTab(t.id)}
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0.5rem 0.35rem', borderRadius: 9, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800,
-                      background: active ? `${t.color}22` : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${active ? t.color + '80' : 'rgba(255,255,255,0.08)'}`,
-                      color: active ? t.color : 'rgba(255,255,255,0.55)' }}>
-                    <t.Icon size={14} /> {t.label}
+                    style={{
+                      flex: 1, minHeight: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                      background: 'transparent', border: 'none',
+                      borderBottom: `2px solid ${active ? '#fff' : 'transparent'}`,
+                      color: active ? '#fff' : 'rgba(255,255,255,0.4)',
+                      fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 900, fontFamily: 'inherit',
+                      cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                    <t.Icon size={16} strokeWidth={2.8} /> {t.label}
                   </button>
                 )
               })}
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+            <div style={{
+              flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+              padding: isMobile ? '1rem 1rem calc(1.5rem + env(safe-area-inset-bottom, 0px))' : '1.5rem',
+            }}>
               {revLoading ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>Laden…</div>
               ) : revTab === 'challenge' ? (
@@ -1495,29 +1526,83 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   onGewijzigd={openRevenuePanel}
                 />
               ) : revTab === 'omzet' ? (
-                (!revenue || revenue.saleCount === 0) ? (
+                // Ook openen als er alleen nog toegezegde sales zijn: juist dan
+                // wil je zien wat er nog binnen moet komen.
+                (!revenue || (revenue.saleCount === 0 && !(revenue.toegezegdAantal > 0))) ? (
                   <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', lineHeight: 1.5 }}>
                     Nog geen sales met een bedrag vastgelegd. Sleep een lead naar een sale-sectie en vul de order-waarde + betaalwijze in.
                   </div>
                 ) : (() => {
                 const eur = (n) => '€' + Math.round(n || 0).toLocaleString('nl-NL')
                 const maxAmount = Math.max(1, ...revenue.months.map(m => m.amount))
+                const toegezegd = revenue.toegezegdTotaal || 0
                 const cards = [
-                  { label: 'MRR deze maand', value: eur(revenue.mrr), color: '#22c55e', hint: `${revenue.activeMonthly} lopend maandplan${revenue.activeMonthly === 1 ? '' : 'nen'}` },
-                  { label: 'Actieve plannen', value: revenue.activeMonthly, color: '#06b6d4' },
-                  { label: 'Geboekt totaal', value: eur(revenue.totalBooked), color: '#FFD700', hint: `${revenue.saleCount} sale${revenue.saleCount === 1 ? '' : 's'}` },
+                  { label: 'MRR deze maand', value: eur(revenue.mrr), color: '#fff', hint: `${revenue.activeMonthly} lopend maandplan${revenue.activeMonthly === 1 ? '' : 'nen'}` },
+                  { label: 'Actieve plannen', value: revenue.activeMonthly, color: '#fff' },
+                  { label: 'Geboekt totaal', value: eur(revenue.totalBooked), color: '#fff', hint: `${revenue.saleCount} betaalde sale${revenue.saleCount === 1 ? '' : 's'}` },
+                  // Vierde kaart alleen als er iets openstaat: anders staat er
+                  // een nul te pronken waar niets aan de hand is.
+                  ...(toegezegd > 0 ? [{
+                    label: 'Toegezegd, niet binnen', value: eur(toegezegd), color: GOLD,
+                    hint: `${revenue.toegezegdAantal} ja${revenue.toegezegdAantal === 1 ? '' : "'s"} zonder betaling`,
+                  }] : []),
                 ]
                 return (
                   <>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: '1.1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${cards.length}, 1fr)`, gap: 10, marginBottom: '1.5rem' }}>
                       {cards.map(c => (
-                        <div key={c.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.7rem 0.5rem', textAlign: 'center' }}>
-                          <div style={{ fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: 900, color: c.color, lineHeight: 1.1 }}>{c.value}</div>
-                          <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{c.label}</div>
-                          {c.hint && <div style={{ fontSize: '0.56rem', color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{c.hint}</div>}
+                        <div key={c.label} style={{
+                          background: 'rgba(255,255,255,0.03)',
+                          border: `1px solid ${c.color === GOLD ? 'rgba(255,215,0,0.28)' : 'rgba(255,255,255,0.08)'}`,
+                          borderRadius: 14, padding: isMobile ? '0.85rem 0.7rem' : '1rem 0.9rem',
+                        }}>
+                          <div style={{ fontSize: isMobile ? '1.35rem' : '1.7rem', fontWeight: 900, color: c.color, lineHeight: 1.05, letterSpacing: '-0.03em' }}>{c.value}</div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>{c.label}</div>
+                          {c.hint && <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.32)', marginTop: 2 }}>{c.hint}</div>}
                         </div>
                       ))}
                     </div>
+
+                    {/* Wie ja zei maar nog niet betaalde. Staat bewust bóven de
+                        grafiek: dit is geld dat je nog moet ophalen, en het zit
+                        in geen enkel bedrag hieronder. */}
+                    {toegezegd > 0 && (
+                      <div style={{ marginBottom: '1.5rem', border: '1px solid rgba(255,215,0,0.22)', borderRadius: 14, overflow: 'hidden' }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '0.7rem 0.9rem', background: 'rgba(255,215,0,0.06)',
+                          borderBottom: '1px solid rgba(255,215,0,0.16)',
+                        }}>
+                          <Info size={14} color={GOLD} style={{ flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#fff' }}>
+                            Toegezegd, nog niet binnen
+                          </div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 900, color: GOLD }}>{eur(toegezegd)}</div>
+                        </div>
+                        {(revenue.toegezegd || []).slice(0, 8).map((t, i) => {
+                          const dagen = Math.max(0, Math.floor((Date.now() - new Date(t.datum).getTime()) / 86400000))
+                          return (
+                            <div key={`${t.naam}-${i}`} style={{
+                              display: 'flex', alignItems: 'baseline', gap: 10,
+                              padding: '0.6rem 0.9rem',
+                              borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                            }}>
+                              <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {t.naam}
+                              </span>
+                              <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
+                                {dagen === 0 ? 'vandaag' : `${dagen} dag${dagen === 1 ? '' : 'en'}`}
+                              </span>
+                              <span style={{ flexShrink: 0, fontSize: '0.88rem', fontWeight: 900, color: '#fff' }}>{eur(t.bedrag)}</span>
+                            </div>
+                          )
+                        })}
+                        <div style={{ padding: '0.6rem 0.9rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+                          Telt nergens hierboven mee — ook niet in wat {partnerName} krijgt.
+                          Voer de betaling in via het calls-venster, tabblad Betaling.
+                        </div>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Omzet per maand</div>
                       <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)' }}>← scroll voor meer →</div>
@@ -1541,6 +1626,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     </div>
                     <div style={{ marginTop: '0.8rem', fontSize: '0.66rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
                       Vol groen = gerealiseerd (afgelopen + deze maand) · lichter = projectie. Vooruitbetaald telt in de sale-maand; maandelijks = totaal ÷ looptijd, gespreid.
+                      Alleen sales waarvan het geld binnen is; een ja zonder betaling staat erboven apart.
                     </div>
                   </>
                 )
