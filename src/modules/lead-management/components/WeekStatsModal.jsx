@@ -1642,15 +1642,23 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 // Hoogte van het grafiekvlak.
                 const BALK_H = isMobile ? 150 : 200
 
-                // Een ronde bovengrens voor de y-as: 1, 2, 2,5 of 5 maal een
-                // macht van tien. Zonder dat staan er bedragen als "€3.594" op
-                // de as, en dan lees je er niets van af.
-                const ruw = Math.max(maxAmount, maandDoel || 0, 1)
-                const macht = Math.pow(10, Math.floor(Math.log10(ruw)))
+                // Een ronde bovengrens voor de y-as, met vier à vijf stappen:
+                // 1, 2, 2,5 of 5 maal een macht van tien. Zonder dat staan er
+                // bedragen als "€3.594" op de as en lees je er niets van af.
+                //
+                // Een doel dat veel hoger ligt dan wat je draait, drukt de hele
+                // grafiek plat: bij een doel van €10.000 en maanden van €500
+                // zie je alleen nog streepjes. Daarom schaalt de as op de
+                // cijfers; ligt het doel daarboven, dan hangt de doellijn
+                // bovenaan met een pijltje.
+                const dataMax = Math.max(maxAmount, 1)
+                const ruw = Math.min(Math.max(dataMax, maandDoel || 0), dataMax * 1.3)
+                const macht = Math.pow(10, Math.floor(Math.log10(Math.max(1, ruw / 4))))
                 const stap = [1, 2, 2.5, 5, 10].map(f => f * macht).find(v => v >= ruw / 4) || macht
                 const asMax = Math.ceil(ruw / stap) * stap
                 const ticks = []
                 for (let v = 0; v <= asMax + 0.5; v += stap) ticks.push(Math.round(v))
+                const doelBuitenBeeld = maandDoel > 0 && maandDoel > asMax
 
                 // €3.594 wordt €3,6k: op een as telt de orde van grootte.
                 const kort = (n) => (n >= 1000
@@ -1759,7 +1767,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                         }}
                       >
                         <Target size={14} strokeWidth={2.6} />
-                        {maandDoel ? `doel ${eur(maandDoel)}` : 'Doel'}
+                        Doel
                       </button>
                       <button onClick={() => kanTerug && setMaandOffset(o => o - 2)} style={pijl(kanTerug)} aria-label="Eerdere maanden">
                         <ChevronLeft size={18} strokeWidth={3} />
@@ -1790,26 +1798,30 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ position: 'relative', height: BALK_H }}>
-                          {/* Rasterlijnen op de tick-hoogtes. */}
+                          {/* Rasterlijnen op de tick-hoogtes; de nullijn is de x-as. */}
                           {ticks.map(t => (
                             <div key={t} style={{
                               position: 'absolute', left: 0, right: 0, bottom: Math.round((t / asMax) * BALK_H),
-                              height: 0, borderTop: `1px solid rgba(255,255,255,${t === 0 ? 0.22 : 0.07})`,
+                              height: 0,
+                              borderTop: t === 0
+                                ? '2px solid rgba(255,255,255,0.5)'
+                                : '1px solid rgba(255,255,255,0.07)',
+                              zIndex: t === 0 ? 2 : 0,
                             }} />
                           ))}
 
                           {/* Doel: rode stippellijn over het raster. */}
-                          {maandDoel > 0 && maandDoel <= asMax && (
+                          {maandDoel > 0 && (
                             <div style={{
                               position: 'absolute', left: 0, right: 0, zIndex: 2,
-                              bottom: Math.round((maandDoel / asMax) * BALK_H),
+                              bottom: doelBuitenBeeld ? BALK_H : Math.round((maandDoel / asMax) * BALK_H),
                               height: 0, borderTop: '1px dashed rgba(239,68,68,0.7)', pointerEvents: 'none',
                             }}>
                               <span style={{
-                                position: 'absolute', right: 0, top: -16,
-                                fontSize: '0.72rem', fontWeight: 800, color: 'rgba(239,68,68,0.9)',
+                                position: 'absolute', right: 0, top: -17,
+                                fontSize: '0.74rem', fontWeight: 800, color: 'rgba(239,68,68,0.9)', whiteSpace: 'nowrap',
                               }}>
-                                doel {eur(maandDoel)}
+                                doel {eur(maandDoel)}{doelBuitenBeeld ? ' ↑' : ''}
                               </span>
                             </div>
                           )}
@@ -1856,8 +1868,15 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                           </div>
                         </div>
 
-                        {/* X-as */}
-                        <div style={{ display: 'flex', gap: 3, marginTop: 10 }}>
+                        {/* X-as: streepje per maand, daaronder het label. */}
+                        <div style={{ display: 'flex', gap: 3 }}>
+                          {zichtbaar.map(m => (
+                            <div key={m.key} style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+                              <div style={{ width: 1, height: 5, background: 'rgba(255,255,255,0.3)' }} />
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: 3, marginTop: 6 }}>
                           {zichtbaar.map(m => (
                             <div key={m.key} style={{
                               flex: 1, minWidth: 0, textAlign: 'center',
