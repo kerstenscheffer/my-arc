@@ -1660,6 +1660,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 for (let v = 0; v <= asMax + 0.5; v += stap) ticks.push(Math.round(v))
                 const doelBuitenBeeld = maandDoel > 0 && maandDoel > asMax
 
+                // Mijlpalen: elke €2.500 die een maand passeert krijgt een
+                // groen streepje in de staaf. Zo lees je de hoogte af zonder
+                // naar de as te kijken — drie streepjes is €7.500 gehaald.
+                const MIJLPAAL = 2500
+
                 // €3.594 wordt €3,6k: op een as telt de orde van grootte.
                 const kort = (n) => (n >= 1000
                   ? '€' + (Math.round(n / 100) / 10).toLocaleString('nl-NL') + 'k'
@@ -1854,12 +1859,21 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                                   )}
                                   {h > 0 && (
                                     <div style={{
+                                      position: 'relative',
                                       width: '100%', height: h, overflow: 'hidden',
                                       display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
                                       opacity: gerealiseerd ? 1 : 0.3, transition: 'height 0.3s ease',
                                     }}>
                                       {chDeel > 0 && <div style={{ height: chDeel, background: '#D4AF37' }} />}
                                       {gewoon > 0 && <div style={{ height: gewoon, background: '#fff' }} />}
+                                      {/* Gehaalde mijlpalen, van onder naar boven. */}
+                                      {Array.from({ length: Math.floor(m.amount / MIJLPAAL) }, (_, i) => (
+                                        <div key={i} style={{
+                                          position: 'absolute', left: 0, right: 0,
+                                          bottom: Math.round(((i + 1) * MIJLPAAL / asMax) * BALK_H) - 1,
+                                          height: 3, background: '#10b981',
+                                        }} />
+                                      ))}
                                     </div>
                                   )}
                                 </div>
@@ -1898,6 +1912,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       {[
                         { kleur: '#fff', tekst: 'binnen' },
                         { kleur: 'rgba(255,255,255,0.3)', tekst: 'verwacht' },
+                        ...(zichtbaar.some(m => m.amount >= MIJLPAAL) ? [{ kleur: '#10b981', tekst: `streep = € ${(MIJLPAAL / 1000).toLocaleString('nl-NL')}k gehaald` }] : []),
                         ...(zichtbaar.some(m => (m.challengeAmount || 0) > 0) ? [{ kleur: '#D4AF37', tekst: 'challenge · kan terug' }] : []),
                         ...(zichtbaar.some(m => (m.pendingAmount || 0) > 0) ? [{ streep: true, tekst: 'toegezegd, niet betaald' }] : []),
                       ].map(l => (
