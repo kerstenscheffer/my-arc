@@ -9,8 +9,8 @@
 // stukgaan, en de twee pagina's zullen uit elkaar lopen zodra de copy per
 // pagina verandert.
 
-import { useState, useEffect, useRef, Fragment } from 'react'
-import { Star, ChevronDown, X, Compass, ListChecks, Target, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, ClipboardCheck, LineChart, SlidersHorizontal, Video } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Star, ChevronDown, X, Compass, ListChecks, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, ClipboardCheck, LineChart, SlidersHorizontal, Video } from 'lucide-react'
 
 // Geen prijs op deze pagina: het bedrag hoort bij het afrekenen en staat dus
 // pas op /6week-checkout.
@@ -306,10 +306,14 @@ function MethodeSlider({ isMobile, onClose }) {
 }
 
 // ── De voorwaarden: schermvullend, zelfde opzet als de methode-slides ──────
-const GARANTIE_KAARTEN = [
-  { Icon: Target,    kop: 'Plan volgt of resultaat haalt' },
-  { Icon: Clock,     kop: 'Merkt dat het niet past' },
-  { Icon: BadgeEuro, kop: '6 weken service' },
+// Wat je moet doen om je inleg terug te krijgen. Vijf regels, genummerd —
+// concreet genoeg om na te rekenen, kort genoeg om in één blik te lezen.
+const BORG_EISEN = [
+  '2 workouts per week gelogd',
+  '75% van je meal plan gevolgd',
+  '3 coaching calls gehad',
+  '3x per week je gewicht gelogd',
+  "3 progressiefoto's gemaakt",
 ]
 
 function VoorwaardenVenster({ isMobile, onClose }) {
@@ -385,14 +389,12 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             letterSpacing: '-0.035em', lineHeight: 1.1, textAlign: 'center',
             maxWidth: 820, margin: '0 auto',
           }}>
-            <span style={{ color: GOLD }}>€300 inleg</span>, die je terug krijgt.
+            <span style={{ color: GOLD }}>€297 inleg</span>, die je terug krijgt.
           </div>
 
-          {/* Eén regel: de drie manieren om je inleg terug te krijgen, met
-              'of' ertussen. Zelfde vorm als de knoppen op het eerste scherm:
-              icoon boven een bold wit woord. */}
-          {/* Een streep in plaats van een kopje: hij scheidt de zin van de
-              drie voorwaarden zonder zelf gelezen te willen worden. */}
+          {/* De eisen zelf: een kopje, daaronder de vijf regels genummerd.
+              Geen iconen — vijf regels met een plaatje ervoor leest als een
+              menukaart, terwijl dit een afspraak is die je nakomt. */}
           <div style={{
             width: isMobile ? 120 : 180, height: 1,
             margin: `${isMobile ? '1.25rem' : '1.75rem'} auto 0`,
@@ -400,38 +402,36 @@ function VoorwaardenVenster({ isMobile, onClose }) {
           }} />
 
           <div style={{
-            display: 'flex',
-            flexDirection: isMobile ? 'column' : 'row',
-            alignItems: 'center', justifyContent: 'center',
-            gap: isMobile ? '0.9rem' : '2.75rem',
-            marginTop: isMobile ? '1rem' : '1.25rem',
+            marginTop: isMobile ? '1.25rem' : '1.75rem',
+            fontSize: isMobile ? '0.72rem' : '0.8rem', fontWeight: 900,
+            letterSpacing: '0.2em', color: '#fff', textAlign: 'center',
+            textTransform: 'uppercase',
           }}>
-            {GARANTIE_KAARTEN.map((g, n) => (
-              <Fragment key={g.kop}>
-                {n > 0 && (
-                  <span style={{
-                    fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800,
-                    color: 'rgba(255,255,255,0.25)', alignSelf: isMobile ? 'center' : 'flex-start',
-                    marginTop: isMobile ? 0 : 14,
-                  }}>
-                    of
-                  </span>
-                )}
-                <div style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  gap: isMobile ? 7 : 10, textAlign: 'center',
-                  width: isMobile ? '100%' : 300,
+            Zo krijg je je borg terug
+          </div>
+
+          <div style={{
+            margin: `${isMobile ? '1.25rem' : '2rem'} auto 0`,
+            display: 'flex', flexDirection: 'column',
+            gap: isMobile ? '0.9rem' : '1.35rem',
+            width: 'fit-content', maxWidth: '100%', textAlign: 'left',
+          }}>
+            {BORG_EISEN.map((eis, n) => (
+              <div key={eis} style={{ display: 'flex', alignItems: 'baseline', gap: isMobile ? 14 : 22 }}>
+                <span style={{
+                  flexShrink: 0, width: isMobile ? 14 : 20, textAlign: 'right',
+                  fontSize: isMobile ? '1.05rem' : '1.45rem', fontWeight: 900,
+                  color: GOLD, fontVariantNumeric: 'tabular-nums',
                 }}>
-                  <g.Icon size={isMobile ? 24 : 34} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
-                  <span style={{
-                    fontSize: isMobile ? '0.9rem' : '1.15rem', fontWeight: 900,
-                    color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
-                    whiteSpace: isMobile ? 'normal' : 'nowrap',
-                  }}>
-                    {g.kop}
-                  </span>
-                </div>
-              </Fragment>
+                  {n + 1}
+                </span>
+                <span style={{
+                  fontSize: isMobile ? '1rem' : '1.35rem', fontWeight: 800,
+                  color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.25,
+                }}>
+                  {eis}
+                </span>
+              </div>
             ))}
           </div>
 
