@@ -18,6 +18,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Gift, ArrowUpRight, Check, Undo2, Clock } from 'lucide-react'
 
 const LIJN = 'rgba(255,255,255,0.08)'
+// Challenge-geld is goud: het staat op de rekening, maar het is nog niet van
+// jou. In de maandgrafiek van de omzet-hub heeft datzelfde geld dezelfde kleur.
+const GOUD = '#FFD700'
 const LIJN_ZACHT = 'rgba(255,255,255,0.05)'
 const euro = (n) => '€' + Math.round(Number(n) || 0).toLocaleString('nl-NL')
 
@@ -173,32 +176,31 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: '0.9rem' }}>
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '1.25rem 3.5rem',
+        paddingBottom: '1.25rem', borderBottom: `1px solid ${LIJN}`, marginBottom: '1rem',
+      }}>
         {[
-          { label: 'In bewaring', waarde: euro(totaal), hint: `${lijst.length} challenge${lijst.length === 1 ? '' : 's'}` },
-          { label: 'Termijn voorbij', waarde: String(verlopen.length), hint: verlopen.length ? 'kun je afronden' : 'nog niets' },
+          { label: `In bewaring · ${lijst.length} challenge${lijst.length === 1 ? '' : 's'}`, waarde: euro(totaal), goud: true },
+          { label: verlopen.length ? 'Termijn voorbij · kun je afronden' : 'Termijn voorbij', waarde: String(verlopen.length), goud: false },
         ].map(k => (
-          <div key={k.label} style={{
-            flex: 1, padding: '0.7rem 0.8rem', borderRadius: 12,
-            background: 'rgba(255,255,255,0.04)', border: `1px solid ${LIJN}`,
-          }}>
+          <div key={k.label}>
             <div style={{
-              fontSize: '0.54rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
-              textTransform: 'uppercase', letterSpacing: '0.1em',
+              fontSize: '2.2rem', fontWeight: 900, lineHeight: 1,
+              color: k.goud ? GOUD : '#fff', letterSpacing: '-0.035em',
             }}>
-              {k.label}
-            </div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', marginTop: 2, letterSpacing: '-0.02em' }}>
               {k.waarde}
             </div>
-            <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>{k.hint}</div>
+            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 8 }}>
+              {k.label}
+            </div>
           </div>
         ))}
       </div>
 
       <div style={{
-        fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
-        lineHeight: 1.45, marginBottom: '0.5rem',
+        fontSize: '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)',
+        lineHeight: 1.5, marginBottom: '1rem',
       }}>
         Dit geld staat op de rekening maar telt nog niet als omzet, en er gaat
         geen commissie overheen zolang de klant het kan terugvragen.

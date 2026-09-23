@@ -2736,6 +2736,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         total: Number(r.order_value) || 0,
         betaald: r.payment_received === true || r.is_reservation === true,
         naam: r.lead_name || 'Lead',
+        // Challenge-geld dat nog terug kan: het staat op de rekening, maar is
+        // nog niet van ons. In de grafiek krijgt dat deel een eigen kleur.
+        challenge: r.sale_kind === 'challenge' && r.challenge_status !== 'behouden',
         type: r.payment_type || 'prepaid',
         months: Math.max(1, Number(r.duration_months) || 1),
         date: new Date(r.moved_at),
@@ -2754,9 +2757,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)
 
-      // Cashflow per maand opbouwen.
+      // Cashflow per maand opbouwen. `cashChallenge` houdt bij welk deel van
+      // een maand uit money-back-geld bestaat.
       const cash = {}
+      const cashChallenge = {}
       sales.forEach(s => {
+        const boek = (k, bedrag) => {
+          cash[k] = (cash[k] || 0) + bedrag
+          if (s.challenge) cashChallenge[k] = (cashChallenge[k] || 0) + bedrag
+        }
         // Bij een reservering valt de aanbetaling nu, en start de rest pas op de
         // afgesproken betaaldatum. Zonder geldige datum valt alles terug op het
         // oude gedrag (alles op de sale-datum).
@@ -2765,20 +2774,17 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const restStart = heeftRest ? s.restDatum : s.date
 
         if (heeftRest && s.reservering > 0) {
-          const k = monthKey(s.date)
-          cash[k] = (cash[k] || 0) + s.reservering
+          boek(monthKey(s.date), s.reservering)
         }
         if (restBedrag <= 0) return
 
         if (s.type === 'monthly' && s.months > 1) {
           const per = restBedrag / s.months
           for (let i = 0; i < s.months; i++) {
-            const k = monthKey(startOfMonth(restStart, i))
-            cash[k] = (cash[k] || 0) + per
+            boek(monthKey(startOfMonth(restStart, i)), per)
           }
         } else {
-          const k = monthKey(restStart)
-          cash[k] = (cash[k] || 0) + restBedrag
+          boek(monthKey(restStart), restBedrag)
         }
       })
 
@@ -2805,6 +2811,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           key: k,
           label: d.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' }),
           amount: Math.round(cash[k] || 0),
+          challengeAmount: Math.round(cashChallenge[k] || 0),
           isPast: i < 0,
           isCurrent: i === 0,
         })

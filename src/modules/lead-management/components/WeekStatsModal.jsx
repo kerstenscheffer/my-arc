@@ -1653,8 +1653,16 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
                     <div style={{ display: 'flex', gap: isMobile ? 8 : 12, alignItems: 'flex-end' }}>
                       {zichtbaar.map(m => {
-                        const h = Math.max(4, Math.round((m.amount / maxAmount) * (isMobile ? 130 : 170)))
-                        const barColor = (m.isPast || m.isCurrent) ? '#22c55e' : 'rgba(34,197,94,0.35)'
+                        const hoogte = (bedrag) => Math.round((bedrag / maxAmount) * (isMobile ? 130 : 170))
+                        const h = Math.max(4, hoogte(m.amount))
+                        // Challenge-geld staat op de rekening maar kan terug: dat
+                        // deel is goud, de rest groen. Zo zie je in één blik hoeveel
+                        // van een maand nog niet echt van jou is.
+                        const chDeel = Math.min(h, hoogte(m.challengeAmount || 0))
+                        const gewoon = Math.max(0, h - chDeel)
+                        const gerealiseerd = m.isPast || m.isCurrent
+                        const barColor = gerealiseerd ? '#22c55e' : 'rgba(34,197,94,0.35)'
+                        const goudColor = gerealiseerd ? GOLD : 'rgba(255,215,0,0.4)'
                         return (
                           <div key={m.key} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                             <div style={{
@@ -1665,7 +1673,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                               {m.amount > 0 ? eur(m.amount) : '—'}
                             </div>
                             <div style={{ height: isMobile ? 134 : 174, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                              <div style={{ width: '100%', height: h, background: barColor, borderRadius: 8, transition: 'height 0.3s ease' }} />
+                              <div style={{ width: '100%', height: h, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', borderRadius: 8, overflow: 'hidden', transition: 'height 0.3s ease' }}>
+                                {chDeel > 0 && <div style={{ height: chDeel, background: goudColor }} />}
+                                {gewoon > 0 && <div style={{ height: gewoon, background: barColor }} />}
+                              </div>
                             </div>
                             <div style={{
                               fontSize: isMobile ? '0.8rem' : '0.88rem', fontWeight: m.isCurrent ? 900 : 700,
@@ -1680,7 +1691,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     </div>
 
                     <div style={{ marginTop: '1.25rem', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
-                      Vol groen is binnen, licht groen verwacht.
+                      Vol groen is binnen, licht groen verwacht.{zichtbaar.some(m => (m.challengeAmount || 0) > 0) ? ' Goud is challenge-geld: staat op de rekening, kan nog terug.' : ''}
                     </div>
                   </>
                 )
