@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
+import { teamCoachIds } from '../../teamCoaches'
 import {
   X, Send, FileText, AlertTriangle, ArrowRight, CheckCircle,
   ChevronDown, Plus, Check,
@@ -49,7 +50,7 @@ export default function LeadSourceModal({
         const [{ data: camps }, { data: mags }, { data: usage }] = await Promise.all([
           db.supabase.from('outreach_campaigns')
             .select('id, name, variant_tag, status')
-            .eq('coach_id', coachId)
+            .in('coach_id', await teamCoachIds(db.supabase, coachId))
             .order('status', { ascending: true }) // active first
             .order('created_at', { ascending: false }),
           db.supabase.from('lead_magnets')

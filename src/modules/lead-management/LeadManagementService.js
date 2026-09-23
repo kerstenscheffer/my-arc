@@ -15,6 +15,8 @@ const NEGATIVE_FUNNEL_WORDS = [
   'unqualified',
 ]
 
+import { teamCoachIds } from './teamCoaches'
+
 class LeadManagementService {
   constructor() {
     this.db = DatabaseService
@@ -3805,10 +3807,12 @@ async createLeadWithSection(leadData, sectionId, coachId) {
 
   async getCampaigns(coachId, limit = 50) {
     try {
+      // Team-breed: campagnes van je teamgenoten mag je ook draaien.
+      const coachIds = await teamCoachIds(this.db.supabase, coachId)
       const { data, error } = await this.db.supabase
         .from('outreach_campaigns')
         .select('*, metrics:outreach_metrics(*)')
-        .eq('coach_id', coachId)
+        .in('coach_id', coachIds)
         .order('campaign_date', { ascending: false })
         .limit(limit)
 
@@ -3935,10 +3939,11 @@ async createLeadWithSection(leadData, sectionId, coachId) {
       const cutoffDate = new Date()
       cutoffDate.setDate(cutoffDate.getDate() - dateRange)
 
+      const coachIds = await teamCoachIds(this.db.supabase, coachId)
       const { data: campaigns, error } = await this.db.supabase
         .from('outreach_campaigns')
         .select('*, metrics:outreach_metrics(*)')
-        .eq('coach_id', coachId)
+        .in('coach_id', coachIds)
         .gte('campaign_date', cutoffDate.toISOString().split('T')[0])
 
       if (error) throw error

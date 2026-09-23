@@ -18,6 +18,7 @@ import {
   X, Link2, Check, Calendar, Send, ChevronDown, ChevronUp, AlertCircle,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { teamCoachIds } from '../teamCoaches'
 
 const formatDate = (iso) => {
   if (!iso) return ''
@@ -46,7 +47,7 @@ export default function BulkAssignLeadsModal({ coachId, isMobile, onClose, onDon
         const [campRes, sendRes, leadRes] = await Promise.all([
           supabase.from('outreach_campaigns')
             .select('id, name, variant_tag, status')
-            .eq('coach_id', coachId)
+            .in('coach_id', await teamCoachIds(supabase, coachId))
             .order('created_at', { ascending: false }),
           supabase.from('outreach_sends')
             .select('campaign_id, send_date')

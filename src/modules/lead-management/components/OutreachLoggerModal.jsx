@@ -12,6 +12,7 @@ import {
   Trophy, CalendarDays, Pencil, Check, Link2,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { teamCoachIds } from '../teamCoaches'
 import BulkAssignLeadsModal from './BulkAssignLeadsModal'
 
 const DEBOUNCE_MS = 600
@@ -62,7 +63,7 @@ export default function OutreachLoggerModal({ coachId, isMobile, onClose }) {
         const [campRes, sendRes, leadRes] = await Promise.all([
           supabase.from('outreach_campaigns')
             .select('id, name, variant_tag, message_text, status, created_at')
-            .eq('coach_id', coachId).order('created_at', { ascending: false }),
+            .in('coach_id', await teamCoachIds(supabase, coachId)).order('created_at', { ascending: false }),
           supabase.from('outreach_sends')
             .select('campaign_id, send_date, count').eq('coach_id', coachId),
           supabase.from('call_leads')

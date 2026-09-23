@@ -43,6 +43,7 @@ const renderTemplate = (template, lead, magnet) => {
     .replace(/\{url\}/g, magnet?.url || '')
 }
 import { supabase } from '../../../../lib/supabase'
+import { teamCoachIds } from '../../teamCoaches'
 
 const TABS = [
   { id: 'info',     label: 'Info',         icon: User },
@@ -143,11 +144,11 @@ export default function LeadDetailModalV2({
   useEffect(() => {
     if (!lead?.coach_id) return
     let cancelled = false
-    supabase
+    teamCoachIds(supabase, lead.coach_id).then(coachIds => supabase
       .from('outreach_campaigns')
       .select('id, name, variant_tag, status')
-      .eq('coach_id', lead.coach_id)
-      .order('created_at', { ascending: false })
+      .in('coach_id', coachIds)
+      .order('created_at', { ascending: false }))
       .then(({ data, error }) => {
         if (cancelled) return
         if (error) { console.error('Load campaigns failed:', error); setCampaigns([]) }

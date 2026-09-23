@@ -14,6 +14,7 @@ import {
   Flame, TrendingUp,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { teamCoachIds } from '../teamCoaches'
 
 const FUNNEL = [
   { key: 'reached_call',  label: 'Voorgesteld', color: '#ef4444', icon: PhoneCall,    re: /call.*voorgesteld|voorgesteld.*call/i },
@@ -41,7 +42,7 @@ export default function OutreachMetricsModal({ coachId, isMobile, onClose }) {
         const [campRes, sendRes, leadRes] = await Promise.all([
           supabase.from('outreach_campaigns')
             .select('id, name, variant_tag, message_text, status, campaign_date, created_at')
-            .eq('coach_id', coachId)
+            .in('coach_id', await teamCoachIds(supabase, coachId))
             .order('created_at', { ascending: false }),
           supabase.from('outreach_sends')
             .select('campaign_id, count')

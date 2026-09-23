@@ -315,6 +315,7 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
                 <CampagneRegel
                   key={c.id}
                   c={c}
+                  vanTeam={!!c.coach_id && !!coachId && c.coach_id !== coachId}
                   cijfersAan={cijfersAan}
                   statsLaden={statsLaden}
                   rij={stats?.get(c.id)}
@@ -340,7 +341,7 @@ function NaamHint() {
 }
 
 // Eén campagne. De regel zelf start hem; het potlood opent het bewerk-venster.
-function CampagneRegel({ c, cijfersAan, statsLaden, rij, onStart, onEdit }) {
+function CampagneRegel({ c, vanTeam, cijfersAan, statsLaden, rij, onStart, onEdit }) {
   const geenBericht = !c.message_text
 
   return (
@@ -365,6 +366,17 @@ function CampagneRegel({ c, cijfersAan, statsLaden, rij, onStart, onEdit }) {
             <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
               {c.platform || 'instagram'}{c.purpose ? ` · ${c.purpose}` : ''}
             </span>
+            {/* Campagnes zijn van het team; dit merkje zegt van wie de tekst is,
+                zodat je die van een teamgenoot niet per ongeluk herschrijft. */}
+            {vanTeam && (
+              <span style={{
+                flexShrink: 0, padding: '1px 6px', borderRadius: 5,
+                border: '1px solid rgba(255,255,255,0.18)',
+                fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
+              }}>
+                team
+              </span>
+            )}
           </div>
 
           {geenBericht ? (
