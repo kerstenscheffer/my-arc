@@ -2267,7 +2267,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // Omzet: elke movement met een ingevulde order-waarde telt mee (die
         // wordt alleen bij een sale gezet). Vóór de early-returns zodat 'ie
         // altijd meetelt, ook als de sectie geen puur "Sale"-label heeft.
-        if (mov.order_value != null) funnel.sale.omzet += Number(mov.order_value) || 0
+        //
+        // Maar pas als het geld binnen is. Een lead die ja zegt terwijl je nog
+        // op de betaling wacht (payment_received = false) telt wél als sale —
+        // dat is je ja-teller — maar nog niet als omzet, anders staat er geld
+        // op je scherm dat niet op je rekening staat. Een reservering is de
+        // uitzondering: daar is een deel binnen en telt het hele bedrag mee,
+        // precies zoals het altijd al werkte.
+        const geldBinnen = mov.payment_received === true || mov.is_reservation === true
+        if (mov.order_value != null && geldBinnen) funnel.sale.omzet += Number(mov.order_value) || 0
         const leadInfo = {
           id: mov.id,  // movement-id → nodig om deze stat-regel terug te kunnen draaien
           leadId: mov.lead_id,
@@ -2463,6 +2471,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // status op 'behouden' staat — en er gaat tot die tijd geen commissie
       // overheen. Zie de omzet- en partnerberekeningen verderop.
       if (sale !== undefined && sale) {
+        // Is het geld binnen? Niet meegegeven = ja (zo werkte het altijd).
+        if (sale.paymentReceived !== undefined) patch.payment_received = !!sale.paymentReceived
         if (sale.saleKind) patch.sale_kind = sale.saleKind
         if (sale.saleKind === 'challenge') {
           patch.challenge_status = sale.challenge?.status || 'open'
@@ -2502,6 +2512,65 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     } catch (error) {
       console.error('❌ setMovementOrderValue failed:', error)
       return { error }
+    }
+  }
+
+  // Closes waar het geld nog niet binnen is: je hebt een ja, je wacht op de
+  // betaling. Deze staan in het calls-venster onder een eigen tabblad, zodat je
+  // ze niet kwijtraakt tussen de leads die wél betaald hebben.
+  async getAwaitingPayment(coachId = null) {
+    try {
+      const { data, error } = await this.db.supabase
+        .rpc('get_awaiting_payment', { p_coach_id: coachId })
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('❌ getAwaitingPayment failed:', error)
+      return []
+    }
+  }
+
+  // Betaling binnen: bedrag en voorwaarden op de sale-rij zetten en 'm als
+  // betaald markeren. Vanaf dat moment telt hij mee in de omzet.
+  async markSalePaid(movementId, sale = {}) {
+    try {
+      const patch = { payment_received: true }
+      // Je kunt in hetzelfde formulier ook alleen het bedrag vastleggen en
+      // zeggen dat het geld nóg niet binnen is; dan blijft hij openstaan.
+      if (sale.paymentReceived === false) patch.payment_received = false
+      if (sale.value !== undefined && sale.value !== null) patch.order_value = sale.value
+      if (sale.paymentType !== undefined) patch.payment_type = sale.paymentType
+      if (sale.durationMonths !== undefined) patch.duration_months = sale.durationMonths
+      if (sale.partnerSharePct !== undefined) {
+        const pct = sale.partnerSharePct === null || sale.partnerSharePct === '' ? null : Number(sale.partnerSharePct)
+        patch.partner_share_pct = (pct != null && !isNaN(pct)) ? pct : null
+      }
+      if (sale.saleKind) {
+        patch.sale_kind = sale.saleKind
+        if (sale.saleKind === 'challenge') {
+          patch.challenge_status = sale.challenge?.status || 'open'
+          patch.challenge_deadline = sale.challenge?.deadline || null
+        } else {
+          patch.challenge_status = null
+          patch.challenge_deadline = null
+        }
+      }
+      // Aanbetaling met een restbedrag: dan is het geen kale betaling maar een
+      // reservering, en blijft de rest openstaan in het reserveringen-overzicht.
+      if (sale.reservation && sale.reservation.isReservation) {
+        const bedrag = Number(sale.reservation.amount)
+        patch.is_reservation = true
+        patch.reservation_amount = (!isNaN(bedrag) && bedrag > 0) ? bedrag : 50
+        patch.payment_due_date = sale.reservation.dueDate || null
+        patch.payment_received = false
+      }
+      const { error } = await this.db.supabase
+        .from('lead_movements').update(patch).eq('id', movementId)
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('❌ markSalePaid failed:', error)
+      return { success: false, error: error?.message || 'Opslaan mislukt' }
     }
   }
 

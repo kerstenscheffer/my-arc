@@ -1,5 +1,10 @@
 // src/modules/lead-management/components/kanban/DueCallsModal.jsx
 //
+// Twee tabbladen: de ingeplande calls, en de closes die nog op geld wachten.
+// Dat tweede tabblad bestaat omdat een ja en een betaling niet hetzelfde
+// moment zijn — je zet 'm meteen op sale en voert het bedrag in zodra het
+// binnen is. Tot die tijd telt hij wel als ja, niet als omzet.
+//
 // Alle ingeplande calls op één plek: wat af te handelen is, en wat er nog
 // aankomt. Per call twee stappen:
 //   Stap 1: Gevoerd / Niet gevoerd
@@ -16,7 +21,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass, ChevronRight } from 'lucide-react'
+import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass, ChevronRight, Euro } from 'lucide-react'
 import SaleForm from './SaleForm'
 import { SaleLostReasonForm } from './SaleLostReasonModal'
 
@@ -174,6 +179,60 @@ function CallRegel({ dc, onOutcome }) {
   )
 }
 
+// Een close die nog op geld wacht. Dichtgeklapt zie je wie en wanneer; open
+// staat hetzelfde sale-formulier als bij het afhandelen van de call, zodat de
+// bedragen op één manier gevraagd worden.
+function BetaalRegel({ rij, onBetaling }) {
+  const [open, setOpen] = useState(false)
+  const dagen = (() => {
+    if (!rij.moved_at) return null
+    const d = Math.floor((Date.now() - new Date(rij.moved_at).getTime()) / 86400000)
+    return isNaN(d) ? null : d
+  })()
+
+  return (
+    <div style={{ padding: '0.7rem 1rem', borderBottom: `1px solid ${LIJN_ZACHT}` }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+          textAlign: 'left', fontFamily: 'inherit', marginBottom: open ? 10 : 0,
+        }}
+      >
+        <Euro size={13} color="rgba(255,255,255,0.4)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontWeight: 900, color: '#fff', fontSize: '0.88rem', letterSpacing: '-0.015em',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {rij.lead_name || 'Lead'}
+          </div>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+            {rij.order_value != null
+              ? `€${Number(rij.order_value).toLocaleString('nl-NL')} afgesproken`
+              : 'Bedrag nog niet ingevuld'}
+            {dagen != null && ` · ${dagen === 0 ? 'vandaag' : `${dagen} dag${dagen === 1 ? '' : 'en'} geleden`}`}
+          </div>
+        </div>
+        <ChevronRight
+          size={15} strokeWidth={3} color="rgba(255,255,255,0.3)"
+          style={{ flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.18s ease' }}
+        />
+      </button>
+
+      {open && (
+        <SaleForm
+          leadName={rij.lead_name}
+          compact
+          onCancel={() => setOpen(false)}
+          onSave={(gegevens) => onBetaling(rij, gegevens)}
+        />
+      )}
+    </div>
+  )
+}
+
 function Kop({ tekst, aantal }) {
   return (
     <div style={{
@@ -188,11 +247,15 @@ function Kop({ tekst, aantal }) {
   )
 }
 
-export default function DueCallsModal({ dueCalls, onOutcome, onClose }) {
+export default function DueCallsModal({ dueCalls, wachtBetaling, onOutcome, onBetaling, onClose }) {
   const modalHost = useModalHost()
   const lijst = dueCalls || []
+  const betalingen = wachtBetaling || []
   const teDoen = lijst.filter(c => !c.toekomstig)
   const komtNog = lijst.filter(c => c.toekomstig)
+  // Begin op het tabblad waar werk ligt: staan er geen calls open maar wel
+  // betalingen, dan is dat het scherm dat je wilde zien.
+  const [tab, setTab] = useState(teDoen.length === 0 && betalingen.length > 0 ? 'betaling' : 'calls')
 
   return createPortal(
     <div
@@ -218,8 +281,10 @@ export default function DueCallsModal({ dueCalls, onOutcome, onClose }) {
             <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
               Ingeplande calls
             </div>
-            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
-              {teDoen.length} af te handelen · {komtNog.length} komt nog
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+              {tab === 'calls'
+                ? `${teDoen.length} af te handelen · ${komtNog.length} komt nog`
+                : `${betalingen.length} ${betalingen.length === 1 ? 'close wacht' : 'closes wachten'} op geld`}
             </div>
           </div>
           <button onClick={onClose} title="Later" aria-label="Sluiten" style={{
@@ -232,8 +297,58 @@ export default function DueCallsModal({ dueCalls, onOutcome, onClose }) {
           </button>
         </div>
 
+        {/* Tabbladen. De calls blijven voorop: dat is waarvoor dit venster
+            opengaat. Het aantal staat erbij, zodat je niet hoeft te klikken om
+            te zien of er iets ligt. */}
+        <div style={{ display: 'flex', flexShrink: 0, borderBottom: `1px solid ${LIJN}` }}>
+          {[
+            { id: 'calls', label: 'Calls', aantal: teDoen.length },
+            { id: 'betaling', label: 'Betaling', aantal: betalingen.length },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                flex: 1, minHeight: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: 'transparent', border: 'none',
+                borderBottom: `2px solid ${tab === t.id ? '#fff' : 'transparent'}`,
+                color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.4)',
+                fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {t.label}
+              {t.aantal > 0 && (
+                <span style={{
+                  minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9,
+                  background: tab === t.id ? '#fff' : 'rgba(255,255,255,0.12)',
+                  color: tab === t.id ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                  fontSize: '0.68rem', fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {t.aantal}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {lijst.length === 0 ? (
+          {tab === 'betaling' ? (
+            betalingen.length === 0 ? (
+              <div style={{
+                padding: '2.5rem 1.25rem', textAlign: 'center',
+                color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem', fontWeight: 700, lineHeight: 1.6,
+              }}>
+                Niemand wacht op betaling.<br />
+                Zet een close op “nog niet betaald” en hij komt hier te staan.
+              </div>
+            ) : (
+              betalingen.map(rij => (
+                <BetaalRegel key={rij.movement_id} rij={rij} onBetaling={onBetaling} />
+              ))
+            )
+          ) : lijst.length === 0 ? (
             <div style={{
               padding: '2.5rem 1rem', textAlign: 'center',
               color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem', fontWeight: 700,

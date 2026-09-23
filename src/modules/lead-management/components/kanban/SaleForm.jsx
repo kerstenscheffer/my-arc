@@ -15,7 +15,7 @@
 //               alsnog mee. Zo betalen we niemand uit over geld dat terug moet.
 
 import { useState } from 'react'
-import { Trophy, Gift, Wallet, CalendarClock, Users, BookmarkCheck } from 'lucide-react'
+import { Trophy, Gift, Wallet, CalendarClock, Users, BookmarkCheck, Check, Hourglass } from 'lucide-react'
 
 const LIJN = 'rgba(255,255,255,0.09)'
 
@@ -52,6 +52,10 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
   const [betaalwijze, setBetaalwijze] = useState('prepaid')
   const [maanden, setMaanden] = useState('12')
   const [partnerPct, setPartnerPct] = useState('50')
+  // Een ja is nog geen geld. Staat dit op 'nee', dan telt de sale wel als ja
+  // maar nog niet als omzet, en komt hij in het calls-venster onder 'Betaling'
+  // te staan tot je het bedrag invoert.
+  const [betaald, setBetaald] = useState(true)
   const [reservering, setReservering] = useState(false)
   const [aanbetaling, setAanbetaling] = useState('50')
   const [restDatum, setRestDatum] = useState('')
@@ -81,8 +85,10 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
       // bekend zijn welk deel de partner toekomt.
       partnerSharePct: pct > 0 ? pct : null,
       challenge: isChallenge ? { status: 'open', deadline } : null,
+      paymentReceived: betaald,
       reservation: {
-        isReservation: reservering,
+        // Nog niets binnen is geen aanbetaling: dan staat het hele bedrag open.
+        isReservation: betaald && reservering,
         amount: isNaN(resNum) ? 50 : resNum,
         dueDate: restDatum || null,
       },
@@ -114,7 +120,28 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
       </div>
 
       <div>
-        <div style={kopje}>Bedrag{leadName ? ` van ${leadName}` : ''}</div>
+        <div style={kopje}>Betaling</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => setBetaald(true)} style={keuze(betaald)}>
+            <Check size={14} strokeWidth={3} /> Geld binnen
+          </button>
+          <button onClick={() => { setBetaald(false); setReservering(false) }} style={keuze(!betaald)}>
+            <Hourglass size={14} strokeWidth={3} /> Nog niet
+          </button>
+        </div>
+        {!betaald && (
+          <div style={{
+            marginTop: 6, fontSize: '0.66rem', fontWeight: 700,
+            color: 'rgba(255,255,255,0.35)', lineHeight: 1.4,
+          }}>
+            Telt als ja, nog niet als omzet. Hij komt in het calls-venster onder
+            <b style={{ color: 'rgba(255,255,255,0.6)' }}> Betaling</b> te staan.
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div style={kopje}>{betaald ? 'Bedrag' : 'Afgesproken bedrag'}{leadName ? ` van ${leadName}` : ''}</div>
         <input
           type="number" inputMode="decimal" autoFocus value={bedrag}
           onChange={e => setBedrag(e.target.value)}
@@ -169,8 +196,9 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
         </div>
 
       {/* Aanbetaling: het bedrag blijft de volledige waarde; dit legt vast wat
-          er nu binnen is en wanneer de rest komt. */}
-      <div>
+          er nu binnen is en wanneer de rest komt. Alleen zinnig als er al iets
+          binnen is. */}
+      <div hidden={!betaald}>
         <button
           onClick={() => setReservering(v => !v)}
           style={{
@@ -231,7 +259,9 @@ export default function SaleForm({ leadName, partnerName = 'Marcel', compact = f
           cursor: 'pointer', fontFamily: 'inherit',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
-          {isNaN(totaal) ? 'Opslaan zonder bedrag' : `Opslaan · ${euro(totaal)}`}
+          {!betaald
+            ? (isNaN(totaal) ? 'Ja, betaling later' : `Ja · ${euro(totaal)} later`)
+            : (isNaN(totaal) ? 'Opslaan zonder bedrag' : `Opslaan · ${euro(totaal)}`)}
         </button>
       </div>
     </div>

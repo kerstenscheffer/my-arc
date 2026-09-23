@@ -121,6 +121,8 @@ export default function KanbanBoard({
   const [statsRange, setStatsRange] = useState({ start: '', end: '' })
   const [statsVolledig, setStatsVolledig] = useState(false)
   const [dueCalls, setDueCalls] = useState([])
+  // Closes die nog op geld wachten; tweede tabblad van hetzelfde venster.
+  const [wachtBetaling, setWachtBetaling] = useState([])
   const [showDueCalls, setShowDueCalls] = useState(false)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
   // boardFilter shape: {
@@ -902,6 +904,7 @@ export default function KanbanBoard({
         const schedIds = board.filter(s => s.id !== 'unassigned' && isScheduledSectionTitle(s.title)).map(s => s.id)
         const due = schedIds.length ? await leadService.getDueScheduledCalls(schedIds) : []
         setDueCalls(due)
+        leadService.getAwaitingPayment(coachId).then(setWachtBetaling).catch(() => {})
         if (isInitialLoad && due.length) setShowDueCalls(true) // auto-open bij openen bord
       } catch (e) { console.warn('due calls load failed:', e?.message) }
     } catch (error) { console.error('❌ Load kanban failed:', error) }
@@ -1367,6 +1370,22 @@ export default function KanbanBoard({
     }
   }
 
+  // Betaling binnen bij een close die erop wachtte. De rij verdwijnt meteen uit
+  // het tabblad; lukt het opslaan niet, dan zetten we 'm terug en zeggen we het.
+  const handleBetalingBinnen = async (rij, gegevens) => {
+    setWachtBetaling(prev => prev.filter(r => r.movement_id !== rij.movement_id))
+    const res = await leadService.markSalePaid(rij.movement_id, gegevens)
+    if (!res?.success) {
+      setWachtBetaling(prev => (prev.some(r => r.movement_id === rij.movement_id) ? prev : [rij, ...prev]))
+      alert(res?.error || 'Opslaan mislukt')
+      return
+    }
+    // Opnieuw ophalen in plaats van gokken: wie alleen het bedrag vastlegde en
+    // nog niet betaald kreeg, hoort gewoon in de lijst te blijven staan.
+    leadService.getAwaitingPayment(coachId).then(setWachtBetaling).catch(() => {})
+    setStatsRefreshKey(k => k + 1)
+  }
+
   // Openstaande-calls pop-up handmatig openen (ververst de lijst eerst).
   const openDueCalls = async () => {
     try {
@@ -1375,6 +1394,7 @@ export default function KanbanBoard({
       // is. Bij het handmatig openen wil je élke openstaande call kunnen
       // afronden; bij het automatisch openen alleen wat vandaag speelt.
       setDueCalls(schedIds.length ? await leadService.getDueScheduledCalls(schedIds, true) : [])
+      setWachtBetaling(await leadService.getAwaitingPayment(coachId))
     } catch (e) { console.warn('due calls open failed:', e?.message) }
     setShowDueCalls(true)
   }
@@ -1442,15 +1462,15 @@ export default function KanbanBoard({
       if (target) await handleMoveLeadToSection(lead, dc.sectionId, target.id, alGevraagd)
       else console.warn('Geen doel-sectie gevonden voor uitkomst:', kind)
       if (metBedrag) {
-        const { value, paymentType, durationMonths, partnerSharePct, reservation, saleKind, challenge } = extra.sale
-        if (value != null) {
-          try {
-            await leadService.setMovementOrderValue(
-              dc.leadId, value, paymentType, durationMonths, partnerSharePct, reservation,
-              { saleKind, challenge },
-            )
-          } catch (e) { console.error('Omzet opslaan mislukt:', e) }
-        }
+        // Ook zonder bedrag opslaan: bij "ja, betaling later" is er niets om te
+        // tellen, maar moet de sale-rij wel weten dat het geld nog moet komen.
+        const { value, paymentType, durationMonths, partnerSharePct, reservation, saleKind, challenge, paymentReceived } = extra.sale
+        try {
+          await leadService.setMovementOrderValue(
+            dc.leadId, value ?? null, paymentType, durationMonths, partnerSharePct, reservation,
+            { saleKind, challenge, paymentReceived },
+          )
+        } catch (e) { console.error('Omzet opslaan mislukt:', e) }
       }
       // Objectie pas ná de verplaatsing: hij landt op de laatste movement-rij.
       if (kind === 'saleLost' && extra.reason && target) {
@@ -2471,14 +2491,14 @@ export default function KanbanBoard({
           isMobile={isMobile}
           leadName={saleModalLead.name}
           onClose={() => setSaleModalLead(null)}
-          onSave={async ({ value, paymentType, durationMonths, partnerSharePct, reservation, saleKind, challenge }) => {
+          onSave={async ({ value, paymentType, durationMonths, partnerSharePct, reservation, saleKind, challenge, paymentReceived }) => {
             const lead = saleModalLead
             setSaleModalLead(null)
-            if (value != null && lead?.id) {
+            if (lead?.id) {
               try {
                 await leadService.setMovementOrderValue(
-                  lead.id, value, paymentType, durationMonths, partnerSharePct, reservation,
-                  { saleKind, challenge },
+                  lead.id, value ?? null, paymentType, durationMonths, partnerSharePct, reservation,
+                  { saleKind, challenge, paymentReceived },
                 )
               } catch (e) { console.error('Omzet opslaan mislukt:', e) }
               setStatsRefreshKey(k => k + 1)
@@ -2613,7 +2633,9 @@ export default function KanbanBoard({
       {showDueCalls && (
         <DueCallsModal
           dueCalls={dueCalls}
+          wachtBetaling={wachtBetaling}
           onOutcome={handleDueCallOutcome}
+          onBetaling={handleBetalingBinnen}
           onClose={() => setShowDueCalls(false)}
         />
       )}
