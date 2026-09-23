@@ -125,7 +125,7 @@ const PIJLERS = [
   },
 ]
 
-function MethodeSlider({ isMobile, onClose }) {
+function MethodeSlider({ isMobile, onClose, onBetaal, knopLabel }) {
   const [i, setI] = useState(0)
   const raakX = useRef(null)
   const p = PIJLERS[i]
@@ -225,7 +225,7 @@ function MethodeSlider({ isMobile, onClose }) {
       {/* Tekst: wat het is, en wat we gaan doen. */}
       <div style={{
         flex: 1, minHeight: 0, overflowY: 'auto',
-        padding: isMobile ? '0 1.25rem 1.25rem' : '0 2rem 2rem',
+        padding: isMobile ? '0 1.25rem 6rem' : '0 2rem 6.5rem',
       }}>
         <div style={{
           maxWidth: 1100, width: '100%', margin: '0 auto', position: 'relative',
@@ -299,8 +299,29 @@ function MethodeSlider({ isMobile, onClose }) {
         </div>
       </div>
 
-      {/* Geen knoppenbalk: je bladert met de pijltjestoetsen, Enter, een
-          klik in het venster of een swipe. */}
+      {/* Bladeren doe je met de pijltjestoetsen, Enter, een klik in het
+          venster of een swipe. De enige knop onderin is die naar de
+          betaling — die blijft staan, zodat je niet eerst terug hoeft. */}
+      <button
+        onClick={onBetaal}
+        style={{
+          position: 'absolute',
+          left: '50%',
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '1.25rem' : '1.75rem'})`,
+          transform: 'translateX(-50%)',
+          zIndex: 5,
+          display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+          padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem',
+          borderRadius: 999, border: 'none',
+          background: '#fff', color: '#000',
+          fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 24px rgba(255,255,255,0.12)',
+          letterSpacing: '0.01em', whiteSpace: 'nowrap', fontFamily: 'inherit',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {knopLabel}
+      </button>
     </div>
   )
 }
@@ -1069,7 +1090,7 @@ export default function SixWeekChallengePage() {
 
       {/* De methode — schermvullend, één pijler per slide. */}
       {open === 'methode' && (
-        <MethodeSlider isMobile={isMobile} onClose={() => setOpen(null)} />
+        <MethodeSlider isMobile={isMobile} onClose={() => setOpen(null)} onBetaal={naarCheckout} knopLabel="Doe mee" />
       )}
 
       {/* De voorwaarden — schermvullend, zelfde opzet als de methode-slides. */}
