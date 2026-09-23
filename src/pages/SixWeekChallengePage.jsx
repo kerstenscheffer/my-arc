@@ -26,6 +26,32 @@ const BG = '#000000'
 // transformaties staan verderop, bij de reviews onder het formulier.
 const SECTION_COUNT = 2
 
+// ── Foto's voor telefoon ────────────────────────────────────────────────────
+//
+// De banners zijn breed (49:15). Op een telefoon wordt dat een streepje van
+// honderd pixels hoog en blijft er van een titel in het beeld niets over.
+// Naast elke foto mag daarom een staande versie staan met '-mobile' achter de
+// naam; die pakt de telefoon dan. Staat hij er niet, dan blijft de brede
+// versie staan — zo breekt de pagina niet zolang er nog een ontbreekt.
+//
+// Formaten: de hero 1080x1350 (4:5), de methode-slides en de
+// voorwaarden-banner 1080x1080.
+const mobielPad = (pad) => pad.replace(/(\.[a-z0-9]+)$/i, '-mobile$1')
+
+function useFoto(pad, isMobile) {
+  const [mobiel, setMobiel] = useState(false)
+  useEffect(() => {
+    setMobiel(false)
+    if (!isMobile) return
+    let levend = true
+    const beeld = new Image()
+    beeld.onload = () => { if (levend) setMobiel(true) }
+    beeld.src = mobielPad(pad)
+    return () => { levend = false }
+  }, [pad, isMobile])
+  return { src: mobiel ? mobielPad(pad) : pad, mobiel }
+}
+
 const REVIEWS = [
   { name: 'Hessel', date: 'dec 2025', text: 'Kersten begreep het meteen! Na een uitgebreide 0-meting kreeg ik een plan op maat. Van 79,8 naar 74,4 in 8 weken. Als jij je aan het plan houdt geeft Kersten altijd de volle 100%!' },
   { name: 'Me', date: 'dec 2025', text: 'Als je hulp nodig hebt met sporten raad ik Myarc echt aan. Je krijgt een goed schema om je doel te halen en je hebt wekelijkse calls.' },
@@ -103,6 +129,7 @@ function MethodeSlider({ isMobile, onClose }) {
   const [i, setI] = useState(0)
   const raakX = useRef(null)
   const p = PIJLERS[i]
+  const foto = useFoto(p.foto, isMobile)
   const naar = (n) => setI(Math.max(0, Math.min(PIJLERS.length - 1, n)))
 
   useEffect(() => {
@@ -152,13 +179,15 @@ function MethodeSlider({ isMobile, onClose }) {
           balken. De gewone foto's blijven een band met vaste hoogte. */}
       <div style={{
         position: 'relative', width: '100%', flexShrink: 0,
-        ...(p.beeldVult && !isMobile
-          ? { aspectRatio: '49 / 15' }   // 1960x600, exact de verhouding van het beeld
-          : { height: isMobile ? '34vh' : 'min(46vh, 460px)' }),
+        ...(foto.mobiel
+          ? { aspectRatio: '1 / 1' }     // 1080x1080, de telefoonversie
+          : p.beeldVult && !isMobile
+            ? { aspectRatio: '49 / 15' } // 1960x600, exact de verhouding van het beeld
+            : { height: isMobile ? '34vh' : 'min(46vh, 460px)' }),
       }}>
-        <div key={p.foto} style={{
+        <div key={foto.src} style={{
           position: 'absolute', inset: 0,
-          backgroundImage: `url(${p.foto})`,
+          backgroundImage: `url(${foto.src})`,
           backgroundSize: 'cover',
           // Staat de tekst op het beeld, dan houden we de onderkant vast: daar
           // staat de titel. Bijsnijden gebeurt dan bovenin.
@@ -284,6 +313,7 @@ const GARANTIE_KAARTEN = [
 ]
 
 function VoorwaardenVenster({ isMobile, onClose }) {
+  const banner = useFoto('/voorwaarden-banner.jpg', isMobile)
   useEffect(() => {
     const toets = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', toets)
@@ -305,11 +335,13 @@ function VoorwaardenVenster({ isMobile, onClose }) {
         position: 'relative', width: '100%', flexShrink: 0,
         // Geen maxHeight: die maakte het vak lager dan de verhouding van de
         // foto, waardoor cover de bovenkant eraf sneed.
-        ...(isMobile ? { height: '30vh' } : { aspectRatio: '49 / 15' }),
+        ...(banner.mobiel
+          ? { aspectRatio: '1 / 1' }
+          : isMobile ? { height: '30vh' } : { aspectRatio: '49 / 15' }),
       }}>
         <div style={{
           position: 'absolute', inset: 0,
-          backgroundImage: 'url(/voorwaarden-banner.jpg)',
+          backgroundImage: `url(${banner.src})`,
           backgroundSize: 'cover', backgroundPosition: 'center bottom',
         }} />
         <div style={{
@@ -516,6 +548,7 @@ export default function SixWeekChallengePage() {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [current, setCurrent] = useState(0)
   const scrollRef = useRef(null)
+  const hero = useFoto('/6week-challenge-hero.jpg', isMobile)
   const containerRef = useRef(null)
   const offerRef = useRef(null)
   const aanbodRef = useRef(null)
@@ -638,13 +671,15 @@ export default function SixWeekChallengePage() {
           <div style={{
             position: 'relative', width: '100%',
             margin: 0,
-            aspectRatio: '49 / 15',
+            // Telefoon krijgt de staande versie (4:5); op desktop blijft het de
+            // brede band waarin de titel al verwerkt zit.
+            aspectRatio: hero.mobiel ? '4 / 5' : '49 / 15',
             flexShrink: 0,
           }}>
             <div style={{
               position: 'absolute', inset: 0,
-              backgroundImage: 'url(/6week-challenge-hero.jpg)',
-              backgroundSize: 'cover', backgroundPosition: 'center 45%',
+              backgroundImage: `url(${hero.src})`,
+              backgroundSize: 'cover', backgroundPosition: hero.mobiel ? 'center' : 'center 45%',
             }} />
             {/* Klein randje naar zwart onderaan, zodat de foto niet met een
                 harde lijn eindigt. */}
