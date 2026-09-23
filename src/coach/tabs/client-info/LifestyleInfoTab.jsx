@@ -3,6 +3,10 @@ import { useState, useEffect } from 'react'
 import { Save, X, Edit2, Activity, Moon, Briefcase, Clock } from 'lucide-react'
 import Field from './components/Field'
 import ClientIntelligenceService from '../../../modules/client-intelligence/ClientIntelligenceService'
+// Hetzelfde slaapblok als in het klant-inzicht van het command center: de
+// laatste veertien nachten uit sleep_logs. Bewust dezelfde component en geen
+// tweede versie — anders vertellen twee schermen straks een ander verhaal.
+import SlaapInsight from '../../../modules/coach-command-center/components/insight/SlaapInsight'
 
 export default function LifestyleInfoTab({ db, client, isEditing, setIsEditing, saving, setSaving, onRefresh, isMobile }) {
   const [formData, setFormData] = useState({})
@@ -318,6 +322,10 @@ export default function LifestyleInfoTab({ db, client, isEditing, setIsEditing, 
               isMobile={isMobile}
             />
             
+            {/* Wat hij zelf bij de intake opgaf is een schatting; hierboven
+                staat wat hij écht logde. */}
+            <SlaapInsight db={db} client={client} isMobile={isMobile} />
+
             <Field 
               label="Average Sleep (hours)" 
               value={formData.sleepHours} 
