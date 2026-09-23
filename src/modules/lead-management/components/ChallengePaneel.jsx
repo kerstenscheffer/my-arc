@@ -18,9 +18,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Gift, ArrowUpRight, Check, Undo2, Clock } from 'lucide-react'
 
 const LIJN = 'rgba(255,255,255,0.08)'
-// Challenge-geld is goud: het staat op de rekening, maar het is nog niet van
-// jou. In de maandgrafiek van de omzet-hub heeft datzelfde geld dezelfde kleur.
-const GOUD = '#FFD700'
+// Challenge-geld is wit zoals de rest — het staat op de rekening — maar met
+// een streep erdoor in de grafiek van de omzet-hub, omdat het nog terug kan.
+// Hier doet het label dat werk: "in bewaring".
 const LIJN_ZACHT = 'rgba(255,255,255,0.05)'
 const euro = (n) => '€' + Math.round(Number(n) || 0).toLocaleString('nl-NL')
 
@@ -181,13 +181,13 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
         paddingBottom: '1.25rem', borderBottom: `1px solid ${LIJN}`, marginBottom: '1rem',
       }}>
         {[
-          { label: `In bewaring · ${lijst.length} challenge${lijst.length === 1 ? '' : 's'}`, waarde: euro(totaal), goud: true },
-          { label: verlopen.length ? 'Termijn voorbij · kun je afronden' : 'Termijn voorbij', waarde: String(verlopen.length), goud: false },
+          { label: `In bewaring · ${lijst.length} challenge${lijst.length === 1 ? '' : 's'}`, waarde: euro(totaal) },
+          { label: verlopen.length ? 'Termijn voorbij · kun je afronden' : 'Termijn voorbij', waarde: String(verlopen.length) },
         ].map(k => (
           <div key={k.label}>
             <div style={{
               fontSize: '2.2rem', fontWeight: 900, lineHeight: 1,
-              color: k.goud ? GOUD : '#fff', letterSpacing: '-0.035em',
+              color: '#fff', letterSpacing: '-0.035em',
             }}>
               {k.waarde}
             </div>

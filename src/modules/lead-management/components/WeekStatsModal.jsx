@@ -1665,6 +1665,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 // naar de as te kijken — drie streepjes is €7.500 gehaald.
                 const MIJLPAAL = 2500
 
+                // Challenge-geld is ook wit — het staat immers op de rekening —
+                // maar gestreept, zodat je ziet dat het nog terug kan. Goud
+                // trok te veel aandacht voor geld dat je misschien niet houdt.
+                const CHALLENGE_VULLING = 'repeating-linear-gradient(135deg, rgba(255,255,255,0.9) 0 3px, rgba(255,255,255,0.35) 3px 7px)'
+
                 // €3.594 wordt €3,6k: op een as telt de orde van grootte.
                 const kort = (n) => (n >= 1000
                   ? '€' + (Math.round(n / 100) / 10).toLocaleString('nl-NL') + 'k'
@@ -1864,7 +1869,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                                       display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
                                       opacity: gerealiseerd ? 1 : 0.3, transition: 'height 0.3s ease',
                                     }}>
-                                      {chDeel > 0 && <div style={{ height: chDeel, background: '#D4AF37' }} />}
+                                      {chDeel > 0 && <div style={{ height: chDeel, background: CHALLENGE_VULLING }} />}
                                       {gewoon > 0 && <div style={{ height: gewoon, background: '#fff' }} />}
                                       {/* Gehaalde mijlpalen, van onder naar boven. */}
                                       {Array.from({ length: Math.floor(m.amount / MIJLPAAL) }, (_, i) => (
@@ -1913,7 +1918,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                         { kleur: '#fff', tekst: 'binnen' },
                         { kleur: 'rgba(255,255,255,0.3)', tekst: 'verwacht' },
                         ...(zichtbaar.some(m => m.amount >= MIJLPAAL) ? [{ kleur: '#10b981', tekst: `streep = € ${(MIJLPAAL / 1000).toLocaleString('nl-NL')}k gehaald` }] : []),
-                        ...(zichtbaar.some(m => (m.challengeAmount || 0) > 0) ? [{ kleur: '#D4AF37', tekst: 'challenge · kan terug' }] : []),
+                        ...(zichtbaar.some(m => (m.challengeAmount || 0) > 0) ? [{ kleur: CHALLENGE_VULLING, tekst: 'challenge · kan terug' }] : []),
                         ...(zichtbaar.some(m => (m.pendingAmount || 0) > 0) ? [{ streep: true, tekst: 'toegezegd, niet betaald' }] : []),
                       ].map(l => (
                         <span key={l.tekst} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
