@@ -686,6 +686,8 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // De gegevens staan in een blad dat openschuift, niet permanent op de pagina.
+  const [formOpen, setFormOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [current, setCurrent] = useState(0)
   const scrollRef = useRef(null)
@@ -976,110 +978,32 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
             </div>
 
 
-            <div style={{
-              borderRadius: isMobile ? 16 : 18,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.02)',
-              padding: isMobile ? '1.5rem 1.25rem' : '1.75rem 1.5rem',
-            }}>
-              <div style={{
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: 800, color: '#fff', marginBottom: '1rem',
-              }}>Jouw gegevens</div>
-
-              {[
-                { icon: User,  value: name,  set: setName,  placeholder: 'Je naam',                      type: 'text' },
-                { icon: Mail,  value: email, set: setEmail, placeholder: 'Je e-mailadres',               type: 'email' },
-                { icon: Phone, value: phone, set: setPhone, placeholder: 'Je telefoonnummer (optioneel)', type: 'tel' },
-              ].map((field, idx) => (
-                <div key={idx} style={{
-                  display: 'flex', alignItems: 'center', gap: '0.6rem',
-                  padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
-                  borderRadius: 12,
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  background: 'rgba(255,255,255,0.05)',
-                  marginBottom: '0.6rem',
-                }}>
-                  <field.icon size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
-                  <input
-                    type={field.type}
-                    placeholder={field.placeholder}
-                    value={field.value}
-                    onChange={e => field.set(e.target.value)}
-                    style={{
-                      flex: 1, background: 'none', border: 'none', outline: 'none',
-                      color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem',
-                      fontWeight: 500, fontFamily: 'inherit',
-                    }}
-                  />
-                </div>
-              ))}
-
-              {error && (
-                <div style={{
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  color: '#ef4444', fontWeight: 600,
-                  marginBottom: '0.75rem', marginTop: '0.25rem',
-                }}>{error}</div>
-              )}
-
-              <button
-                onClick={handleCheckout}
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '1rem' : '1.1rem',
-                  borderRadius: 12, border: 'none',
-                  background: loading ? 'rgba(255,255,255,0.4)' : '#fff',
-                  color: '#000',
-                  fontSize: isMobile ? '0.9rem' : '0.95rem',
-                  fontWeight: 900,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  marginTop: '0.5rem', minHeight: 52,
-                  boxShadow: loading ? 'none' : '0 4px 20px rgba(255,255,255,0.15)',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  letterSpacing: '0.01em', fontFamily: 'inherit',
-                }}
-              >
-                {loading ? 'Even geduld...' : variant.knop}
-              </button>
-
-              {/* Alleen bij termijnen: wat je precies betaalt en wanneer. Dit
-                  hoort vlak bij de knop te staan, niet in de kleine lettertjes. */}
-              {variant.prijsRegel && (
-                <div style={{
-                  marginTop: '0.7rem', padding: isMobile ? '0.65rem 0.8rem' : '0.75rem 0.9rem',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 10,
-                  fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 700,
-                  color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, textAlign: 'center',
-                }}>
-                  {variant.prijsRegel}
-                </div>
-              )}
-
-              <div style={{
+            {/* Eén knop; je gegevens vraagt het blad dat eronder openschuift.
+                Een formulier dat altijd openstond maakte dit scherm zwaarder
+                dan de beslissing die je hier neemt. */}
+            <button
+              onClick={() => setFormOpen(true)}
+              style={{
+                width: '100%', minHeight: isMobile ? 56 : 62, borderRadius: 14, border: 'none',
+                background: '#fff', color: '#000',
+                fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900,
+                letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: '0.4rem', marginTop: '0.85rem',
-              }}>
-                <Lock size={12} color="rgba(255,255,255,0.25)" />
-                <span style={{
-                  fontSize: isMobile ? '0.65rem' : '0.7rem',
-                  color: 'rgba(255,255,255,0.25)', fontWeight: 500,
-                }}>Veilig betalen via Stripe · SSL beveiligd</span>
-              </div>
-            </div>
+                boxShadow: '0 4px 24px rgba(255,255,255,0.14)',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {variant.knop}
+            </button>
 
             {/* ══ Reviews en transformaties — onderaan, na het formulier ══ */}
-            <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>
-              <TrustpilotBadge style={{ margin: isMobile ? '1rem 0' : '1.25rem 0' }} />
+            <div style={{ marginTop: isMobile ? '1.5rem' : '1.75rem' }}>
+              <TrustpilotBadge style={{ margin: isMobile ? '0.75rem 0' : '0.9rem 0' }} />
 
               <div
                 ref={scrollRef}
                 style={{
-                  display: 'flex', gap: isMobile ? '0.75rem' : '1rem',
+                  display: 'flex', gap: isMobile ? '0.6rem' : '0.75rem',
                   overflow: 'hidden', cursor: 'grab',
                   marginLeft: isMobile ? '-1.25rem' : '-2rem',
                   marginRight: isMobile ? '-1.25rem' : '-2rem',
@@ -1089,11 +1013,11 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
               >
                 {doubledSlides.map((slide, idx) => (
                   <div key={idx} style={{
-                    minWidth: isMobile ? 240 : 280, maxWidth: isMobile ? 240 : 280,
+                    minWidth: isMobile ? 200 : 230, maxWidth: isMobile ? 200 : 230,
                     padding: slide.soort === 'foto'
-                      ? (isMobile ? '0.6rem' : '0.7rem')
-                      : (isMobile ? '0.85rem 1rem' : '1rem 1.15rem'),
-                    borderRadius: 12,
+                      ? (isMobile ? '0.45rem' : '0.5rem')
+                      : (isMobile ? '0.7rem 0.8rem' : '0.75rem 0.9rem'),
+                    borderRadius: 10,
                     border: '1px solid rgba(255,255,255,0.06)',
                     background: 'rgba(255,255,255,0.02)',
                     flexShrink: 0,
@@ -1111,7 +1035,7 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
                             draggable={false}
                             onError={(e) => { e.currentTarget.style.opacity = 0 }}
                             style={{
-                              maxWidth: '100%', maxHeight: isMobile ? 170 : 195,
+                              maxWidth: '100%', maxHeight: isMobile ? 120 : 140,
                               width: 'auto', height: 'auto', display: 'block',
                             }}
                           />
@@ -1132,16 +1056,16 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
                           ))}
                         </div>
                         <p style={{
-                          fontSize: isMobile ? '0.7rem' : '0.75rem',
+                          fontSize: isMobile ? '0.7rem' : '0.72rem',
                           color: 'rgba(255,255,255,0.45)', fontWeight: 500,
-                          lineHeight: 1.5, marginBottom: '0.6rem',
+                          lineHeight: 1.45, marginBottom: '0.5rem',
                           display: '-webkit-box', WebkitLineClamp: 3,
                           WebkitBoxOrient: 'vertical', overflow: 'hidden',
                         }}>{slide.text}</p>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <div style={{
-                              width: 24, height: 24, borderRadius: '50%',
+                              width: 20, height: 20, borderRadius: '50%',
                               background: '#fff', border: `1px solid ${TP_GREEN}`,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: '0.6rem', fontWeight: 800, color: TP_GREEN,
@@ -1268,6 +1192,93 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
         />
       )}
 
+
+      {/* Jouw gegevens — schuift van onderen open zodra je op de knop drukt. */}
+      <Blad open={formOpen} titel="Jouw gegevens" onClose={() => setFormOpen(false)} isMobile={isMobile}>
+        {[
+          { icon: User,  value: name,  set: setName,  placeholder: 'Je naam',                       type: 'text' },
+          { icon: Mail,  value: email, set: setEmail, placeholder: 'Je e-mailadres',                type: 'email' },
+          { icon: Phone, value: phone, set: setPhone, placeholder: 'Je telefoonnummer (optioneel)', type: 'tel' },
+        ].map((field, idx) => (
+          <div key={idx} style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: isMobile ? '0.8rem 0.9rem' : '0.85rem 1rem',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.18)',
+            background: 'rgba(255,255,255,0.05)',
+            marginBottom: '0.6rem',
+          }}>
+            <field.icon size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
+            <input
+              type={field.type}
+              placeholder={field.placeholder}
+              value={field.value}
+              onChange={e => field.set(e.target.value)}
+              style={{
+                flex: 1, minWidth: 0, background: 'none', border: 'none', outline: 'none',
+                color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem',
+                fontWeight: 600, fontFamily: 'inherit',
+              }}
+            />
+          </div>
+        ))}
+
+        {error && (
+          <div style={{
+            fontSize: isMobile ? '0.8rem' : '0.85rem',
+            color: '#ef4444', fontWeight: 700,
+            marginBottom: '0.75rem', marginTop: '0.25rem',
+          }}>{error}</div>
+        )}
+
+        <button
+          onClick={handleCheckout}
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: isMobile ? '1rem' : '1.1rem',
+            borderRadius: 12, border: 'none',
+            background: loading ? 'rgba(255,255,255,0.4)' : '#fff',
+            color: '#000',
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            fontWeight: 900,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            transition: 'all 0.3s ease',
+            marginTop: '0.5rem', minHeight: 54,
+            boxShadow: loading ? 'none' : '0 4px 20px rgba(255,255,255,0.15)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            letterSpacing: '0.01em', fontFamily: 'inherit',
+          }}
+        >
+          {loading ? 'Even geduld...' : variant.knop}
+        </button>
+
+        {/* Alleen bij termijnen: wat je precies betaalt en wanneer. Dit hoort
+            vlak bij de knop te staan, niet in de kleine lettertjes. */}
+        {variant.prijsRegel && (
+          <div style={{
+            marginTop: '0.7rem', padding: isMobile ? '0.65rem 0.8rem' : '0.75rem 0.9rem',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 10,
+            fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 700,
+            color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, textAlign: 'center',
+          }}>
+            {variant.prijsRegel}
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '0.4rem', marginTop: '0.85rem',
+        }}>
+          <Lock size={13} color="rgba(255,255,255,0.35)" />
+          <span style={{
+            fontSize: isMobile ? '0.72rem' : '0.76rem',
+            color: 'rgba(255,255,255,0.35)', fontWeight: 600,
+          }}>Veilig betalen via Stripe · SSL beveiligd</span>
+        </div>
+      </Blad>
 
       {/* Waarom doe ik dit — foto rechts, twee redenen links. */}
       <Blad open={open === 'waarom'} titel="Waarom doe ik dit?" onClose={() => setOpen(null)} isMobile={isMobile}>
