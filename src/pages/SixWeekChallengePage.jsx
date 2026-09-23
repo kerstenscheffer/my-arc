@@ -863,7 +863,7 @@ export default function SixWeekChallengePage() {
               </div>
               {[
                 { Icon: Clock, tekst: 'Onvoorwaardelijke 7 daagse geld terug garantie.' },
-                { Icon: BadgeEuro, tekst: 'Vind je de coaching niet goed genoeg of werkt het niet? Geld terug.' },
+                { Icon: BadgeEuro, tekst: 'Coaching niet goed genoeg of werkt het niet? Geld terug.' },
               ].map((r, i) => (
                 <div key={r.tekst} style={{
                   display: 'flex', gap: '0.7rem',
@@ -874,20 +874,20 @@ export default function SixWeekChallengePage() {
                 }}>
                   {/* Zelfde stijl als de drie knoppen: bold en wit. */}
                   <r.Icon
-                    size={isMobile ? 20 : 22} strokeWidth={2.4}
+                    size={isMobile ? 24 : 28} strokeWidth={2.6}
                     style={{ flexShrink: 0, color: '#fff' }}
                   />
                   <span style={{
-                    fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 700,
-                    color: 'rgba(255,255,255,0.85)', lineHeight: 1.35, letterSpacing: '-0.01em',
+                    fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 900,
+                    color: '#fff', lineHeight: 1.3, letterSpacing: '-0.02em',
                     textAlign: isMobile ? 'center' : 'left',
                   }}>{r.tekst}</span>
                 </div>
               ))}
               <p style={{
                 margin: `${isMobile ? '0.9rem' : '1.1rem'} 0 0`,
-                fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
-                color: 'rgba(255,255,255,0.6)', lineHeight: 1.45,
+                fontSize: isMobile ? '0.92rem' : '1rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.55)', lineHeight: 1.45,
                 letterSpacing: '-0.01em', textAlign: 'center',
               }}>
                 Mijn doel is gratis laten zien dat het werkt, niet om geld te verdienen aan de borg.
