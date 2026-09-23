@@ -324,7 +324,7 @@ const BORG_EISEN = [
   "3 progressiefoto's gemaakt",
 ]
 
-function VoorwaardenVenster({ isMobile, onClose }) {
+function VoorwaardenVenster({ isMobile, onClose, onBetaal }) {
   const banner = useFoto('/voorwaarden-banner.jpg', isMobile)
   useEffect(() => {
     const toets = (e) => { if (e.key === 'Escape') onClose() }
@@ -447,9 +447,18 @@ function VoorwaardenVenster({ isMobile, onClose }) {
               boven het woord, op telefoon drie regels met het icoon ervoor —
               daar is een kolom van drie blokken te hoog. */}
           <div style={{
-            margin: `${isMobile ? '1.5rem' : '2.5rem'} auto 0`,
+            marginTop: isMobile ? '1.5rem' : '2.5rem',
             paddingTop: isMobile ? '1.25rem' : '1.75rem',
             borderTop: '1px solid rgba(255,255,255,0.1)',
+            fontSize: isMobile ? '0.72rem' : '0.8rem', fontWeight: 900,
+            letterSpacing: '0.2em', color: '#fff', textAlign: 'center',
+            textTransform: 'uppercase',
+          }}>
+            Beschermende garanties voor borg terug
+          </div>
+
+          <div style={{
+            margin: `${isMobile ? '1rem' : '1.5rem'} auto 0`,
             maxWidth: 900, width: '100%',
             display: 'flex',
             flexDirection: isMobile ? 'column' : 'row',
@@ -491,6 +500,24 @@ function VoorwaardenVenster({ isMobile, onClose }) {
               Mijn doel: serieuze mannen gratis serieus resultaat laten zien.
             </span>
           </p>
+
+          {/* Vanaf hier hoef je niet terug te bladeren: de knop staat eronder. */}
+          <button
+            onClick={onBetaal}
+            style={{
+              width: '100%', maxWidth: 420,
+              margin: `${isMobile ? '1.25rem' : '1.5rem'} auto 0`,
+              minHeight: isMobile ? 54 : 60, borderRadius: 14, border: 'none',
+              background: '#fff', color: '#000',
+              fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+              letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 24px rgba(255,255,255,0.14)',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            Betaal borg
+          </button>
 
         </div>
       </div>
@@ -1049,7 +1076,7 @@ export default function SixWeekChallengePage() {
 
       {/* De voorwaarden — schermvullend, zelfde opzet als de methode-slides. */}
       {open === 'voorwaarden' && (
-        <VoorwaardenVenster isMobile={isMobile} onClose={() => setOpen(null)} />
+        <VoorwaardenVenster isMobile={isMobile} onClose={() => setOpen(null)} onBetaal={naarCheckout} />
       )}
 
 
