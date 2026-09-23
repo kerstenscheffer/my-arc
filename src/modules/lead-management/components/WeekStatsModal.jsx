@@ -1639,12 +1639,18 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 const kanTerug = start > 0
                 const kanVooruit = start < maxStart
 
+                // Maten van de grafiek: hoogte van het staafvlak en de breedte
+                // van een staaf. Slank, niet de volle kolombreedte — dat leest
+                // als een balkje, niet als een blok.
+                const BALK_H = isMobile ? 120 : 150
+                const BALK_B = isMobile ? 14 : 18
+
                 const getal = { fontSize: isMobile ? '1.9rem' : '2.6rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.035em' }
                 const label = { fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 8 }
                 const pijl = (aan) => ({
-                  width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.14)',
-                  color: aan ? '#fff' : 'rgba(255,255,255,0.2)',
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  background: 'transparent', border: 'none',
+                  color: aan ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.18)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: aan ? 'pointer' : 'default', fontFamily: 'inherit',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -1732,16 +1738,16 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       <button
                         onClick={() => { setDoelInput(maandDoel != null ? String(maandDoel) : ''); setDoelOpen(true) }}
                         style={{
-                          flexShrink: 0, minHeight: 34, padding: '0 0.75rem', borderRadius: 10,
+                          flexShrink: 0, minHeight: 32, padding: '0 0.4rem', borderRadius: 8,
                           display: 'inline-flex', alignItems: 'center', gap: 6,
-                          background: 'transparent', border: `1px solid ${maandDoel ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.14)'}`,
-                          color: maandDoel ? '#ef4444' : '#fff',
-                          fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                          background: 'transparent', border: 'none',
+                          color: maandDoel ? 'rgba(239,68,68,0.9)' : 'rgba(255,255,255,0.55)',
+                          fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
                           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                         }}
                       >
-                        <Target size={15} strokeWidth={2.8} />
-                        {maandDoel ? eur(maandDoel) : 'Doel'}
+                        <Target size={14} strokeWidth={2.6} />
+                        {maandDoel ? `doel ${eur(maandDoel)}` : 'Doel'}
                       </button>
                       <button onClick={() => kanTerug && setMaandOffset(o => o - 2)} style={pijl(kanTerug)} aria-label="Eerdere maanden">
                         <ChevronLeft size={18} strokeWidth={3} />
@@ -1751,76 +1757,95 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       </button>
                     </div>
 
-                    <div style={{ position: 'relative', display: 'flex', gap: isMobile ? 8 : 12, alignItems: 'flex-end' }}>
-                      {/* Doel: rode stippellijn dwars over de grafiek, op de
-                          hoogte die bij het bedrag hoort. */}
+                    {/* De grafiek zelf. Slanke staven op één basislijn, geen
+                        gekleurde blokken: de hoogte doet het werk, de kleur
+                        zegt alleen waar het geld staat. */}
+                    <div style={{ position: 'relative' }}>
                       {maandDoel > 0 && (
                         <div style={{
-                          position: 'absolute', left: 0, right: 0,
-                          // De balkjes staan onder de bedragen; de lijn meet
-                          // vanaf de onderkant van het balk-vlak.
-                          bottom: (isMobile ? 34 : 36) + Math.min(isMobile ? 134 : 174, Math.round((maandDoel / maxAmount) * (isMobile ? 130 : 170))),
-                          height: 0, borderTop: '2px dashed #ef4444', pointerEvents: 'none', zIndex: 1,
+                          position: 'absolute', left: 0, right: 0, zIndex: 1,
+                          bottom: (isMobile ? 30 : 32) + Math.min(BALK_H, Math.round((maandDoel / maxAmount) * BALK_H)),
+                          height: 0, borderTop: '1px dashed rgba(239,68,68,0.55)', pointerEvents: 'none',
                         }}>
                           <span style={{
-                            position: 'absolute', right: 0, top: -18,
-                            fontSize: '0.78rem', fontWeight: 900, color: '#ef4444',
+                            position: 'absolute', right: 0, top: -17,
+                            fontSize: '0.72rem', fontWeight: 800, color: 'rgba(239,68,68,0.9)',
                           }}>
                             doel {eur(maandDoel)}
                           </span>
                         </div>
                       )}
-                      {zichtbaar.map(m => {
-                        const hoogte = (bedrag) => Math.round((bedrag / maxAmount) * (isMobile ? 130 : 170))
-                        const h = Math.max(4, hoogte(m.amount))
-                        // Challenge-geld staat op de rekening maar kan terug: dat
-                        // deel is goud, de rest groen. Zo zie je in één blik hoeveel
-                        // van een maand nog niet echt van jou is.
-                        const chDeel = Math.min(h, hoogte(m.challengeAmount || 0))
-                        const gewoon = Math.max(0, h - chDeel)
-                        // Toegezegd maar niet betaald: als gestippeld vak bovenop,
-                        // leeg van binnen. Het is er nog niet.
-                        const openDeel = m.pendingAmount > 0 ? Math.max(6, hoogte(m.pendingAmount)) : 0
-                        const gerealiseerd = m.isPast || m.isCurrent
-                        const barColor = gerealiseerd ? '#22c55e' : 'rgba(34,197,94,0.35)'
-                        const goudColor = gerealiseerd ? GOLD : 'rgba(255,215,0,0.4)'
-                        return (
-                          <div key={m.key} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                            <div style={{
-                              fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 900,
-                              color: m.amount > 0 ? '#fff' : 'rgba(255,255,255,0.25)',
-                              whiteSpace: 'nowrap', letterSpacing: '-0.02em',
-                            }}>
-                              {m.amount > 0 ? eur(m.amount) : '—'}
-                            </div>
-                            <div style={{ height: isMobile ? 134 : 174, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 3 }}>
-                              {openDeel > 0 && (
-                                <div style={{
-                                  width: '100%', height: openDeel, borderRadius: 8,
-                                  border: '2px dashed rgba(255,255,255,0.45)', boxSizing: 'border-box',
-                                }} />
-                              )}
-                              <div style={{ width: '100%', height: h, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', borderRadius: 8, overflow: 'hidden', transition: 'height 0.3s ease' }}>
-                                {chDeel > 0 && <div style={{ height: chDeel, background: goudColor }} />}
-                                {gewoon > 0 && <div style={{ height: gewoon, background: barColor }} />}
+
+                      <div style={{ display: 'flex', gap: isMobile ? 6 : 10, alignItems: 'flex-end' }}>
+                        {zichtbaar.map(m => {
+                          const hoogte = (bedrag) => Math.round((bedrag / maxAmount) * BALK_H)
+                          const h = m.amount > 0 ? Math.max(3, hoogte(m.amount)) : 0
+                          const chDeel = Math.min(h, hoogte(m.challengeAmount || 0))
+                          const gewoon = Math.max(0, h - chDeel)
+                          const openDeel = m.pendingAmount > 0 ? Math.max(8, hoogte(m.pendingAmount)) : 0
+                          const gerealiseerd = m.isPast || m.isCurrent
+                          return (
+                            <div key={m.key} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{
+                                height: 22, display: 'flex', alignItems: 'center',
+                                fontSize: isMobile ? '0.78rem' : '0.88rem', fontWeight: 800,
+                                color: m.amount > 0 ? '#fff' : 'transparent',
+                                letterSpacing: '-0.02em', whiteSpace: 'nowrap',
+                              }}>
+                                {m.amount > 0 ? eur(m.amount) : '·'}
+                              </div>
+                              <div style={{ height: BALK_H, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
+                                {openDeel > 0 && (
+                                  <div style={{
+                                    width: BALK_B, height: openDeel, borderRadius: 3,
+                                    border: '1px dashed rgba(255,255,255,0.4)', boxSizing: 'border-box',
+                                  }} />
+                                )}
+                                {h > 0 && (
+                                  <div style={{
+                                    width: BALK_B, height: h, borderRadius: 3, overflow: 'hidden',
+                                    display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                                    opacity: gerealiseerd ? 1 : 0.35, transition: 'height 0.3s ease',
+                                  }}>
+                                    {chDeel > 0 && <div style={{ height: chDeel, background: '#D4AF37' }} />}
+                                    {gewoon > 0 && <div style={{ height: gewoon, background: '#10b981' }} />}
+                                  </div>
+                                )}
+                              </div>
+                              {/* Basislijn: zonder streep zweven de staven. */}
+                              <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.1)' }} />
+                              <div style={{
+                                marginTop: 8,
+                                fontSize: isMobile ? '0.76rem' : '0.82rem',
+                                fontWeight: m.isCurrent ? 900 : 700,
+                                color: m.isCurrent ? '#fff' : 'rgba(255,255,255,0.4)',
+                                textTransform: 'capitalize', whiteSpace: 'nowrap',
+                              }}>
+                                {m.label.replace(/ 20/, " '")}
                               </div>
                             </div>
-                            <div style={{
-                              fontSize: isMobile ? '0.8rem' : '0.88rem', fontWeight: m.isCurrent ? 900 : 700,
-                              color: m.isCurrent ? GOLD : 'rgba(255,255,255,0.6)',
-                              textTransform: 'capitalize', whiteSpace: 'nowrap',
-                            }}>
-                              {m.label.replace(/ 20/, " '")}
-                            </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
                     </div>
 
-                    <div style={{ marginTop: '1.25rem', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
-                      Vol groen is binnen, licht groen verwacht.
-                      {zichtbaar.some(m => (m.challengeAmount || 0) > 0) ? ' Goud is challenge-geld: staat op de rekening, kan nog terug.' : ''}
-                      {zichtbaar.some(m => (m.pendingAmount || 0) > 0) ? ' Gestippeld is toegezegd, nog niet betaald.' : ''}
+                    {/* Legenda in plaats van een alinea: alleen wat in beeld staat. */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem', marginTop: '1.25rem' }}>
+                      {[
+                        { kleur: '#10b981', tekst: 'binnen' },
+                        { kleur: 'rgba(16,185,129,0.35)', tekst: 'verwacht' },
+                        ...(zichtbaar.some(m => (m.challengeAmount || 0) > 0) ? [{ kleur: '#D4AF37', tekst: 'challenge · kan terug' }] : []),
+                        ...(zichtbaar.some(m => (m.pendingAmount || 0) > 0) ? [{ streep: true, tekst: 'toegezegd, niet betaald' }] : []),
+                      ].map(l => (
+                        <span key={l.tekst} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                          <span style={{
+                            width: 10, height: 10, borderRadius: 2, flexShrink: 0,
+                            background: l.streep ? 'transparent' : l.kleur,
+                            border: l.streep ? '1px dashed rgba(255,255,255,0.5)' : 'none',
+                          }} />
+                          {l.tekst}
+                        </span>
+                      ))}
                     </div>
                   </>
                 )
