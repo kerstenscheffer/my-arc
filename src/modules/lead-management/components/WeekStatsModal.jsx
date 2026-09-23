@@ -178,6 +178,22 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [toegezegdOpen, setToegezegdOpen] = useState(false)
   // Welk stuk van de maandreeks in beeld staat; 0 = rond deze maand.
   const [maandOffset, setMaandOffset] = useState(0)
+  // Doel-omzet per maand: de rode stippellijn in de grafiek.
+  const [maandDoel, setMaandDoel] = useState(null)
+  const [doelOpen, setDoelOpen] = useState(false)
+  const [doelInput, setDoelInput] = useState('')
+  const [doelBezig, setDoelBezig] = useState(false)
+
+  const bewaarDoel = async () => {
+    if (doelBezig) return
+    setDoelBezig(true)
+    const waarde = String(doelInput).replace(/[^0-9]/g, '')
+    const res = await leadService.saveMaandOmzetDoel(coachId, waarde === '' ? null : Number(waarde))
+    setDoelBezig(false)
+    if (res?.error) { alert('Doel opslaan mislukt'); return }
+    setMaandDoel(waarde === '' ? null : Number(waarde))
+    setDoelOpen(false)
+  }
   const [revenue, setRevenue] = useState(null)
   const [revLoading, setRevLoading] = useState(false)
   // Partner-uitbetaling (bv. Marcel): per maand wat er open staat + betaald-knop.
@@ -263,11 +279,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     setRevTab('omzet')
     setRevLoading(true)
     try {
-      const [r] = await Promise.all([
+      const [r, doel] = await Promise.all([
         leadService.getRevenueProjection(coachId, 12),
+        leadService.getMaandOmzetDoel(coachId),
         loadPayouts(),
       ])
       setRevenue(r)
+      setMaandDoel(doel)
+      setDoelInput(doel != null ? String(doel) : '')
     } catch (e) {
       console.error('Revenue laden mislukt:', e)
       setRevenue(null)
@@ -1467,6 +1486,69 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           }}
         >
           <style>{`@keyframes geldHubIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }`}</style>
+
+          {/* Doel per maand. Eén getal, dus één veld — geen scherm vol opties. */}
+          {doelOpen && (
+            <div
+              onClick={(e) => { if (e.target === e.currentTarget) setDoelOpen(false) }}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 20,
+                background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+                display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
+                padding: isMobile ? 0 : '1.5rem',
+              }}
+            >
+              <div style={{
+                width: '100%', maxWidth: 420, background: '#0a0a0a',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: isMobile ? '18px 18px 0 0' : 18,
+                padding: isMobile ? '1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px))' : '1.5rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
+                  <Target size={19} color="#ef4444" strokeWidth={2.8} />
+                  <div style={{ flex: 1, fontSize: '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+                    Doel per maand
+                  </div>
+                  <button onClick={() => setDoelOpen(false)} aria-label="Sluiten" style={{
+                    width: 34, height: 34, borderRadius: 10, background: 'transparent',
+                    border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}><X size={18} strokeWidth={2.8} /></button>
+                </div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginBottom: '1rem' }}>
+                  Komt als rode stippellijn in de grafiek te staan. Leeg laten haalt 'm weg.
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem' }}>
+                  <span style={{ fontSize: '1.8rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)' }}>€</span>
+                  <input
+                    type="text" inputMode="numeric" autoFocus
+                    value={doelInput}
+                    onChange={e => setDoelInput(e.target.value.replace(/[^0-9]/g, ''))}
+                    onKeyDown={e => { if (e.key === 'Enter') bewaarDoel() }}
+                    placeholder="5000"
+                    style={{
+                      flex: 1, minWidth: 0, minHeight: 54, padding: '0 0.9rem',
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)',
+                      borderRadius: 12, color: '#fff', fontSize: '1.8rem', fontWeight: 900,
+                      fontFamily: 'inherit', letterSpacing: '-0.03em', outline: 'none',
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setDoelOpen(false)} style={{
+                    flex: 1, minHeight: 48, borderRadius: 12, background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.6)',
+                    fontSize: '0.92rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                  }}>Annuleer</button>
+                  <button onClick={bewaarDoel} disabled={doelBezig} style={{
+                    flex: 2, minHeight: 48, borderRadius: 12, border: 'none',
+                    background: '#fff', color: '#000',
+                    fontSize: '0.92rem', fontWeight: 900, fontFamily: 'inherit',
+                    cursor: doelBezig ? 'wait' : 'pointer', opacity: doelBezig ? 0.6 : 1,
+                  }}>{doelBezig ? 'Opslaan…' : 'Doel opslaan'}</button>
+                </div>
+              </div>
+            </div>
+          )}
           <div
             style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 1100, margin: '0 auto' }}
           >
@@ -1549,7 +1631,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 const maxStart = Math.max(0, alle.length - VENSTER)
                 const start = Math.min(maxStart, Math.max(0, huidig - Math.floor(VENSTER / 2) + maandOffset))
                 const zichtbaar = alle.slice(start, start + VENSTER)
-                const maxAmount = Math.max(1, ...zichtbaar.map(m => m.amount))
+                const maxAmount = Math.max(
+                  1,
+                  ...zichtbaar.map(m => m.amount + (m.pendingAmount || 0)),
+                  maandDoel || 0,
+                )
                 const kanTerug = start > 0
                 const kanVooruit = start < maxStart
 
@@ -1643,6 +1729,20 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     {/* Omzet per maand: weinig maanden, brede balken. */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: isMobile ? '1.5rem 0 1rem' : '1.75rem 0 1.25rem' }}>
                       <div style={{ flex: 1, fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff' }}>Omzet per maand</div>
+                      <button
+                        onClick={() => { setDoelInput(maandDoel != null ? String(maandDoel) : ''); setDoelOpen(true) }}
+                        style={{
+                          flexShrink: 0, minHeight: 34, padding: '0 0.75rem', borderRadius: 10,
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          background: 'transparent', border: `1px solid ${maandDoel ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.14)'}`,
+                          color: maandDoel ? '#ef4444' : '#fff',
+                          fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        }}
+                      >
+                        <Target size={15} strokeWidth={2.8} />
+                        {maandDoel ? eur(maandDoel) : 'Doel'}
+                      </button>
                       <button onClick={() => kanTerug && setMaandOffset(o => o - 2)} style={pijl(kanTerug)} aria-label="Eerdere maanden">
                         <ChevronLeft size={18} strokeWidth={3} />
                       </button>
@@ -1651,7 +1751,25 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       </button>
                     </div>
 
-                    <div style={{ display: 'flex', gap: isMobile ? 8 : 12, alignItems: 'flex-end' }}>
+                    <div style={{ position: 'relative', display: 'flex', gap: isMobile ? 8 : 12, alignItems: 'flex-end' }}>
+                      {/* Doel: rode stippellijn dwars over de grafiek, op de
+                          hoogte die bij het bedrag hoort. */}
+                      {maandDoel > 0 && (
+                        <div style={{
+                          position: 'absolute', left: 0, right: 0,
+                          // De balkjes staan onder de bedragen; de lijn meet
+                          // vanaf de onderkant van het balk-vlak.
+                          bottom: (isMobile ? 34 : 36) + Math.min(isMobile ? 134 : 174, Math.round((maandDoel / maxAmount) * (isMobile ? 130 : 170))),
+                          height: 0, borderTop: '2px dashed #ef4444', pointerEvents: 'none', zIndex: 1,
+                        }}>
+                          <span style={{
+                            position: 'absolute', right: 0, top: -18,
+                            fontSize: '0.78rem', fontWeight: 900, color: '#ef4444',
+                          }}>
+                            doel {eur(maandDoel)}
+                          </span>
+                        </div>
+                      )}
                       {zichtbaar.map(m => {
                         const hoogte = (bedrag) => Math.round((bedrag / maxAmount) * (isMobile ? 130 : 170))
                         const h = Math.max(4, hoogte(m.amount))
@@ -1660,6 +1778,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                         // van een maand nog niet echt van jou is.
                         const chDeel = Math.min(h, hoogte(m.challengeAmount || 0))
                         const gewoon = Math.max(0, h - chDeel)
+                        // Toegezegd maar niet betaald: als gestippeld vak bovenop,
+                        // leeg van binnen. Het is er nog niet.
+                        const openDeel = m.pendingAmount > 0 ? Math.max(6, hoogte(m.pendingAmount)) : 0
                         const gerealiseerd = m.isPast || m.isCurrent
                         const barColor = gerealiseerd ? '#22c55e' : 'rgba(34,197,94,0.35)'
                         const goudColor = gerealiseerd ? GOLD : 'rgba(255,215,0,0.4)'
@@ -1672,7 +1793,13 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                             }}>
                               {m.amount > 0 ? eur(m.amount) : '—'}
                             </div>
-                            <div style={{ height: isMobile ? 134 : 174, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                            <div style={{ height: isMobile ? 134 : 174, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 3 }}>
+                              {openDeel > 0 && (
+                                <div style={{
+                                  width: '100%', height: openDeel, borderRadius: 8,
+                                  border: '2px dashed rgba(255,255,255,0.45)', boxSizing: 'border-box',
+                                }} />
+                              )}
                               <div style={{ width: '100%', height: h, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', borderRadius: 8, overflow: 'hidden', transition: 'height 0.3s ease' }}>
                                 {chDeel > 0 && <div style={{ height: chDeel, background: goudColor }} />}
                                 {gewoon > 0 && <div style={{ height: gewoon, background: barColor }} />}
@@ -1691,7 +1818,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     </div>
 
                     <div style={{ marginTop: '1.25rem', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
-                      Vol groen is binnen, licht groen verwacht.{zichtbaar.some(m => (m.challengeAmount || 0) > 0) ? ' Goud is challenge-geld: staat op de rekening, kan nog terug.' : ''}
+                      Vol groen is binnen, licht groen verwacht.
+                      {zichtbaar.some(m => (m.challengeAmount || 0) > 0) ? ' Goud is challenge-geld: staat op de rekening, kan nog terug.' : ''}
+                      {zichtbaar.some(m => (m.pendingAmount || 0) > 0) ? ' Gestippeld is toegezegd, nog niet betaald.' : ''}
                     </div>
                   </>
                 )

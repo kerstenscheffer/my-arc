@@ -2758,14 +2758,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)
 
       // Cashflow per maand opbouwen. `cashChallenge` houdt bij welk deel van
-      // een maand uit money-back-geld bestaat.
+      // een maand uit money-back-geld bestaat, `cashPending` wat er is
+      // toegezegd maar nog niet betaald — dat laatste staat los van de omzet
+      // en wordt in de grafiek gestippeld getekend.
       const cash = {}
       const cashChallenge = {}
-      sales.forEach(s => {
-        const boek = (k, bedrag) => {
-          cash[k] = (cash[k] || 0) + bedrag
-          if (s.challenge) cashChallenge[k] = (cashChallenge[k] || 0) + bedrag
-        }
+      const cashPending = {}
+      const verdeel = (s, boek) => {
         // Bij een reservering valt de aanbetaling nu, en start de rest pas op de
         // afgesproken betaaldatum. Zonder geldige datum valt alles terug op het
         // oude gedrag (alles op de sale-datum).
@@ -2786,7 +2785,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         } else {
           boek(monthKey(restStart), restBedrag)
         }
-      })
+      }
+
+      sales.forEach(s => verdeel(s, (k, bedrag) => {
+        cash[k] = (cash[k] || 0) + bedrag
+        if (s.challenge) cashChallenge[k] = (cashChallenge[k] || 0) + bedrag
+      }))
+      openstaand.forEach(s => verdeel(s, (k, bedrag) => {
+        cashPending[k] = (cashPending[k] || 0) + bedrag
+      }))
 
       // MRR nu + actieve maandplannen (maandplannen die deze maand nog lopen).
       const now = new Date()
@@ -2812,6 +2819,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           label: d.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' }),
           amount: Math.round(cash[k] || 0),
           challengeAmount: Math.round(cashChallenge[k] || 0),
+          pendingAmount: Math.round(cashPending[k] || 0),
           isPast: i < 0,
           isCurrent: i === 0,
         })
@@ -3317,6 +3325,44 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       return { error }
     } catch (error) {
       console.error('❌ saveKpiTargets failed:', error)
+      return { error }
+    }
+  }
+
+  // Doel-omzet per maand. Ligt in dezelfde doelen-tabel als de dag- en
+  // weekdoelen (stat_key 'omzet'), zodat er niet nog een tabel bijkomt voor
+  // één getal. null = geen doel gesteld.
+  async getMaandOmzetDoel(coachId) {
+    try {
+      if (!coachId) return null
+      const { data, error } = await this.db.supabase
+        .from('lead_kpi_targets')
+        .select('month_target')
+        .eq('coach_id', coachId)
+        .eq('stat_key', 'omzet')
+        .maybeSingle()
+      if (error) throw error
+      const n = data?.month_target
+      return (n == null || n === '') ? null : Number(n)
+    } catch (error) {
+      console.error('❌ getMaandOmzetDoel failed:', error)
+      return null
+    }
+  }
+
+  async saveMaandOmzetDoel(coachId, bedrag) {
+    try {
+      if (!coachId) return { error: 'geen coach' }
+      const n = (bedrag === '' || bedrag == null) ? null : Number(bedrag)
+      const { error } = await this.db.supabase
+        .from('lead_kpi_targets')
+        .upsert(
+          { coach_id: coachId, stat_key: 'omzet', month_target: (n != null && !isNaN(n) && n > 0) ? n : null, updated_at: new Date().toISOString() },
+          { onConflict: 'coach_id,stat_key' },
+        )
+      return { error }
+    } catch (error) {
+      console.error('❌ saveMaandOmzetDoel failed:', error)
       return { error }
     }
   }
