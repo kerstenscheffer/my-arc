@@ -19,7 +19,7 @@
 // per pagina verandert.
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone, ChevronDown, X, Compass, ListChecks, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, ClipboardCheck, LineChart, SlidersHorizontal, Video } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown, X, Compass, ListChecks, Target, HelpCircle, Clock, BadgeEuro, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, ClipboardCheck, LineChart, SlidersHorizontal, Video } from 'lucide-react'
 
 // Eenmalige prijs.
 const PRICE = 297
@@ -355,6 +355,14 @@ function MethodeSlider({ isMobile, onClose }) {
 // ── De voorwaarden: schermvullend, zelfde opzet als de methode-slides ──────
 // Wat je moet doen om je inleg terug te krijgen. Vijf regels, genummerd —
 // concreet genoeg om na te rekenen, kort genoeg om in één blik te lezen.
+// De drie garanties die naast de eisen blijven staan: ook als je het plan
+// volgt of juist merkt dat het niets voor je is, kom je er zonder schade uit.
+const GARANTIE_KAARTEN = [
+  { Icon: Target,    kop: 'Plan volgt of resultaat haalt' },
+  { Icon: Clock,     kop: 'Merkt dat het niet past' },
+  { Icon: BadgeEuro, kop: '6 weken service' },
+]
+
 const BORG_EISEN = [
   '2 workouts per week gelogd',
   '75% van je meal plan gevolgd',
@@ -454,7 +462,7 @@ function VoorwaardenVenster({ isMobile, onClose }) {
             letterSpacing: '0.2em', color: '#fff', textAlign: 'center',
             textTransform: 'uppercase',
           }}>
-            Zo krijg je je borg terug
+            Zo krijg je resultaat en je borg terug
           </div>
 
           <div style={{
@@ -477,6 +485,40 @@ function VoorwaardenVenster({ isMobile, onClose }) {
                   color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.25,
                 }}>
                   {eis}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* De garanties eronder: op desktop drie kolommen met het icoon
+              boven het woord, op telefoon drie regels met het icoon ervoor —
+              daar is een kolom van drie blokken te hoog. */}
+          <div style={{
+            margin: `${isMobile ? '1.5rem' : '2.5rem'} auto 0`,
+            paddingTop: isMobile ? '1.25rem' : '1.75rem',
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+            maxWidth: 900, width: '100%',
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'center' : 'flex-start',
+            justifyContent: 'center',
+            gap: isMobile ? '0.9rem' : '2.75rem',
+          }}>
+            {GARANTIE_KAARTEN.map((g) => (
+              <div key={g.kop} style={{
+                display: 'flex',
+                flexDirection: isMobile ? 'row' : 'column',
+                alignItems: 'center', textAlign: isMobile ? 'left' : 'center',
+                gap: isMobile ? 12 : 10,
+                width: isMobile ? 'fit-content' : 300, maxWidth: '100%',
+              }}>
+                <g.Icon size={isMobile ? 22 : 34} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.9rem' : '1.15rem', fontWeight: 900,
+                  color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2,
+                  whiteSpace: isMobile ? 'normal' : 'nowrap',
+                }}>
+                  {g.kop}
                 </span>
               </div>
             ))}
