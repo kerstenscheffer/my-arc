@@ -19,7 +19,7 @@ import { Info } from 'lucide-react'
 import KopKeuze from './KopKeuze'
 import {
   maakConfig, trendReeks, bepaalStart, weekFractie, lijnenOpWeek,
-  weekBeoordelingen, advies, ernstVan, kleurVoorErnst, STATUS_TEKST, STATUS_KLEUR,
+  weekBeoordelingen, advies, ernstVan, kleurVoorErnst, weergaveStatus, STATUS_TEKST, STATUS_KLEUR,
 } from '../../../weight-tracker/utils/coachingBand'
 
 const kort = (d) => {
@@ -301,7 +301,10 @@ export default function GewichtBandGrafiek({
   // elkaars verloop gebruiken.
   const kleurId = `${client?.id || 'x'}-${gekozen || 'nu'}`
   const raad = advies(laatste, config)
-  const kleur = STATUS_KLEUR[laatste?.status] || 'rgba(255,255,255,0.35)'
+  // De kop volgt niet blind het tempo-oordeel: staat hij achter op de lijn,
+  // dan hoort daar geen groen "op koers" boven.
+  const kopStatus = weergaveStatus(laatste)
+  const kleur = STATUS_KLEUR[kopStatus] || 'rgba(255,255,255,0.35)'
 
   // Y-as: net iets ruimer dan wat er te zien is, zodat de band niet tegen de
   // rand plakt.
@@ -468,7 +471,7 @@ export default function GewichtBandGrafiek({
               fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900,
               color: kleur, letterSpacing: '-0.02em',
             }}>
-              {STATUS_TEKST[laatste.status] || '—'}
+              {STATUS_TEKST[kopStatus] || '—'}
             </span>
             {laatste.wekenBuiten > 1 && (
               <span style={{
@@ -521,9 +524,7 @@ export default function GewichtBandGrafiek({
               color: STATUS_KLEUR[laatste.stand] || 'rgba(255,255,255,0.4)',
             }}>
               Staat {Math.abs(laatste.vanPlan)} kg {laatste.vanPlan > 0 ? 'boven' : 'onder'} de plan-lijn
-              {laatste.stand !== laatste.status && laatste.status === 'OP_KOERS'
-                ? ' — het tempo klopt weer, de achterstand van eerder niet.'
-                : ''}
+              {laatste.verschil != null ? ` · deze week ${laatste.verschil > 0 ? '+' : ''}${laatste.verschil} kg` : ''}
             </div>
           )}
 

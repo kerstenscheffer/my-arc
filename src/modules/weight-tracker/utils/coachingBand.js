@@ -318,6 +318,33 @@ export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
   })
 }
 
+// Tempo en stand kunnen los van elkaar kloppen. Gaat het tempo goed terwijl de
+// trend buiten de band ligt, dan is "op koers, niets veranderen" misleidend: hij
+// gaat goed, maar staat niet waar hij zou staan. Deze functie zegt of dat
+// speelt, en welke kant op.
+//
+// Onder de 0,3 kg laten we het lopen: dat is ruis in een 7-daags gemiddelde,
+// geen achterstand.
+export function standAfwijking(laatste) {
+  if (!laatste || laatste.status !== 'OP_KOERS') return null
+  if (laatste.stand !== 'TE_LANGZAAM' && laatste.stand !== 'TE_SNEL') return null
+  if (!Number.isFinite(laatste.vanPlan) || Math.abs(laatste.vanPlan) < 0.3) return null
+  return {
+    kg: Math.round(Math.abs(laatste.vanPlan) * 10) / 10,
+    boven: laatste.vanPlan > 0,
+    // Achterlopen op de afspraak (te langzaam) of juist voorlopen (te snel).
+    achter: laatste.stand === 'TE_LANGZAAM',
+  }
+}
+
+// De status zoals hij bovenaan het oordeel hoort te staan. Zegt het tempo
+// "op koers" terwijl de stand achterloopt, dan is dat geen groen vinkje.
+export function weergaveStatus(laatste) {
+  const afw = standAfwijking(laatste)
+  if (!afw) return laatste?.status
+  return afw.achter ? 'ACHTER_OP_PLAN' : 'VOOR_OP_PLAN'
+}
+
 // Wat je met dit oordeel doet. Bewust alleen een voorstel: kcal aanpassen blijft
 // een besluit van de coach.
 export function advies(laatste, config) {
@@ -332,7 +359,21 @@ export function advies(laatste, config) {
     return { toon: 'wacht', tekst: `Maar ${laatste.metingen} van de 7 dagen gewogen — te weinig voor een oordeel.` }
   }
   if (laatste.status === 'OP_KOERS') {
-    return { toon: 'goed', tekst: 'Op koers. Niets veranderen.' }
+    // Het tempo klopt. Maar staat hij ondertussen naast de lijn, dan is er wel
+    // degelijk een besluit te nemen: inlopen of de lijn verleggen.
+    const afw = standAfwijking(laatste)
+    if (!afw) return { toon: 'goed', tekst: 'Op koers. Niets veranderen.' }
+    const waar = `${afw.kg} kg ${afw.boven ? 'boven' : 'onder'} de plan-lijn`
+    if (afw.achter) {
+      return {
+        toon: 'kijk',
+        tekst: `Tempo klopt, maar hij staat ${waar}. Op dit tempo loopt hij dat niet in: kies bewust — tijdelijk scherper sturen, of de lijn verleggen naar waar hij nu staat.`,
+      }
+    }
+    return {
+      toon: 'goed',
+      tekst: `Tempo klopt en hij loopt voor op schema (${waar}). Niets veranderen.`,
+    }
   }
   if (config.richting === 'stabiel') {
     return laatste.status === 'OP_KOERS'
@@ -379,6 +420,8 @@ export const kcalPerWeektempo = (kgPerWeek) => {
 
 export const STATUS_TEKST = {
   OP_KOERS: 'Op koers',
+  ACHTER_OP_PLAN: 'Achter op plan',
+  VOOR_OP_PLAN: 'Voor op plan',
   TE_VROEG: 'Net begonnen',
   TE_SNEL: 'Te snel',
   TE_LANGZAAM: 'Te langzaam',
@@ -443,6 +486,8 @@ export function kleurVoorErnst(ernst) {
 
 export const STATUS_KLEUR = {
   OP_KOERS: '#10b981',
+  ACHTER_OP_PLAN: '#f59e0b',
+  VOOR_OP_PLAN: '#10b981',
   TE_VROEG: 'rgba(255,255,255,0.35)',
   TE_SNEL: '#f59e0b',
   TE_LANGZAAM: '#f59e0b',
