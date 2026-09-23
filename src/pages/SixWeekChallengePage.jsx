@@ -862,8 +862,8 @@ export default function SixWeekChallengePage() {
                 EXTRA GARANTIES
               </div>
               {[
-                { Icon: Clock, tekst: 'Binnen 7 dagen niet tevreden? Geld terug.' },
-                { Icon: BadgeEuro, tekst: 'Vind je tijdens de 6 weken dat je niet genoeg coaching waarde krijgt? Geld terug.' },
+                { Icon: Clock, tekst: 'Onvoorwaardelijke 7 daagse geld terug garantie.' },
+                { Icon: BadgeEuro, tekst: 'Vind je de coaching niet goed genoeg of werkt het niet? Geld terug.' },
               ].map((r, i) => (
                 <div key={r.tekst} style={{
                   display: 'flex', gap: '0.7rem',
@@ -885,6 +885,15 @@ export default function SixWeekChallengePage() {
                 </div>
               ))}
             </div>
+              <p style={{
+                margin: `${isMobile ? '0.9rem' : '1.1rem'} 0 0`,
+                fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.6)', lineHeight: 1.45,
+                letterSpacing: '-0.01em', textAlign: 'center',
+              }}>
+                Mijn doel is gratis laten zien dat het werkt, niet om geld te verdienen aan de borg.
+              </p>
+
 
             {/* Geen formulier hier: één knop naar de checkout. */}
             <div style={{ flexShrink: 0, width: isMobile ? '100%' : 300 }}>
