@@ -228,7 +228,7 @@ function MethodeSlider({ isMobile, onClose }) {
         position: 'relative', width: '100%', flexShrink: 0,
         ...(foto.mobiel
           ? { aspectRatio: '1 / 1' }     // 1080x1080, de telefoonversie
-          : p.beeldVult && !isMobile
+          : p.beeldVult
             ? { aspectRatio: '49 / 15' } // 1960x600, exact de verhouding van het beeld
             : { height: isMobile ? '34vh' : 'min(46vh, 460px)' }),
       }}>
@@ -394,9 +394,7 @@ function VoorwaardenVenster({ isMobile, onClose, onBetaal }) {
         position: 'relative', width: '100%', flexShrink: 0,
         // Geen maxHeight: die maakte het vak lager dan de verhouding van de
         // foto, waardoor cover de bovenkant eraf sneed.
-        ...(banner.mobiel
-          ? { aspectRatio: '1 / 1' }
-          : isMobile ? { height: '30vh' } : { aspectRatio: '49 / 15' }),
+        ...(banner.mobiel ? { aspectRatio: '1 / 1' } : { aspectRatio: '49 / 15' }),
       }}>
         <div style={{
           position: 'absolute', inset: 0,
