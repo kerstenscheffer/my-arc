@@ -393,7 +393,7 @@ function VoorwaardenVenster({ isMobile, onClose, onBetaal, knopLabel }) {
             letterSpacing: '-0.035em', lineHeight: 1.1, textAlign: 'center',
             maxWidth: 820, margin: '0 auto',
           }}>
-            Geen transformatie, <span style={{ color: GOLD }}>je investering terug</span>.
+            Werkt het niet voor jou terwijl je wel het plan volgt? <span style={{ color: GOLD }}>Geld terug.</span>
           </div>
 
           {/* Eén regel: de drie dingen die we van je vragen, met 'en'
@@ -454,7 +454,7 @@ function VoorwaardenVenster({ isMobile, onClose, onBetaal, knopLabel }) {
           }}>
             {/* Eén regel: afbreken haalt de klap uit de zin. */}
             <span style={{ whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
-              Doe je dat 16 weken lang, dan sta je er anders bij. Of je krijgt je geld terug.
+              Doe je dat 16 weken lang, dan maak je progressie. Werkt het niet? Geld terug.
             </span>
           </p>
 
