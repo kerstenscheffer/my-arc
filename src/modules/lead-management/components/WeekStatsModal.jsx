@@ -174,6 +174,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [isOwner, setIsOwner] = useState(true)
   const [showRevenue, setShowRevenue] = useState(false)
   const [revTab, setRevTab] = useState('omzet') // 'omzet' | 'payout'
+  // Toegezegd-lijst dichtgeklapt: het bedrag is het nieuws, de namen zijn detail.
+  const [toegezegdOpen, setToegezegdOpen] = useState(false)
+  // Welk stuk van de maandreeks in beeld staat; 0 = rond deze maand.
+  const [maandOffset, setMaandOffset] = useState(0)
   const [revenue, setRevenue] = useState(null)
   const [revLoading, setRevLoading] = useState(false)
   // Partner-uitbetaling (bv. Marcel): per maand wat er open staat + betaald-knop.
@@ -1534,99 +1538,149 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   </div>
                 ) : (() => {
                 const eur = (n) => '€' + Math.round(n || 0).toLocaleString('nl-NL')
-                const maxAmount = Math.max(1, ...revenue.months.map(m => m.amount))
                 const toegezegd = revenue.toegezegdTotaal || 0
-                const cards = [
-                  { label: 'MRR deze maand', value: eur(revenue.mrr), color: '#fff', hint: `${revenue.activeMonthly} lopend maandplan${revenue.activeMonthly === 1 ? '' : 'nen'}` },
-                  { label: 'Actieve plannen', value: revenue.activeMonthly, color: '#fff' },
-                  { label: 'Geboekt totaal', value: eur(revenue.totalBooked), color: '#fff', hint: `${revenue.saleCount} betaalde sale${revenue.saleCount === 1 ? '' : 's'}` },
-                  // Vierde kaart alleen als er iets openstaat: anders staat er
-                  // een nul te pronken waar niets aan de hand is.
-                  ...(toegezegd > 0 ? [{
-                    label: 'Toegezegd, niet binnen', value: eur(toegezegd), color: GOLD,
-                    hint: `${revenue.toegezegdAantal} ja${revenue.toegezegdAantal === 1 ? '' : "'s"} zonder betaling`,
-                  }] : []),
-                ]
+
+                // Niet zeventien maanden tegelijk: een handvol, met brede balken.
+                // Met de pijltjes schuif je door de reeks; deze maand staat in
+                // het midden zolang je niets verschuift.
+                const alle = revenue.months || []
+                const VENSTER = isMobile ? 5 : 8
+                const huidig = Math.max(0, alle.findIndex(m => m.isCurrent))
+                const maxStart = Math.max(0, alle.length - VENSTER)
+                const start = Math.min(maxStart, Math.max(0, huidig - Math.floor(VENSTER / 2) + maandOffset))
+                const zichtbaar = alle.slice(start, start + VENSTER)
+                const maxAmount = Math.max(1, ...zichtbaar.map(m => m.amount))
+                const kanTerug = start > 0
+                const kanVooruit = start < maxStart
+
+                const getal = { fontSize: isMobile ? '1.9rem' : '2.6rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.035em' }
+                const label = { fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 8 }
+                const pijl = (aan) => ({
+                  width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.14)',
+                  color: aan ? '#fff' : 'rgba(255,255,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: aan ? 'pointer' : 'default', fontFamily: 'inherit',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                })
+
                 return (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${cards.length}, 1fr)`, gap: 10, marginBottom: '1.5rem' }}>
-                      {cards.map(c => (
-                        <div key={c.label} style={{
-                          background: 'rgba(255,255,255,0.03)',
-                          border: `1px solid ${c.color === GOLD ? 'rgba(255,215,0,0.28)' : 'rgba(255,255,255,0.08)'}`,
-                          borderRadius: 14, padding: isMobile ? '0.85rem 0.7rem' : '1rem 0.9rem',
-                        }}>
-                          <div style={{ fontSize: isMobile ? '1.35rem' : '1.7rem', fontWeight: 900, color: c.color, lineHeight: 1.05, letterSpacing: '-0.03em' }}>{c.value}</div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>{c.label}</div>
-                          {c.hint && <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.32)', marginTop: 2 }}>{c.hint}</div>}
-                        </div>
-                      ))}
+                    {/* Drie getallen, geen vakken. */}
+                    <div style={{
+                      display: 'flex', flexWrap: 'wrap',
+                      gap: isMobile ? '1.5rem 2rem' : '0 3.5rem',
+                      paddingBottom: isMobile ? '1.25rem' : '1.75rem',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                    }}>
+                      <div>
+                        <div style={getal}>{eur(revenue.mrr)}</div>
+                        <div style={label}>MRR deze maand</div>
+                      </div>
+                      <div>
+                        <div style={getal}>{revenue.activeMonthly}</div>
+                        <div style={label}>Actieve plannen</div>
+                      </div>
+                      <div>
+                        <div style={getal}>{eur(revenue.totalBooked)}</div>
+                        <div style={label}>Geboekt · {revenue.saleCount} sales</div>
+                      </div>
                     </div>
 
-                    {/* Wie ja zei maar nog niet betaalde. Staat bewust bóven de
-                        grafiek: dit is geld dat je nog moet ophalen, en het zit
-                        in geen enkel bedrag hieronder. */}
+                    {/* Toegezegd, nog niet binnen — dichtgeklapt. Het bedrag is
+                        het nieuws; wie het zijn lees je alleen als je 'm opent. */}
                     {toegezegd > 0 && (
-                      <div style={{ marginBottom: '1.5rem', border: '1px solid rgba(255,215,0,0.22)', borderRadius: 14, overflow: 'hidden' }}>
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '0.7rem 0.9rem', background: 'rgba(255,215,0,0.06)',
-                          borderBottom: '1px solid rgba(255,215,0,0.16)',
-                        }}>
-                          <Info size={14} color={GOLD} style={{ flexShrink: 0 }} />
-                          <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#fff' }}>
-                            Toegezegd, nog niet binnen
-                          </div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 900, color: GOLD }}>{eur(toegezegd)}</div>
-                        </div>
-                        {(revenue.toegezegd || []).slice(0, 8).map((t, i) => {
-                          const dagen = Math.max(0, Math.floor((Date.now() - new Date(t.datum).getTime()) / 86400000))
-                          return (
-                            <div key={`${t.naam}-${i}`} style={{
-                              display: 'flex', alignItems: 'baseline', gap: 10,
-                              padding: '0.6rem 0.9rem',
-                              borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                            }}>
-                              <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {t.naam}
-                              </span>
-                              <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
-                                {dagen === 0 ? 'vandaag' : `${dagen} dag${dagen === 1 ? '' : 'en'}`}
-                              </span>
-                              <span style={{ flexShrink: 0, fontSize: '0.88rem', fontWeight: 900, color: '#fff' }}>{eur(t.bedrag)}</span>
+                      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <button
+                          onClick={() => setToegezegdOpen(v => !v)}
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                            padding: isMobile ? '1rem 0' : '1.15rem 0',
+                            background: 'transparent', border: 'none', cursor: 'pointer',
+                            fontFamily: 'inherit', textAlign: 'left',
+                          }}
+                        >
+                          <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff' }}>
+                            Toegezegd, niet binnen
+                          </span>
+                          <span style={{ fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 900, color: GOLD, letterSpacing: '-0.03em' }}>
+                            {eur(toegezegd)}
+                          </span>
+                          <ChevronDown
+                            size={20} strokeWidth={3} color="rgba(255,255,255,0.45)"
+                            style={{ flexShrink: 0, transform: toegezegdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }}
+                          />
+                        </button>
+
+                        {toegezegdOpen && (
+                          <div style={{ paddingBottom: '1rem' }}>
+                            {(revenue.toegezegd || []).map((t, i) => {
+                              const dagen = Math.max(0, Math.floor((Date.now() - new Date(t.datum).getTime()) / 86400000))
+                              return (
+                                <div key={`${t.naam}-${i}`} style={{
+                                  display: 'flex', alignItems: 'baseline', gap: 12,
+                                  padding: '0.65rem 0',
+                                  borderTop: '1px solid rgba(255,255,255,0.07)',
+                                }}>
+                                  <span style={{ flex: 1, minWidth: 0, fontSize: '1rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {t.naam}
+                                  </span>
+                                  <span style={{ flexShrink: 0, fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                                    {dagen === 0 ? 'vandaag' : `${dagen} dag${dagen === 1 ? '' : 'en'}`}
+                                  </span>
+                                  <span style={{ flexShrink: 0, fontSize: '1rem', fontWeight: 900, color: '#fff' }}>{eur(t.bedrag)}</span>
+                                </div>
+                              )
+                            })}
+                            <div style={{ marginTop: 10, fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                              Telt nergens mee — ook niet in wat {partnerName} krijgt. Betaling voer je in bij Calls → Betaling.
                             </div>
-                          )
-                        })}
-                        <div style={{ padding: '0.6rem 0.9rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-                          Telt nergens hierboven mee — ook niet in wat {partnerName} krijgt.
-                          Voer de betaling in via het calls-venster, tabblad Betaling.
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Omzet per maand</div>
-                      <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)' }}>← scroll voor meer →</div>
+
+                    {/* Omzet per maand: weinig maanden, brede balken. */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: isMobile ? '1.5rem 0 1rem' : '1.75rem 0 1.25rem' }}>
+                      <div style={{ flex: 1, fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff' }}>Omzet per maand</div>
+                      <button onClick={() => kanTerug && setMaandOffset(o => o - 2)} style={pijl(kanTerug)} aria-label="Eerdere maanden">
+                        <ChevronLeft size={18} strokeWidth={3} />
+                      </button>
+                      <button onClick={() => kanVooruit && setMaandOffset(o => o + 2)} style={pijl(kanVooruit)} aria-label="Latere maanden">
+                        <ChevronRight size={18} strokeWidth={3} />
+                      </button>
                     </div>
-                    {/* Horizontaal scrollbare balk-chart: afgelopen (vol) + komende
-                        (lichter, projectie) maanden. Start links = afgelopen maanden. */}
-                    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 6 }}>
-                      {revenue.months.map(m => {
-                        const h = Math.max(3, Math.round((m.amount / maxAmount) * 72))
-                        const barColor = (m.isPast || m.isCurrent) ? '#22c55e' : 'rgba(34,197,94,0.4)'
+
+                    <div style={{ display: 'flex', gap: isMobile ? 8 : 12, alignItems: 'flex-end' }}>
+                      {zichtbaar.map(m => {
+                        const h = Math.max(4, Math.round((m.amount / maxAmount) * (isMobile ? 130 : 170)))
+                        const barColor = (m.isPast || m.isCurrent) ? '#22c55e' : 'rgba(34,197,94,0.35)'
                         return (
-                          <div key={m.key} style={{ flexShrink: 0, width: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                            <div style={{ fontSize: '0.5rem', fontWeight: 800, color: m.amount > 0 ? '#fff' : 'rgba(255,255,255,0.22)', whiteSpace: 'nowrap' }}>{m.amount > 0 ? eur(m.amount) : '—'}</div>
-                            <div style={{ height: 76, width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                              <div style={{ width: 20, height: h, background: barColor, borderRadius: 4, transition: 'height 0.3s ease' }} />
+                          <div key={m.key} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                            <div style={{
+                              fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 900,
+                              color: m.amount > 0 ? '#fff' : 'rgba(255,255,255,0.25)',
+                              whiteSpace: 'nowrap', letterSpacing: '-0.02em',
+                            }}>
+                              {m.amount > 0 ? eur(m.amount) : '—'}
                             </div>
-                            <div style={{ fontSize: '0.55rem', fontWeight: m.isCurrent ? 900 : 600, color: m.isCurrent ? '#FFD700' : 'rgba(255,255,255,0.5)', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{m.label.replace(/ 20/, " '")}</div>
+                            <div style={{ height: isMobile ? 134 : 174, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                              <div style={{ width: '100%', height: h, background: barColor, borderRadius: 8, transition: 'height 0.3s ease' }} />
+                            </div>
+                            <div style={{
+                              fontSize: isMobile ? '0.8rem' : '0.88rem', fontWeight: m.isCurrent ? 900 : 700,
+                              color: m.isCurrent ? GOLD : 'rgba(255,255,255,0.6)',
+                              textTransform: 'capitalize', whiteSpace: 'nowrap',
+                            }}>
+                              {m.label.replace(/ 20/, " '")}
+                            </div>
                           </div>
                         )
                       })}
                     </div>
-                    <div style={{ marginTop: '0.8rem', fontSize: '0.66rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-                      Vol groen = gerealiseerd (afgelopen + deze maand) · lichter = projectie. Vooruitbetaald telt in de sale-maand; maandelijks = totaal ÷ looptijd, gespreid.
-                      Alleen sales waarvan het geld binnen is; een ja zonder betaling staat erboven apart.
+
+                    <div style={{ marginTop: '1.25rem', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                      Vol groen is binnen, licht groen verwacht.
                     </div>
                   </>
                 )
