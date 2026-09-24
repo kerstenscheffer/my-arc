@@ -21,7 +21,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass, ChevronRight, Euro } from 'lucide-react'
+import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass, ChevronRight, Euro, Pencil } from 'lucide-react'
 import SaleForm from './SaleForm'
 import { SaleLostReasonForm } from './SaleLostReasonModal'
 
@@ -205,6 +205,18 @@ function CallRegel({ dc, onOutcome }) {
 // bedragen op één manier gevraagd worden.
 function BetaalRegel({ rij, onBetaling }) {
   const [open, setOpen] = useState(false)
+  // Staat het bedrag er al, dan is er meestal niets te vullen: je drukt op
+  // "ontvangen" en klaar. Wijzigen zit eronder voor de keren dat het anders
+  // liep dan afgesproken.
+  const [wijzigen, setWijzigen] = useState(false)
+  const bekend = rij.order_value != null
+  const gegevens = {
+    value: rij.order_value != null ? Number(rij.order_value) : null,
+    paymentType: rij.payment_type || 'prepaid',
+    durationMonths: rij.duration_months || 1,
+    partnerSharePct: rij.partner_share_pct,
+    saleKind: rij.sale_kind || 'coaching',
+  }
   const dagen = (() => {
     if (!rij.moved_at) return null
     const d = Math.floor((Date.now() - new Date(rij.moved_at).getTime()) / 86400000)
@@ -242,12 +254,27 @@ function BetaalRegel({ rij, onBetaling }) {
         />
       </button>
 
-      {open && (
+      {open && bekend && !wijzigen && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            style={{ ...knop('#10b981'), flex: 2, background: '#fff', border: 'none', color: '#0a0a0a' }}
+            onClick={() => onBetaling(rij, gegevens)}
+          >
+            <Check size={13} strokeWidth={3} /> €{Number(rij.order_value).toLocaleString('nl-NL')} ontvangen
+          </button>
+          <button style={knop('rgba(255,255,255,0.55)')} onClick={() => setWijzigen(true)}>
+            <Pencil size={13} strokeWidth={3} /> Wijzigen
+          </button>
+        </div>
+      )}
+
+      {open && (!bekend || wijzigen) && (
         <SaleForm
           leadName={rij.lead_name}
           compact
-          onCancel={() => setOpen(false)}
-          onSave={(gegevens) => onBetaling(rij, gegevens)}
+          start={bekend ? gegevens : null}
+          onCancel={() => { setWijzigen(false); if (!bekend) setOpen(false) }}
+          onSave={(nieuw) => onBetaling(rij, nieuw)}
         />
       )}
     </div>

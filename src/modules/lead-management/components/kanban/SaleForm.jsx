@@ -46,12 +46,15 @@ const keuze = (aan) => ({
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })
 
-export default function SaleForm({ leadName, partnerName = 'Marcel', compact = false, onSave, onCancel }) {
-  const [soort, setSoort] = useState('coaching')      // 'coaching' | 'challenge'
-  const [bedrag, setBedrag] = useState('')
-  const [betaalwijze, setBetaalwijze] = useState('prepaid')
-  const [maanden, setMaanden] = useState('12')
-  const [partnerPct, setPartnerPct] = useState('50')
+// `start` vult het formulier met wat er al bekend is — bij een close die op
+// betaling wacht staan bedrag, betaalwijze en aandeel er meestal al in. Zonder
+// dat begon je opnieuw met typen wat je gisteren al had ingevuld.
+export default function SaleForm({ leadName, partnerName = 'Marcel', compact = false, start = null, onSave, onCancel }) {
+  const [soort, setSoort] = useState(start?.saleKind === 'challenge' ? 'challenge' : 'coaching')
+  const [bedrag, setBedrag] = useState(start?.value != null ? String(start.value) : '')
+  const [betaalwijze, setBetaalwijze] = useState(start?.paymentType === 'monthly' ? 'monthly' : 'prepaid')
+  const [maanden, setMaanden] = useState(start?.durationMonths ? String(start.durationMonths) : '12')
+  const [partnerPct, setPartnerPct] = useState(start?.partnerSharePct != null ? String(start.partnerSharePct) : '50')
   // Een ja is nog geen geld. Staat dit op 'nee', dan telt de sale wel als ja
   // maar nog niet als omzet, en komt hij in het calls-venster onder 'Betaling'
   // te staan tot je het bedrag invoert.
