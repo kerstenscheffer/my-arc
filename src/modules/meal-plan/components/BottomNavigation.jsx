@@ -17,7 +17,7 @@ export default function BottomNavigation({ onNavigate, onShowHistory, currentPag
     }}>
       <NavButton
         icon={ShoppingCart}
-        label="Shop"
+        label="Boodschappen"
         isActive={currentPage === 'shopping'}
         onClick={() => onNavigate('shopping')}
       />

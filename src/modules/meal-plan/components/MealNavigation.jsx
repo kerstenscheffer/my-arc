@@ -5,7 +5,7 @@ import { Utensils, ShoppingCart, TrendingUp } from 'lucide-react'
 export default function MealNavigation({ activePage, onNavigate, onShowHistory }) {
   const navItems = [
     { icon: Utensils, label: 'Meals', id: 'meals' },
-    { icon: ShoppingCart, label: 'Shopping', id: 'shopping', onClick: () => onNavigate('shopping') },
+    { icon: ShoppingCart, label: 'Boodschappen', id: 'shopping', onClick: () => onNavigate('shopping') },
     { icon: TrendingUp, label: 'Progress', id: 'progress', onClick: onShowHistory }
   ]
   

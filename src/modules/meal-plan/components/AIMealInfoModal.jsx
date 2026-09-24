@@ -135,7 +135,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
               legt ze vanzelf naast elkaar. */}
           <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             {canPrep && (
-              <button onClick={() => setShowPrep(true)} style={{ height: '36px', padding: '0 0.8rem', background: 'transparent', border: '1.5px solid rgba(255,255,255,0.35)', borderRadius: '10px', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><ChefHat size={13} /> Meal preppen</button>
+              <button onClick={() => setShowPrep(true)} style={{ height: '36px', padding: '0 0.8rem', background: '#22c55e', border: 'none', borderRadius: '10px', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><ChefHat size={13} /> Meal preppen</button>
             )}
             {canEdit && (
               <button onClick={() => setShowEdit(true)} style={{ height: '36px', padding: '0 0.8rem', background: '#fff', border: 'none', borderRadius: '10px', color: '#0a0a0a', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Pencil size={13} /> Aanpassen</button>

@@ -2542,7 +2542,7 @@ export default function ClientMealPlan({ client, onNavigate, db }) {
           }}
         >
           <ShoppingCart size={22} />
-          <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>Shop</span>
+          <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>Boodschappen</span>
         </button>
         
         <button 
