@@ -17,6 +17,19 @@ const NEGATIVE_FUNNEL_WORDS = [
 
 import { teamCoachIds } from './teamCoaches'
 
+// De kalenderdag zoals jij hem ziet, niet zoals UTC hem ziet.
+//
+// `new Date(x).toISOString().split('T')[0]` lijkt de datum te geven maar rekent
+// eerst om naar UTC. In de zomer loopt Nederland twee uur voor, dus wordt
+// donderdag 00:00 hier woensdag 22:00 daar — en schoof een hele dagkolom een
+// dag op. Zo stond het geld van woensdag op donderdag.
+const lokaleDag = (d) => {
+  const x = d instanceof Date ? d : new Date(d)
+  if (isNaN(x.getTime())) return String(d).slice(0, 10)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}`
+}
+
 class LeadManagementService {
   constructor() {
     this.db = DatabaseService
@@ -1863,7 +1876,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const endTs = new Date(endISO)
       const buckets = {}
       for (let d = new Date(startDay); d < endTs; d.setDate(d.getDate() + 1)) {
-        const key = d.toISOString().split('T')[0]
+        const key = lokaleDag(d)
         buckets[key] = {
           date: key,
           newLeads: 0, followups: 0,
@@ -1871,7 +1884,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           noShow: 0,
         }
       }
-      const dayKey = (iso) => new Date(iso).toISOString().split('T')[0]
+      const dayKey = (iso) => lokaleDag(iso)
 
       ;(leads || []).forEach(l => {
         const k = dayKey(l.created_at)
@@ -2688,14 +2701,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async getRangeCashCollected(coachId, startISO, endISO) {
     try {
-      const dag = (iso) => new Date(iso).toISOString().split('T')[0]
       // Het venster is [start, end) — de RPC is inclusief aan beide kanten,
       // dus een dag eraf, anders telt de eerste dag van de volgende week mee.
       const tot = new Date(endISO); tot.setDate(tot.getDate() - 1)
       const { data, error } = await this.db.supabase.rpc('get_payment_schedule', {
         p_coach_id: coachId || null,
-        p_van: dag(startISO),
-        p_tot: tot.toISOString().split('T')[0],
+        p_van: lokaleDag(startISO),
+        p_tot: lokaleDag(tot),
       })
       if (error) throw error
       // komt_nog is in de RPC strikt toekomstig: een betaling met de datum van
