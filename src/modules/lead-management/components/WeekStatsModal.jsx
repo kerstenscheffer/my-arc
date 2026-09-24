@@ -2580,16 +2580,22 @@ function CampaignStatCard({ campaign: c, isMobile, onVraag, revertingId, deletin
     { label: 'Reacties',    value: s.replied,        Icon: MessageCircle, color: '#10b981', stage: metNamen('replied') },
     { label: 'Voorgesteld', value: s.callProposed,   Icon: PhoneCall,     color: '#a855f7', stage: metNamen('callProposed') },
     { label: 'Ingepland',   value: s.callScheduled,  Icon: CalendarCheck, color: '#06b6d4', stage: metNamen('callScheduled') },
+    { label: 'Gevoerd',     value: s.callHeld || 0,  Icon: PhoneCall,     color: '#10b981', stage: metNamen('callHeld') },
+    { label: 'No-shows',    value: s.noShow || 0,    Icon: UserX,         color: '#ef4444', stage: metNamen('noShow') },
     { label: 'Sale',        value: s.sale,           Icon: Trophy,        color: '#FFD700', stage: metNamen('sale') },
+    { label: 'Verloren',    value: s.saleLost || 0,  Icon: XCircle,       color: '#ef4444', stage: metNamen('saleLost') },
     { label: 'Opvolg',      value: c.followupCount,  Icon: Send,          color: '#f59e0b' },
   ]
-  const STAP_KLEUR = { getagd: '#a855f7', replied: '#10b981', callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#FFD700' }
-  const STAP_LABEL = { getagd: 'Getagd', replied: 'Reacties', callProposed: 'Voorgesteld', callScheduled: 'Ingepland', sale: 'Sale' }
+  const STAP_KLEUR = { getagd: '#a855f7', replied: '#10b981', callProposed: '#a855f7', callScheduled: '#06b6d4', callHeld: '#10b981', noShow: '#ef4444', sale: '#FFD700', saleLost: '#ef4444' }
+  const STAP_LABEL = { getagd: 'Getagd', replied: 'Reacties', callProposed: 'Voorgesteld', callScheduled: 'Ingepland', callHeld: 'Gevoerd', noShow: 'No-shows', sale: 'Sale', saleLost: 'Sale verloren' }
   const pctItems = [
     { label: 'Reactie',       value: p(s.replied, c.total),          Icon: MessageCircle, color: '#10b981', sub: frac(s.replied, c.total) },
     { label: 'Voorstel',      value: p(s.callProposed, c.total),     Icon: PhoneCall,     color: '#a855f7', sub: frac(s.callProposed, c.total) },
     { label: 'Voorstel→call', value: p(s.callScheduled, s.callProposed), Icon: CalendarCheck, color: '#06b6d4', sub: frac(s.callScheduled, s.callProposed) },
-    { label: 'Close rate',    value: p(s.sale, s.callScheduled),     Icon: Trophy,        color: '#22c55e', sub: frac(s.sale, s.callScheduled) },
+    // Show-up en close rate horen bij de calls die je écht voerde. Op
+    // ingeplande calls rekenen maakt van elke no-show een gemiste sale.
+    { label: 'Show-up',       value: p(s.callHeld, s.callScheduled), Icon: PhoneCall,     color: '#10b981', sub: frac(s.callHeld, s.callScheduled) },
+    { label: 'Close rate',    value: p(s.sale, s.callHeld),          Icon: Trophy,        color: '#22c55e', sub: frac(s.sale, s.callHeld) },
   ]
   return (
     <div style={{ padding: '0.7rem 0.75rem', background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.22)', borderRadius: 10 }}>

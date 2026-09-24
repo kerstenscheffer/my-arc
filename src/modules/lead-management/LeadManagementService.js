@@ -3695,7 +3695,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             .order('id', { ascending: true })),
           this._fetchAllRows(() => this.db.supabase
             .from('lead_movements')
-            .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at')
+            .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at, call_happened, outcome_type, call_date')
             .in('lead_id', chunk)
             .order('id', { ascending: true })),
         ])
@@ -3749,8 +3749,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           sentCount: 0, lastSentAt: null,
           // Hoeveel koppelingen inmiddels naar een andere campagne zijn gegaan.
           afgeslotenLeads: 0,
-          stages: { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 },
-          leads: { getagd: [], replied: [], callProposed: [], callScheduled: [], sale: [] },
+          // callHeld/noShow/saleLost horen erbij: een close rate over
+          // ingeplande calls rekent no-shows mee als gemiste kans, terwijl je
+          // alleen kunt closen op een call die je écht gevoerd hebt.
+          stages: { replied: 0, callProposed: 0, callScheduled: 0, callHeld: 0, noShow: 0, sale: 0, saleLost: 0 },
+          leads: { getagd: [], replied: [], callProposed: [], callScheduled: [], callHeld: [], noShow: [], sale: [], saleLost: [] },
         }
 
         const naam = [lead.first_name, lead.last_name].filter(Boolean).join(' ').trim() || 'Onbekend'
@@ -3778,11 +3781,38 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         }
 
         const gezien = {}
+        // Uitkomst van de calls van deze lead binnen het tag-venster. Een lead
+        // die eerst niet kwam opdagen en later wél belde, telt als gevoerd —
+        // niet als allebei.
+        let heeftGevoerd = false
+        let gemisteCall = null
         ;(movPerLead.get(lead.id) || [])
           .filter(m => binnen(m.moved_at))
           .sort((a, b) => String(a.moved_at).localeCompare(String(b.moved_at)))
           .forEach(m => {
             const titel = (m.to_section_title || '').toLowerCase()
+
+            // Call gevoerd of niet: dat staat op de call-rij zelf, los van de
+            // sectie waar de lead heen ging.
+            if (m.call_happened === true && !heeftGevoerd) {
+              heeftGevoerd = true
+              entry.stages.callHeld += 1
+              entry.leads.callHeld.push({ id: m.id, leadId: lead.id, name: m.lead_name || naam, from: m.from_section_title || null, to: m.to_section_title || null, at: m.moved_at })
+            }
+            // Afgezegd of verplaatst is geen no-show: de lead kwam niet
+            // opdagen zonder iets te laten horen.
+            if (m.call_happened === false && m.outcome_type !== 'cancelled' && m.outcome_type !== 'rescheduled' && !gemisteCall) {
+              gemisteCall = { id: m.id, leadId: lead.id, name: m.lead_name || naam, from: m.from_section_title || null, to: 'No show', at: m.moved_at }
+            }
+
+            // Sale verloren staat in de negatieve woorden hieronder, dus we
+            // pakken 'm ervóór.
+            if (!gezien.saleLost && (titel.includes('verloren') || titel.includes('lost'))) {
+              gezien.saleLost = true
+              entry.stages.saleLost += 1
+              entry.leads.saleLost.push({ id: m.id, leadId: lead.id, name: m.lead_name || naam, from: m.from_section_title || null, to: m.to_section_title || null, at: m.moved_at })
+            }
+
             if (NEGATIVE_FUNNEL_WORDS.some(w => titel.includes(w))) return
             for (const stage of stageKeywords) {
               if (!stage.words.some(k => titel.includes(k))) continue
@@ -3800,6 +3830,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               break
             }
           })
+        // Een no-show telt alleen als de lead binnen deze campagne nooit een
+        // call heeft gevoerd; anders is het achterhaald nieuws.
+        if (gemisteCall && !heeftGevoerd) {
+          entry.stages.noShow += 1
+          entry.leads.noShow.push(gemisteCall)
+        }
         if (gezien.callProposed || gezien.callScheduled) entry.reached += 1
 
         campStats.set(t.campaign_id, entry)
