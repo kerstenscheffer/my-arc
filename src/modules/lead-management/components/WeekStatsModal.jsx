@@ -738,38 +738,32 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   ]
 
   const modal = (
+    // Schermvullend: dit is een werkscherm, geen pop-up. Geen kader, geen
+    // doorschijnende achtergrond — alleen je cijfers.
     <div
-      onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 2147483450,
-        background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)',
-        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
+        background: '#0a0a0a', color: '#fff',
+        display: 'flex', flexDirection: 'column',
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
-          width: isMobile ? '100%' : 'calc(100vw - 32px)',
-          maxWidth: isMobile ? '100%' : 1400,
-          height: isMobile ? '92vh' : 'calc(100vh - 48px)',
-          background: '#0a0a0a',
-          border: '1px solid rgba(255,215,0,0.18)',
-          borderRadius: isMobile ? '16px 16px 0 0' : 14,
+          flex: 1, minHeight: 0, width: '100%',
+          maxWidth: 1400, margin: '0 auto',
           display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',
         }}
       >
         {/* Header — titel, Dag/Week/Maand én de actie-knoppen op één regel */}
         <div style={{
           flexShrink: 0,
-          padding: isMobile ? 'calc(0.6rem + env(safe-area-inset-top)) 0.75rem 0.6rem' : '0.7rem 1rem',
-          display: 'flex', alignItems: 'center', gap: 6,
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          background: 'rgba(0,0,0,0.5)',
+          padding: isMobile ? 'calc(0.9rem + env(safe-area-inset-top, 0px)) 1rem 0.8rem' : '1.1rem 1.5rem 0.9rem',
+          display: 'flex', alignItems: 'center', gap: 8,
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
           overflowX: 'auto', WebkitOverflowScrolling: 'touch',
         }}>
-          <BarChart3 size={16} color={GOLD} style={{ flexShrink: 0 }} />
-          <div style={{ flexShrink: 0, color: '#fff', fontWeight: 800, fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+          <BarChart3 size={20} color={GOLD} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+          <div style={{ flexShrink: 0, color: '#fff', fontWeight: 900, fontSize: isMobile ? '1.05rem' : '1.25rem', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
             Stats
           </div>
           {/* Periode-keuze. Was een segment-rij met drie knoppen; met zes
@@ -779,11 +773,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             value={periodMode}
             onChange={(e) => setPeriodMode(e.target.value)}
             style={{
-              flexShrink: 0, marginLeft: 4, minHeight: 32,
-              padding: isMobile ? '0 1.6rem 0 0.6rem' : '0 1.8rem 0 0.8rem',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
-              color: '#fff', fontSize: isMobile ? '0.74rem' : '0.78rem', fontWeight: 800,
+              flexShrink: 0, marginLeft: 6, minHeight: 38,
+              padding: isMobile ? '0 1.7rem 0 0.7rem' : '0 1.9rem 0 0.9rem',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.12)', borderRadius: 11,
+              color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800,
               fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
               appearance: 'none', WebkitAppearance: 'none',
               // Eigen pijltje: zonder appearance:none tekent Safari een grijze
@@ -825,26 +819,26 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             onClick={openRevenuePanel}
             title="Terugkerende omzet & cashflow"
             style={{
-              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+              width: 40, height: 40, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
               color: '#22c55e', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <TrendingUp size={16} />
+            <TrendingUp size={18} strokeWidth={2.6} />
           </button>
           <button
             onClick={openKpiPanel}
             disabled={loading}
             title="KPI-doelen instellen (dag/week)"
             style={{
-              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+              width: 40, height: 40, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
               color: GOLD, opacity: loading ? 0.4 : 1,
               cursor: loading ? 'not-allowed' : 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <Target size={16} />
+            <Target size={18} strokeWidth={2.6} />
           </button>
           <button
             onClick={async () => {
@@ -876,51 +870,51 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             disabled={loading || pdfBusy}
             title={pdfBusy ? 'Bezig…' : 'Download als PDF'}
             style={{
-              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+              width: 40, height: 40, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
               color: 'rgba(255,255,255,0.7)',
               opacity: (loading || pdfBusy) ? 0.4 : 1,
               cursor: (loading || pdfBusy) ? 'not-allowed' : 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <Download size={16} />
+            <Download size={18} strokeWidth={2.6} />
           </button>
           <button onClick={onClose} title="Sluiten" style={{
-            width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
-            color: 'rgba(255,255,255,0.6)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            width: 40, height: 40, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
+            color: '#fff', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
-            <X size={16} />
+            <X size={19} strokeWidth={2.8} />
           </button>
         </div>
 
         {/* Period navigator */}
         <div style={{
-          flexShrink: 0, padding: '0.55rem 0.85rem 0.7rem',
-          display: 'flex', alignItems: 'center', gap: '0.4rem',
-          borderBottom: '1px solid rgba(255,255,255,0.04)',
+          flexShrink: 0, padding: isMobile ? '0.75rem 1rem' : '0.9rem 1.5rem',
+          display: 'flex', alignItems: 'center', gap: '0.6rem',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}>
           <button onClick={goPrev} disabled={isCustom} title={`Vorige ${periodeWoord}`} style={{ ...navBtn, opacity: isCustom ? 0.3 : 1, cursor: isCustom ? 'not-allowed' : 'pointer' }}>
-            <ChevronLeft size={16} />
+            <ChevronLeft size={19} strokeWidth={2.8} />
           </button>
           <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: GOLD, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
               {periodeTitel}
             </div>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#fff', marginTop: 2 }}>
+            <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
               {periodeBereik}
             </div>
           </div>
           <button onClick={goNext} title={`Volgende ${periodeWoord}`} disabled={isFuturePeriod} style={{ ...navBtn, opacity: isFuturePeriod ? 0.3 : 1, cursor: isFuturePeriod ? 'not-allowed' : 'pointer' }}>
-            <ChevronRight size={16} />
+            <ChevronRight size={19} strokeWidth={2.8} />
           </button>
         </div>
 
         {/* Body */}
         <div style={{
           flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-          padding: '0.85rem',
+          padding: isMobile ? '1rem 1rem calc(2rem + env(safe-area-inset-bottom, 0px))' : '1.25rem 1.5rem 2rem',
         }}>
           {loading && (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
@@ -932,19 +926,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             <>
               {/* Schakelaar tussen de tegels en een tabel met de vorige
                   periode ernaast. */}
-              <div style={{
-                position: 'relative', display: 'flex',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.09)',
-                borderRadius: 999, padding: 3, marginBottom: '0.7rem',
-              }}>
-                <div style={{
-                  position: 'absolute', top: 3, bottom: 3,
-                  left: weergave === 'tabel' ? 'calc(50% + 1.5px)' : 3,
-                  width: 'calc(50% - 4.5px)',
-                  background: '#fff', borderRadius: 999,
-                  transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                }} />
+              <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.25rem' }}>
                 {[
                   { id: 'tegels', label: 'Tegels', Icon: BarChart3 },
                   { id: 'tabel', label: 'Tabel', Icon: TableIcon },
@@ -955,16 +937,17 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       key={k.id}
                       onClick={() => setWeergave(k.id)}
                       style={{
-                        position: 'relative', zIndex: 1, flex: 1, minHeight: 32,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        background: 'transparent', border: 'none', borderRadius: 999,
-                        color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
-                        fontSize: '0.72rem', fontWeight: aan ? 900 : 800,
+                        flex: 1, minHeight: 46,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                        background: 'transparent', border: 'none',
+                        borderBottom: `2px solid ${aan ? '#fff' : 'transparent'}`,
+                        color: aan ? '#fff' : 'rgba(255,255,255,0.4)',
+                        fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 900,
                         fontFamily: 'inherit', cursor: 'pointer',
                         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                       }}
                     >
-                      <k.Icon size={13} strokeWidth={2.6} />
+                      <k.Icon size={16} strokeWidth={2.8} />
                       {k.label}
                     </button>
                   )
@@ -1180,21 +1163,23 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               <button
                 onClick={() => setShowCallProposals(true)}
                 style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                  margin: '0.9rem 0 0.2rem', padding: '0.7rem 0.85rem', borderRadius: 11,
-                  background: 'rgba(168,85,247,0.10)', border: '1px solid rgba(168,85,247,0.4)',
-                  color: '#a855f7', cursor: 'pointer', fontFamily: 'inherit',
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  margin: '1.5rem 0 0', padding: '1rem 0',
+                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                  borderLeft: 'none', borderRight: 'none',
+                  background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <PhoneCall size={16} style={{ flexShrink: 0 }} />
+                <PhoneCall size={18} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0 }} />
                 <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>Call-voorstel berichten</div>
-                  <div style={{ fontSize: '0.64rem', color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>
-                    Bekijk verstuurde berichten, welke geslaagd zijn & hergebruik ze
+                  <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff' }}>Call-voorstel berichten</div>
+                  <div style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                    Wat je stuurde, wat het opleverde, en hergebruiken
                   </div>
                 </div>
-                <ChevronRight size={16} style={{ flexShrink: 0, opacity: 0.6 }} />
+                <ChevronRight size={20} strokeWidth={3} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
               </button>
 
               {/* ─── Vierkante tab-vakjes op één rij — klik opent de sectie eronder ─── */}
@@ -1204,25 +1189,27 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   { key: 'calls',          label: 'Calls',       Icon: PhoneCall,     show: callProposals && callProposals.length > 0 },
                   { key: 'campagnes',      label: 'Campagnes',   Icon: Send,          show: campaignBreakdown && campaignBreakdown.campaigns.length > 0 },
                   { key: 'bron',           label: 'Bron',        Icon: FileText,      show: sourceBreakdown && (sourceBreakdown.campaigns.length > 0 || sourceBreakdown.magnets.length > 0 || sourceBreakdown.noSource.total > 0) },
-                  { key: 'verplaatsingen', label: 'Verplaats.',  Icon: Calendar,      show: activity.movementsList && activity.movementsList.length > 0 },
+                  { key: 'verplaatsingen', label: 'Verplaatsingen', Icon: Calendar,      show: activity.movementsList && activity.movementsList.length > 0 },
                 ].filter(t => t.show)
                 if (!tabs.length) return null
                 return (
-                  <div style={{ display: 'flex', gap: isMobile ? 6 : 8, margin: '0.9rem 0 0.5rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '1.25rem 0 1rem' }}>
                     {tabs.map(t => {
                       const on = !!openTabs[t.key]
                       return (
                         <button key={t.key} onClick={() => toggleTab(t.key)}
                           style={{
-                            flex: '1 1 0', minWidth: 0, aspectRatio: '1 / 1', maxWidth: isMobile ? 'none' : 108,
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            background: on ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.03)',
-                            border: `1px solid ${on ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                            minHeight: 44, padding: '0 1rem',
+                            display: 'inline-flex', alignItems: 'center', gap: 8,
+                            background: on ? '#fff' : 'transparent',
+                            border: `1px solid ${on ? '#fff' : 'rgba(255,255,255,0.16)'}`,
                             borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                            color: on ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+                            fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900,
                             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                           }}>
-                          <t.Icon size={isMobile ? 18 : 21} color={on ? GOLD : 'rgba(255,255,255,0.55)'} strokeWidth={2.2} />
-                          <span style={{ fontSize: isMobile ? '0.5rem' : '0.58rem', fontWeight: 800, letterSpacing: '0.02em', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.1, color: on ? GOLD : 'rgba(255,255,255,0.6)' }}>{t.label}</span>
+                          <t.Icon size={16} strokeWidth={2.6} />
+                          {t.label}
                         </button>
                       )
                     })}
@@ -2296,9 +2283,10 @@ const iconBtn = {
   borderRadius: 8, color: '#fff', cursor: 'pointer', touchAction: 'manipulation',
 }
 const navBtn = {
-  width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 8, color: '#fff', cursor: 'pointer', touchAction: 'manipulation',
+  width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'transparent', border: '1px solid rgba(255,255,255,0.14)',
+  borderRadius: 12, color: '#fff', cursor: 'pointer', touchAction: 'manipulation',
+  WebkitTapHighlightColor: 'transparent',
 }
 
 function SectionTitle({ icon, title }) {
