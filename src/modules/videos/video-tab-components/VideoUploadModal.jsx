@@ -49,6 +49,9 @@ export default function VideoUploadModal({
     best_time_to_watch: 'anytime',
     default_pages: [],
     show_in_slider: false,
+    // Belangrijk = moet gezien worden: de video staat dan als blok ín de
+    // gekozen pagina's tot de klant hem afspeelt of afvinkt.
+    is_belangrijk: false,
     is_personal: voorinvulling?.is_personal === true,
     ...(voorinvulling?.category_id ? { category_id: voorinvulling.category_id } : null),
   })
@@ -704,6 +707,34 @@ export default function VideoUploadModal({
                   </button>
                 )
               })}
+            </div>
+          </div>
+
+          {/* ── BELANGRIJK ── */}
+          <div style={{
+            padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+            borderLeft: formData.is_belangrijk ? '3px solid #fff' : '3px solid transparent',
+            transition: 'border-left-color 0.2s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '800', color: '#fff', marginBottom: '0.15rem' }}>
+                  Belangrijk — moet gezien worden
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
+                  {formData.is_belangrijk
+                    ? 'Staat als blok ín de gekozen pagina’s tot de klant hem afspeelt of afvinkt. Daarna alleen nog in de bibliotheek.'
+                    : 'Uit: de video komt alleen langs in de video-balk en staat in de bibliotheek.'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_belangrijk: !formData.is_belangrijk })}
+                style={{ width: '40px', height: '22px', background: formData.is_belangrijk ? '#fff' : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div style={{ position: 'absolute', top: '2px', left: formData.is_belangrijk ? '20px' : '2px', width: '18px', height: '18px', background: formData.is_belangrijk ? '#0a0a0a' : '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
+              </button>
             </div>
           </div>
 
