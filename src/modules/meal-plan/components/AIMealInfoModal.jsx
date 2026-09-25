@@ -1,7 +1,7 @@
 // src/modules/meal-plan/components/AIMealInfoModal.jsx
 // 🎯 v2.2 - DEBUG versie met volledige logging
 import React, { useState, useEffect } from 'react'
-import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCircle, Sparkles, Pencil } from 'lucide-react'
+import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCircle, Sparkles, Pencil, HelpCircle } from 'lucide-react'
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
 import ClientMealEditModal from './ClientMealEditModal'
 import MealCard from './day-schedule/MealCard'
@@ -41,7 +41,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
       if (mealId) {
         const { data: mealRow, error: mealError } = await db.supabase
           .from('ai_meals')
-          .select('preparation_steps, tips')
+          .select('preparation_steps, tips, description, faq, prep_time_min')
           .eq('id', mealId)
           .single()
 
@@ -67,7 +67,10 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
         if (ingData) {
           const mapped = ingList.map(item => {
             const ing = ingData.find(i => i.id === item.ingredient_id)
-            return ing ? { ...ing, amount: item.amount, unit: item.unit || 'gram' } : null
+            // `display` is hoe het op je boodschappenlijst zou staan
+            // ("2 sneeën volkoren brood"); die leest prettiger dan de kale
+            // databasenaam. Staat hij er niet, dan de naam.
+            return ing ? { ...ing, amount: item.amount, unit: item.unit || 'gram', display: item.display || null } : null
           }).filter(Boolean)
           setIngredients(mapped)
         }
@@ -89,6 +92,11 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
       ? meal.preparation_steps
       : (dbMealData?.preparation_steps || []),
     tips: meal.tips || dbMealData?.tips || null,
+    // Beschrijving en vragen staan in het plan-object als het daaruit komt,
+    // anders bij de maaltijd zelf.
+    description: meal.description || dbMealData?.description || null,
+    faq: (Array.isArray(meal.faq) && meal.faq.length) ? meal.faq : (dbMealData?.faq || []),
+    prep_time_min: meal.prep_time_min || dbMealData?.prep_time_min || null,
   }
 
 
@@ -118,7 +126,9 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
     { id: 'info', label: 'Info', icon: Info },
     { id: 'recipe', label: 'Recept', icon: ChefHat },
     { id: 'price', label: 'Prijs', icon: Euro },
-    { id: 'tips', label: 'Tips', icon: Lightbulb }
+    { id: 'tips', label: 'Tips', icon: Lightbulb },
+    // Alleen tonen als er iets te vragen valt; een lege tab is een dood eind.
+    ...(effectiveMeal.faq?.length ? [{ id: 'faq', label: 'Vragen', icon: HelpCircle }] : []),
   ]
 
   return (
@@ -175,6 +185,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
           {activeTab === 'recipe' && <RecipeTab meal={effectiveMeal} loading={loading} isMobile={isMobile} />}
           {activeTab === 'price' && <PriceTab meal={effectiveMeal} ingredients={ingredients} isMobile={isMobile} />}
           {activeTab === 'tips' && <TipsTab meal={effectiveMeal} isMobile={isMobile} />}
+          {activeTab === 'faq' && <FaqTab meal={effectiveMeal} isMobile={isMobile} />}
         </div>
       </div>
       <style>{`@keyframes infoFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes infoSpin { to { transform: rotate(360deg); } }`}</style>
@@ -210,6 +221,18 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
 function InfoTab({ meal, ingredients, loading, calcMacros, isMobile }) {
   return (
     <div>
+      {/* Wat het is, in één alinea. Staat bovenaan: je leest dit voordat je
+          naar de grammen kijkt. */}
+      {meal.description && (
+        <div style={{
+          padding: isMobile ? '0.9rem 1rem' : '1rem 1.5rem',
+          borderBottom: '1px solid rgba(255,255,255,0.04)',
+          fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 600,
+          color: 'rgba(255,255,255,0.7)', lineHeight: 1.55,
+        }}>
+          {meal.description}
+        </div>
+      )}
       <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
         {[{ label: 'Bereiding', val: `${meal.prep_time_min || 10} min` }, { label: 'Kooktijd', val: `${meal.cook_time_min || 15} min` }, { label: 'Niveau', val: meal.difficulty || 'Medium' }].map((item, i) => (
           <div key={item.label} style={{ flex: 1, padding: '0.7rem 0', textAlign: 'center', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
@@ -230,7 +253,7 @@ function InfoTab({ meal, ingredients, loading, calcMacros, isMobile }) {
                 <MealCard
                   key={idx}
                   meal={{
-                    name: ing.name,
+                    name: ing.display || ing.name,
                     image_url: ing.image_url || foodImageFallback(ing.name, null, 200),
                     calories: macros.calories, protein: macros.protein,
                     carbs: macros.carbs, fat: macros.fat,
@@ -320,9 +343,60 @@ function PriceTab({ meal, ingredients, isMobile }) {
   )
 }
 
+// Veelgestelde vragen bij dit recept. Dicht beginnen: de vraag is de knop,
+// het antwoord komt eronder. Een lijst met alle antwoorden open leest als een
+// lap tekst.
+function FaqTab({ meal, isMobile }) {
+  const [open, setOpen] = useState(null)
+  const vragen = Array.isArray(meal.faq) ? meal.faq : []
+  return (
+    <div style={{ padding: isMobile ? '0.5rem 1rem 1.25rem' : '0.75rem 1.5rem 1.5rem' }}>
+      {vragen.map((v, i) => {
+        const aan = open === i
+        return (
+          <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <button
+              onClick={() => setOpen(aan ? null : i)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '0.9rem 0', background: 'transparent', border: 'none',
+                cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.4 }}>
+                {v.q}
+              </span>
+              <span style={{ flexShrink: 0, fontSize: '1.1rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)', lineHeight: 1 }}>
+                {aan ? '−' : '+'}
+              </span>
+            </button>
+            {aan && (
+              <p style={{
+                margin: '0 0 0.9rem', paddingRight: '1.5rem',
+                fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 600,
+                color: 'rgba(255,255,255,0.6)', lineHeight: 1.55,
+              }}>
+                {v.a}
+              </p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function TipsTab({ meal, isMobile }) {
-  const tips = [
-    ...(meal.tips ? [{ text: meal.tips, icon: CheckCircle }] : []),
+  // Tips van het recept zelf staan vaak op meerdere regels; die splitsen we,
+  // zodat elke tip zijn eigen regel krijgt. Heeft een recept eigen tips, dan
+  // laten we de algemene open deuren weg — die voegen daar niets toe.
+  const eigen = String(meal.tips || '')
+    .split('\n')
+    .map(t => t.trim())
+    .filter(Boolean)
+    .map(text => ({ text, icon: CheckCircle }))
+  const tips = eigen.length ? eigen : [
     { text: 'Bereid ingrediënten van tevoren voor om tijd te besparen', icon: Clock },
     { text: 'Bewaar restjes in een luchtdichte container tot 3 dagen', icon: Package },
     { text: 'Voeg verse kruiden toe voor extra smaak', icon: Sparkles }

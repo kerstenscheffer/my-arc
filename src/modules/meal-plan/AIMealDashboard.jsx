@@ -9,6 +9,7 @@ import AIMealPlanService from './AIMealPlanService'
 // Core Components
 import AIDaySchedule from './components/AIDaySchedule'
 import DagTemplatePaneel from './components/DagTemplatePaneel'
+import VoedingsplanFaq from './components/VoedingsplanFaq'
 import AIWeekPlanner from './components/AIWeekPlanner'
 import MealSetupWizard from './components/wizard/MealSetupWizard'
 
@@ -694,6 +695,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         weekOffset={weekOffset}
         onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
       />
+
+      {/* Algemene vragen over het plan: onderaan, dicht. Ze horen niet bij
+          één maaltijd, dus ze staan onder de dag en niet in een recept. */}
+      <VoedingsplanFaq db={db} isMobile={isMobile} />
 
       {/* De dagen die je coach klaarzette, achter een tab tegen de linkerrand.
           Staat buiten de dag-tijdlijn: het gaat over je week, niet over deze
