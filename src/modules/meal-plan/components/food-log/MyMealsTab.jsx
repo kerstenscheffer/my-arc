@@ -1,7 +1,7 @@
 // src/modules/meal-plan/components/food-log/MyMealsTab.jsx
 // 🎯 v3.0 - Uses parent buildingMeal state to survive tab switches
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator, Sunrise, Salad, Zap, Apple, Utensils, Package } from 'lucide-react'
+import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator, Sunrise, Salad, Zap, Apple, Utensils, Package, Search } from 'lucide-react'
 import MealPrepCalculator from '../MealPrepCalculator'
 import MealCard from '../day-schedule/MealCard'
 import Keuze from '../Keuze'
@@ -40,6 +40,13 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
   // Filter + volgorde in plaats van vijf uitklap-secties.
   const [filterSectie, setFilterSectie] = useState('alle')
   const [sortering, setSortering] = useState('nieuwste')
+  // Zoeken doorzoekt twee lijsten: je eigen maaltijden én de maaltijden van de
+  // app. Die tweede stond nergens in het log-venster, terwijl daar honderden
+  // complete gerechten in staan — "uitsmijter ham kaas" hoef je niet zelf na
+  // te bouwen.
+  const [zoek, setZoek] = useState('')
+  const [appMaaltijden, setAppMaaltijden] = useState([])
+  const [appBezig, setAppBezig] = useState(false)
 
   useEffect(() => {
     if (client?.id) loadMyMeals()
@@ -58,6 +65,46 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
       setMyMeals(data || [])
     } catch { setMyMeals([]) }
     finally { setLoading(false) }
+  }
+
+  // Zoeken in de app-maaltijden, pas vanaf twee letters en met een korte pauze
+  // zodat er niet bij elke toetsaanslag een query vertrekt.
+  useEffect(() => {
+    const term = zoek.trim()
+    if (term.length < 2) { setAppMaaltijden([]); return undefined }
+    let levend = true
+    setAppBezig(true)
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await db.supabase
+          .from('ai_meals')
+          .select('id, name, calories, protein, carbs, fat, image_url, ingredients_list, timing, meal_type')
+          .ilike('name', `%${term}%`)
+          .gt('calories', 0)
+          .limit(25)
+        if (levend) setAppMaaltijden(data || [])
+      } catch (e) {
+        console.warn('App-maaltijden zoeken mislukt:', e?.message)
+        if (levend) setAppMaaltijden([])
+      } finally {
+        if (levend) setAppBezig(false)
+      }
+    }, 250)
+    return () => { levend = false; clearTimeout(t) }
+  }, [zoek, db])
+
+  // Een maaltijd uit de app loggen. Zelfde vorm als een eigen maaltijd, zodat
+  // de rest van het log-venster geen verschil hoeft te kennen.
+  const logAppMaaltijd = (meal) => {
+    const moment = Array.isArray(meal.timing) ? meal.timing[0] : (meal.meal_type || 'snack')
+    onLog({
+      name: meal.name, sourceId: meal.id, type: 'ai_meal',
+      calories: Math.round(meal.calories || 0), protein: parseFloat(meal.protein) || 0,
+      carbs: parseFloat(meal.carbs) || 0, fat: parseFloat(meal.fat) || 0,
+      ingredients: meal.ingredients_list || [], source: 'app_meals',
+      meal_type: SECTION_MOMENT[sectieVan(moment)] || moment || 'snack', per100g: false,
+      image_url: meal.image_url || null,
+    })
   }
 
   const handleQuickLog = (meal) => {
@@ -137,8 +184,10 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
   // Gefilterde, gesorteerde lijst. De uitklap-secties zijn vervangen door een
   // filter: met vijf secties die allemaal dicht staan zag je je eigen
   // maaltijden pas na twee tikken.
+  const zoekterm = zoek.trim().toLowerCase()
   const gefilterd = myMeals
     .filter(m => filterSectie === 'alle' || (sectieVan(m.section) || 'overige') === filterSectie)
+    .filter(m => !zoekterm || String(m.name || '').toLowerCase().includes(zoekterm))
     .sort((a, b) => {
       if (sortering === 'naam') return String(a.name || '').localeCompare(String(b.name || ''))
       if (sortering === 'kcal-hoog') return (b.calories || 0) - (a.calories || 0)
@@ -161,6 +210,36 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
 
   return (
     <div>
+      {/* Zoeken: eerst je eigen maaltijden, daaronder die van de app. */}
+      <div style={{ padding: isMobile ? '0.75rem 0.9rem 0' : '1rem 1.25rem 0' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          minHeight: 44, padding: '0 0.8rem',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
+        }}>
+          <Search size={16} color="rgba(255,255,255,0.4)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+          <input
+            value={zoek}
+            onChange={e => setZoek(e.target.value)}
+            placeholder="Zoek een maaltijd — ook uit de app"
+            style={{
+              flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
+              color: '#fff', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'inherit',
+            }}
+          />
+          {zoek && (
+            <button
+              onClick={() => setZoek('')}
+              aria-label="Zoekterm wissen"
+              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 2, display: 'flex' }}
+            >
+              <X size={15} strokeWidth={2.8} />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Twee acties bovenaan, in bold wit. */}
       <div style={{ display: 'flex', gap: 8, padding: isMobile ? '0.75rem 0.9rem 0.6rem' : '1rem 1.25rem 0.75rem' }}>
         <button
@@ -301,6 +380,41 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
               acties={[
                 { icon: <Plus size={11} strokeWidth={3} />, label: 'Loggen', onClick: () => handleQuickLog(meal) },
                 { icon: <ChevronRight size={11} strokeWidth={2.6} />, label: 'Bewerken', onClick: () => handleOpenMeal(meal) },
+              ]}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Maaltijden uit de app. Alleen bij een zoekterm: ongevraagd honderden
+          gerechten tonen maakt van dit tabblad een catalogus. */}
+      {zoekterm.length >= 2 && (
+        <div style={{ paddingBottom: '1rem' }}>
+          <div style={{
+            padding: isMobile ? '0.9rem 0.9rem 0.5rem' : '1rem 1.25rem 0.6rem',
+            fontSize: '0.74rem', fontWeight: 900, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)',
+          }}>
+            Uit de app{appBezig ? ' · zoeken…' : appMaaltijden.length ? ` · ${appMaaltijden.length}` : ''}
+          </div>
+          {!appBezig && appMaaltijden.length === 0 ? (
+            <div style={{ padding: '0 1.25rem 0.5rem', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
+              Niets gevonden voor “{zoek.trim()}”.
+            </div>
+          ) : appMaaltijden.map(meal => (
+            <MealCard
+              key={`app-${meal.id}`}
+              meal={{
+                name: meal.name,
+                image_url: meal.image_url,
+                calories: meal.calories, protein: meal.protein,
+                carbs: meal.carbs, fat: meal.fat,
+              }}
+              momentLabel="App"
+              isMobile={isMobile}
+              onCheck={() => logAppMaaltijd(meal)}
+              acties={[
+                { icon: <Plus size={11} strokeWidth={3} />, label: 'Loggen', onClick: () => logAppMaaltijd(meal) },
               ]}
             />
           ))}
