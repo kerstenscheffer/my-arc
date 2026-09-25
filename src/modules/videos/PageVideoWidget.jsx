@@ -766,7 +766,7 @@ function FullscreenPlayer({ item, onClose, onWatched, onCompleted }) {
       }
 
   const embedUrl = videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1&cc_load_policy=0&iv_load_policy=3&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : null
   // Zoom Clips: /clips/share/ → /clips/embed/ is wél embedbaar (geen x-frame-options).
   const zoomEmbed = getZoomEmbedUrl(video?.video_url)

@@ -54,6 +54,12 @@ export const getYouTubeEmbedUrl = (videoId, options = {}) => {
     rel: '0',
     modestbranding: '1',
     playsinline: '1',
+    // Ondertitels uit. YouTube zet ze aan als de kijker dat ooit ergens heeft
+    // aangezet, en dan ligt er een balk tekst over de helft van het beeld.
+    // Aanzetten kan hij zelf met de cc-knop.
+    cc_load_policy: '0',
+    // Geen annotaties/kaartjes over het beeld.
+    iv_load_policy: '3',
   })
   return `https://www.youtube.com/embed/${videoId}?${params.toString()}`
 }

@@ -107,6 +107,47 @@ export async function stappenBijOpstart() {
   return stappenVanVandaag()
 }
 
+// De laatste n dagen als lijst van { iso, steps }, oudste eerst. Null als we
+// het niet kunnen weten.
+//
+// Waarom dit er is: de app las alleen vandaag. Opende een klant de app twee
+// dagen niet, dan stonden die dagen bij de coach op nul terwijl zijn telefoon
+// ze gewoon had — ze werden nooit meer opgehaald. HealthKit bewaart die
+// historie wel, dus halen we bij het opstarten een week terug op.
+export async function stappenPerDag(dagenTerug = 7) {
+  if (!(await heeftTelefoonBron())) return null
+  const start = new Date()
+  start.setDate(start.getDate() - (dagenTerug - 1))
+  start.setHours(0, 0, 0, 0)
+  const eind = new Date()
+  try {
+    const res = await Health.queryAggregated({
+      startDate: start.toISOString(),
+      endDate: eind.toISOString(),
+      dataType: 'steps',
+      bucket: 'day',
+    })
+    const rijen = res?.aggregatedData || []
+    // Emmers optellen per kalenderdag. De plugin geeft per emmer een
+    // begin-datum; die kan als string of als tijdstempel binnenkomen.
+    const perDag = new Map()
+    rijen.forEach(r => {
+      const ruw = r?.startDate || r?.date || r?.start || null
+      const d = ruw ? new Date(ruw) : null
+      if (!d || isNaN(d.getTime())) return
+      const p = (n) => String(n).padStart(2, '0')
+      const iso = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+      perDag.set(iso, (perDag.get(iso) || 0) + (Number(r?.value) || 0))
+    })
+    return [...perDag.entries()]
+      .map(([iso, aantal]) => ({ iso, steps: Math.round(aantal) }))
+      .sort((a, b) => a.iso.localeCompare(b.iso))
+  } catch (e) {
+    console.warn('Stappen-historie lezen mislukt:', e?.message || e)
+    return null
+  }
+}
+
 // Het aantal stappen van vandaag, of null als we het niet kunnen weten.
 export async function stappenVanVandaag() {
   if (!(await heeftTelefoonBron())) return null

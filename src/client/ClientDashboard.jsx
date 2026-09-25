@@ -335,7 +335,10 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                 zichzelf niet als er niets openstaat. Boven de pagina-inhoud,
                 want een video die je moet zien hoort niet onder een scherm
                 grafieken te liggen. */}
-            {!focusMode && (
+            {/* Meal doet dit zelf: dat scherm staat vast (position: fixed) en
+                legt alles wat hier gerenderd wordt eronder. Daar staat het blok
+                tussen de dag en de macro's. */}
+            {!focusMode && currentView !== 'meal' && (
               <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
             )}
             {currentView === 'home' && (

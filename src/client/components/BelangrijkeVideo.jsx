@@ -20,7 +20,11 @@ import videoService from '../../modules/videos/VideoService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
 import { getThumbnailFromUrl } from '../../modules/videos/utils/youtubeHelpers'
 
-export default function BelangrijkeVideo({ client, pagina, isMobile = false }) {
+// `compact`: een smalle regel in plaats van een kaart met grote thumbnail.
+// Voor plekken waar de video tussen bestaande blokken in staat — op de
+// maaltijdpagina tussen de dag en de macro's — en waar 190 pixels kaart de
+// ringen van het scherm zou duwen.
+export default function BelangrijkeVideo({ client, pagina, isMobile = false, compact = false }) {
   const [items, setItems] = useState([])
   const [speler, setSpeler] = useState(null)
   const [bezig, setBezig] = useState(null)   // video_id dat wordt afgevinkt
@@ -57,6 +61,93 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false }) {
   }
 
   if (!items.length) return null
+
+  const speler_ = speler && (
+    <VideoPlayerModal
+      item={{ id: speler.assignment_id, video: speler.video }}
+      onClose={sluitSpeler}
+    />
+  )
+
+  if (compact) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 6,
+        padding: isMobile ? '0.5rem 1rem 0' : '0.6rem 1.5rem 0',
+      }}>
+        {items.map(item => {
+          const v = item.video
+          const thumb = v.thumbnail_url || getThumbnailFromUrl(v.video_url)
+          return (
+            // Geen kader eromheen: tussen de dag-kop en de macro-ringen is een
+            // kaartje een derde blok dat om aandacht vraagt. De thumbnail is
+            // het blok.
+            <div key={item.video_id} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <div
+                onClick={() => setSpeler(item)}
+                style={{
+                  position: 'relative', flexShrink: 0,
+                  width: isMobile ? 132 : 150, height: isMobile ? 76 : 86,
+                  borderRadius: 10, overflow: 'hidden',
+                  backgroundImage: thumb ? `url(${thumb})` : 'none',
+                  backgroundSize: 'cover', backgroundPosition: 'center',
+                  backgroundColor: '#1a1a1a', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+                  width: 34, height: 34, borderRadius: '50%', background: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+                }}>
+                  <Play size={16} fill="#0a0a0a" strokeWidth={0} style={{ marginLeft: 2 }} />
+                </div>
+              </div>
+
+              <div onClick={() => setSpeler(item)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                <div style={{
+                  fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 900, color: '#fff',
+                  letterSpacing: '-0.015em', lineHeight: 1.2, marginBottom: 3,
+                }}>
+                  Bekijk deze video!
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.55)', lineHeight: 1.25,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {v.title}
+                </div>
+              </div>
+
+              <button
+                onClick={() => afvinken(item, 'knop')}
+                disabled={bezig === item.video_id}
+                title="Ik heb 'm gezien"
+                aria-label="Ik heb 'm gezien"
+                style={{
+                  flexShrink: 0, width: 34, height: 34, padding: 0, borderRadius: 9,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {bezig === item.video_id
+                  ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Check size={15} strokeWidth={3} />}
+              </button>
+            </div>
+          )
+        })}
+        {speler_}
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -173,12 +264,7 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false }) {
           de video standaard op de pagina, dan is er geen toewijzing en blijft
           dat veld leeg — de speler slaat het bijwerken dan over, en het
           gezien-zetten doen wij hier. */}
-      {speler && (
-        <VideoPlayerModal
-          item={{ id: speler.assignment_id, video: speler.video }}
-          onClose={sluitSpeler}
-        />
-      )}
+      {speler_}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
