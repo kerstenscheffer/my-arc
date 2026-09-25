@@ -9,7 +9,7 @@ import { niveauVoorDoel } from '../DayTemplateService'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Plus, Info } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Plus, Info, SlidersHorizontal } from 'lucide-react'
 
 // De secties van "Mijn maaltijden" heten anders dan de log-momenten hier.
 const MOMENT_NAAR_SECTIE = {
@@ -48,6 +48,12 @@ export default function AIAlternativesModal({
   const [moment, setMoment] = useState('alles')
   const [bron, setBron] = useState('alles')
   const [sortering, setSortering] = useState('smart')
+  // Grenzen in plaats van alleen volgorde: "laat me alles zien onder de 400
+  // kcal" of "minstens 30 gram eiwit". De volgorde-keuze zegt hoe de lijst
+  // gesorteerd is, dit zegt wat er in mag.
+  const [maxKcal, setMaxKcal] = useState('')
+  const [minEiwit, setMinEiwit] = useState('')
+  const [toonFilter, setToonFilter] = useState(false)
   // Het caloriedoel bepaalt welk dagmenu-niveau je ziet. Het zit niet altijd
   // op het client-object dat dit venster binnenkrijgt, dus halen we het er zo
   // nodig zelf bij — anders valt het hele niveau weg en blijft er van de
@@ -206,7 +212,7 @@ export default function AIAlternativesModal({
           const { data: dagmenu, error: dagmenuFout } = await db.supabase
             .from('ai_meals')
             .select('*')
-            .like('internal_name', `dagmenu${niveau}\_%`)
+            .like('internal_name', `dagmenu${niveau}_%`)
           if (dagmenuFout) console.warn('Dagmenu-suggesties:', dagmenuFout.message)
           const alGekozen = new Set([...(curated || []).map(m => m.id)])
           ;(dagmenu || []).forEach(m => {
@@ -289,6 +295,8 @@ export default function AIAlternativesModal({
     return uit
   }
 
+  const filterActief = !!(maxKcal || minEiwit)
+
   const getFilteredMeals = () => {
     const currentCal = currentMeal?.calories || 0
     const currentProt = currentMeal?.protein || 0
@@ -359,7 +367,18 @@ export default function AIAlternativesModal({
       })
     }
 
-    // 4. Volgorde.
+    // 4. Grenzen op kcal en eiwit. Wie een maximum of minimum invult, wil die
+    // maaltijden zien en de rest niet — ook niet onderaan.
+    const kcalGrens = parseFloat(String(maxKcal).replace(',', '.'))
+    const eiwitGrens = parseFloat(String(minEiwit).replace(',', '.'))
+    if (Number.isFinite(kcalGrens) && kcalGrens > 0) {
+      meals = meals.filter(m => (m.calories || 0) <= kcalGrens)
+    }
+    if (Number.isFinite(eiwitGrens) && eiwitGrens > 0) {
+      meals = meals.filter(m => (m.protein || 0) >= eiwitGrens)
+    }
+
+    // 5. Volgorde.
     const opCal = (m) => m.calories || 0
     const opProt = (m) => m.protein || 0
     switch (sortering) {
@@ -618,6 +637,68 @@ export default function AIAlternativesModal({
             <Keuze waarde={bron} opties={bronOpties} zet={setBron} isMobile={isMobile} />
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
             <Keuze waarde={sortering} opties={sorteerOpties} zet={setSortering} isMobile={isMobile} uitlijning="rechts" />
+          </div>
+
+          {/* Grenzen. Dicht, want de meeste keren wissel je zonder na te
+              denken over getallen; wie het wel wil, tikt het open. */}
+          <div style={{ marginTop: 8 }}>
+            <button
+              onClick={() => setToonFilter(v => !v)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'transparent', border: 'none', padding: 0,
+                color: filterActief ? '#fff' : 'rgba(255,255,255,0.45)',
+                fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 800,
+                fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <SlidersHorizontal size={14} strokeWidth={2.6} />
+              {filterActief
+                ? [
+                  maxKcal ? `max ${maxKcal} kcal` : null,
+                  minEiwit ? `min ${minEiwit}g eiwit` : null,
+                ].filter(Boolean).join(' · ')
+                : 'Grenzen'}
+            </button>
+
+            {toonFilter && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                {[
+                  { waarde: maxKcal, zet: setMaxKcal, plaats: 'max kcal' },
+                  { waarde: minEiwit, zet: setMinEiwit, plaats: 'min eiwit' },
+                ].map(veld => (
+                  <input
+                    key={veld.plaats}
+                    type="number"
+                    inputMode="numeric"
+                    value={veld.waarde}
+                    onChange={e => veld.zet(e.target.value)}
+                    placeholder={veld.plaats}
+                    style={{
+                      width: 110, minHeight: 38, padding: '0 0.7rem',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+                      color: '#fff', fontSize: '0.85rem', fontWeight: 700,
+                      fontFamily: 'inherit', outline: 'none',
+                    }}
+                  />
+                ))}
+                {filterActief && (
+                  <button
+                    onClick={() => { setMaxKcal(''); setMinEiwit('') }}
+                    style={{
+                      minHeight: 38, padding: '0 0.8rem', borderRadius: 10,
+                      background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                      color: 'rgba(255,255,255,0.6)', fontSize: '0.82rem', fontWeight: 800,
+                      fontFamily: 'inherit', cursor: 'pointer',
+                    }}
+                  >
+                    Wissen
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
