@@ -15,7 +15,8 @@ export default defineConfig([
     ],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      // __APP_VERSIE__ zet Vite erin bij het bouwen (zie vite.config.js).
+      globals: { ...globals.browser, __APP_VERSIE__: 'readonly' },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },

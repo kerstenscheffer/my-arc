@@ -14,6 +14,7 @@ import ClientProfile from './pages/ClientProfile'
 import ShoppingHub from '../modules/shopping/ShoppingHub'
 import NotificationWidget from '../modules/notifications/NotificationWidget'
 import PWAUpdateBanner from '../components/PWAUpdateBanner'
+import UpdateBalk from '../modules/app-update/UpdateBalk'
 import ClientFAQModal from '../modules/faq/ClientFAQModal'
 import ChallengeProgressTab from '../modules/challenge-monitor/ChallengeProgressTab'
 import MediaBibliotheek from './components/MediaBibliotheek'
@@ -297,6 +298,11 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       position: 'relative'
     }}>
       <PWAUpdateBanner />
+
+      {/* Staat er een nieuwere versie in de App Store, dan zegt deze balk dat.
+          Bovenaan en in de flow, zodat hij niets bedekt; wegklikken geldt tot
+          de volgende versie. */}
+      <UpdateBalk isMobile={isMobile} />
 
       {/* Challenge-stand, altijd bereikbaar. Zwevend en niet op Home, omdat je
           hem juist wilt kunnen checken terwijl je in je workout of je
