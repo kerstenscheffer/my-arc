@@ -84,7 +84,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
   const [selectedDay, setSelectedDay] = useState('today')
-  const [dayTemplates, setDayTemplates] = useState([])
   const [showWeekPlanner, setShowWeekPlanner] = useState(false)
   const [showWizard, setShowWizard] = useState(false)
   // Counter dat AIDaySchedule's FoodLogModal triggert wanneer de FAB
@@ -141,19 +140,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   useEffect(() => {
     if (client?.id) {
       loadDashboardData()
-      loadTemplates()
     }
   }, [client])
-  
-  const loadTemplates = async () => {
-    try {
-      const templates = await db.getClientDayTemplates(client.id)
-      setDayTemplates(templates || [])
-    } catch (error) {
-      console.error('Failed to load templates:', error)
-      setDayTemplates([])
-    }
-  }
   
   const loadDashboardData = async () => {
     console.log('🚀 Loading AI dashboard data')
@@ -688,9 +676,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         onUncheckMeal={handleUncheckMeal}
         onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
         onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
-        dayTemplates={dayTemplates || []}
         db={db}
-        onPlanUpdate={loadDashboardData}
         dailyTotals={dashboardData.dailyTotals || {
           targets: {
             calories: client.target_calories || 0,

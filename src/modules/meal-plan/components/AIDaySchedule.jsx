@@ -6,11 +6,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { getOverrides, lokaleDatum } from '../DayTemplateService'
 import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd } from '../utils/preWorkoutMeal'
 import { ClientAgendaService } from '../../client-agenda/ClientAgendaService'
-import DayScheduleHeader from './day-schedule/DayScheduleHeader'
 import DaySelector from './day-schedule/DaySelector'
 import DailyTotalsBar from './day-schedule/DailyTotalsBar'
 import MealTimelineMobile from './day-schedule/MealTimelineMobile'
-import DayTemplatePickerModal from './DayTemplatePickerModal'
 import FoodLogModal from './food-log/FoodLogModal'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
 import { laadSupplementen, geldtOpDag, momentVanSupplement, doseringTekst } from '../../supplements/utils/supplementSchedule'
@@ -34,7 +32,7 @@ const daysOfWeek = [
 export default function AIDaySchedule({
   activePlan, todayMeals, todayProgress, selectedDay, onDayChange,
   onCheckMeal, onUncheckMeal, onOpenInfo, onOpenAlternatives,
-  dayTemplates = [], db, onPlanUpdate, dailyTotals,
+  db, dailyTotals,
   // ✅ FOOD LOG: New props from AIMealDashboard
   client, onMealLogged, targets,
   // ✅ OVERHAUL: View mode — 'plan' (default, show plan slots) | 'free' (logging only)
@@ -138,7 +136,6 @@ export default function AIDaySchedule({
     eind.setDate(eind.getDate() + 1)
     return { vanaf: start.toISOString(), tot: eind.toISOString() }
   }
-  const [showApplyTemplate, setShowApplyTemplate] = useState(false)
 
   // Dagen die tijdelijk anders zijn (klant koos een dagtemplate voor deze
   // week). Map datum → rij; wint van het weekplan voor die ene dag.
@@ -647,7 +644,9 @@ export default function AIDaySchedule({
     }}>
       {/* DayScheduleHeader (titel/datum/Template-knop) en de MA-ZO
           DaySelector zijn verwijderd: navigatie en dagweergave zitten nu
-          in MealDayNavHeader bovenaan AIMealDashboard. */}
+          in MealDayNavHeader bovenaan AIMealDashboard. Het oude
+          dagtemplate-venster (ai_day_templates) is hier ook weg — dagen komen
+          nu uit DagTemplatePaneel. */}
 
       {!hideTotalsBar && hasContent && (
         <DailyTotalsBar dailyTotals={combinedTotals} targets={clientTargets} isMobile={isMobile} />
@@ -833,19 +832,6 @@ export default function AIDaySchedule({
         </div>
       )}
       
-      {showApplyTemplate && (
-        <DayTemplatePickerModal
-          isOpen={showApplyTemplate}
-          onClose={() => setShowApplyTemplate(false)}
-          dayTemplates={dayTemplates}
-          currentDayKey={daysOfWeek[currentDay]?.key}
-          activePlan={activePlan}
-          clientId={client?.id}
-          db={db}
-          isMobile={isMobile}
-          onSuccess={() => { setShowApplyTemplate(false); if (onPlanUpdate) onPlanUpdate(); loadDayMeals(currentDay) }}
-        />
-      )}
 
       {/* ✅ FOOD LOG + EDIT: Modal with editMeal support */}
       {showFoodLog && (() => {
