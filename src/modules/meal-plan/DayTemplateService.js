@@ -134,7 +134,10 @@ export async function getKlantDagTemplates(supabase, clientId) {
   ])
   if (error) console.warn('Dagtemplates van klant laden mislukt:', error.message)
 
-  const lijst = (gekoppeld || []).map(r => r.meal_plan_templates).filter(Boolean)
+  const lijst = (gekoppeld || [])
+    .map(r => r.meal_plan_templates)
+    .filter(Boolean)
+    .map(t => ({ ...t, bron: BRON_COACH }))
 
   // Daarbovenop: de dagmenu's die bij zijn caloriedoel passen. Die hoeft de
   // coach niet toe te wijzen — verandert het doel, dan verschuift de lijst mee.
@@ -150,11 +153,119 @@ export async function getKlantDagTemplates(supabase, clientId) {
     ;(auto || []).forEach(t => {
       if (templateNiveau(t) !== niveau) return
       if (lijst.some(x => x.id === t.id)) return
-      lijst.push(t)
+      lijst.push({ ...t, bron: BRON_COACH })
     })
   }
 
   return lijst
+}
+
+// ── Eigen dagen van de klant ───────────────────────────────────────────────
+//
+// Een dag die de klant zelf bewaart. Zelfde vorm als een coach-dag, maar in
+// zijn eigen tabel: hij mag hem weggooien en de coach hoeft er niet over te
+// struikelen. `bron` markeert waar hij vandaan komt, zodat de lijst het
+// onderscheid kan tonen.
+
+export const BRON_COACH = 'coach'
+export const BRON_KLANT = 'klant'
+
+export async function getEigenDagen(supabase, clientId) {
+  if (!clientId) return []
+  const { data, error } = await supabase
+    .from('client_saved_days')
+    .select('id, naam, dag, daily_calories, daily_protein, daily_carbs, daily_fat, created_at')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false })
+  if (error) { console.warn('Eigen dagen laden mislukt:', error.message); return [] }
+  // Zelfde vorm als een template, zodat de rest van dit bestand geen verschil
+  // hoeft te kennen tussen een coach-dag en een eigen dag.
+  return (data || []).map(r => ({
+    id: r.id,
+    name: r.naam,
+    template_name: r.naam,
+    week_structure: { day: r.dag },
+    daily_calories: r.daily_calories,
+    daily_protein: r.daily_protein,
+    daily_carbs: r.daily_carbs,
+    daily_fat: r.daily_fat,
+    meals_per_day: Object.keys(r.dag || {}).filter(k => k !== 'totals' && k !== 'is_training_day').length,
+    bron: BRON_KLANT,
+  }))
+}
+
+// De dag zoals hij nu op het scherm staat bewaren. `maaltijden` is de lijst
+// die de dagweergave toont: per maaltijd een slot en de maaltijd zelf.
+export async function bewaarEigenDag(supabase, { clientId, naam, maaltijden, bronTemplateId = null }) {
+  try {
+    const dag = {}
+    let kcal = 0, eiwit = 0, kh = 0, vet = 0
+    ;(maaltijden || []).forEach(m => {
+      const slot = m?.slot || m?.meal?.slot
+      const maaltijd = m?.meal || m
+      if (!slot || !maaltijd) return
+      dag[slot] = maaltijd
+      kcal += Number(maaltijd.calories) || 0
+      eiwit += Number(maaltijd.protein) || 0
+      kh += Number(maaltijd.carbs) || 0
+      vet += Number(maaltijd.fat) || 0
+    })
+    if (!Object.keys(dag).length) return { error: 'Deze dag heeft geen maaltijden' }
+
+    const { error } = await supabase.from('client_saved_days').insert({
+      client_id: clientId,
+      naam: String(naam || '').trim().slice(0, 80) || 'Mijn dag',
+      dag,
+      daily_calories: Math.round(kcal),
+      daily_protein: Math.round(eiwit),
+      daily_carbs: Math.round(kh),
+      daily_fat: Math.round(vet),
+      bron_template_id: bronTemplateId,
+    })
+    if (error) throw error
+    return { ok: true }
+  } catch (e) {
+    console.error('bewaarEigenDag mislukt:', e)
+    return { error: e.message || 'Opslaan mislukt' }
+  }
+}
+
+export async function verwijderEigenDag(supabase, { clientId, id }) {
+  const { error } = await supabase
+    .from('client_saved_days').delete().eq('id', id).eq('client_id', clientId)
+  return { error }
+}
+
+// ── Herkennen welke dag je voor je hebt ────────────────────────────────────
+//
+// Geen vlaggetje in de database maar een vergelijking van de inhoud: welke
+// maaltijd staat op welk slot. Wissel je er één, dan klopt de handtekening
+// niet meer en heet de dag weer naamloos — precies wat je wilt, want het is
+// die dag dan ook niet meer.
+export const handtekeningVanDag = (dagOfMaaltijden) => {
+  const paren = []
+  if (Array.isArray(dagOfMaaltijden)) {
+    dagOfMaaltijden.forEach(m => {
+      const slot = m?.slot || m?.meal?.slot
+      const maaltijd = m?.meal || m
+      const id = maaltijd?.meal_id || maaltijd?.id || maaltijd?.name
+      if (slot && id) paren.push(`${slot}:${id}`)
+    })
+  } else {
+    Object.entries(dagOfMaaltijden || {}).forEach(([slot, maaltijd]) => {
+      if (slot === 'totals' || slot === 'is_training_day' || !maaltijd) return
+      const id = maaltijd?.meal_id || maaltijd?.id || maaltijd?.name
+      if (id) paren.push(`${slot}:${id}`)
+    })
+  }
+  return paren.sort().join('|')
+}
+
+// Hoort deze dag bij een bewaarde dag? Geeft die dag terug, anders null.
+export const vindDag = (maaltijden, dagen) => {
+  const nu = handtekeningVanDag(maaltijden)
+  if (!nu) return null
+  return (dagen || []).find(d => handtekeningVanDag(slotsVanTemplate(d)) === nu) || null
 }
 
 // Tijdelijke dagen in een venster, als map datum → rij.
