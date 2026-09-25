@@ -14,12 +14,12 @@
 // verdwijnt vanzelf, de tweede blijft staan.
 
 import { useState, useEffect, useCallback } from 'react'
-import { CalendarDays, X, ChevronRight, Check, Loader } from 'lucide-react'
+import { CalendarDays, X, ChevronRight, Check, Loader, Trash2 } from 'lucide-react'
 import MealCard from './day-schedule/MealCard'
 import { foodImageFallback } from '../foodImageFallback'
 import {
-  getKlantDagTemplates, slotsVanTemplate, zetDagAltijd, zetDagDezeWeek,
-  lokaleDatum, DAG_LABELS,
+  getKlantDagTemplates, getEigenDagen, verwijderEigenDag, slotsVanTemplate,
+  zetDagAltijd, zetDagDezeWeek, lokaleDatum, DAG_LABELS, BRON_KLANT,
 } from '../DayTemplateService'
 
 const DAGEN_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -70,9 +70,23 @@ export default function DagTemplatePaneel({
   const laad = useCallback(async () => {
     if (!db?.supabase || !client?.id) return
     setLaden(true)
-    setTemplates(await getKlantDagTemplates(db.supabase, client.id))
+    // Eerst je eigen dagen, dan die van je coach: wat je zelf bewaarde zoek je
+    // het vaakst op.
+    const [coach, eigen] = await Promise.all([
+      getKlantDagTemplates(db.supabase, client.id),
+      getEigenDagen(db.supabase, client.id),
+    ])
+    setTemplates([...eigen, ...coach])
     setLaden(false)
   }, [db, client?.id])
+
+  const gooiWeg = async (t, e) => {
+    e.stopPropagation()
+    if (!window.confirm(`"${t.name}" uit je dagen halen?`)) return
+    const res = await verwijderEigenDag(db.supabase, { clientId: client.id, id: t.id })
+    if (res?.error) { alert('Verwijderen mislukt'); return }
+    await laad()
+  }
 
   useEffect(() => { if (open) laad() }, [open, laad])
   useEffect(() => { if (open) setDoelDagen([dagIndex]) }, [open, dagIndex])
@@ -212,16 +226,15 @@ export default function DagTemplatePaneel({
             // een hoop leest als een dump; drie groepjes van vijf niet.
             const groepen = new Map()
             templates.forEach(t => {
+              // Eigen dagen krijgen hun eigen kop; die horen niet tussen de
+              // caloriegroepen van de coach.
               const { niveau } = ontleed(t)
-              const sleutel = niveau ?? 'overig'
+              const sleutel = t.bron === BRON_KLANT ? 'mijn' : (niveau ?? 'overig')
               if (!groepen.has(sleutel)) groepen.set(sleutel, [])
               groepen.get(sleutel).push(t)
             })
-            const volgorde = [...groepen.keys()].sort((a, b) => {
-              if (a === 'overig') return 1
-              if (b === 'overig') return -1
-              return a - b
-            })
+            const rang = (k) => (k === 'mijn' ? -1 : k === 'overig' ? 1e9 : k)
+            const volgorde = [...groepen.keys()].sort((a, b) => rang(a) - rang(b))
 
             return volgorde.map(sleutel => (
               <div key={sleutel} style={{ marginBottom: '1.5rem' }}>
@@ -230,14 +243,19 @@ export default function DagTemplatePaneel({
                   textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)',
                   padding: '0.25rem 0 0.75rem',
                 }}>
-                  {sleutel === 'overig' ? 'Overige dagen' : `Dagmenu ${sleutel} kcal`}
+                  {sleutel === 'mijn' ? 'Jouw dagen'
+                    : sleutel === 'overig' ? 'Van je coach'
+                    : `Dagmenu ${sleutel} kcal`}
                 </div>
 
                 {groepen.get(sleutel)
                   .slice()
                   .sort((a, b) => ontleed(a).titel.localeCompare(ontleed(b).titel, 'nl', { numeric: true }))
                   .map(t => {
-                    const { niveau, titel } = ontleed(t)
+                    const vanMij = t.bron === BRON_KLANT
+                    const { niveau, titel } = vanMij
+                      ? { niveau: null, titel: t.name || 'Mijn dag' }
+                      : ontleed(t)
                     const foto = dagFoto(t)
                     const namen = maaltijdNamen(t)
                     return (
@@ -260,16 +278,17 @@ export default function DagTemplatePaneel({
                           backgroundSize: 'cover', backgroundPosition: 'center',
                         }} />
                         <span style={{ flex: 1, minWidth: 0, padding: '0.8rem 0.9rem' }}>
-                          {niveau && (
-                            <span style={{
-                              display: 'inline-block', marginBottom: 5,
-                              fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.08em',
-                              textTransform: 'uppercase', color: '#0a0a0a',
-                              background: '#fff', borderRadius: 5, padding: '2px 6px',
-                            }}>
-                              {niveau} kcal
-                            </span>
-                          )}
+                          <span style={{
+                            display: 'inline-block', marginBottom: 5,
+                            fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            color: vanMij ? 'rgba(255,255,255,0.6)' : '#0a0a0a',
+                            background: vanMij ? 'transparent' : '#fff',
+                            border: vanMij ? `1px solid ${LIJN}` : 'none',
+                            borderRadius: 5, padding: '2px 6px',
+                          }}>
+                            {vanMij ? 'Jouw dag' : `${niveau || Math.round(t.daily_calories || 0)} kcal`}
+                          </span>
                           <span style={{
                             display: 'block', fontSize: '1rem', fontWeight: 900, color: '#fff',
                             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -293,7 +312,23 @@ export default function DagTemplatePaneel({
                             </span>
                           )}
                         </span>
-                        <span style={{ display: 'flex', alignItems: 'center', paddingRight: 8, flexShrink: 0 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 2, paddingRight: 8, flexShrink: 0 }}>
+                          {vanMij && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => gooiWeg(t, e)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') gooiWeg(t, e) }}
+                              title="Uit je dagen halen"
+                              style={{
+                                width: 34, height: 34, borderRadius: 9, display: 'flex',
+                                alignItems: 'center', justifyContent: 'center',
+                                color: 'rgba(239,68,68,0.75)', cursor: 'pointer',
+                              }}
+                            >
+                              <Trash2 size={15} strokeWidth={2.4} />
+                            </span>
+                          )}
                           <ChevronRight size={20} strokeWidth={3} color="rgba(255,255,255,0.3)" />
                         </span>
                       </button>
