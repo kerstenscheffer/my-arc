@@ -227,6 +227,10 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
 export default function WeightProgressRing({
   weight = 70, onWeightChange, onSave, saving = false,
   todayEntry = null, isFriday = false, isMobile = false,
+  // Losse knop die rechts naast de fijnregel-rij komt te staan (de omtrek-knop
+  // op de trackingpagina). Hier, en niet los in de pagina, omdat het bij het
+  // weegmoment hoort: je stapt van de weegschaal en pakt het meetlint.
+  extraKnop = null,
   // legacy props (niet meer gebruikt)
   progressPercent, targetWeight,
 }) {
@@ -294,16 +298,21 @@ export default function WeightProgressRing({
         onEdit={startEdit}
       />
 
-      {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk */}
-      {!showSavedState && (
+      {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk. De rij blijft wel
+          staan zodra er een extra knop in zit, want die hoort rechts naast de
+          slider te blijven staan, ook als het gewicht al gelogd is. */}
+      {(!showSavedState || extraKnop) && (
         <div style={{
+          position: 'relative',
           display: 'flex',
           gap: '0.4rem',
           marginTop: '0.625rem',
           justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '32px',
           maxWidth: '100%',
         }}>
-          {[-0.1, +0.1].map((d) => (
+          {!showSavedState && [-0.1, +0.1].map((d) => (
             <button key={d} onClick={() => adjust(d)} style={{
               width: isMobile ? '64px' : '72px',
               height: '32px',
@@ -320,6 +329,11 @@ export default function WeightProgressRing({
               WebkitTapHighlightColor: 'transparent',
             }}>{d > 0 ? `+${d}` : d}</button>
           ))}
+          {extraKnop && (
+            <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
+              {extraKnop}
+            </div>
+          )}
         </div>
       )}
 

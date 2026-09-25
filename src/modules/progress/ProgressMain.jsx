@@ -2,7 +2,8 @@
 // v6.2 - overflow hidden fix
 
 import React, { useState, useEffect } from 'react'
-import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon, GitCompareArrows } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X } from 'lucide-react'
 
 import ProgressPhotos from '../progress-photos/ProgressPhotos'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
@@ -15,6 +16,7 @@ import SlaapKnop from './SlaapKnop'
 import BeforeAfterCard from './components/BeforeAfterCard'
 import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
+import GewichtBandGrafiek from '../coach-command-center/components/insight/GewichtBandGrafiek'
 import { useChallenge } from '../../hooks/useChallenge'
 
 // Coach-tip bovenaan de tracking pagina — foto links, vaste boodschap rechts.
@@ -90,6 +92,15 @@ export default function ProgressMain({ db, client }) {
   const [photoCount, setPhotoCount] = useState(0)
   const [recentPhotos, setRecentPhotos] = useState([])
   const [todayData, setTodayData] = useState({})
+  // De fases van deze klant (cut/build/onderhoud). De coaching-band tekent zijn
+  // tempo per fase, dus zonder deze lijst staat er een band omheen die nergens
+  // op slaat. Eerste rij = de lopende fase, zelfde volgorde als in het
+  // coach-paneel.
+  const [fases, setFases] = useState([])
+  // Omtrekken zitten achter een knop naast de slider en openen in een blad van
+  // onderen — zelfde patroon als de slaapknop. Als blok in de pagina stond het
+  // er altijd, terwijl je je omtrek hooguit één keer per week meet.
+  const [omtrekOpen, setOmtrekOpen] = useState(false)
   // Angle picker modal — opens when a 'progress' photo is being uploaded.
   // Replaces the old browser prompt() flow.
   const [anglePicker, setAnglePicker] = useState(null)   // { file, photoType } when open
@@ -107,15 +118,17 @@ export default function ProgressMain({ db, client }) {
     if (!client?.id) return
     setLoading(true)
     try {
-      const [stats, friday, history, entry, photos, recent] = await Promise.all([
+      const [stats, friday, history, entry, photos, recent, faseLijst] = await Promise.all([
         weightService.getWeightStats(client.id),
         weightService.getFridayCompliance(client.id),
         weightService.getWeightHistory(client.id, 730),
         weightService.getTodayEntry(client.id),
         getPhotoCount(client.id),
-        getRecentPhotos(client.id)
+        getRecentPhotos(client.id),
+        getFases(client.id)
       ])
       setWeightStats(stats || {}); setFridayData(friday || {}); setWeightHistory(history || [])
+      setFases(faseLijst || [])
       setTodayEntry(entry); setPhotoCount(photos); setRecentPhotos(recent || [])
       const tp = recent.filter(p => p.photo_date === dateString)
       const counts = { progress: 0, meal: 0, workout: 0, victory: 0, total: 0 }
@@ -125,6 +138,19 @@ export default function ProgressMain({ db, client }) {
       else if (client?.current_weight) setWeight(client.current_weight)
     } catch (e) { console.error('Error:', e); showMessage('Fout bij laden', 'error') }
     finally { setLoading(false) }
+  }
+
+  // Let op: een Supabase query-builder heeft geen .catch(), dus de fout vangen
+  // we met het tweede argument van then — anders sloopt hij de Promise.all
+  // hierboven nog voor de query vertrekt.
+  const getFases = async (id) => {
+    const { data } = await db.supabase
+      .from('client_phases')
+      .select('*')
+      .eq('client_id', id)
+      .order('started_on', { ascending: false })
+      .then(r => r, () => ({ data: [] }))
+    return data || []
   }
 
   const getPhotoCount = async (id) => {
@@ -255,28 +281,110 @@ export default function ProgressMain({ db, client }) {
           saving={saving} todayEntry={todayEntry} progressPercent={progressPercent}
           isFriday={isFriday} isMobile={isMobile}
           targetWeight={parseFloat(client?.target_weight) || 75}
+          extraKnop={(
+            <button
+              onClick={() => setOmtrekOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                height: 32, padding: '0 0.7rem', borderRadius: 9,
+                background: '#fff', border: 'none', color: '#0a0a0a',
+                fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 900,
+                fontFamily: 'inherit', letterSpacing: '-0.01em',
+                cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Ruler size={13} strokeWidth={2.8} />
+              Omtrek
+            </button>
+          )}
         />
       )}
 
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
       {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '3rem' : '3.5rem' }}>
+        <div style={{ marginTop: isMobile ? '1rem' : '1.25rem' }}>
+          {/* Geen `fase` hier, met opzet: dan rekent de balk 'sinds start' vanaf
+              de eerste weging ooit en staan er vier cellen (gemiddelde, tempo,
+              vorige week, sinds start). Dat is de balk die de klant kent. De
+              fase-cijfers — tempo deze week, boven/onder plan — horen bij het
+              sturen, en dat doet de coach. */}
           <WeightStatsGrid
             stats={weightStats}
             client={client}
             fridayData={fridayData}
             history={weightHistory}
             isMobile={isMobile}
+            toonGrafiek={false}
           />
+          {/* De coaching-band: dezelfde grafiek die de coach ziet. Het losse
+              verloop dat hier stond (witte lijn, doel-streep) toonde alleen de
+              metingen — en daar valt niets aan af te lezen, want twee kilo
+              verschil tussen twee ochtenden is normaal. Hier staat de band
+              omheen waarin je hoort te blijven, met het 7-daags gemiddelde als
+              lijn: dat is waar het over gaat. */}
+          {weightHistory.length > 0 && (
+            <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
+              <GewichtBandGrafiek
+                client={client}
+                history={weightHistory}
+                fase={fases[0] || null}
+                fases={fases}
+                isMobile={isMobile}
+                klantModus
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Omtrekken horen bij het gewicht: de weegschaal staat stil terwijl de
-          taille krimpt, en dat zie je alleen als die twee bij elkaar staan. */}
-      {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-          <CircumferenceMeasurements weightService={weightService} clientId={client?.id} isMobile={isMobile} onSave={loadAllData} />
-        </div>
+          taille krimpt. Ze staan daarom achter de knop naast de slider, in een
+          blad van onderen — niet meer als blok verderop de pagina. */}
+      {omtrekOpen && createPortal(
+        <div
+          onClick={() => setOmtrekOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2147483100,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 520, maxHeight: '92dvh', overflowY: 'auto',
+              background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '18px 18px 0 0',
+              padding: '0.9rem 1rem calc(env(safe-area-inset-bottom, 0px) + 1rem)',
+              boxShadow: '0 -20px 60px rgba(0,0,0,0.7)',
+              animation: 'omtrekOmhoog 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.9rem' }}>
+              <Ruler size={17} color="#fff" strokeWidth={2.4} />
+              <span style={{ flex: 1, fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+                Omtrekmetingen
+              </span>
+              <button onClick={() => setOmtrekOpen(false)} aria-label="Sluiten" style={{
+                width: 30, height: 30, padding: 0, background: 'transparent', border: 'none',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <X size={18} strokeWidth={3} />
+              </button>
+            </div>
+            <CircumferenceMeasurements
+              weightService={weightService} clientId={client?.id}
+              isMobile={isMobile} onSave={loadAllData} alsBlad
+            />
+            <style>{`
+              @keyframes omtrekOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
+            `}</style>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ═══ ZONE 3: FOTO-KNOP — TodaysWorkoutCard-stijl: foto-banner bovenaan,

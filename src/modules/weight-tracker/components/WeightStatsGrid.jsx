@@ -389,7 +389,13 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             geen vakken. Het doel-blok dat hier stond is eruit; het doel staat
             al als lijn in de grafiek. ═══ */}
       <div style={{
-        display: 'flex', alignItems: 'stretch', flexWrap: 'wrap',
+        display: 'flex', alignItems: 'stretch',
+        // Niet afbreken naar een tweede regel. Vijf cellen van 33% breed maakten
+        // op een telefoon twee rijen waarvan de onderste half gevuld was; dat
+        // leest als twee losse balken. Ze passen zich nu aan de breedte aan.
+        // In het coach-paneel (volleBreedte) blijft het afbreken: die kolom is
+        // smal en heeft een cel extra.
+        flexWrap: volleBreedte ? 'wrap' : 'nowrap',
         margin: volleBreedte ? 0 : (isMobile ? '0 1rem' : '0 1.5rem'),
       }}>
         {[
@@ -440,15 +446,21 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
             color: totalChange !== null ? weightGoalColor(totalChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)',
           },
-        ].map((s2, i, arr) => (
+        ].map((s2, i, arr) => {
+          // Op één regel met vier of vijf cellen is er per cel nog geen 80px
+          // over; dan moeten de cijfers mee krimpen, anders duwen ze elkaar
+          // eruit. Bij twee of drie cellen blijft alles op volle grootte.
+          const smal = !volleBreedte && arr.length >= 4
+          return (
           <div key={i} style={{
-            flex: 1, minWidth: isMobile ? '33%' : 96,
-            padding: isMobile ? '0.5rem 0.35rem' : '0.6rem 0.6rem',
+            flex: 1, minWidth: 0,
+            padding: isMobile ? (smal ? '0.5rem 0.2rem' : '0.5rem 0.35rem') : '0.6rem 0.6rem',
             borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
             display: 'flex', flexDirection: 'column', gap: 3,
+            overflow: 'hidden',
           }}>
             <div style={{
-              fontSize: isMobile ? '0.62rem' : '0.66rem',
+              fontSize: isMobile ? (smal ? '0.55rem' : '0.62rem') : '0.66rem',
               fontWeight: 900, color: '#fff',
               letterSpacing: '-0.01em',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -456,10 +468,10 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               {s2.label}
             </div>
             <div style={{
-              fontSize: isMobile ? '1.15rem' : '1.35rem',
+              fontSize: isMobile ? (smal ? '0.95rem' : '1.15rem') : (smal ? '1.2rem' : '1.35rem'),
               fontWeight: 900, color: s2.color, lineHeight: 1,
               letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {s2.val}
               <span style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800, opacity: 0.5, marginLeft: 2 }}>
@@ -467,14 +479,15 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               </span>
             </div>
             <div style={{
-              fontSize: isMobile ? '0.58rem' : '0.62rem', fontWeight: 700,
+              fontSize: isMobile ? (smal ? '0.53rem' : '0.58rem') : '0.62rem', fontWeight: 700,
               color: 'rgba(255,255,255,0.35)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {s2.sub}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* "Wekelijkse Historie" dropdown verwijderd — die functie zit nu in de

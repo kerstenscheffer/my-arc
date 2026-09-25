@@ -152,8 +152,13 @@ function WeekTabel({ weken, startDatum, isMobile }) {
   )
 }
 
+// `klantModus`: dezelfde grafiek op de trackingpagina van de klant, maar zonder
+// het oordeelblok eronder ('Te snel', 'twee weken te snel → 150 kcal eraf').
+// Dat is het gesprek tussen coach en klant, niet een melding die de app zelf
+// afgeeft. De klant ziet de lijn, de band en de cijfers.
 export default function GewichtBandGrafiek({
   client, history, fase = null, fases = [], onNieuweFase = null, onBijsturen = null, isMobile,
+  klantModus = false,
 }) {
   const [uitleg, setUitleg] = useState(false)
   const [weergave, setWeergave] = useState('grafiek')   // 'grafiek' | 'tabel'
@@ -457,7 +462,7 @@ export default function GewichtBandGrafiek({
           daaronder wat je ermee doet. De grijze regels eronder zijn de cijfers
           waar het op rust; die lees je alleen als je twijfelt. Alleen bij één
           fase: over een reeks fases heen is 'op koers' betekenisloos. */}
-      {laatste && !model.alles && !model.zonderBand && (
+      {laatste && !klantModus && !model.alles && !model.zonderBand && (
         <div style={{
           marginTop: 10, padding: isMobile ? '0.7rem 0.8rem' : '0.8rem 0.9rem',
           borderRadius: 12,

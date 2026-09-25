@@ -27,14 +27,18 @@ const GOLDEN_THEME = {
   gradient: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)'
 }
 
+// `alsBlad`: het blok zit in het blad dat van onderen omhoog komt. Dan heeft het
+// geen eigen uitklapkop meer nodig (je hebt er al op gedrukt om hier te komen)
+// en ook geen kaart-rand, want het blad ís de kaart.
 export default function CircumferenceMeasurements({
   weightService,
   clientId,
   isMobile = false,
-  onSave
+  onSave,
+  alsBlad = false
 }) {
   // Collapsible state
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(alsBlad)
   
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false)
@@ -236,7 +240,7 @@ export default function CircumferenceMeasurements({
   ]
   
   return (
-    <div style={{
+    <div style={alsBlad ? { background: 'transparent' } : {
       background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.6) 0%, rgba(10, 10, 10, 0.6) 100%)',
       borderRadius: isMobile ? '12px' : '16px',
       border: `1px solid ${GOLDEN_THEME.border}`,
@@ -273,6 +277,7 @@ export default function CircumferenceMeasurements({
       )}
       
       {/* Header - Collapsible Toggle */}
+      {!alsBlad && (
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         style={{
@@ -322,10 +327,11 @@ export default function CircumferenceMeasurements({
           <ChevronDown size={isMobile ? 18 : 20} color='rgba(255, 255, 255, 0.5)' />
         )}
       </button>
+      )}
       
       {/* Expanded Content */}
       {isExpanded && (
-        <div style={{
+        <div style={alsBlad ? { padding: 0 } : {
           padding: isMobile ? '0 1rem 1rem 1rem' : '0 1.25rem 1.25rem 1.25rem',
           borderTop: `1px solid ${GOLDEN_THEME.border}`
         }}>
