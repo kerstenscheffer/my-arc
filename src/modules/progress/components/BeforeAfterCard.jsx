@@ -60,7 +60,10 @@ const isFront = (p) => isHoek(p, 'front')
 // plaats van "voorkant, anders de eerste groep met twee foto's". `fotos` laat
 // de aanroeper een al opgehaalde lijst meegeven, zodat drie kaarten naast
 // elkaar niet drie keer dezelfde query doen.
-export default function BeforeAfterCard({ client, db, isMobile, bare = false, fallbackUrl = null, hoek = null, fotos = null, bijschrift = null }) {
+// `verbergDownload`: geen download-knop over de foto. In een preview van 120
+// pixels breed is die knop het halve plaatje, en downloaden doe je vanuit de
+// foto-sectie zelf.
+export default function BeforeAfterCard({ client, db, isMobile, bare = false, fallbackUrl = null, hoek = null, fotos = null, bijschrift = null, verbergDownload = false }) {
   const canvasRef = useRef(null)
   const [status, setStatus] = useState('loading') // loading | ready | empty | error
   const [pair, setPair] = useState(null)
@@ -187,7 +190,7 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
         </div>
       )}
 
-      {status === 'ready' && (
+      {status === 'ready' && !verbergDownload && (
         <button onClick={download} title="Download" style={{ position: 'absolute', top: 8, right: 8, width: 38, height: 38, borderRadius: 10, background: '#fff', color: '#000', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', touchAction: 'manipulation' }}>
           <Download size={16} />
         </button>

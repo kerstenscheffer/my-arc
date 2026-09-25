@@ -11,11 +11,13 @@ const SUBTYPE_OPTIONS = [
   { value: 'back',  label: 'Achterkant' },
 ]
 
-// Color per angle. Custom subtypes fall back to grey.
+// Kleur per hoek. Goud, oranje en blauw naast elkaar maakten van de galerij een
+// kleurenkaart; het label zegt al welke hoek het is. Nu drie tinten wit, zodat
+// je de groepen nog steeds uit elkaar houdt zonder dat het schreeuwt.
 const ANGLE_COLOR = {
-  front: '#FFD700',
-  side:  '#f97316',
-  back:  '#3b82f6',
+  front: '#fff',
+  side:  'rgba(255,255,255,0.62)',
+  back:  'rgba(255,255,255,0.38)',
 }
 const angleColor = (subtype) => ANGLE_COLOR[(subtype || '').toLowerCase()] || '#9ca3af'
 
@@ -60,7 +62,7 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
         padding: isMobile ? '2rem 1rem' : '2.5rem', textAlign: 'center',
         borderBottom: '1px solid rgba(255,255,255,0.04)'
       }}>
-        <Grid size={32} color="rgba(255, 215, 0, 0.15)" style={{ marginBottom: '0.5rem' }} />
+        <Grid size={32} color="rgba(255, 255, 255, 0.15)" style={{ marginBottom: '0.5rem' }} />
         <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginBottom: '0.2rem' }}>
           Nog geen foto's
         </div>
@@ -92,10 +94,10 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button onClick={toggleCompareMode}
             style={{
-              background: compareMode ? 'rgba(255,215,0,0.12)' : 'none',
-              border: compareMode ? '1px solid rgba(255,215,0,0.3)' : '1px solid transparent',
+              background: compareMode ? 'rgba(255, 255, 255,0.12)' : 'none',
+              border: compareMode ? '1px solid rgba(255, 255, 255,0.3)' : '1px solid transparent',
               borderRadius: '6px',
-              color: compareMode ? '#FFD700' : 'rgba(255,255,255,0.35)',
+              color: compareMode ? '#fff' : 'rgba(255,255,255,0.35)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem',
               padding: '0.25rem 0.5rem',
               fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '700',
@@ -108,7 +110,7 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
 
           <button onClick={() => setExpanded(!expanded)}
             style={{
-              background: 'none', border: 'none', color: 'rgba(255,215,0,0.4)',
+              background: 'none', border: 'none', color: 'rgba(255, 255, 255,0.4)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
               padding: '0.2rem', fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '600',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
@@ -125,13 +127,13 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
           {comparePhotos.length < 2 ? (
             <div style={{
               padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.5rem',
-              background: 'rgba(255,215,0,0.04)',
-              borderBottom: '1px solid rgba(255,215,0,0.08)',
+              background: 'rgba(255, 255, 255,0.04)',
+              borderBottom: '1px solid rgba(255, 255, 255,0.08)',
               fontSize: isMobile ? '0.6rem' : '0.65rem',
-              color: 'rgba(255,215,0,0.55)', fontWeight: '600',
+              color: 'rgba(255, 255, 255,0.55)', fontWeight: '600',
               display: 'flex', alignItems: 'center', gap: '0.4rem',
             }}>
-              <ArrowLeftRight size={11} color="#FFD700" style={{ opacity: 0.6 }} />
+              <ArrowLeftRight size={11} color="#fff" style={{ opacity: 0.6 }} />
               {comparePhotos.length === 0 ? 'Tik op 2 foto\'s om te vergelijken' : 'Tik op een tweede foto'}
               {comparePhotos.length === 1 && (
                 <button onClick={() => setComparePhotos([])}
@@ -160,7 +162,7 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                         background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)',
                         display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
                       }}>
-                        <span style={{ fontSize: '0.55rem', fontWeight: 700, color: '#FFD700' }}>
+                        <span style={{ fontSize: '0.55rem', fontWeight: 700, color: '#fff' }}>
                           {i === 0 ? 'VOOR' : 'NA'}
                         </span>
                         {dateLabel && (
@@ -208,15 +210,15 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                 display: 'flex', alignItems: 'center', gap: '0.35rem',
                 padding: isMobile ? '0.35rem 1rem' : '0.4rem 1.5rem'
               }}>
-                <Calendar size={10} color="rgba(255,215,0,0.3)" />
+                <Calendar size={10} color="rgba(255, 255, 255,0.3)" />
                 <span style={{
                   fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '500',
-                  color: 'rgba(255,215,0,0.4)'
+                  color: 'rgba(255, 255, 255,0.4)'
                 }}>
                   {d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
                 {d.getDay() === 5 && (
-                  <span style={{ fontSize: '0.45rem', fontWeight: '700', color: '#FFD700', textTransform: 'uppercase' }}>VR</span>
+                  <span style={{ fontSize: '0.45rem', fontWeight: '700', color: '#fff', textTransform: 'uppercase' }}>VR</span>
                 )}
               </div>
 
@@ -234,8 +236,8 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                       style={{
                         position: 'relative', paddingBottom: '100%',
                         overflow: 'hidden', cursor: 'pointer',
-                        background: 'rgba(255, 215, 0, 0.02)',
-                        outline: selected ? '2px solid #FFD700' : 'none',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        outline: selected ? '2px solid #fff' : 'none',
                         outlineOffset: '-2px',
                       }}>
                       <img src={photo.photo_url} alt="Progress"
@@ -260,8 +262,8 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                         <div style={{
                           position: 'absolute', top: '2px', left: '2px',
                           width: 18, height: 18, borderRadius: 4,
-                          background: selected ? '#FFD700' : 'rgba(0,0,0,0.5)',
-                          border: selected ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.3)',
+                          background: selected ? '#fff' : 'rgba(0,0,0,0.5)',
+                          border: selected ? '1px solid #fff' : '1px solid rgba(255,255,255,0.3)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>
                           {selected && <Check size={10} color="#000" strokeWidth={3} />}
@@ -303,7 +305,7 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
               padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <span style={{
-                fontSize: '0.65rem', fontWeight: '700', color: '#FFD700',
+                fontSize: '0.65rem', fontWeight: '700', color: '#fff',
                 textTransform: 'uppercase', letterSpacing: '0.04em'
               }}>
                 Progressie {selectedPhoto.metadata?.subtype ? `— ${selectedPhoto.metadata.subtype}` : ''}
@@ -312,10 +314,10 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                 {onUpdateSubtype && (
                   <button onClick={(e) => { e.stopPropagation(); setEditingSubtype(v => !v) }}
                     style={{
-                      padding: '0.35rem 0.5rem', background: editingSubtype ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.1)',
-                      borderRadius: '6px', border: editingSubtype ? '1px solid rgba(255,215,0,0.5)' : '1px solid rgba(255,255,255,0.15)',
+                      padding: '0.35rem 0.5rem', background: editingSubtype ? 'rgba(255, 255, 255,0.2)' : 'rgba(255,255,255,0.1)',
+                      borderRadius: '6px', border: editingSubtype ? '1px solid rgba(255, 255, 255,0.5)' : '1px solid rgba(255,255,255,0.15)',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
-                      color: editingSubtype ? '#FFD700' : '#fff', fontSize: '0.65rem', fontWeight: '600'
+                      color: editingSubtype ? '#fff' : '#fff', fontSize: '0.65rem', fontWeight: '600'
                     }}>
                     <Edit2 size={12} /> Hoek
                   </button>
@@ -372,10 +374,10 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                         }}
                         style={{
                           flex: 1, padding: '0.5rem',
-                          background: isCurrent ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.06)',
-                          border: isCurrent ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.12)',
+                          background: isCurrent ? 'rgba(255, 255, 255,0.15)' : 'rgba(255,255,255,0.06)',
+                          border: isCurrent ? '1px solid #fff' : '1px solid rgba(255,255,255,0.12)',
                           borderRadius: '8px', cursor: subtypeSaving ? 'wait' : 'pointer',
-                          color: isCurrent ? '#FFD700' : '#fff',
+                          color: isCurrent ? '#fff' : '#fff',
                           fontSize: '0.7rem', fontWeight: '700',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>

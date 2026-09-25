@@ -17,10 +17,10 @@ export default function PhotoStats({ weeklyStats = {}, todayData = {}, isMobile 
       background: 'rgba(10, 10, 10, 0.5)'
     }}>
       {[
-        { label: 'VANDAAG', val: todayTotal, icon: Calendar, gold: true },
-        { label: 'WEEK', val: current_week || total, icon: Image, gold: false },
-        { label: 'TOTAAL', val: progress || total, icon: TrendingUp, gold: false },
-        { label: 'ACTIEF', val: `${activeDays}/7`, icon: Award, gold: false }
+        { label: 'VANDAAG', val: todayTotal, icon: Calendar, accent: true },
+        { label: 'WEEK', val: current_week || total, icon: Image, accent: false },
+        { label: 'TOTAAL', val: progress || total, icon: TrendingUp, accent: false },
+        { label: 'ACTIEF', val: `${activeDays}/7`, icon: Award, accent: false }
       ].map((s, i) => (
         <div key={i} style={{
           flex: 1,
@@ -31,17 +31,17 @@ export default function PhotoStats({ weeklyStats = {}, todayData = {}, isMobile 
         }}>
           {React.createElement(s.icon, {
             size: isMobile ? 11 : 12,
-            color: s.gold ? '#FFD700' : 'rgba(255,255,255,0.25)',
+            color: s.accent ? '#fff' : 'rgba(255,255,255,0.25)',
             style: { marginBottom: '0.1rem' }
           })}
           <div style={{
             fontSize: isMobile ? '0.45rem' : '0.5rem', fontWeight: '700',
-            color: s.gold ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.25)',
+            color: s.accent ? 'rgba(255, 255, 255,0.5)' : 'rgba(255,255,255,0.25)',
             textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.1rem'
           }}>{s.label}</div>
           <div style={{
             fontSize: isMobile ? '0.9rem' : '1.05rem', fontWeight: '800',
-            color: s.gold ? '#FFD700' : '#fff', lineHeight: 1
+            color: s.accent ? '#fff' : '#fff', lineHeight: 1
           }}>{s.val}</div>
         </div>
       ))}

@@ -209,7 +209,7 @@ export default function ProgressMain({ db, client }) {
   if (loading) {
     return (
       <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Loader2 size={24} color="#FFD700" style={{ animation: 'spin 1s linear infinite' }} />
+        <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
       </div>
     )
   }
@@ -241,81 +241,71 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
-      {/* ═══ ZONE 0: TRANSFORMATIE — het eerste wat je ziet ═══
-            De before/after met de MA-overlay en de maand-labels, over de volle
-            breedte. Onderaan loopt hij weg in het zwart van de pagina; de knop
-            naar de foto's ligt daar overheen. Hij stond eerder halverwege de
-            pagina als plaatje van 120 pixels naast wat tekst — daar zag je je
-            eigen verandering niet op, en dat is precies waarom je hier komt. */}
+      {/* ═══ ZONE 0: PROGRESS FOTO'S — foto links, tekst en knop rechts ═══
+            De before/after over de volle breedte was mooi maar onleesbaar: van
+            een 4:5-kaart teruggesneden naar een band van 215 pixels hou je
+            plafond en muur over, niet de lichamen. Klein naast de tekst doet
+            hij wat hij moet doen — laten zien dat er foto's zijn en waar je
+            moet drukken. */}
       {!photosOpen && (
         <div
           onClick={() => setPhotosOpen(true)}
           style={{
-            position: 'relative',
+            marginTop: isMobile ? '0.75rem' : '1rem',
+            padding: isMobile ? '0 1rem' : '0 1.5rem',
             cursor: 'pointer',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
-            maxWidth: isMobile ? '100%' : 420,
-            margin: '0 auto',
           }}
         >
-          {/* De kaart zelf is 4:5 — over de volle breedte is dat een half
-              scherm hoog. We tonen er een band van uit, vastgezet aan de
-              bovenkant: daar staan de gezichten en de romp. De maand-labels
-              onderin de kaart vallen daarmee buiten beeld. */}
           <div style={{
-            position: 'relative',
-            height: isMobile ? 215 : 260,
-            overflow: 'hidden',
-            borderRadius: 14,
+            display: 'flex', alignItems: 'center',
+            gap: isMobile ? '0.75rem' : '1rem',
           }}>
-            <div style={{ position: 'absolute', left: 0, right: 0, top: 0 }}>
+            <div style={{ width: isMobile ? 120 : 150, flexShrink: 0 }}>
               <BeforeAfterCard
-                bare client={client} db={db} isMobile={isMobile}
+                bare verbergDownload client={client} db={db} isMobile={isMobile}
                 fallbackUrl={heroFoto}
               />
             </div>
-          </div>
-          {/* Zwarte fade: laat de maand-labels net vrij en loopt daaronder dicht
-              naar het zwart van de pagina, zodat de knop leesbaar is zonder een
-              vak eromheen. */}
-          <div style={{
-            position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%',
-            background: 'linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.9) 32%, rgba(10,10,10,0.45) 65%, transparent 100%)',
-            pointerEvents: 'none', borderRadius: '0 0 14px 14px',
-          }} />
-          <div style={{
-            position: 'absolute', left: 0, right: 0, bottom: 0,
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: isMobile ? '0 0.9rem 0.85rem' : '0 1.1rem 1rem',
-          }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              flex: 1, minWidth: 0,
+              display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            }}>
               <div style={{
-                fontSize: isMobile ? '1.05rem' : '1.15rem',
+                fontSize: isMobile ? '0.55rem' : '0.6rem',
+                fontWeight: 900, color: 'rgba(255,255,255,0.45)',
+                textTransform: 'uppercase', letterSpacing: '0.1em',
+                lineHeight: 1, marginBottom: 5,
+              }}>
+                Progressie
+              </div>
+              <h2 style={{
+                fontSize: isMobile ? '1.05rem' : '1.2rem',
                 fontWeight: 900, color: '#fff',
-                letterSpacing: '-0.02em', lineHeight: 1.1,
-                textShadow: '0 2px 12px rgba(0,0,0,0.9)',
+                margin: 0, marginBottom: 5,
+                letterSpacing: '-0.02em', lineHeight: 1.15,
               }}>
                 Progress foto's
-              </div>
+              </h2>
               <div style={{
-                fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 700,
-                color: 'rgba(255,255,255,0.6)', marginTop: 3,
-                textShadow: '0 1px 8px rgba(0,0,0,0.9)',
+                fontSize: isMobile ? '0.7rem' : '0.76rem',
+                color: 'rgba(255,255,255,0.55)', fontWeight: 700,
               }}>
                 {photoCount > 0
                   ? `${photoCount} ${photoCount === 1 ? 'foto' : "foto's"} · open om te bekijken`
-                  : 'Open om je eerste foto toe te voegen'}
+                  : 'Open om foto toe te voegen'}
               </div>
             </div>
+
             <div style={{
               flexShrink: 0,
-              width: isMobile ? 42 : 46, height: isMobile ? 42 : 46,
+              width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
               borderRadius: '50%', background: '#fff', color: '#0a0a0a',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
             }}>
-              <ChevronDown size={isMobile ? 22 : 24} strokeWidth={3} />
+              <ChevronDown size={isMobile ? 22 : 26} strokeWidth={3} />
             </div>
           </div>
         </div>
@@ -339,7 +329,7 @@ export default function ProgressMain({ db, client }) {
       {/* De regel over weekgemiddeldes staat vlak boven het weegmoment: dat is
           waar je hem nodig hebt, net voordat je je gewicht van vandaag intikt. */}
       {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '0.5rem' : '0.7rem' }}>
+        <div style={{ marginTop: isMobile ? '2.25rem' : '2.75rem' }}>
           <TrackingTipBlock isMobile={isMobile} />
         </div>
       )}
@@ -521,7 +511,7 @@ export default function ProgressMain({ db, client }) {
             {photoCount > 0 && (
               <div style={{
                 fontSize: isMobile ? '0.7rem' : '0.78rem',
-                color: 'rgba(255,215,0,0.7)', fontWeight: 800,
+                color: 'rgba(255,255,255,0.55)', fontWeight: 800,
                 fontVariantNumeric: 'tabular-nums',
               }}>
                 {photoCount}
@@ -537,10 +527,10 @@ export default function ProgressMain({ db, client }) {
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
                 padding: isMobile ? '0.8rem' : '0.9rem',
-                background: 'rgba(255,215,0,0.08)',
-                border: '1px solid rgba(255,215,0,0.4)',
+                background: '#fff',
+                border: 'none',
                 borderRadius: 12,
-                color: '#FFD700',
+                color: '#0a0a0a',
                 fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, letterSpacing: '-0.01em',
                 cursor: 'pointer', minHeight: '48px',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -574,7 +564,7 @@ export default function ProgressMain({ db, client }) {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#0f0f0f', border: '1px solid rgba(255,215,0,0.1)',
+              background: '#0f0f0f', border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: '12px', padding: '1.75rem',
               width: '100%', maxWidth: '340px',
             }}
@@ -603,7 +593,7 @@ export default function ProgressMain({ db, client }) {
                 appearance: 'none',
                 WebkitAppearance: 'none',
                 MozAppearance: 'none',
-                backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23FFD700\' stroke-width=\'3\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'/></svg>")',
+                backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'3\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'/></svg>")',
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: 'right 1rem center',
                 paddingRight: '2.5rem',
@@ -636,7 +626,7 @@ export default function ProgressMain({ db, client }) {
                   fontFamily: 'inherit',
                   WebkitAppearance: 'none',
                 }}
-                onFocus={(e) => e.target.style.borderColor = '#FFD700'}
+                onFocus={(e) => e.target.style.borderColor = '#fff'}
                 onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
               />
             )}
@@ -647,7 +637,7 @@ export default function ProgressMain({ db, client }) {
                 onClick={handleAngleConfirm}
                 style={{
                   width: '100%', padding: '0.9rem', minHeight: '48px',
-                  background: '#FFD700', border: 'none', borderRadius: '10px',
+                  background: '#fff', border: 'none', borderRadius: '10px',
                   color: '#000', fontSize: '0.95rem', fontWeight: '800',
                   cursor: 'pointer', letterSpacing: '0.02em',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',

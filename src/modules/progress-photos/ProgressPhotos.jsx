@@ -45,7 +45,7 @@ export default function ProgressPhotos({ db, client }) {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-        <Loader2 size={24} color="#FFD700" style={{ animation: 'spin 1s linear infinite' }} />
+        <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
