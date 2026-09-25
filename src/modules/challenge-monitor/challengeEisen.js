@@ -98,14 +98,19 @@ export const allesGehaald = (stand) => {
 // zes weken is 3 en 4 per week, een geldige voedingsweek is 5 goede dagen, en
 // de check-in is er sowieso één per week. Foto's en calls hebben geen
 // weekritme — die staan apart onder WEEK_LOOPT_DOOR.
+// Let op: de weekeisen staan bewust lager dan de totalen. Twee workouts per
+// week maal zes weken is twaalf, terwijl het totaal er veertien vraagt — wie
+// alleen de weekeisen haalt, haalt de challenge dus niet. Dat is met opzet: de
+// week is de ondergrens die je elke week moet halen, het totaal is waar je aan
+// het eind op wordt afgerekend.
 export const WEEK_EISEN = [
   {
-    key: 'workouts', label: 'Workouts', nodig: 3,
-    info: 'Drie workouts per week uit je schema. Een workout telt zodra 70% van de sets is afgevinkt.',
+    key: 'workouts', label: 'Workouts', nodig: 2,
+    info: 'Twee workouts per week uit je schema. Een workout telt zodra 70% van de sets is afgevinkt.',
   },
   {
-    key: 'wegingen', label: 'Wegingen', nodig: 4,
-    info: 'Vier keer je gewicht invullen deze week. Twee keer op dezelfde dag telt één keer.',
+    key: 'wegingen', label: 'Wegingen', nodig: 3,
+    info: 'Drie keer je gewicht invullen deze week. Twee keer op dezelfde dag telt één keer.',
   },
   {
     key: 'voeding', label: 'Voedingsdagen', nodig: 5,

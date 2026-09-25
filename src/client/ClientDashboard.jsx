@@ -575,10 +575,15 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       {/* De zwevende widgetbalk van de klant hoort niet in een meekijk-paneel.
           Hij dekt in die smalle kolom de inhoud af, en zijn knoppen openen
           de meldingen en vragen van de klant — niet waarvoor je meekijkt. */}
+      {/* De bel verschijnt alleen als er een melding van de coach openstaat.
+          Een belletje dat er altijd hangt en nooit iets te zeggen heeft, leer
+          je wegkijken — en dan mis je de keer dat er wél iets staat. Staat het
+          venster open terwijl je de laatste wegtikt, dan blijft de bel staan
+          tot je hem sluit; anders verdwijnt de knop onder je vinger. */}
       {!ingebed && <WidgetSidebar
         isMobile={isMobile}
         plek="rechtsboven"
-        buttons={[
+        buttons={(widgetCounts.notifications > 0 || widgetOpen === 'notifications') ? [
           {
             id: 'notifications', label: 'Meldingen', Icon: Bell, color: '#FFD700',
             active: widgetOpen === 'notifications', badge: widgetCounts.notifications,
@@ -587,7 +592,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           // Vragen zit in het Meer-menu op de onderbalk en de bibliotheek in
           // de video-balk daarboven; twee ingangen naar hetzelfde venster
           // maakte deze balk onnodig lang.
-        ]}
+        ] : []}
       />}
 
       {/* Om dezelfde reden ook het formulier zelf niet. */}

@@ -83,6 +83,83 @@ const videoService = {
     }
   },
 
+  // ── Belangrijke video's ──────────────────────────────────────────────
+  //
+  // Een video die de coach als "belangrijk" heeft gemarkeerd hoort ín de
+  // pagina te staan, niet alleen in de zwevende teaser: die komt langs en gaat
+  // weer weg, en dan heb je 'm gemist. Zodra de klant 'm gezien heeft
+  // verdwijnt hij weer uit de pagina — hij blijft wel in de bibliotheek staan.
+  //
+  // Twee routes leiden naar dezelfde lijst: de video staat standaard op die
+  // pagina (default_pages, voor iedereen) of hij is aan deze klant toegewezen
+  // (video_assignments.page_context). Wat er gezien is, staat in video_gezien;
+  // dat is de enige plek die voor allebei werkt, want default-video's hebben
+  // geen assignment-rij om een status in te zetten.
+  //
+  // 'progress' is de oude naam van de trackingpagina. Die staat nog in oude
+  // rijen, dus hij telt mee.
+  getBelangrijkeVideosVoorPagina: async (clientId, pagina) => {
+    if (!clientId || !pagina) return []
+    const alias = pagina === 'tracking' ? ['tracking', 'progress'] : [pagina]
+    try {
+      const [alleBelangrijk, toewijzingen, gezien] = await Promise.all([
+        supabase.from('coach_videos').select('*').eq('is_belangrijk', true).eq('is_active', true)
+          .then(r => r, () => ({ data: [] })),
+        supabase.from('video_assignments').select('id, video_id, page_context').eq('client_id', clientId)
+          .then(r => r, () => ({ data: [] })),
+        supabase.from('video_gezien').select('video_id').eq('client_id', clientId)
+          .then(r => r, () => ({ data: [] })),
+      ])
+
+      const videos = alleBelangrijk.data || []
+      if (!videos.length) return []
+
+      const alGezien = new Set((gezien.data || []).map(r => r.video_id))
+      // Toewijzing per video, zodat we de status daar ook kunnen bijwerken.
+      const opPagina = new Map()
+      for (const t of (toewijzingen.data || [])) {
+        if (alias.includes(t.page_context)) opPagina.set(t.video_id, t.id)
+      }
+
+      return videos
+        .filter(v => !alGezien.has(v.id))
+        .filter(v => opPagina.has(v.id) || (v.default_pages || []).some(p => alias.includes(p)))
+        .map(v => ({
+          id: v.id,
+          video: v,
+          assignment_id: opPagina.get(v.id) || null,
+        }))
+    } catch (e) {
+      console.error('Belangrijke video\'s laden mislukt:', e)
+      return []
+    }
+  },
+
+  // `via`: 'knop' als de klant zelf afvinkt, 'speler' als hij de video heeft
+  // afgespeeld. Het onderscheid zegt iets over hoe hard het bewijs is.
+  markeerVideoGezien: async (clientId, videoId, via = 'knop', assignmentId = null) => {
+    if (!clientId || !videoId) return { success: false }
+    try {
+      const { error } = await supabase
+        .from('video_gezien')
+        .upsert({ client_id: clientId, video_id: videoId, via, gezien_op: new Date().toISOString() },
+                { onConflict: 'client_id,video_id' })
+      if (error) { console.error('markeerVideoGezien mislukt:', error); return { success: false, error: error.message } }
+
+      // Is er een toewijzing, dan houden we die in de pas: het coach-overzicht
+      // leest de status daar, niet in video_gezien.
+      if (assignmentId) {
+        await supabase.from('video_assignments')
+          .update({ status: 'completed', viewed_at: new Date().toISOString(), completed_at: new Date().toISOString() })
+          .eq('id', assignmentId)
+      }
+      return { success: true }
+    } catch (e) {
+      console.error('markeerVideoGezien error:', e)
+      return { success: false, error: e.message }
+    }
+  },
+
   updateVideo: async (videoId, updates) => {
     try {
       const { data, error } = await supabase.from('coach_videos').update(updates).eq('id', videoId).select().single()

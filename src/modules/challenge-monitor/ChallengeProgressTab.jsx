@@ -72,7 +72,7 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
       <div style={{
         position: 'fixed',
         top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 10 : 14}px)`,
-        left: 12, zIndex: 80,
+        left: '50%', transform: 'translateX(-50%)', zIndex: 80,
         display: 'flex', alignItems: 'center', gap: 7,
         height: 40, padding: '0 12px', borderRadius: 999,
         background: 'rgba(10,10,10,0.94)',
@@ -107,7 +107,11 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
       style={{
         position: 'fixed',
         top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 10 : 14}px)`,
-        left: 12,
+        // Midden boven het scherm. Hij stond linksboven, waar hij over de kop
+        // van de pagina eronder viel; in het midden hoort hij bij niets anders
+        // en groeit hij bij het openen naar beide kanten uit.
+        left: '50%',
+        transform: 'translateX(-50%)',
         width: breedte,
         maxWidth: 'calc(100vw - 24px)',
         zIndex: 80,
