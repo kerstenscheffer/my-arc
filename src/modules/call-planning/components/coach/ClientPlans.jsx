@@ -13,7 +13,8 @@ export default function ClientPlans({ plans, onRefresh }) {
   const [completingCall, setCompletingCall] = useState(null)
   const [completeNotes, setCompleteNotes] = useState('')
   const [loading, setLoading] = useState(false)
-  
+  const [unschedulingCall, setUnschedulingCall] = useState(null)
+
   const isMobile = window.innerWidth <= 768
   
   const filteredPlans = plans.filter(plan => 
@@ -24,6 +25,20 @@ export default function ClientPlans({ plans, onRefresh }) {
     if (!plan.client_calls || plan.client_calls.length === 0) return 0
     const completed = plan.client_calls.filter(c => c.status === 'completed').length
     return Math.round((completed / plan.client_calls.length) * 100)
+  }
+
+  const handleUnscheduleCall = async (callId) => {
+    if (!window.confirm('Inplanning verwijderen? De call komt terug op "beschikbaar" en kan opnieuw worden ingepland.')) return
+    setUnschedulingCall(callId)
+    try {
+      await CallPlanningService.unscheduleCall(callId)
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      console.error('Error unscheduling call:', error)
+      alert('Er ging iets mis bij het verwijderen van de inplanning')
+    } finally {
+      setUnschedulingCall(null)
+    }
   }
 
   const handleCompleteCall = async (callId, planId) => {
@@ -417,40 +432,69 @@ export default function ClientPlans({ plans, onRefresh }) {
                             </span>
                           </div>
                           
-                          {/* Show complete button for scheduled calls */}
+                          {/* Show complete + unschedule buttons for scheduled calls */}
                           {call.status === 'scheduled' && !isCompleting && (
-                            <button
-                              onClick={() => setCompletingCall(call.id)}
-                              style={{
-                                padding: isMobile ? '0.5rem' : '0.625rem',
-                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                border: 'none',
-                                borderRadius: '8px',
-                                color: '#fff',
-                                fontSize: isMobile ? '0.75rem' : '0.8rem',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.5rem',
-                                transition: 'all 0.3s ease',
-                                touchAction: 'manipulation',
-                                WebkitTapHighlightColor: 'transparent',
-                                minHeight: '44px'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)'
-                                e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)'
-                                e.currentTarget.style.boxShadow = 'none'
-                              }}
-                            >
-                              <Check size={isMobile ? 14 : 16} />
-                              Markeer als Afgerond
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <button
+                                onClick={() => setCompletingCall(call.id)}
+                                style={{
+                                  flex: 1,
+                                  padding: isMobile ? '0.5rem' : '0.625rem',
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  color: '#fff',
+                                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.5rem',
+                                  transition: 'all 0.3s ease',
+                                  touchAction: 'manipulation',
+                                  WebkitTapHighlightColor: 'transparent',
+                                  minHeight: '44px'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-2px)'
+                                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(0)'
+                                  e.currentTarget.style.boxShadow = 'none'
+                                }}
+                              >
+                                <Check size={isMobile ? 14 : 16} />
+                                Markeer als Afgerond
+                              </button>
+                              <button
+                                onClick={() => handleUnscheduleCall(call.id)}
+                                disabled={unschedulingCall === call.id}
+                                style={{
+                                  padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
+                                  background: 'rgba(239, 68, 68, 0.1)',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  borderRadius: '8px',
+                                  color: unschedulingCall === call.id ? 'rgba(255,255,255,0.4)' : '#ef4444',
+                                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                                  fontWeight: '600',
+                                  cursor: unschedulingCall === call.id ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.4rem',
+                                  transition: 'all 0.2s ease',
+                                  touchAction: 'manipulation',
+                                  WebkitTapHighlightColor: 'transparent',
+                                  minHeight: '44px',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                <X size={isMobile ? 13 : 15} />
+                                {unschedulingCall === call.id ? 'Bezig...' : 'Verwijder inplanning'}
+                              </button>
+                            </div>
                           )}
                           
                           {/* Complete form */}

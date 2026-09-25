@@ -576,6 +576,32 @@ class CallPlanningService {
     }
   }
 
+  async unscheduleCall(callId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('client_calls')
+        .update({
+          status: 'available',
+          scheduled_date: null,
+          calendly_event_id: null,
+          calendly_event_uri: null,
+          calendly_invitee_uri: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', callId)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      console.log('📅 Call unscheduled — status reset to available')
+      return data
+    } catch (error) {
+      console.error('Error unscheduling call:', error)
+      throw error
+    }
+  }
+
   async cancelCall(callId, reason = null) {
     try {
       const { data, error } = await this.supabase
