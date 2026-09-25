@@ -121,6 +121,14 @@ export default function AIDaySchedule({
   // "Vandaag" is alleen vandaag als je ook in deze week kijkt.
   const isVandaag = (dayIndex = currentDay) => weekOffset === 0 && dayIndex === getTodayIndex()
 
+  // De kalenderdatum van de dag die je bekijkt. Dagtemplates die maar één week
+  // gelden hangen aan een datum, niet aan een weekdag.
+  const datumVanDag = (dayIndex) => {
+    const d = new Date()
+    d.setDate(d.getDate() + (dayIndex - getTodayIndex()) + weekOffset * 7)
+    return lokaleDatum(d)
+  }
+
   const dagVenster = (dayIndex) => {
     const start = new Date()
     start.setDate(start.getDate() + (dayIndex - getTodayIndex()) + weekOffset * 7)
@@ -130,6 +138,19 @@ export default function AIDaySchedule({
     return { vanaf: start.toISOString(), tot: eind.toISOString() }
   }
   const [showApplyTemplate, setShowApplyTemplate] = useState(false)
+
+  // Dagen die tijdelijk anders zijn (klant koos een dagtemplate voor deze
+  // week). Map datum → rij; wint van het weekplan voor die ene dag.
+  const [overrides, setOverrides] = useState({})
+  const laadOverrides = useCallback(async () => {
+    if (!db?.supabase || !client?.id) return
+    const maandag = new Date()
+    maandag.setDate(maandag.getDate() - getTodayIndex() + weekOffset * 7)
+    const zondag = new Date(maandag)
+    zondag.setDate(zondag.getDate() + 6)
+    setOverrides(await getOverrides(db.supabase, client.id, lokaleDatum(maandag), lokaleDatum(zondag)))
+  }, [db, client?.id, weekOffset])
+  useEffect(() => { laadOverrides() }, [laadOverrides])
 
   // ✅ FOOD LOG: New state
   const [consumedMeals, setConsumedMeals] = useState([])
@@ -232,7 +253,7 @@ export default function AIDaySchedule({
     // OVERHAUL: free-mode skips plan loading entirely
     if (isFreeMode) {
       setDisplayMeals([])
-    } else if (isVandaag() && todayMeals) {
+    } else if (isVandaag() && todayMeals && !overrides[datumVanDag(currentDay)]) {
       setDisplayMeals(todayMeals)
     } else {
       loadDayMeals(currentDay)
@@ -240,7 +261,7 @@ export default function AIDaySchedule({
 
     // ✅ FOOD LOG: Load consumed meals for this day (works in both modes)
     if (client?.id) loadConsumedMeals(currentDay)
-  }, [currentDay, weekOffset, todayMeals, activePlan, client?.id, isFreeMode])
+  }, [currentDay, weekOffset, todayMeals, activePlan, client?.id, isFreeMode, overrides])
 
   // ✅ FOOD LOG: Load consumed_meals from DB for selected day
   const loadConsumedMeals = async (dayIndex) => {
@@ -320,12 +341,14 @@ export default function AIDaySchedule({
   }, [db, client?.id])
 
   const loadDayMeals = async (dayIndex) => {
-    if (!activePlan?.week_structure) { setDisplayMeals([]); return }
+    const tijdelijk = overrides[datumVanDag(dayIndex)]?.dag || null
+    if (!tijdelijk && !activePlan?.week_structure) { setDisplayMeals([]); return }
     setLoading(true)
     try {
       const dayKey = daysOfWeek[dayIndex]?.key
       if (!dayKey) { setDisplayMeals([]); setLoading(false); return }
-      const dayPlan = activePlan.week_structure[dayKey]
+      // Een dagtemplate voor deze week wint van het weekplan.
+      const dayPlan = tijdelijk || activePlan?.week_structure?.[dayKey]
       if (!dayPlan) { setDisplayMeals([]); setLoading(false); return }
       
       const meals = []

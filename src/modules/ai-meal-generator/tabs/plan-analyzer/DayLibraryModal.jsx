@@ -15,13 +15,14 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { SJABLOON_DAG } from '../../../../lib/mealTemplateTypes'
-import { X, CalendarDays, Trash2, Loader, Check, Bookmark } from 'lucide-react'
+import { X, CalendarDays, Trash2, Loader, Check, Bookmark, UserCheck } from 'lucide-react'
+import { getGekoppeldeIds, koppelTemplate, ontkoppelTemplate } from '../../../meal-plan/DayTemplateService'
 
 const DAGEN_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const GOUD = '#FFD700'
 
 export default function DayLibraryModal({
-  db, coachId, weekData, activeDay = 0, dayName = '', clientName = '',
+  db, coachId, clientId = null, weekData, activeDay = 0, dayName = '', clientName = '',
   trainingDays = [], onApply, onClose, isMobile, embedded = false,
 }) {
   const modalHost = useModalHost()
@@ -43,6 +44,32 @@ export default function DayLibraryModal({
   const [verwijderId, setVerwijderId] = useState(null)
 
   // Welke opgeslagen dag staat open om toe te passen, en op welke weekdagen.
+  // Welke dagen deze klant zelf mag kiezen in zijn app. Coach-breed bewaard,
+  // per klant vrijgegeven — zo kun je werk-dagen bewaren zonder dat iedereen
+  // ze meteen ziet.
+  const [voorKlant, setVoorKlant] = useState(new Set())
+  const [koppelBezig, setKoppelBezig] = useState(null)
+
+  const wisselVoorKlant = async (templateId, e) => {
+    e.stopPropagation()
+    if (!clientId || koppelBezig) return
+    const aan = voorKlant.has(templateId)
+    setKoppelBezig(templateId)
+    const res = aan
+      ? await ontkoppelTemplate(db.supabase, { clientId, templateId })
+      : await koppelTemplate(db.supabase, { clientId, templateId, coachId })
+    if (!res?.error) {
+      setVoorKlant(prev => {
+        const kopie = new Set(prev)
+        if (aan) kopie.delete(templateId); else kopie.add(templateId)
+        return kopie
+      })
+    } else {
+      console.warn('Koppelen mislukt:', res.error)
+    }
+    setKoppelBezig(null)
+  }
+
   const [gekozenDag, setGekozenDag] = useState(null)
   const [doelDagen, setDoelDagen] = useState([activeDay])
   const [toegepast, setToegepast] = useState(false)
@@ -66,6 +93,12 @@ export default function DayLibraryModal({
     setLaden(false)
   }
   useEffect(() => { laadLijst() }, [coachId])
+  useEffect(() => {
+    if (!clientId) { setVoorKlant(new Set()); return }
+    let levend = true
+    getGekoppeldeIds(db.supabase, clientId).then(ids => { if (levend) setVoorKlant(ids) })
+    return () => { levend = false }
+  }, [db, clientId])
 
   const bewaarDag = async () => {
     if (!naam.trim()) { setFout('Geef de dag een naam'); return }
@@ -224,6 +257,26 @@ export default function DayLibraryModal({
                     {d.created_at ? <span>· {datum(d.created_at)}</span> : null}
                   </div>
                 </div>
+                {clientId && (
+                  <button
+                    onClick={(e) => wisselVoorKlant(d.id, e)}
+                    title={voorKlant.has(d.id)
+                      ? `${clientName || 'De klant'} kan deze dag zelf kiezen — klik om dat weer uit te zetten`
+                      : `Vrijgeven: ${clientName || 'de klant'} kan deze dag dan zelf kiezen in de app`}
+                    style={{
+                      width: 32, height: 32, flexShrink: 0, borderRadius: 7,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: voorKlant.has(d.id) ? 'rgba(16,185,129,0.16)' : 'transparent',
+                      border: `1px solid ${voorKlant.has(d.id) ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                      color: voorKlant.has(d.id) ? '#10b981' : 'rgba(255,255,255,0.4)',
+                      cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    {koppelBezig === d.id
+                      ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                      : <UserCheck size={14} />}
+                  </button>
+                )}
                 <button onClick={() => open ? setGekozenDag(null) : openToepassen(d)} title="Op dagen toepassen"
                   style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.6rem', flexShrink: 0, background: open ? 'rgba(255,215,0,0.2)' : 'rgba(255,215,0,0.1)', border: `1px solid rgba(255,215,0,${open ? 0.6 : 0.35})`, borderRadius: 6, color: GOUD, fontSize: m ? '0.68rem' : '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
                   <CalendarDays size={13} /> Toepassen

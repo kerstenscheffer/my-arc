@@ -1565,6 +1565,7 @@ export default function PlanAnalyzer({
           )}
           {dockedSection === 'dagen' && weekData && (
             <DayLibraryModal embedded db={db} coachId={coachId}
+              clientId={resolvedClientId || null}
               weekData={weekData} activeDay={activeDay}
               dayName={DAYS[activeDay]?.full || DAYS[activeDay]?.label || ''}
               clientName={clientRecord?.first_name || ''}
