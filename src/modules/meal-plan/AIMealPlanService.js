@@ -42,8 +42,13 @@ async loadAIDashboardData(clientId) {
     // Hoe laat traint hij vandaag? De pre-workout maaltijd hangt daaraan, niet
     // aan de kloktijd die in het maaltijd-slot staat.
     const trainingStart = await this.getTrainingStartVandaag(clientId)
+    // Koos de klant voor vandaag een dagtemplate "alleen deze week", dan wint
+    // die van het weekplan. Hier afhandelen en niet alleen in de dagweergave:
+    // "je volgende maaltijd" en de dagtotalen komen uit dezelfde bron, en die
+    // hoorden anders nog het oude eten te tonen.
+    const planVandaag = await this.planMetDagVanVandaag(clientId, activePlan, today)
     const todayMeals = await this.getTodayFromWeekStructure(
-      activePlan, todayProgress, klant?.workout_schedule, trainingStart)
+      planVandaag, todayProgress, klant?.workout_schedule, trainingStart)
     const nextMeal = this.calculateNextMeal(todayMeals, todayProgress?.consumed_meals)
 const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayProgress, activePlan)
     
@@ -94,6 +99,28 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
   }
   // `workoutSchedule` = clients.workout_schedule. Nodig om te bepalen of
   // vandaag een trainingsdag is, en dus of de pre-workout maaltijd meetelt.
+  // Het weekplan met, als die er is, de tijdelijke dag van vandaag erin. Het
+  // plan zelf blijft ongemoeid — dit is alleen wat je vandaag ziet.
+  async planMetDagVanVandaag(clientId, plan, datum = new Date()) {
+    try {
+      if (!plan?.week_structure || !clientId) return plan
+      const p = (n) => String(n).padStart(2, '0')
+      const dag = `${datum.getFullYear()}-${p(datum.getMonth() + 1)}-${p(datum.getDate())}`
+      const { data } = await this.supabase
+        .from('client_day_overrides')
+        .select('dag')
+        .eq('client_id', clientId)
+        .eq('datum', dag)
+        .maybeSingle()
+      if (!data?.dag) return plan
+      const dagKey = this.getDayName(datum).toLowerCase()
+      return { ...plan, week_structure: { ...plan.week_structure, [dagKey]: data.dag } }
+    } catch (e) {
+      console.warn('Tijdelijke dag ophalen mislukt:', e?.message)
+      return plan
+    }
+  }
+
   async getTodayFromWeekStructure(plan, todayProgress, workoutSchedule = null, trainingStartMin = null) {
     if (!plan?.week_structure) return []
     

@@ -85,6 +85,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
   const [selectedDay, setSelectedDay] = useState('today')
+  // Gaat omhoog zodra er een dagtemplate is toegepast. De dagweergave luistert
+  // daarnaar en haalt zijn dag opnieuw op, zodat je meteen het nieuwe eten
+  // ziet in plaats van het oude tot je de pagina ververst.
+  const [dagRefreshKey, setDagRefreshKey] = useState(0)
   const [showWeekPlanner, setShowWeekPlanner] = useState(false)
   const [showWizard, setShowWizard] = useState(false)
   // Counter dat AIDaySchedule's FoodLogModal triggert wanneer de FAB
@@ -693,6 +697,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         foodLogTrigger={foodLogTrigger}
         foodLogTab={foodLogTab}
         weekOffset={weekOffset}
+        dagRefreshKey={dagRefreshKey}
         onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
       />
 
@@ -710,7 +715,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         isMobile={isMobile}
         dagIndex={dayKeyToIndex(selectedDay)}
         weekOffset={weekOffset}
-        onToegepast={loadDashboardData}
+        onToegepast={() => { setDagRefreshKey(k => k + 1); loadDashboardData() }}
       />
 
       </div>

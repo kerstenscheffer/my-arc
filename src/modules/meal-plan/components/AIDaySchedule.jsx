@@ -51,6 +51,9 @@ export default function AIDaySchedule({
   // dit bestand ging uit van "deze week"; met de pijlen kun je nu ook naar
   // de vorige of volgende week, en dan moet de dag-index mee opschuiven.
   weekOffset = 0,
+  // Telt op zodra er een dagtemplate is toegepast: dan opnieuw ophalen welke
+  // dagen tijdelijk anders zijn, en de getoonde dag opnieuw opbouwen.
+  dagRefreshKey = 0,
   // Callback waarmee AIMealDashboard op de hoogte gesteld wordt als een
   // verleden-dag-log gewijzigd is (zodat MacroHero-cache ongeldig gemaakt wordt).
   onPastDayUpdate,
@@ -147,7 +150,7 @@ export default function AIDaySchedule({
     const zondag = new Date(maandag)
     zondag.setDate(zondag.getDate() + 6)
     setOverrides(await getOverrides(db.supabase, client.id, lokaleDatum(maandag), lokaleDatum(zondag)))
-  }, [db, client?.id, weekOffset])
+  }, [db, client?.id, weekOffset, dagRefreshKey])
   useEffect(() => { laadOverrides() }, [laadOverrides])
 
   // ✅ FOOD LOG: New state
@@ -259,7 +262,7 @@ export default function AIDaySchedule({
 
     // ✅ FOOD LOG: Load consumed meals for this day (works in both modes)
     if (client?.id) loadConsumedMeals(currentDay)
-  }, [currentDay, weekOffset, todayMeals, activePlan, client?.id, isFreeMode, overrides])
+  }, [currentDay, weekOffset, todayMeals, activePlan, client?.id, isFreeMode, overrides, dagRefreshKey])
 
   // ✅ FOOD LOG: Load consumed_meals from DB for selected day
   const loadConsumedMeals = async (dayIndex) => {
