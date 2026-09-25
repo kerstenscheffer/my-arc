@@ -604,17 +604,35 @@ export default function AIDaySchedule({
       const planCheckRecord = mealId
         ? consumedMeals.find(m => m.source === 'plan_check' && m.meal_id === mealId)
         : consumedMeals.find(m => m.source === 'plan_check' && m.meal_type === meal.slot?.replace(/\d+$/, ''))
-      if (planCheckRecord && db?.supabase) {
-        setConsumedMeals(prev => prev.filter(m => m.id !== planCheckRecord.id))
-        db.supabase.from('consumed_meals').delete().eq('id', planCheckRecord.id)
-          .then(({ error }) => {
-            if (!error) return
-            console.error('Failed to remove plan_check on uncheck:', error)
-            // Mislukt het, dan zetten we het vinkje terug: anders lijkt het weg
-            // terwijl het na een herlaadbeurt weer staat.
+
+      if (db?.supabase) {
+        if (planCheckRecord) setConsumedMeals(prev => prev.filter(m => m.id !== planCheckRecord.id))
+
+        // Op id als we 'm kennen, anders op de maaltijd binnen deze dag. Dat
+        // tweede pad is er voor de klik die net te snel komt: dan is de rij al
+        // ingevoegd maar staat hij nog niet in de lokale lijst, en zonder deze
+        // opruiming bleef hij in de database staan — met een vinkje dat na een
+        // herlaadbeurt vanzelf terugkwam.
+        const { vanaf, tot } = dagVenster(currentDay)
+        let vraag = db.supabase.from('consumed_meals').delete()
+          .eq('client_id', client.id)
+          .eq('source', 'plan_check')
+          .gte('consumed_at', vanaf)
+          .lt('consumed_at', tot)
+        vraag = planCheckRecord
+          ? vraag.eq('id', planCheckRecord.id)
+          : (mealId ? vraag.eq('meal_id', mealId) : vraag.eq('meal_type', meal.slot?.replace(/\d+$/, '')))
+
+        vraag.then(({ error }) => {
+          if (!error) return
+          console.error('Failed to remove plan_check on uncheck:', error)
+          // Mislukt het, dan zetten we het vinkje terug: anders lijkt het weg
+          // terwijl het na een herlaadbeurt weer staat.
+          if (planCheckRecord) {
             setConsumedMeals(prev => (prev.some(m => m.id === planCheckRecord.id) ? prev : [...prev, planCheckRecord]))
-            zetVink(true)
-          }, (e) => console.error('Failed to remove plan_check on uncheck:', e))
+          }
+          zetVink(true)
+        }, (e) => console.error('Failed to remove plan_check on uncheck:', e))
       }
     } else {
       zetVink(true)
@@ -723,6 +741,16 @@ export default function AIDaySchedule({
             const logSleutel = `${meal.slot}|${meal.id}`
             if (bezigMetLoggen.current.has(logSleutel)) return
             bezigMetLoggen.current.add(logSleutel)
+            // Vinkje meteen aan. Stond dit pas ná het invoegen, dan gebeurde er
+            // bij een tweede klik vlak erna niets zichtbaars — die klik werd
+            // als "nog niet afgevinkt" gelezen en door de dubbelklik-slot
+            // tegengehouden. Vandaar dat het scherm leek te haperen.
+            const zetVinkVoorDeze = (waarde) => setCheckedByDay(prev => {
+              const dagKey = daysOfWeek[currentDay]?.key
+              if (!dagKey) return prev
+              return { ...prev, [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: waarde } }
+            })
+            zetVinkVoorDeze(true)
             try {
               // Dubbel-bewaking op de BEKEKEN dag, niet op vandaag.
               //
@@ -753,16 +781,22 @@ export default function AIDaySchedule({
               }
 
               if (existing && existing.length > 0) {
-                // Wél het vinkje zetten. Stond de maaltijd al gelogd terwijl
-                // de kaart "Afronden" liet zien, dan deed een klik hier
-                // helemaal niets en bleef de klant achter met een knop die
-                // niet reageert. De macro's blijven ongemoeid: die rij telt
-                // al mee in de dagtotalen.
-                setCheckedByDay(prev => {
-                  const dagKey = daysOfWeek[currentDay]?.key
-                  if (!dagKey) return prev
-                  return { ...prev, [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: true } }
-                })
+                // Stond de maaltijd al gelogd, dan blijft het vinkje aan en de
+                // macro's ongemoeid — die rij telt al mee. Wel de rij in de
+                // lokale lijst zetten: zonder id vindt het ongedaan maken 'm
+                // straks niet en blijft hij in de database staan.
+                setConsumedMeals(prev => (
+                  prev.some(m => m.id === existing[0].id)
+                    ? prev
+                    : [...prev, {
+                      id: existing[0].id, meal_id: meal.id, source: 'plan_check',
+                      meal_type: meal.slot?.replace(/\d+$/, ''),
+                      calories: Math.round(meal.calories || 0),
+                      protein: Math.round(meal.protein || 0),
+                      carbs: Math.round(meal.carbs || 0),
+                      fat: Math.round(meal.fat || 0),
+                    }]
+                ))
                 console.log('Plan meal stond al gelogd op deze dag; alleen vinkje bijgewerkt')
                 return
               }
@@ -831,6 +865,7 @@ export default function AIDaySchedule({
                 console.log('Plan meal stond al gelogd (unieke index)')
               } else {
                 console.error('Auto-log plan meal failed:', err)
+                zetVinkVoorDeze(false)
               }
             } finally {
               bezigMetLoggen.current.delete(logSleutel)
