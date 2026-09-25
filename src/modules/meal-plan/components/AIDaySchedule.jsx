@@ -82,6 +82,11 @@ export default function AIDaySchedule({
   // onderweg, dan vindt hij de oude rij en springt het vinkje terug op
   // "Gelogd". Deze lijst houdt dat tegen tot het verwijderen rond is.
   const netUitgevinkt = useRef(new Set())
+  // Welke maaltijd stond er de vorige keer op dit slot? Verandert die —
+  // bijvoorbeeld doordat je een dagtemplate toepast of een maaltijd wisselt —
+  // dan hoort het vinkje van de oude maaltijd niet mee te verhuizen naar de
+  // nieuwe. De herstel-effecten zetten vinkjes alleen áán; dit haalt ze weg.
+  const vorigeMaaltijdPerSlot = useRef({})
 
   // Supplementen van de klant. Uit app_issues: "Toegewezen supplementen
   // moeten ook zichtbaar worden op de client meal pagina op de juiste
@@ -228,6 +233,26 @@ export default function AIDaySchedule({
       }))
     }
   }, [todayProgress, displayMeals])
+
+  // Ander eten op hetzelfde moment? Dan gaat het vinkje eraf.
+  useEffect(() => {
+    const dagKey = daysOfWeek[currentDay]?.key
+    if (!dagKey || !displayMeals.length) return
+    const gewisseld = []
+    displayMeals.forEach(m => {
+      const sleutel = `${dagKey}|${m.slot}`
+      const id = m.meal_id || m.id || m.name
+      const vorig = vorigeMaaltijdPerSlot.current[sleutel]
+      if (vorig && id && vorig !== id) gewisseld.push(m.slot)
+      vorigeMaaltijdPerSlot.current[sleutel] = id
+    })
+    if (!gewisseld.length) return
+    setCheckedByDay(prev => {
+      const dag = { ...(prev[dagKey] || {}) }
+      gewisseld.forEach(slot => { delete dag[slot] })
+      return { ...prev, [dagKey]: dag }
+    })
+  }, [displayMeals, currentDay])
 
   // Herstel de afvink-status bij (her)laden van de pagina. De macro-totalen
   // bleven wel staan (losse som uit consumed_meals), maar de vinkjes per maaltijd

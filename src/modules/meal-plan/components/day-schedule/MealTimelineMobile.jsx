@@ -155,6 +155,7 @@ export default function MealTimelineMobile({
               }}
               momentLabel={g.brand || MOMENT_LABEL[g.meal_type] || 'Gelogd'}
               tijdLabel={klok(item.min)}
+              gegeten
               isMobile={isMobile !== false}
               acties={[
                 { icon: <Edit3 size={11} />, label: 'Bewerken', onClick: () => onEditConsumedMeal?.(g) },

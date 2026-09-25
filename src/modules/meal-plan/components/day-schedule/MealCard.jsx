@@ -57,6 +57,11 @@ export default function MealCard({
   // Vaste waarde helemaal rechts op de kaart, verticaal in het midden — bv.
   // het aantal gram bij een ingrediënt.
   rechts = null,
+  // Groen vinkje over de foto zonder de rest van de kaart te dempen: voor
+  // een maaltijd die je gelogd hebt maar die niet in het plan staat. Die is
+  // gegeten — dat hoort te zien te zijn — maar hij is niet "afgevinkt", dus
+  // de naam blijft gewoon leesbaar.
+  gegeten = false,
 }) {
   const photoSize = isMobile ? 78 : 90
   // Een lege string betekent bewust geen label op de foto (ingrediënten).
@@ -123,7 +128,7 @@ export default function MealCard({
               </div>
             )}
           </div>
-          {isChecked && (
+          {(isChecked || gegeten) && (
             <div style={{
               position: 'absolute', inset: 0,
               background: 'rgba(16, 185, 129, 0.78)',
