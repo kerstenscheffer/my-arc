@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react'
 import MealCard from './day-schedule/MealCard'
 import Keuze from './Keuze'
 import { foodImageFallback } from '../foodImageFallback'
+import { niveauVoorDoel } from '../DayTemplateService'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
@@ -178,6 +179,34 @@ export default function AIAlternativesModal({
           curated = (alleSlots?.[slotKey]?.meal_ids || []).map(id => opId.get(id)).filter(Boolean)
         }
       } catch (e) { /* geen curatie → gewoon de normale pool */ }
+
+      // Dagmenu's als vaste suggesties. Elk moment heeft binnen een niveau
+      // vijf gerechten met vrijwel dezelfde macro's, dus ze zijn onderling
+      // inwisselbaar — precies wat je zoekt als je wisselt. Welk niveau?
+      // Dat wat het dichtst bij het caloriedoel van deze klant ligt, zodat
+      // iemand van 2200 de ontbijten van het 2000-menu krijgt en niet die van
+      // 3000. De coach hoeft hier niets voor in te stellen.
+      try {
+        const niveau = niveauVoorDoel(client?.target_calories)
+        if (niveau) {
+          const { data: dagmenu } = await db.supabase
+            .from('ai_meals')
+            .select('*')
+            .contains('labels', [`dagmenu_${niveau}`])
+          const alGekozen = new Set([...(curated || []).map(m => m.id)])
+          ;(dagmenu || []).forEach(m => {
+            const moment = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
+            // Achteraan: wat de coach zelf koos staat voorop.
+            if (!(perMoment[moment] || []).some(x => x.id === m.id)) {
+              perMoment[moment] = [...(perMoment[moment] || []), m]
+            }
+            if (moment === slotNaarMoment(slotKey) && !alGekozen.has(m.id)) {
+              curated = [...curated, m]
+              alGekozen.add(m.id)
+            }
+          })
+        }
+      } catch (e) { console.warn('Dagmenu-suggesties laden mislukt:', e?.message) }
 
       // Eigen maaltijden van de klant (ai_custom_meals), zodat je ook daarnaar
       // kunt wisselen. getMealById ondersteunt al custom-meal-IDs.
