@@ -214,9 +214,9 @@ export default function MealCard({
         borderTop: `1px solid ${DIVIDER}`,
       }}>
         {(acties || [
-          { icon: <Info size={isMobile ? 11 : 12} />, label: 'Info', onClick: onInfo },
-          { icon: <RefreshCw size={isMobile ? 11 : 12} />, label: 'Wissel', onClick: onAlternatives },
-          { icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />, label: isChecked ? 'Gelogd' : 'Afronden', onClick: onCheck, checked: isChecked },
+          { icon: <Info size={isMobile ? 16 : 17} strokeWidth={2.6} />, label: 'Info', onClick: onInfo },
+          { icon: <RefreshCw size={isMobile ? 16 : 17} strokeWidth={2.6} />, label: 'Wissel', onClick: onAlternatives },
+          { icon: <Check size={isMobile ? 17 : 18} strokeWidth={3} />, label: isChecked ? 'Gelogd' : 'Afronden', onClick: onCheck, checked: isChecked },
         ]).map((actie, i) => (
           <React.Fragment key={actie.label}>
             {i > 0 && <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />}
@@ -249,30 +249,31 @@ export default function MealCard({
   )
 }
 
+// Alleen het icoon, geen woord erbij. Drie woorden naast elkaar onder elke
+// kaart maakten de lijst rumoerig, terwijl de iconen op zichzelf duidelijk
+// zijn. Het label blijft wel als title/aria-label staan: voor wie het niet
+// meteen ziet, en voor schermlezers.
 function ActionCell({ icon, label, onClick, isMobile, checked, kleur }) {
-  const color = kleur || (checked ? '#10b981' : 'rgba(255,255,255,0.7)')
+  const color = kleur || (checked ? '#10b981' : '#fff')
   return (
     <button
       onClick={onClick}
+      title={label}
+      aria-label={label}
       style={{
         flex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 4,
-        padding: isMobile ? '0.25rem 0.3rem' : '0.3rem 0.4rem',
+        padding: isMobile ? '0.35rem 0.3rem' : '0.4rem 0.4rem',
         background: 'transparent',
         border: 'none',
         color,
-        fontSize: isMobile ? '0.6rem' : '0.65rem',
-        fontWeight: 700,
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        minHeight: 24,
-        letterSpacing: '-0.005em',
+        minHeight: isMobile ? 34 : 36,
       }}
     >
       {icon}
-      <span>{label}</span>
     </button>
   )
 }
