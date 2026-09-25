@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import { Plus, X, Footprints, Trash2, Check } from 'lucide-react'
 import CardioService, { weekStartISO, normaliseerSoort } from '../services/CardioService'
 import { cardioFoto } from '../utils/workoutFoto'
+import StappenStrook from './StappenStrook'
 
 // Veelgebruikte cardio-types als snelkeuze; vrij typen kan ook.
 const CARDIO_PRESETS = ['Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT']
@@ -127,6 +128,10 @@ export default function CardioLogSection({ client, db, isMobile }) {
 
   const section = (
     <div style={{ padding: m ? '0 0.75rem' : '0 1rem', marginBottom: m ? '0.9rem' : '1.1rem' }}>
+      {/* Wat de telefoon zelf bijhoudt, bovenaan. Wandelen is cardio; wie hier
+          kijkt hoeft zijn stappen niet ergens anders op te zoeken. */}
+      <StappenStrook client={client} db={db} isMobile={m} />
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Footprints size={m ? 14 : 16} color="rgba(255,255,255,0.45)" />
