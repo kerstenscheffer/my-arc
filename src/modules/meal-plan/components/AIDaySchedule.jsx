@@ -76,6 +76,12 @@ export default function AIDaySchedule({
   const [checkedByDay, setCheckedByDay] = useState({})
   // Welke maaltijden op dit moment worden weggeschreven.
   const bezigMetLoggen = useRef(new Set())
+  // Slots die je net hebt uitgevinkt. Het herstel-effect hieronder leest de
+  // database opnieuw zodra de dag verandert — en dat gebeurt meteen na het
+  // uitvinken, want de dagtotalen veranderen. Is de verwijdering dan nog
+  // onderweg, dan vindt hij de oude rij en springt het vinkje terug op
+  // "Gelogd". Deze lijst houdt dat tegen tot het verwijderen rond is.
+  const netUitgevinkt = useRef(new Set())
 
   // Supplementen van de klant. Uit app_issues: "Toegewezen supplementen
   // moeten ook zichtbaar worden op de client meal pagina op de juiste
@@ -241,7 +247,9 @@ export default function AIDaySchedule({
         for (const row of data) {
           let m = row.meal_id ? displayMeals.find(dm => (dm.meal_id || dm.id) === row.meal_id) : null
           if (!m && row.meal_type) m = displayMeals.find(dm => dm.slot === row.meal_type)
-          if (m) restored[m.slot] = true
+          // Net uitgevinkt? Dan is deze rij op weg naar de prullenbak; hem nu
+          // terugzetten zou het vinkje laten opspringen.
+          if (m && !netUitgevinkt.current.has(`${dagKey}|${m.slot}`)) restored[m.slot] = true
         }
         if (Object.keys(restored).length > 0) {
           setCheckedByDay(prev => ({
@@ -590,7 +598,9 @@ export default function AIDaySchedule({
     // Het vinkje en de macro's gaan meteen om; de database volgt erachteraan.
     // Stond dit andersom, dan wachtte je op twee netwerkrondjes voordat er iets
     // gebeurde — dat voelde traag, vooral bij het ongedaan maken.
+    const uitvinkSleutel = `${dagKey}|${meal.slot}`
     if (checkedMeals[meal.slot]) {
+      netUitgevinkt.current.add(uitvinkSleutel)
       zetVink(false)
       // De macro's van vandaag meteen bijwerken (rekent met de maaltijd die je
       // aantikte). Op een andere dag hoeft dat niet: die telt niet mee in de
@@ -624,6 +634,8 @@ export default function AIDaySchedule({
           : (mealId ? vraag.eq('meal_id', mealId) : vraag.eq('meal_type', meal.slot?.replace(/\d+$/, '')))
 
         vraag.then(({ error }) => {
+          // Rond: het herstel-effect mag deze slot weer normaal behandelen.
+          netUitgevinkt.current.delete(uitvinkSleutel)
           if (!error) return
           console.error('Failed to remove plan_check on uncheck:', error)
           // Mislukt het, dan zetten we het vinkje terug: anders lijkt het weg
@@ -632,9 +644,17 @@ export default function AIDaySchedule({
             setConsumedMeals(prev => (prev.some(m => m.id === planCheckRecord.id) ? prev : [...prev, planCheckRecord]))
           }
           zetVink(true)
-        }, (e) => console.error('Failed to remove plan_check on uncheck:', e))
+        }, (e) => {
+          netUitgevinkt.current.delete(uitvinkSleutel)
+          console.error('Failed to remove plan_check on uncheck:', e)
+        })
+      } else {
+        netUitgevinkt.current.delete(uitvinkSleutel)
       }
     } else {
+      // Weer afvinken: de blokkade hoort meteen weg, anders blijft het
+      // herstel-effect deze slot overslaan.
+      netUitgevinkt.current.delete(uitvinkSleutel)
       zetVink(true)
       if (isVandaagNu()) onCheckMeal(meal.slot, meal)
     }
