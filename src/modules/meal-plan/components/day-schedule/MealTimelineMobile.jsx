@@ -158,8 +158,8 @@ export default function MealTimelineMobile({
               gegeten
               isMobile={isMobile !== false}
               acties={[
-                { icon: <Edit3 size={16} strokeWidth={2.6} />, label: 'Bewerken', onClick: () => onEditConsumedMeal?.(g) },
-                { icon: <Trash2 size={16} strokeWidth={2.6} />, label: 'Verwijderen', onClick: () => onDeleteConsumedMeal?.(g.id), kleur: 'rgba(239,68,68,0.85)' },
+                { icon: <Edit3 size={11} />, label: 'Bewerken', onClick: () => onEditConsumedMeal?.(g) },
+                { icon: <Trash2 size={11} />, label: 'Verwijderen', onClick: () => onDeleteConsumedMeal?.(g.id), kleur: 'rgba(239,68,68,0.85)' },
               ]}
             />
           )
@@ -180,9 +180,9 @@ export default function MealTimelineMobile({
             isMobile={isMobile !== false}
             onCheck={() => onSupplementCheck?.(sp)}
             acties={[
-              { icon: <Info size={16} strokeWidth={2.6} />, label: 'Info', onClick: () => onSupplementInfo?.(sp) },
+              { icon: <Info size={11} />, label: 'Info', onClick: () => onSupplementInfo?.(sp) },
               {
-                icon: <Check size={17} strokeWidth={3} />,
+                icon: <Check size={11} strokeWidth={2.6} />,
                 label: afgevinkt ? 'Genomen' : 'Afronden',
                 onClick: () => onSupplementCheck?.(sp),
                 checked: afgevinkt,
