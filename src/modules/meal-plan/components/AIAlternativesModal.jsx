@@ -218,6 +218,16 @@ export default function AIAlternativesModal({
     ontbijt: 'breakfast', lunch: 'lunch', diner: 'dinner', avondeten: 'dinner',
     snack: 'snack', tussendoortje: 'snack',
   }
+  // Dagmenu's: elk gerecht draagt het label van zijn niveau (dagmenu_2000,
+  // _2500, _3000). Dezelfde gerechten bestaan in drie maten, dus wissel je er
+  // een, dan horen daar alleen de gerechten van jouw niveau bij — anders kiest
+  // een klant van 2000 kcal een bord van 3000.
+  const niveauVan = (m) => {
+    const labels = Array.isArray(m?.labels) ? m.labels : []
+    return labels.map(String).find(l => l.startsWith('dagmenu_')) || null
+  }
+  const huidigNiveau = niveauVan(currentMeal)
+
   const momentenVan = (m) => {
     const uit = new Set()
     ;(Array.isArray(m?.timing) ? m.timing : []).forEach(t => uit.add(String(t).toLowerCase()))
@@ -284,6 +294,15 @@ export default function AIAlternativesModal({
       meals = pool.filter(m => {
         const set = momentenVan(m)
         return set.size === 0 || set.has(moment)
+      })
+    }
+
+    // Zit je in een dagmenu, dan vallen de andere niveaus weg. Eet je niet uit
+    // een dagmenu, dan blijft alles staan zoals het was.
+    if (huidigNiveau) {
+      meals = meals.filter(m => {
+        const n = niveauVan(m)
+        return !n || n === huidigNiveau
       })
     }
 
