@@ -11,7 +11,6 @@ import AIDaySchedule from './components/AIDaySchedule'
 import DagTemplatePaneel from './components/DagTemplatePaneel'
 import ShoppingHub from '../shopping/ShoppingHub'
 import { ShoppingCart, X, Eye, EyeOff } from 'lucide-react'
-import VoedingsplanFaq from './components/VoedingsplanFaq'
 import AIWeekPlanner from './components/AIWeekPlanner'
 import MealSetupWizard from './components/wizard/MealSetupWizard'
 
@@ -59,6 +58,7 @@ const indexToDate = (idx, weekOffset = 0) => {
 
 // Challenge Sidebar
 import MealChallengeSidebar from '../../client/components/MealChallengeSidebar'
+import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 
 // Modals
 import AIAlternativesModal from './components/AIAlternativesModal'
@@ -637,6 +637,13 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         </div>
       </div>
 
+      {/* Belangrijke video van de coach: tussen de dag en de macro's. Dit
+          scherm staat vast (position: fixed, eigen scrollgebied), dus een blok
+          dat ClientDashboard erboven zet valt erachter — hij hoort hier. */}
+      <div style={{ flexShrink: 0 }}>
+        <BelangrijkeVideo client={client} pagina="meal" isMobile={isMobile} compact />
+      </div>
+
       {/* ════ NEW MACRO HERO — selected-day aware ════
           flexShrink: 0 — in de flex-kolom van het vaste scherm zou dit blok
           anders indrukken zodra de lijst eronder om ruimte vraagt, en dan
@@ -764,10 +771,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           </div>
         </div>
       )}
-
-      {/* Algemene vragen over het plan: onderaan, dicht. Ze horen niet bij
-          één maaltijd, dus ze staan onder de dag en niet in een recept. */}
-      <VoedingsplanFaq db={db} isMobile={isMobile} />
 
       {/* De dagen die je coach klaarzette, achter een tab tegen de linkerrand.
           Staat buiten de dag-tijdlijn: het gaat over je week, niet over deze
