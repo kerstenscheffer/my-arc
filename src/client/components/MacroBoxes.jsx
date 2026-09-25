@@ -16,7 +16,7 @@ function MacroBox({ label, icon, color, consumed, target, unitLabel, kaal = fals
     <div style={{ background: kaal ? 'transparent' : 'rgba(255,255,255,0.03)', border: kaal ? 'none' : '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: kaal ? '0.2rem 0.25rem 0.35rem' : '0.5rem 0.25rem 0.55rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 3, maxWidth: '100%' }}>
         <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
-        <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+        <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
       </div>
       <div style={{ position: 'relative', width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
@@ -31,11 +31,11 @@ function MacroBox({ label, icon, color, consumed, target, unitLabel, kaal = fals
           kanten. Met de vaste tussenruimte van de kolom ertussen stond er
           een gat waar niets gebeurde. */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', letterSpacing: '-0.02em' }}>
+        <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', letterSpacing: '-0.02em' }}>
           {Math.abs(over)}
           <span style={{ fontSize: '0.72em', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{unitLabel} {over >= 0 ? 'over' : 'te veel'}</span>
         </div>
-        <div style={{ fontSize: '0.76rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
+        <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
           {Math.round(consumed || 0)}{unitLabel} / {Math.round(target || 0)}{unitLabel}
         </div>
       </div>
