@@ -131,7 +131,9 @@ export default function MealCard({
           {(isChecked || gegeten) && (
             <div style={{
               position: 'absolute', inset: 0,
-              background: 'rgba(16, 185, 129, 0.78)',
+              // Dieper groen en iets doorzichtiger dan het felle #10b981: het
+              // mag zeggen "dit is gegeten", niet de foto overschreeuwen.
+              background: 'rgba(6, 95, 70, 0.72)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Check size={isMobile ? 22 : 26} color="white" strokeWidth={3} />
