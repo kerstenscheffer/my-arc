@@ -2,7 +2,7 @@
 // v4.0 — Sidebar layout: linker icon nav + compacte builder rechts
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, CalendarDays, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill, Users, SlidersHorizontal } from 'lucide-react'
+import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Grid3X3, Calendar, CalendarDays, List, Download, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill, Users, SlidersHorizontal } from 'lucide-react'
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import VezelsMicros from './plan-analyzer/VezelsMicros'
@@ -12,7 +12,6 @@ import MealMakerModal from './plan-analyzer/MealMakerModal'
 import { PRE_WORKOUT_SLOT, totalenMetPreWorkout } from '../../meal-plan/utils/preWorkoutMeal'
 import { meldMaaltijdTijd, luisterMaaltijdTijd, meldPlanGewijzigd, luisterPlanGewijzigd } from '../../meal-plan/utils/mealSync'
 import ClientContextPanel from './plan-analyzer/ClientContextPanel'
-import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
 import WeekOverview from './plan-analyzer/WeekOverview'
 import SupplementDaySection from './plan-analyzer/SupplementDaySection'
@@ -29,7 +28,7 @@ import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
-import { openMealPlanForPrint, openCoachingGuideForPrint } from '../mealplanhtmlgenerator'
+import { openMealPlanForPrint } from '../mealplanhtmlgenerator'
 
 // Slots — de 6 vaste + extra snack-slots zodat er geen harde max van 6
 // maaltijden meer is. Alles wordt op tijd gesorteerd bij het tonen; lege
@@ -40,7 +39,7 @@ import { openMealPlanForPrint, openCoachingGuideForPrint } from '../mealplanhtml
 const ZWEVENDE_NAV_HOOGTE = 105
 
 const DOCK_LABELS = {
-  client: 'Client', timing: 'Tijden', dag: 'Dag', swaps: 'Swaps',
+  client: 'Client', timing: 'Tijden', swaps: 'Swaps',
   library: 'Opslaan', supp: 'Supplementen', agenda: 'Agenda',
   dagen: 'Dagen bewaren',
 }
@@ -192,7 +191,6 @@ export default function PlanAnalyzer({
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
   const [showPlanLibrary, setShowPlanLibrary] = useState(false)
   const [showTimingModal, setShowTimingModal] = useState(false)
-  const [showBalancer, setShowBalancer] = useState(false)
   const [showWeekBalancer, setShowWeekBalancer] = useState(false)
   const [showFloatingClient, setShowFloatingClient] = useState(false)
   const [showBestSwaps, setShowBestSwaps] = useState(false)
@@ -965,11 +963,6 @@ export default function PlanAnalyzer({
 
     await applyWeekUpdate(updated, `Aangepast: ${cleanMeal.name} (alle dagen)`)
   }
-  const handleAutoBalance = async (dayIndex, updatedMeals) => {
-    if (!weekData) return
-    const updated = [...weekData]; updated[dayIndex] = { ...updated[dayIndex], meals: updatedMeals }; updated[dayIndex].totals = calculateTotals(updatedMeals)
-    await applyWeekUpdate(updated, `Auto-balance: ${DAYS[dayIndex].full}`); setShowBalancer(false)
-  }
   const handleWeekBalance = async (updatedWeekData, shouldClose = true) => {
     await applyWeekUpdate(updatedWeekData, 'Week gebalanceerd'); if (shouldClose) setShowWeekBalancer(false)
   }
@@ -1115,12 +1108,6 @@ export default function PlanAnalyzer({
       await openMealPlanForPrint(plan, clientName, weekRange, genOpts)
     } catch (err) { console.error('❌ PDF-export fout:', err); alert('PDF maken mislukt: ' + (err?.message || 'onbekende fout')) }
     setLoadingPdf(false)
-  }
-
-  const handleWhatsApp = () => {
-    const name = clientRecord?.first_name || 'je'; const phone = clientRecord?.phone || ''; const planName = planMeta?.name || 'je nieuwe weekplan'
-    const message = `Hey ${name}! Je nieuwe voedingsplan staat klaar in de MY ARC app: "${planName}". Open de app om het te bekijken. Vragen? Stuur me een berichtje! 💪`
-    window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
   // ════════════ RENDER: NO DATA ════════════
@@ -1320,7 +1307,6 @@ export default function PlanAnalyzer({
   const sidebarNav = [
     { id: 'client', icon: '👤',                    label: 'Client',  active: dockedSection === 'client', onClick: () => toggleDock('client') },
     { id: 'timing', icon: <Clock size={18} />,     label: 'Tijden',  active: dockedSection === 'timing', onClick: () => toggleDock('timing') },
-    { id: 'dag',    icon: <Zap size={18} />,       label: 'Dag',     active: dockedSection === 'dag',    onClick: () => toggleDock('dag') },
     { id: 'dagen',  icon: <CalendarDays size={18} />, label: 'Dagen', active: dockedSection === 'dagen', onClick: () => toggleDock('dagen') },
     { id: 'week',   icon: <Grid3X3 size={18} />,   label: 'Week',    active: viewMode === 'week',        onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
     { id: 'agenda', icon: <Calendar size={18} />,  label: 'Agenda',  active: dockedSection === 'agenda', onClick: () => toggleDock('agenda') },
@@ -1331,8 +1317,6 @@ export default function PlanAnalyzer({
 
   const sidebarBottom = [
     { id: 'pdf',     icon: loadingPdf ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={16} />, label: 'PDF',    onClick: handlePDF,                                                     color: '#FFD700' },
-    { id: 'guide',   icon: <FileText size={16} />,    label: 'Guide',  onClick: () => openCoachingGuideForPrint(clientRecord?.first_name || 'Client'), color: '#6366f1' },
-    { id: 'wa',      icon: <MessageSquare size={16} />, label: 'WA',   onClick: handleWhatsApp,  color: '#10b981' },
     { id: 'undo',    icon: <RotateCcw size={16} />,   label: 'Undo',   onClick: handleUndo,      color: canUndo ? '#fff' : 'rgba(255,255,255,0.2)', disabled: !canUndo },
     { id: 'redo',    icon: <RotateCw size={16} />,    label: 'Redo',   onClick: handleRedo,      color: canRedo ? '#fff' : 'rgba(255,255,255,0.2)', disabled: !canRedo },
   ]
@@ -1559,10 +1543,6 @@ export default function PlanAnalyzer({
               onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); setDockedSection(null) }}
               onClose={() => setDockedSection(null)} isMobile={m} />
           )}
-          {dockedSection === 'dag' && currentDay && (
-            <AutoBalancer embedded dayData={currentDay} targets={targets} dayIndex={activeDay}
-              onApply={handleAutoBalance} onClose={() => setDockedSection(null)} isMobile={m} />
-          )}
           {dockedSection === 'dagen' && weekData && (
             <DayLibraryModal embedded db={db} coachId={coachId}
               clientId={resolvedClientId || null}
@@ -1605,7 +1585,6 @@ export default function PlanAnalyzer({
           {dockedSection && !makerState && !swapState && !(
             (dockedSection === 'client' && resolvedClientId) ||
             (dockedSection === 'timing' && weekData) ||
-            (dockedSection === 'dag' && currentDay) ||
             (dockedSection === 'dagen' && weekData) ||
             (dockedSection === 'swaps') ||
             (dockedSection === 'library' && resolvedClientId) ||
@@ -2034,11 +2013,6 @@ export default function PlanAnalyzer({
 
       {/* ════════════ MODALS ════════════ */}
       {/* SwapModal opent nu in het modal vak (zie boven), niet meer full-screen. */}
-
-      {showBalancer && currentDay && (
-        <AutoBalancer dayData={currentDay} targets={targets} dayIndex={activeDay}
-          onApply={handleAutoBalance} onClose={() => setShowBalancer(false)} isMobile={m} />
-      )}
 
       {showWeekBalancer && weekData && (
         <WeekBalancer weekData={weekData} targets={targets}
