@@ -330,12 +330,17 @@ export async function zetDagAltijd(supabase, { clientId, planId, dagIndex, templ
 // volgende week staat het oude eten er weer.
 export async function zetDagDezeWeek(supabase, { clientId, planId, datums, template }) {
   try {
+    // template_id verwijst naar meal_plan_templates. Een eigen dag van de
+    // klant staat in zijn eigen tabel, dus daarvan mag het id hier niet in —
+    // dat botst op de foreign key. De naam bewaren we wel, die is het enige
+    // wat we er later van tonen.
+    const vanCoach = template?.bron !== BRON_KLANT
     const rijen = (datums || []).map(d => ({
       client_id: clientId,
       plan_id: planId || null,
       datum: d,
       dag: dagVanTemplate(template),
-      template_id: template?.id || null,
+      template_id: vanCoach ? (template?.id || null) : null,
       template_naam: template?.name || template?.template_name || null,
     }))
     if (!rijen.length) return { error: 'Geen dag gekozen' }
