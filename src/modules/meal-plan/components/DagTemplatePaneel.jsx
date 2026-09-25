@@ -16,6 +16,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CalendarDays, X, ChevronRight, Check, Loader } from 'lucide-react'
 import MealCard from './day-schedule/MealCard'
+import { foodImageFallback } from '../foodImageFallback'
 import {
   getKlantDagTemplates, slotsVanTemplate, zetDagAltijd, zetDagDezeWeek,
   lokaleDatum, DAG_LABELS,
@@ -29,6 +30,31 @@ const slotRang = (slot) => {
   const i = SLOT_VOLGORDE.indexOf(slot)
   return i === -1 ? 99 : i
 }
+
+// "Dagmenu 2000 · Dag 3" uit elkaar halen: het niveau kopt de groep, de dag
+// is de titel van de kaart. Past een naam niet in dat patroon, dan blijft hij
+// gewoon in z'n geheel staan.
+const ontleed = (t) => {
+  const naam = t.name || t.template_name || 'Dag'
+  const m = /^Dagmenu\s+(\d+)\s*·\s*(.+)$/i.exec(naam)
+  return m ? { niveau: Number(m[1]), titel: m[2].trim(), naam } : { niveau: null, titel: naam, naam }
+}
+
+// De foto van het diner draagt de kaart: dat is de maaltijd waar je je iets
+// bij voorstelt. Geen eigen foto? Dan pakt het fallback-systeem er een op de
+// titel (kwark → zuivel, kip → kip).
+const dagFoto = (t) => {
+  const slots = slotsVanTemplate(t)
+  const maaltijd = slots.dinner || slots.lunch || slots.breakfast || Object.values(slots)[0]
+  if (!maaltijd) return null
+  return maaltijd.image_url || foodImageFallback(maaltijd.name || maaltijd.title, 'dinner', 200)
+}
+
+// De namen van de maaltijden, in de volgorde van de dag.
+const maaltijdNamen = (t) => Object.entries(slotsVanTemplate(t))
+  .sort((a, b) => slotRang(a[0]) - slotRang(b[0]))
+  .map(([, m]) => m?.name)
+  .filter(Boolean)
 
 export default function DagTemplatePaneel({
   db, client, activePlan, isMobile, dagIndex = 0, weekOffset = 0, onToegepast,
@@ -181,30 +207,101 @@ export default function DagTemplatePaneel({
           )}
 
           {/* Lijst */}
-          {!laden && !gekozen && templates.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setGekozen(t)}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                padding: '0.9rem 0', background: 'transparent',
-                border: 'none', borderBottom: `1px solid ${LIJN}`,
-                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>{t.emoji || '📌'}</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: '1rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {t.name || t.template_name || 'Dag'}
-                </span>
-                <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-                  {Math.round(t.daily_calories || 0)} kcal · {t.daily_protein ? `${Math.round(t.daily_protein)}g eiwit · ` : ''}{t.meals_per_day || Object.keys(slotsVanTemplate(t)).length} maaltijden
-                </span>
-              </span>
-              <ChevronRight size={20} strokeWidth={3} color="rgba(255,255,255,0.35)" style={{ flexShrink: 0 }} />
-            </button>
-          ))}
+          {!laden && !gekozen && (() => {
+            // Per niveau een kopje, en de dagen op volgorde. Vijftien regels op
+            // een hoop leest als een dump; drie groepjes van vijf niet.
+            const groepen = new Map()
+            templates.forEach(t => {
+              const { niveau } = ontleed(t)
+              const sleutel = niveau ?? 'overig'
+              if (!groepen.has(sleutel)) groepen.set(sleutel, [])
+              groepen.get(sleutel).push(t)
+            })
+            const volgorde = [...groepen.keys()].sort((a, b) => {
+              if (a === 'overig') return 1
+              if (b === 'overig') return -1
+              return a - b
+            })
+
+            return volgorde.map(sleutel => (
+              <div key={sleutel} style={{ marginBottom: '1.5rem' }}>
+                <div style={{
+                  fontSize: '0.74rem', fontWeight: 900, letterSpacing: '0.12em',
+                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)',
+                  padding: '0.25rem 0 0.75rem',
+                }}>
+                  {sleutel === 'overig' ? 'Overige dagen' : `Dagmenu ${sleutel} kcal`}
+                </div>
+
+                {groepen.get(sleutel)
+                  .slice()
+                  .sort((a, b) => ontleed(a).titel.localeCompare(ontleed(b).titel, 'nl', { numeric: true }))
+                  .map(t => {
+                    const { niveau, titel } = ontleed(t)
+                    const foto = dagFoto(t)
+                    const namen = maaltijdNamen(t)
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setGekozen(t)}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'stretch', gap: 0,
+                          marginBottom: 10, padding: 0, overflow: 'hidden',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: `1px solid ${LIJN}`, borderRadius: 14,
+                          cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        }}
+                      >
+                        <span style={{
+                          width: isMobile ? 92 : 104, flexShrink: 0, alignSelf: 'stretch',
+                          backgroundImage: foto ? `url(${foto})` : 'none',
+                          backgroundColor: 'rgba(255,255,255,0.05)',
+                          backgroundSize: 'cover', backgroundPosition: 'center',
+                        }} />
+                        <span style={{ flex: 1, minWidth: 0, padding: '0.8rem 0.9rem' }}>
+                          {niveau && (
+                            <span style={{
+                              display: 'inline-block', marginBottom: 5,
+                              fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.08em',
+                              textTransform: 'uppercase', color: '#0a0a0a',
+                              background: '#fff', borderRadius: 5, padding: '2px 6px',
+                            }}>
+                              {niveau} kcal
+                            </span>
+                          )}
+                          <span style={{
+                            display: 'block', fontSize: '1rem', fontWeight: 900, color: '#fff',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                          }}>
+                            {titel}
+                          </span>
+                          <span style={{
+                            display: 'block', fontSize: '0.8rem', fontWeight: 700,
+                            color: 'rgba(255,255,255,0.45)', marginTop: 2,
+                          }}>
+                            {Math.round(t.daily_calories || 0)} kcal · {t.daily_protein ? `${Math.round(t.daily_protein)}g eiwit` : `${namen.length} maaltijden`}
+                          </span>
+                          {namen.length > 0 && (
+                            <span style={{
+                              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden', marginTop: 6,
+                              fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.4,
+                              color: 'rgba(255,255,255,0.55)',
+                            }}>
+                              {namen.join(' · ')}
+                            </span>
+                          )}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', paddingRight: 8, flexShrink: 0 }}>
+                          <ChevronRight size={20} strokeWidth={3} color="rgba(255,255,255,0.3)" />
+                        </span>
+                      </button>
+                    )
+                  })}
+              </div>
+            ))
+          })()}
 
           {/* Eén dag: de maaltijden zoals ze in je plan zouden staan. */}
           {gekozen && (
