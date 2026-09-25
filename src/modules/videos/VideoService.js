@@ -124,8 +124,11 @@ const videoService = {
       return videos
         .filter(v => !alGezien.has(v.id))
         .filter(v => opPagina.has(v.id) || (v.default_pages || []).some(p => alias.includes(p)))
+        // `assignment_id` is bewust apart van `video_id`: de speler en de
+        // beoordeling schrijven op de toewijzing, en die bestaat niet voor een
+        // video die standaard op de pagina staat.
         .map(v => ({
-          id: v.id,
+          video_id: v.id,
           video: v,
           assignment_id: opPagina.get(v.id) || null,
         }))

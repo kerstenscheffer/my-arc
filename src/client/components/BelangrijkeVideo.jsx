@@ -14,7 +14,7 @@
 // losse boodschap, en samenvouwen tot "3 video's" maakt er een lijstje van dat
 // je wegklikt.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Play, Check, Loader2 } from 'lucide-react'
 import videoService from '../../modules/videos/VideoService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
@@ -25,13 +25,20 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false }) {
   const [speler, setSpeler] = useState(null)
   const [bezig, setBezig] = useState(null)   // video_id dat wordt afgevinkt
 
-  const laad = useCallback(async () => {
-    if (!client?.id || !pagina) { setItems([]); return }
-    const lijst = await videoService.getBelangrijkeVideosVoorPagina(client.id, pagina)
-    setItems(lijst)
+  // Leegmaken vóór het ophalen, niet erna. Anders blijft de video van de vorige
+  // pagina staan zolang de nieuwe query onderweg is — je switcht naar Workout,
+  // ziet de maaltijd-video nog een tel staan en dan klapt hij weg. `weg` vangt
+  // het omgekeerde af: twee snelle wissels waarbij het oude antwoord als
+  // laatste binnenkomt en de verkeerde pagina zou vullen.
+  useEffect(() => {
+    let weg = false
+    setItems([])
+    if (!client?.id || !pagina) return undefined
+    videoService.getBelangrijkeVideosVoorPagina(client.id, pagina)
+      .then(lijst => { if (!weg) setItems(lijst || []) })
+      .catch(e => { console.error('Belangrijke video laden mislukt:', e); if (!weg) setItems([]) })
+    return () => { weg = true }
   }, [client?.id, pagina])
-
-  useEffect(() => { laad() }, [laad])
 
   const afvinken = async (item, via) => {
     setBezig(item.video_id)

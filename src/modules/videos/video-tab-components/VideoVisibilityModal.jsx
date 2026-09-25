@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
-import { X, Globe, Check, PlayCircle, Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User, Eye, EyeOff, Users } from 'lucide-react'
+import { X, Globe, Check, PlayCircle, Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User, Eye, EyeOff, Users, AlertCircle } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 
@@ -50,6 +50,10 @@ export default function VideoVisibilityModal({ video, clients = [], onClose, onS
   const [forEveryone, setForEveryone] = useState(hadDefaults)
   const [pages, setPages] = useState(normalizePages(video.default_pages))
   const [showInSlider, setShowInSlider] = useState(!!video.show_in_slider)
+  // Belangrijk = moet gezien worden. Dan staat de video ín de gekozen pagina's
+  // (niet alleen in de zwevende teaser) tot de klant hem heeft afgevinkt of
+  // afgespeeld.
+  const [belangrijk, setBelangrijk] = useState(!!video.is_belangrijk)
   const [selectedClients, setSelectedClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -83,13 +87,13 @@ export default function VideoVisibilityModal({ video, clients = [], onClose, onS
     setSaving(true)
     try {
       if (!isActive) {
-        await videoService.updateVideo(video.id, { is_active: false })
+        await videoService.updateVideo(video.id, { is_active: false, is_belangrijk: belangrijk })
       } else if (forEveryone) {
-        await videoService.updateVideo(video.id, { is_active: true, default_pages: pages, show_in_slider: showInSlider })
+        await videoService.updateVideo(video.id, { is_active: true, default_pages: pages, show_in_slider: showInSlider, is_belangrijk: belangrijk })
         await videoService.clearVideoAssignments(video.id) // niet meer per-persoon
       } else {
         // Personen-modus: geen standaard, wel per-client toewijzingen (vervang de set).
-        await videoService.updateVideo(video.id, { is_active: true, default_pages: [], show_in_slider: false })
+        await videoService.updateVideo(video.id, { is_active: true, default_pages: [], show_in_slider: false, is_belangrijk: belangrijk })
         await videoService.clearVideoAssignments(video.id)
         if (selectedClients.length > 0) {
           const targetPages = pages.length ? pages : ['home']
@@ -148,6 +152,24 @@ export default function VideoVisibilityModal({ video, clients = [], onClose, onS
                   <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>{forEveryone ? 'Alle clients (ook nieuwe) zien deze video.' : 'Uit: alleen de aangevinkte personen krijgen de video.'}</div>
                 </div>
                 <button onClick={() => setForEveryone(v => !v)} style={toggleBtn(forEveryone, GOLD)}><div style={knob(forEveryone)} /></button>
+              </div>
+            </div>
+
+            {/* Belangrijk. Staat vlak boven de pagina-keuze, want die twee horen
+                bij elkaar: belangrijk zonder pagina heeft geen plek om te
+                verschijnen. */}
+            <div style={{ padding: isMobile ? '0.85rem 0.95rem' : '0.95rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: `3px solid ${belangrijk ? '#fff' : 'transparent'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <AlertCircle size={16} color={belangrijk ? '#fff' : 'rgba(255,255,255,0.3)'} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 800, color: '#fff', marginBottom: '0.15rem' }}>Belangrijk — moet gezien worden</div>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                    {belangrijk
+                      ? 'Staat als blok ín de gekozen pagina’s tot de klant hem heeft afgespeeld of afgevinkt. Daarna alleen nog in de bibliotheek.'
+                      : 'Uit: de video komt alleen langs in de video-balk en staat in de bibliotheek.'}
+                  </div>
+                </div>
+                <button onClick={() => setBelangrijk(v => !v)} style={toggleBtn(belangrijk, '#fff')}><div style={knob(belangrijk)} /></button>
               </div>
             </div>
 
