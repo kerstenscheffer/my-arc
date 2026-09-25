@@ -24,6 +24,7 @@ import FadeOnScroll from '../../components/FadeOnScroll'
 import DagAgenda from '../components/DagAgenda'
 import StappenPil from '../components/StappenPil'
 import { vandaagStand, verzetDag } from '../components/dagNavigatie'
+import BelangrijkeVideo from '../components/BelangrijkeVideo'
 import { dateForDay } from '../../modules/client-agenda/ClientAgendaService'
 import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
 
@@ -691,6 +692,14 @@ export default function ClientHome({ client, db, setCurrentView }) {
         isVandaag={isVandaagAgenda}
         onVerzet={verzetAgendaDag}
       />
+
+      {/* Belangrijke video van de coach: onder de begroeting met de dagkiezer,
+          boven de agenda van vandaag. Bovenaan zou hij over de herofoto heen
+          liggen; hier is hij het eerste wat je leest zodra je door de foto heen
+          bent. Verdwijnt zodra je 'm hebt afgespeeld of afgevinkt. */}
+      <div style={{ marginTop: isMobile ? '1.1rem' : '1.4rem' }}>
+        <BelangrijkeVideo client={client} pagina="home" isMobile={isMobile} />
+      </div>
 
       {/* ── De dag als agenda ─────────────────────────────────────────────
           Eigen component (DagAgenda), los van het coach-gereedschap. Dit is

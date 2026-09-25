@@ -341,11 +341,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                 zichzelf niet als er niets openstaat. Boven de pagina-inhoud,
                 want een video die je moet zien hoort niet onder een scherm
                 grafieken te liggen. */}
-            {/* Meal en Workout doen dit zelf: op Meal staat het scherm vast
-                (position: fixed) en zou alles wat hier gerenderd wordt eronder
-                vallen; op Workout hoort de training van vandaag bovenaan en
-                staat de video daaronder. */}
-            {!focusMode && currentView !== 'meal' && currentView !== 'workout' && (
+            {/* Meal, Workout en Home plaatsen dit blok zelf, elk op de plek
+                waar het hoort: op Meal tussen de dag en de macro's (dat scherm
+                staat vast en zou alles hier eronder leggen), op Workout onder
+                de training van vandaag, op Home onder de dagkiezer. De overige
+                pagina's krijgen hem hier bovenaan. */}
+            {!focusMode && !['meal', 'workout', 'home'].includes(currentView) && (
               <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
             )}
             {currentView === 'home' && (
