@@ -282,13 +282,15 @@ export default function WeightProgressRing({
     <div style={{
       // Geen randen meer om de slider: die sneden het blok los van de rest
       // terwijl de zwarte ruimte het werk al doet.
-      marginTop: isMobile ? '2rem' : '2.5rem',
+      // Krap boven: de regel van de coach staat er vlak boven en samen namen ze
+      // een half scherm zwart in beslag.
+      marginTop: isMobile ? '0.5rem' : '0.75rem',
       width: '100%',
       maxWidth: '100%',
       boxSizing: 'border-box',
       overflow: 'hidden',
       contain: 'layout',
-      padding: isMobile ? '0.875rem 1rem 0' : '1rem 1.5rem 0',
+      padding: isMobile ? '0.25rem 1rem 0' : '0.35rem 1.5rem 0',
     }}>
       {/* De knop staat naast de slider, op dezelfde hoogte: de slider houdt
           eerder op aan de rechterkant en laat die ruimte vrij. Het gekozen

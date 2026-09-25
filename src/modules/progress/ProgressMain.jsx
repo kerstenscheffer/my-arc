@@ -28,47 +28,30 @@ const COACH_PHOTO_URL = '/coach-compliment.jpg'
 const COACH_TRACKING_MESSAGE = 'Gewichtsschommelingen zijn normaal. We sturen op basis van het week op week gemiddelde.'
 
 function TrackingTipBlock({ isMobile }) {
+  // Eén dunne regel boven de slider: rond fotootje, zin ernaast, gecentreerd.
+  // Dit was een banner van 130 pixels hoog met de foto half over de pagina —
+  // mooi, maar hij duwde het weegmoment onder de vouw, en je leest die zin één
+  // keer.
   return (
-    // Geen kader: de foto staat links en loopt naar rechts weg in het zwart
-    // van de pagina, met de tekst er half overheen. Een kaartje eromheen
-    // maakte er een blokje van dat los op de pagina lag.
     <div style={{
-      position: 'relative',
-      width: '100%',
-      minHeight: isMobile ? 130 : 150,
-      overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      gap: isMobile ? 8 : 10,
+      padding: isMobile ? '0.25rem 1rem' : '0.3rem 1.5rem',
+      maxWidth: 420, margin: '0 auto',
     }}>
       <div style={{
-        position: 'absolute', top: 0, left: 0, bottom: 0, width: '46%',
+        width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, flexShrink: 0,
+        borderRadius: '50%', overflow: 'hidden',
         backgroundImage: `url(${COACH_PHOTO_URL})`,
-        backgroundSize: 'cover', backgroundPosition: 'center 28%',
+        backgroundSize: 'cover', backgroundPosition: 'center 22%',
       }} />
       <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.35) 22%, rgba(10,10,10,0.8) 40%, #0a0a0a 58%)',
-      }} />
-      <div style={{
-        position: 'relative',
-        marginLeft: '26%',
-        padding: isMobile ? '0.9rem 1rem 1rem 0.5rem' : '1.1rem 1.5rem 1.2rem 0.75rem',
+        fontSize: isMobile ? '0.68rem' : '0.74rem',
+        fontWeight: 900, color: '#fff',
+        lineHeight: 1.3, letterSpacing: '-0.01em',
+        textAlign: 'center',
       }}>
-        <div style={{
-          fontSize: isMobile ? '0.6rem' : '0.65rem',
-          fontWeight: 800, color: 'rgba(255,255,255,0.45)',
-          textTransform: 'uppercase', letterSpacing: '0.1em',
-          marginBottom: 5,
-          textShadow: '0 2px 10px rgba(0,0,0,0.9)',
-        }}>
-          Van Kersten
-        </div>
-        <div style={{
-          fontSize: isMobile ? '0.88rem' : '0.95rem',
-          fontWeight: 900, color: '#fff',
-          lineHeight: 1.35, letterSpacing: '-0.015em',
-          textShadow: '0 2px 12px rgba(0,0,0,0.95)',
-        }}>
-          {COACH_TRACKING_MESSAGE}
-        </div>
+        {COACH_TRACKING_MESSAGE}
       </div>
     </div>
   )
@@ -276,15 +259,28 @@ export default function ProgressMain({ db, client }) {
             margin: '0 auto',
           }}
         >
-          <BeforeAfterCard
-            bare client={client} db={db} isMobile={isMobile}
-            fallbackUrl={heroFoto}
-          />
+          {/* De kaart zelf is 4:5 — over de volle breedte is dat een half
+              scherm hoog. We tonen er een band van uit, vastgezet aan de
+              bovenkant: daar staan de gezichten en de romp. De maand-labels
+              onderin de kaart vallen daarmee buiten beeld. */}
+          <div style={{
+            position: 'relative',
+            height: isMobile ? 215 : 260,
+            overflow: 'hidden',
+            borderRadius: 14,
+          }}>
+            <div style={{ position: 'absolute', left: 0, right: 0, top: 0 }}>
+              <BeforeAfterCard
+                bare client={client} db={db} isMobile={isMobile}
+                fallbackUrl={heroFoto}
+              />
+            </div>
+          </div>
           {/* Zwarte fade: laat de maand-labels net vrij en loopt daaronder dicht
               naar het zwart van de pagina, zodat de knop leesbaar is zonder een
               vak eromheen. */}
           <div style={{
-            position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%',
+            position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%',
             background: 'linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.9) 32%, rgba(10,10,10,0.45) 65%, transparent 100%)',
             pointerEvents: 'none', borderRadius: '0 0 14px 14px',
           }} />
@@ -340,6 +336,14 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
+      {/* De regel over weekgemiddeldes staat vlak boven het weegmoment: dat is
+          waar je hem nodig hebt, net voordat je je gewicht van vandaag intikt. */}
+      {!photosOpen && (
+        <div style={{ marginTop: isMobile ? '0.5rem' : '0.7rem' }}>
+          <TrackingTipBlock isMobile={isMobile} />
+        </div>
+      )}
+
       {/* ═══ ZONE 2: GEWICHT — Ring + Picker + Save ═══ */}
       {!photosOpen && (
         <WeightProgressRing
@@ -370,14 +374,6 @@ export default function ProgressMain({ db, client }) {
             </button>
           )}
         />
-      )}
-
-      {/* De boodschap over weekgemiddeldes hoort hier: je hebt net je gewicht
-          van vandaag ingetikt en ziet het tegelijk in de cijfers eronder. */}
-      {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
-          <TrackingTipBlock isMobile={isMobile} />
-        </div>
       )}
 
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
