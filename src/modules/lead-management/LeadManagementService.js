@@ -2234,7 +2234,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         callScheduled: { count: 0, happenedCount: 0, leads: [] },
         callBooked:    { count: 0, leads: [] },
         callHeld:      { count: 0, leads: [] },
-        sale:          { count: 0, leads: [], omzet: 0 },
+        sale:          { count: 0, leads: [], omzet: 0, toegezegd: 0 },
         noShow:        { count: 0, leads: [] },
         callRejected:  { count: 0, leads: [], reasons: {} },
         saleLost:      { count: 0, leads: [], reasons: {} },
@@ -2296,6 +2296,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // precies zoals het altijd al werkte.
         const geldBinnen = mov.payment_received === true || mov.is_reservation === true
         if (mov.order_value != null && geldBinnen) funnel.sale.omzet += Number(mov.order_value) || 0
+        // Wat je wél verkocht maar nog niet ontving: de ja's die op betaling
+        // wachten. Apart geteld, zodat je ziet wat er nog op te halen valt.
+        if (mov.order_value != null && !geldBinnen) funnel.sale.toegezegd += Number(mov.order_value) || 0
         const leadInfo = {
           id: mov.id,  // movement-id → nodig om deze stat-regel terug te kunnen draaien
           leadId: mov.lead_id,
@@ -2465,7 +2468,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
         callBooked: { count: 0, leads: [] },
         callHeld: { count: 0, leads: [] },
-        sale: { count: 0, leads: [], omzet: 0 }, noShow: { count: 0, leads: [] },
+        sale: { count: 0, leads: [], omzet: 0, toegezegd: 0 }, noShow: { count: 0, leads: [] },
         callRejected: { count: 0, leads: [], reasons: {} },
         saleLost: { count: 0, leads: [], reasons: {} },
         notSuitable: { count: 0, leads: [] },

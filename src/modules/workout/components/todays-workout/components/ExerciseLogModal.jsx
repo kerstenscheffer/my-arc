@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
+import ExerciseProgressChart from './ExerciseProgressChart'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
 import BladModal from './BladModal'
@@ -1179,6 +1180,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               </div>
               <div aria-hidden style={{ flexShrink: 0, width: isMobile ? 128 : 148 }} />
             </div>
+
+            {/* Krachtverloop van deze oefening: de beste set per training.
+                Staat onder de pillen, want het is context bij het loggen —
+                je ziet meteen of het zwaarder mag. */}
+            <ExerciseProgressChart
+              db={db}
+              client={client}
+              exerciseName={exercise.name}
+              isMobile={isMobile}
+            />
 
             {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} />}
 
