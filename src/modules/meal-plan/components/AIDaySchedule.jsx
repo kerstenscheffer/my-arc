@@ -587,35 +587,38 @@ export default function AIDaySchedule({
       ...prev,
       [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: waarde },
     }))
+    // Het vinkje en de macro's gaan meteen om; de database volgt erachteraan.
+    // Stond dit andersom, dan wachtte je op twee netwerkrondjes voordat er iets
+    // gebeurde — dat voelde traag, vooral bij het ongedaan maken.
     if (checkedMeals[meal.slot]) {
-      // Find the corresponding plan_check record so we can delete it.
-      // Without this, the record stays in consumed_meals: MacroHero keeps
-      // showing the calories AND the restore effect re-checks the slot on
-      // the next re-render — the "stuck on completed" bug.
+      zetVink(false)
+      // De macro's van vandaag meteen bijwerken (rekent met de maaltijd die je
+      // aantikte). Op een andere dag hoeft dat niet: die telt niet mee in de
+      // dagtotalen van vandaag.
+      if (isVandaagNu()) onUncheckMeal(meal.slot, meal)
+
+      // De plan_check-rij weghalen. Blijft die staan, dan blijft MacroHero de
+      // calorieën tellen en zet het herstel-effect het vinkje bij de volgende
+      // render gewoon weer aan.
       const mealId = meal.meal_id || meal.id
       const planCheckRecord = mealId
         ? consumedMeals.find(m => m.source === 'plan_check' && m.meal_id === mealId)
         : consumedMeals.find(m => m.source === 'plan_check' && m.meal_type === meal.slot?.replace(/\d+$/, ''))
       if (planCheckRecord && db?.supabase) {
-        try {
-          await db.supabase.from('consumed_meals').delete().eq('id', planCheckRecord.id)
-          setConsumedMeals(prev => prev.filter(m => m.id !== planCheckRecord.id))
-        } catch (e) {
-          console.error('Failed to remove plan_check on uncheck:', e)
-        }
+        setConsumedMeals(prev => prev.filter(m => m.id !== planCheckRecord.id))
+        db.supabase.from('consumed_meals').delete().eq('id', planCheckRecord.id)
+          .then(({ error }) => {
+            if (!error) return
+            console.error('Failed to remove plan_check on uncheck:', error)
+            // Mislukt het, dan zetten we het vinkje terug: anders lijkt het weg
+            // terwijl het na een herlaadbeurt weer staat.
+            setConsumedMeals(prev => (prev.some(m => m.id === planCheckRecord.id) ? prev : [...prev, planCheckRecord]))
+            zetVink(true)
+          }, (e) => console.error('Failed to remove plan_check on uncheck:', e))
       }
-      // onUncheckMeal en onCheckMeal rekenen met de dagtotalen van VANDAAG
-      // (ze zoeken in dashboardData.todayMeals). Afvinken op een andere dag
-      // zou daarmee vandaags macro's op- of aftellen. De rij in
-      // consumed_meals is hierboven al verwijderd en het vinkje staat lokaal,
-      // dus voor een andere dag hoeft die stap niet.
-      // De maaltijd zelf meegeven: aftellen moet met wat je aantikte, niet met
-      // wat er toevallig op dat slot in de dagtotalen staat.
-      if (isVandaagNu()) await onUncheckMeal(meal.slot, meal)
-      zetVink(false)
     } else {
-      if (isVandaagNu()) await onCheckMeal(meal.slot, meal)
       zetVink(true)
+      if (isVandaagNu()) onCheckMeal(meal.slot, meal)
     }
   }
   
