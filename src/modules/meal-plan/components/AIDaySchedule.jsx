@@ -2,7 +2,8 @@
 // 🎯 v3.1 - Edit consumed meal support added
 // ✅ FOOD LOG: Loads consumed_meals, combined totals, log button
 // ✅ EDIT: editingMeal state + FoodLogModal editMeal prop
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { getOverrides, lokaleDatum } from '../DayTemplateService'
 import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd } from '../utils/preWorkoutMeal'
 import { ClientAgendaService } from '../../client-agenda/ClientAgendaService'
 import DayScheduleHeader from './day-schedule/DayScheduleHeader'

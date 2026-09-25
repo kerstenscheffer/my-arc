@@ -8,6 +8,7 @@ import AIMealPlanService from './AIMealPlanService'
 
 // Core Components
 import AIDaySchedule from './components/AIDaySchedule'
+import DagTemplatePaneel from './components/DagTemplatePaneel'
 import AIWeekPlanner from './components/AIWeekPlanner'
 import MealSetupWizard from './components/wizard/MealSetupWizard'
 
@@ -706,6 +707,19 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         foodLogTab={foodLogTab}
         weekOffset={weekOffset}
         onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
+      />
+
+      {/* De dagen die je coach klaarzette, achter een tab tegen de linkerrand.
+          Staat buiten de dag-tijdlijn: het gaat over je week, niet over deze
+          ene maaltijd. */}
+      <DagTemplatePaneel
+        db={db}
+        client={client}
+        activePlan={dashboardData.activePlan}
+        isMobile={isMobile}
+        dagIndex={dayKeyToIndex(selectedDay)}
+        weekOffset={weekOffset}
+        onToegepast={loadDashboardData}
       />
 
       </div>
