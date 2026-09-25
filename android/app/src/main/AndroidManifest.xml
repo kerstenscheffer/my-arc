@@ -24,6 +24,20 @@
 
         </activity>
 
+        <!-- Health Connect: waarom we stappen lezen. Google Play weigert een
+             app die gezondheidsdata leest zonder dit scherm. De activiteit
+             zelf komt uit capacitor-health. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity="com.fit_up.health.capacitor.PermissionsRationaleActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -34,6 +48,13 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
     </application>
+
+    <!-- Health Connect moet zichtbaar zijn voor de app; zonder deze queries
+         ziet isHealthAvailable() hem niet staan op Android 11 en hoger. De
+         leesrechten zelf (READ_STEPS enz.) komen uit capacitor-health. -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 
     <!-- Permissions -->
 
