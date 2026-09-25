@@ -10,7 +10,7 @@ import AIMealPlanService from './AIMealPlanService'
 import AIDaySchedule from './components/AIDaySchedule'
 import DagTemplatePaneel from './components/DagTemplatePaneel'
 import ShoppingHub from '../shopping/ShoppingHub'
-import { ShoppingCart, X } from 'lucide-react'
+import { ShoppingCart, X, Eye, EyeOff } from 'lucide-react'
 import VoedingsplanFaq from './components/VoedingsplanFaq'
 import AIWeekPlanner from './components/AIWeekPlanner'
 import MealSetupWizard from './components/wizard/MealSetupWizard'
@@ -576,58 +576,50 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           position: 'absolute', inset: 0, pointerEvents: 'none',
           background: 'linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.12) 18%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.88) 72%, #0a0a0a 100%)',
         }} />
-        {/* Maaltijdplan tonen — bovenin op de foto, waar anders alleen lucht
-            zat. Wit in plaats van goud, net als de rest van de kop. */}
+        {/* Twee knoppen rechtsboven op de foto, onder elkaar: de
+            boodschappenlijst en de schakelaar voor het plan. Zelfde pil, zodat
+            ze als één setje lezen in plaats van een knop naast een los
+            schuifje. */}
         <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2,
+          position: 'absolute', top: 0, right: 0, zIndex: 2,
           padding: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 0.5rem) 1rem 0' : '0.7rem 1.5rem 0',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
+          display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6,
         }}>
-          <span style={{
-            fontSize: isMobile ? '0.8rem' : '0.88rem', fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.015em', textShadow: '0 2px 10px rgba(0,0,0,0.8)',
-          }}>
-            Maaltijdplan tonen
-          </span>
-          <button
-            onClick={() => setShopOpen(true)}
-            title="Boodschappenlijst"
-            style={{
+          {(() => {
+            const pil = (aan) => ({
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              marginLeft: 'auto', marginRight: 10, flexShrink: 0,
               minHeight: 32, padding: '0 0.7rem', borderRadius: 999,
-              background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.25)',
+              background: aan ? '#fff' : 'rgba(0,0,0,0.45)',
+              border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.25)'}`,
               backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-              color: '#fff', fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900,
-              fontFamily: 'inherit', cursor: 'pointer',
-              textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+              color: aan ? '#0a0a0a' : '#fff',
+              fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900,
+              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+              textShadow: aan ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <ShoppingCart size={14} strokeWidth={2.8} />
-            Boodschappen
-          </button>
-          <button
-            onClick={toggleMealPlanVisible}
-            disabled={savingVisibility}
-            role="switch"
-            aria-checked={mealPlanVisible}
-            style={{
-              width: 46, height: 26, borderRadius: 999, flexShrink: 0, position: 'relative',
-              background: mealPlanVisible ? '#fff' : 'rgba(0,0,0,0.45)',
-              border: mealPlanVisible ? 'none' : '1.5px solid rgba(255,255,255,0.6)',
-              cursor: savingVisibility ? 'default' : 'pointer',
-              transition: 'background 0.2s ease', opacity: savingVisibility ? 0.6 : 1,
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
-            }}>
-            <span style={{
-              position: 'absolute', top: 3, left: mealPlanVisible ? 23 : 3,
-              width: 20, height: 20, borderRadius: '50%',
-              background: mealPlanVisible ? '#0a0a0a' : '#fff',
-              transition: 'left 0.2s ease',
-            }} />
-          </button>
+            })
+            return (
+              <>
+                <button onClick={() => setShopOpen(true)} title="Boodschappenlijst" style={pil(false)}>
+                  <ShoppingCart size={14} strokeWidth={2.8} />
+                  Boodschappen
+                </button>
+                <button
+                  onClick={toggleMealPlanVisible}
+                  disabled={savingVisibility}
+                  role="switch"
+                  aria-checked={mealPlanVisible}
+                  title={mealPlanVisible ? 'Maaltijdplan verbergen' : 'Maaltijdplan tonen'}
+                  style={{ ...pil(mealPlanVisible), opacity: savingVisibility ? 0.6 : 1 }}
+                >
+                  {mealPlanVisible
+                    ? <Eye size={14} strokeWidth={2.8} />
+                    : <EyeOff size={14} strokeWidth={2.8} />}
+                  Maaltijdplan
+                </button>
+              </>
+            )
+          })()}
         </div>
 
         <div style={{
