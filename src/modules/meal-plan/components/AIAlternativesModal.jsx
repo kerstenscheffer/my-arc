@@ -248,14 +248,20 @@ export default function AIAlternativesModal({
     snack: 'snack', tussendoortje: 'snack',
   }
   // Dagmenu's: elk gerecht draagt het label van zijn niveau (dagmenu_2000,
-  // _2500, _3000). Dezelfde gerechten bestaan in drie maten, dus wissel je er
-  // een, dan horen daar alleen de gerechten van jouw niveau bij — anders kiest
-  // een klant van 2000 kcal een bord van 3000.
+  // _2500, _3000). Dezelfde gerechten bestaan in drie maten, dus je ziet er
+  // maar één — anders kiest een klant van 2000 kcal een bord van 3000.
+  //
+  // Welk niveau dat is, hangt aan het caloriedoel van de klant en niet aan de
+  // maaltijd die hij toevallig wisselt. Dat laatste ging mis: eet hij een dag
+  // uit het 2000-menu terwijl zijn doel 3150 is, dan filterde hij juist de
+  // suggesties weg die bij hem passen. Is het doel onbekend, dan volgen we
+  // alsnog de maaltijd.
   const niveauVan = (m) => {
     const labels = Array.isArray(m?.labels) ? m.labels : []
-    return labels.map(String).find(l => l.startsWith('dagmenu_')) || null
+    const label = labels.map(String).find(l => l.startsWith('dagmenu_'))
+    return label ? Number(label.replace('dagmenu_', '')) : null
   }
-  const huidigNiveau = niveauVan(currentMeal)
+  const huidigNiveau = niveauVoorDoel(client?.target_calories) || niveauVan(currentMeal)
 
   const momentenVan = (m) => {
     const uit = new Set()
@@ -331,6 +337,9 @@ export default function AIAlternativesModal({
     if (huidigNiveau) {
       meals = meals.filter(m => {
         const n = niveauVan(m)
+        // De maaltijd die je nu wisselt blijft altijd staan, ook als hij uit
+        // een ander niveau komt: hem verstoppen zou raar zijn.
+        if (m.id && currentMeal && (m.id === (currentMeal.meal_id || currentMeal.id))) return true
         return !n || n === huidigNiveau
       })
     }
