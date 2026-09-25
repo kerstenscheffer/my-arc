@@ -203,7 +203,17 @@ export default function AIDaySchedule({
     if (todayProgress?.consumed_meals) {
       const newChecked = {}
       Object.entries(todayProgress.consumed_meals).forEach(([slot, data]) => {
-        if (data?.consumed) newChecked[slot] = true
+        if (!data?.consumed) return
+        // Alleen als het ook dezelfde maaltijd is. Deze voortgang is per slot
+        // bewaard; zet je vandaag een andere dag neer, dan zou het nieuwe
+        // ontbijt anders meteen als gegeten worden getoond terwijl je iets
+        // anders at.
+        if (data.meal_id) {
+          const nu = displayMeals.find(m => m.slot === slot)
+          const nuId = nu?.meal_id || nu?.id
+          if (nu && nuId && nuId !== data.meal_id) return
+        }
+        newChecked[slot] = true
       })
       // Deze voortgang gaat over VANDAAG, dus komt hij alleen in de bak van
       // vandaag. Eerder ging hij in de gedeelde bak en gold hij daarmee voor
@@ -217,7 +227,7 @@ export default function AIDaySchedule({
         [vandaagKey]: { ...(prev[vandaagKey] || {}), ...newChecked },
       }))
     }
-  }, [todayProgress])
+  }, [todayProgress, displayMeals])
 
   // Herstel de afvink-status bij (her)laden van de pagina. De macro-totalen
   // bleven wel staan (losse som uit consumed_meals), maar de vinkjes per maaltijd
@@ -245,8 +255,13 @@ export default function AIDaySchedule({
         if (!alive || !Array.isArray(data)) return
         const restored = {}
         for (const row of data) {
+          // Strikt op maaltijd, niet op moment. Matchte dit op slot, dan kreeg
+          // een nieuwe dag een afgevinkt ontbijt zodra je eerder die dag iets
+          // anders als ontbijt had gelogd — een vinkje bij eten dat je nooit
+          // op hebt gehad. Alleen een rij zonder meal_id (ouder, of
+          // handmatig gelogd) valt nog terug op het moment.
           let m = row.meal_id ? displayMeals.find(dm => (dm.meal_id || dm.id) === row.meal_id) : null
-          if (!m && row.meal_type) m = displayMeals.find(dm => dm.slot === row.meal_type)
+          if (!m && !row.meal_id && row.meal_type) m = displayMeals.find(dm => dm.slot === row.meal_type)
           // Net uitgevinkt? Dan is deze rij op weg naar de prullenbak; hem nu
           // terugzetten zou het vinkje laten opspringen.
           if (m && !netUitgevinkt.current.has(`${dagKey}|${m.slot}`)) restored[m.slot] = true

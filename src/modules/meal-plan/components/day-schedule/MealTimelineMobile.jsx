@@ -72,10 +72,19 @@ export default function MealTimelineMobile({
     // omgerekend naar de trainingstijd. timing is de terugval.
     min: minutenVan(meal.plannedTime) ?? minutenVan(meal.timing) ?? 12 * 60,
   }))
+  // Welke maaltijden staan er vandaag in het plan? Daar vergelijken we de
+  // gelogde rijen mee.
+  const planIds = new Set(meals.map(m => m.meal_id || m.id).filter(Boolean))
   ;(consumedMeals || []).forEach(meal => {
     // Een afgevinkte plan-maaltijd staat al als kaart in de lijst; hem hier
     // nog eens tonen zou hetzelfde eten twee keer laten zien.
-    if (showPlan && meal.source === 'plan_check') return
+    //
+    // Maar alleen als hij er nog ín staat. Wissel je van dag nadat je iets
+    // hebt afgevinkt, dan hoort wat je at gewoon zichtbaar te blijven —
+    // anders verdwijnt het van het scherm terwijl het wel meetelt in je
+    // dagtotalen.
+    const staatInPlan = meal.meal_id ? planIds.has(meal.meal_id) : true
+    if (showPlan && meal.source === 'plan_check' && staatInPlan) return
     items.push({
       soort: 'gelogd', sleutel: `logged-${meal.id}`, data: meal,
       min: tijdVanGelogd(meal) ?? 12 * 60,
