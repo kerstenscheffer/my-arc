@@ -214,6 +214,12 @@ export default function ProgressMain({ db, client }) {
 
   const showMessage = (text, type = 'success') => { setMessage({ text, type }); setTimeout(() => setMessage(null), 3000) }
 
+  // Terugval voor de hero: de laatste foto die er wél is, zodat er nooit een
+  // leeg vak bovenaan de pagina staat. Zonder foto's valt BeforeAfterCard terug
+  // op deze afbeelding met de MA-overlay eroverheen.
+  const heroFoto = (recentPhotos.find(p => p.photo_url) || {}).photo_url
+    || 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=1000&fit=crop&q=80'
+
   const progressPercent = weightStats?.current && client?.target_weight
     ? Math.round((weightStats.current / parseFloat(client.target_weight)) * 100) : 0
 
@@ -252,11 +258,71 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
-      {/* ═══ ZONE 0: DAG-BANNER ═══ */}
+      {/* ═══ ZONE 0: TRANSFORMATIE — het eerste wat je ziet ═══
+            De before/after met de MA-overlay en de maand-labels, over de volle
+            breedte. Onderaan loopt hij weg in het zwart van de pagina; de knop
+            naar de foto's ligt daar overheen. Hij stond eerder halverwege de
+            pagina als plaatje van 120 pixels naast wat tekst — daar zag je je
+            eigen verandering niet op, en dat is precies waarom je hier komt. */}
       {!photosOpen && (
-        <>
-          <TrackingTipBlock isMobile={isMobile} />
-        </>
+        <div
+          onClick={() => setPhotosOpen(true)}
+          style={{
+            position: 'relative',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            maxWidth: isMobile ? '100%' : 420,
+            margin: '0 auto',
+          }}
+        >
+          <BeforeAfterCard
+            bare client={client} db={db} isMobile={isMobile}
+            fallbackUrl={heroFoto}
+          />
+          {/* Zwarte fade: laat de maand-labels net vrij en loopt daaronder dicht
+              naar het zwart van de pagina, zodat de knop leesbaar is zonder een
+              vak eromheen. */}
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%',
+            background: 'linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.9) 32%, rgba(10,10,10,0.45) 65%, transparent 100%)',
+            pointerEvents: 'none', borderRadius: '0 0 14px 14px',
+          }} />
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: isMobile ? '0 0.9rem 0.85rem' : '0 1.1rem 1rem',
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: isMobile ? '1.05rem' : '1.15rem',
+                fontWeight: 900, color: '#fff',
+                letterSpacing: '-0.02em', lineHeight: 1.1,
+                textShadow: '0 2px 12px rgba(0,0,0,0.9)',
+              }}>
+                Progress foto's
+              </div>
+              <div style={{
+                fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.6)', marginTop: 3,
+                textShadow: '0 1px 8px rgba(0,0,0,0.9)',
+              }}>
+                {photoCount > 0
+                  ? `${photoCount} ${photoCount === 1 ? 'foto' : "foto's"} · open om te bekijken`
+                  : 'Open om je eerste foto toe te voegen'}
+              </div>
+            </div>
+            <div style={{
+              flexShrink: 0,
+              width: isMobile ? 42 : 46, height: isMobile ? 42 : 46,
+              borderRadius: '50%', background: '#fff', color: '#0a0a0a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
+            }}>
+              <ChevronDown size={isMobile ? 22 : 24} strokeWidth={3} />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ═══ ZONE 1: FRIDAY ALERT ═══ */}
@@ -285,20 +351,33 @@ export default function ProgressMain({ db, client }) {
             <button
               onClick={() => setOmtrekOpen(true)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                height: 32, padding: '0 0.7rem', borderRadius: 9,
-                background: '#fff', border: 'none', color: '#0a0a0a',
-                fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 900,
+                // Geen vlak eromheen: naast een slider die zelf alleen uit
+                // cijfers bestaat, is een witte knop een blok dat de aandacht
+                // van het gewicht wegtrekt. Icoon boven het woord, allebei wit
+                // en dik — dat is genoeg om een knop te zijn.
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 3,
+                width: isMobile ? 52 : 58, minHeight: 52, padding: '0.4rem 0',
+                background: 'transparent', border: 'none', color: '#fff',
+                fontSize: isMobile ? '0.6rem' : '0.64rem', fontWeight: 900,
                 fontFamily: 'inherit', letterSpacing: '-0.01em',
                 cursor: 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Ruler size={13} strokeWidth={2.8} />
+              <Ruler size={20} strokeWidth={2.8} />
               Omtrek
             </button>
           )}
         />
+      )}
+
+      {/* De boodschap over weekgemiddeldes hoort hier: je hebt net je gewicht
+          van vandaag ingetikt en ziet het tegelijk in de cijfers eronder. */}
+      {!photosOpen && (
+        <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
+          <TrackingTipBlock isMobile={isMobile} />
+        </div>
       )}
 
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
@@ -387,103 +466,10 @@ export default function ProgressMain({ db, client }) {
         document.body
       )}
 
-      {/* ═══ ZONE 3: FOTO-KNOP — TodaysWorkoutCard-stijl: foto-banner bovenaan,
-            info-rij eronder, gouden cirkel-chevron rechts ═══ */}
-      {!photosOpen && (() => {
-        // Pak de laatste progress-foto als banner-image, fallback op een
-        // generieke gym-shot zodat de knop nooit leeg is.
-        const bannerUrl =
-          (recentPhotos.find(p => p.photo_url) || {}).photo_url
-          || 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=400&fit=crop&q=80'
-        // Hier stond een eigen before/after-opmaak (twee foto's naast elkaar met
-        // labels). Die tekent BeforeAfterCard zelf al; wat hier overbleef waren
-        // vier variabelen die nergens meer heen gingen.
-        return (
-          <div
-            onClick={() => setPhotosOpen(true)}
-            style={{
-              marginTop: isMobile ? '4rem' : '5rem',
-              padding: isMobile ? '0 1rem' : '0 1.5rem',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            {/* Foto links, tekst en knop rechts. De preview besloeg eerst de
-                hele breedte met de tekst eronder; dat is een halve schermhoogte
-                voor een knop. Nu staat hij ernaast en zie je in één blik waar
-                je op drukt. */}
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              gap: isMobile ? '0.75rem' : '1rem',
-            }}>
-              <div style={{ width: isMobile ? 120 : 150, flexShrink: 0 }}>
-                <BeforeAfterCard bare client={client} db={db} isMobile={isMobile} fallbackUrl={bannerUrl} />
-              </div>
-              <div style={{
-                flex: 1, minWidth: 0,
-                display: 'flex', flexDirection: 'column', justifyContent: 'center',
-              }}>
-                <div style={{
-                  fontSize: isMobile ? '0.55rem' : '0.6rem',
-                  fontWeight: 800,
-                  color: '#FFD700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  lineHeight: 1, marginBottom: 4, opacity: 0.85,
-                }}>
-                  Progressie
-                </div>
-                <h2 style={{
-                  fontSize: isMobile ? '1.05rem' : '1.2rem',
-                  fontWeight: 900, color: '#fff',
-                  margin: 0, marginBottom: 5,
-                  letterSpacing: '-0.02em',
-                  lineHeight: 1.15,
-                }}>
-                  Progress foto's
-                </h2>
-                <div style={{
-                  display: 'flex', gap: isMobile ? '0.6rem' : '0.8rem',
-                  alignItems: 'baseline',
-                  fontSize: isMobile ? '0.7rem' : '0.76rem',
-                  color: 'rgba(255,255,255,0.55)',
-                  fontWeight: 600,
-                }}>
-                  {photoCount > 0
-                    ? <>
-                        <span style={{ color: '#FFD700', fontWeight: 800 }}>{photoCount}</span>
-                        <span>{photoCount === 1 ? 'foto' : "foto's"}</span>
-                        <span style={{ opacity: 0.5 }}>·</span>
-                        <span>open om te bekijken</span>
-                      </>
-                    : <span>Open om foto toe te voegen</span>}
-                </div>
-              </div>
-
-              {/* Chevron — gouden cirkel-knop, identiek aan TodaysWorkoutCard */}
-              <div style={{
-                flexShrink: 0,
-                width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-                border: 'none',
-                boxShadow: '0 6px 16px rgba(255,215,0,0.35), 0 2px 6px rgba(0,0,0,0.4)',
-                color: '#0a0a0a',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-              }}>
-                <ChevronDown size={isMobile ? 22 : 26} strokeWidth={3} />
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
       {/* ═══ ZONE 4: GEWICHT-CONTENT — alleen wanneer foto-dropdown gesloten ═══
             Volgorde: histograaf bovenaan, daarna omtrekken. */}
       {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '4.25rem' : '5.25rem' }}>
+        <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>
           {/* De lijst met alle weeglogs stond hier. Die staat al in het verloop
               hierboven, en tweehonderd regels onder een grafiek leest niemand. */}
 

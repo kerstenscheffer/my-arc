@@ -290,29 +290,32 @@ export default function WeightProgressRing({
       contain: 'layout',
       padding: isMobile ? '0.875rem 1rem 0' : '1rem 1.5rem 0',
     }}>
-      <HorizontalPicker
-        value={weight}
-        onChange={onWeightChange}
-        disabled={showSavedState}
-        savedLabel={showSavedState}
-        onEdit={startEdit}
-      />
+      {/* De knop staat naast de slider, op dezelfde hoogte: de slider houdt
+          eerder op aan de rechterkant en laat die ruimte vrij. Het gekozen
+          getal blijft midden in wat er van de slider overblijft. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <HorizontalPicker
+            value={weight}
+            onChange={onWeightChange}
+            disabled={showSavedState}
+            savedLabel={showSavedState}
+            onEdit={startEdit}
+          />
+        </div>
+        {extraKnop && <div style={{ flexShrink: 0 }}>{extraKnop}</div>}
+      </div>
 
-      {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk. De rij blijft wel
-          staan zodra er een extra knop in zit, want die hoort rechts naast de
-          slider te blijven staan, ook als het gewicht al gelogd is. */}
-      {(!showSavedState || extraKnop) && (
+      {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk */}
+      {!showSavedState && (
         <div style={{
-          position: 'relative',
           display: 'flex',
           gap: '0.4rem',
           marginTop: '0.625rem',
           justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '32px',
           maxWidth: '100%',
         }}>
-          {!showSavedState && [-0.1, +0.1].map((d) => (
+          {[-0.1, +0.1].map((d) => (
             <button key={d} onClick={() => adjust(d)} style={{
               width: isMobile ? '64px' : '72px',
               height: '32px',
@@ -329,11 +332,6 @@ export default function WeightProgressRing({
               WebkitTapHighlightColor: 'transparent',
             }}>{d > 0 ? `+${d}` : d}</button>
           ))}
-          {extraKnop && (
-            <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
-              {extraKnop}
-            </div>
-          )}
         </div>
       )}
 

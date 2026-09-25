@@ -18,13 +18,16 @@ import {
   Edit2
 } from 'lucide-react'
 
-const GOLDEN_THEME = {
-  primary: '#FFD700',
-  secondary: '#FFA500',
+// Wit en dik, zoals de rest van de trackingpagina. Het goud stond hier nog uit
+// de tijd dat elk blok zijn eigen kleur had; naast een slider en een grafiek die
+// allebei wit zijn, trok dit blad de aandacht naar de verkeerde kant.
+const WIT = {
+  primary: '#fff',
+  secondary: 'rgba(255,255,255,0.55)',
   success: '#10b981',  // GROEN = AFVALLEN (alle metrics)
   danger: '#dc2626',
-  border: 'rgba(255, 215, 0, 0.08)',
-  gradient: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)'
+  border: 'rgba(255,255,255,0.10)',
+  gradient: '#fff'
 }
 
 // `alsBlad`: het blok zit in het blad dat van onderen omhoog komt. Dan heeft het
@@ -190,7 +193,7 @@ export default function CircumferenceMeasurements({
           'rgba(220, 38, 38, 0.1)',     // ROOD voor toename
         borderRadius: '4px',
         fontSize: isMobile ? '0.65rem' : '0.7rem',
-        color: isDecrease ? GOLDEN_THEME.success : GOLDEN_THEME.danger,
+        color: isDecrease ? WIT.success : WIT.danger,
         fontWeight: '600'
       }}>
         {isDecrease ? (
@@ -243,7 +246,7 @@ export default function CircumferenceMeasurements({
     <div style={alsBlad ? { background: 'transparent' } : {
       background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.6) 0%, rgba(10, 10, 10, 0.6) 100%)',
       borderRadius: isMobile ? '12px' : '16px',
-      border: `1px solid ${GOLDEN_THEME.border}`,
+      border: `1px solid ${WIT.border}`,
       backdropFilter: 'blur(10px)',
       overflow: 'hidden'
     }}>
@@ -294,7 +297,7 @@ export default function CircumferenceMeasurements({
           WebkitTapHighlightColor: 'transparent'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(255, 215, 0, 0.05)'
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'transparent'
@@ -305,7 +308,7 @@ export default function CircumferenceMeasurements({
           alignItems: 'center',
           gap: '0.5rem'
         }}>
-          <Ruler size={isMobile ? 16 : 18} color={GOLDEN_THEME.primary} style={{ opacity: 0.7 }} />
+          <Ruler size={isMobile ? 16 : 18} color={WIT.primary} style={{ opacity: 0.7 }} />
           <span style={{
             fontSize: isMobile ? '0.9rem' : '1rem',
             fontWeight: '600',
@@ -314,15 +317,15 @@ export default function CircumferenceMeasurements({
             Omtrekmetingen
           </span>
           {todayEntry && !isEditMode && (
-            <Check size={isMobile ? 14 : 16} color={GOLDEN_THEME.success} />
+            <Check size={isMobile ? 14 : 16} color={WIT.success} />
           )}
           {isEditMode && (
-            <Edit2 size={isMobile ? 14 : 16} color={GOLDEN_THEME.primary} />
+            <Edit2 size={isMobile ? 14 : 16} color={WIT.primary} />
           )}
         </div>
         
         {isExpanded ? (
-          <ChevronUp size={isMobile ? 18 : 20} color={GOLDEN_THEME.primary} />
+          <ChevronUp size={isMobile ? 18 : 20} color={WIT.primary} />
         ) : (
           <ChevronDown size={isMobile ? 18 : 20} color='rgba(255, 255, 255, 0.5)' />
         )}
@@ -333,7 +336,7 @@ export default function CircumferenceMeasurements({
       {isExpanded && (
         <div style={alsBlad ? { padding: 0 } : {
           padding: isMobile ? '0 1rem 1rem 1rem' : '0 1.25rem 1.25rem 1.25rem',
-          borderTop: `1px solid ${GOLDEN_THEME.border}`
+          borderTop: `1px solid ${WIT.border}`
         }}>
           {loading ? (
             <div style={{
@@ -345,12 +348,12 @@ export default function CircumferenceMeasurements({
             }}>
               <Loader2 
                 size={isMobile ? 20 : 24} 
-                color={GOLDEN_THEME.primary}
+                color={WIT.primary}
                 style={{ animation: 'spin 1s linear infinite' }}
               />
               <span style={{
                 fontSize: isMobile ? '0.75rem' : '0.8rem',
-                color: 'rgba(255, 215, 0, 0.7)'
+                color: 'rgba(255, 255, 255, 0.7)'
               }}>
                 Data laden...
               </span>
@@ -368,10 +371,10 @@ export default function CircumferenceMeasurements({
                     onClick={handleEdit}
                     style={{
                       padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
-                      background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%)',
-                      border: `1px solid ${GOLDEN_THEME.border}`,
+                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+                      border: `1px solid ${WIT.border}`,
                       borderRadius: '10px',
-                      color: GOLDEN_THEME.primary,
+                      color: WIT.primary,
                       fontSize: isMobile ? '0.8rem' : '0.85rem',
                       fontWeight: '600',
                       cursor: 'pointer',
@@ -383,11 +386,11 @@ export default function CircumferenceMeasurements({
                       WebkitTapHighlightColor: 'transparent'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 165, 0, 0.08) 100%)'
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%)'
                       e.currentTarget.style.transform = 'translateY(-1px)'
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%)'
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)'
                       e.currentTarget.style.transform = 'translateY(0)'
                     }}
                   >
@@ -404,7 +407,7 @@ export default function CircumferenceMeasurements({
                   padding: isMobile ? '0.75rem' : '1rem',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderRadius: '12px',
-                  border: `1px solid rgba(255, 215, 0, 0.08)`
+                  border: `1px solid rgba(255, 255, 255, 0.08)`
                 }}>
                   <div style={{
                     fontSize: isMobile ? '0.7rem' : '0.75rem',
@@ -475,7 +478,7 @@ export default function CircumferenceMeasurements({
                           <div style={{
                             textAlign: isMobile ? 'center' : 'left',
                             fontSize: isMobile ? '0.8rem' : '0.85rem',
-                            color: GOLDEN_THEME.primary,
+                            color: WIT.primary,
                             fontWeight: '700'
                           }}>
                             {current ? `${current} cm` : '--'}
@@ -532,14 +535,15 @@ export default function CircumferenceMeasurements({
                             gap: '0.375rem'
                           }}>
                             <IconComponent 
-                              size={isMobile ? 14 : 16} 
-                              color={GOLDEN_THEME.primary}
-                              style={{ opacity: 0.7 }}
+                              size={isMobile ? 15 : 17} 
+                              color={WIT.primary}
+                              strokeWidth={2.6}
                             />
                             <span style={{
-                              fontSize: isMobile ? '0.7rem' : '0.75rem',
-                              color: 'rgba(255,255,255,0.6)',
-                              fontWeight: '600'
+                              fontSize: isMobile ? '0.72rem' : '0.78rem',
+                              color: '#fff',
+                              fontWeight: '900',
+                              letterSpacing: '-0.01em'
                             }}>
                               {metric.label}
                             </span>
@@ -569,13 +573,13 @@ export default function CircumferenceMeasurements({
                               'rgba(0, 0, 0, 0.4)',
                             border: `1px solid ${inputsDisabled ? 
                               'rgba(255, 255, 255, 0.05)' : 
-                              'rgba(255, 215, 0, 0.15)'}`,
+                              'rgba(255, 255, 255, 0.15)'}`,
                             borderRadius: '8px',
                             color: inputsDisabled ? 
                               'rgba(255, 255, 255, 0.4)' : 
                               '#fff',
-                            fontSize: isMobile ? '0.9rem' : '1rem',
-                            fontWeight: '600',
+                            fontSize: isMobile ? '1rem' : '1.05rem',
+                            fontWeight: '900',
                             textAlign: 'center',
                             outline: 'none',
                             opacity: inputsDisabled ? 0.6 : 1
@@ -594,7 +598,7 @@ export default function CircumferenceMeasurements({
                   padding: isMobile ? '0.75rem' : '1rem',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderRadius: '12px',
-                  border: `1px solid rgba(255, 215, 0, 0.08)`
+                  border: `1px solid rgba(255, 255, 255, 0.08)`
                 }}>
                   <div style={{
                     fontSize: isMobile ? '0.7rem' : '0.75rem',
@@ -626,7 +630,7 @@ export default function CircumferenceMeasurements({
                             {metric.label}:
                           </span>
                           <span style={{ 
-                            color: GOLDEN_THEME.primary,
+                            color: WIT.primary,
                             fontWeight: '600'
                           }}>
                             {avgValue} cm
@@ -688,13 +692,11 @@ export default function CircumferenceMeasurements({
                       flex: 1,
                       padding: isMobile ? '0.75rem' : '0.875rem',
                       borderRadius: '12px',
-                      background: saving
-                        ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(255, 165, 0, 0.5) 100%)'
-                        : GOLDEN_THEME.gradient,
+                      background: saving ? 'rgba(255,255,255,0.55)' : WIT.gradient,
                       border: 'none',
-                      color: '#000',
+                      color: '#0a0a0a',
                       fontSize: isMobile ? '0.9rem' : '1rem',
-                      fontWeight: '700',
+                      fontWeight: '900',
                       cursor: saving ? 'wait' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -708,7 +710,7 @@ export default function CircumferenceMeasurements({
                     onMouseEnter={(e) => {
                       if (!saving) {
                         e.currentTarget.style.transform = 'translateY(-2px)'
-                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 215, 0, 0.3)'
+                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 255, 255, 0.3)'
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -739,7 +741,7 @@ export default function CircumferenceMeasurements({
                   padding: isMobile ? '0.75rem' : '1rem',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderRadius: '12px',
-                  border: `1px solid rgba(255, 215, 0, 0.08)`
+                  border: `1px solid rgba(255, 255, 255, 0.08)`
                 }}>
                   <div style={{
                     fontSize: isMobile ? '0.7rem' : '0.75rem',
