@@ -48,6 +48,11 @@ export default function AIAlternativesModal({
   const [moment, setMoment] = useState('alles')
   const [bron, setBron] = useState('alles')
   const [sortering, setSortering] = useState('smart')
+  // Het caloriedoel bepaalt welk dagmenu-niveau je ziet. Het zit niet altijd
+  // op het client-object dat dit venster binnenkrijgt, dus halen we het er zo
+  // nodig zelf bij — anders valt het hele niveau weg en blijft er van de
+  // suggesties niets over.
+  const [doelKcal, setDoelKcal] = useState(client?.target_calories || null)
   const [alternatives, setAlternatives] = useState([])
   const [allMeals, setAllMeals] = useState([])
   const [customMeals, setCustomMeals] = useState([])
@@ -187,12 +192,22 @@ export default function AIAlternativesModal({
       // iemand van 2200 de ontbijten van het 2000-menu krijgt en niet die van
       // 3000. De coach hoeft hier niets voor in te stellen.
       try {
-        const niveau = niveauVoorDoel(client?.target_calories)
+        let doel = client?.target_calories || doelKcal
+        if (!doel && client?.id) {
+          const { data: rij } = await db.supabase
+            .from('clients').select('target_calories').eq('id', client.id).maybeSingle()
+          doel = rij?.target_calories || null
+          if (doel) setDoelKcal(doel)
+        }
+        const niveau = niveauVoorDoel(doel)
         if (niveau) {
-          const { data: dagmenu } = await db.supabase
+          // Op internal_name (dagmenu3000_kwarkbowl) in plaats van op het
+          // label: een gewone tekstvergelijking, geen jsonb-containment.
+          const { data: dagmenu, error: dagmenuFout } = await db.supabase
             .from('ai_meals')
             .select('*')
-            .contains('labels', [`dagmenu_${niveau}`])
+            .like('internal_name', `dagmenu${niveau}\_%`)
+          if (dagmenuFout) console.warn('Dagmenu-suggesties:', dagmenuFout.message)
           const alGekozen = new Set([...(curated || []).map(m => m.id)])
           ;(dagmenu || []).forEach(m => {
             const moment = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
@@ -261,7 +276,7 @@ export default function AIAlternativesModal({
     const label = labels.map(String).find(l => l.startsWith('dagmenu_'))
     return label ? Number(label.replace('dagmenu_', '')) : null
   }
-  const huidigNiveau = niveauVoorDoel(client?.target_calories) || niveauVan(currentMeal)
+  const huidigNiveau = niveauVoorDoel(client?.target_calories || doelKcal) || niveauVan(currentMeal)
 
   const momentenVan = (m) => {
     const uit = new Set()
