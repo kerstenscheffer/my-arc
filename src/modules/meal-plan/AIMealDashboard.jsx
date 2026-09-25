@@ -9,6 +9,8 @@ import AIMealPlanService from './AIMealPlanService'
 // Core Components
 import AIDaySchedule from './components/AIDaySchedule'
 import DagTemplatePaneel from './components/DagTemplatePaneel'
+import ShoppingHub from '../shopping/ShoppingHub'
+import { ShoppingCart, X } from 'lucide-react'
 import VoedingsplanFaq from './components/VoedingsplanFaq'
 import AIWeekPlanner from './components/AIWeekPlanner'
 import MealSetupWizard from './components/wizard/MealSetupWizard'
@@ -89,6 +91,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   // daarnaar en haalt zijn dag opnieuw op, zodat je meteen het nieuwe eten
   // ziet in plaats van het oude tot je de pagina ververst.
   const [dagRefreshKey, setDagRefreshKey] = useState(0)
+  // De boodschappenlijst hoort bij je eten, niet in een apart tabblad achter
+  // "Meer". Hij opent nu vanaf de kop van deze pagina.
+  const [shopOpen, setShopOpen] = useState(false)
   const [showWeekPlanner, setShowWeekPlanner] = useState(false)
   const [showWizard, setShowWizard] = useState(false)
   // Counter dat AIDaySchedule's FoodLogModal triggert wanneer de FAB
@@ -585,6 +590,24 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
             Maaltijdplan tonen
           </span>
           <button
+            onClick={() => setShopOpen(true)}
+            title="Boodschappenlijst"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              marginLeft: 'auto', marginRight: 10, flexShrink: 0,
+              minHeight: 32, padding: '0 0.7rem', borderRadius: 999,
+              background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.25)',
+              backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+              color: '#fff', fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900,
+              fontFamily: 'inherit', cursor: 'pointer',
+              textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <ShoppingCart size={14} strokeWidth={2.8} />
+            Boodschappen
+          </button>
+          <button
             onClick={toggleMealPlanVisible}
             disabled={savingVisibility}
             role="switch"
@@ -715,6 +738,40 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         onDagBewaard={() => setDagRefreshKey(k => k + 1)}
         onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
       />
+
+      {/* Boodschappenlijst: schermvullend over de maaltijdpagina heen. */}
+      {shopOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 2147483000,
+          background: '#0a0a0a', display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
+            padding: isMobile ? 'calc(0.9rem + env(safe-area-inset-top, 0px)) 1rem 0.8rem' : '1.1rem 1.5rem 0.9rem',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <ShoppingCart size={19} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+              Boodschappen
+            </div>
+            <button
+              onClick={() => setShopOpen(false)}
+              aria-label="Sluiten"
+              style={{
+                width: 40, height: 40, flexShrink: 0, borderRadius: 12,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <X size={19} strokeWidth={2.8} />
+            </button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <ShoppingHub client={client} db={db} />
+          </div>
+        </div>
+      )}
 
       {/* Algemene vragen over het plan: onderaan, dicht. Ze horen niet bij
           één maaltijd, dus ze staan onder de dag en niet in een recept. */}

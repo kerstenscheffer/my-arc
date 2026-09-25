@@ -19,6 +19,7 @@ import ChallengeProgressTab from '../modules/challenge-monitor/ChallengeProgress
 import MediaBibliotheek from './components/MediaBibliotheek'
 import WidgetSidebar from '../components/WidgetSidebar'
 import VideoTeaser from './components/VideoTeaser'
+import BelangrijkeVideo from './components/BelangrijkeVideo'
 import WaterFles from './components/WaterFles'
 import { syncStappen } from '../modules/steps/stappenSync'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
@@ -107,7 +108,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   // Achter "Meer". Vragen is geen pagina maar het vragen-venster; die stond
   // alleen nog in de zwevende widgetbalk.
   const meerItems = [
-    { id: 'boodschappen', label: 'Shop',    Icon: ShoppingCart, actie: () => setCurrentView('boodschappen') },
+    // Boodschappen is verhuisd naar de maaltijdpagina (knop op de foto): daar
+    // hoort hij, want hij komt uit je plan. De weergave hieronder blijft
+    // bestaan zodat een oude link niet doodloopt.
     { id: 'calls',        label: 'Calls',   Icon: Phone,        actie: () => setCurrentView('calls') },
     { id: 'profile',      label: 'Profile', Icon: User,         actie: () => setCurrentView('profile') },
     { id: 'vragen',       label: 'Vragen',  Icon: HelpCircle,   actie: () => setWidgetOpen('vragen') },
@@ -327,6 +330,14 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       }}>
         <div>
           <div style={{ flex: 1 }}>
+            {/* Video's die de coach als belangrijk heeft gemarkeerd voor déze
+                pagina. Eén plek voor alle zeven pagina's; het blok tekent
+                zichzelf niet als er niets openstaat. Boven de pagina-inhoud,
+                want een video die je moet zien hoort niet onder een scherm
+                grafieken te liggen. */}
+            {!focusMode && (
+              <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
+            )}
             {currentView === 'home' && (
               <ClientHome client={client} db={db} setCurrentView={setCurrentView} />
             )}
