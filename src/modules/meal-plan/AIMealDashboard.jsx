@@ -354,11 +354,25 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     }
   }
   
-  const handleUncheckMeal = async (slot) => {
+  // `mealData` is de maaltijd die de klant aantikte. Die telt af, en niet de
+  // maaltijd die toevallig op datzelfde slot in todayMeals staat.
+  //
+  // Dat was de bug: afvinken telde de aangetikte maaltijd óp, ongedaan maken
+  // zocht er zelf een bij het slot. Staat daar iets anders — bijvoorbeeld
+  // omdat de dag een dagtemplate kreeg en todayMeals nog het weekplan had —
+  // dan trok hij een ander bedrag af en bleef het verschil staan. Vond hij
+  // niets, dan gebeurde er helemaal niets en bleven de macro's staan terwijl
+  // het vinkje wel uit ging.
+  const handleUncheckMeal = async (slot, mealData = null) => {
     console.log('❌ [OPTIMISTIC] Unchecking meal:', slot)
-    
-    const mealToUncheck = dashboardData.todayMeals?.find(m => m.slot === slot)
-    if (!mealToUncheck) return
+
+    const mealToUncheck = mealData || dashboardData.todayMeals?.find(m => m.slot === slot)
+    if (!mealToUncheck) {
+      // Niets om mee te rekenen: dan liever opnieuw ophalen dan de teller
+      // laten staan.
+      await loadDashboardData()
+      return
+    }
     
     setDashboardData(prev => {
       const newConsumed = {

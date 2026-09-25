@@ -609,7 +609,9 @@ export default function AIDaySchedule({
       // zou daarmee vandaags macro's op- of aftellen. De rij in
       // consumed_meals is hierboven al verwijderd en het vinkje staat lokaal,
       // dus voor een andere dag hoeft die stap niet.
-      if (isVandaagNu()) await onUncheckMeal(meal.slot)
+      // De maaltijd zelf meegeven: aftellen moet met wat je aantikte, niet met
+      // wat er toevallig op dat slot in de dagtotalen staat.
+      if (isVandaagNu()) await onUncheckMeal(meal.slot, meal)
       zetVink(false)
     } else {
       if (isVandaagNu()) await onCheckMeal(meal.slot, meal)
