@@ -102,17 +102,59 @@ export async function ontkoppelTemplate(supabase, { clientId, templateId }) {
 
 // ── Klant: zijn eigen lijst ────────────────────────────────────────────────
 
+// De dagmenu's bestaan in drie maten. Welke hoort bij deze klant? De
+// dichtstbijzijnde: tot 2250 kcal het 2000-menu, daarboven 2500, en vanaf
+// 2750 het 3000-menu. Zo hoeft niemand iets toe te wijzen — wie 2200 als doel
+// heeft ziet vanzelf de 2000-dagen.
+export const DAGMENU_NIVEAUS = [2000, 2500, 3000]
+
+export const niveauVoorDoel = (doelKcal) => {
+  const doel = Number(doelKcal)
+  if (!Number.isFinite(doel) || doel <= 0) return null
+  return DAGMENU_NIVEAUS.reduce((beste, niveau) => (
+    Math.abs(niveau - doel) < Math.abs(beste - doel) ? niveau : beste
+  ), DAGMENU_NIVEAUS[0])
+}
+
+// Hoort een dagtemplate bij dit niveau? De dagen schommelen rond hun doel
+// (1971–2019 voor het 2000-menu), dus we kijken of het dichtstbijzijnde
+// niveau van die dag hetzelfde is.
+const templateNiveau = (t) => niveauVoorDoel(t?.daily_calories)
+
 export async function getKlantDagTemplates(supabase, clientId) {
   if (!clientId) return []
-  const { data, error } = await supabase
-    .from('client_day_templates')
-    .select('template_id, meal_plan_templates(id, name, template_name, emoji, daily_calories, daily_protein, daily_carbs, daily_fat, meals_per_day, week_structure)')
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: true })
-  if (error) { console.warn('Dagtemplates van klant laden mislukt:', error.message); return [] }
-  return (data || [])
-    .map(r => r.meal_plan_templates)
-    .filter(Boolean)
+
+  const [{ data: gekoppeld, error }, { data: klant }] = await Promise.all([
+    supabase
+      .from('client_day_templates')
+      .select('template_id, meal_plan_templates(id, name, template_name, emoji, daily_calories, daily_protein, daily_carbs, daily_fat, meals_per_day, week_structure)')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: true }),
+    supabase.from('clients').select('target_calories').eq('id', clientId).maybeSingle(),
+  ])
+  if (error) console.warn('Dagtemplates van klant laden mislukt:', error.message)
+
+  const lijst = (gekoppeld || []).map(r => r.meal_plan_templates).filter(Boolean)
+
+  // Daarbovenop: de dagmenu's die bij zijn caloriedoel passen. Die hoeft de
+  // coach niet toe te wijzen — verandert het doel, dan verschuift de lijst mee.
+  const niveau = niveauVoorDoel(klant?.target_calories)
+  if (niveau) {
+    const { data: auto } = await supabase
+      .from('meal_plan_templates')
+      .select('id, name, template_name, emoji, daily_calories, daily_protein, daily_carbs, daily_fat, meals_per_day, week_structure')
+      .eq('plan_type', SJABLOON_DAG)
+      .gte('daily_calories', niveau - 250)
+      .lte('daily_calories', niveau + 250)
+      .order('name', { ascending: true })
+    ;(auto || []).forEach(t => {
+      if (templateNiveau(t) !== niveau) return
+      if (lijst.some(x => x.id === t.id)) return
+      lijst.push(t)
+    })
+  }
+
+  return lijst
 }
 
 // Tijdelijke dagen in een venster, als map datum → rij.
