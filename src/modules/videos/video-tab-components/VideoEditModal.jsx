@@ -11,7 +11,10 @@ import {
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 
-const GOLD = '#FFD700'
+// Wit, zoals de rest van de app. Het goud kwam uit de tijd dat elk blok zijn
+// eigen kleur had; in een formulier vol zwarte velden is een witte knop het
+// duidelijkst.
+const WIT = '#fff'
 
 // ── Page keys matchen ClientDashboard ──
 const PAGE_OPTIONS = [
@@ -39,7 +42,8 @@ export default function VideoEditModal({
     category_id: video.category_id || null,
     is_personal: video.is_personal === true,
     default_pages: video.default_pages || [],
-    show_in_slider: video.show_in_slider || false
+    show_in_slider: video.show_in_slider || false,
+    is_belangrijk: video.is_belangrijk === true
   })
   const [thumbnailFile, setThumbnailFile] = useState(null)
   const [thumbnailPreview, setThumbnailPreview] = useState(video.thumbnail_url || null)
@@ -101,7 +105,8 @@ export default function VideoEditModal({
         category_id: formData.category_id || null,
         is_personal: formData.is_personal === true,
         default_pages: formData.default_pages,
-        show_in_slider: formData.show_in_slider
+        show_in_slider: formData.show_in_slider,
+        is_belangrijk: formData.is_belangrijk === true
       }
 
       // Handle thumbnail upload if changed
@@ -316,7 +321,7 @@ export default function VideoEditModal({
           }}>
             <label style={{
               ...labelStyle,
-              color: customCategories.length > 0 ? GOLD : 'rgba(255, 255, 255, 0.3)'
+              color: customCategories.length > 0 ? WIT : 'rgba(255, 255, 255, 0.3)'
             }}>
               Categorie
               {customCategories.length === 0 && (
@@ -464,7 +469,7 @@ export default function VideoEditModal({
                     bottom: '0.4rem',
                     left: '0.4rem',
                     padding: '0.2rem 0.45rem',
-                    background: GOLD,
+                    background: WIT,
                     borderRadius: '4px',
                     fontSize: '0.55rem',
                     fontWeight: '800',
@@ -544,7 +549,7 @@ export default function VideoEditModal({
                 <span style={{
                   marginLeft: '0.3rem',
                   padding: '0.1rem 0.35rem',
-                  background: GOLD,
+                  background: WIT,
                   color: '#000',
                   borderRadius: '3px',
                   fontSize: '0.5rem',
@@ -578,9 +583,9 @@ export default function VideoEditModal({
                     onClick={() => togglePage(page.value)}
                     style={{
                       padding: '0.55rem 0.4rem',
-                      background: isSelected ? GOLD : 'transparent',
+                      background: isSelected ? WIT : 'transparent',
                       border: isSelected
-                        ? `1px solid ${GOLD}`
+                        ? `1px solid ${WIT}`
                         : '1px solid rgba(255, 255, 255, 0.08)',
                       borderRadius: '6px',
                       color: isSelected ? '#000' : 'rgba(255, 255, 255, 0.5)',
@@ -607,11 +612,41 @@ export default function VideoEditModal({
             </div>
           </div>
 
+          {/* ── BELANGRIJK ── */}
+          {/* Staat direct onder de pagina's: die twee horen bij elkaar. Een
+              video die gezien moet worden zonder pagina heeft geen plek om te
+              verschijnen. */}
+          <div style={{
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+            borderLeft: formData.is_belangrijk ? `3px solid ${WIT}` : '3px solid transparent',
+            transition: 'border-left-color 0.2s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '800', color: '#fff', marginBottom: '0.15rem' }}>
+                  Belangrijk — moet gezien worden
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
+                  {formData.is_belangrijk
+                    ? 'Staat als blok ín de gekozen pagina’s tot de klant hem afspeelt of afvinkt. Daarna alleen nog in de bibliotheek.'
+                    : 'Uit: de video komt alleen langs in de video-balk en staat in de bibliotheek.'}
+                </div>
+              </div>
+              <button
+                onClick={() => setFormData({ ...formData, is_belangrijk: !formData.is_belangrijk })}
+                style={{ width: '40px', height: '22px', background: formData.is_belangrijk ? WIT : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div style={{ position: 'absolute', top: '2px', left: formData.is_belangrijk ? '20px' : '2px', width: '18px', height: '18px', background: formData.is_belangrijk ? '#0a0a0a' : '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
+              </button>
+            </div>
+          </div>
+
           {/* ── IN HOME-SLIDER? ── */}
           <div style={{
             padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-            borderLeft: formData.show_in_slider ? `3px solid ${GOLD}` : '3px solid transparent',
+            borderLeft: formData.show_in_slider ? `3px solid ${WIT}` : '3px solid transparent',
             transition: 'border-left-color 0.2s ease'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -625,7 +660,7 @@ export default function VideoEditModal({
               </div>
               <button
                 onClick={() => setFormData({ ...formData, show_in_slider: !formData.show_in_slider })}
-                style={{ width: '40px', height: '22px', background: formData.show_in_slider ? GOLD : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                style={{ width: '40px', height: '22px', background: formData.show_in_slider ? WIT : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
               >
                 <div style={{ position: 'absolute', top: '2px', left: formData.show_in_slider ? '20px' : '2px', width: '18px', height: '18px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
               </button>
@@ -673,8 +708,8 @@ export default function VideoEditModal({
               flex: 2,
               padding: '0.625rem',
               background: saving || !formData.title.trim() || !formData.video_url.trim()
-                ? 'rgba(255, 215, 0, 0.2)'
-                : GOLD,
+                ? 'rgba(255, 255, 255, 0.2)'
+                : WIT,
               border: 'none',
               borderRadius: '6px',
               color: saving || !formData.title.trim() || !formData.video_url.trim()

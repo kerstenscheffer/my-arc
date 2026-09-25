@@ -72,7 +72,11 @@ export default function VideoPlayerModal({ item, onClose }) {
         position: 'fixed',
         inset: 0,
         background: 'rgba(0,0,0,0.92)',
-        zIndex: 9999,
+        // Boven alles. De speler wordt geopend vanuit lagen die zelf al hoog
+        // zitten — de bibliotheek staat op 2147483000 en de bladen op
+        // 2147483100 — en op 9999 speelde de video eronder verder terwijl je
+        // hem niet zag.
+        zIndex: 2147483200,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

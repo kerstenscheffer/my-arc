@@ -9,6 +9,7 @@ import PlanSwitchModal from './components/PlanSwitchModal'
 import WeekSchedule from './components/WeekSchedule'
 import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
 import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
+import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 import WorkoutProgressToast from './components/WorkoutProgressToast'
 import CardioLogSection from './components/CardioLogSection'
 import WorkoutHistory from '../progress/WorkoutHistory'
@@ -166,6 +167,16 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         />
       </div>
 
+
+      {/* Belangrijke video van de coach, onder de workout van vandaag. Niet
+          erboven: je opent deze pagina om te trainen, en het eerste wat je ziet
+          hoort de training van vandaag te zijn. Verdwijnt zodra je hem hebt
+          afgespeeld of afgevinkt, en staat weg zolang je in een workout zit. */}
+      {!workoutOpen && (
+        <div style={{ marginTop: isMobile ? '1.75rem' : '2.25rem' }}>
+          <BelangrijkeVideo client={client} pagina="workout" isMobile={isMobile} />
+        </div>
+      )}
 
       {/* Twee knoppen tussen de workout van vandaag en de weekplanning: het
           krachtoverzicht en de geschiedenis. Stonden eerder als inline blokken
