@@ -56,7 +56,6 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // Wat er standaard dicht staat. De band en de cijfers zijn waar je naar
   // kijkt; het verloop en de losse logs zijn om iets op te zoeken, en die
   // maakten de kolom onleesbaar.
-  const [toonVerloop, setToonVerloop] = React.useState(false)
   // Teller: gaat omhoog als je in de fase-dropdown '+ Nieuwe fase' kiest. Het
   // formulier zelf blijft in FasePaneel wonen.
   const [nieuweFase, setNieuweFase] = React.useState(0)
@@ -105,7 +104,8 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           herlaad={faseVersie}
         />
         {/* De weken-strook en het doel; de cijferregel eronder zit achter een
-            uitklap. Geen toonHuidig meer: het huidige gewicht staat in de
+            uitklap. Het oude 'Verloop'-lijntje eruit: de bandgrafiek hieronder
+            laat hetzelfde verloop zien, mét de planlijn en de band erbij. Geen toonHuidig meer: het huidige gewicht staat in de
             kopregel naast de naam, en twee keer hetzelfde getal is er één te
             veel. */}
         {history.length > 0 && (
@@ -113,17 +113,8 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
             stats={weightData?.stats || {}} client={client}
             fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }}
             history={history} isMobile={isMobile} coachingPlan={coachingPlan}
-            fase={actieveFase} volleBreedte toonGrafiek={toonVerloop}
+            fase={actieveFase} volleBreedte toonGrafiek={false}
             onBewerkDoel={() => setDoelOpen(true)}
-            grafiekKnop={(
-              <Uitklap
-                label="Verloop"
-                extra={`${history.length} metingen`}
-                open={toonVerloop}
-                onKlik={() => setToonVerloop(v => !v)}
-                isMobile={isMobile}
-              />
-            )}
           />
         )}
         {/* De band: waar het gewicht hoort te lopen, en of dat gebeurt. */}
