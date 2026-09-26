@@ -376,6 +376,22 @@ export function zaterdagTempo(history, anker = new Date(), dagen = STANDAARD.ven
   return { zaterdag: za, vorigeZaterdag: vorigeZa, nu, vorige, verschil }
 }
 
+// Dezelfde som voor een rij zaterdagen achter elkaar, van nieuw naar oud.
+//
+// Stopt zodra er in beide vensters niets meer staat — dan is de historie op en
+// zouden er alleen lege blokjes bijkomen.
+export function zaterdagReeks(history, anker = new Date(), maxWeken = 26, dagen = STANDAARD.venster_dagen) {
+  const uit = []
+  let za = laatsteZaterdag(anker)
+  for (let i = 0; i < maxWeken; i++) {
+    const t = zaterdagTempo(history, new Date(`${za}T00:00:00`), dagen)
+    if (t.nu.metingen === 0 && t.vorige.metingen === 0) break
+    uit.push(t)
+    za = iso(new Date(new Date(`${za}T00:00:00`).getTime() - 7 * dagInMs))
+  }
+  return uit
+}
+
 // Het afgesproken bereik als tekst: van het kleinste toegestane tempo naar het
 // grootste, allebei met het teken van de richting. "+0.2 – +0.4" bij een build,
 // "-0.15 – -0.9" bij een cut.

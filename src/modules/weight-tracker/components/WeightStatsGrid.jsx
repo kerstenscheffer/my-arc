@@ -2,13 +2,13 @@
 // v4.0 — flush stat bar, borderBottom dividers, compact chart + plan line
 // Props: { stats, client, fridayData, history, isMobile, coachingPlan }
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef } from 'react'
 import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity, Info, Pencil } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
 import {
   maakConfig, trendReeks, tempoPerWeek, weekFractie, lijnenOpWeek, ernstVan, kleurVoorErnst,
-  tempoOordeel, zaterdagTempo, bereikTekst,
+  tempoOordeel, zaterdagReeks, bereikTekst,
 } from '../utils/coachingBand'
 
 const PERIODES = [
@@ -375,27 +375,26 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   // Onder de drie wegingen in een van beide vensters geven we geen kleur. Dan
   // is het verschil grotendeels dagruis en zou een groen vinkje meer zeggen dan
   // we weten.
-  const za = useMemo(() => zaterdagTempo(binnenFase), [binnenFase])
-  const zaGenoeg = za.nu.metingen >= 3 && za.vorige.metingen >= 3
-  const zaOordeel = (za.verschil != null && zaGenoeg) ? tempoOordeel(za.verschil, bandConfig) : null
-  const zaKleur = zaOordeel == null ? 'rgba(255,255,255,0.45)'
-    : zaOordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b'
   const bereik = bereikTekst(bandConfig)
-  const zaDatum = new Date(`${za.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 
-  // Dezelfde som, een week eerder. Twee weken naast elkaar laten zien of het
-  // een losse slechte week was of dat het er twee op rij stilstaat — en dát is
-  // het moment om bij te sturen.
-  const zaVorig = useMemo(() => {
-    const anker = new Date(`${za.zaterdag}T00:00:00`)
-    anker.setDate(anker.getDate() - 7)
-    return zaterdagTempo(binnenFase, anker)
-  }, [binnenFase, za.zaterdag])
-  const zaVorigGenoeg = zaVorig.nu.metingen >= 3 && zaVorig.vorige.metingen >= 3
-  const zaVorigOordeel = (zaVorig.verschil != null && zaVorigGenoeg) ? tempoOordeel(zaVorig.verschil, bandConfig) : null
-  const zaVorigKleur = zaVorigOordeel == null ? 'rgba(255,255,255,0.45)'
-    : zaVorigOordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b'
-  const zaVorigDatum = new Date(`${zaVorig.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  // Alle weken achter elkaar, van deze week terug. Twee weken naast elkaar
+  // liet al zien of het een losse matige week was; met de hele rij zie je het
+  // verloop — waar het inzakte, en of het daarvoor wél liep.
+  const weken = useMemo(() => zaterdagReeks(binnenFase).map((z, i) => {
+    const genoeg = z.nu.metingen >= 3 && z.vorige.metingen >= 3
+    const oordeel = (z.verschil != null && genoeg) ? tempoOordeel(z.verschil, bandConfig) : null
+    return {
+      sleutel: z.zaterdag,
+      waarde: z.verschil,
+      genoeg,
+      kleur: oordeel == null ? 'rgba(255,255,255,0.45)'
+        : oordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b',
+      kop: i === 0 ? 'Tempo deze week' : i === 1 ? 'Tempo vorige week' : `${i} weken terug`,
+      onder: genoeg
+        ? `za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
+        : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
+    }
+  }), [binnenFase, bandConfig])
 
   // Weeknummer voor het label bij het gemiddelde ("Gemiddeld w38").
   const weekNummer = (() => {
@@ -422,19 +421,10 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               de twee tempo's horen bij elkaar en staan op één regel, het doel
               zakt eronder. Op een breed scherm staan ze met z'n drieën. */}
           <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap' }}>
-            <GrootBlok
-              titel="Tempo deze week"
-              waarde={za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—'}
-              eenheid="kg/wk"
-              kleur={zaKleur}
-              onder={za.verschil == null
-                ? 'nog geen twee weken'
-                : zaGenoeg
-                  ? `za ${zaDatum}`
-                  : `te weinig wegingen (${za.vorige.metingen} en ${za.nu.metingen})`}
-              isMobile={isMobile}
-              basis={isMobile ? '1 1 45%' : '1 1 0'}
-              actie={(
+            {/* De weken als strook: deze week vooraan, daarachter terug in de
+                tijd. Slepen met de muis of vegen op een telefoon. */}
+            <div style={{ flex: isMobile ? '1 1 100%' : '1 1 0', minWidth: 0, display: 'flex' }}>
+              <WekenStrook weken={weken} isMobile={isMobile} uitleg={(
                 <button
                   onClick={() => setUitlegOpen(v => !v)}
                   aria-label="Wat betekent dit?"
@@ -448,22 +438,8 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
                 >
                   <Info size={14} strokeWidth={2.8} />
                 </button>
-              )}
-            />
-
-            <GrootBlok
-              titel="Tempo vorige week"
-              waarde={zaVorig.verschil != null ? `${zaVorig.verschil > 0 ? '+' : ''}${zaVorig.verschil}` : '—'}
-              eenheid="kg/wk"
-              kleur={zaVorigKleur}
-              onder={zaVorig.verschil == null
-                ? 'geen gegevens'
-                : zaVorigGenoeg
-                  ? `za ${zaVorigDatum}`
-                  : `te weinig wegingen (${zaVorig.vorige.metingen} en ${zaVorig.nu.metingen})`}
-              isMobile={isMobile}
-              basis={isMobile ? '1 1 45%' : '1 1 0'}
-            />
+              )} />
+            </div>
 
             <GrootBlok
               titel="Doel per week"
@@ -472,7 +448,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               kleur="#fff"
               onder={bandConfig.handmatig ? 'zelf ingesteld' : 'afgeleid van het weekdoel'}
               isMobile={isMobile}
-              basis={isMobile ? '1 1 100%' : '1 1 0'}
+              basis={isMobile ? '1 1 100%' : '0 0 auto'}
               laatste
               actie={onBewerkDoel ? (
                 <button
@@ -765,6 +741,95 @@ function GrootBlok(props) {
       }}>
         {onder}
       </div>
+    </div>
+  )
+}
+
+// De weken als horizontale strook: deze week vooraan, daarachter terug in de
+// tijd. Zo zie je niet twee losse getallen maar het verloop — waar het inzakte,
+// en of het daarvoor wél liep.
+//
+// Slepen met de muis moet er expliciet in: op een desktop scrollt een muiswiel
+// verticaal, dus zonder dit kun je met een gewone muis niets. Op een telefoon
+// doet de browser het zelf en laten we hem met rust.
+function WekenStrook(props) {
+  const { weken, isMobile, uitleg } = props
+  const baan = useRef(null)
+  const sleep = useRef(null)
+
+  if (!weken.length) return null
+
+  const begin = (e) => {
+    if (e.pointerType === 'touch') return          // native scroll doet het beter
+    sleep.current = { x: e.clientX, links: baan.current.scrollLeft }
+    baan.current.setPointerCapture(e.pointerId)
+  }
+  const beweeg = (e) => {
+    if (!sleep.current) return
+    baan.current.scrollLeft = sleep.current.links - (e.clientX - sleep.current.x)
+  }
+  const stop = (e) => {
+    if (!sleep.current) return
+    sleep.current = null
+    try { baan.current.releasePointerCapture(e.pointerId) } catch { /* al losgelaten */ }
+  }
+
+  return (
+    <div
+      ref={baan}
+      className="weken-strook"
+      onPointerDown={begin}
+      onPointerMove={beweeg}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      style={{
+        flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch',
+        overflowX: 'auto', overflowY: 'hidden',
+        scrollSnapType: 'x proximity',
+        scrollbarWidth: 'none', msOverflowStyle: 'none',
+        cursor: 'grab', touchAction: 'pan-x',
+      }}
+    >
+      {/* scrollbarWidth dekt Firefox; WebKit luistert alleen naar een regel met
+          een selector, en die kan niet inline. */}
+      <style>{'.weken-strook::-webkit-scrollbar{display:none}'}</style>
+      {weken.map((w, i) => (
+        <div key={w.sleutel} style={{
+          flex: '0 0 auto', width: isMobile ? 128 : 152,
+          scrollSnapAlign: 'start',
+          padding: isMobile ? '0.7rem 0.5rem' : '0.8rem 0.75rem',
+          borderRight: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', flexDirection: 'column', gap: 4,
+          // Verder terug is minder urgent; dat mag je zien zonder dat het
+          // onleesbaar wordt.
+          opacity: i > 1 ? 0.7 : 1,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{
+              fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 900, color: '#fff',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {w.kop}
+            </span>
+            {i === 0 ? uitleg : null}
+          </div>
+          <div style={{
+            fontSize: isMobile ? '1.45rem' : '1.8rem', fontWeight: 900, color: w.kleur,
+            lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {w.waarde != null ? `${w.waarde > 0 ? '+' : ''}${w.waarde}` : '—'}
+            <span style={{ fontSize: '0.42em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg/wk</span>
+          </div>
+          <div style={{
+            fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
+            color: 'rgba(255,255,255,0.45)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {w.onder}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
