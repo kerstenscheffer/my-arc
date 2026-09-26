@@ -383,6 +383,20 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   const bereik = bereikTekst(bandConfig)
   const zaDatum = new Date(`${za.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 
+  // Dezelfde som, een week eerder. Twee weken naast elkaar laten zien of het
+  // een losse slechte week was of dat het er twee op rij stilstaat — en dát is
+  // het moment om bij te sturen.
+  const zaVorig = useMemo(() => {
+    const anker = new Date(`${za.zaterdag}T00:00:00`)
+    anker.setDate(anker.getDate() - 7)
+    return zaterdagTempo(binnenFase, anker)
+  }, [binnenFase, za.zaterdag])
+  const zaVorigGenoeg = zaVorig.nu.metingen >= 3 && zaVorig.vorige.metingen >= 3
+  const zaVorigOordeel = (zaVorig.verschil != null && zaVorigGenoeg) ? tempoOordeel(zaVorig.verschil, bandConfig) : null
+  const zaVorigKleur = zaVorigOordeel == null ? 'rgba(255,255,255,0.45)'
+    : zaVorigOordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b'
+  const zaVorigDatum = new Date(`${zaVorig.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+
   // Weeknummer voor het label bij het gemiddelde ("Gemiddeld w38").
   const weekNummer = (() => {
     if (!laatsteTrend?.datum) return null
@@ -403,23 +417,24 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           deze balk mee en daar heeft de klant niet om een doelbereik gevraagd;
           dat is een apart besluit. */}
       {bereik && volleBreedte && (
-        <div style={{
-          margin: 0,
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'stretch' }}>
-            <div style={{
-              flex: 1, minWidth: 0, padding: isMobile ? '0.7rem 0.5rem' : '0.8rem 0.75rem',
-              borderRight: '1px solid rgba(255,255,255,0.08)',
-              display: 'flex', flexDirection: 'column', gap: 4,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{
-                  fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 900, color: '#fff',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  Tempo deze week
-                </span>
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          {/* Op een telefoon passen drie van deze cijfers niet naast elkaar:
+              de twee tempo's horen bij elkaar en staan op één regel, het doel
+              zakt eronder. Op een breed scherm staan ze met z'n drieën. */}
+          <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap' }}>
+            <GrootBlok
+              titel="Tempo deze week"
+              waarde={za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—'}
+              eenheid="kg/wk"
+              kleur={zaKleur}
+              onder={za.verschil == null
+                ? 'nog geen twee weken'
+                : zaGenoeg
+                  ? `za ${zaDatum}`
+                  : `te weinig wegingen (${za.vorige.metingen} en ${za.nu.metingen})`}
+              isMobile={isMobile}
+              basis={isMobile ? '1 1 45%' : '1 1 0'}
+              actie={(
                 <button
                   onClick={() => setUitlegOpen(v => !v)}
                   aria-label="Wat betekent dit?"
@@ -433,71 +448,48 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
                 >
                   <Info size={14} strokeWidth={2.8} />
                 </button>
-              </div>
-              <div style={{
-                fontSize: isMobile ? '1.7rem' : '2rem', fontWeight: 900, color: zaKleur,
-                lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—'}
-                <span style={{ fontSize: '0.4em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg/wk</span>
-              </div>
-              <div style={{
-                fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
-                color: 'rgba(255,255,255,0.45)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {za.verschil == null
-                  ? 'nog geen twee weken'
-                  : zaGenoeg
-                    ? `za ${zaDatum} · vorige za`
-                    : `te weinig wegingen (${za.vorige.metingen} en ${za.nu.metingen})`}
-              </div>
-            </div>
+              )}
+            />
 
-            <div style={{
-              flex: 1, minWidth: 0, padding: isMobile ? '0.7rem 0.5rem' : '0.8rem 0.75rem',
-              display: 'flex', flexDirection: 'column', gap: 4,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{
-                  fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 900, color: '#fff',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  Doel per week
-                </span>
-                {onBewerkDoel && (
-                  <button
-                    onClick={onBewerkDoel}
-                    aria-label="Doel per week aanpassen"
-                    title="Aanpassen"
-                    style={{
-                      flexShrink: 0, width: 18, height: 18, padding: 0, borderRadius: 999,
-                      border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.45)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >
-                    <Pencil size={13} strokeWidth={2.8} />
-                  </button>
-                )}
-              </div>
-              <div style={{
-                fontSize: isMobile ? '1.7rem' : '2rem', fontWeight: 900, color: '#fff',
-                lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {bereik}
-                <span style={{ fontSize: '0.4em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg</span>
-              </div>
-              <div style={{
-                fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
-                color: 'rgba(255,255,255,0.45)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {bandConfig.handmatig ? 'zelf ingesteld' : 'afgeleid van het weekdoel'}
-              </div>
-            </div>
+            <GrootBlok
+              titel="Tempo vorige week"
+              waarde={zaVorig.verschil != null ? `${zaVorig.verschil > 0 ? '+' : ''}${zaVorig.verschil}` : '—'}
+              eenheid="kg/wk"
+              kleur={zaVorigKleur}
+              onder={zaVorig.verschil == null
+                ? 'geen gegevens'
+                : zaVorigGenoeg
+                  ? `za ${zaVorigDatum}`
+                  : `te weinig wegingen (${zaVorig.vorige.metingen} en ${zaVorig.nu.metingen})`}
+              isMobile={isMobile}
+              basis={isMobile ? '1 1 45%' : '1 1 0'}
+            />
+
+            <GrootBlok
+              titel="Doel per week"
+              waarde={bereik}
+              eenheid="kg"
+              kleur="#fff"
+              onder={bandConfig.handmatig ? 'zelf ingesteld' : 'afgeleid van het weekdoel'}
+              isMobile={isMobile}
+              basis={isMobile ? '1 1 100%' : '1 1 0'}
+              laatste
+              actie={onBewerkDoel ? (
+                <button
+                  onClick={onBewerkDoel}
+                  aria-label="Doel per week aanpassen"
+                  title="Aanpassen"
+                  style={{
+                    flexShrink: 0, width: 18, height: 18, padding: 0, borderRadius: 999,
+                    border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.45)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <Pencil size={13} strokeWidth={2.8} />
+                </button>
+              ) : null}
+            />
           </div>
 
           {uitlegOpen && (
@@ -508,15 +500,15 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             }}>
               <strong style={{ color: '#fff', fontWeight: 900 }}>Tempo deze week</strong> is het gemiddelde
               gewicht over de zeven dagen tot en met zaterdag, min datzelfde venster van vorige week.
-              Elke zaterdag leg je die twee naast elkaar. Losse dagen tellen dus niet zwaar mee, en
-              er hoeft niet per se óp zaterdag gewogen te worden.
+              <strong style={{ color: '#fff', fontWeight: 900 }}> Tempo vorige week</strong> is diezelfde som,
+              een week eerder. Staan die twee allebei rond nul, dan sta je stil en is er iets te doen —
+              één matige week kan toeval zijn, twee niet.
               <br /><br />
               <strong style={{ color: '#fff', fontWeight: 900 }}>Doel per week</strong> is het bereik waarbinnen
-              dat tempo hoort te vallen. Erbinnen is groen, erboven of eronder oranje. Staat er geen
-              eigen bereik ingesteld, dan leidt de app het af van het weekdoel van de fase — je kunt
-              het bij de fase zelf overschrijven.
+              het tempo hoort te vallen. Erbinnen is groen, erboven of eronder oranje. Met het potlood
+              stel je het in.
               <br /><br />
-              Onder de drie wegingen in een van beide weken krijgt het getal geen kleur: dan is het
+              Onder de drie wegingen in een van beide weken krijgt een getal geen kleur: dan is het
               verschil vooral dagruis.
             </div>
           )}
@@ -729,6 +721,50 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Eén van de grote cijfers boven de regel: kop (met eventueel een knopje),
+// het getal, en één regel context eronder.
+//
+// Props in plaats van drie keer dezelfde JSX: de drie blokken verschilden
+// alleen in tekst en kleur, en dan gaat er bij een wijziging altijd eentje
+// achterlopen.
+function GrootBlok(props) {
+  const { titel, waarde, eenheid, kleur, onder, isMobile, basis, actie, laatste } = props
+  return (
+    <div style={{
+      flex: basis, minWidth: 0,
+      padding: isMobile ? '0.7rem 0.5rem' : '0.8rem 0.75rem',
+      borderRight: laatste ? 'none' : '1px solid rgba(255,255,255,0.08)',
+      borderTop: basis === '1 1 100%' ? '1px solid rgba(255,255,255,0.08)' : 'none',
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{
+          fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 900, color: '#fff',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {titel}
+        </span>
+        {actie}
+      </div>
+      <div style={{
+        fontSize: isMobile ? '1.45rem' : '1.8rem', fontWeight: 900, color: kleur,
+        lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {waarde}
+        <span style={{ fontSize: '0.42em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>{eenheid}</span>
+      </div>
+      <div style={{
+        fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
+        color: 'rgba(255,255,255,0.45)',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {onder}
+      </div>
     </div>
   )
 }
