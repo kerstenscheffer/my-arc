@@ -3,12 +3,12 @@
 // Props: { stats, client, fridayData, history, isMobile, coachingPlan }
 
 import React, { useState, useMemo } from 'react'
-import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity } from 'lucide-react'
+import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity, Info } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
 import {
   maakConfig, trendReeks, tempoPerWeek, weekFractie, lijnenOpWeek, ernstVan, kleurVoorErnst,
-  weekBeoordelingen, tempoOordeel,
+  tempoOordeel, zaterdagTempo, bereikTekst,
 } from '../utils/coachingBand'
 
 const PERIODES = [
@@ -26,6 +26,7 @@ const PERIODES = [
 // verloop achter een knop. De klant-kant laat hem gewoon staan.
 export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true, grafiekKnop = null }) {
   const [showWeekly, setShowWeekly] = useState(false)
+  const [uitlegOpen, setUitlegOpen] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 
   // Calendar-week averages (Ma-Zo) — apples-to-apples comparison between
@@ -357,13 +358,6 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   //   nu    — wat deed hij déze week? Daar stuur je op bij.
   //   fase  — wat is het gemiddelde sinds de start? Dat zegt of de afspraak
   //           over de hele rit gehaald wordt.
-  const weekOordelen = (bandStart && fase?.started_on)
-    ? weekBeoordelingen(trendReeksData, bandStart, fase.started_on, bandConfig)
-    : []
-  const laatsteWeek = weekOordelen[weekOordelen.length - 1] || null
-  const tempoNu = laatsteWeek?.verschil ?? null
-  const tempoNuKleur = tempoNu == null ? 'rgba(255,255,255,0.4)'
-    : kleurVoorErnst(tempoOordeel(tempoNu, bandConfig) === 'OP_KOERS' ? 0 : 0.7)
 
   const wekenSinds = (laatsteTrend && fase?.started_on)
     ? weekFractie(laatsteTrend.datum, fase.started_on, bandConfig.venster_dagen)
@@ -371,6 +365,23 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   const tempoFase = (laatsteTrend && bandStart && wekenSinds > 0.5)
     ? Math.round(((laatsteTrend.trend - bandStart) / wekenSinds) * 100) / 100
     : (tempo ? tempo.kgPerWeek : null)
+
+  // ── Het weektempo waar de coach op zaterdag naar kijkt ──
+  //
+  // Zaterdag tegen zaterdag, allebei als gemiddelde over de zeven dagen ervoor.
+  // Kleur volgt het afgesproken bereik, niet een los oordeel: binnen bereik is
+  // groen, eronder of erboven is oranje.
+  //
+  // Onder de drie wegingen in een van beide vensters geven we geen kleur. Dan
+  // is het verschil grotendeels dagruis en zou een groen vinkje meer zeggen dan
+  // we weten.
+  const za = useMemo(() => zaterdagTempo(binnenFase), [binnenFase])
+  const zaGenoeg = za.nu.metingen >= 3 && za.vorige.metingen >= 3
+  const zaOordeel = (za.verschil != null && zaGenoeg) ? tempoOordeel(za.verschil, bandConfig) : null
+  const zaKleur = zaOordeel == null ? 'rgba(255,255,255,0.45)'
+    : zaOordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b'
+  const bereik = bereikTekst(bandConfig)
+  const zaDatum = new Date(`${za.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 
   // Weeknummer voor het label bij het gemiddelde ("Gemiddeld w38").
   const weekNummer = (() => {
@@ -385,6 +396,116 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
 
   return (
     <div>
+      {/* ═══ HET WEEKTEMPO — het getal waar je op zaterdag naar kijkt, en het
+            bereik waarbinnen het hoort te vallen. Deze twee staan groot omdat
+            je hierop bijstuurt; de rest van de regel is context. ═══ */}
+      {/* Alleen in het coach-paneel (volleBreedte). Op de klantpagina draait
+          deze balk mee en daar heeft de klant niet om een doelbereik gevraagd;
+          dat is een apart besluit. */}
+      {bereik && volleBreedte && (
+        <div style={{
+          margin: 0,
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <div style={{
+              flex: 1, minWidth: 0, padding: isMobile ? '0.7rem 0.5rem' : '0.8rem 0.75rem',
+              borderRight: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{
+                  fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 900, color: '#fff',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  Tempo deze week
+                </span>
+                <button
+                  onClick={() => setUitlegOpen(v => !v)}
+                  aria-label="Wat betekent dit?"
+                  style={{
+                    flexShrink: 0, width: 18, height: 18, padding: 0, borderRadius: 999,
+                    border: 'none', background: 'transparent',
+                    color: uitlegOpen ? '#ffba09' : 'rgba(255,255,255,0.45)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <Info size={14} strokeWidth={2.8} />
+                </button>
+              </div>
+              <div style={{
+                fontSize: isMobile ? '1.7rem' : '2rem', fontWeight: 900, color: zaKleur,
+                lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—'}
+                <span style={{ fontSize: '0.4em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg/wk</span>
+              </div>
+              <div style={{
+                fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.45)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {za.verschil == null
+                  ? 'nog geen twee weken'
+                  : zaGenoeg
+                    ? `za ${zaDatum} · vorige za`
+                    : `te weinig wegingen (${za.vorige.metingen} en ${za.nu.metingen})`}
+              </div>
+            </div>
+
+            <div style={{
+              flex: 1, minWidth: 0, padding: isMobile ? '0.7rem 0.5rem' : '0.8rem 0.75rem',
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}>
+              <div style={{
+                fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 900, color: '#fff',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                Doel per week
+              </div>
+              <div style={{
+                fontSize: isMobile ? '1.7rem' : '2rem', fontWeight: 900, color: '#fff',
+                lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {bereik}
+                <span style={{ fontSize: '0.4em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg</span>
+              </div>
+              <div style={{
+                fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.45)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {bandConfig.handmatig ? 'zelf ingesteld' : 'afgeleid van het weekdoel'}
+              </div>
+            </div>
+          </div>
+
+          {uitlegOpen && (
+            <div style={{
+              padding: isMobile ? '0 0.5rem 0.8rem' : '0 0.75rem 0.9rem',
+              fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 700,
+              color: 'rgba(255,255,255,0.7)', lineHeight: 1.55,
+            }}>
+              <strong style={{ color: '#fff', fontWeight: 900 }}>Tempo deze week</strong> is het gemiddelde
+              gewicht over de zeven dagen tot en met zaterdag, min datzelfde venster van vorige week.
+              Elke zaterdag leg je die twee naast elkaar. Losse dagen tellen dus niet zwaar mee, en
+              er hoeft niet per se óp zaterdag gewogen te worden.
+              <br /><br />
+              <strong style={{ color: '#fff', fontWeight: 900 }}>Doel per week</strong> is het bereik waarbinnen
+              dat tempo hoort te vallen. Erbinnen is groen, erboven of eronder oranje. Staat er geen
+              eigen bereik ingesteld, dan leidt de app het af van het weekdoel van de fase — je kunt
+              het bij de fase zelf overschrijven.
+              <br /><br />
+              Onder de drie wegingen in een van beide weken krijgt het getal geen kleur: dan is het
+              verschil vooral dagruis.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ═══ WEEKCIJFERS — één regel als tabel: verticale lijntjes ertussen,
             geen vakken. Het doel-blok dat hier stond is eruit; het doel staat
             al als lijn in de grafiek. ═══ */}
@@ -411,13 +532,6 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             val: laatsteTrend?.trend != null ? `${laatsteTrend.trend}` : '—',
             color: '#fff',
           },
-          ...(fase ? [{
-            label: 'Tempo nu',
-            sub: 'deze week',
-            val: tempoNu != null ? `${tempoNu > 0 ? '+' : ''}${tempoNu}` : '—',
-            eenheid: '/wk',
-            color: tempoNuKleur,
-          }] : []),
           {
             label: fase ? 'Tempo fase' : 'Tempo',
             sub: fase?.week_doel_kg != null

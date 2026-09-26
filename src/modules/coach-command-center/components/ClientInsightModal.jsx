@@ -75,10 +75,14 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [photoZoom, setPhotoZoom] = useState(false)
   const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
   const [mobileTab, setMobileTab] = useState('weight')
-  // Desktop: welke secties naast elkaar staan. De rail vinkt ze aan en uit,
+  // Desktop: welke secties naast elkaar staan. De kopregel vinkt ze aan en uit,
   // dus dit is een lijst en geen enkele keuze. Minimaal één blijft staan —
   // een leeg paneel is geen bruikbare toestand.
   const [openSecties, setOpenSecties] = useState(['weight'])
+  // De looptijd stond altijd open als balkenrij onder de kop. Dat is een blok
+  // dat je één keer per maand nodig hebt en de rest van de tijd meekijkt, dus
+  // nu dicht tenzij je erom vraagt.
+  const [looptijdOpen, setLooptijdOpen] = useState(false)
   const toggleSectie = (id) => {
     setOpenSecties(prev => (
       prev.includes(id)
@@ -140,9 +144,13 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   }
 
 
-  // Eén lijst voor de rail (desktop) én de tabbalk (mobiel), zodat ze niet
+  // Eén lijst voor de kopregel (desktop) én de tabbalk (mobiel), zodat ze niet
   // uit elkaar kunnen lopen. Journey is nu een gewone sectie i.p.v. een
   // aparte lade onderaan.
+  // De inhoud in het midden houden. Volle breedte leest bij één kolom als een
+  // heel scherm vol losse cijfers; een kolom met marges eromheen is rustiger.
+  const middenBreedte = openSecties.length > 1 ? 1500 : 980
+
   const SECTIES = [
     { id: 'weight',  label: 'Gewicht',  icon: Scale },
     { id: 'workout', label: 'Training', icon: Dumbbell },
@@ -212,8 +220,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         <div onClick={e => e.stopPropagation()} ref={containerRef} style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           // Volle breedte. Stond op max 1600px omdat er vijf kolommen naast
-          // elkaar pasten; met de rail + één paneel is dat alleen nog
-          // weggegooid scherm.
+          // elkaar pasten. De inhoud zelf staat nu gecentreerd met een
+          // maximumbreedte; de container blijft vol zodat de achtergrond dat is.
           width: '100%',
           background: '#0a0a0a', overflow: 'hidden', position: 'relative',
           // iPhone Dynamic Island / notch beschermt anders de header met
@@ -234,16 +242,68 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 zIndex: 15,
               }}
             >
-              <div style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{
+                maxWidth: middenBreedte, margin: '0 auto',
+                padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem',
+              }}>
                   <span className={PRIVE} style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', flexShrink: 0 }}>
                     {effectiveClient.first_name} {effectiveClient.last_name}
                   </span>
-                  {effectiveClient.target_weight && (
-                    <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>
-                      → {parseFloat(effectiveClient.target_weight).toFixed(1)}kg
-                    </span>
-                  )}
+
+                  {/* De secties stonden in een rail van 78px langs de linkerrand.
+                      Als tekst in de kopregel kost het geen kolom én leest het als
+                      één rij keuzes; de streepjes ertussen houden ze uit elkaar
+                      zonder dat er vakjes omheen hoeven. Aan/uit blijft: elke
+                      aangezette sectie komt er als kolom bij. */}
+                  <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    {SECTIES.map((sec, i) => {
+                      const aan = openSecties.includes(sec.id)
+                      return (
+                        <React.Fragment key={sec.id}>
+                          {i > 0 && (
+                            <span aria-hidden style={{
+                              width: 1, height: 12, background: 'rgba(255,255,255,0.14)', flexShrink: 0,
+                            }} />
+                          )}
+                          <button
+                            onClick={() => toggleSectie(sec.id)}
+                            title={aan ? `${sec.label} verbergen` : `${sec.label} erbij`}
+                            style={{
+                              background: 'none', border: 'none', padding: '0.3rem 0.6rem',
+                              color: aan ? '#fff' : 'rgba(255,255,255,0.4)',
+                              fontSize: '0.78rem', fontWeight: aan ? 900 : 700,
+                              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                              letterSpacing: '-0.01em',
+                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            }}
+                          >
+                            {sec.label}
+                          </button>
+                        </React.Fragment>
+                      )
+                    })}
+                  </div>
+
                   <div style={{ flex: 1 }} />
+
+                  <button
+                    onClick={() => setLooptijdOpen(v => !v)}
+                    title="Looptijd van het traject"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      background: 'none', border: 'none', padding: '0.3rem 0.4rem',
+                      color: looptijdOpen ? '#fff' : 'rgba(255,255,255,0.5)',
+                      fontSize: '0.76rem', fontWeight: looptijdOpen ? 900 : 700,
+                      fontFamily: 'inherit', cursor: 'pointer', flexShrink: 0,
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    Looptijd
+                    <ChevronDown size={13} strokeWidth={2.6} style={{
+                      transform: looptijdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s',
+                    }} />
+                  </button>
+
                   <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={kopKnop()}>
                     <ClipboardCheck size={17} />
                   </button>
@@ -265,14 +325,16 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </div>
           )}
 
-          {/* ═══ LOOPTIJD — vast onder de kopregel, volle breedte ═══ */}
-          {!isMobile && (
-            <CoachingPeriodPanel
-              client={effectiveClient}
-              coachId={coachId}
-              isMobile={false}
-              onClientUpdate={handleClientUpdate}
-            />
+          {/* ═══ LOOPTIJD — achter de knop in de kopregel ═══ */}
+          {!isMobile && looptijdOpen && (
+            <div style={{ maxWidth: middenBreedte, margin: '0 auto', width: '100%' }}>
+              <CoachingPeriodPanel
+                client={effectiveClient}
+                coachId={coachId}
+                isMobile={false}
+                onClientUpdate={handleClientUpdate}
+              />
+            </div>
           )}
           {/* ═══ MAANDELIJKSE CHECK BANNER (desktop) ═══ */}
           {!isMobile && showMonthlyReminder && (
@@ -329,13 +391,35 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   <X size={19} strokeWidth={2.4} />
                 </button>
               </div>
-              {/* ═══ LOOPTIJD — direct onder de kop, boven de tabs ═══ */}
-              <CoachingPeriodPanel
-                client={effectiveClient}
-                coachId={coachId}
-                isMobile={isMobile}
-                onClientUpdate={handleClientUpdate}
-              />
+              {/* ═══ LOOPTIJD — achter één regel, niet standaard open ═══ */}
+              {/* Dicht is dit één regel van 30px in plaats van een blok met
+                  balken; op een telefoon scheelt dat het halve eerste scherm. */}
+              <button
+                onClick={() => setLooptijdOpen(v => !v)}
+                style={{
+                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
+                  width: '100%', padding: '0.35rem 0.8rem',
+                  background: 'none', border: 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  color: looptijdOpen ? '#fff' : 'rgba(255,255,255,0.5)',
+                  fontSize: '0.72rem', fontWeight: looptijdOpen ? 900 : 700,
+                  fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Looptijd
+                <ChevronDown size={12} strokeWidth={2.6} style={{
+                  transform: looptijdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s',
+                }} />
+              </button>
+              {looptijdOpen && (
+                <CoachingPeriodPanel
+                  client={effectiveClient}
+                  coachId={coachId}
+                  isMobile={isMobile}
+                  onClientUpdate={handleClientUpdate}
+                />
+              )}
               {/* ═══ MAANDELIJKSE CHECK BANNER (mobiel) ═══ */}
               {showMonthlyReminder && (
                 <div style={{
@@ -385,48 +469,28 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           )}
 
 
-          {/* ═══ DESKTOP CONTENT — rail links, gekozen secties rechts ═══ */}
-          {/* De rail is een aan/uit-keuze, geen radioknop: elke sectie die je
-              aanzet komt er als eigen kolom bij te staan. Eén aan = volle
-              breedte, drie aan = drie kolommen naast elkaar. Zo bepaal je zelf
-              wat je naast elkaar wil vergelijken. */}
+          {/* ═══ DESKTOP CONTENT — gekozen secties naast elkaar, gecentreerd ═══ */}
+          {/* De rail van 78px langs de rand is weg; die keuzes staan nu als
+              tekst in de kopregel. Wat overblijft is de inhoud zelf, met marge
+              links en rechts zodat het oog niet over de volle schermbreedte
+              hoeft. Aanzetten blijft optellen: elke sectie die aanstaat komt er
+              als kolom bij. */}
           {!isMobile && (
-            <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-
-              {/* Rail — smal, iconen boven het label. */}
+            <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', justifyContent: 'center' }}>
               <div style={{
-                width: 78, flexShrink: 0, display: 'flex', flexDirection: 'column',
-                gap: 4, padding: '0.6rem 0.4rem', overflowY: 'auto',
-                borderRight: '1px solid rgba(255,255,255,0.07)',
+                flex: 1, minWidth: 0, maxWidth: middenBreedte,
+                display: 'flex', overflowX: 'auto', overflowY: 'hidden',
+                borderLeft: '1px solid rgba(255,255,255,0.05)',
+                borderRight: '1px solid rgba(255,255,255,0.05)',
               }}>
-                {SECTIES.map(sec => {
-                  const Icon = sec.icon
-                  const aan = openSecties.includes(sec.id)
-                  return (
-                    <button key={sec.id} onClick={() => toggleSectie(sec.id)}
-                      title={aan ? `${sec.label} verbergen` : `${sec.label} erbij`}
-                      style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                        padding: '0.55rem 0.2rem', borderRadius: 10, cursor: 'pointer',
-                        background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
-                        border: `1px solid ${aan ? 'rgba(255,255,255,0.2)' : 'transparent'}`,
-                        color: aan ? '#fff' : 'rgba(255,255,255,0.45)',
-                        fontFamily: 'inherit', touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent',
-                      }}>
-                      <Icon size={17} strokeWidth={aan ? 2.4 : 2} />
-                      <span style={{ fontSize: '0.6rem', fontWeight: aan ? 900 : 700, letterSpacing: '-0.01em' }}>{sec.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Kolommen — één per aangezette sectie, gelijk verdeeld. Vanaf
-                  twee kolommen geldt een ondergrens van 300px: zet je alle zes
-                  aan, dan schuift de rij liever horizontaal dan dat je zes
-                  onleesbare kokers van 220px krijgt. */}
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden' }}>
-              {SECTIES.filter(sec => openSecties.includes(sec.id)).map((sec, i) => (
+              {openSecties.length === 0 ? (
+                <div style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'rgba(255,255,255,0.35)', fontSize: '0.85rem', fontWeight: 700,
+                }}>
+                  Kies hierboven wat je wil zien.
+                </div>
+              ) : SECTIES.filter(sec => openSecties.includes(sec.id)).map((sec, i) => (
                 <div key={sec.id} style={{
                   flex: '1 1 0',
                   minWidth: openSecties.length > 1 ? 300 : 0,
@@ -434,7 +498,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none',
                 }}>
                   {/* Kop alleen zodra er meer dan één kolom staat; bij één
-                      kolom weet je uit de rail al waar je naar kijkt. */}
+                      kolom weet je uit de kopregel al waar je naar kijkt. */}
                   {openSecties.length > 1 && (
                     <div style={{
                       position: 'sticky', top: 0, zIndex: 5,

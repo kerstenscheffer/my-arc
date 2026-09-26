@@ -330,6 +330,62 @@ export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
   })
 }
 
+// ── Het weektempo zoals je het op zaterdag naast elkaar legt ──────────────
+//
+// Elke zaterdag één getal: het gemiddelde van de wegingen in de zeven dagen
+// tot en met die zaterdag, min datzelfde venster een week eerder.
+//
+// Waarom een vast venster en niet "de laatste meting van de week": dan hangt
+// het getal ervan af op welke dag iemand toevallig woog, en vergelijk je een
+// maandagochtend met een zondagavond. Zo hoeft er ook niet per se óp zaterdag
+// gewogen te worden — de zaterdag is alleen het moment waarop je kijkt.
+
+export function laatsteZaterdag(datum = new Date()) {
+  const d = new Date(datum)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 1) % 7))   // 6=za → 0 terug, 0=zo → 1 terug
+  return iso(d)
+}
+
+// Gemiddelde van alle wegingen in het venster dat op `eindIso` eindigt.
+export function vensterGemiddelde(history, eindIso, dagen = STANDAARD.venster_dagen) {
+  const eind = new Date(`${eindIso}T00:00:00`).getTime()
+  const begin = eind - (dagen - 1) * dagInMs
+  const perDag = new Map()
+  ;(history || []).forEach(e => {
+    const w = parseFloat(e?.weight)
+    if (!Number.isFinite(w) || !e?.date) return
+    const dag = String(e.date).slice(0, 10)
+    const t = new Date(`${dag}T00:00:00`).getTime()
+    if (t >= begin && t <= eind) perDag.set(dag, w)
+  })
+  const waarden = [...perDag.values()]
+  if (waarden.length === 0) return { gemiddelde: null, metingen: 0 }
+  const som = waarden.reduce((a, b) => a + b, 0)
+  return { gemiddelde: Math.round((som / waarden.length) * 100) / 100, metingen: waarden.length }
+}
+
+export function zaterdagTempo(history, anker = new Date(), dagen = STANDAARD.venster_dagen) {
+  const za = laatsteZaterdag(anker)
+  const vorigeZa = iso(new Date(new Date(`${za}T00:00:00`).getTime() - 7 * dagInMs))
+  const nu = vensterGemiddelde(history, za, dagen)
+  const vorige = vensterGemiddelde(history, vorigeZa, dagen)
+  const verschil = (nu.gemiddelde != null && vorige.gemiddelde != null)
+    ? Math.round((nu.gemiddelde - vorige.gemiddelde) * 100) / 100
+    : null
+  return { zaterdag: za, vorigeZaterdag: vorigeZa, nu, vorige, verschil }
+}
+
+// Het afgesproken bereik als tekst: van het kleinste toegestane tempo naar het
+// grootste, allebei met het teken van de richting. "+0.2 – +0.4" bij een build,
+// "-0.15 – -0.9" bij een cut.
+export function bereikTekst(config) {
+  if (!config || config.richting === 'stabiel') return null
+  const teken = config.richting === 'aankomen' ? 1 : -1
+  const f = (v) => `${teken > 0 ? '+' : '-'}${Math.round(Math.abs(v) * 100) / 100}`
+  return `${f(config.traagKg)} – ${f(config.snelKg)}`
+}
+
 // Tempo en stand kunnen los van elkaar kloppen. Gaat het tempo goed terwijl de
 // trend buiten de band ligt, dan is "op koers, niets veranderen" misleidend: hij
 // gaat goed, maar staat niet waar hij zou staan. Deze functie zegt of dat
