@@ -57,6 +57,27 @@ const losGetal = (v) => {
   return Number.isFinite(n) ? n : null
 }
 
+// De bijsturingen van een fase, oplopend op datum en zonder rommel.
+export function bijsturingenVan(fase) {
+  const lijst = Array.isArray(fase?.bijsturingen) ? fase.bijsturingen : []
+  return lijst
+    .filter(b => b && b.vanaf)
+    .map(b => ({
+      vanaf: String(b.vanaf).slice(0, 10),
+      week_doel_kg: losGetal(b.week_doel_kg),
+      tempo_min_kg: losGetal(b.tempo_min_kg),
+      tempo_max_kg: losGetal(b.tempo_max_kg),
+    }))
+    .sort((a, b) => a.vanaf.localeCompare(b.vanaf))
+}
+
+// Welke bijsturing er vandaag geldt: de laatste die al ingegaan is.
+export function geldendeBijsturing(fase, opDatum = new Date()) {
+  const dag = iso(opDatum)
+  const geldig = bijsturingenVan(fase).filter(b => b.vanaf <= dag)
+  return geldig.length ? geldig[geldig.length - 1] : null
+}
+
 // Welke kant gaat het op, en met welke marges?
 //
 // De fase is de baas. Daar staat wat er is afgesproken: cut of build, hoeveel
@@ -67,6 +88,19 @@ const losGetal = (v) => {
 // Zonder fase vallen we terug op wat er van de klant bekend is, met de
 // standaardpercentages. Dat is de oude situatie en blijft werken.
 export function maakConfig(client, fase = null, overrides = {}) {
+  // Een bijsturing die al ingegaan is vervangt het tempo van de fase. Wat er
+  // vandaag geldt is de laatste die begonnen is; de eerdere leven alleen nog in
+  // de planlijn (zie planSegmenten).
+  const nu = geldendeBijsturing(fase)
+  if (nu) {
+    fase = {
+      ...fase,
+      week_doel_kg: nu.week_doel_kg ?? fase.week_doel_kg,
+      tempo_min_kg: nu.tempo_min_kg ?? null,
+      tempo_max_kg: nu.tempo_max_kg ?? null,
+      bijsturingen: [],
+    }
+  }
   const vetPct = Number(client?.body_fat_percentage) || null
   const leeftijd = Number(client?.age) || null
   const kwetsbaar = (vetPct != null && vetPct < 12) || (leeftijd != null && leeftijd > 45)
