@@ -270,8 +270,66 @@ export function lijnenOpWeek(n, startGewicht, config) {
   }
 }
 
+// De planlijn in stukken: vanaf de start geldt het tempo van de fase, en vanaf
+// elke bijsturing het tempo dat daar is afgesproken.
+export function planSegmenten(client, fase) {
+  const kaal = { ...fase, bijsturingen: [] }
+  const uit = [{
+    vanaf: String(fase?.started_on || '').slice(0, 10),
+    config: maakConfig(client, kaal),
+  }]
+  for (const b of bijsturingenVan(fase)) {
+    uit.push({
+      vanaf: b.vanaf,
+      config: maakConfig(client, {
+        ...kaal,
+        week_doel_kg: b.week_doel_kg ?? fase?.week_doel_kg,
+        tempo_min_kg: b.tempo_min_kg,
+        tempo_max_kg: b.tempo_max_kg,
+      }),
+    })
+  }
+  return uit
+}
+
+// Waar de drie lijnen op een datum lopen, met de knikken erin.
+//
+// Elk stuk rekent verder vanaf de waarde waar het vorige stuk eindigde — dus
+// geen sprong en geen nieuwe band die bij nul begint, alleen een andere hoek.
+// Zo blijft het verleden staan zoals het was.
+//
+// Net als lijnenOpWeek rekenen we op het midden van het trendvenster: het
+// 7-daags gemiddelde hoort bij die dag, niet bij vandaag.
+export function lijnenOpDatum(datum, startGewicht, segmenten, vensterDagen = STANDAARD.venster_dagen) {
+  if (!Number.isFinite(startGewicht) || !segmenten?.length) return null
+  const eerste = segmenten[0]
+  if (eerste.config.richting === 'stabiel') {
+    const marge = startGewicht * (eerste.config.recomp_marge_pct / 100)
+    return { doel: startGewicht, traag: startGewicht + marge, snel: startGewicht - marge }
+  }
+
+  const midden = new Date(`${String(datum).slice(0, 10)}T00:00:00`).getTime() - ((vensterDagen - 1) / 2) * dagInMs
+  const waarde = { doel: startGewicht, traag: startGewicht, snel: startGewicht }
+
+  for (let i = 0; i < segmenten.length; i++) {
+    const seg = segmenten[i]
+    const begin = new Date(`${seg.vanaf}T00:00:00`).getTime()
+    if (midden <= begin) break
+    const volgende = segmenten[i + 1]
+    const grens = volgende ? new Date(`${volgende.vanaf}T00:00:00`).getTime() : Infinity
+    const eind = Math.min(midden, grens)
+    const n = Math.max(0, (eind - begin) / (7 * dagInMs))
+    const teken = seg.config.richting === 'aankomen' ? 1 : -1
+    waarde.doel += seg.config.tempoKg * n * teken
+    waarde.traag += seg.config.traagKg * n * teken
+    waarde.snel += seg.config.snelKg * n * teken
+    if (eind === midden) break
+  }
+  return waarde
+}
+
 // Het oordeel op één moment.
-export function beoordeel(trendWaarde, metingen, n, startGewicht, config) {
+export function beoordeel(trendWaarde, metingen, n, startGewicht, config, lijnenVooraf = null) {
   if (!Number.isFinite(trendWaarde) || !Number.isFinite(startGewicht)) {
     return { status: 'GEEN_DATA' }
   }
@@ -279,8 +337,8 @@ export function beoordeel(trendWaarde, metingen, n, startGewicht, config) {
   // In de eerste week is de band nog vrijwel een streep: er is per definitie
   // bijna geen verandering toegestaan, dus elke afwijking van een ons valt
   // erbuiten. Dat is geen oordeel maar een rekenartefact.
-  if (n < 1) return { status: 'TE_VROEG', lijnen: lijnenOpWeek(n, startGewicht, config) }
-  const l = lijnenOpWeek(n, startGewicht, config)
+  if (n < 1) return { status: 'TE_VROEG', lijnen: lijnenVooraf || lijnenOpWeek(n, startGewicht, config) }
+  const l = lijnenVooraf || lijnenOpWeek(n, startGewicht, config)
   if (!l) return { status: 'GEEN_DATA' }
   const hoog = Math.max(l.traag, l.snel)
   const laag = Math.min(l.traag, l.snel)
@@ -312,7 +370,9 @@ export function tempoOordeel(verschil, config) {
   return 'OP_KOERS'
 }
 
-export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
+// `segmenten` (uit planSegmenten) maakt de planlijn stuksgewijs: na een
+// bijsturing wordt het verleden niet alsnog met het nieuwe tempo beoordeeld.
+export function weekBeoordelingen(reeks, startGewicht, startDatum, config, segmenten = null) {
   const perWeek = new Map()
   reeks.forEach(r => {
     const n = weekVan(r.datum, startDatum)
@@ -325,7 +385,12 @@ export function weekBeoordelingen(reeks, startGewicht, startDatum, config) {
   return weken.map(n => {
     const r = perWeek.get(n)
     // Waar de trend staat ten opzichte van de band. Dit tekent de grafiek.
-    const stand = beoordeel(r.trend, r.metingen, weekFractie(r.datum, startDatum, config.venster_dagen), startGewicht, config)
+    const stand = beoordeel(
+      r.trend, r.metingen,
+      weekFractie(r.datum, startDatum, config.venster_dagen),
+      startGewicht, config,
+      segmenten ? lijnenOpDatum(r.datum, startGewicht, segmenten, config.venster_dagen) : null,
+    )
 
     // Verschil met de vorige week, op de trend. Dit is het getal waar de coach
     // op stuurt: "week 37 +0,9, week 38 +0,9".

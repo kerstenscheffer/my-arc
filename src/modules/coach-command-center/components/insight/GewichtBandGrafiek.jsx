@@ -18,7 +18,7 @@ import {
 import { Info } from 'lucide-react'
 import KopKeuze from './KopKeuze'
 import {
-  maakConfig, trendReeks, bepaalStart, weekFractie, lijnenOpWeek,
+  maakConfig, trendReeks, bepaalStart, lijnenOpDatum, planSegmenten,
   weekBeoordelingen, advies, ernstVan, kleurVoorErnst, weergaveStatus, STATUS_TEKST, STATUS_KLEUR,
 } from '../../../weight-tracker/utils/coachingBand'
 
@@ -231,8 +231,8 @@ export default function GewichtBandGrafiek({
         const f = faseVan(r.datum)
         if (!f?.start_gewicht) return { datum: r.datum, label: kort(r.datum), meting: r.meting, trend: r.trend }
         const c = maakConfig(client, f)
-        const n = weekFractie(r.datum, f.started_on, c.venster_dagen)
-        const l = lijnenOpWeek(n, Number(f.start_gewicht), c)
+        const l = lijnenOpDatum(r.datum, Number(f.start_gewicht), planSegmenten(client, f), c.venster_dagen)
+        if (!l) return { datum: r.datum, label: kort(r.datum), meting: r.meting, trend: r.trend }
         return {
           datum: r.datum, label: kort(r.datum), meting: r.meting, trend: r.trend,
           doel: Math.round(l.doel * 10) / 10,
@@ -269,9 +269,16 @@ export default function GewichtBandGrafiek({
     const { startGewicht, startDatum, herijkt } = uitFase || bepaalStart(client, reeks)
     if (!Number.isFinite(startGewicht)) return { config, leeg: true }
 
+    // Stuksgewijs: vanaf elke bijsturing loopt de lijn met een andere hoek
+    // verder vanaf waar hij was. Zonder bijsturingen is dit exact dezelfde
+    // uitkomst als de oude lijnenOpWeek.
+    const segmenten = actief
+      ? planSegmenten(client, { ...actief, started_on: startDatum })
+      : [{ vanaf: String(startDatum).slice(0, 10), config }]
+
     const punten = reeks.map(r => {
-      const n = weekFractie(r.datum, startDatum, config.venster_dagen)
-      const l = lijnenOpWeek(n, startGewicht, config)
+      const l = lijnenOpDatum(r.datum, startGewicht, segmenten, config.venster_dagen)
+      if (!l) return { datum: r.datum, label: kort(r.datum), meting: r.meting, trend: r.trend }
       const hoog = Math.max(l.traag, l.snel)
       const laag = Math.min(l.traag, l.snel)
       return {
@@ -285,7 +292,7 @@ export default function GewichtBandGrafiek({
       }
     })
 
-    const weken = weekBeoordelingen(reeks, startGewicht, startDatum, config)
+    const weken = weekBeoordelingen(reeks, startGewicht, startDatum, config, segmenten)
     const laatste = weken[weken.length - 1] || null
     return { config, punten, weken, laatste, startGewicht, startDatum, herijkt, leeg: false }
   }, [client, history, actief, gekozen, perFase, fase, eersteStart])

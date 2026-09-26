@@ -17,7 +17,7 @@
 import { est8Rep } from '../coach-command-center/components/insight/workoutChartUtils'
 import { trajectLoopt } from '../client-checkin/trajectStatus'
 import {
-  maakConfig, trendReeks, weekBeoordelingen, weergaveStatus, advies,
+  maakConfig, trendReeks, weekBeoordelingen, planSegmenten, weergaveStatus, advies,
   STATUS_TEKST,
 } from '../weight-tracker/utils/coachingBand'
 
@@ -282,7 +282,7 @@ function bouwKlant({ client, week, sessies, oefeningen, gewicht, fase, checkin, 
     const startGewicht = fase?.start_gewicht ? Number(fase.start_gewicht) : null
     const startDatum = fase?.started_on || reeks[0]?.datum
     const weken = (startGewicht && startDatum)
-      ? weekBeoordelingen(reeks, startGewicht, startDatum, config)
+      ? weekBeoordelingen(reeks, startGewicht, startDatum, config, fase ? planSegmenten(client, fase) : null)
       : []
     const laatste = weken.length ? weken[weken.length - 1] : null
     if (laatste) {

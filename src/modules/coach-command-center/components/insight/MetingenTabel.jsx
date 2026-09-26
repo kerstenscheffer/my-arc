@@ -17,7 +17,7 @@
 import { useMemo, useState } from 'react'
 import KopKeuze from './KopKeuze'
 import {
-  maakConfig, trendReeks, weekBeoordelingen, STATUS_TEKST, STATUS_KLEUR,
+  maakConfig, trendReeks, weekBeoordelingen, planSegmenten, STATUS_TEKST, STATUS_KLEUR,
 } from '../../../weight-tracker/utils/coachingBand'
 
 const PERIODES = [
@@ -76,7 +76,7 @@ export default function MetingenTabel({ client, history, fase, isMobile }) {
     const startGewicht = fase?.start_gewicht ? Number(fase.start_gewicht) : null
     const startDatum = fase?.started_on || reeks[0]?.datum
     const weken = (startGewicht && startDatum)
-      ? weekBeoordelingen(reeks, startGewicht, startDatum, config)
+      ? weekBeoordelingen(reeks, startGewicht, startDatum, config, fase ? planSegmenten(client, fase) : null)
       : []
 
     // Dag-weergave: elke meting met zijn verschil t.o.v. de vorige meting en de

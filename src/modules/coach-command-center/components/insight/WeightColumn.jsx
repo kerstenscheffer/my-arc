@@ -243,7 +243,6 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           client={client}
           db={db}
           fase={actieveFase}
-          history={history}
           isMobile={isMobile}
           onSluit={() => setDoelOpen(false)}
           onKlaar={() => { setFaseVersie(v => v + 1); onClientUpdate?.() }}

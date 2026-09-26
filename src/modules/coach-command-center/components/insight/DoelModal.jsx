@@ -24,15 +24,15 @@ const LIJN = 'rgba(255,255,255,0.1)'
 const MARGE = 0.2
 
 const KEUZES = [
-  { id: 'vanaf-vandaag', kop: 'Vanaf vandaag' },
-  { id: 'corrigeer', kop: 'Deze hele fase' },
+  { id: 'vanaf-vandaag', kop: 'Bijsturen vanaf vandaag' },
+  { id: 'corrigeer', kop: 'Deze hele fase corrigeren' },
 ]
 
 const datumNL = (d) => d
   ? new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   : ''
 
-export default function DoelModal({ client, db, fase, history = [], isMobile, onKlaar, onSluit, onNieuweFase }) {
+export default function DoelModal({ client, db, fase, isMobile, onKlaar, onSluit, onNieuweFase }) {
   const [perWeek, setPerWeek] = useState('')
   const [min, setMin] = useState('')
   const [max, setMax] = useState('')
@@ -61,9 +61,9 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
     setMax(fase?.tempo_max_kg != null ? String(Math.abs(Number(fase.tempo_max_kg))) : '')
     setEigenGrenzen(eigen)
     setFout(null)
-    setVanaf((history || []).some(e => Number.isFinite(parseFloat(e?.weight))) ? 'vanaf-vandaag' : 'corrigeer')
+    setVanaf('vanaf-vandaag')
     setVanafOpen(false)
-  }, [fase, history])
+  }, [fase])
 
   // Het doel bepaalt de grenzen, tenzij je ze zelf hebt ingevuld.
   const zetPerWeek = (waarde) => {
@@ -87,15 +87,6 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
     setMin(String(Math.round(Math.max(0, n - MARGE) * 100) / 100))
     setMax(String(Math.round((n + MARGE) * 100) / 100))
   }
-
-  // Waar een nieuwe fase vandaag zou beginnen: het laatst gewogen gewicht.
-  const laatsteGewicht = (() => {
-    const g = (history || [])
-      .map(e => ({ d: e?.date, w: parseFloat(e?.weight) }))
-      .filter(e => Number.isFinite(e.w) && e.d)
-      .sort((a, b) => String(b.d).localeCompare(String(a.d)))[0]
-    return g ? g.w : (client?.current_weight ? parseFloat(client.current_weight) : null)
-  })()
 
   const vandaagIso = (() => {
     const d = new Date()
@@ -128,27 +119,23 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
     setBezig(true); setFout(null)
 
     if (vanaf === 'vanaf-vandaag') {
-      if (!laatsteGewicht) { setBezig(false); setFout('Geen weging om vanaf te starten.'); return }
-      // De lopende fase eindigt gisteren: twee open fases zouden de planlijn
-      // dubbel tekenen.
-      const eind = new Date(`${vandaagIso}T00:00:00`)
-      eind.setDate(eind.getDate() - 1)
-      const eindIso = `${eind.getFullYear()}-${String(eind.getMonth() + 1).padStart(2, '0')}-${String(eind.getDate()).padStart(2, '0')}`
-      const { error: eFout } = await db.supabase.from('client_phases')
-        .update({ ended_on: eindIso }).eq('id', fase.id)
-      if (eFout) { setBezig(false); setFout(eFout.message); return }
-
-      const { error: iFout } = await db.supabase.from('client_phases').insert({
-        client_id: client.id,
-        started_on: vandaagIso,
-        doel: fase.doel,
-        start_gewicht: laatsteGewicht,
+      // Een bijsturing, geen nieuwe fase. Een nieuwe fase begon met nul
+      // metingen en liet de grafiek leeg achter; dit laat de fase staan en
+      // geeft de planlijn alleen een knik op vandaag.
+      const eerdere = (Array.isArray(fase.bijsturingen) ? fase.bijsturingen : [])
+        .filter(b => b?.vanaf && String(b.vanaf).slice(0, 10) !== vandaagIso)
+      const nieuweLijst = [...eerdere, {
+        vanaf: vandaagIso,
         week_doel_kg: nWeek,
-        doel_gewicht: fase.doel_gewicht ?? null,
         tempo_min_kg: nMin,
         tempo_max_kg: nMax,
-      })
-      if (iFout) { setBezig(false); setFout(iFout.message); return }
+      }].sort((a, b) => String(a.vanaf).localeCompare(String(b.vanaf)))
+
+      const { error: bFout } = await db.supabase
+        .from('client_phases')
+        .update({ bijsturingen: nieuweLijst })
+        .eq('id', fase.id)
+      if (bFout) { setBezig(false); setFout(bFout.message); return }
       await db.supabase.from('clients').update({ weekly_weight_goal: nWeek }).eq('id', client.id)
       setBezig(false)
       onKlaar?.()
@@ -156,9 +143,11 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
       return
     }
 
+    // 'Deze hele fase': het tempo van de fase zelf, en alle bijsturingen eraf —
+    // anders zou een oude knik het nieuwe doel meteen weer overschrijven.
     const { error } = await db.supabase
       .from('client_phases')
-      .update({ week_doel_kg: nWeek, tempo_min_kg: nMin, tempo_max_kg: nMax })
+      .update({ week_doel_kg: nWeek, tempo_min_kg: nMin, tempo_max_kg: nMax, bijsturingen: [] })
       .eq('id', fase.id)
     if (error) { setBezig(false); setFout(error.message); return }
 
@@ -305,7 +294,7 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
                   </span>
                   <span style={{ display: 'block', marginTop: 1, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
                     {vanaf === 'vanaf-vandaag'
-                      ? (laatsteGewicht ? `nieuwe fase op ${laatsteGewicht} kg` : 'geen weging om vanaf te starten')
+                      ? 'knik in de lijn op vandaag'
                       : `kantelt vanaf ${datumNL(fase.started_on)}`}
                   </span>
                 </span>
@@ -320,20 +309,17 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
                   marginTop: 6, border: `1px solid ${LIJN}`, borderRadius: 10, overflow: 'hidden',
                 }}>
                   {KEUZES.map((k, i) => {
-                    const uit = k.id === 'vanaf-vandaag' && !laatsteGewicht
                     const aan = vanaf === k.id
                     return (
                       <button
                         key={k.id}
-                        onClick={() => { if (!uit) { setVanaf(k.id); setVanafOpen(false) } }}
-                        disabled={uit}
+                        onClick={() => { setVanaf(k.id); setVanafOpen(false) }}
                         style={{
                           display: 'block', width: '100%', textAlign: 'left',
                           padding: '0.6rem 0.75rem',
                           background: aan ? 'rgba(255,255,255,0.08)' : 'transparent',
                           border: 'none', borderTop: i > 0 ? `1px solid ${LIJN}` : 'none',
-                          cursor: uit ? 'default' : 'pointer', fontFamily: 'inherit',
-                          opacity: uit ? 0.4 : 1,
+                          cursor: 'pointer', fontFamily: 'inherit',
                           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                         }}
                       >
@@ -342,10 +328,8 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
                         </div>
                         <div style={{ marginTop: 2, fontSize: '0.73rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
                           {k.id === 'vanaf-vandaag'
-                            ? (laatsteGewicht
-                                ? `Nieuwe fase vanaf vandaag op ${laatsteGewicht} kg. De lijn krijgt hier een knik; wat geweest is blijft staan.`
-                                : 'Geen weging om vanaf te starten.')
-                            : `De lijn kantelt vanaf ${datumNL(fase.started_on)}. Voor als het doel al die tijd anders had moeten staan.`}
+                            ? 'De fase blijft staan; de planlijn krijgt vanaf vandaag een andere hoek. Je historie en je grafiek blijven zoals ze zijn.'
+                            : `De lijn kantelt vanaf ${datumNL(fase.started_on)}, ook over de weken die al geweest zijn. Eerdere bijsturingen vervallen.`}
                         </div>
                       </button>
                     )
@@ -390,7 +374,7 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
                 fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit',
                 cursor: bezig ? 'wait' : 'pointer',
               }}>
-                {bezig ? 'Opslaan…' : vanaf === 'vanaf-vandaag' ? 'Start vanaf vandaag' : 'Bewaren'}
+                {bezig ? 'Opslaan…' : vanaf === 'vanaf-vandaag' ? 'Bijsturen' : 'Bewaren'}
               </button>
             </div>
 
