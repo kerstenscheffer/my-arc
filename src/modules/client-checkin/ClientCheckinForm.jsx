@@ -14,6 +14,7 @@
 import { useState, useEffect } from 'react'
 import { CheckCircle } from 'lucide-react'
 import CheckinService from './CheckinService'
+import { laadWeekCijfers, oordeel, gewichtOordeel } from './weekCijfers'
 
 const KAART = '#161616'
 const RAND = '#2a2a2a'
@@ -39,28 +40,26 @@ const SECTIES = [
     kop: 'Je week in cijfers',
     velden: [
       {
-        id: 'training_gedaan', type: 'aantal-van',
-        vraag: 'Hoeveel trainingen heb je gedaan?',
-        tweedeId: 'training_gepland', na: 'van', slot: 'gepland', max: 14,
+        // Geen vraag maar een scherm: dit hadden we afgesproken, dit is er
+        // gebeurd. Hier stonden vijf vragen die de klant uit zijn hoofd moest
+        // beantwoorden terwijl de app het precies wist — hoeveel trainingen,
+        // hoeveel keer gewogen, hoeveel dagen volgens plan. Een herinnering
+        // van een week oud is altijd te positief, en je hoeft er niet naar te
+        // vragen als je het kunt laten zien.
+        id: 'week_cijfers_scherm', type: 'cijfers',
+        vraag: 'Dit is je week',
+        hulp: 'Afgesproken tegenover gedaan, de afgelopen zeven dagen.',
       },
-      {
-        id: 'training_gelogd', type: 'keuze',
-        vraag: 'Heb je je trainingen gelogd in de app?',
-        opties: ['Alle', 'Meeste', 'Enkele', 'Geen'],
-      },
+    ],
+  },
+  {
+    kop: 'Wat de app niet ziet',
+    velden: [
       {
         id: 'training_falen', type: 'keuze',
         vraag: 'Heb je je sets tot falen gebracht?',
         hulp: 'Tot falen betekent: geen herhaling meer met goede techniek.',
         opties: ['Elke set', 'Meeste sets', 'Soms', 'Niet'],
-      },
-      {
-        id: 'dagen_gewogen', type: 'aantal',
-        vraag: 'Hoeveel dagen heb je jezelf gewogen?', slot: 'van 7', max: 7,
-      },
-      {
-        id: 'dagen_voeding', type: 'aantal',
-        vraag: 'Hoeveel dagen heb je volgens je voedingsplan gegeten?', slot: 'van 7', max: 7,
       },
       {
         id: 'alcohol_aantal', type: 'aantal',
@@ -94,9 +93,29 @@ const SECTIES = [
     velden: [
       {
         id: 'wins', type: 'tekst',
-        vraag: 'Wat ging er deze week beter dan je had verwacht?',
-        hulp: 'Groot of klein, alles telt.',
+        vraag: 'Wat ging er afgelopen week goed?',
+        hulp: 'Groot of klein, alles telt — en dit is wat je volgende week wilt herhalen.',
         placeholder: 'In je eigen woorden.',
+      },
+    ],
+  },
+  {
+    // De twee vragen die vooruitkijken. Ze staan na de cijfers en na "wat ging
+    // goed", zodat je ze beantwoordt met je eigen week vers in beeld in plaats
+    // van uit het niets.
+    kop: 'Volgende week',
+    velden: [
+      {
+        id: 'volgende_week_beter', type: 'tekst',
+        vraag: 'Wat ga je volgende week anders doen om je doel wél te halen?',
+        hulp: 'Eén ding dat je echt gaat doen is meer waard dan een lijstje goede voornemens.',
+        placeholder: 'Bijvoorbeeld: zondagavond mijn eten voorbereiden.',
+      },
+      {
+        id: 'hulp_van_coach', type: 'tekst',
+        vraag: 'Hoe kan ik jou komende week zo goed mogelijk helpen?',
+        hulp: 'Waar heb je iets aan van mij? Een aanpassing in je plan, uitleg, of gewoon dat ik je eraan herinner.',
+        placeholder: 'Zeg het gerust rechtstreeks.',
       },
     ],
   },
@@ -110,8 +129,7 @@ const SECTIES = [
       },
     ],
   },
-  // Als laatste, want dit is de enige vraag die vooruitkijkt. Eerst de week
-  // afsluiten, dan pas de volgende in.
+  // Als laatste, want dit gaat over de planning van de week die komt.
   //
   // Een tekstveld en geen ja/nee: "ja" zonder te weten wát er speelt levert
   // geen gesprek op, en dan moet de coach het alsnog vragen.
@@ -181,20 +199,6 @@ const platteVragen = (secties) => secties.flatMap(sec => sec.velden.map(v => ({ 
 const VRAGEN_BASIS = platteVragen(SECTIES)
 const VRAGEN_MET_COACHING = platteVragen([...SECTIES, COACHING_SECTIE])
 
-// Hoeveel trainingen staan er gepland? Eerst het toegewezen schema (dat is
-// wat de klant daadwerkelijk voor zich ziet), anders wat er in de intake is
-// opgegeven. Zo hoeft de klant dit niet zelf op te zoeken.
-const geplandeTrainingen = (client) => {
-  const ws = client?.workout_schedule
-  if (ws && typeof ws === 'object') {
-    const n = Object.values(ws).filter(Boolean).length
-    if (n > 0) return n
-  }
-  const alt = [client?.workout_days_per_week, client?.days_per_week, client?.training_days]
-    .map(v => parseInt(v, 10)).find(n => Number.isFinite(n) && n > 0)
-  return alt || null
-}
-
 export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) {
   const isMobile = window.innerWidth <= 768
   const [loading, setLoading] = useState(true)
@@ -207,6 +211,9 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // het traject, niet op het aantal check-ins.
   const [coachingRonde, setCoachingRonde] = useState(false)
   const [vorigeCheckin, setVorigeCheckin] = useState(null)
+  // De gemeten week. Null zolang hij laadt; het scherm toont dan een regel dat
+  // de cijfers worden opgehaald in plaats van lege streepjes.
+  const [cijfers, setCijfers] = useState(null)
 
   const service = new CheckinService(db)
 
@@ -214,6 +221,18 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     if (client?.id) checkExistingCheckin()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id])
+
+  // De cijfers van de afgelopen zeven dagen. Mislukt dit, dan blijft het bij
+  // een lege kaart — nooit een blokkade, want de open vragen zijn het echte
+  // doel van de check-in.
+  useEffect(() => {
+    let weg = false
+    if (!client?.id) return undefined
+    laadWeekCijfers(db, client)
+      .then(c => { if (!weg) setCijfers(c) })
+      .catch(e => { console.error('Weekcijfers laden mislukt:', e); if (!weg) setCijfers(null) })
+    return () => { weg = true }
+  }, [db, client])
 
   const checkExistingCheckin = async () => {
     setLoading(true)
@@ -237,19 +256,16 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     }
   }
 
-  // Aantal geplande trainingen alvast invullen zodra de klant bekend is.
-  // De klant kan het overschrijven als het die week anders lag.
-  useEffect(() => {
-    const n = geplandeTrainingen(client)
-    if (n) setFormData(prev => (prev.training_gepland == null ? { ...prev, training_gepland: n } : prev))
-  }, [client])
-
   const updateField = (id, value) => setFormData(prev => ({ ...prev, [id]: value }))
 
   const buildPayload = () => ({
     coach_id: client.coach_id || client.trainer_id || null,
     // Zodat de coach-weergave weet welke vragen bij deze check-in hoorden.
-    formulier_versie: 2,
+    // 3 = dit formulier: de cijfers worden getoond in plaats van gevraagd.
+    formulier_versie: 3,
+    // De stand zoals de klant hem zag toen hij dit invulde. Wordt later niet
+    // meer herrekend, ook niet als er nog wordt nagelogd.
+    week_cijfers: cijfers || null,
     // Waren de coaching-vragen deze keer aan de beurt, dan gaan ze altijd mee
     // — desnoods leeg. Zo is "gesteld maar niet beantwoord" te onderscheiden
     // van "niet gesteld", en komt de vraag niet de week erna meteen terug.
@@ -326,6 +342,74 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
             {v.hulp}
           </div>
         )}
+
+        {v.type === 'cijfers' && (() => {
+          if (!cijfers) {
+            return (
+              <div style={{ marginTop: '2.2vh', color: GRIJS, fontSize: 14, fontWeight: 700 }}>
+                Je cijfers worden opgehaald…
+              </div>
+            )
+          }
+          const KLEUR = { goed: '#10b981', bijna: '#f59e0b', niet: '#ef4444' }
+          const g = cijfers.gewicht
+          const tekenen = (n) => `${n > 0 ? '+' : ''}${n}`
+          const regels = [
+            {
+              label: 'Trainingen',
+              waarde: cijfers.trainingen.gedaan != null ? String(cijfers.trainingen.gedaan) : '—',
+              doel: cijfers.trainingen.gepland != null ? `${cijfers.trainingen.gepland} gepland` : null,
+              staat: oordeel(cijfers.trainingen.gedaan, cijfers.trainingen.gepland),
+            },
+            {
+              label: 'Gewogen',
+              waarde: cijfers.wegingen.gedaan != null ? String(cijfers.wegingen.gedaan) : '—',
+              doel: 'van 7 dagen',
+              staat: oordeel(cijfers.wegingen.gedaan, 7),
+            },
+            {
+              label: 'Voeding op plan',
+              waarde: cijfers.voeding.dagen != null ? String(cijfers.voeding.dagen) : '—',
+              doel: 'van 7 dagen',
+              staat: oordeel(cijfers.voeding.dagen, 7),
+            },
+            {
+              label: 'Gewicht',
+              waarde: g.verschil != null ? `${tekenen(g.verschil)} kg` : '—',
+              doel: g.tempoDoel != null ? `afgesproken ${tekenen(g.tempoDoel)} kg/wk` : null,
+              staat: gewichtOordeel(g.verschil, g.tempoDoel, g.richting),
+            },
+          ]
+          return (
+            <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
+              {regels.map(r => (
+                <div key={r.label} style={{
+                  display: 'flex', alignItems: 'baseline', gap: 10,
+                  padding: '12px 14px', marginBottom: 8,
+                  background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
+                }}>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff' }}>
+                    {r.label}
+                  </span>
+                  {r.doel && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: GRIJS }}>{r.doel}</span>
+                  )}
+                  <span style={{
+                    fontSize: 19, fontWeight: 900,
+                    color: r.staat ? KLEUR[r.staat] : '#fff',
+                    fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right',
+                  }}>
+                    {r.waarde}
+                  </span>
+                </div>
+              ))}
+              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 10, lineHeight: 1.5 }}>
+                Het gewicht is het verschil tussen je 7-daags gemiddelde van nu en dat van een
+                week geleden — niet twee losse wegingen, want die schommelen.
+              </div>
+            </div>
+          )
+        })()}
 
         {(v.type === 'aantal' || v.type === 'aantal-van') && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: '2.2vh', flexWrap: 'wrap' }}>
@@ -470,13 +554,29 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       }}>
         {stap === 0 && vorigeCheckin && (() => {
           const c = vorigeCheckin
-          const items = [
+          // Vanaf formulierversie 3 staan de cijfers van die week in
+          // week_cijfers; daarvoor vulde de klant ze zelf in. Eerst de gemeten
+          // variant, anders de oude kolommen — zo blijft dit blok werken voor
+          // wie nog een check-in van het oude formulier heeft.
+          const wc = c.week_cijfers || null
+          const items = (wc ? [
+            wc.trainingen?.gedaan != null && {
+              label: 'Trainingen',
+              waarde: wc.trainingen.gepland != null
+                ? `${wc.trainingen.gedaan} / ${wc.trainingen.gepland}`
+                : String(wc.trainingen.gedaan),
+            },
+            wc.wegingen?.gedaan != null && { label: 'Gewogen', waarde: `${wc.wegingen.gedaan} / 7 dagen` },
+            wc.voeding?.dagen != null && { label: 'Voeding', waarde: `${wc.voeding.dagen} / 7 dagen` },
+            wc.gewicht?.verschil != null && { label: 'Gewicht', waarde: `${wc.gewicht.verschil > 0 ? '+' : ''}${wc.gewicht.verschil} kg` },
+            c.energie_score != null && { label: 'Energie', waarde: `${c.energie_score} / 10` },
+          ] : [
             c.training_gedaan != null && c.training_gepland != null && { label: 'Trainingen', waarde: `${c.training_gedaan} / ${c.training_gepland}` },
             c.training_gedaan != null && c.training_gepland == null && { label: 'Trainingen', waarde: c.training_gedaan },
             c.dagen_gewogen != null && { label: 'Gewogen', waarde: `${c.dagen_gewogen} / 7 dagen` },
             c.dagen_voeding != null && { label: 'Voeding', waarde: `${c.dagen_voeding} / 7 dagen` },
             c.energie_score != null && { label: 'Energie', waarde: `${c.energie_score} / 10` },
-          ].filter(Boolean)
+          ]).filter(Boolean)
           if (!items.length) return null
           return (
             <div style={{

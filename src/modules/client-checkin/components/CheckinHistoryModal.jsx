@@ -42,6 +42,8 @@ const OPEN = [
   { id: 'vastgelopen', label: 'Waar je op vastliep' },
   { id: 'wins', label: 'Wat beter ging' },
   { id: 'komende_week', label: 'Komende week' },
+  { id: 'volgende_week_beter', label: 'Gaat anders doen' },
+  { id: 'hulp_van_coach', label: 'Vraagt van de coach' },
   { id: 'coaching_fijnste', label: 'Fijnste aan de coaching' },
   { id: 'coaching_verbeterpunt', label: 'Wat beter kan' },
 ]

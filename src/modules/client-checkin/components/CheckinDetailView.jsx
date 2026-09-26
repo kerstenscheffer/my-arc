@@ -87,8 +87,25 @@ export default function CheckinDetailView({
   // in plaats van een score per onderdeel. De oude scoretegels zijn dan leeg,
   // dus die tonen we niet — we tonen de antwoorden die er wél zijn. Oude
   // check-ins (versie 1, of zonder vlag) blijven hun vertrouwde weergave houden.
-  const isV2 = checkin.formulier_versie === 2
+  // Versie 2 en 3 zijn allebei het nieuwe formulier; 3 toont de cijfers in
+  // plaats van ze te vragen, dus daar komen ze uit week_cijfers in plaats van
+  // uit losse kolommen.
+  const isV2 = checkin.formulier_versie === 2 || checkin.formulier_versie === 3
   const nietLeeg = (v) => v !== null && v !== undefined && v !== ''
+  const wc = checkin.week_cijfers || null
+  const teken = (n) => `${n > 0 ? '+' : ''}${n}`
+  // Gemeten cijfers (versie 3): wat de app die week heeft geteld, plus wat er
+  // was afgesproken. Dit is waar de klant naar keek toen hij zijn antwoorden
+  // gaf.
+  const v3Cijfers = wc ? [
+    { label: 'Trainingen', waarde: nietLeeg(wc.trainingen?.gedaan)
+        ? `${wc.trainingen.gedaan}${nietLeeg(wc.trainingen?.gepland) ? ` van ${wc.trainingen.gepland} gepland` : ''}` : null },
+    { label: 'Dagen gewogen', waarde: nietLeeg(wc.wegingen?.gedaan) ? `${wc.wegingen.gedaan} van 7` : null },
+    { label: 'Dagen op plan', waarde: nietLeeg(wc.voeding?.dagen) ? `${wc.voeding.dagen} van 7` : null },
+    { label: 'Gewicht (7-daags gem.)', waarde: nietLeeg(wc.gewicht?.verschil)
+        ? `${teken(wc.gewicht.verschil)} kg${nietLeeg(wc.gewicht?.tempoDoel) ? ` · afgesproken ${teken(wc.gewicht.tempoDoel)}/wk` : ''}` : null },
+  ].filter(r => nietLeeg(r.waarde)) : []
+
   const v2Cijfers = [
     { label: 'Trainingen',
       waarde: nietLeeg(checkin.training_gedaan)
@@ -102,6 +119,9 @@ export default function CheckinDetailView({
     { label: 'Slaap gemiddeld',    waarde: nietLeeg(checkin.slaap_uren_gem) ? `${checkin.slaap_uren_gem} uur` : null },
     { label: 'Energie',            waarde: nietLeeg(checkin.energie_score) ? `${checkin.energie_score}/10` : null },
   ].filter(r => nietLeeg(r.waarde))
+  // Gemeten eerst: dat is de harde stand. Wat de klant zelf opgaf (alcohol,
+  // slaap, sets tot falen) staat eronder.
+  const cijfersRegels = [...v3Cijfers, ...v2Cijfers]
   const v2Open = [
     { label: 'Hoe het gaat',            waarde: checkin.hoe_gaat_het },
     { label: 'Kostte de meeste moeite', waarde: checkin.struggles },
@@ -110,6 +130,10 @@ export default function CheckinDetailView({
     // Stond er niet bij, terwijl dit juist het antwoord is waar je iets mee
     // moet: een bruiloft of vakantie volgende week verandert het plan.
     { label: 'Komende week',            waarde: checkin.komende_week },
+    // De twee vragen waar je je week op inricht: wat hij zelf anders gaat doen,
+    // en wat hij van jou nodig heeft.
+    { label: 'Gaat volgende week anders doen', waarde: checkin.volgende_week_beter },
+    { label: 'Vraagt van jou',                 waarde: checkin.hulp_van_coach },
     // Elke vierde check-in erbij. Alleen tonen als er iets is ingevuld, want
     // de andere drie weken bestaan deze vragen niet.
     { label: 'Fijnste aan de coaching', waarde: checkin.coaching_fijnste, feedback: true },
@@ -342,7 +366,8 @@ export default function CheckinDetailView({
         </div>
       </div>
       
-      {/* Nieuw formulier (versie 2): cijfers als lijst, open antwoorden eronder. */}
+      {/* Nieuw formulier (versie 2 en 3): cijfers als lijst, open antwoorden
+          eronder. Bij versie 3 zijn de eerste vier gemeten door de app. */}
       {isV2 && (
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{
@@ -350,7 +375,7 @@ export default function CheckinDetailView({
             gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
             gap: '0.6rem', marginBottom: v2Open.length ? '1rem' : 0,
           }}>
-            {v2Cijfers.map(r => (
+            {cijfersRegels.map(r => (
               <div key={r.label} style={{
                 padding: '0.7rem 0.8rem',
                 background: 'rgba(255,255,255,0.03)',
