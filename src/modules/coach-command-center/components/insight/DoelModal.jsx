@@ -23,19 +23,44 @@ const datumNL = (d) => d
   ? new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   : ''
 
-export default function DoelModal({ client, db, fase, isMobile, onKlaar, onSluit, onNieuweFase }) {
+export default function DoelModal({ client, db, fase, history = [], isMobile, onKlaar, onSluit, onNieuweFase }) {
   const [perWeek, setPerWeek] = useState('')
   const [min, setMin] = useState('')
   const [max, setMax] = useState('')
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
+  // Waar het nieuwe tempo vandaan gaat lopen.
+  //
+  // 'corrigeer' past de lopende fase aan. De planlijn rekent vanaf het
+  // startgewicht op de startdatum, dus die kantelt dan over de héle fase — ook
+  // over de weken die al geweest zijn. Dat wil je als je je vergist had.
+  //
+  // 'vanaf-vandaag' sluit de fase vandaag af en begint een nieuwe op het gewicht
+  // van nu. Dan krijgt de lijn een knik op vandaag en blijft het verleden staan
+  // zoals het was. Dat wil je als de afspraak verandert.
+  const [vanaf, setVanaf] = useState('corrigeer')
 
   useEffect(() => {
     setPerWeek(fase?.week_doel_kg != null ? String(Number(fase.week_doel_kg)) : '')
     setMin(fase?.tempo_min_kg != null ? String(Math.abs(Number(fase.tempo_min_kg))) : '')
     setMax(fase?.tempo_max_kg != null ? String(Math.abs(Number(fase.tempo_max_kg))) : '')
     setFout(null)
+    setVanaf('corrigeer')
   }, [fase])
+
+  // Waar een nieuwe fase vandaag zou beginnen: het laatst gewogen gewicht.
+  const laatsteGewicht = (() => {
+    const g = (history || [])
+      .map(e => ({ d: e?.date, w: parseFloat(e?.weight) }))
+      .filter(e => Number.isFinite(e.w) && e.d)
+      .sort((a, b) => String(b.d).localeCompare(String(a.d)))[0]
+    return g ? g.w : (client?.current_weight ? parseFloat(client.current_weight) : null)
+  })()
+
+  const vandaagIso = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
 
   // Wat er gaat gelden met wat er nú in de velden staat. Zonder dit vul je iets
   // in en weet je pas na opslaan wat 'te snel' wordt.
@@ -61,6 +86,36 @@ export default function DoelModal({ client, db, fase, isMobile, onKlaar, onSluit
     if (nWeek != null && !Number.isFinite(nWeek)) { setFout('Het weekdoel is geen getal.'); return }
 
     setBezig(true); setFout(null)
+
+    if (vanaf === 'vanaf-vandaag') {
+      if (!laatsteGewicht) { setBezig(false); setFout('Geen weging om vanaf te starten.'); return }
+      // De lopende fase eindigt gisteren: twee open fases zouden de planlijn
+      // dubbel tekenen.
+      const eind = new Date(`${vandaagIso}T00:00:00`)
+      eind.setDate(eind.getDate() - 1)
+      const eindIso = `${eind.getFullYear()}-${String(eind.getMonth() + 1).padStart(2, '0')}-${String(eind.getDate()).padStart(2, '0')}`
+      const { error: eFout } = await db.supabase.from('client_phases')
+        .update({ ended_on: eindIso }).eq('id', fase.id)
+      if (eFout) { setBezig(false); setFout(eFout.message); return }
+
+      const { error: iFout } = await db.supabase.from('client_phases').insert({
+        client_id: client.id,
+        started_on: vandaagIso,
+        doel: fase.doel,
+        start_gewicht: laatsteGewicht,
+        week_doel_kg: nWeek,
+        doel_gewicht: fase.doel_gewicht ?? null,
+        tempo_min_kg: nMin,
+        tempo_max_kg: nMax,
+      })
+      if (iFout) { setBezig(false); setFout(iFout.message); return }
+      await db.supabase.from('clients').update({ weekly_weight_goal: nWeek }).eq('id', client.id)
+      setBezig(false)
+      onKlaar?.()
+      onSluit?.()
+      return
+    }
+
     const { error } = await db.supabase
       .from('client_phases')
       .update({ week_doel_kg: nWeek, tempo_min_kg: nMin, tempo_max_kg: nMax })
@@ -179,6 +234,45 @@ export default function DoelModal({ client, db, fase, isMobile, onKlaar, onSluit
               </div>
             </div>
 
+            {/* Waar het nieuwe tempo vandaan loopt. De planlijn rekent vanaf het
+                startgewicht van de fase, dus 'deze fase' kantelt de hele lijn —
+                ook over weken die al geweest zijn. Een nieuwe fase geeft een
+                knik op vandaag en laat het verleden staan. */}
+            <div>
+              <label style={label}>Geldt vanaf</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { id: 'corrigeer', kop: 'Deze hele fase', uitleg: `De lijn kantelt vanaf ${datumNL(fase.started_on)}. Voor als het doel al die tijd anders had moeten staan.` },
+                  { id: 'vanaf-vandaag', kop: 'Vanaf vandaag', uitleg: laatsteGewicht ? `Nieuwe fase vanaf vandaag op ${laatsteGewicht} kg. De lijn krijgt hier een knik; wat geweest is blijft staan.` : 'Geen weging om vanaf te starten.' },
+                ].map(k => {
+                  const aan = vanaf === k.id
+                  const uit = k.id === 'vanaf-vandaag' && !laatsteGewicht
+                  return (
+                    <button
+                      key={k.id}
+                      onClick={() => !uit && setVanaf(k.id)}
+                      disabled={uit}
+                      style={{
+                        textAlign: 'left', padding: '0.6rem 0.75rem', borderRadius: 10,
+                        background: aan ? 'rgba(255,255,255,0.08)' : 'transparent',
+                        border: `1px solid ${aan ? 'rgba(255,255,255,0.28)' : LIJN}`,
+                        cursor: uit ? 'default' : 'pointer', fontFamily: 'inherit',
+                        opacity: uit ? 0.4 : 1,
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.85rem', fontWeight: 900, color: aan ? '#fff' : 'rgba(255,255,255,0.7)' }}>
+                        {k.kop}
+                      </div>
+                      <div style={{ marginTop: 2, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                        {k.uitleg}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {voorbeeld && (
               <div style={{
                 padding: '0.7rem 0.85rem', borderRadius: 10,
@@ -215,7 +309,7 @@ export default function DoelModal({ client, db, fase, isMobile, onKlaar, onSluit
                 fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit',
                 cursor: bezig ? 'wait' : 'pointer',
               }}>
-                {bezig ? 'Opslaan…' : 'Bewaren'}
+                {bezig ? 'Opslaan…' : vanaf === 'vanaf-vandaag' ? 'Start vanaf vandaag' : 'Bewaren'}
               </button>
             </div>
 
