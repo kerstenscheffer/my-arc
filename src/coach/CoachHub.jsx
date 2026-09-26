@@ -51,6 +51,7 @@ import ClientContextPanel from '../modules/ai-meal-generator/tabs/plan-analyzer/
 import WorkoutContextPanel from '../modules/coach-command-center/components/WorkoutContextPanel'
 import CoachAgendaTab from '../modules/client-agenda/CoachAgendaTab'
 import LabHub from '../modules/lab/LabHub'
+import CoachWeekReview from '../modules/week-review/CoachWeekReview'
 
 import {
   Home, Wand2, Send, Users, ClipboardCheck, UserPlus, Shield,
@@ -58,7 +59,7 @@ import {
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText, Columns2,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
   Bell, Bug, Lightbulb, AlertCircle, Image as ImageIcon, FlaskConical,
-  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare
+  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck
 } from 'lucide-react'
 
 // ============================================
@@ -102,6 +103,7 @@ const MORE_CATEGORIES = [
   {
     label: 'Clients',
     items: [
+      { id: 'week-review', label: 'Weekreview', icon: CalendarCheck },
       { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
       { id: 'client-view', label: 'Meekijken', icon: Eye },
       // De challenge-hub stond wél in de switch maar niet in dit menu, dus je
@@ -552,6 +554,8 @@ export default function CoachHub() {
             isMobile={isMobile}
           />
         )
+      case 'week-review':
+        return <CoachWeekReview db={db} isMobile={isMobile} />
       case 'checkins':
         return <CoachCheckinDashboard db={db} clients={clients || []} />
       case 'challenge-hub':
