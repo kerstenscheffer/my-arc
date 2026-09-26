@@ -13,11 +13,20 @@
 // ervan maakt, zodat je niet hoeft op te slaan om te weten wat er gaat gelden.
 
 import { useState, useEffect } from 'react'
-import { X, Flag } from 'lucide-react'
+import { X, Flag, ChevronDown } from 'lucide-react'
 import { maakConfig, bereikTekst, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'
 import { DOELEN } from '../../../weight-tracker/utils/fase'
 
 const LIJN = 'rgba(255,255,255,0.1)'
+
+// Hoeveel het tempo van het doel mag afwijken en nog goed is: 0,2 kg per week
+// naar beide kanten. Bij -1,0 is dat dus -0,8 tot -1,2.
+const MARGE = 0.2
+
+const KEUZES = [
+  { id: 'vanaf-vandaag', kop: 'Vanaf vandaag' },
+  { id: 'corrigeer', kop: 'Deze hele fase' },
+]
 
 const datumNL = (d) => d
   ? new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
@@ -38,15 +47,46 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
   // 'vanaf-vandaag' sluit de fase vandaag af en begint een nieuwe op het gewicht
   // van nu. Dan krijgt de lijn een knik op vandaag en blijft het verleden staan
   // zoals het was. Dat wil je als de afspraak verandert.
-  const [vanaf, setVanaf] = useState('corrigeer')
+  const [vanaf, setVanaf] = useState('vanaf-vandaag')
+  const [vanafOpen, setVanafOpen] = useState(false)
+  // Zolang je de grenzen niet zelf aanraakt, volgen ze het weekdoel: 0,2 eronder
+  // en 0,2 erboven. Dat is wat je in de praktijk toch invult, en zo hoef je maar
+  // één getal te bedenken.
+  const [eigenGrenzen, setEigenGrenzen] = useState(false)
 
   useEffect(() => {
+    const eigen = fase?.tempo_min_kg != null || fase?.tempo_max_kg != null
     setPerWeek(fase?.week_doel_kg != null ? String(Number(fase.week_doel_kg)) : '')
     setMin(fase?.tempo_min_kg != null ? String(Math.abs(Number(fase.tempo_min_kg))) : '')
     setMax(fase?.tempo_max_kg != null ? String(Math.abs(Number(fase.tempo_max_kg))) : '')
+    setEigenGrenzen(eigen)
     setFout(null)
-    setVanaf('corrigeer')
-  }, [fase])
+    setVanaf((history || []).some(e => Number.isFinite(parseFloat(e?.weight))) ? 'vanaf-vandaag' : 'corrigeer')
+    setVanafOpen(false)
+  }, [fase, history])
+
+  // Het doel bepaalt de grenzen, tenzij je ze zelf hebt ingevuld.
+  const zetPerWeek = (waarde) => {
+    setPerWeek(waarde)
+    if (eigenGrenzen) return
+    const n = Math.abs(Number(waarde))
+    if (!Number.isFinite(n) || waarde === '') { setMin(''); setMax(''); return }
+    setMin(String(Math.round(Math.max(0, n - MARGE) * 100) / 100))
+    setMax(String(Math.round((n + MARGE) * 100) / 100))
+  }
+
+  const zetGrens = (welke, waarde) => {
+    setEigenGrenzen(true)
+    if (welke === 'min') setMin(waarde); else setMax(waarde)
+  }
+
+  const grenzenTerug = () => {
+    setEigenGrenzen(false)
+    const n = Math.abs(Number(perWeek))
+    if (!Number.isFinite(n) || perWeek === '') { setMin(''); setMax(''); return }
+    setMin(String(Math.round(Math.max(0, n - MARGE) * 100) / 100))
+    setMax(String(Math.round((n + MARGE) * 100) / 100))
+  }
 
   // Waar een nieuwe fase vandaag zou beginnen: het laatst gewogen gewicht.
   const laatsteGewicht = (() => {
@@ -200,7 +240,7 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
               <input
                 type="number" step="0.05" inputMode="decimal"
                 value={perWeek}
-                onChange={e => setPerWeek(e.target.value)}
+                onChange={e => zetPerWeek(e.target.value)}
                 placeholder="bv. -0.5"
                 style={veld}
               />
@@ -216,61 +256,102 @@ export default function DoelModal({ client, db, fase, history = [], isMobile, on
                 <input
                   type="number" step="0.05" min="0" inputMode="decimal"
                   value={min}
-                  onChange={e => setMin(e.target.value)}
+                  onChange={e => zetGrens('min', e.target.value)}
                   placeholder="minstens"
                   style={{ ...veld, flex: 1 }}
                 />
                 <input
                   type="number" step="0.05" min="0" inputMode="decimal"
                   value={max}
-                  onChange={e => setMax(e.target.value)}
+                  onChange={e => zetGrens('max', e.target.value)}
                   placeholder="hoogstens"
                   style={{ ...veld, flex: 1 }}
                 />
               </div>
               <div style={{ marginTop: 6, fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', lineHeight: 1.45 }}>
-                Zonder min-teken, allebei positief. Binnen dit bereik kleurt het weektempo groen.
-                Laat je ze leeg, dan rekent de app het zelf uit vanaf het weekdoel.
+                {eigenGrenzen
+                  ? 'Zelf ingevuld.'
+                  : `Loopt mee met het doel: ${MARGE} eronder en ${MARGE} erboven.`}
+                {' '}Binnen dit bereik kleurt het weektempo groen.
               </div>
+              {eigenGrenzen && (
+                <button onClick={grenzenTerug} style={{
+                  marginTop: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontFamily: 'inherit',
+                }}>
+                  Terug naar automatisch
+                </button>
+              )}
             </div>
 
             {/* Waar het nieuwe tempo vandaan loopt. De planlijn rekent vanaf het
-                startgewicht van de fase, dus 'deze fase' kantelt de hele lijn —
+                startgewicht van de fase, dus 'deze hele fase' kantelt de lijn —
                 ook over weken die al geweest zijn. Een nieuwe fase geeft een
-                knik op vandaag en laat het verleden staan. */}
+                knik op vandaag en laat het verleden staan; dat is het normale
+                geval, dus dat staat voor. */}
             <div>
               <label style={label}>Geldt vanaf</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {[
-                  { id: 'corrigeer', kop: 'Deze hele fase', uitleg: `De lijn kantelt vanaf ${datumNL(fase.started_on)}. Voor als het doel al die tijd anders had moeten staan.` },
-                  { id: 'vanaf-vandaag', kop: 'Vanaf vandaag', uitleg: laatsteGewicht ? `Nieuwe fase vanaf vandaag op ${laatsteGewicht} kg. De lijn krijgt hier een knik; wat geweest is blijft staan.` : 'Geen weging om vanaf te starten.' },
-                ].map(k => {
-                  const aan = vanaf === k.id
-                  const uit = k.id === 'vanaf-vandaag' && !laatsteGewicht
-                  return (
-                    <button
-                      key={k.id}
-                      onClick={() => !uit && setVanaf(k.id)}
-                      disabled={uit}
-                      style={{
-                        textAlign: 'left', padding: '0.6rem 0.75rem', borderRadius: 10,
-                        background: aan ? 'rgba(255,255,255,0.08)' : 'transparent',
-                        border: `1px solid ${aan ? 'rgba(255,255,255,0.28)' : LIJN}`,
-                        cursor: uit ? 'default' : 'pointer', fontFamily: 'inherit',
-                        opacity: uit ? 0.4 : 1,
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <div style={{ fontSize: '0.85rem', fontWeight: 900, color: aan ? '#fff' : 'rgba(255,255,255,0.7)' }}>
-                        {k.kop}
-                      </div>
-                      <div style={{ marginTop: 2, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
-                        {k.uitleg}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+              <button
+                onClick={() => setVanafOpen(v => !v)}
+                style={{
+                  ...veld, display: 'flex', alignItems: 'center', gap: 8,
+                  textAlign: 'left', cursor: 'pointer', paddingTop: 8, paddingBottom: 8,
+                  height: 'auto', minHeight: 48,
+                }}
+              >
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 900, color: '#fff' }}>
+                    {KEUZES.find(k => k.id === vanaf)?.kop}
+                  </span>
+                  <span style={{ display: 'block', marginTop: 1, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                    {vanaf === 'vanaf-vandaag'
+                      ? (laatsteGewicht ? `nieuwe fase op ${laatsteGewicht} kg` : 'geen weging om vanaf te starten')
+                      : `kantelt vanaf ${datumNL(fase.started_on)}`}
+                  </span>
+                </span>
+                <ChevronDown size={16} strokeWidth={2.6} style={{
+                  flexShrink: 0, color: 'rgba(255,255,255,0.45)',
+                  transform: vanafOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s',
+                }} />
+              </button>
+
+              {vanafOpen && (
+                <div style={{
+                  marginTop: 6, border: `1px solid ${LIJN}`, borderRadius: 10, overflow: 'hidden',
+                }}>
+                  {KEUZES.map((k, i) => {
+                    const uit = k.id === 'vanaf-vandaag' && !laatsteGewicht
+                    const aan = vanaf === k.id
+                    return (
+                      <button
+                        key={k.id}
+                        onClick={() => { if (!uit) { setVanaf(k.id); setVanafOpen(false) } }}
+                        disabled={uit}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '0.6rem 0.75rem',
+                          background: aan ? 'rgba(255,255,255,0.08)' : 'transparent',
+                          border: 'none', borderTop: i > 0 ? `1px solid ${LIJN}` : 'none',
+                          cursor: uit ? 'default' : 'pointer', fontFamily: 'inherit',
+                          opacity: uit ? 0.4 : 1,
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        }}
+                      >
+                        <div style={{ fontSize: '0.85rem', fontWeight: 900, color: aan ? '#fff' : 'rgba(255,255,255,0.75)' }}>
+                          {k.kop}
+                        </div>
+                        <div style={{ marginTop: 2, fontSize: '0.73rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                          {k.id === 'vanaf-vandaag'
+                            ? (laatsteGewicht
+                                ? `Nieuwe fase vanaf vandaag op ${laatsteGewicht} kg. De lijn krijgt hier een knik; wat geweest is blijft staan.`
+                                : 'Geen weging om vanaf te starten.')
+                            : `De lijn kantelt vanaf ${datumNL(fase.started_on)}. Voor als het doel al die tijd anders had moeten staan.`}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             {voorbeeld && (
