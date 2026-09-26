@@ -49,6 +49,14 @@ const iso = (d) => {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
 }
 
+// Een getal uit de database dat ook leeg mag zijn. Number('') en Number(null)
+// geven allebei 0, en dat is hier een heel ander antwoord dan "niet ingevuld".
+const losGetal = (v) => {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
 // Welke kant gaat het op, en met welke marges?
 //
 // De fase is de baas. Daar staat wat er is afgesproken: cut of build, hoeveel
@@ -92,17 +100,21 @@ export function maakConfig(client, fase = null, overrides = {}) {
     // scherper sturen dan bij de andere, en soms bewust sneller dan de
     // standaard toelaat. Wie dat invult weet wat hij doet; de app hoort dat
     // niet stilletjes terug te draaien.
-    const eigenMin = Number(fase.tempo_min_kg)
-    const eigenMax = Number(fase.tempo_max_kg)
-    const handmatig = (Number.isFinite(eigenMin) && eigenMin > 0) || (Number.isFinite(eigenMax) && eigenMax > 0)
+    // Number(null) is 0, niet NaN. Daardoor las een leeg tempo_min_kg als een
+    // ingestelde ondergrens van 0 kg/week, en gold elke daling — ook 0,04 kg op
+    // een afspraak van 0,5 — als op koers. Vandaar een parser die "niet
+    // ingevuld" en "expres nul" uit elkaar houdt.
+    const eigenMin = losGetal(fase.tempo_min_kg)
+    const eigenMax = losGetal(fase.tempo_max_kg)
+    const handmatig = (eigenMin !== null && eigenMin > 0) || (eigenMax !== null && eigenMax > 0)
 
     return {
       ...STANDAARD, richting, kwetsbaar, handmatig,
       tempoKg,
-      traagKg: (Number.isFinite(eigenMin) && eigenMin >= 0)
+      traagKg: (eigenMin !== null && eigenMin >= 0)
         ? eigenMin
         : Math.max(0, tempoKg * STANDAARD.traag_factor - STANDAARD.marge_kg),
-      snelKg: (Number.isFinite(eigenMax) && eigenMax > 0) ? eigenMax : snelKg,
+      snelKg: (eigenMax !== null && eigenMax > 0) ? eigenMax : snelKg,
       faseLabel: fase.doel,
       doelGewicht: Number(fase.doel_gewicht) || null,
       ...overrides,
