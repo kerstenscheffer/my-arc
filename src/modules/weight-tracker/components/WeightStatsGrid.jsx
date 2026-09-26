@@ -759,19 +759,36 @@ function WekenStrook(props) {
 
   if (!weken.length) return null
 
+  // Twee dingen die hier misgingen en allebei de klik opaten:
+  //
+  // 1. Een knop in de strook (het info-icoon) hoort niet te slepen. Begint de
+  //    druk daarop, dan doen we niets.
+  // 2. De pointer meteen vastpakken bij het indrukken maakt van élke klik een
+  //    sleep: de knop krijgt zijn click-event nooit, want het doel is dan de
+  //    baan geworden. Daarom pakken we hem pas als er echt bewogen is.
   const begin = (e) => {
     if (e.pointerType === 'touch') return          // native scroll doet het beter
-    sleep.current = { x: e.clientX, links: baan.current.scrollLeft }
-    baan.current.setPointerCapture(e.pointerId)
+    if (e.target?.closest?.('button')) return
+    sleep.current = { x: e.clientX, links: baan.current.scrollLeft, id: e.pointerId, actief: false }
   }
   const beweeg = (e) => {
-    if (!sleep.current) return
-    baan.current.scrollLeft = sleep.current.links - (e.clientX - sleep.current.x)
+    const sl = sleep.current
+    if (!sl) return
+    const dx = e.clientX - sl.x
+    if (!sl.actief) {
+      if (Math.abs(dx) < 4) return                 // een trillende hand is geen sleep
+      sl.actief = true
+      try { baan.current.setPointerCapture(sl.id) } catch { /* mag mislukken */ }
+    }
+    baan.current.scrollLeft = sl.links - dx
   }
   const stop = (e) => {
-    if (!sleep.current) return
+    const sl = sleep.current
+    if (!sl) return
     sleep.current = null
-    try { baan.current.releasePointerCapture(e.pointerId) } catch { /* al losgelaten */ }
+    if (sl.actief) {
+      try { baan.current.releasePointerCapture(e.pointerId) } catch { /* al losgelaten */ }
+    }
   }
 
   return (
