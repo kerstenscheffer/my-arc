@@ -66,7 +66,7 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab, z
     if (!url) return null
     if (url.includes('youtube.com/embed/')) return url
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\s?]+)/)
-    if (match) return `https://www.youtube.com/embed/${match[1]}`
+    if (match) return `https://www.youtube-nocookie.com/embed/${match[1]}`
     return url
   }
 
@@ -124,6 +124,7 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab, z
                   )}
                   <div style={{ width: isMobile ? '100%' : 'min(400px, 56.25vh)', height: '100%', position: 'relative', overflow: 'hidden', background: '#000' }}>
                     <iframe
+              referrerPolicy="strict-origin-when-cross-origin"
                       src={`${videoUrl}?modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&controls=1&playsinline=1&autoplay=${videoPlaying ? 1 : 0}&mute=0`}
                       title={exercise.name}
                       style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: videoUrl.includes('shorts') ? '100%' : '177.78%', height: '100%', border: 'none', pointerEvents: 'auto' }}

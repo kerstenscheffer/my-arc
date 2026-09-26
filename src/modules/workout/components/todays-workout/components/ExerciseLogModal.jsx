@@ -386,7 +386,7 @@ function embedUrl(url) {
   // fs=0 zet de volledig-scherm-knop van YouTube uit. Bij een Short levert die
   // een zwarte speler met alleen knoppen op; we bieden er zelf een aan die het
   // wél doet.
-  return m ? `https://www.youtube.com/embed/${m[1]}?autoplay=1&rel=0&playsinline=1&fs=0` : null
+  return m ? `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&rel=0&playsinline=1&fs=0` : null
 }
 
 // De voorvertoning van een YouTube-video. Een coach die een filmpje aan een
@@ -789,6 +789,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 scherm. */}
             {toonVideo && videoEmbed ? (
               <iframe
+                referrerPolicy="strict-origin-when-cross-origin"
                 src={videoEmbed}
                 title={exercise.name}
                 allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
@@ -1221,6 +1222,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
           }}
         >
           <iframe
+            referrerPolicy="strict-origin-when-cross-origin"
             src={videoEmbed}
             title={exercise.name}
             allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"

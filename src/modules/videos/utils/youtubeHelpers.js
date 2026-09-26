@@ -14,6 +14,9 @@ export const extractYouTubeId = (url) => {
     /youtu\.be\/([^&\n?#]+)/,
     /youtube\.com\/embed\/([^&\n?#]+)/,
     /youtube\.com\/shorts\/([^&\n?#]+)/,
+    // Livestreams en premières delen als /live/<id>; zonder deze regel viel
+    // zo'n link terug op "extern openen" en ging de klant de app uit.
+    /youtube\.com\/live\/([^&\n?#]+)/,
     /m\.youtube\.com\/watch\?v=([^&\n?#]+)/,
     /m\.youtube\.com\/shorts\/([^&\n?#]+)/,
   ]
@@ -61,7 +64,11 @@ export const getYouTubeEmbedUrl = (videoId, options = {}) => {
     // Geen annotaties/kaartjes over het beeld.
     iv_load_policy: '3',
   })
-  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`
+  // youtube-nocookie.com in plaats van youtube.com: dat domein is toegestaan
+  // zonder dat de player een geldige referrer-configuratie nodig heeft. In een
+  // webview (Capacitor) stuurt de browser die header niet mee zoals YouTube
+  // verwacht, en dan weigert de player met "error 153".
+  return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`
 }
 
 /**

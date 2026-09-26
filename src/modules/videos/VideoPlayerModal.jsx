@@ -167,6 +167,7 @@ export default function VideoPlayerModal({ item, onClose }) {
         }}>
           {playerEmbed ? (
             <iframe
+              referrerPolicy="strict-origin-when-cross-origin"
               src={playerEmbed}
               style={{
                 position: 'absolute',

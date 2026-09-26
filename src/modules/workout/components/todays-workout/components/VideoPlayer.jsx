@@ -23,7 +23,7 @@ export default function VideoPlayer({
   
   // YouTube embed URL met autoplay + loop
   const embedUrl = videoId 
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=0&playsinline=1&rel=0&modestbranding=1&controls=0&showinfo=0`
+    ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=0&playsinline=1&rel=0&modestbranding=1&controls=0&showinfo=0`
     : null
 
   const handleTap = () => {
@@ -124,6 +124,7 @@ export default function VideoPlayer({
       }}
     >
       <iframe
+              referrerPolicy="strict-origin-when-cross-origin"
         src={isPlaying ? embedUrl : embedUrl.replace('autoplay=1', 'autoplay=0')}
         title={title}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

@@ -45,7 +45,7 @@ export default function ExerciseVideoModal({ exercise, onClose, isMobile }) {
     // Regular YouTube URL
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)
     if (match) {
-      return `https://www.youtube.com/embed/${match[1]}`
+      return `https://www.youtube-nocookie.com/embed/${match[1]}`
     }
     
     return null
@@ -172,6 +172,7 @@ export default function ExerciseVideoModal({ exercise, onClose, isMobile }) {
             boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
           }}>
             <iframe
+              referrerPolicy="strict-origin-when-cross-origin"
               src={videoUrl}
               title={exercise.name}
               style={{
