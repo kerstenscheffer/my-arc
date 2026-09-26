@@ -206,6 +206,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // ze er deze keer bij. De service rekent op de kalender vanaf de start van
   // het traject, niet op het aantal check-ins.
   const [coachingRonde, setCoachingRonde] = useState(false)
+  const [vorigeCheckin, setVorigeCheckin] = useState(null)
 
   const service = new CheckinService(db)
 
@@ -221,12 +222,14 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // openen. We kijken of er sinds de laatste vrijdag al een is ingediend;
       // zo ja, dan het succes-scherm in plaats van het formulier. De cyclus
       // reset elke vrijdag.
-      const [hasCheckin, coachingBeurt] = await Promise.all([
+      const [hasCheckin, coachingBeurt, laaste] = await Promise.all([
         service.hasCheckinSinceLastFriday(client.id),
         service.coachingVraagAanDeBeurt(client.id, client.coaching_start_date),
+        service.getLatestCheckin(client.id),
       ])
       setSubmitted(hasCheckin)
       setCoachingRonde(coachingBeurt)
+      setVorigeCheckin(laaste)
     } catch (error) {
       console.error('Error checking existing check-in:', error)
     } finally {
@@ -465,6 +468,36 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         alignItems: 'center', justifyContent: 'center',
         padding: '2vh 0',
       }}>
+        {stap === 0 && vorigeCheckin && (() => {
+          const c = vorigeCheckin
+          const items = [
+            c.training_gedaan != null && c.training_gepland != null && { label: 'Trainingen', waarde: `${c.training_gedaan} / ${c.training_gepland}` },
+            c.training_gedaan != null && c.training_gepland == null && { label: 'Trainingen', waarde: c.training_gedaan },
+            c.dagen_gewogen != null && { label: 'Gewogen', waarde: `${c.dagen_gewogen} / 7 dagen` },
+            c.dagen_voeding != null && { label: 'Voeding', waarde: `${c.dagen_voeding} / 7 dagen` },
+            c.energie_score != null && { label: 'Energie', waarde: `${c.energie_score} / 10` },
+          ].filter(Boolean)
+          if (!items.length) return null
+          return (
+            <div style={{
+              width: '100%', maxWidth: 560, margin: '0 auto 2.5vh',
+              background: 'rgba(255,255,255,0.05)', borderRadius: 12,
+              padding: '12px 16px', boxSizing: 'border-box',
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: GRIJS, marginBottom: 10 }}>
+                Vorige week
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px' }}>
+                {items.map(({ label, waarde }) => (
+                  <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: GRIJS, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{waarde}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
         {renderVeld(vraag)}
       </div>
 

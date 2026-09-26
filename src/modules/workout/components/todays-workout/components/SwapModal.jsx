@@ -268,6 +268,20 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
         client.id, schema.id, workoutDayKey, exerciseIndex, updatedExercise, db
       )
 
+      const coachId = client?.coach_id || client?.trainer_id
+      if (coachId) {
+        const clientName = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'Klant'
+        db.supabase.from('coach_notifications').insert({
+          coach_id: coachId,
+          client_id: client.id,
+          type: 'workout',
+          priority: 'low',
+          title: `${clientName} heeft een oefening gewisseld`,
+          message: `${exercise.name} → ${newExercise.name}`,
+          read_status: false,
+        }).then(r => r, err => console.error('❌ Swap notification failed:', err))
+      }
+
       if (navigator.vibrate) navigator.vibrate(50)
       setVisible(false)
       setTimeout(() => {
@@ -295,6 +309,21 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
       await db.updateExerciseInSchema(schema.id, workoutDayKey, exerciseIndex, updatedExercise)
       // Verwijder de weekly override als die bestaat
       await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, exerciseIndex, db)
+
+      const coachId = client?.coach_id || client?.trainer_id
+      if (coachId) {
+        const clientName = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'Klant'
+        db.supabase.from('coach_notifications').insert({
+          coach_id: coachId,
+          client_id: client.id,
+          type: 'workout',
+          priority: 'low',
+          title: `${clientName} heeft een oefening permanent gewisseld`,
+          message: `${exercise.name} → ${newExercise.name}`,
+          read_status: false,
+        }).then(r => r, err => console.error('❌ Permanent swap notification failed:', err))
+      }
+
       if (navigator.vibrate) navigator.vibrate(50)
       setVisible(false)
       setTimeout(() => {
