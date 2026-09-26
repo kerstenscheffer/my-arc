@@ -3,7 +3,7 @@
 // Props: { stats, client, fridayData, history, isMobile, coachingPlan }
 
 import React, { useState, useMemo } from 'react'
-import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity, Info } from 'lucide-react'
+import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity, Info, Pencil } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
 import {
@@ -24,7 +24,7 @@ const PERIODES = [
 // blijft het een zwevend kaartje binnen de bestaande opmaak.
 // `toonGrafiek` uit: de coach-kant heeft zijn eigen band-grafiek en zet dit
 // verloop achter een knop. De klant-kant laat hem gewoon staan.
-export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true, grafiekKnop = null }) {
+export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true, grafiekKnop = null, onBewerkDoel = null }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const [uitlegOpen, setUitlegOpen] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -459,11 +459,28 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               flex: 1, minWidth: 0, padding: isMobile ? '0.7rem 0.5rem' : '0.8rem 0.75rem',
               display: 'flex', flexDirection: 'column', gap: 4,
             }}>
-              <div style={{
-                fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 900, color: '#fff',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                Doel per week
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{
+                  fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 900, color: '#fff',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  Doel per week
+                </span>
+                {onBewerkDoel && (
+                  <button
+                    onClick={onBewerkDoel}
+                    aria-label="Doel per week aanpassen"
+                    title="Aanpassen"
+                    style={{
+                      flexShrink: 0, width: 18, height: 18, padding: 0, borderRadius: 999,
+                      border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.45)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <Pencil size={13} strokeWidth={2.8} />
+                  </button>
+                )}
               </div>
               <div style={{
                 fontSize: isMobile ? '1.7rem' : '2rem', fontWeight: 900, color: '#fff',

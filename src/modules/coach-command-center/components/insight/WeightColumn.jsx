@@ -8,6 +8,7 @@ import { Ruler, Camera, Download, Maximize2, ChevronDown, ChevronUp } from 'luci
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
 import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
 import FasePaneel from './FasePaneel'
+import DoelModal from './DoelModal'
 import GewichtBandGrafiek from './GewichtBandGrafiek'
 import MetingenTabel from './MetingenTabel'
 import DoelenMacrosPaneel from './DoelenMacrosPaneel'
@@ -65,6 +66,11 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // Het voorstel uit de band: hoeveel kcal erbij of eraf. Wordt getoond boven
   // het macro-paneel, en pas toegepast als je erop drukt.
   const [voorstel, setVoorstel] = React.useState(null)
+  // Het weekdoel en het goede-tempo-bereik instellen. Kon nergens: die velden
+  // zaten alleen in het formulier voor een níeuwe fase.
+  const [doelOpen, setDoelOpen] = React.useState(false)
+  // Omhoog na het opslaan van een doel, zodat FasePaneel de fase opnieuw laadt.
+  const [faseVersie, setFaseVersie] = React.useState(0)
 
   const circumFields = [
     { key: 'waist_cm', label: 'Buik' }, { key: 'bicep_cm', label: 'Arm' },
@@ -96,6 +102,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           toonOordeel={false}
           toonKop={false}
           openNieuw={nieuweFase}
+          herlaad={faseVersie}
         />
         {/* De cijfers eerst: huidig, trend, tempo, op plan. Dat is de
             samenvatting; de band eronder laat zien hoe die cijfers lopen. */}
@@ -105,6 +112,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
             fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }}
             history={history} isMobile={isMobile} coachingPlan={coachingPlan}
             fase={actieveFase} volleBreedte toonHuidig toonGrafiek={toonVerloop}
+            onBewerkDoel={() => setDoelOpen(true)}
             grafiekKnop={(
               <Uitklap
                 label="Verloop"
@@ -225,6 +233,20 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen data</div>
         )}
       </div>
+
+      {/* Het weekdoel en het goede-tempo-bereik. Opent vanaf het potlood bij
+          'Doel per week' in de cijferbalk. */}
+      {doelOpen && (
+        <DoelModal
+          client={client}
+          db={db}
+          fase={actieveFase}
+          isMobile={isMobile}
+          onSluit={() => setDoelOpen(false)}
+          onKlaar={() => { setFaseVersie(v => v + 1); onClientUpdate?.() }}
+          onNieuweFase={() => setNieuweFase(n => n + 1)}
+        />
+      )}
     </div>
   )
 }

@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react'
 import { Flag, Plus, Check, X } from 'lucide-react'
 import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/utils/fase'
-import { maakConfig, bereikTekst, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'
+import { maakConfig, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'
 
 const vandaag = () => new Date().toISOString().split('T')[0]
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -26,18 +26,16 @@ const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric',
 export default function FasePaneel({
   client, db, history, isMobile, onFaseChange, onActieveFase, onFases,
   toonOordeel = true, toonKop = true, openNieuw = 0,
+  // Gaat omhoog als iets buiten dit paneel de fase heeft gewijzigd (zoals
+  // DoelModal). Zonder dit blijft de cijferbalk het oude bereik tonen tot je
+  // de klant opnieuw opent.
+  herlaad = 0,
 }) {
   const [fases, setFases] = useState([])
   const [laden, setLaden] = useState(true)
   const [nieuw, setNieuw] = useState(null)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
-  // Het tempobereik van de lópende fase bijstellen. Stond alleen in het
-  // formulier voor een nieuwe fase, waardoor je een fase moest afbreken om een
-  // grens te kunnen zetten — vandaar dat het bij iedereen leeg stond.
-  const [bereikOpen, setBereikOpen] = useState(false)
-  const [bMin, setBMin] = useState('')
-  const [bMax, setBMax] = useState('')
 
   const laad = async () => {
     if (!client?.id || !db?.supabase) return
@@ -56,7 +54,7 @@ export default function FasePaneel({
     onFases?.(data || [])
     setLaden(false)
   }
-  useEffect(() => { laad() }, [client?.id, db])
+  useEffect(() => { laad() }, [client?.id, db, herlaad])
 
   // Van buitenaf een nieuwe fase beginnen (knop in de dropdown hierboven).
   useEffect(() => {
@@ -83,9 +81,6 @@ export default function FasePaneel({
 
   const huidige = fases[0] || null
   const oordeel = huidige ? beoordeelFase(huidige, history) : null
-  // Hetzelfde bereik als in de cijferbalk boven de grafiek, zodat de twee
-  // schermen niet ieder hun eigen getal tonen.
-  const bereikVanFase = huidige ? bereikTekst(maakConfig(client, huidige)) : null
 
   // Laatste meting als startpunt: dat is waar de klant nú staat, en dat is
   // het punt waarvandaan de nieuwe fase moet rekenen.
@@ -169,33 +164,6 @@ export default function FasePaneel({
     } finally { setBezig(false) }
   }
 
-  const openBereik = () => {
-    setBMin(huidige?.tempo_min_kg != null ? String(Math.abs(Number(huidige.tempo_min_kg))) : '')
-    setBMax(huidige?.tempo_max_kg != null ? String(Math.abs(Number(huidige.tempo_max_kg))) : '')
-    setFout(null)
-    setBereikOpen(true)
-  }
-
-  const bewaarBereik = async () => {
-    if (!huidige?.id) return
-    const min = bMin === '' ? null : Math.abs(Number(bMin))
-    const max = bMax === '' ? null : Math.abs(Number(bMax))
-    if (min != null && max != null && min > max) {
-      setFout('De ondergrens is hoger dan de bovengrens.')
-      return
-    }
-    setBezig(true); setFout(null)
-    const { error } = await db.supabase
-      .from('client_phases')
-      .update({ tempo_min_kg: min, tempo_max_kg: max })
-      .eq('id', huidige.id)
-    setBezig(false)
-    if (error) { setFout(error.message); return }
-    setBereikOpen(false)
-    await laad()
-    onFaseChange?.()
-  }
-
   if (laden) return null
   // Zonder kop en zonder open formulier valt er niets te tekenen; dan ook geen
   // lege strook met een randje.
@@ -236,48 +204,6 @@ export default function FasePaneel({
           }}><Plus size={12} /> Nieuwe fase</button>
         )}
       </div>
-      )}
-
-      {/* Het tempobereik van deze fase: wat je goed vindt gaan. Staat het leeg,
-          dan rekent de app het af van het weekdoel — dat is te zien, zodat je
-          niet hoeft te raden of er iets is ingesteld. */}
-      {huidige && !nieuw && huidige.doel !== 'recomp' && huidige.doel !== 'maintain' && (
-        bereikOpen ? (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '0.6rem' }}>
-            <Veld label="Tempo minstens" type="number" suffix="kg/wk" stap="0.05" waarde={bMin}
-              zet={setBMin} isMobile={isMobile} optioneel />
-            <Veld label="Tempo hoogstens" type="number" suffix="kg/wk" stap="0.05" waarde={bMax}
-              zet={setBMax} isMobile={isMobile} optioneel />
-            <button onClick={bewaarBereik} disabled={bezig} style={{
-              minHeight: 38, padding: '0 0.9rem', background: bezig ? 'rgba(255,255,255,0.06)' : '#fff',
-              border: '1px solid rgba(255,255,255,0.2)', color: bezig ? 'rgba(255,255,255,0.3)' : '#0a0a0a',
-              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-              touchAction: 'manipulation',
-            }}>{bezig ? 'Opslaan…' : 'Bewaren'}</button>
-            <button onClick={() => { setBereikOpen(false); setFout(null) }} style={{
-              minHeight: 38, padding: '0 0.7rem', background: 'none',
-              border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)',
-              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-            }}>Annuleren</button>
-            {fout && <div style={{ flexBasis: '100%', fontSize: '0.72rem', fontWeight: 700, color: '#ef4444' }}>{fout}</div>}
-          </div>
-        ) : (
-          <button onClick={openBereik} style={{
-            display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.6rem',
-            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-            fontFamily: 'inherit', textAlign: 'left',
-          }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)' }}>
-              Goed tempo
-            </span>
-            <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>
-              {bereikVanFase || '—'}
-            </span>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
-              {(huidige.tempo_min_kg != null || huidige.tempo_max_kg != null) ? 'zelf ingesteld' : 'afgeleid'} · wijzig
-            </span>
-          </button>
-        )
       )}
 
       {/* Oordeel: ligt de klant op schema? */}
