@@ -27,6 +27,11 @@ const PERIODES = [
 export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true, grafiekKnop = null, onBewerkDoel = null }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const [uitlegOpen, setUitlegOpen] = useState(false)
+  // De cijferregel (huidig, gemiddelde, tempo fase, boven plan, sinds fase) is
+  // context die je af en toe wil nazoeken, geen dagelijks nieuws. Het nieuws
+  // staat erboven in de weken-strook. Dus dicht, achter dezelfde uitklap-regel
+  // als 'Verloop' eronder.
+  const [cijfersOpen, setCijfersOpen] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 
   // Calendar-week averages (Ma-Zo) — apples-to-apples comparison between
@@ -491,6 +496,33 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         </div>
       )}
 
+      {/* ═══ CIJFERS — standaard dicht ═══ */}
+      {volleBreedte && (
+        <button
+          onClick={() => setCijfersOpen(v => !v)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+            padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem',
+            background: 'transparent', border: 'none',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <span style={{ flex: 1, fontSize: '0.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
+            Cijfers
+          </span>
+          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)' }}>
+            {laatsteTrend?.trend != null ? `gem. ${laatsteTrend.trend} kg` : ''}
+          </span>
+          {cijfersOpen
+            ? <ChevronUp size={15} strokeWidth={3} color="#fff" />
+            : <ChevronDown size={15} strokeWidth={3} color="#fff" />}
+        </button>
+      )}
+
+      {(!volleBreedte || cijfersOpen) && (
+      <>
       {/* ═══ WEEKCIJFERS — één regel als tabel: verticale lijntjes ertussen,
             geen vakken. Het doel-blok dat hier stond is eruit; het doel staat
             al als lijn in de grafiek. ═══ */}
@@ -588,6 +620,8 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           )
         })}
       </div>
+      </>
+      )}
 
       {/* "Wekelijkse Historie" dropdown verwijderd — die functie zit nu in de
           "Bekijk week progressie"-toggle van WeightHistory. */}

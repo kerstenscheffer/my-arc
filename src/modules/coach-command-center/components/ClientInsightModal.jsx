@@ -151,6 +151,18 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   // heel scherm vol losse cijfers; een kolom met marges eromheen is rustiger.
   const middenBreedte = openSecties.length > 1 ? 1500 : 980
 
+  // Het huidige gewicht stond als eerste cel in de cijferregel. Die regel is nu
+  // dicht, en dit getal wil je bij de naam zien — het is wie je voor je hebt,
+  // geen statistiek. Komt uit de laatste weging; valt terug op het veld in de
+  // klantrij als er nog niet gewogen is.
+  const laatsteWeging = effectiveClient?.weightData?.latest || null
+  const huidigGewicht = laatsteWeging?.weight != null
+    ? Number(laatsteWeging.weight)
+    : (effectiveClient?.current_weight ? Number(effectiveClient.current_weight) : null)
+  const huidigDatum = laatsteWeging?.date
+    ? new Date(`${String(laatsteWeging.date).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+    : null
+
   const SECTIES = [
     { id: 'weight',  label: 'Gewicht',  icon: Scale },
     { id: 'workout', label: 'Training', icon: Dumbbell },
@@ -249,6 +261,14 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   <span className={PRIVE} style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', flexShrink: 0 }}>
                     {effectiveClient.first_name} {effectiveClient.last_name}
                   </span>
+                  {huidigGewicht != null && (
+                    <span className={PRIVE} style={{
+                      flexShrink: 0, fontSize: '0.72rem', fontWeight: 800,
+                      color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap',
+                    }}>
+                      {huidigGewicht} kg{huidigDatum ? ` · ${huidigDatum}` : ''}
+                    </span>
+                  )}
 
                   {/* De secties stonden in een rail van 78px langs de linkerrand.
                       Als tekst in de kopregel kost het geen kolom én leest het als
@@ -370,9 +390,18 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 padding: '0.4rem 0.6rem', borderBottom: '1px solid rgba(255,255,255,0.06)',
                 display: 'flex', alignItems: 'center', gap: '0.1rem', flexShrink: 0
               }}>
-                <span className={PRIVE} style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '0.3rem' }}>
+                <span className={PRIVE} style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '0.3rem' }}>
                   {effectiveClient.first_name} {effectiveClient.last_name}
                 </span>
+                {huidigGewicht != null && (
+                  <span className={PRIVE} style={{
+                    fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)',
+                    whiteSpace: 'nowrap', paddingRight: '0.3rem',
+                  }}>
+                    {huidigGewicht} kg
+                  </span>
+                )}
+                <span style={{ flex: 1 }} />
                 <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <ClipboardCheck size={17} />
                 </button>

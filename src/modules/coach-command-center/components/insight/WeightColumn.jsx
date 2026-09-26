@@ -104,14 +104,16 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           openNieuw={nieuweFase}
           herlaad={faseVersie}
         />
-        {/* De cijfers eerst: huidig, trend, tempo, op plan. Dat is de
-            samenvatting; de band eronder laat zien hoe die cijfers lopen. */}
+        {/* De weken-strook en het doel; de cijferregel eronder zit achter een
+            uitklap. Geen toonHuidig meer: het huidige gewicht staat in de
+            kopregel naast de naam, en twee keer hetzelfde getal is er één te
+            veel. */}
         {history.length > 0 && (
           <WeightStatsGrid
             stats={weightData?.stats || {}} client={client}
             fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }}
             history={history} isMobile={isMobile} coachingPlan={coachingPlan}
-            fase={actieveFase} volleBreedte toonHuidig toonGrafiek={toonVerloop}
+            fase={actieveFase} volleBreedte toonGrafiek={toonVerloop}
             onBewerkDoel={() => setDoelOpen(true)}
             grafiekKnop={(
               <Uitklap
