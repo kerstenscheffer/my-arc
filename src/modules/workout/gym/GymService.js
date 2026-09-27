@@ -67,6 +67,11 @@ export async function bewaarGym(db, { id, clientId, naam, eenheid }) {
   if (!schoon) return { error: 'Geef de sportschool een naam.', gym: null }
   const rij = { client_id: clientId, naam: schoon, eenheid: eenheid === 'lb' ? 'lb' : 'kg' }
 
+  // Is dit de eerste? Dan hoort alles wat hij tot nu toe logde hier thuis: hij
+  // trainde al ergens, hij had het alleen nog niet opgeschreven. Tellen vóór de
+  // insert, anders telt de nieuwe zichzelf mee.
+  const eerste = !id && await isEerste(db, clientId)
+
   const vraag = id
     ? db.supabase.from('client_gyms').update({ ...rij, updated_at: new Date().toISOString() }).eq('id', id).select('id, naam, eenheid').maybeSingle()
     : db.supabase.from('client_gyms').insert(rij).select('id, naam, eenheid').maybeSingle()
@@ -77,7 +82,39 @@ export async function bewaarGym(db, { id, clientId, naam, eenheid }) {
     const dubbel = error.code === '23505'
     return { error: dubbel ? 'Je hebt al een sportschool met die naam.' : error.message, gym: null }
   }
-  return { error: null, gym: data }
+
+  let overgenomen = 0
+  if (eerste && data?.id) {
+    const res = await neemHistorieOver(db, clientId, data.id)
+    overgenomen = res.aantal
+  }
+  return { error: null, gym: data, overgenomen }
+}
+
+async function isEerste(db, clientId) {
+  const { count, error } = await db.supabase
+    .from('client_gyms')
+    .select('id', { count: 'exact', head: true })
+    .eq('client_id', clientId)
+  if (error) return false          // bij twijfel niets overnemen
+  return (count || 0) === 0
+}
+
+// Alle trainingen die nog nergens bij horen onder deze sportschool hangen, en
+// hem meteen als de actieve zetten.
+//
+// Alleen bij de eerste: heeft iemand er al twee, dan weten we niet waar een
+// losse sessie bij hoorde en is stilletjes gokken erger dan niets doen.
+export async function neemHistorieOver(db, clientId, gymId) {
+  const { data, error } = await db.supabase
+    .from('workout_sessions')
+    .update({ gym_id: gymId })
+    .eq('client_id', clientId)
+    .is('gym_id', null)
+    .select('id')
+  if (error) return { error: error.message, aantal: 0 }
+  await db.supabase.from('clients').update({ actieve_gym_id: gymId }).eq('id', clientId)
+  return { error: null, aantal: (data || []).length }
 }
 
 export async function verwijderGym(db, gymId) {

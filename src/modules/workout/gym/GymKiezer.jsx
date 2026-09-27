@@ -161,14 +161,19 @@ function GymBeheer({ db, client, gyms, isMobile, onSluit, onGewijzigd }) {
   const [bewerkt, setBewerkt] = useState(null)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
+  const [melding, setMelding] = useState(null)
 
   const leeg = () => { setNaam(''); setEenheid('kg'); setBewerkt(null); setFout(null) }
 
   const bewaar = async () => {
     setBezig(true); setFout(null)
-    const { error } = await bewaarGym(db, { id: bewerkt, clientId: client.id, naam, eenheid })
+    const { error, gym, overgenomen } = await bewaarGym(db, { id: bewerkt, clientId: client.id, naam, eenheid })
     setBezig(false)
     if (error) { setFout(error); return }
+    // Je historie stilletjes verplaatsen is eng; zeg dus wat er gebeurd is.
+    setMelding(overgenomen > 0
+      ? `Je ${overgenomen} eerdere training${overgenomen === 1 ? '' : 'en'} staan nu onder ${gym?.naam}.`
+      : null)
     leeg()
     await onGewijzigd()
   }
@@ -289,6 +294,16 @@ function GymBeheer({ db, client, gyms, isMobile, onSluit, onGewijzigd }) {
               grafieken kloppen als je wisselt.
             </div>
           </div>
+
+          {melding && (
+            <div style={{
+              padding: '0.6rem 0.75rem', borderRadius: 10,
+              background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
+              fontSize: '0.8rem', fontWeight: 800, color: '#10b981', lineHeight: 1.45,
+            }}>
+              {melding}
+            </div>
+          )}
 
           {fout && <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ef4444' }}>{fout}</div>}
 
