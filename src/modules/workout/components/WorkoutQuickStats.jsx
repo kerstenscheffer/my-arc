@@ -90,8 +90,8 @@ export default function WorkoutQuickStats({ client, schema, db, isMobile: propMo
       <div style={{ padding: '1.5rem 0', textAlign: 'center' }}>
         <div style={{
           width: '24px', height: '24px',
-          border: '2px solid rgba(255, 215, 0, 0.15)',
-          borderTopColor: '#FFD700',
+          border: '2px solid rgba(255,255,255,0.15)',
+          borderTopColor: '#fff',
           borderRadius: '50%',
           margin: '0 auto',
           animation: 'spin 1s linear infinite'

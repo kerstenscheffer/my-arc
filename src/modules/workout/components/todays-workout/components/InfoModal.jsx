@@ -101,7 +101,7 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab, z
             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
               {loading ? (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ width: '36px', height: '36px', border: '3px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', margin: '0 auto 1rem', animation: 'spin 1s linear infinite' }} />
+                  <div style={{ width: '36px', height: '36px', border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto 1rem', animation: 'spin 1s linear infinite' }} />
                   <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', margin: 0 }}>Video laden...</p>
                 </div>
               ) : externalOnly ? (

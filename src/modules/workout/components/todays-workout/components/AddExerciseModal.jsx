@@ -178,7 +178,7 @@ export default function AddExerciseModal({ onClose, onSave, client, db, schema, 
             <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {loading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
-                  <div style={{ width: '28px', height: '28px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  <div style={{ width: '28px', height: '28px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : results.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>

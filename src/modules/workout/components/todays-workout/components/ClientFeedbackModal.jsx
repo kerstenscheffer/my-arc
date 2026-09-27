@@ -142,7 +142,7 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
         <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? '1rem' : '1.25rem', WebkitOverflowScrolling: 'touch' }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
-              <div style={{ width: '32px', height: '32px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <div style={{ width: '32px', height: '32px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -241,7 +241,7 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
                 <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
                   style={{ width: '100%', padding: '0.8rem 1.25rem', background: uploading ? 'rgba(255,215,0,0.06)' : 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '10px', color: '#FFD700', fontSize: '0.82rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '48px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}>
                   {uploading ? (
-                    <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,215,0,0.2)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Uploaden...</>
+                    <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Uploaden...</>
                   ) : uploadSuccess ? (
                     <><CheckCircle size={16} strokeWidth={2.5} />Verstuurd!</>
                   ) : sizeWarning ? (

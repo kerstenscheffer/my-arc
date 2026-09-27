@@ -542,7 +542,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
             <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {loading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem' }}>
-                  <div style={{ width: '32px', height: '32px', border: '3px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  <div style={{ width: '32px', height: '32px', border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : filteredAlternatives.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'rgba(255,255,255,0.5)' }}>

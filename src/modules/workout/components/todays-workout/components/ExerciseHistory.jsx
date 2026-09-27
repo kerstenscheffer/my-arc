@@ -98,7 +98,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
     return (
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '0.65rem 0' : '0.75rem 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
           <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', color: 'rgba(255,255,255,0.35)', fontWeight: '600' }}>Laden...</span>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -190,7 +190,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
       <div>
         {loadingHistory && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem 0' }}>
-            <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
             <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Laden…</span>
           </div>
         )}
@@ -397,7 +397,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: isMobile ? '0.5rem' : '0.625rem', paddingBottom: isMobile ? '0.5rem' : '0.625rem', maxHeight: '350px', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {loadingHistory && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem 0', gap: '0.5rem' }}>
-              <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
             </div>
           )}
           {!loadingHistory && fullHistory.length > 0 && (

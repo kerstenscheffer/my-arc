@@ -230,7 +230,7 @@ export default function CustomExerciseModal({ onClose, onSave, client, db, schem
                   <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Typ om te zoeken..."
                     onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true) }}
                     style={{ ...inputStyle, paddingLeft: '2.75rem', border: isDuplicate ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.08)' }} />
-                  {loading && <div style={{ position: 'absolute', right: '0.875rem', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />}
+                  {loading && <div style={{ position: 'absolute', right: '0.875rem', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />}
                 </div>
 
                 {isDuplicate && (
@@ -297,7 +297,7 @@ export default function CustomExerciseModal({ onClose, onSave, client, db, schem
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
               }}>
                 {uploading
-                  ? <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,215,0,0.2)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Opslaan...</>
+                  ? <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Opslaan...</>
                   : <><CheckCircle size={18} strokeWidth={2.5} />Volgende</>}
               </button>
             </div>
@@ -356,7 +356,7 @@ export default function CustomExerciseModal({ onClose, onSave, client, db, schem
                   </div>
                   <button onClick={handlePermanent} disabled={!selectedDay || savingPermanent} style={{ width: '100%', padding: '0.75rem', background: (!selectedDay || savingPermanent) ? 'rgba(255,255,255,0.05)' : 'rgba(255,215,0,0.12)', border: (!selectedDay || savingPermanent) ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(255,215,0,0.3)', borderRadius: '8px', color: (!selectedDay || savingPermanent) ? 'rgba(255,255,255,0.3)' : '#FFD700', fontSize: '0.82rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: (!selectedDay || savingPermanent) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     {savingPermanent
-                      ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,215,0,0.2)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Opslaan...</>
+                      ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Opslaan...</>
                       : <><BookmarkPlus size={15} strokeWidth={2.5} />Zet permanent in plan</>}
                   </button>
                 </div>
