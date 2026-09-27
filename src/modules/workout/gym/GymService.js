@@ -48,7 +48,18 @@ export async function haalGyms(db, clientId) {
 export async function kiesGym(db, clientId, gymId) {
   const { error } = await db.supabase
     .from('clients').update({ actieve_gym_id: gymId }).eq('id', clientId)
-  return { error: error?.message || null }
+  if (error) return { error: error.message }
+
+  // Wissel je halverwege de dag, dan hoort de training van vandaag mee te
+  // verhuizen. De sessie wordt bij de eerste set aangemaakt en draagt dan nog
+  // de vorige sportschool.
+  const nu = new Date()
+  const vandaag = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, '0')}-${String(nu.getDate()).padStart(2, '0')}`
+  await db.supabase.from('workout_sessions')
+    .update({ gym_id: gymId })
+    .eq('client_id', clientId)
+    .eq('workout_date', vandaag)
+  return { error: null }
 }
 
 export async function bewaarGym(db, { id, clientId, naam, eenheid }) {

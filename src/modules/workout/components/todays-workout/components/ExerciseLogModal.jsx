@@ -415,17 +415,15 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // In welke eenheid je invoert, komt van de sportschool waar je nu staat.
   // Zelf ophalen in plaats van als prop: dit scherm wordt vanuit vier plekken
   // geopend en bij doorgeven vergeet je er altijd één. Opslaan blijft kilo.
-  const [eenheid, setEenheid] = useState('kg')
+  const [gymInfo, setGymInfo] = useState({ gyms: [], actiefId: null })
   useEffect(() => {
     if (!db?.supabase || !client?.id) return undefined
     let weg = false
-    haalGyms(db, client.id).then(({ gyms, actiefId }) => {
-      if (weg) return
-      const g = gyms.find(x => x.id === actiefId)
-      setEenheid(g?.eenheid === 'lb' ? 'lb' : 'kg')
-    }, () => {})
+    haalGyms(db, client.id).then(info => { if (!weg) setGymInfo(info) }, () => {})
     return () => { weg = true }
   }, [db, client?.id])
+  const actieveGym = gymInfo.gyms.find(g => g.id === gymInfo.actiefId) || null
+  const eenheid = actieveGym?.eenheid === 'lb' ? 'lb' : 'kg'
 
   const [showWizard, setShowWizard] = useState(false)
   const [editingIndex, setEditingIndex] = useState(null) // ✅ Nieuw: track welke set wordt bewerkt
@@ -467,6 +465,14 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
 
   useEffect(() => { loadExistingLogs(); loadPreviousPerformance(); loadExercisePreference(); laadEerdereNotities() }, [])
 
+  // De sportschool komt een tel later binnen dan deze eerste ronde. Zonder
+  // deze tweede kijkbeurt zou "vorige keer" de laatste training tonen waar dan
+  // ook, en precies dat wilden we niet meer.
+  useEffect(() => {
+    if (gymInfo.actiefId) loadPreviousPerformance()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gymInfo.actiefId])
+
   useEffect(() => {
     let weg = false
     ExerciseService.getExerciseDetails(exercise.name)
@@ -480,19 +486,42 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     try {
       const today = new Date().toISOString().split('T')[0]
       const { data: sessions } = await db.supabase
-        .from('workout_sessions').select('id, workout_date')
+        .from('workout_sessions').select('id, workout_date, gym_id')
         .eq('client_id', client.id).lt('workout_date', today)
-        .order('workout_date', { ascending: false }).limit(10)
+        .order('workout_date', { ascending: false }).limit(30)
       if (!sessions?.length) return
       const { data: progress } = await db.supabase
         .from('workout_progress').select('sets, session_id, created_at, attachment_used, machine_settings')
         .in('session_id', sessions.map(s => s.id))
         .eq('exercise_name', exercise.name)
-        .order('created_at', { ascending: false }).limit(1)
-      if (!progress?.length || !progress[0].sets?.length) return
-      const session = sessions.find(s => s.id === progress[0].session_id)
-      setPreviousPerformance({ sets: progress[0].sets, date: session?.workout_date || null })
-      if (progress[0].machine_settings) setPreviousMachineSettings(progress[0].machine_settings)
+        .order('created_at', { ascending: false }).limit(12)
+      if (!progress?.length) return
+
+      // Liefst dezelfde sportschool: 60 kg op de ene legpress is niet 60 kg op
+      // de andere, en dan lijkt een andere zaak op vooruitgang of terugval.
+      //
+      // Is er hier nog niets, dan tonen we wel de laatste keer elders — met de
+      // naam erbij. Niets tonen zou erger zijn: dan sta je bij je eerste
+      // training in een nieuwe zaak zonder enig houvast.
+      const bijSessie = (r) => sessions.find(x => x.id === r.session_id) || null
+      const bruikbaar = progress.filter(r => r.sets?.length)
+      if (!bruikbaar.length) return
+      const hier = gymInfo.actiefId
+        ? bruikbaar.find(r => bijSessie(r)?.gym_id === gymInfo.actiefId)
+        : null
+      const gekozen = hier || bruikbaar[0]
+      const session = bijSessie(gekozen)
+      const anderGymId = !hier && gymInfo.actiefId ? (session?.gym_id || null) : null
+      const anderGym = anderGymId
+        ? (gymInfo.gyms.find(g => g.id === anderGymId)?.naam || null)
+        : null
+
+      setPreviousPerformance({
+        sets: gekozen.sets,
+        date: session?.workout_date || null,
+        anderGym,
+      })
+      if (gekozen.machine_settings) setPreviousMachineSettings(gekozen.machine_settings)
     } catch (e) { console.error('Previous performance load failed:', e) }
   }
 
@@ -1062,6 +1091,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 {previousPerformance?.date
                   ? new Date(`${String(previousPerformance.date).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
                   : 'vorige'}
+                {/* Komt de vergelijking van een andere zaak, dan hoort dat
+                    erbij te staan: een ander apparaat weegt anders. */}
+                {previousPerformance?.anderGym && (
+                  <span style={{ display: 'block', marginTop: 1, fontSize: '0.88em', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'none', letterSpacing: 0 }}>
+                    {previousPerformance.anderGym}
+                  </span>
+                )}
               </span>
               <span />
             </div>

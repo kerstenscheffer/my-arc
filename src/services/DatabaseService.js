@@ -686,12 +686,23 @@ async getOrCreateWorkoutSession(clientId, datum, extra = {}) {
     return bestaand[0]
   }
 
+  // Waar traint hij vandaag? Hier stempelen en niet door de aanroepers laten
+  // meegeven: deze helper is het enige pad waarlangs een sessie ontstaat, dus
+  // dit is de plek waar het niet vergeten kan worden.
+  let gymId = extra.gym_id ?? null
+  if (gymId === null) {
+    const { data: klant } = await this.supabase
+      .from('clients').select('actieve_gym_id').eq('id', clientId).maybeSingle()
+    gymId = klant?.actieve_gym_id || null
+  }
+
   const { data: nieuw, error: maakFout } = await this.supabase
     .from('workout_sessions')
     .insert({
       client_id: clientId,
       user_id: clientId,
       workout_date: datum,
+      gym_id: gymId,
       day_name: new Date(`${datum}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' }),
       exercises_completed: [],
       is_completed: false,
