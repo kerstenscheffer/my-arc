@@ -22,7 +22,7 @@ import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp } from 'lucide-react'
-import { metBand, KLEUR_VOOR, KRACHT_NORM } from '../krachtBand'
+import { metBandFases, faseSamenvatting, KLEUR_VOOR, oordeelTekst } from '../krachtBand'
 
 const LIJN = 'rgba(255,255,255,0.1)'
 const GROEN = '#10b981'
@@ -66,11 +66,12 @@ function Kaartje({ active, payload }) {
       {p.doel != null && (
         <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
           Streeftempo hier: {p.doel} kg
+          {p.norm?.faseDoel ? ` · ${p.norm.faseDoel}` : ''}
         </div>
       )}
       {p.oordeel && (
         <div style={{ fontSize: '0.66rem', fontWeight: 900, color: KLEUR_VOOR[p.oordeel], marginTop: 2 }}>
-          {p.oordeel === 'goed' ? 'Op tempo' : p.oordeel === 'traag' ? 'Vooruit, maar traag' : 'Staat stil'}
+          {oordeelTekst(p.oordeel, p.norm)}
         </div>
       )}
       {p.isPR && (
@@ -88,6 +89,10 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
   const velling = String(exerciseName || 'x').replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'x'
   const [punten, setPunten] = useState([])
   const [laden, setLaden] = useState(true)
+  // Álle fases van deze klant, niet alleen de lopende. Iemand die maanden
+  // cutte en nu bouwt hoort een doellijn te zien die tijdens de cut vlak loopt
+  // en pas vanaf de build klimt.
+  const [fases, setFases] = useState([])
 
   useEffect(() => {
     let leeft = true
@@ -104,6 +109,16 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
           // twaalf punten heb je een flink venster aan sessies nodig.
           .order('workout_date', { ascending: false })
           .limit(150)
+        // De fases erbij. Mislukt dit, dan valt de norm terug op opbouwen —
+        // dan klopt het oordeel misschien niet, maar de grafiek staat er wel.
+        db.supabase
+          .from('client_phases')
+          .select('doel, started_on')
+          .eq('client_id', client.id)
+          .order('started_on', { ascending: true })
+          .then(r => r, () => ({ data: [] }))
+          .then(({ data }) => { if (leeft) setFases(data || []) })
+
         if (!sessions?.length) { if (leeft) { setPunten([]); setLaden(false) } return }
 
         const perSessie = new Map(sessions.map(s => [s.id, s.workout_date]))
@@ -177,7 +192,7 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
   // De band eromheen: waar je minimaal hoort te zitten, waar we op mikken, en
   // hoe dit punt daartegen afsteekt. Rekenen gebeurt in krachtBand.js zodat de
   // norm op één plek staat.
-  const data = metBand(punten).map((p, i) => ({
+  const data = metBandFases(punten, fases).map((p, i) => ({
     ...p,
     label: kortDatum(p.datum),
     isPR: i === prIdx,
@@ -296,7 +311,17 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 10, height: 2, background: 'rgba(255,255,255,0.28)' }} />
-          streeftempo {KRACHT_NORM.streef_pct_week}% per week
+          {(() => {
+            const stukken = faseSamenvatting(punten, fases)
+            if (!stukken.length || !stukken[0].doel) return 'streeftempo'
+            // "cut tot 4 sep · build daarna" — zodat je ziet waarom de lijn
+            // halverwege van richting verandert.
+            return stukken
+              .map((f, i) => i === 0 && stukken.length > 1
+                ? `${f.doel} tot ${kortDatum(stukken[1].vanaf)}`
+                : i === 0 ? `${f.doel}-fase` : `${f.doel} daarna`)
+              .join(' · ')
+          })()}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 10, height: 8, background: 'rgba(255,255,255,0.12)', borderRadius: 2 }} />
