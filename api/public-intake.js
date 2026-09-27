@@ -107,6 +107,36 @@ const ALLOWED_UPDATE_FIELDS = new Set([
   'agenda_toelichting', 'eigen_blokken', 'intake_slotwoord'
 ]);
 
+// De sportschool uit de intake omzetten naar een rij in client_gyms.
+//
+// Alleen als de klant er nog geen heeft: heeft hij er al een aangemaakt in de
+// app, dan is dat wat hij bedoelde en hoort een herhaalde intake daar niet
+// overheen te rijden. Is het zijn eerste, dan nemen zijn bestaande trainingen
+// meteen die zaal over — dezelfde regel als in de app.
+async function koppelSportschool(supabase, clientId, naam) {
+  const schoon = String(naam ?? '').trim();
+  if (schoon.length < 3) return;
+
+  const { count } = await supabase
+    .from('client_gyms')
+    .select('id', { count: 'exact', head: true })
+    .eq('client_id', clientId);
+  if ((count || 0) > 0) return;
+
+  const { data: gym, error } = await supabase
+    .from('client_gyms')
+    .insert({ client_id: clientId, naam: schoon, eenheid: 'kg' })
+    .select('id')
+    .maybeSingle();
+  if (error || !gym?.id) return;
+
+  await supabase.from('clients').update({ actieve_gym_id: gym.id }).eq('id', clientId);
+  await supabase.from('workout_sessions')
+    .update({ gym_id: gym.id })
+    .eq('client_id', clientId)
+    .is('gym_id', null);
+}
+
 export default async function handler(req, res) {
   // Diagnose-route: GET of ?diag=1 → laat versie + env-status zien zonder
   // secrets. Zo controleer je met één curl of de nieuwe code live staat.
@@ -211,6 +241,19 @@ export default async function handler(req, res) {
         .eq('id', clientId);
 
       if (error) throw error;
+
+      // De sportschool uit de intake wordt ook een echte rij in client_gyms:
+      // dat is waar het loggen straks op filtert. Zonder dit staat de naam wel
+      // in het intakeformulier maar begint de klant in de app zonder zaal, en
+      // vergelijkt zijn eerste training met niets.
+      //
+      // Apart en met een eigen try: mislukt het, dan is de intake al veilig
+      // opgeslagen en is dit hooguit iets dat de klant zelf nog invult.
+      if ('gym_name' in safeFields) {
+        try { await koppelSportschool(supabase, clientId, safeFields.gym_name); }
+        catch (e) { console.warn('sportschool koppelen mislukt:', e?.message); }
+      }
+
       return res.status(200).json({ success: true });
     }
 
