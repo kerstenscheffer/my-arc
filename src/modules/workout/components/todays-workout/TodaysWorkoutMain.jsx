@@ -261,8 +261,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
 
   if (loading) return (
     <div style={{ padding: isMobile ? '1rem' : '1.5rem' }}>
-      <div style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 12, padding: '2rem', textAlign: 'center' }}>
-        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,215,0,0.2)', borderTopColor: '#FFD700', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }} />
+      <div style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '2rem', textAlign: 'center' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }} />
       </div>
     </div>
   )

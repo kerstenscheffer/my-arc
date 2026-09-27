@@ -10,12 +10,23 @@
 //
 // Onder de lijn staat wat er veranderde sinds je eerste sessie: de reden dat
 // je hier kijkt.
+//
+// De opmaak volgt de gewichtsgrafiek (GewichtBandGrafiek): recharts, witte as-
+// labels, een vlak onder de lijn en dezelfde lijndikte. Hier stond een met de
+// hand getekende SVG in een viewBox van 300 bij 90, waardoor de tekst met de
+// breedte meeschaalde en op een telefoon onleesbaar klein werd. Twee grafieken
+// in dezelfde app horen niet twee verschillende talen te spreken.
 
 import { useEffect, useState } from 'react'
+import {
+  ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts'
 import { TrendingUp } from 'lucide-react'
+import { metBand, KLEUR_VOOR, KRACHT_NORM } from '../krachtBand'
 
 const LIJN = 'rgba(255,255,255,0.1)'
-const GOUD = '#FFD700'
+const GROEN = '#10b981'
+const ROOD = '#ef4444'
 
 // Het zwaarste gewicht van een sessie; bij gelijk gewicht de meeste reps.
 const besteSet = (sets) => (sets || []).reduce((beste, set) => {
@@ -34,7 +45,47 @@ const kortDatum = (iso) => {
   } catch { return '' }
 }
 
+// Zelfde kaartje als bij de gewichtsgrafiek: recharts kleurt zijn standaard
+// regels naar de lijnkleur, en dat is hier wit op wit.
+function Kaartje({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const p = payload[0]?.payload
+  if (!p) return null
+  return (
+    <div style={{
+      background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: 10, padding: '0.5rem 0.65rem',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+    }}>
+      <div style={{ fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', marginBottom: 2 }}>
+        {p.label}
+      </div>
+      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff' }}>
+        {p.gewicht} kg × {p.reps}
+      </div>
+      {p.doel != null && (
+        <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+          Streeftempo hier: {p.doel} kg
+        </div>
+      )}
+      {p.oordeel && (
+        <div style={{ fontSize: '0.66rem', fontWeight: 900, color: KLEUR_VOOR[p.oordeel], marginTop: 2 }}>
+          {p.oordeel === 'goed' ? 'Op tempo' : p.oordeel === 'traag' ? 'Vooruit, maar traag' : 'Staat stil'}
+        </div>
+      )}
+      {p.isPR && (
+        <div style={{ fontSize: '0.66rem', fontWeight: 900, color: GROEN, marginTop: 2 }}>
+          Zwaarste tot nu toe
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ExerciseProgressChart({ db, client, exerciseName, isMobile }) {
+  // Eigen id voor het kleurverloop: staan er twee van deze grafieken op één
+  // pagina, dan pakken ze anders elkaars definitie.
+  const velling = String(exerciseName || 'x').replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'x'
   const [punten, setPunten] = useState([])
   const [laden, setLaden] = useState(true)
 
@@ -111,47 +162,66 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
   const gewichten = punten.map(p => p.gewicht)
   const max = Math.max(...gewichten)
   const min = Math.min(...gewichten)
-  const marge = Math.max(2.5, (max - min) * 0.25)
-  const boven = max + marge
-  const onder = Math.max(0, min - marge)
-  const bereik = Math.max(1, boven - onder)
 
   const eerste = punten[0]
   const laatste = punten[punten.length - 1]
   const verschil = Math.round((laatste.gewicht - eerste.gewicht) * 10) / 10
-  const kleur = verschil > 0 ? '#10b981' : verschil < 0 ? '#ef4444' : 'rgba(255,255,255,0.6)'
+  const kleur = verschil > 0 ? GROEN : verschil < 0 ? ROOD : 'rgba(255,255,255,0.6)'
 
-  // Chart layout with margins for axes
-  const PAD_L = 38, PAD_T = 14, PAD_B = 18, PAD_R = 6
-  const VB_W = 300, VB_H = 90
-  const cW = VB_W - PAD_L - PAD_R
-  const cH = VB_H - PAD_T - PAD_B
-  const cx = (i) => PAD_L + (punten.length === 1 ? cW / 2 : (i / (punten.length - 1)) * cW)
-  const cy = (g) => PAD_T + cH - ((g - onder) / bereik) * cH
-
-  // Nice Y-axis ticks (max 4)
-  const niceStep = (span) => {
-    if (span <= 0) return 5
-    const rough = span / 3
-    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(1, rough))))
-    return ([1, 2, 2.5, 5, 10].map(c => c * mag).find(c => c >= rough)) || 5
-  }
-  const step = niceStep(boven - onder)
-  const firstTick = Math.ceil(onder / step) * step
-  const yTicks = []
-  for (let v = firstTick; v <= boven + step * 0.01 && yTicks.length < 4; v = Math.round((v + step) * 1000) / 1000) {
-    yTicks.push(Math.round(v * 10) / 10)
-  }
-
-  // X-axis: first, last, and 1–2 intermediates
-  const xLabelIdx = new Set([0, punten.length - 1])
-  if (punten.length >= 4) xLabelIdx.add(Math.round((punten.length - 1) / 3))
-  if (punten.length >= 6) xLabelIdx.add(Math.round(2 * (punten.length - 1) / 3))
-
+  // De PR is de laatste keer dat je het zwaarste gewicht haalde — bij gelijk
+  // gewicht is de recentste het nieuws. Het laagste punt is de eerste keer:
+  // dat is waar je vandaan komt.
   const prIdx = gewichten.lastIndexOf(max)
   const laagsteIdx = gewichten.indexOf(min)
-  const lineCmd = punten.map((p, i) => `${i === 0 ? 'M' : 'L'} ${cx(i).toFixed(1)} ${cy(p.gewicht).toFixed(1)}`).join(' ')
-  const areaCmd = `${lineCmd} L ${cx(punten.length - 1).toFixed(1)} ${(PAD_T + cH).toFixed(1)} L ${cx(0).toFixed(1)} ${(PAD_T + cH).toFixed(1)} Z`
+
+  // De band eromheen: waar je minimaal hoort te zitten, waar we op mikken, en
+  // hoe dit punt daartegen afsteekt. Rekenen gebeurt in krachtBand.js zodat de
+  // norm op één plek staat.
+  const data = metBand(punten).map((p, i) => ({
+    ...p,
+    label: kortDatum(p.datum),
+    isPR: i === prIdx,
+    isLaagste: i === laagsteIdx && laagsteIdx !== prIdx,
+  }))
+
+  // Iets ruimer dan wat er te zien is, zodat de lijn niet tegen de rand plakt
+  // en het PR-label erboven past. Zelfde aanpak als de gewichtsgrafiek.
+  // Het domein moet ook de band en de doellijn omvatten, anders loopt de
+  // doellijn boven de grafiek uit zodra iemand achterloopt. Afronden op vijf
+  // kilo geeft nette aslabels (70, 75, 80) in plaats van 69, 73, 77.
+  const alles = [
+    ...gewichten,
+    ...data.map(p => p.doel).filter(Number.isFinite),
+    ...data.flatMap(p => (Array.isArray(p.band) ? p.band : [])).filter(Number.isFinite),
+  ]
+  const marge = Math.max(2.5, (Math.max(...alles) - Math.min(...alles)) * 0.2)
+  const onder = Math.max(0, Math.floor((Math.min(...alles) - marge) / 5) * 5)
+  const boven = Math.ceil((Math.max(...alles) + marge) / 5) * 5
+
+  // Elke log een eigen punt. De PR groen en groter, het laagste rood; de rest
+  // wit, met de laatste net iets groter want daar kijk je naar.
+  const Punt = (props) => {
+    const { cx, cy, payload, index } = props
+    if (cx == null || cy == null) return null
+    const isLaatste = index === data.length - 1
+    const kleurPunt = payload.isPR ? GROEN
+      : payload.isLaagste ? ROOD
+      : (KLEUR_VOOR[payload.oordeel] || '#fff')
+    const straal = payload.isPR ? 5 : payload.isLaagste ? 4.5 : isLaatste ? 4 : 3
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={straal} fill={kleurPunt} stroke="#0a0a0a" strokeWidth={1.5} />
+        {payload.isPR && (
+          <text
+            x={cx} y={cy - 10} textAnchor="middle"
+            fontSize={11} fontWeight={900} fill={GROEN}
+          >
+            {payload.gewicht} kg PR
+          </text>
+        )}
+      </g>
+    )
+  }
 
   return (
     <div style={{
@@ -159,7 +229,7 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
       paddingTop: '0.85rem', borderTop: `1px solid ${LIJN}`,
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
-        <TrendingUp size={14} color={GOUD} strokeWidth={2.6} style={{ flexShrink: 0, alignSelf: 'center' }} />
+        <TrendingUp size={14} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0, alignSelf: 'center' }} />
         <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
           Krachtverloop
         </span>
@@ -168,54 +238,71 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
         </span>
       </div>
 
-      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} style={{ width: '100%', display: 'block' }}>
-        <defs>
-          <linearGradient id="krachtVlakGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={GOUD} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={GOUD} stopOpacity="0" />
-          </linearGradient>
-          <clipPath id="krachtChartClip">
-            <rect x={PAD_L} y={PAD_T} width={cW} height={cH} />
-          </clipPath>
-        </defs>
-        {yTicks.map(v => (
-          <g key={v}>
-            <line x1={PAD_L} y1={cy(v).toFixed(1)} x2={VB_W - PAD_R} y2={cy(v).toFixed(1)}
-              stroke="rgba(255,255,255,0.07)" strokeWidth="0.5" />
-            <text x={PAD_L - 3} y={(cy(v) + 2.5).toFixed(1)} textAnchor="end"
-              fontSize="7.5" fontWeight="700" fill="rgba(255,255,255,0.4)">
-              {v}
-            </text>
-          </g>
-        ))}
-        <path d={areaCmd} fill="url(#krachtVlakGrad)" clipPath="url(#krachtChartClip)" />
-        <path d={lineCmd} fill="none" stroke={GOUD} strokeWidth="1.4"
-          strokeLinejoin="round" strokeLinecap="round" clipPath="url(#krachtChartClip)" />
-        {punten.map((p, i) => {
-          const isPR = i === prIdx
-          const isLow = i === laagsteIdx && laagsteIdx !== prIdx
-          const r = (isPR || isLow) ? 3.2 : 2.2
-          const dotFill = isPR ? '#10b981' : isLow ? '#ef4444' : (i === punten.length - 1 ? '#fff' : GOUD)
-          return (
-            <circle key={p.datum} cx={cx(i).toFixed(1)} cy={cy(p.gewicht).toFixed(1)} r={r} fill={dotFill}>
-              <title>{`${kortDatum(p.datum)}: ${p.gewicht} kg × ${p.reps}`}</title>
-            </circle>
-          )
-        })}
-        {prIdx >= 0 && (
-          <text x={cx(prIdx).toFixed(1)} y={(cy(punten[prIdx].gewicht) - 4.5).toFixed(1)}
-            textAnchor="middle" fontSize="7" fontWeight="900" fill="#10b981">
-            {punten[prIdx].gewicht} kg PR
-          </text>
-        )}
-        {[...xLabelIdx].sort((a, b) => a - b).map(i => (
-          <text key={i} x={cx(i).toFixed(1)} y={VB_H - 2}
-            textAnchor={i === 0 ? 'start' : i === punten.length - 1 ? 'end' : 'middle'}
-            fontSize="7.5" fontWeight="700" fill="rgba(255,255,255,0.4)">
-            {kortDatum(punten[i].datum)}
-          </text>
-        ))}
-      </svg>
+      <div style={{ width: '100%', height: isMobile ? 190 : 230 }}>
+        <ResponsiveContainer>
+          <ComposedChart data={data} margin={{ top: 16, right: 10, bottom: 0, left: -18 }}>
+            <defs>
+              {/* De lijn kleurt mee met hoe je ervoor staat: groen op tempo,
+                  oranje als je vooruitgaat maar traag, rood als je stilstaat.
+                  Eén lijn met een verloop per meetpunt — precies zoals de
+                  trendlijn in de gewichtsgrafiek. */}
+              <linearGradient id={`kracht-lijn-${velling}`} x1="0" y1="0" x2="1" y2="0">
+                {data.map((p, i) => (
+                  <stop
+                    key={p.datum}
+                    offset={data.length > 1 ? `${(i / (data.length - 1)) * 100}%` : '0%'}
+                    stopColor={KLEUR_VOOR[p.oordeel] || '#fff'}
+                  />
+                ))}
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <XAxis
+              dataKey="label" tick={{ fontSize: 10, fill: '#fff', fontWeight: 800 }}
+              axisLine={false} tickLine={false} minTickGap={28}
+            />
+            <YAxis
+              domain={[onder, boven]} tick={{ fontSize: 10, fill: '#fff', fontWeight: 800 }}
+              axisLine={false} tickLine={false} width={38}
+              tickFormatter={(v) => `${v}`}
+            />
+            <Tooltip content={<Kaartje />} cursor={{ stroke: 'rgba(255,255,255,0.25)' }} />
+            {/* Het vlak tussen "dit is het minste wat we willen zien" en het
+                streeftempo. Zit je lijn erin of erboven, dan loopt het. */}
+            <Area
+              dataKey="band" stroke="none" fill="rgba(255,255,255,0.07)"
+              isAnimationActive={false} activeDot={false}
+            />
+            {/* Het streeftempo zelf: een streep, geen lijn om op te sturen. */}
+            <Line
+              dataKey="doel" stroke="rgba(255,255,255,0.28)" strokeWidth={1}
+              strokeDasharray="4 4" dot={false} isAnimationActive={false}
+            />
+            <Line
+              dataKey="gewicht" stroke={`url(#kracht-lijn-${velling})`} strokeWidth={2.6}
+              strokeLinejoin="round" strokeLinecap="round"
+              dot={<Punt />} activeDot={false} isAnimationActive={false}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Wat de band betekent. Zonder deze regel is een grijs vlak onder een
+          lijn decoratie, en dan gaat niemand ernaar handelen. */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '0.35rem 0.9rem',
+        marginTop: 2, fontSize: '0.62rem', fontWeight: 700,
+        color: 'rgba(255,255,255,0.4)',
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 2, background: 'rgba(255,255,255,0.28)' }} />
+          streeftempo {KRACHT_NORM.streef_pct_week}% per week
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 8, background: 'rgba(255,255,255,0.12)', borderRadius: 2 }} />
+          minimaal tot streef
+        </span>
+      </div>
     </div>
   )
 }
