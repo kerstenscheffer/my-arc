@@ -116,24 +116,49 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
   const onder = Math.max(0, min - marge)
   const bereik = Math.max(1, boven - onder)
 
-  const B = 100   // viewBox-breedte; de svg rekt mee met de kaart
-  const H = 46
-  const x = (i) => (punten.length === 1 ? B / 2 : (i / (punten.length - 1)) * B)
-  const y = (g) => H - ((g - onder) / bereik) * H
-  const pad = punten.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(2)} ${y(p.gewicht).toFixed(2)}`).join(' ')
-  const vlak = `${pad} L ${B} ${H} L 0 ${H} Z`
-
   const eerste = punten[0]
   const laatste = punten[punten.length - 1]
   const verschil = Math.round((laatste.gewicht - eerste.gewicht) * 10) / 10
   const kleur = verschil > 0 ? '#10b981' : verschil < 0 ? '#ef4444' : 'rgba(255,255,255,0.6)'
+
+  // Chart layout with margins for axes
+  const PAD_L = 38, PAD_T = 14, PAD_B = 18, PAD_R = 6
+  const VB_W = 300, VB_H = 90
+  const cW = VB_W - PAD_L - PAD_R
+  const cH = VB_H - PAD_T - PAD_B
+  const cx = (i) => PAD_L + (punten.length === 1 ? cW / 2 : (i / (punten.length - 1)) * cW)
+  const cy = (g) => PAD_T + cH - ((g - onder) / bereik) * cH
+
+  // Nice Y-axis ticks (max 4)
+  const niceStep = (span) => {
+    if (span <= 0) return 5
+    const rough = span / 3
+    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(1, rough))))
+    return ([1, 2, 2.5, 5, 10].map(c => c * mag).find(c => c >= rough)) || 5
+  }
+  const step = niceStep(boven - onder)
+  const firstTick = Math.ceil(onder / step) * step
+  const yTicks = []
+  for (let v = firstTick; v <= boven + step * 0.01 && yTicks.length < 4; v = Math.round((v + step) * 1000) / 1000) {
+    yTicks.push(Math.round(v * 10) / 10)
+  }
+
+  // X-axis: first, last, and 1–2 intermediates
+  const xLabelIdx = new Set([0, punten.length - 1])
+  if (punten.length >= 4) xLabelIdx.add(Math.round((punten.length - 1) / 3))
+  if (punten.length >= 6) xLabelIdx.add(Math.round(2 * (punten.length - 1) / 3))
+
+  const prIdx = gewichten.lastIndexOf(max)
+  const laagsteIdx = gewichten.indexOf(min)
+  const lineCmd = punten.map((p, i) => `${i === 0 ? 'M' : 'L'} ${cx(i).toFixed(1)} ${cy(p.gewicht).toFixed(1)}`).join(' ')
+  const areaCmd = `${lineCmd} L ${cx(punten.length - 1).toFixed(1)} ${(PAD_T + cH).toFixed(1)} L ${cx(0).toFixed(1)} ${(PAD_T + cH).toFixed(1)} Z`
 
   return (
     <div style={{
       margin: isMobile ? '0.75rem 1rem 0' : '0.9rem 1.25rem 0',
       paddingTop: '0.85rem', borderTop: `1px solid ${LIJN}`,
     }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
         <TrendingUp size={14} color={GOUD} strokeWidth={2.6} style={{ flexShrink: 0, alignSelf: 'center' }} />
         <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
           Krachtverloop
@@ -143,34 +168,54 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
         </span>
       </div>
 
-      <svg viewBox={`0 0 ${B} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: isMobile ? 76 : 92, display: 'block', overflow: 'visible' }}>
+      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} style={{ width: '100%', display: 'block' }}>
         <defs>
-          <linearGradient id="krachtVlak" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={GOUD} stopOpacity="0.22" />
+          <linearGradient id="krachtVlakGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={GOUD} stopOpacity="0.25" />
             <stop offset="100%" stopColor={GOUD} stopOpacity="0" />
           </linearGradient>
+          <clipPath id="krachtChartClip">
+            <rect x={PAD_L} y={PAD_T} width={cW} height={cH} />
+          </clipPath>
         </defs>
-        <path d={vlak} fill="url(#krachtVlak)" />
-        <path d={pad} fill="none" stroke={GOUD} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-        {punten.map((p, i) => (
-          <circle
-            key={p.datum}
-            cx={x(i)} cy={y(p.gewicht)} r="2.5"
-            fill={i === punten.length - 1 ? '#fff' : GOUD}
-            vectorEffect="non-scaling-stroke"
-          >
-            <title>{`${kortDatum(p.datum)}: ${p.gewicht} kg × ${p.reps}`}</title>
-          </circle>
+        {yTicks.map(v => (
+          <g key={v}>
+            <line x1={PAD_L} y1={cy(v).toFixed(1)} x2={VB_W - PAD_R} y2={cy(v).toFixed(1)}
+              stroke="rgba(255,255,255,0.07)" strokeWidth="0.5" />
+            <text x={PAD_L - 3} y={(cy(v) + 2.5).toFixed(1)} textAnchor="end"
+              fontSize="7.5" fontWeight="700" fill="rgba(255,255,255,0.4)">
+              {v}
+            </text>
+          </g>
+        ))}
+        <path d={areaCmd} fill="url(#krachtVlakGrad)" clipPath="url(#krachtChartClip)" />
+        <path d={lineCmd} fill="none" stroke={GOUD} strokeWidth="1.4"
+          strokeLinejoin="round" strokeLinecap="round" clipPath="url(#krachtChartClip)" />
+        {punten.map((p, i) => {
+          const isPR = i === prIdx
+          const isLow = i === laagsteIdx && laagsteIdx !== prIdx
+          const r = (isPR || isLow) ? 3.2 : 2.2
+          const dotFill = isPR ? '#10b981' : isLow ? '#ef4444' : (i === punten.length - 1 ? '#fff' : GOUD)
+          return (
+            <circle key={p.datum} cx={cx(i).toFixed(1)} cy={cy(p.gewicht).toFixed(1)} r={r} fill={dotFill}>
+              <title>{`${kortDatum(p.datum)}: ${p.gewicht} kg × ${p.reps}`}</title>
+            </circle>
+          )
+        })}
+        {prIdx >= 0 && (
+          <text x={cx(prIdx).toFixed(1)} y={(cy(punten[prIdx].gewicht) - 4.5).toFixed(1)}
+            textAnchor="middle" fontSize="7" fontWeight="900" fill="#10b981">
+            {punten[prIdx].gewicht} kg PR
+          </text>
+        )}
+        {[...xLabelIdx].sort((a, b) => a - b).map(i => (
+          <text key={i} x={cx(i).toFixed(1)} y={VB_H - 2}
+            textAnchor={i === 0 ? 'start' : i === punten.length - 1 ? 'end' : 'middle'}
+            fontSize="7.5" fontWeight="700" fill="rgba(255,255,255,0.4)">
+            {kortDatum(punten[i].datum)}
+          </text>
         ))}
       </svg>
-
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', marginTop: 6,
-        fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)',
-      }}>
-        <span>{kortDatum(eerste.datum)} · {eerste.gewicht} kg</span>
-        <span style={{ color: 'rgba(255,255,255,0.7)' }}>{kortDatum(laatste.datum)} · {laatste.gewicht} kg × {laatste.reps}</span>
-      </div>
     </div>
   )
 }
