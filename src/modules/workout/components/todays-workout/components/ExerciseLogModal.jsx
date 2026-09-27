@@ -1,6 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
-import { vanKg, naarKg, eenheidLabel } from '../../../gym/GymService'
+import { vanKg, naarKg, eenheidLabel, haalGyms } from '../../../gym/GymService'
 import { createPortal } from 'react-dom'
 import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
@@ -410,8 +410,23 @@ function youtubeThumb(url) {
 }
 
 // ========== MAIN MODAL ==========
-export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768, eenheid = 'kg' }) {
+export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768 }) {
   const [loggedSets, setLoggedSets] = useState([])
+  // In welke eenheid je invoert, komt van de sportschool waar je nu staat.
+  // Zelf ophalen in plaats van als prop: dit scherm wordt vanuit vier plekken
+  // geopend en bij doorgeven vergeet je er altijd één. Opslaan blijft kilo.
+  const [eenheid, setEenheid] = useState('kg')
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return undefined
+    let weg = false
+    haalGyms(db, client.id).then(({ gyms, actiefId }) => {
+      if (weg) return
+      const g = gyms.find(x => x.id === actiefId)
+      setEenheid(g?.eenheid === 'lb' ? 'lb' : 'kg')
+    }, () => {})
+    return () => { weg = true }
+  }, [db, client?.id])
+
   const [showWizard, setShowWizard] = useState(false)
   const [editingIndex, setEditingIndex] = useState(null) // ✅ Nieuw: track welke set wordt bewerkt
   const [dropsetIndex, setDropsetIndex] = useState(null)

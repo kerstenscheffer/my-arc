@@ -19,9 +19,6 @@ export default function TodaysWorkoutCard({
   // oefeningen scrolt. Zweefde eerder los over de pagina.
   timerElapsedSec = 0, timerRunning = false, timerStarted = false,
   timerFinished = false, onTimerToggle, onTimerReset,
-  // Geeft de gekozen sportschool door naar boven, zodat het logscherm weet in
-  // welke eenheid je invoert.
-  onGymChange,
 }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
 
@@ -195,7 +192,7 @@ export default function TodaysWorkoutCard({
             {/* Waar je vandaag traint. Hier omdat je er pas aan denkt op het
                 moment dat je het eerste gewicht invult. */}
             {client?.id && db && (
-              <GymKiezer db={db} client={client} isMobile={isMobile} onGymChange={onGymChange} />
+              <GymKiezer db={db} client={client} isMobile={isMobile} />
             )}
           </div>
         </div>

@@ -15,7 +15,7 @@ import { haalGyms, kiesGym, bewaarGym, verwijderGym, eenheidLabel } from './GymS
 
 const LIJN = 'rgba(255,255,255,0.12)'
 
-export default function GymKiezer({ db, client, isMobile, onGymChange }) {
+export default function GymKiezer({ db, client, isMobile }) {
   const [gyms, setGyms] = useState([])
   const [actiefId, setActiefId] = useState(null)
   const [open, setOpen] = useState(false)
@@ -26,8 +26,7 @@ export default function GymKiezer({ db, client, isMobile, onGymChange }) {
     const { gyms: lijst, actiefId: id } = await haalGyms(db, client.id)
     setGyms(lijst)
     setActiefId(id)
-    onGymChange?.(lijst.find(g => g.id === id) || null)
-  }, [db, client?.id, onGymChange])
+  }, [db, client?.id])
 
   useEffect(() => { laad() }, [laad])
 
@@ -36,7 +35,6 @@ export default function GymKiezer({ db, client, isMobile, onGymChange }) {
   const wissel = async (gym) => {
     setActiefId(gym.id)
     setOpen(false)
-    onGymChange?.(gym)
     const { error } = await kiesGym(db, client.id, gym.id)
     if (error) { alert(`Wisselen mislukt: ${error}`); laad() }
   }
