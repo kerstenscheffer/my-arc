@@ -694,6 +694,16 @@ async getOrCreateWorkoutSession(clientId, datum, extra = {}) {
     const { data: klant } = await this.supabase
       .from('clients').select('actieve_gym_id').eq('id', clientId).maybeSingle()
     gymId = klant?.actieve_gym_id || null
+    // Staat er geen keuze, maar heeft hij wél een sportschool? Dan is dat waar
+    // hij traint. Dezelfde terugval als in de kiezer; zonder dit kreeg een
+    // klant met één zaal maar zonder expliciete keuze sessies zonder zaal, en
+    // dan klopt "vorige keer" weer niet.
+    if (!gymId) {
+      const { data: gyms } = await this.supabase
+        .from('client_gyms').select('id').eq('client_id', clientId)
+        .order('naam', { ascending: true }).limit(1)
+      gymId = gyms?.[0]?.id || null
+    }
   }
 
   const { data: nieuw, error: maakFout } = await this.supabase
