@@ -10,6 +10,7 @@ import { Check, ChevronDown, Timer } from 'lucide-react'
 import { useRef } from 'react'
 import { actieveOefeningen } from '../../utils/exerciseCompletion'
 import { workoutFoto } from '../../utils/workoutFoto'
+import GymKiezer from '../../gym/GymKiezer'
 
 export default function TodaysWorkoutCard({
   workout, onLogClick, logsCount, isCompleted: isCompletedProp, completionPct = 0,
@@ -18,6 +19,9 @@ export default function TodaysWorkoutCard({
   // oefeningen scrolt. Zweefde eerder los over de pagina.
   timerElapsedSec = 0, timerRunning = false, timerStarted = false,
   timerFinished = false, onTimerToggle, onTimerReset,
+  // Geeft de gekozen sportschool door naar boven, zodat het logscherm weet in
+  // welke eenheid je invoert.
+  onGymChange,
 }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
 
@@ -188,6 +192,11 @@ export default function TodaysWorkoutCard({
             <span style={{ color: isCompleted ? '#10b981' : '#fff' }}>
               {pct}<span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78em', fontWeight: 800 }}>% klaar</span>
             </span>
+            {/* Waar je vandaag traint. Hier omdat je er pas aan denkt op het
+                moment dat je het eerste gewicht invult. */}
+            {client?.id && db && (
+              <GymKiezer db={db} client={client} isMobile={isMobile} onGymChange={onGymChange} />
+            )}
           </div>
         </div>
       </div>

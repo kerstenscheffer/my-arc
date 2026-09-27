@@ -1,5 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
+import { vanKg, naarKg, eenheidLabel } from '../../../gym/GymService'
 import { createPortal } from 'react-dom'
 import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
@@ -118,34 +119,39 @@ function SetsKiezer({ waarde, gelogd, onKies }) {
 // en dropsets blijven bestaan, maar niet als vier schermen tussen elke set
 // door — dan is de timer zijn doel voorbij. Wie er een dropset bij wil, voegt
 // die na afloop toe via het menu op de set.
-function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false, snel = false }) {
+// De wizard rekent in de eenheid van de sportschool waar je staat: je draait
+// aan het wiel in lb en er gaan kilo's naar buiten. Alles wat deze component
+// verlaat via onComplete is kilo, zodat er nooit een pond in de database komt.
+function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false, snel = false, eenheid = 'kg' }) {
+  const EH = eenheidLabel(eenheid)
+  const toon = (kilo) => vanKg(kilo, eenheid)
   const [step, setStep] = useState(1)
-  const [weight, setWeight] = useState(previousWeight)
+  const [weight, setWeight] = useState(toon(previousWeight))
   const [reps, setReps] = useState(previousReps)
   const [hasPartials, setHasPartials] = useState(false)
   const [partialReps, setPartialReps] = useState(1)
   const [hasDropset, setHasDropset] = useState(false)
-  const [dropWeight, setDropWeight] = useState(Math.max(0, previousWeight - 10))
+  const [dropWeight, setDropWeight] = useState(Math.max(0, toon(previousWeight) - (eenheid === 'lb' ? 20 : 10)))
   const [dropReps, setDropReps] = useState(0)
   const [dropStep, setDropStep] = useState(1)
 
   const stepTitles = {
-    1: editMode ? 'Gewicht aanpassen' : 'Hoeveel kilo?',
+    1: editMode ? 'Gewicht aanpassen' : (eenheid === 'lb' ? 'Hoeveel pond?' : 'Hoeveel kilo?'),
     2: editMode ? 'Reps aanpassen' : 'Hoeveel reps?',
     3: 'Partials?',
     4: 'Dropset?',
-    5: dropStep === 1 ? 'Dropset — Gewicht?' : `Dropset ${dropWeight}kg — Reps?`
+    5: dropStep === 1 ? 'Dropset — Gewicht?' : `Dropset ${dropWeight}${EH} — Reps?`
   }
 
   const totalSteps = snel ? 2 : (hasDropset ? 5 : 4)
   const displayStep = step <= 4 ? Math.min(step, totalSteps) : totalSteps
 
   const handleFinish = () => {
-    onComplete({ weight, reps, partials: hasPartials ? partialReps : 0, dropsets: hasDropset ? [{ weight: dropWeight, reps: dropReps }] : [] })
+    onComplete({ weight: naarKg(weight, eenheid), reps, partials: hasPartials ? partialReps : 0, dropsets: hasDropset ? [{ weight: naarKg(dropWeight, eenheid), reps: dropReps }] : [] })
   }
 
   function handleFinishWithoutDrop() {
-    onComplete({ weight, reps, partials: hasPartials ? partialReps : 0, dropsets: [] })
+    onComplete({ weight: naarKg(weight, eenheid), reps, partials: hasPartials ? partialReps : 0, dropsets: [] })
   }
 
   const InfoTip = ({ text }) => (
@@ -170,12 +176,12 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
           {stepTitles[step]}
         </h3>
 
-        {step === 1 && <NumberPicker value={weight} onChange={setWeight} min={0} max={300} step={1} unit="kg" onConfirm={() => setStep(2)} halfStep={0.5} />}
+        {step === 1 && <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 660 : 300} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} />}
         {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => (editMode || snel) ? handleFinishWithoutDrop() : setStep(3)} />}
 
         {step === 3 && !editMode && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>kg</span> × {reps}</div>
+            <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>{EH}</span> × {reps}</div>
             <InfoTip text="Partials zijn onvolledige herhalingen aan het einde van je set, wanneer je de volle beweging niet meer kunt maken maar nog wél een stukje." />
             <div style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
               <button onClick={() => { setHasPartials(false); setStep(4) }} style={{ flex: 1, padding: isMobile ? '0.9rem' : '1rem', background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900, cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation' }}>Nee</button>
@@ -187,7 +193,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 
         {step === 4 && !editMode && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>kg</span> × {reps}{hasPartials ? ` +${partialReps}p` : ''}</div>
+            <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>{EH}</span> × {reps}{hasPartials ? ` +${partialReps}p` : ''}</div>
             <InfoTip text="Een dropset is wanneer je direct na je set het gewicht verlaagt en zonder rust nog een set doet." />
             <div style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
               <button onClick={handleFinishWithoutDrop} style={{ flex: 1, padding: isMobile ? '0.9rem' : '1rem', background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900, cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation' }}>Nee</button>
@@ -199,7 +205,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
         {step === 5 && !editMode && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
             {dropStep === 1
-              ? <NumberPicker value={dropWeight} onChange={setDropWeight} min={0} max={200} step={1} unit="kg" onConfirm={() => setDropStep(2)} halfStep={0.5} />
+              ? <NumberPicker value={dropWeight} onChange={setDropWeight} min={0} max={eenheid === 'lb' ? 440 : 200} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setDropStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} />
               : <NumberPicker value={dropReps} onChange={setDropReps} min={1} max={50} step={1} unit="reps" onConfirm={handleFinish} />}
           </div>
         )}
@@ -210,7 +216,9 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 }
 
 // ========== LOGGED SET ROW ==========
-function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMobile }) {
+function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMobile, eenheid = 'kg' }) {
+  const EH = eenheidLabel(eenheid)
+  const toon = (kilo) => vanKg(kilo, eenheid)
   const [showMenu, setShowMenu] = useState(false)
 
   // Vergelijking met dezelfde set van vorige keer. Precies wat je tijdens het
@@ -220,7 +228,8 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
   if (vorige) {
     const dKg = (set.weight || 0) - (vorige.weight || 0)
     const dReps = (set.reps || 0) - (vorige.reps || 0)
-    if (dKg !== 0) delta = { tekst: `${dKg > 0 ? '+' : ''}${Number(dKg.toFixed(1))} kg`, op: dKg > 0 }
+    const dTonen = toon(dKg)
+    if (dKg !== 0) delta = { tekst: `${dKg > 0 ? '+' : ''}${Number(dTonen.toFixed(1))} ${EH}`, op: dKg > 0 }
     else if (dReps !== 0) delta = { tekst: `${dReps > 0 ? '+' : ''}${dReps} rep${Math.abs(dReps) === 1 ? '' : 's'}`, op: dReps > 0 }
     else delta = { tekst: 'gelijk', op: null }
   }
@@ -248,7 +257,7 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
             fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff',
             fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
           }}>
-            {set.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
+            {toon(set.weight)}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>{EH}</span>
             <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
             {set.reps}
             {set.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{set.partials}p</span>}
@@ -256,7 +265,7 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
           {set.dropsets?.length > 0 && (
             <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
               {set.dropsets.map((ds, i) => (
-                <span key={i}>↓ {ds.weight}kg × {ds.reps}{i < set.dropsets.length - 1 ? ', ' : ''}</span>
+                <span key={i}>↓ {toon(ds.weight)}{EH} × {ds.reps}{i < set.dropsets.length - 1 ? ', ' : ''}</span>
               ))}
             </div>
           )}
@@ -267,7 +276,7 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
           fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
         }}>
           {vorige
-            ? <>{vorige.weight}<span style={{ fontSize: '0.8em' }}>kg</span> × {vorige.reps}</>
+            ? <>{toon(vorige.weight)}<span style={{ fontSize: '0.8em' }}>{EH}</span> × {vorige.reps}</>
             : <span style={{ color: 'rgba(255,255,255,0.18)' }}>—</span>}
         </span>
 
@@ -308,7 +317,8 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
 // Een set die nog moet. Staat er meteen in zodra je de oefening opent, met
 // wat je vorige keer deed als richtpunt. Zo zie je in één blik hoeveel sets
 // er nog liggen en wat je moet halen, in plaats van "Nog geen sets gelogd".
-function LegeSetRow({ index, vorige, onClick, isMobile }) {
+function LegeSetRow({ index, vorige, onClick, isMobile, eenheid = 'kg' }) {
+  const EH = eenheidLabel(eenheid)
   return (
     <button
       onClick={onClick}
@@ -339,7 +349,7 @@ function LegeSetRow({ index, vorige, onClick, isMobile }) {
         fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
       }}>
         {vorige
-          ? <>{vorige.weight}<span style={{ fontSize: '0.8em' }}>kg</span> × {vorige.reps}</>
+          ? <>{vanKg(vorige.weight, eenheid)}<span style={{ fontSize: '0.8em' }}>{EH}</span> × {vorige.reps}</>
           : <span style={{ color: 'rgba(255,255,255,0.18)' }}>—</span>}
       </span>
       <span />
@@ -356,7 +366,8 @@ function MenuBtn({ label, onClick, isMobile, danger, gold }) {
 }
 
 // ========== DROPSET INPUT ==========
-function DropsetInput({ onSave, onCancel, isMobile }) {
+function DropsetInput({ onSave, onCancel, isMobile, eenheid = 'kg' }) {
+  const EH = eenheidLabel(eenheid)
   const [weight, setWeight] = useState(0)
   const [reps, setReps] = useState(0)
   const [step, setStep] = useState(1)
@@ -364,12 +375,12 @@ function DropsetInput({ onSave, onCancel, isMobile }) {
   return (
     <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', color: 'rgba(255,215,0,0.5)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span>↓ Dropset — {step === 1 ? 'Gewicht?' : `${weight}kg — Reps?`}</span>
+        <span>↓ Dropset — {step === 1 ? 'Gewicht?' : `${weight}${EH} — Reps?`}</span>
         <button onClick={onCancel} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: isMobile ? '0.65rem' : '0.7rem', cursor: 'pointer', touchAction: 'manipulation' }}>Annuleren</button>
       </div>
       {step === 1
-        ? <NumberPicker value={weight} onChange={setWeight} min={0} max={200} step={1} unit="kg" onConfirm={() => setStep(2)} halfStep={0.5} />
-        : <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => onSave({ weight, reps })} />}
+        ? <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 440 : 200} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} />
+        : <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => onSave({ weight: naarKg(weight, eenheid), reps })} />}
     </div>
   )
 }
@@ -399,7 +410,7 @@ function youtubeThumb(url) {
 }
 
 // ========== MAIN MODAL ==========
-export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768 }) {
+export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768, eenheid = 'kg' }) {
   const [loggedSets, setLoggedSets] = useState([])
   const [showWizard, setShowWizard] = useState(false)
   const [editingIndex, setEditingIndex] = useState(null) // ✅ Nieuw: track welke set wordt bewerkt
@@ -1050,9 +1061,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                   onEdit={handleEditSet}
                   onDelete={handleDeleteSet}
                   isMobile={isMobile}
+                  eenheid={eenheid}
                 />
               ) : (
-                <LegeSetRow key={i} index={i} vorige={vorige} isMobile={isMobile}
+                <LegeSetRow key={i} index={i} vorige={vorige} isMobile={isMobile} eenheid={eenheid}
                   onClick={() => { setEditingIndex(null); setShowWizard(true) }}
                 />
               )
@@ -1192,7 +1204,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               isMobile={isMobile}
             />
 
-            {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} />}
+            {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} eenheid={eenheid} />}
 
             {wizardActive && (
               <SetInputWizard
@@ -1203,6 +1215,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 isMobile={isMobile}
                 editMode={editingIndex !== null}
                 snel={rustTimerAan && editingIndex === null}
+                eenheid={eenheid}
               />
             )}
 
