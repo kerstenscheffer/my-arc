@@ -155,9 +155,26 @@ export default function MacroRingen({ client, db, onClientUpdate, isMobile }) {
     const patch = Object.fromEntries(gewijzigd.map(r => [r.veld, waarden[r.veld]]))
     try {
       const before = pickTrackedFields(client)
-      const { error } = await db.supabase.from('clients').update(patch).eq('id', client.id)
+      // .select() erbij en tellen wat er terugkomt. Een update die niets raakt
+      // — verkeerd id, of tegengehouden door RLS — komt terug als 204 zonder
+      // fout. Dan meldde dit scherm "opgeslagen", werkte het de ringen
+      // optimistisch bij, en stond er in de database nog het oude getal. De
+      // maaltijdpagina en AI Meals lezen dáár, dus die bleven het oude doel
+      // tonen en het leek alsof zij achterliepen.
+      const { data, error } = await db.supabase
+        .from('clients').update(patch).eq('id', client.id).select('id')
       if (error) throw error
+      if (!data || data.length === 0) throw new Error('geen rij bijgewerkt')
+      console.log('[macros] opgeslagen', { clientId: client.id, ...patch })
       onClientUpdate?.(patch)
+      // Iedereen die deze macro's toont zit in een eigen componentboom — het
+      // maaltijdplan, de agenda, de klantpagina. Eén bericht op window is de
+      // enige manier om ze allemaal te bereiken zonder ze aan elkaar te knopen.
+      try {
+        window.dispatchEvent(new CustomEvent('myarc:macros-gewijzigd', {
+          detail: { clientId: client.id, ...patch },
+        }))
+      } catch { /* window bestaat niet in een test-omgeving */ }
       await logClientChanges({ db, clientId: client.id, before, after: patch, source: 'macro_ringen' })
       setConcept({})
       setOpenVeld(null)
@@ -165,7 +182,7 @@ export default function MacroRingen({ client, db, onClientUpdate, isMobile }) {
       setTimeout(() => setZojuist(false), 1600)
     } catch (e) {
       console.error('Macro\'s opslaan mislukt:', e)
-      setFout('Opslaan mislukt')
+      setFout(e?.message === 'geen rij bijgewerkt' ? 'Niet opgeslagen' : 'Opslaan mislukt')
     } finally {
       setBezig(false)
     }

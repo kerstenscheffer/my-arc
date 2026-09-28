@@ -320,6 +320,21 @@ export default function PlanAnalyzer({
     try { const { data } = await db.supabase.from('clients').select('*').eq('id', cId).single(); if (data) setClientRecord(data) } catch {}
   }
 
+  // De coach past de macro's aan in het inzicht-paneel; dat scherm staat in een
+  // eigen componentboom en kan deze state niet bereiken. Vandaar één bericht op
+  // window: horen we dat, dan halen we de klantrij opnieuw op zodat de targets
+  // hierboven meteen kloppen in plaats van pas na een herlaad.
+  useEffect(() => {
+    const opWijziging = (e) => {
+      const cId = e?.detail?.clientId
+      if (!cId || cId !== resolvedClientId) return
+      loadClientRecord(cId)
+    }
+    window.addEventListener('myarc:macros-gewijzigd', opWijziging)
+    return () => window.removeEventListener('myarc:macros-gewijzigd', opWijziging)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedClientId])
+
   useEffect(() => {
     const schemaId = clientRecord?.assigned_schema_id
     if (!schemaId) { setValidSchemaDagKeys(null); return }
@@ -868,6 +883,49 @@ export default function PlanAnalyzer({
       return
     }
     await handleDelete(idx, slot)
+    setAgendaRefreshKey(k => k + 1)
+  }
+
+  // Meerdere maaltijden in één keer. Móet apart van agendaMealDelete: die
+  // leest weekData uit zijn closure, dus vier keer achter elkaar aanroepen
+  // betekent vier keer dezelfde momentopname bewerken en vier keer wegschrijven.
+  // De laatste schrijfactie wint en de andere drie verdwijnen — precies het
+  // beeld van "ik vink er vier aan en er gaat er één weg".
+  //
+  // Hier halen we ze allemaal uit één kopie en schrijven we één keer.
+  const agendaMealDeleteMany = async (items) => {
+    if (!weekData || !items?.length) return
+    const updated = [...weekData]
+    const geraakteDagen = new Set()
+    let planPreWorkoutWeg = false
+
+    for (const { day, slot } of items) {
+      const idx = DAYS.findIndex(d => d.id === day)
+      if (idx < 0 || !slot) continue
+      const dag = updated[idx]
+      if (dag?.meals?.[slot]) {
+        const meals = { ...dag.meals }
+        delete meals[slot]
+        updated[idx] = { ...dag, meals, totals: calculateTotals(meals) }
+        geraakteDagen.add(idx)
+      } else if (slot === 'pre_workout') {
+        // Staat niet in de dag → dit is de plan-brede pre-workout uit de
+        // losse kolom. Die geldt voor de hele week, dus één keer wissen.
+        planPreWorkoutWeg = true
+      }
+    }
+
+    if (planPreWorkoutWeg) {
+      const naam = preWorkoutMeal?.name || 'de pre-workout maaltijd'
+      if (confirm(`${naam} staat één keer voor het hele plan en verschijnt op elke trainingsdag. Voor de hele week verwijderen?`)) {
+        await bewaarPreWorkout(null)
+      }
+    }
+
+    if (geraakteDagen.size > 0) {
+      const aantal = items.length
+      await applyWeekUpdate(updated, `${aantal} maaltijd${aantal === 1 ? '' : 'en'} verwijderd`)
+    }
     setAgendaRefreshKey(k => k + 1)
   }
 
@@ -1664,6 +1722,7 @@ export default function PlanAnalyzer({
                   // herberekend worden en het plan één schrijfpad houdt.
                   onMealSelect={agendaMealSelect}
                   onMealDelete={agendaMealDelete}
+                  onMealDeleteMany={agendaMealDeleteMany}
                   onMealTimingChange={({ day, slot, newTiming }) => {
                     const idx = DAYS.findIndex(d => d.id === day)
                     if (idx < 0 || !slot || !newTiming) return
@@ -1835,6 +1894,7 @@ export default function PlanAnalyzer({
                 mealPlanId={actievePlanId}
                 onMealSelect={agendaMealSelect}
                 onMealDelete={agendaMealDelete}
+                onMealDeleteMany={agendaMealDeleteMany}
                 onMealTimingChange={({ day, slot, newTiming }) => {
                   // Synchroon: update weekData lokaal zodat MealCard direct
                   // de nieuwe tijd toont. Agenda's async DB-save runt apart.

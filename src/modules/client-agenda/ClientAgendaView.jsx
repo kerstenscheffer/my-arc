@@ -1223,6 +1223,10 @@ export default function ClientAgendaView({
   // Alleen gevuld vanuit de Plan Analyzer — zie BlockEditModal.
   onMealSelect,
   onMealDelete,
+  // Meerdere maaltijden in één keer wissen. Bestaat omdat de aanroeper zijn
+  // weekdata in één kopie moet bewerken; los per maaltijd aanroepen laat drie
+  // van de vier verdwijnen (elke ronde schrijft dezelfde momentopname terug).
+  onMealDeleteMany,
   // Forceer een specifiek meal-plan (i.p.v. de actieve). Plan-analyzer
   // werkt vaak met een concept-plan dat NIET is_active=true is. Zonder
   // deze prop laadde de agenda het verkeerde plan en gingen edits in
@@ -1525,8 +1529,19 @@ export default function ClientAgendaView({
     setBulkBezig(true)
     const overgeslagen = []
     try {
+      // Maaltijden eerst, in één keer. De aanroeper bewerkt zijn weekdata in
+      // één kopie; los per maaltijd aanroepen schreef elke ronde dezelfde
+      // momentopname terug en dan blijft alleen de laatste over.
+      const maaltijden = blokken.filter(b => b.type === 'meal' && b.meta?.slot)
+      if (maaltijden.length && onMealDeleteMany) {
+        console.log('[agenda] maaltijden verwijderen (samen)', maaltijden.map(b => `${b.day}/${b.meta.slot}`))
+        await onMealDeleteMany(maaltijden.map(b => ({ day: b.day, slot: b.meta.slot })))
+      }
+
       for (const b of blokken) {
         if (b.type === 'meal') {
+          // Al meegenomen in de bulk hierboven.
+          if (maaltijden.includes(b) && onMealDeleteMany) continue
           if (onMealDelete && b.meta?.slot) {
             console.log('[agenda] maaltijd verwijderen', { dag: b.day, slot: b.meta.slot, label: b.label })
             await onMealDelete({ day: b.day, slot: b.meta.slot })
