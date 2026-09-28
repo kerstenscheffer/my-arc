@@ -845,6 +845,38 @@ export default function PlanAnalyzer({
     await applyWeekUpdate(updated, `Verwijderd: ${mealName} (${DAYS[dayIndex].full})`)
   }
   const handleAdd = (dayIndex, slot) => setSwapState({ dayIndex, slot, meal: null })
+
+  // Maaltijd verwijderen vanuit de agenda. Staat hier als losse functie omdat
+  // de agenda op twee plekken gemonteerd wordt — als zijpaneel én als
+  // weekweergave — en de weekweergave deze afhandeling niet meekreeg. Gevolg:
+  // bulk-verwijderen sloeg daar elke maaltijd over met "overgeslagen", want
+  // zonder callback durft de agenda niets te wissen.
+  const agendaMealDelete = async ({ day, slot }) => {
+    const idx = DAYS.findIndex(d => d.id === day)
+    if (idx < 0 || !slot) return
+    // De pre-workout maaltijd kan op twee plekken staan: als slot in
+    // week_structure (per dag) óf in de losse kolom pre_workout_meal (één
+    // maaltijd voor het hele plan, die op elke trainingsdag verschijnt).
+    // Staat hij in de kolom, dan haalde handleDelete een slot weg dat er niet
+    // is: geen fout, geen effect, blok blijft staan.
+    const staatInDag = !!weekData?.[idx]?.meals?.[slot]
+    if (slot === 'pre_workout' && !staatInDag) {
+      const naam = preWorkoutMeal?.name || 'de pre-workout maaltijd'
+      if (!confirm(`${naam} staat één keer voor het hele plan en verschijnt op elke trainingsdag. Voor de hele week verwijderen?`)) return
+      await bewaarPreWorkout(null)
+      setAgendaRefreshKey(k => k + 1)
+      return
+    }
+    await handleDelete(idx, slot)
+    setAgendaRefreshKey(k => k + 1)
+  }
+
+  const agendaMealSelect = ({ day, slot, meal }) => {
+    const idx = DAYS.findIndex(d => d.id === day)
+    if (idx < 0 || !slot) return
+    setActiveDay(idx)
+    handleSwap(idx, slot, meal || weekData?.[idx]?.meals?.[slot] || null)
+  }
   // Laad een opgeslagen full_week-plan uit de bibliotheek en pas het toe op het
   // huidige (client-)plan. Reconstrueert via dezelfde hydrate-helper als een
   // normale plan-load, en persisteert naar het actieve planMeta.id.
@@ -1630,18 +1662,8 @@ export default function PlanAnalyzer({
                   // Maaltijd wisselen of verwijderen vanuit de agenda. Loopt
                   // langs dezelfde handlers als de meal-cards, zodat totalen
                   // herberekend worden en het plan één schrijfpad houdt.
-                  onMealSelect={({ day, slot, meal }) => {
-                    const idx = DAYS.findIndex(d => d.id === day)
-                    if (idx < 0 || !slot) return
-                    setActiveDay(idx)
-                    handleSwap(idx, slot, meal || weekData?.[idx]?.meals?.[slot] || null)
-                  }}
-                  onMealDelete={async ({ day, slot }) => {
-                    const idx = DAYS.findIndex(d => d.id === day)
-                    if (idx < 0 || !slot) return
-                    await handleDelete(idx, slot)
-                    setAgendaRefreshKey(k => k + 1)
-                  }}
+                  onMealSelect={agendaMealSelect}
+                  onMealDelete={agendaMealDelete}
                   onMealTimingChange={({ day, slot, newTiming }) => {
                     const idx = DAYS.findIndex(d => d.id === day)
                     if (idx < 0 || !slot || !newTiming) return
@@ -1811,6 +1833,8 @@ export default function PlanAnalyzer({
                 viewerRole="coach"
                 refreshKey={agendaRefreshKey}
                 mealPlanId={actievePlanId}
+                onMealSelect={agendaMealSelect}
+                onMealDelete={agendaMealDelete}
                 onMealTimingChange={({ day, slot, newTiming }) => {
                   // Synchroon: update weekData lokaal zodat MealCard direct
                   // de nieuwe tijd toont. Agenda's async DB-save runt apart.
