@@ -18,7 +18,7 @@ import SupplementDaySection from './plan-analyzer/SupplementDaySection'
 import SupplementPanel from './plan-analyzer/SupplementPanel'
 import { laadSupplementen } from '../../supplements/utils/supplementSchedule'
 import ClientAgendaView from '../../client-agenda/ClientAgendaView'
-import MacroHero from '../../meal-plan/components/MacroHero'
+import DagRingen from './plan-analyzer/DagRingen'
 import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
 import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
@@ -1791,9 +1791,9 @@ export default function PlanAnalyzer({
           />
         )}
 
-        {/* Header — compact: pijl + dagnaam + pijl, daaronder MacroHero
-            (zelfde stijl als client meal pagina). De oude plan-name banner,
-            DayMacroBar, DayNavigator-knoppen en training-badge zijn weg. */}
+        {/* Header — compact: pijl + dagnaam + pijl, daaronder de vier
+            dag-ringen in de stijl van het inzicht-paneel. De oude plan-name
+            banner, DayMacroBar en DayNavigator-knoppen zijn weg. */}
         <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1864,21 +1864,18 @@ export default function PlanAnalyzer({
             </button>
           </div>
 
-          {/* MacroHero — in week-view direct hier (geen splitsing). In
-              day-view verhuist 'ie naar boven de meal-cards kolom. */}
+          {/* De ringen staan in week-view hier; in day-view verhuizen ze naar
+              boven de meal-cards kolom. */}
           {viewMode === 'week' && (
-            <MacroHero
-              consumed={{
+            <DagRingen
+              totalen={{
                 calories: dagTotalen.kcal,
                 protein:  dagTotalen.protein,
                 carbs:    dagTotalen.carbs,
                 fat:      dagTotalen.fat,
               }}
               targets={targets || {}}
-              db={db}
-              clientId={resolvedClientId}
               isMobile={m}
-              selectedIsToday={true}
             />
           )}
         </div>
@@ -1937,7 +1934,7 @@ export default function PlanAnalyzer({
         {/* ── DAG VIEW ──
             Twee onafhankelijk scrollende stroken:
               LINKS  = agenda dag-strook (volle hoogte van content-area)
-              RECHTS = MacroHero + meal cards (boven elkaar, samen scrollend) */}
+              RECHTS = dag-ringen + meal cards (boven elkaar, samen scrollend) */}
         {viewMode === 'day' && (
           <div style={{
             flex: 1, overflow: 'hidden',
@@ -1945,25 +1942,22 @@ export default function PlanAnalyzer({
             flexDirection: m ? 'column' : 'row',
             WebkitOverflowScrolling: 'touch',
           }}>
-            {/* Meal-cards strook — MacroHero erboven, beide samen scrollend.
+            {/* Meal-cards strook — de ringen erboven, beide samen scrollend.
                 Onderaan ruimte voor de zwevende navbalk, anders ligt de
                 laatste maaltijdkaart eronder. */}
             <div style={{
               flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
               minWidth: 0, paddingBottom: navRuimte,
             }}>
-              <MacroHero
-                consumed={{
+              <DagRingen
+                totalen={{
                   calories: dagTotalen.kcal,
                   protein:  dagTotalen.protein,
                   carbs:    dagTotalen.carbs,
                   fat:      dagTotalen.fat,
                 }}
                 targets={targets || {}}
-                db={db}
-                clientId={resolvedClientId}
                 isMobile={m}
-                selectedIsToday={true}
               />
               <VezelsMicros db={db} maaltijden={maaltijdenVanDag} isMobile={m} />
               {/* ── PRE-WORKOUT ────────────────────────────────────────────
