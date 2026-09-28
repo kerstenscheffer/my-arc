@@ -222,8 +222,39 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
                 een aparte strip eronder zou dezelfde foto's dubbel tonen. */}
           </div>
         )}
-        {!history.length && !circumData?.latest && photos.length === 0 && (
-          <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen data</div>
+        {/* Geen fase en geen wegingen. "Geen data" was hier een doodlopende
+            straat: waar dan de fase-regel en de grafiek staan, stond niets, en
+            de enige knop om een fase te beginnen zit ín die grafiek. Nu staat
+            er wat er ontbreekt, met de knop erbij. */}
+        {!history.length && !actieveFase && (
+          <div style={{ padding: isMobile ? '1.5rem 1rem' : '2rem 1.25rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: 6 }}>
+              Nog geen fase
+            </div>
+            <div style={{
+              fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)',
+              lineHeight: 1.5, maxWidth: 320, margin: '0 auto 14px',
+            }}>
+              Zonder startgewicht en weektempo valt er niets te verwachten en niets te beoordelen.
+              Zet een fase, dan tekent de grafiek meteen waar {client?.first_name || 'de klant'} heen gaat —
+              ook voordat er gewogen is.
+            </div>
+            <button
+              onClick={() => setNieuweFase(n => n + 1)}
+              style={{
+                minHeight: 44, padding: '0 1.2rem', borderRadius: 10, border: 'none',
+                background: '#fff', color: '#0a0a0a', fontSize: '0.88rem', fontWeight: 900,
+                fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Fase starten
+            </button>
+          </div>
+        )}
+
+        {!history.length && actieveFase && !circumData?.latest && photos.length === 0 && (
+          <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Nog geen wegingen</div>
         )}
       </div>
 
