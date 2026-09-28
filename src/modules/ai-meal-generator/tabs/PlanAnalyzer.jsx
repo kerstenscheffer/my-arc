@@ -361,7 +361,14 @@ export default function PlanAnalyzer({
       SLOTS.filter(s => s.startsWith('snack')).forEach(s => { if (day[s]) meals[s] = day[s] })
       return { dayId: DAYS[i].id, meals, totals: calculateTotals(meals), is_training_day: day.is_training_day || false }
     })
-    setWeekData(days); setTargets(dailyTargets); setPlanMeta(null)
+    setWeekData(days)
+    // De ringen tonen de macro-doelen van de coach (clientRecord.target_*),
+    // niet die van het plan dat je opent. Hier stond setTargets(dailyTargets)
+    // onvoorwaardelijk, dus bij het openen van een plan sprongen ze terug naar
+    // wat de generator ooit berekende — precies wat de opmerking verderop in
+    // dit bestand probeerde te voorkomen.
+    if (!clientRecord?.target_calories) setTargets(dailyTargets)
+    setPlanMeta(null)
     setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
   }
 
@@ -575,10 +582,10 @@ export default function PlanAnalyzer({
   //      workout_schedule meteen door naar de gok hieronder. Bij Mark stond
   //      daar ["ma","wo","vr","zo"] terwijl de Analyzer dinsdag als
   //      trainingsdag toonde.
-  //   4. een vaste lijst. Dat is een gok en niets meer; hij verzint vijf
-  //      trainingsdagen voor iemand die er misschien drie heeft. Blijft
-  //      staan zodat het scherm iets toont, maar pas als alles hierboven
-  //      leeg is.
+  //   4. niets. Hier stond een vaste lijst ['ma','di','wo','vr','za'] als
+  //      laatste redmiddel, en die verzon vijf trainingsdagen voor iemand die
+  //      er misschien drie heeft — of geen. De banner zag er dan ingevuld uit
+  //      terwijl er niets bekend was, en dat is erger dan een lege banner.
   const voorkeurDagen = Array.isArray(clientRecord?.preferred_training_days)
     ? clientRecord.preferred_training_days.filter(Boolean)
     : []
@@ -586,7 +593,7 @@ export default function PlanAnalyzer({
     trainingDaysFromSchedule?.length ? trainingDaysFromSchedule
     : clientIntake?.training?.training_days?.length > 0 ? clientIntake.training.training_days
     : voorkeurDagen.length ? voorkeurDagen
-    : ['ma', 'di', 'wo', 'vr', 'za']
+    : []
   const mealSchedule = clientIntake?.meal_schedule || null
   const trainingTime = clientIntake?.training?.default_time || null
 
