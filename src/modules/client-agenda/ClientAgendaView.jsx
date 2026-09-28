@@ -1527,11 +1527,29 @@ export default function ClientAgendaView({
     try {
       for (const b of blokken) {
         if (b.type === 'meal') {
-          if (onMealDelete && b.meta?.slot) await onMealDelete({ day: b.day, slot: b.meta.slot })
-          else overgeslagen.push(b.label)
+          if (onMealDelete && b.meta?.slot) {
+            console.log('[agenda] maaltijd verwijderen', { dag: b.day, slot: b.meta.slot, label: b.label })
+            await onMealDelete({ day: b.day, slot: b.meta.slot })
+          } else {
+            // Waaróm hij wordt overgeslagen is het enige wat je hier wilt
+            // weten, en dat stond nergens: de melding zei alleen "overgeslagen".
+            console.warn('[agenda] maaltijd overgeslagen', {
+              dag: b.day, label: b.label,
+              reden: !onMealDelete ? 'geen onMealDelete-callback op dit scherm' : 'blok heeft geen meta.slot',
+              slot: b.meta?.slot ?? null,
+            })
+            overgeslagen.push(b.label)
+          }
           continue
         }
-        if (!b.dbId) { overgeslagen.push(b.label); continue }
+        if (!b.dbId) {
+          console.warn('[agenda] blok overgeslagen', {
+            dag: b.day, label: b.label, type: b.type,
+            reden: 'staat niet in de database (placeholder)',
+          })
+          overgeslagen.push(b.label); continue
+        }
+        console.log('[agenda] blok verwijderen', { dag: b.day, type: b.type, dbId: b.dbId })
         await service.deleteBlock(b.dbId)
       }
       await reload()
