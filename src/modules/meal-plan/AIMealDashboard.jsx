@@ -152,6 +152,20 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       loadDashboardData()
     }
   }, [client])
+
+  // Past de coach de macro's aan terwijl dit scherm openstaat, dan hoort dit
+  // mee te bewegen. De targets worden hier vers uit de database gehaald, maar
+  // alleen bij het laden — zonder dit bleef de ring het oude doel tonen tot
+  // iemand de pagina verversde.
+  useEffect(() => {
+    const opWijziging = (e) => {
+      if (!client?.id || e?.detail?.clientId !== client.id) return
+      loadDashboardData()
+    }
+    window.addEventListener('myarc:macros-gewijzigd', opWijziging)
+    return () => window.removeEventListener('myarc:macros-gewijzigd', opWijziging)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id])
   
   const loadDashboardData = async () => {
     console.log('🚀 Loading AI dashboard data')
