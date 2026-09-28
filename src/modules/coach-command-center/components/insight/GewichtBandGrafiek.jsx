@@ -260,12 +260,50 @@ export default function GewichtBandGrafiek({
       })
       : history
     const reeks = trendReeks(binnenFase)
-    if (reeks.length === 0) return { config, leeg: true }
 
     // De fase levert het nulpunt; zonder fase zoeken we het in de metingen.
     const uitFase = actief?.start_gewicht && actief?.started_on
       ? { startGewicht: Number(actief.start_gewicht), startDatum: actief.started_on, herijkt: false }
       : null
+
+    // Nog niets gewogen, maar er ligt wel een afspraak? Dan tekenen we alvast
+    // waar het heen zou moeten. Dat is precies wat je aan het begin van een
+    // fase wil zien: dit is het plan, hier hoort je gewicht te lopen. Wachten
+    // tot de eerste weging levert een leeg scherm op het moment dat de
+    // verwachting het meest waard is.
+    if (reeks.length === 0) {
+      if (!uitFase) return { config, leeg: true }
+      const segmentenLeeg = planSegmenten(client, actief)
+      const start = new Date(`${String(uitFase.startDatum).slice(0, 10)}T00:00:00`)
+      const eindIso = actief?.eindigt ? String(actief.eindigt).slice(0, 10) : null
+      const eind = eindIso ? new Date(`${eindIso}T00:00:00`) : null
+      // Twaalf weken vooruit als er geen einddatum staat: ver genoeg om het
+      // verloop te zien, kort genoeg om niet te doen alsof we de toekomst weten.
+      const weken = eind
+        ? Math.max(1, Math.min(26, Math.round((eind - start) / (7 * 86400000))))
+        : 12
+      const vooruit = []
+      for (let w = 0; w <= weken; w++) {
+        const d = new Date(start)
+        d.setDate(d.getDate() + w * 7)
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        // De lijnen worden op het midden van het trendvenster gerekend; voor
+        // een verwachting willen we ze op de dag zelf, dus vensterDagen 1.
+        const l = lijnenOpDatum(iso, uitFase.startGewicht, segmentenLeeg, 1)
+        if (!l) continue
+        vooruit.push({
+          datum: iso, label: kort(iso),
+          doel: Math.round(l.doel * 10) / 10,
+          band: [Math.round(Math.min(l.traag, l.snel) * 10) / 10, Math.round(Math.max(l.traag, l.snel) * 10) / 10],
+        })
+      }
+      return {
+        config, punten: vooruit, weken: [], laatste: null,
+        startGewicht: uitFase.startGewicht, startDatum: uitFase.startDatum,
+        herijkt: false, verwachting: true, leeg: vooruit.length === 0,
+      }
+    }
+
     const { startGewicht, startDatum, herijkt } = uitFase || bepaalStart(client, reeks)
     if (!Number.isFinite(startGewicht)) return { config, leeg: true }
 
@@ -331,6 +369,20 @@ export default function GewichtBandGrafiek({
 
   return (
     <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.75rem' : '0.625rem 1rem 0.875rem' }}>
+      {/* Er is nog niet gewogen: dan staat hier het plan, niet de werkelijkheid.
+          Dat hoort erbij te staan, anders leest iemand een verwachting als een
+          meting. */}
+      {model.verwachting && (
+        <div style={{
+          marginBottom: 8, padding: '0.5rem 0.7rem', borderRadius: 10,
+          background: 'rgba(255,186,9,0.08)', border: '1px solid rgba(255,186,9,0.22)',
+          fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 800, color: '#ffba09', lineHeight: 1.45,
+        }}>
+          Nog geen wegingen — dit is de verwachting: waar het gewicht hoort te lopen
+          bij {config.tempoKg ? `${config.richting === 'aankomen' ? '+' : '-'}${config.tempoKg} kg per week` : 'dit plan'}.
+        </div>
+      )}
+
       {/* Eén regel voor alles wat je hier kunt kiezen: welke fase je bekijkt
           (met onderin de knop voor een nieuwe) en of je de lijn of de cijfers
           wilt. De losse fase-regel bovenaan de kolom is hierin opgegaan. */}

@@ -341,6 +341,26 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       display: 'flex', alignItems: 'stretch',
     }}>
 
+      {/* Wit bolletje rechtsboven: deze klant heeft een check-in ingediend die
+          jij nog niet hebt nagekeken. Bewust niet meer dan een stip — je scant
+          de lijst op wie aandacht nodig heeft, en een badge met tekst maakt van
+          elke kaart een mededeling. Verdwijnt zodra je de check-in in het
+          check-in-scherm afhandelt (status wordt dan 'reviewed'). */}
+      {client.openCheckin?.aantal > 0 && (
+        <div
+          title={client.openCheckin.aantal === 1
+            ? 'Check-in wacht op je'
+            : `${client.openCheckin.aantal} check-ins wachten op je`}
+          style={{
+            position: 'absolute', top: 8, right: 8, zIndex: 3,
+            width: 9, height: 9, borderRadius: '50%',
+            background: '#fff',
+            boxShadow: '0 0 0 3px #0a0a0a, 0 2px 8px rgba(0,0,0,0.6)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
       {/* Foto-strook. Een tiende van de breedte: genoeg om een gezicht te
           herkennen, niet zoveel dat het een fotoalbum wordt. Geen foto →
           initialen op dezelfde plek, zodat de kaarten uitgelijnd blijven. */}

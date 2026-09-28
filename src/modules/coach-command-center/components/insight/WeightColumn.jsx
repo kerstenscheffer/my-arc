@@ -108,7 +108,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
             laat hetzelfde verloop zien, mét de planlijn en de band erbij. Geen toonHuidig meer: het huidige gewicht staat in de
             kopregel naast de naam, en twee keer hetzelfde getal is er één te
             veel. */}
-        {history.length > 0 && (
+        {(history.length > 0 || actieveFase) && (
           <WeightStatsGrid
             stats={weightData?.stats || {}} client={client}
             fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }}
@@ -118,7 +118,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           />
         )}
         {/* De band: waar het gewicht hoort te lopen, en of dat gebeurt. */}
-        {history.length > 0 && (
+        {(history.length > 0 || actieveFase) && (
           <GewichtBandGrafiek
             client={client} history={history} fase={actieveFase} fases={alleFases}
             onNieuweFase={() => setNieuweFase(n => n + 1)}

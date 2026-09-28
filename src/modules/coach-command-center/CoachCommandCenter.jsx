@@ -110,7 +110,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
       setLoading(false)   // ← lijst is meteen zichtbaar
 
       // ── Stap 2: weight + coaching logs (kritisch voor urgentie-sortering) ──
-      const [dataWithWeight, coachingLogDataEarly] = await Promise.all([
+      const [dataWithWeight, coachingLogDataEarly, openCheckins] = await Promise.all([
         service.getClientsWeightData(clients, coachId),
         db.supabase
           .from('client_coaching_logs')
@@ -121,7 +121,29 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             const byClient = {}
             r.data?.forEach(log => { if (!byClient[log.client_id]) byClient[log.client_id] = log })
             return byClient
-          })
+          }),
+        // Check-ins die nog op je liggen te wachten. Eén query voor de hele
+        // lijst in plaats van één per kaart: bij zeventig klanten is dat het
+        // verschil tussen één verzoek en zeventig.
+        //
+        // 'submitted' = ingediend en nog niet nagekeken. Zodra jij hem in het
+        // check-in-scherm afhandelt gaat hij naar 'reviewed' en verdwijnt het
+        // bolletje. 'draft' telt niet mee: die heeft de klant nooit verstuurd.
+        db.supabase
+          .from('client_checkins')
+          .select('client_id, checkin_date')
+          .in('client_id', clientIds)
+          .eq('status', 'submitted')
+          .order('checkin_date', { ascending: false })
+          .then(r => {
+            const perKlant = {}
+            r.data?.forEach(row => {
+              const huidig = perKlant[row.client_id]
+              if (!huidig) perKlant[row.client_id] = { aantal: 1, laatste: row.checkin_date }
+              else huidig.aantal += 1
+            })
+            return perKlant
+          }, (e) => { console.warn('open check-ins laden mislukt:', e?.message); return {} })
       ])
 
       // Let op: de service geeft per klant zowel weightData als fase terug.
@@ -144,6 +166,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           weightData: weightByClient[c.id] || c.weightData,
           fase: faseByClient[c.id] || c.fase || null,
           dagCheck: dagCheckByClient[c.id] || c.dagCheck || null,
+          openCheckin: openCheckins[c.id] || null,
           latestCoachingLog: coachingLogDataEarly[c.id] || c.latestCoachingLog,
         }))
         const sorted = service.sortByUrgency(merged)

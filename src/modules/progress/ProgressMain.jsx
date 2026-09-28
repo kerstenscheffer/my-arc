@@ -388,7 +388,9 @@ export default function ProgressMain({ db, client }) {
               verschil tussen twee ochtenden is normaal. Hier staat de band
               omheen waarin je hoort te blijven, met het 7-daags gemiddelde als
               lijn: dat is waar het over gaat. */}
-          {weightHistory.length > 0 && (
+          {/* Ook zonder wegingen: dan laat de grafiek zien wat de bedoeling is
+              voor deze periode. Juist aan het begin is dat het meest waard. */}
+          {(weightHistory.length > 0 || fases[0]) && (
             <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
               <GewichtBandGrafiek
                 client={client}
