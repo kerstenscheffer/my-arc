@@ -50,6 +50,9 @@ export default function CoachChallengeHub({ db, clients }) {
   const [soort, setSoort] = useState(SOORTEN[0].key)
   const [startDatum, setStartDatum] = useState(() => new Date().toISOString().split('T')[0])
   const [bezig, setBezig] = useState(false)
+  // Startdatum van een lopende deelname aanpassen. Komt voor: iemand begint een
+  // week later dan afgesproken, of je hebt 'm op de verkeerde dag toegewezen.
+  const [datumBezig, setDatumBezig] = useState(false)
   const [melding, setMelding] = useState(null)
   const [bevestigStop, setBevestigStop] = useState(null)
   const [zoek, setZoek] = useState('')
@@ -134,6 +137,40 @@ export default function CoachChallengeHub({ db, clients }) {
       setMelding({ goed: false, tekst: `Toewijzen mislukt — ${e.message}` })
     }
     setBezig(false)
+  }
+
+  // De einddatum volgt altijd uit de startdatum plus de looptijd van het
+  // challenge-type. Alleen de startdatum verzetten zou de challenge korter of
+  // langer maken zonder dat iemand daarom vroeg, en alle tellers rekenen op
+  // dat venster.
+  async function zetStartDatum(deelname, nieuweStart) {
+    if (!nieuweStart || datumBezig) return
+    setMelding(null); setDatumBezig(true)
+    try {
+      const gekozen = SOORTEN.find(s => s.key === deelname.challenge_type) || SOORTEN[0]
+      const eind = new Date(`${nieuweStart}T00:00:00`)
+      eind.setDate(eind.getDate() + gekozen.dagen - 1)
+      const eindIso = `${eind.getFullYear()}-${String(eind.getMonth() + 1).padStart(2, '0')}-${String(eind.getDate()).padStart(2, '0')}`
+
+      // .select() erbij: een update die door RLS wordt tegengehouden komt
+      // terug als 204 zonder fout, en dan lijkt het gelukt.
+      const { data, error } = await db.supabase
+        .from('challenge_assignments')
+        .update({ start_date: nieuweStart, end_date: eindIso })
+        .eq('id', deelname.id)
+        .select('id')
+      if (error) throw error
+      if (!data || data.length === 0) {
+        setMelding({ goed: false, tekst: 'Niet aangepast — waarschijnlijk mag je deze deelname niet wijzigen.' })
+      } else {
+        setMelding({ goed: true, tekst: `Start staat nu op ${nieuweStart}, einde op ${eindIso}.` })
+        await laadRijen()
+      }
+    } catch (e) {
+      console.error('Startdatum aanpassen mislukt:', e)
+      setMelding({ goed: false, tekst: `Startdatum aanpassen mislukt — ${e.message}` })
+    }
+    setDatumBezig(false)
   }
 
   async function stopDeelname(deelnameId) {
@@ -467,6 +504,29 @@ export default function CoachChallengeHub({ db, clients }) {
               {geopend.is_paused && <span style={{ color: '#f97316' }}> · gepauzeerd{geopend.pause_reason ? ` (${geopend.pause_reason})` : ''}</span>}
             </div>
             <div style={{ flex: 1 }} />
+            {/* Startdatum aanpassen. De tellers kijken naar het venster tussen
+                start en eind, dus dit verzet meteen de hele challenge van deze
+                deelnemer — de einddatum schuift mee. */}
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 6, height: 32,
+              padding: '0 0.6rem', border: LIJN, borderRadius: 9,
+              fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)',
+              cursor: datumBezig ? 'wait' : 'pointer',
+            }}>
+              Start
+              <input
+                type="date"
+                value={String(geopend.start_date || '').slice(0, 10)}
+                onChange={(e) => zetStartDatum(geopend, e.target.value)}
+                disabled={datumBezig}
+                style={{
+                  background: 'transparent', border: 'none', color: '#fff',
+                  fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit',
+                  padding: 0, outline: 'none', colorScheme: 'dark',
+                  cursor: datumBezig ? 'wait' : 'pointer',
+                }}
+              />
+            </label>
             <button onClick={() => wisselPauze(geopend)} disabled={pauzeBezig} style={{
               display: 'flex', alignItems: 'center', gap: 5, height: 32, padding: '0 0.7rem',
               background: 'transparent', border: LIJN, borderRadius: 9,

@@ -31,7 +31,11 @@ export default function PlanLibraryModal({
         .select('id, name, template_name, daily_calories, daily_protein, daily_carbs, daily_fat, week_structure, meals_per_day, created_at')
         .eq('plan_type', 'full_week')
         .order('created_at', { ascending: false })
-      if (coachId) q = q.eq('coach_id', coachId)
+      // Ook de plannen zonder coach tonen. Zeven van de tien full-week plannen
+      // in de database hebben geen coach_id — die zijn opgeslagen via een pad
+      // dat dat veld nooit invulde. Met een harde `eq` vielen ze uit de lijst
+      // en leek de bibliotheek leeg terwijl het werk er wél stond.
+      if (coachId) q = q.or(`coach_id.eq.${coachId},coach_id.is.null`)
       const { data, error } = await q
       if (error) throw error
       setPlans(data || [])

@@ -19,9 +19,9 @@
 // wat mensen vragen zodra een getal lager uitvalt dan ze verwachtten.
 export const EISEN = [
   {
-    key: 'workouts', label: 'Workouts', nodig: 14, van: 18,
-    uitleg: '14 van de 18 geplande workouts',
-    info: 'Een workout telt mee zodra je 70% van de geplande sets hebt afgevinkt. Alleen starten is dus niet genoeg, maar de laatste set laten liggen kost je hem niet. Je hebt er 14 nodig van de 18 die in je schema staan.',
+    key: 'workouts', label: 'Workouts', nodig: 12, van: 12,
+    uitleg: '12 workouts — twee per week',
+    info: 'Twee workouts per week, twaalf over de hele challenge. Een workout telt mee zodra je 70% van de geplande sets hebt afgevinkt. Alleen starten is dus niet genoeg, maar de laatste set laten liggen kost je hem niet.',
   },
   {
     key: 'wegingen', label: 'Wegingen', nodig: 18, van: 24,
@@ -98,11 +98,14 @@ export const allesGehaald = (stand) => {
 // zes weken is 3 en 4 per week, een geldige voedingsweek is 5 goede dagen, en
 // de check-in is er sowieso één per week. Foto's en calls hebben geen
 // weekritme — die staan apart onder WEEK_LOOPT_DOOR.
-// Let op: de weekeisen staan bewust lager dan de totalen. Twee workouts per
-// week maal zes weken is twaalf, terwijl het totaal er veertien vraagt — wie
-// alleen de weekeisen haalt, haalt de challenge dus niet. Dat is met opzet: de
-// week is de ondergrens die je elke week moet halen, het totaal is waar je aan
-// het eind op wordt afgerekend.
+// De weekeis en de totaaleis sluiten op elkaar aan: twee workouts per week maal
+// zes weken is precies de twaalf uit EISEN. Haal je elke week je weekeis, dan
+// haal je het totaal — geen verborgen gat tussen wat je per week ziet en waar
+// je aan het eind op wordt afgerekend.
+//
+// Dat geldt niet voor de andere eisen: daar is de weekeis strenger dan nodig
+// (vier wegingen per week is 24, terwijl er 18 gevraagd worden), zodat één
+// mindere week je de challenge niet kost.
 export const WEEK_EISEN = [
   {
     key: 'workouts', label: 'Workouts', nodig: 2,
