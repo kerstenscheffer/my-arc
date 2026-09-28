@@ -7,6 +7,7 @@ import ClientMealEditModal from './ClientMealEditModal'
 import MealCard from './day-schedule/MealCard'
 import { foodImageFallback } from '../foodImageFallback'
 import MealPrepModal from './MealPrepModal'
+import SausBlok from './SausBlok'
 
 export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, onSaved }) {
   const isMobile = window.innerWidth <= 768
@@ -181,7 +182,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
 
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {activeTab === 'info' && <InfoTab meal={effectiveMeal} ingredients={ingredients} loading={loading} calcMacros={calcMacros} isMobile={isMobile} />}
+          {activeTab === 'info' && <InfoTab meal={effectiveMeal} ingredients={ingredients} loading={loading} calcMacros={calcMacros} isMobile={isMobile} db={db} clientId={client?.id} />}
           {activeTab === 'recipe' && <RecipeTab meal={effectiveMeal} loading={loading} isMobile={isMobile} />}
           {activeTab === 'price' && <PriceTab meal={effectiveMeal} ingredients={ingredients} isMobile={isMobile} />}
           {activeTab === 'tips' && <TipsTab meal={effectiveMeal} isMobile={isMobile} />}
@@ -218,7 +219,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
   )
 }
 
-function InfoTab({ meal, ingredients, loading, calcMacros, isMobile }) {
+function InfoTab({ meal, ingredients, loading, calcMacros, isMobile, db, clientId }) {
   return (
     <div>
       {/* Wat het is, in één alinea. Staat bovenaan: je leest dit voordat je
@@ -270,6 +271,9 @@ function InfoTab({ meal, ingredients, loading, calcMacros, isMobile }) {
           <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem', padding: '1rem 0' }}>Geen ingrediënten beschikbaar</div>
         )}
       </div>
+      {/* Onder de ingrediënten, want dáár bedenk je of het gaat smaken. */}
+      <SausBlok db={db} clientId={clientId} mealId={meal?.id} isMobile={isMobile} />
+
       {meal.allergens?.length > 0 && (
         <div style={{ margin: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem', padding: '0.625rem 0.75rem', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
