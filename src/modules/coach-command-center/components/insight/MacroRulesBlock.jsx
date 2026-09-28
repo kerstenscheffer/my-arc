@@ -381,12 +381,31 @@ export default function MacroRulesBlock({ client, db, onClientUpdate, isMobile }
     try {
       const payload = { ...pendingMacros, manual_macro_targets: true }
       const before = pickTrackedFields(client)
-      await db.supabase.from('clients').update(payload).eq('id', client.id)
+      // .select() erbij: een update die geen rij raakt komt terug als 204
+      // zonder fout. Dan werkte dit scherm de macro's optimistisch bij en bleef
+      // in de database het oude doel staan — waar de maaltijdpagina en AI Meals
+      // uit lezen. Die twee leken dan achter te lopen terwijl hier nooit iets
+      // was opgeslagen.
+      const { data, error } = await db.supabase
+        .from('clients').update(payload).eq('id', client.id).select('id')
+      if (error) throw error
+      if (!data || data.length === 0) throw new Error('geen rij bijgewerkt')
+      console.log('[macros] opgeslagen via bereken-knop', { clientId: client.id, ...payload })
       onClientUpdate?.(payload)
+      try {
+        window.dispatchEvent(new CustomEvent('myarc:macros-gewijzigd', {
+          detail: { clientId: client.id, ...payload },
+        }))
+      } catch { /* geen window in een test-omgeving */ }
       await logClientChanges({ db, clientId: client.id, before, after: payload, source: 'confirm_macros' })
       setPendingMacros(null)
       setSurplusDraft(null); setEditingS(false)
-    } catch (e) { console.error('confirm macros', e) }
+    } catch (e) {
+      console.error('confirm macros', e)
+      alert(e?.message === 'geen rij bijgewerkt'
+        ? 'Niet opgeslagen — er is geen rij bijgewerkt.'
+        : `Opslaan mislukt: ${e?.message || e}`)
+    }
     setBusy(null)
   }
 
