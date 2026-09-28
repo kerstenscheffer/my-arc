@@ -1188,6 +1188,22 @@ export class ClientAgendaService {
         if (block.clientId) {
           await this.swapWorkoutScheduleDays({ clientId: block.clientId, fromDay: block.day, toDay: targetDay })
         }
+        // De pre-workout maaltijd verhuist mee. Die hoort bij de training en
+        // nergens anders: liet je hem staan, dan bleef hij achter op een dag
+        // zonder training en viel hij terug op zijn opgeslagen kloktijd —
+        // meestal 12:00, pal naast de lunch, als een splinter van een blokje.
+        if (mealPlanId) {
+          try {
+            await this.swapMealSlot({
+              mealPlanId, fromDay: block.day, toDay: targetDay, slot: 'pre_workout',
+            })
+          } catch (e) {
+            // Geen pre-workout op die dag is het normale geval; dat is geen fout.
+            if (!/is leeg/.test(e?.message || '')) {
+              console.warn('pre-workout mee verhuizen mislukt:', e?.message)
+            }
+          }
+        }
       }
       // Tijd opslaan in client_agenda_blocks (workout_schemas heeft geen tijd-veld)
       await this.upsertBlock({
