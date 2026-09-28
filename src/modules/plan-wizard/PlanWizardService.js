@@ -359,6 +359,9 @@ Let's get it! 💪
           target_protein: macros.protein,
           target_carbs: macros.carbs,
           target_fat: macros.fat,
+          // Zonder dit vlaggetje rekent de trigger update_client_macros deze
+          // waarden meteen weer om naar zijn eigen formule.
+          manual_macro_targets: true,
           coach_notes: `Plan Wizard - ${planType} - ${new Date().toLocaleDateString()}`,
           profile_updated_at: new Date().toISOString()
         })

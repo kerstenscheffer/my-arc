@@ -152,7 +152,16 @@ export default function MacroRingen({ client, db, onClientUpdate, isMobile }) {
   const bewaar = async () => {
     if (!db?.supabase || !client?.id || gewijzigd.length === 0) return
     setBezig(true); setFout(null)
-    const patch = Object.fromEntries(gewijzigd.map(r => [r.veld, waarden[r.veld]]))
+    // `manual_macro_targets` moet mee. Op clients zit een BEFORE UPDATE-trigger
+    // (update_client_macros) die bij élke schrijfactie de macro's opnieuw
+    // uitrekent uit gewicht, lengte, leeftijd en doel — tenzij dit vlaggetje
+    // aan staat. Zonder deze regel gooide de database jouw getallen weg en zette
+    // hij zijn eigen formule terug: geen fout, geen melding, en in de app leek
+    // het opgeslagen omdat de ringen optimistisch werden bijgewerkt.
+    const patch = {
+      ...Object.fromEntries(gewijzigd.map(r => [r.veld, waarden[r.veld]])),
+      manual_macro_targets: true,
+    }
     try {
       const before = pickTrackedFields(client)
       // .select() erbij en tellen wat er terugkomt. Een update die niets raakt
