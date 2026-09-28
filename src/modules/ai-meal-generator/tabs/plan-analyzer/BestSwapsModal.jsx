@@ -201,9 +201,23 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
 
   const totalSelected = SLOTS.reduce((n, s) => n + effectiveCount(s.key), 0)
 
+  // Ingebed in het zijvak is dit geen venster maar gewoon de inhoud van een
+  // kolom. Het overlay-omhulsel (position: fixed + inset 0) hing af van een
+  // transform-ouder om binnen het paneel te blijven; klapte die keten om, dan
+  // stond het blok buiten beeld en zag je een leeg vak — zonder foutmelding,
+  // want er was niets mis. In deze modus dus geen fixed, geen donkere waas en
+  // geen maximale hoogte: de kolom bepaalt de maat.
+  const omhulsel = embedded
+    ? { position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'stretch', padding: 0 }
+    : { position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : '1.5rem' }
+
+  const kaart = embedded
+    ? { width: '100%', height: '100%', background: '#0a0a0a', border: 'none', borderRadius: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+    : { width: '100%', maxWidth: 720, maxHeight: isMobile ? '94vh' : '88vh', background: '#0a0a0a', border: '1px solid rgba(255,215,0,0.2)', borderRadius: isMobile ? '18px 18px 0 0' : 18, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+
   const modal = (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : '1.5rem' }}>
-      <div style={{ width: '100%', maxWidth: 720, maxHeight: isMobile ? '94vh' : '88vh', background: '#0a0a0a', border: '1px solid rgba(255,215,0,0.2)', borderRadius: isMobile ? '18px 18px 0 0' : 18, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={omhulsel}>
+      <div style={kaart}>
 
         {/* Header */}
         <div style={{ padding: isMobile ? '1rem 1rem 0.75rem' : '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
@@ -216,9 +230,12 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
                   : 'Alleen voor deze klant — lege slots erven je standaard.'}
               </p>
             </div>
-            <button onClick={onClose} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <X size={18} />
-            </button>
+            {/* In het zijvak zit er al een kruisje in de kop erboven. */}
+            {!embedded && (
+              <button onClick={onClose} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
+              </button>
+            )}
           </div>
 
           {/* Niveau: standaard voor iedereen, of afwijking voor deze klant. */}
@@ -369,7 +386,7 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
     // hoogte hangt af van of élke ouder in de keten een vaste hoogte heeft, en
     // in split screen klapte die keten dicht: het paneel opende, maar de lijst
     // erin was nul pixels hoog en je zag geen maaltijden.
-    <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: 0, transform: 'translateZ(0)', overflow: 'hidden' }}>{modal}</div>
+    <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}>{modal}</div>
   )
   return createPortal(modal, modalHost)
 }
