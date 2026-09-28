@@ -1,5 +1,6 @@
 // src/modules/manual-workout-builder/ManualWorkoutBuilder.jsx
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import useHistoryState from './hooks/useHistoryState'
 import { Undo2, Redo2 } from 'lucide-react'
 import DayBuilder from './components/DayBuilder'
@@ -668,21 +669,52 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
           {/* Opslaan bovenaan: het is de actie die je het vaakst doet, en
               onderaan de kolom viel 'ie buiten beeld. */}
-          <button onClick={selectedSchemaId ? saveToClientSchema : saveAsTemplate}
-            disabled={saving || workoutPlan.days.length === 0 || (!selectedSchemaId && !workoutPlan.name)}
+          {/* Twee losse knoppen, geen schakelaar op basis van "zit ik in een
+              klant". Eén knop die van betekenis verandert betekende dat je een
+              sjabloon alleen kon maken als er géén klant openstond — en dat je
+              nooit zeker wist wat er ging gebeuren als je erop drukte. */}
+          <button onClick={saveToClientSchema}
+            disabled={saving || !selectedSchemaId || workoutPlan.days.length === 0}
+            title={!selectedSchemaId ? 'Open eerst het plan van een klant' : undefined}
             style={{
-              marginBottom: '0.5rem', width: '100%',
+              marginBottom: '0.35rem', width: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '0.6rem', borderRadius: 8, border: 'none',
               background: '#fff', color: '#0a0a0a',
               fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: saving ? 'wait' : 'pointer',
-              opacity: (workoutPlan.days.length === 0 || (!selectedSchemaId && !workoutPlan.name)) ? 0.45 : 1,
+              cursor: saving ? 'wait' : (!selectedSchemaId ? 'not-allowed' : 'pointer'),
+              opacity: (!selectedSchemaId || workoutPlan.days.length === 0) ? 0.45 : 1,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
             <Save size={15} strokeWidth={2.6} />
-            {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan in client plan' : 'Opslaan als template'}
+            {saving ? 'Opslaan…' : 'Opslaan in klantplan'}
           </button>
+          <button onClick={() => setTemplateNaam(workoutPlan.name || '')}
+            disabled={saving || workoutPlan.days.length === 0}
+            style={{
+              marginBottom: '0.5rem', width: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '0.6rem', borderRadius: 8,
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.25)',
+              color: '#fff',
+              fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+              cursor: saving ? 'wait' : 'pointer',
+              opacity: workoutPlan.days.length === 0 ? 0.45 : 1,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            <Save size={15} strokeWidth={2.6} />
+            Opslaan als template
+          </button>
+          {!selectedSchemaId && (
+            <div style={{
+              marginTop: -4, marginBottom: '0.5rem',
+              fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)',
+              lineHeight: 1.4,
+            }}>
+              Geen klantplan open — je wijzigingen gaan nergens heen tot je ze als
+              template opslaat.
+            </div>
+          )}
           <button onClick={() => setShowPlanManager(true)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
             <Users size={14} /> Plannen toewijzen
           </button>
@@ -771,6 +803,73 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
 
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
+      {/* Titel-venster voor een nieuwe template. Bewust een eigen naam: het plan
+          in beeld heet vaak iets klantspecifieks, en dat wil je niet terugzien
+          in je sjabloonlijst. Het plan zelf houdt zijn naam. */}
+      {templateNaam !== null && createPortal(
+        <div
+          onClick={() => setTemplateNaam(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2147483200,
+            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem',
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 420, background: '#0f0f0f',
+            border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
+            padding: '1.1rem 1.2rem',
+          }}>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+              Opslaan als template
+            </div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>
+              {workoutPlan.days.length} {workoutPlan.days.length === 1 ? 'dag' : 'dagen'} · komt in je sjabloonlijst, niet bij een klant
+            </div>
+            <input
+              autoFocus
+              value={templateNaam}
+              onChange={(e) => setTemplateNaam(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && templateNaam.trim()) saveAsTemplate(templateNaam) }}
+              placeholder="Bijvoorbeeld: PPL 5x — beginners"
+              style={{
+                width: '100%', minHeight: 44, padding: '0 0.75rem', boxSizing: 'border-box',
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 10, color: '#fff', fontSize: '0.95rem', fontWeight: 800,
+                fontFamily: 'inherit', outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <button
+                onClick={() => saveAsTemplate(templateNaam)}
+                disabled={saving || !String(templateNaam).trim()}
+                style={{
+                  flex: 1, minHeight: 42, borderRadius: 10, border: 'none',
+                  background: '#fff', color: '#0a0a0a',
+                  fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+                  cursor: saving ? 'wait' : 'pointer',
+                  opacity: String(templateNaam).trim() ? 1 : 0.45,
+                }}
+              >
+                {saving ? 'Opslaan…' : 'Opslaan'}
+              </button>
+              <button
+                onClick={() => setTemplateNaam(null)}
+                style={{
+                  minWidth: 96, minHeight: 42, borderRadius: 10,
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', fontWeight: 800,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                }}
+              >
+                Annuleren
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {showTemplateManager && <TemplateManager templates={templates} onLoad={loadTemplate} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} db={db} onChange={loadTemplates} />}
       {showDayPicker && (
         <DayTemplatePickerModal
