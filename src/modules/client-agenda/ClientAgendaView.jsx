@@ -1383,6 +1383,39 @@ export default function ClientAgendaView({
 
   const stopSelectie = () => { setSelectieModus(false); setGeselecteerd(new Set()) }
 
+  // Alles in beeld aanvinken. Twee smaken, want "alles" betekent hier twee
+  // dingen: een plan leeghalen gaat over de maaltijden, maar soms wil je de
+  // hele week wissen inclusief slaap-, werk- en trainingsblokken.
+  //
+  // Staat alles al aan, dan zet dezelfde knop de selectie weer leeg — anders
+  // moet je 'm per stuk uitvinken.
+  // Wat niet in de database staat kun je ook niet verwijderen: de slaap- en
+  // werkblokken die het rooster zelf tekent hebben geen `dbId`, en een
+  // maaltijd zonder slot hoort bij geen enkel plan. Die laten we buiten de
+  // selectie — anders vink je zeven dingen aan die daarna als "overgeslagen"
+  // terugkomen, en dan lijkt het alsof er iets stuk is.
+  const kanWeg = (b) => (b.type === 'meal' ? !!b.meta?.slot : !!b.dbId)
+
+  const selecteerAlles = (alleenMaaltijden) => {
+    const ids = [...blokPerId.values()]
+      .filter(b => !alleenMaaltijden || b.type === 'meal')
+      .filter(kanWeg)
+      .map(b => b.id)
+    setGeselecteerd(prev => {
+      const alAan = ids.length > 0 && ids.every(id => prev.has(id))
+      return alAan ? new Set() : new Set(ids)
+    })
+  }
+
+  const aantalMaaltijden = useMemo(
+    () => [...blokPerId.values()].filter(b => b.type === 'meal' && kanWeg(b)).length,
+    [blokPerId],
+  )
+  const aantalTeVerwijderen = useMemo(
+    () => [...blokPerId.values()].filter(kanWeg).length,
+    [blokPerId],
+  )
+
   // Vaste keuzes voor wat je snel wil inplannen. Duur in minuten, want die
   // verschilt sterk: boodschappen doe je in een uur, meal prep kost er twee.
   const SNELKEUZES = [
@@ -2051,7 +2084,11 @@ export default function ClientAgendaView({
               onChange={(e) => setTeplaatsen(SNELKEUZES.find(x => x.id === e.target.value) || null)}
               aria-label="Blok inplannen"
               style={{
-                height: '100%', background: 'transparent', border: 'none',
+                height: '100%', background: 'transparent',
+                // Ook hier losse randen: deze keuzelijst deelt zijn plek in de
+                // balk met elementen die balkVak gebruiken.
+                borderTop: 'none', borderRight: 'none',
+                borderBottom: 'none', borderLeft: 'none',
                 color: 'inherit', font: 'inherit', cursor: 'pointer',
                 outline: 'none', padding: '0 0.5rem 0 0.35rem',
               }}
@@ -2095,6 +2132,29 @@ export default function ClientAgendaView({
               <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>
                 {geselecteerd.size} geselecteerd
               </span>
+
+              {/* Alles aanvinken. Zonder dit moest je voor het leeghalen van een
+                  weekplan achtentwintig kaartjes los aantikken. */}
+              <button
+                onClick={() => selecteerAlles(true)}
+                disabled={bulkBezig || !aantalMaaltijden}
+                style={balkVak(isMobile, {
+                  cursor: (bulkBezig || !aantalMaaltijden) ? 'not-allowed' : 'pointer',
+                  opacity: (bulkBezig || !aantalMaaltijden) ? 0.35 : 1,
+                })}
+              >
+                Alle maaltijden ({aantalMaaltijden})
+              </button>
+              <button
+                onClick={() => selecteerAlles(false)}
+                disabled={bulkBezig || !aantalTeVerwijderen}
+                style={balkVak(isMobile, {
+                  cursor: (bulkBezig || !aantalTeVerwijderen) ? 'not-allowed' : 'pointer',
+                  opacity: (bulkBezig || !aantalTeVerwijderen) ? 0.35 : 1,
+                })}
+              >
+                Alles ({aantalTeVerwijderen})
+              </button>
 
               {/* Vier vaste knoppen (-60/-30/+30/+60) dekten te weinig. Nu
                   één lijst met beide richtingen: kiezen voert direct uit en
@@ -2149,7 +2209,13 @@ export default function ClientAgendaView({
                 disabled={bulkBezig}
                 style={{
                   padding: '0.35rem 0.6rem', borderRadius: 0,
-                  background: 'none', border: 'none',
+                  background: 'none',
+                  // Losse randen in plaats van `border: 'none'`: deze knop
+                  // staat op dezelfde plek als knoppen met balkVak-stijl, en
+                  // React hergebruikt dan hetzelfde DOM-element. Shorthand en
+                  // longhand door elkaar geeft daar een stijlwaarschuwing.
+                  borderTop: 'none', borderRight: 'none',
+                  borderBottom: 'none', borderLeft: 'none',
                   color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
                   fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
                 }}

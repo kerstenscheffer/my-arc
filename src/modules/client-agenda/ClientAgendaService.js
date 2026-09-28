@@ -20,6 +20,7 @@
 //   sleep                  → 23:00–07:00 (placeholder)
 //   work                   → alleen uit de intake; niets ingevuld = geen blok
 
+import { standaardWeekindeling, trainingsdagenUitIntake } from './standaardWeekindeling'
 import { laadSupplementen, groepeerPerMoment, doseringTekst, geldtOpDag } from '../supplements/utils/supplementSchedule'
 
 export const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
@@ -191,7 +192,30 @@ export class ClientAgendaService {
       laadSupplementen(this.supabase, clientId),
     ])
 
-    const workoutSchedule = schedulePakket?.schedule || null
+    // Geen weekindeling maar wél een schema? Dan delen we hem zelf in. Zonder
+    // dit staat een net toegewezen plan nergens in de agenda tot de klant zelf
+    // in zijn weekschema heeft geschoven — de coach wijst toe en ziet niets.
+    // De indeling wordt één keer weggeschreven, zodat klant en coach hetzelfde
+    // zien en de klant hem daarna gewoon kan verslepen.
+    let workoutSchedule = schedulePakket?.schedule || null
+    const heeftIndeling = workoutSchedule && Object.keys(workoutSchedule).length > 0
+    if (!heeftIndeling && schema?.week_structure) {
+      const gekozen = standaardWeekindeling(
+        schema.week_structure,
+        schedulePakket?.voorkeurDagen || [],
+        trainingsdagenUitIntake(intakeSchedule),
+      )
+      if (gekozen) {
+        workoutSchedule = gekozen
+        // Opslaan is een extraatje: lukt het niet (rechten, offline), dan
+        // staat de indeling deze sessie nog steeds in beeld.
+        this.supabase
+          .from('clients')
+          .update({ workout_schedule: gekozen })
+          .eq('id', clientId)
+          .then(r => r, (e) => { console.warn('weekindeling bewaren mislukt', e?.message); return { data: null } })
+      }
+    }
     const voorkeurDagen = new Set(schedulePakket?.voorkeurDagen || [])
 
     // Bouw per dag een lookup van intake-blokken per type. Gebruikt als
