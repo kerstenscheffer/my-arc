@@ -217,6 +217,10 @@ export class ClientAgendaService {
       }
     }
     const voorkeurDagen = new Set(schedulePakket?.voorkeurDagen || [])
+    // Valt terug op 17:00 als de klant niets heeft opgegeven.
+    const trainingStandaard = Number.isFinite(schedulePakket?.voorkeurTijd)
+      ? schedulePakket.voorkeurTijd
+      : TRAINING_DEFAULT_START
 
     // Bouw per dag een lookup van intake-blokken per type. Gebruikt als
     // bron voor placeholders die echte tijden uit het intake-formulier
@@ -496,14 +500,14 @@ export class ClientAgendaService {
             })
           })
         } else {
-          noteerStart(TRAINING_DEFAULT_START)
+          noteerStart(trainingStandaard)
           blocksByDay[day].push({
             id: `training-placeholder-${day}`,
             day, type: 'training',
             label: 'Training',
             sublabel: workoutTitle || 'Tijd nog niet ingesteld',
-            start: TRAINING_DEFAULT_START,
-            end: TRAINING_DEFAULT_START + workoutDuur(dayWorkout),
+            start: trainingStandaard,
+            end: trainingStandaard + workoutDuur(dayWorkout),
             color: TRAINING_COLOR,
             source: 'placeholder',
             editable: true,
@@ -909,7 +913,7 @@ export class ClientAgendaService {
           .select('day, start_time').eq('client_id', clientId).eq('type', 'training')
           .then(r => r, e => ({ data: null, error: e })),
         this.supabase.from('clients')
-          .select('work_schedule, workout_schedule').eq('id', clientId).maybeSingle()
+          .select('work_schedule, workout_schedule, training_time').eq('id', clientId).maybeSingle()
           .then(r => r, e => ({ data: null, error: e })),
       ])
 
@@ -938,14 +942,19 @@ export class ClientAgendaService {
         })
       }
 
-      // 3. Trainingsdagen zonder tijd uit 1 of 2 krijgen de standaardtijd —
-      //    dezelfde die loadWeek voor zijn placeholder-blok gebruikt.
+      // 3. De voorkeurstijd uit de intake (clients.training_time), en pas als
+      //    die er niet is de standaardtijd. Zelfde volgorde als loadWeek
+      //    aanhoudt voor het blok in de agenda — anders staat de training om
+      //    negen uur in beeld terwijl de pre-workout maaltijd om vier uur
+      //    's middags wordt gepland.
+      const voorkeur = timeStrToMinutes(klant?.data?.training_time)
+      const standaard = Number.isFinite(voorkeur) ? voorkeur : TRAINING_DEFAULT_START
       const schema = klant?.data?.workout_schedule
       if (schema && typeof schema === 'object') {
         Object.keys(schema).forEach(k => {
           if (!schema[k]) return
           const dag = String(k).toLowerCase()
-          if (DAYS.includes(dag) && uit[dag] == null) uit[dag] = TRAINING_DEFAULT_START
+          if (DAYS.includes(dag) && uit[dag] == null) uit[dag] = standaard
         })
       }
 
@@ -1446,7 +1455,7 @@ export class ClientAgendaService {
   async _loadWorkoutSchedule(clientId) {
     const { data, error } = await this.supabase
       .from('clients')
-      .select('workout_schedule, preferred_training_days')
+      .select('workout_schedule, preferred_training_days, training_time')
       .eq('id', clientId)
       .maybeSingle()
     if (error) { console.warn('workout_schedule', error); return { schedule: null, voorkeurDagen: [] } }
@@ -1461,7 +1470,14 @@ export class ClientAgendaService {
           .filter(Boolean)
       : []
 
-    return { schedule: data?.workout_schedule || null, voorkeurDagen }
+    // De voorkeurstijd uit de intake. Stond in de database maar werd nergens
+    // gelezen: een klant die 09:00 opgaf zag zijn training om 17:00 staan, en
+    // daarmee stond ook zijn pre-workout maaltijd acht uur te laat.
+    return {
+      schedule: data?.workout_schedule || null,
+      voorkeurDagen,
+      voorkeurTijd: timeStrToMinutes(data?.training_time),
+    }
   }
 
   async _loadWorkoutSchema(clientId) {
