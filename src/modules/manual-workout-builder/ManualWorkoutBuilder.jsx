@@ -45,6 +45,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showDayPicker, setShowDayPicker] = useState(false)
   const [clientSchemas, setClientSchemas] = useState([])
   const [selectedSchemaId, setSelectedSchemaId] = useState(null)
+  // Titel-venster voor "opslaan als template". null = dicht; anders de
+  // ingetikte naam. Een template krijgt zijn eigen naam: die van het plan waar
+  // je in zit is vaak klantspecifiek ("PPL Erwin 23/03") en dat wil je niet
+  // terugzien in je sjabloonlijst.
+  const [templateNaam, setTemplateNaam] = useState(null)
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(false)
   const [localClient, setLocalClient] = useState(null)
   const [showClientPicker, setShowClientPicker] = useState(false)
@@ -237,10 +242,23 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     if (activeDay === dayId) setActiveDay(null)
   }
 
+  // Een gedupliceerde dag krijgt een nummer, geen "(Copy)". De klant ziet deze
+  // naam in zijn weekschema staan: "Push 2" is een tweede push-dag, "Push
+  // (Copy)" is een kijkje in de keuken van de coach.
+  const volgendeDagNaam = (basis) => {
+    // "Push 2" bestaat al? Dan 3. De basis is de naam zonder eventueel nummer,
+    // zodat je van "Push 2" geen "Push 2 2" maakt.
+    const kaal = String(basis || 'Dag').replace(/\s+\d+$/, '').trim()
+    const bestaand = new Set(workoutPlan.days.map(d => String(d.name || '').trim()))
+    let n = 2
+    while (bestaand.has(`${kaal} ${n}`)) n++
+    return `${kaal} ${n}`
+  }
+
   const duplicateDay = (dayId) => {
     const dayToCopy = workoutPlan.days.find(d => d.id === dayId)
     if (!dayToCopy) return
-    const newDay = { ...dayToCopy, id: Date.now(), name: `${dayToCopy.name} (Copy)`, exercises: dayToCopy.exercises.map(ex => ({ ...ex, id: Date.now() + Math.random() })) }
+    const newDay = { ...dayToCopy, id: Date.now(), name: volgendeDagNaam(dayToCopy.name), exercises: dayToCopy.exercises.map(ex => ({ ...ex, id: Date.now() + Math.random() })) }
     setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1 }))
   }
 
@@ -291,15 +309,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     return ws
   }
 
-  const saveAsTemplate = async () => {
-    if (!workoutPlan.name) { alert('Geef je workout plan een naam'); return }
+  // `naam` komt uit het titel-venster. Het plan in beeld verandert hier niet
+  // van naam: je slaat een kopie op als sjabloon en werkt daarna gewoon verder
+  // in het plan waar je mee bezig was.
+  const saveAsTemplate = async (naam) => {
+    const titel = String(naam ?? workoutPlan.name ?? '').trim()
+    if (!titel) { alert('Geef de template een naam'); return }
     if (workoutPlan.days.length === 0) { alert('Voeg minimaal één dag toe'); return }
     setSaving(true)
     try {
       const user = await db.getCurrentUser()
       if (!user) { alert('Je moet ingelogd zijn'); return }
       const { error } = await db.supabase.from('workout_schemas').insert({
-        name: workoutPlan.name, description: workoutPlan.description || '', user_id: user.id,
+        name: titel, description: workoutPlan.description || '', user_id: user.id,
         primary_goal: workoutPlan.primary_goal, experience_level: workoutPlan.experience_level,
         split_type: workoutPlan.split_type, days_per_week: workoutPlan.days.length, time_per_session: 60,
         week_structure: buildWeekStructure(), equipment: workoutPlan.equipment.slice(0, 10),
@@ -307,6 +329,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         created_at: new Date().toISOString(), updated_at: new Date().toISOString()
       })
       if (error) throw error
+      setTemplateNaam(null)
       alert('✅ Template opgeslagen!')
       await loadTemplates()
     } catch (e) { alert('❌ Fout bij opslaan: ' + e.message) }
@@ -355,7 +378,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           days.push({ id: Date.now() + index, name: day.name || `DAG ${index + 1}`, focus: day.focus || '', geschatteTijd: day.geschatteTijd || '60 minutes', exercises: (day.exercises || []).map((ex, i) => ({ ...ex, id: Date.now() + index + i + Math.random() })) })
         })
     }
-    history.reset({ name: template.name + ' (Copy)', description: template.description || '', primary_goal: template.primary_goal || 'muscle_gain', experience_level: template.experience_level || 'intermediate', split_type: template.split_type || 'custom', days_per_week: days.length, equipment: template.equipment || [], days })
+    // Geen ' (Copy)' achter de naam: dit schema belandt één op één in de app van
+    // de klant, en daar hoort geen werkaantekening van de coach in.
+    history.reset({ name: template.name, description: template.description || '', primary_goal: template.primary_goal || 'muscle_gain', experience_level: template.experience_level || 'intermediate', split_type: template.split_type || 'custom', days_per_week: days.length, equipment: template.equipment || [], days })
     setShowTemplateManager(false)
   }
 
