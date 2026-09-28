@@ -28,6 +28,43 @@ const DAG_KORT = {
 
 const RUST = '__rust__'
 
+// De intake slaat voorkeursdagen op als 'ma', 'di', … — hier vertaald naar de
+// Engelse sleutels die het weekschema gebruikt.
+const NL_NAAR_DAG = { ma: 'Monday', di: 'Tuesday', wo: 'Wednesday', do: 'Thursday', vr: 'Friday', za: 'Saturday', zo: 'Sunday' }
+
+// Waar je trainingen neerzet als er nog niets gepland is. Niet zomaar de
+// eerste dagen van de week: rust ertussen is het halve plan, dus drie
+// trainingen worden ma/wo/vr en vier ma/di/do/vr.
+const SPREIDING = {
+  1: ['Monday'],
+  2: ['Monday', 'Thursday'],
+  3: ['Monday', 'Wednesday', 'Friday'],
+  4: ['Monday', 'Tuesday', 'Thursday', 'Friday'],
+  5: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+  6: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  7: DAGEN,
+}
+
+// Een eerste opzet: welke training op welke dag. Zegt de intake op welke dagen
+// hij traint, dan volgen we dat — dat weet hij zelf beter dan een spreiding.
+// Anders verdelen we de dagen uit het schema over de week.
+//
+// Bewust een voorstel en geen opslag: het venster laat het als een wijziging
+// zien, dus er verandert pas iets als de coach op Week opslaan drukt.
+function maakVoorstel(schemaDagen, voorkeurDagen) {
+  if (!schemaDagen.length) return null
+  const uitIntake = (voorkeurDagen || [])
+    .map(d => NL_NAAR_DAG[String(d).toLowerCase().slice(0, 2)])
+    .filter(Boolean)
+  const dagen = uitIntake.length >= schemaDagen.length
+    ? DAGEN.filter(d => uitIntake.includes(d)).slice(0, schemaDagen.length)
+    : (SPREIDING[Math.min(schemaDagen.length, 7)] || [])
+  if (!dagen.length) return null
+  const uit = {}
+  dagen.forEach((dag, i) => { if (schemaDagen[i]) uit[dag] = schemaDagen[i] })
+  return uit
+}
+
 // Kleur per soort training, zodat je in één blik de spreiding ziet: twee keer
 // benen achter elkaar valt op als twee dezelfde kleuren naast elkaar.
 const groepVan = (naam = '') => {
@@ -41,13 +78,14 @@ const groepVan = (naam = '') => {
   return { id: 'other', kleur: '#64748b' }
 }
 
-export default function WeekPlanner({ workoutService, clientId, schema, clientNaam, onComplete, onClose }) {
+export default function WeekPlanner({ workoutService, clientId, schema, clientNaam, voorkeurDagen = [], onComplete, onClose }) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
   const [schedule, setSchedule] = useState({})
   const [origineel, setOrigineel] = useState({})
   const [customWorkouts, setCustomWorkouts] = useState([])
   const [laden, setLaden] = useState(true)
   const [opslaan, setOpslaan] = useState(false)
+  const [isVoorstel, setIsVoorstel] = useState(false)
 
   // ── Wat kun je op een dag zetten ──
   const opties = useMemo(() => {
@@ -78,10 +116,25 @@ export default function WeekPlanner({ workoutService, clientId, schema, clientNa
         setCustomWorkouts(customs || [])
         // De opgeslagen vorm bevat alleen trainingsdagen; rustdagen ontbreken
         // gewoon. Hier vullen we ze aan zodat elke kolom iets toont.
-        const compleet = {}
-        DAGEN.forEach(d => { compleet[d] = bestaand?.[d] || RUST })
-        setSchedule(compleet)
-        setOrigineel(compleet)
+        const leeg = {}
+        DAGEN.forEach(d => { leeg[d] = bestaand?.[d] || RUST })
+        setOrigineel(leeg)
+
+        // Nog niets gepland? Dan is zeven keer "Rust" een nutteloos startpunt:
+        // de coach heeft net een plan van drie dagen gemaakt en mag dan zelf
+        // gaan klikken. We zetten een voorstel klaar — ongewijzigd opslaan doet
+        // niemand per ongeluk, want het venster toont het als wijziging.
+        const ietsGepland = DAGEN.some(d => leeg[d] !== RUST)
+        const schemaDagen = Object.keys(schema?.week_structure || {})
+          .sort((a, b) => parseInt(a.replace(/\D/g, '') || 0) - parseInt(b.replace(/\D/g, '') || 0))
+        const voorstel = ietsGepland ? null : maakVoorstel(schemaDagen, voorkeurDagen)
+        if (voorstel) {
+          const met = { ...leeg, ...voorstel }
+          setSchedule(met)
+          setIsVoorstel(true)
+        } else {
+          setSchedule(leeg)
+        }
       } catch (e) {
         console.error('weekschema laden mislukt:', e)
       } finally {
@@ -93,6 +146,7 @@ export default function WeekPlanner({ workoutService, clientId, schema, clientNa
   }, [workoutService, clientId])
 
   const verschuif = (dag, richting) => {
+    setIsVoorstel(false)
     setSchedule(prev => {
       const huidig = prev[dag] || RUST
       let i = opties.findIndex(o => o.waarde === huidig)
@@ -159,8 +213,10 @@ export default function WeekPlanner({ workoutService, clientId, schema, clientNa
             <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff' }}>
               Trainingsweek{clientNaam ? ` — ${clientNaam}` : ''}
             </div>
-            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>
-              {aantalTrainingen} training{aantalTrainingen === 1 ? '' : 'en'} · blader per dag met de pijltjes
+            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: isVoorstel ? '#ffba09' : 'rgba(255,255,255,0.4)' }}>
+              {isVoorstel
+                ? `Voorstel · ${aantalTrainingen} training${aantalTrainingen === 1 ? '' : 'en'} — pas aan en sla op`
+                : <>{aantalTrainingen} training{aantalTrainingen === 1 ? '' : 'en'} · blader per dag met de pijltjes</>}
             </div>
           </div>
           <button onClick={onClose} style={{
