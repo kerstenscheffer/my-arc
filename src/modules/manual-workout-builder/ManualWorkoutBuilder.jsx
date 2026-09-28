@@ -337,19 +337,63 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     finally { setSaving(false) }
   }
 
+  // Opslaan bij de klant: een bestaand plan bijwerken, of -- als de klant er nog
+  // geen heeft -- zijn eerste maken.
+  //
+  // Dat tweede kon niet. De knop eiste een geopend schema, dus voor een nieuwe
+  // klant zonder plan was hij altijd grijs en was de enige uitweg: template
+  // opslaan en hem elders toewijzen. Precies bij de klant waar je het vaakst
+  // een plan voor bouwt.
   const saveToClientSchema = async () => {
-    if (!selectedSchemaId) { alert('Geen client schema geselecteerd'); return }
     if (!workoutPlan.name) { alert('Geef het plan een naam'); return }
-    if (!confirm('Weet je zeker dat je dit client plan wilt overschrijven?')) return
+    if (workoutPlan.days.length === 0) { alert('Voeg minimaal één dag toe'); return }
+
+    if (selectedSchemaId) {
+      if (!confirm('Weet je zeker dat je dit client plan wilt overschrijven?')) return
+      setSaving(true)
+      try {
+        const { error } = await db.supabase.from('workout_schemas').update({
+          name: workoutPlan.name, description: workoutPlan.description || '',
+          week_structure: buildWeekStructure(), days_per_week: workoutPlan.days.length,
+          updated_at: new Date().toISOString()
+        }).eq('id', selectedSchemaId)
+        if (error) throw error
+        alert('✅ Client plan opgeslagen!')
+      } catch (e) { alert('❌ Fout bij opslaan: ' + e.message) }
+      finally { setSaving(false) }
+      return
+    }
+
+    const klant = effectiveClient
+    if (!klant?.id) { alert('Kies eerst een klant'); return }
+    const naam = `${klant.first_name || 'de klant'}`
+    if (!confirm(`${naam} heeft nog geen plan. Dit plan als zijn eerste instellen?`)) return
+
     setSaving(true)
     try {
-      const { error } = await db.supabase.from('workout_schemas').update({
+      const user = await db.getCurrentUser()
+      if (!user) { alert('Je moet ingelogd zijn'); return }
+      const { data, error } = await db.supabase.from('workout_schemas').insert({
         name: workoutPlan.name, description: workoutPlan.description || '',
-        week_structure: buildWeekStructure(), days_per_week: workoutPlan.days.length,
-        updated_at: new Date().toISOString()
-      }).eq('id', selectedSchemaId)
+        user_id: user.id, client_id: klant.id, client_name: `${klant.first_name || ''} ${klant.last_name || ''}`.trim() || null,
+        primary_goal: workoutPlan.primary_goal, experience_level: workoutPlan.experience_level,
+        split_type: workoutPlan.split_type, days_per_week: workoutPlan.days.length, time_per_session: 60,
+        week_structure: buildWeekStructure(), equipment: workoutPlan.equipment.slice(0, 10),
+        is_template: false, is_ai_generated: false, is_public: false,
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      }).select('id').single()
       if (error) throw error
-      alert('✅ Client plan opgeslagen!')
+
+      // Zijn eerste plan is meteen het actieve; anders staat het klaar maar
+      // ziet de klant nog niets.
+      const { error: kFout } = await db.supabase.from('clients')
+        .update({ assigned_schema_id: data.id, schema_assigned_at: new Date().toISOString() })
+        .eq('id', klant.id)
+      if (kFout) throw kFout
+
+      setSelectedSchemaId(data.id)
+      await loadClientSchemas(klant, false)
+      alert('✅ Plan aangemaakt en toegewezen!')
     } catch (e) { alert('❌ Fout bij opslaan: ' + e.message) }
     finally { setSaving(false) }
   }
@@ -674,20 +718,20 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               sjabloon alleen kon maken als er géén klant openstond — en dat je
               nooit zeker wist wat er ging gebeuren als je erop drukte. */}
           <button onClick={saveToClientSchema}
-            disabled={saving || !selectedSchemaId || workoutPlan.days.length === 0}
-            title={!selectedSchemaId ? 'Open eerst het plan van een klant' : undefined}
+            disabled={saving || (!selectedSchemaId && !effectiveClient?.id) || workoutPlan.days.length === 0}
+            title={(!selectedSchemaId && !effectiveClient?.id) ? 'Kies eerst een klant' : undefined}
             style={{
               marginBottom: '0.35rem', width: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '0.6rem', borderRadius: 8, border: 'none',
               background: '#fff', color: '#0a0a0a',
               fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: saving ? 'wait' : (!selectedSchemaId ? 'not-allowed' : 'pointer'),
-              opacity: (!selectedSchemaId || workoutPlan.days.length === 0) ? 0.45 : 1,
+              cursor: saving ? 'wait' : ((!selectedSchemaId && !effectiveClient?.id) ? 'not-allowed' : 'pointer'),
+              opacity: ((!selectedSchemaId && !effectiveClient?.id) || workoutPlan.days.length === 0) ? 0.45 : 1,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
             <Save size={15} strokeWidth={2.6} />
-            {saving ? 'Opslaan…' : 'Opslaan in klantplan'}
+            {saving ? 'Opslaan…' : (selectedSchemaId ? 'Opslaan in klantplan' : effectiveClient?.id ? `Eerste plan voor ${effectiveClient.first_name || 'klant'}` : 'Opslaan in klantplan')}
           </button>
           <button onClick={() => setTemplateNaam(workoutPlan.name || '')}
             disabled={saving || workoutPlan.days.length === 0}
@@ -711,8 +755,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)',
               lineHeight: 1.4,
             }}>
-              Geen klantplan open — je wijzigingen gaan nergens heen tot je ze als
-              template opslaat.
+              {effectiveClient?.id
+                ? `${effectiveClient.first_name || 'Deze klant'} heeft nog geen plan. Opslaan maakt het aan en zet het meteen actief.`
+                : 'Geen klant gekozen — je wijzigingen gaan nergens heen tot je ze als template opslaat.'}
             </div>
           )}
           <button onClick={() => setShowPlanManager(true)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
