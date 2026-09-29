@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react'
 import { Grid, Calendar, Trash2, ChevronDown, ChevronUp, X, ArrowLeftRight, Check, Edit2 } from 'lucide-react'
+import { fotoWeergaveUrl } from '../../progress/fotoWeergave'
 
 const SUBTYPE_OPTIONS = [
   { value: 'front', label: 'Voorkant' },
@@ -154,7 +155,7 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                   const dateLabel = d ? new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' }) : ''
                   return (
                     <div key={photo.id} style={{ position: 'relative', aspectRatio: '3/4' }}>
-                      <img src={photo.photo_url} alt={`Vergelijking ${i + 1}`}
+                      <img src={fotoWeergaveUrl(photo.photo_url, { breedte: 500 })} alt={`Vergelijking ${i + 1}`}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       <div style={{
                         position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -240,7 +241,7 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                         outline: selected ? '2px solid #fff' : 'none',
                         outlineOffset: '-2px',
                       }}>
-                      <img src={photo.photo_url} alt="Progress"
+                      <img src={fotoWeergaveUrl(photo.photo_url, { breedte: 500 })} alt="Progress"
                         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                         onError={(e) => { e.target.style.display = 'none' }} loading="lazy" />
                       {/* Subtype label — color per angle */}
@@ -296,7 +297,7 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
             padding: '1rem', backdropFilter: 'blur(10px)'
           }}>
           <div onClick={e => e.stopPropagation()} style={{ maxWidth: '90%', maxHeight: '85vh', position: 'relative' }}>
-            <img src={selectedPhoto.photo_url} alt="Photo"
+            <img src={fotoWeergaveUrl(selectedPhoto.photo_url, { breedte: 1200, kwaliteit: 85 })} alt="Photo"
               style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '4px' }} />
 
             <div style={{

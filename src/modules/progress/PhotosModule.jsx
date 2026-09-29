@@ -1,4 +1,5 @@
 // src/modules/progress/PhotosModule.jsx
+import { fotoWeergaveUrl } from './fotoWeergave'
 import useIsMobile from '../../hooks/useIsMobile'
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -689,7 +690,7 @@ export default function PhotosModule({ client, db }) {
         onClick={() => handleCompareSelect(photo)}
       >
         <img
-          src={photo.signedUrl || photo.photo_url}
+          src={photo.signedUrl || fotoWeergaveUrl(photo.photo_url, { breedte: 700 })}
           alt={`Progress ${index + 1}`}
           style={{ width: '100%', height: viewMode === 'grid' ? '200px' : '300px', objectFit: 'cover' }}
         />
@@ -737,7 +738,7 @@ export default function PhotosModule({ client, db }) {
             <div style={{ background: index === 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', borderRadius: '12px', padding: '0.5rem', marginBottom: '0.5rem', textAlign: 'center', fontSize: '0.85rem', fontWeight: '600', color: index === 0 ? '#ef4444' : '#10b981', border: `1px solid ${index === 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}` }}>
               {index === 0 ? 'Voor' : 'Na'}
             </div>
-            <img src={photo.signedUrl || photo.photo_url} alt={index === 0 ? 'Before' : 'After'} style={{ width: '100%', borderRadius: '12px' }} />
+            <img src={photo.signedUrl || fotoWeergaveUrl(photo.photo_url, { breedte: 700 })} alt={index === 0 ? 'Before' : 'After'} style={{ width: '100%', borderRadius: '12px' }} />
             <div style={{ marginTop: '0.5rem', textAlign: 'center', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
               <Calendar size={14} />
               {new Date(photo.date_taken).toLocaleDateString('nl-NL')}

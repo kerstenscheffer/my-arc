@@ -1,6 +1,7 @@
 // src/coach/pages/challenge-monitor/PhotoProgressView.jsx
 import { useState, useEffect } from 'react'
 import { Camera, Calendar, CheckCircle, XCircle, Eye } from 'lucide-react'
+import { fotoWeergaveUrl } from '../../../modules/progress/fotoWeergave'
 
 export default function PhotoProgressView({ client, db, challengeData }) {
   const isMobile = window.innerWidth <= 768
@@ -420,7 +421,7 @@ export default function PhotoProgressView({ client, db, challengeData }) {
           }}
         >
           <img
-            src={selectedPhoto.photo_url}
+            src={fotoWeergaveUrl(selectedPhoto.photo_url, { breedte: 1200, kwaliteit: 85 })}
             alt="Progress"
             style={{
               maxWidth: '90%',

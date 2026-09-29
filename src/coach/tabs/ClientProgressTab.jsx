@@ -3,6 +3,7 @@
 // MY ARC - Kersten 2025
 
 import { useState, useEffect, useCallback } from 'react'
+import { fotoWeergaveUrl } from '../../modules/progress/fotoWeergave'
 
 export default function ClientProgressTab({ client, db }) {
   // ===== STATE MANAGEMENT =====
@@ -762,7 +763,7 @@ export default function ClientProgressTab({ client, db }) {
               >
                 {photo.photo_url ? (
                   <img
-                    src={photo.photo_url}
+                    src={fotoWeergaveUrl(photo.photo_url, { breedte: 500 })}
                     alt="Progress"
                     style={{
                       width: '100%',

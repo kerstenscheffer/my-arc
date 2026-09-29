@@ -14,6 +14,7 @@ import CoachingPeriodPanel from './CoachingPeriodPanel'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
+import { fotoWeergaveUrl } from '../../progress/fotoWeergave'
 
 // Kopknop: kaal icoon, geen vak eromheen. Vier omkaderde knoppen met tekst
 // namen de halve kopregel in; als icoon met tooltip is het even duidelijk en
@@ -600,7 +601,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                           {day.items.map(({ p, idx }) => (
                             <div key={p.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
                               <div onClick={() => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }} style={{ aspectRatio: '3 / 4', cursor: 'pointer' }}>
-                                <img className={PRIVE_FOTO} src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                <img className={PRIVE_FOTO} src={fotoWeergaveUrl(p.photo_url, { breedte: 400 })} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0.35rem 0.45rem' }}>
                                 <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.photo_type || 'foto'}</span>
@@ -636,7 +637,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           }}>
             <X size={18} />
           </button>
-          <img className={PRIVE_FOTO} onClick={e => e.stopPropagation()} src={photos[selectedPhotoIndex]?.photo_url} alt=""
+          <img className={PRIVE_FOTO} onClick={e => e.stopPropagation()} src={fotoWeergaveUrl(photos[selectedPhotoIndex]?.photo_url, { breedte: 1400, kwaliteit: 85 })} alt=""
             style={{ maxWidth: '90vw', maxHeight: '75vh', borderRadius: '8px', objectFit: 'contain' }} />
           {photos.length > 1 && (
             <>
@@ -667,7 +668,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '0.4rem', marginTop: '0.75rem', overflowX: 'auto', maxWidth: '92vw', padding: '0.25rem', WebkitOverflowScrolling: 'touch' }}>
               {photos.map((p, idx) => (
                 <div key={p.id} onClick={() => setSelectedPhotoIndex(idx)} style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: idx === selectedPhotoIndex ? '2px solid #fff' : '2px solid rgba(255,255,255,0.15)', opacity: idx === selectedPhotoIndex ? 1 : 0.6 }}>
-                  <img className={PRIVE_FOTO} src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img className={PRIVE_FOTO} src={fotoWeergaveUrl(p.photo_url, { breedte: 400 })} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               ))}
             </div>
