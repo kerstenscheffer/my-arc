@@ -25,6 +25,7 @@ import DagAgenda from '../components/DagAgenda'
 import StappenPil from '../components/StappenPil'
 import { vandaagStand, verzetDag } from '../components/dagNavigatie'
 import BelangrijkeVideo from '../components/BelangrijkeVideo'
+import FocusDezeWeek from '../../modules/client-checkin/FocusDezeWeek'
 import { dateForDay } from '../../modules/client-agenda/ClientAgendaService'
 import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
 
@@ -699,6 +700,14 @@ export default function ClientHome({ client, db, setCurrentView }) {
           bent. Verdwijnt zodra je 'm hebt afgespeeld of afgevinkt. */}
       <div style={{ marginTop: isMobile ? '1.1rem' : '1.4rem' }}>
         <BelangrijkeVideo client={client} pagina="home" isMobile={isMobile} />
+      </div>
+
+      {/* Wat de klant zichzelf deze week heeft voorgenomen, met hoe ver hij is.
+          Boven de agenda: je doelen horen te sturen wat je vandaag doet, niet
+          onderaan de pagina te staan als naslagwerk. Tekent zichzelf niet als
+          er geen doelen zijn. */}
+      <div style={{ marginTop: isMobile ? '1.4rem' : '1.75rem' }}>
+        <FocusDezeWeek db={db} client={client} isMobile={isMobile} />
       </div>
 
       {/* ── De dag als agenda ─────────────────────────────────────────────

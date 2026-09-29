@@ -3,6 +3,7 @@
 // Features: View scores, edit coach notes, export PDF, export coach notes
 
 import { useState } from 'react'
+import { doelTekst, kleurVoorBehaald, scoreVanDoelen } from '../doelen'
 import {
   ArrowLeft,
   User,
@@ -384,6 +385,71 @@ export default function CheckinDetailView({
         </div>
       </div>
       
+      {/* De doelen van vorige week, bovenaan. Dit is waar je als coach op
+          stuurt: wat had hij zich voorgenomen, en is het gelukt. */}
+      {isV4 && Array.isArray(checkin.doelen_vorige_week) && checkin.doelen_vorige_week.length > 0 && (() => {
+        const score = scoreVanDoelen(checkin.doelen_vorige_week)
+        return (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Doelen afgelopen week
+              </span>
+              {score && (
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff' }}>
+                  {score.gehaald}/{score.totaal} gehaald
+                  {score.deels > 0 && <span style={{ color: '#f59e0b', marginLeft: 6 }}>· {score.deels} deels</span>}
+                </span>
+              )}
+            </div>
+            {checkin.doelen_vorige_week.map((d, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '0.6rem 0.75rem', marginBottom: 6,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderLeft: `3px solid ${kleurVoorBehaald(d.behaald)}`,
+                borderRadius: 10,
+              }}>
+                <span style={{
+                  width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
+                  background: kleurVoorBehaald(d.behaald),
+                }} />
+                <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
+                  {doelTekst(d)}
+                </span>
+                {d.gemeten != null && (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
+                    gemeten {d.gemeten}
+                  </span>
+                )}
+                <span style={{ fontSize: '0.75rem', fontWeight: 900, color: kleurVoorBehaald(d.behaald), minWidth: 44, textAlign: 'right' }}>
+                  {d.behaald === 'ja' ? 'Ja' : d.behaald === 'deels' ? 'Deels' : d.behaald === 'nee' ? 'Nee' : '—'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
+      {/* Wat hij zich voor de kómende week heeft voorgenomen. */}
+      {isV4 && Array.isArray(checkin.doelen_komende_week) && checkin.doelen_komende_week.length > 0 && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+            Doelen komende week
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {checkin.doelen_komende_week.map((d, i) => (
+              <span key={i} style={{
+                padding: '0.4rem 0.7rem', borderRadius: 999,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+                fontSize: '0.8rem', fontWeight: 800, color: '#fff',
+              }}>{doelTekst(d)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Nieuw formulier (versie 2 en 3): cijfers als lijst, open antwoorden
           eronder. Bij versie 3 zijn de eerste vier gemeten door de app. */}
       {isV2 && (

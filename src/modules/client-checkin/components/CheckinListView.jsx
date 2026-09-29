@@ -3,6 +3,7 @@
 // Features: Filters, search, cards met scores, pending indicator
 
 import { useState } from 'react'
+import { scoreVanDoelen } from '../doelen'
 import {
   ClipboardList,
   User,
@@ -352,6 +353,26 @@ export default function CheckinListView({
                             month: 'short'
                           })}
                         </p>
+                        {/* Hoeveel doelen hij haalde. Staat naast de datum,
+                            want dat is waarop je besluit wie je als eerste
+                            opent. */}
+                        {(() => {
+                          const score = scoreVanDoelen(checkin.doelen_vorige_week)
+                          if (!score) return null
+                          const alles = score.gehaald === score.totaal
+                          return (
+                            <span style={{
+                              padding: '0.15rem 0.5rem', borderRadius: 6,
+                              background: alles ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.07)',
+                              border: `1px solid ${alles ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                              fontSize: '0.7rem', fontWeight: 900,
+                              color: alles ? '#10b981' : '#fff',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}>
+                              {score.gehaald}/{score.totaal} doelen
+                            </span>
+                          )
+                        })()}
                         <span style={{
                           padding: '0.15rem 0.5rem',
                           background: `${STATUS_CONFIG[checkin.status]?.color}20`,
