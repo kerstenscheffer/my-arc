@@ -68,6 +68,43 @@ export function oordeelTekst(staat, norm) {
   return null
 }
 
+// Hoe zwaar was die set eigenlijk? Elke set wordt omgerekend naar het gewicht
+// dat je bij acht herhalingen zou halen (een "8RM"), zodat sets met
+// verschillende herhalingen vergelijkbaar worden.
+//
+// Via Epley: 1RM ≈ gewicht × (1 + reps / 30), en dan terug naar acht reps.
+//
+// Waarom niet gewoon het zwaarste gewicht: dan zie je vooruitgang alleen als er
+// een schijf bij gaat. Ga je van 70 kg × 8 naar 70 kg × 11, dan ben je sterker
+// geworden en bleef de lijn vlak.
+//
+// Boven de twaalf herhalingen wordt de schatting onbetrouwbaar — daar meet je
+// eerder conditie dan kracht — dus daarboven rekenen we alsof het er twaalf
+// waren. Een set van dertig telt dus niet als een 1RM van het dubbele.
+export const MAX_REPS_VOOR_SCHATTING = 12
+
+// Op hoeveel herhalingen we de schatting uitdrukken. Acht, niet één: dat is het
+// bereik waarin je klanten daadwerkelijk trainen, dus het getal op de grafiek
+// is direct te vergelijken met wat er op de stang ligt. Een 1RM is een getal
+// dat bijna niemand ooit tilt.
+export const REFERENTIE_REPS = 8
+
+// Eerst naar een 1RM (Epley), dan terug naar het referentie-aantal. De
+// tussenstap staat er omdat elke set eerst op één noemer moet voordat je ze
+// kunt vergelijken.
+export function geschatRM(gewicht, reps, doelReps = REFERENTIE_REPS) {
+  const g = Number(gewicht) || 0
+  const r = Math.min(Math.max(Number(reps) || 1, 1), MAX_REPS_VOOR_SCHATTING)
+  if (!g) return 0
+  const eenRM = g * (1 + r / 30)
+  return Math.round((eenRM / (1 + doelReps / 30)) * 10) / 10
+}
+
+// Blijft bestaan voor wie de kale 1RM wil.
+export function geschat1RM(gewicht, reps) {
+  return geschatRM(gewicht, reps, 1)
+}
+
 const dagInMs = 24 * 60 * 60 * 1000
 
 // Hoeveel weken zit er tussen twee logdatums? Als kommagetal, want je traint

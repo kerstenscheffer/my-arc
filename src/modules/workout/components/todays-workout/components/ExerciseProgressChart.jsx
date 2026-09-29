@@ -22,43 +22,20 @@ import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp, Info } from 'lucide-react'
-import { metBandFases, faseSamenvatting, KLEUR_VOOR, oordeelTekst } from '../krachtBand'
+import { metBandFases, faseSamenvatting, KLEUR_VOOR, oordeelTekst, geschatRM, REFERENTIE_REPS } from '../krachtBand'
 
 const LIJN = 'rgba(255,255,255,0.1)'
 const GROEN = '#10b981'
 const ROOD = '#ef4444'
 
-// Geschat 1RM volgens Epley: het gewicht dat je één keer zou kunnen tillen,
-// afgeleid uit een set die je wél hebt gedaan.
-//
-//   1RM ≈ gewicht × (1 + reps / 30)
-//
-// Waarom niet gewoon het zwaarste gewicht: dan zie je vooruitgang alleen als er
-// een schijf bij gaat. Ga je van 70 kg × 8 naar 70 kg × 11, dan ben je sterker
-// geworden en bleef de lijn vlak — precies het gat dat dit dicht.
-//
-// Boven de twaalf herhalingen wordt de schatting onbetrouwbaar (je loopt dan
-// eerder tegen je conditie aan dan tegen je kracht), dus daar rekenen we mee
-// alsof het er twaalf waren. Een set van dertig telt dus niet als een 1RM van
-// het dubbele.
-const MAX_REPS_VOOR_SCHATTING = 12
-
-export const geschat1RM = (gewicht, reps) => {
-  const g = Number(gewicht) || 0
-  const r = Math.min(Math.max(Number(reps) || 1, 1), MAX_REPS_VOOR_SCHATTING)
-  if (!g) return 0
-  return Math.round(g * (1 + r / 30) * 10) / 10
-}
-
 // De set die het meest zegt over je kracht die dag: de hoogste schatting, niet
-// per se het zwaarste gewicht. 70 kg × 8 (schatting 88,7) telt dus zwaarder dan
-// 80 kg × 1 (schatting 82,7) — acht herhalingen op zeventig is meer werk dan
-// één zware poging.
+// per se het zwaarste gewicht. 70 kg × 8 telt dus zwaarder dan 80 kg × 1 —
+// acht herhalingen op zeventig is meer werk dan één zware poging.
 const besteSet = (sets) => (sets || []).reduce((beste, set) => {
   const gewicht = Number(set?.weight) || 0
   const reps = Number(set?.reps) || 0
   if (!gewicht) return beste
-  const score = geschat1RM(gewicht, reps)
+  const score = geschatRM(gewicht, reps)
   if (!beste || score > beste.score) return { gewicht, reps, score }
   return beste
 }, null)
@@ -86,7 +63,7 @@ function Kaartje({ active, payload }) {
         {p.label}
       </div>
       <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff' }}>
-        {p.gewicht} kg geschat 1RM
+        {p.gewicht} kg op {REFERENTIE_REPS} herhalingen
       </div>
       <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
         gedaan: {p.ruwGewicht} kg × {p.reps}
@@ -225,7 +202,11 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
   // De band eromheen: waar je minimaal hoort te zitten, waar we op mikken, en
   // hoe dit punt daartegen afsteekt. Rekenen gebeurt in krachtBand.js zodat de
   // norm op één plek staat.
-  const data = metBandFases(punten, fases).map((p, i) => ({
+  const dataMetBand = metBandFases(punten, fases)
+  // De norm van het laatste punt: dat is de fase waar de klant nu in zit, en
+  // die staat in de uitleg.
+  const norm = dataMetBand[dataMetBand.length - 1]?.norm || null
+  const data = dataMetBand.map((p, i) => ({
     ...p,
     label: kortDatum(p.datum),
     isPR: i === prIdx,
@@ -308,13 +289,15 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
           padding: '0.6rem 0.7rem', borderRadius: 10,
           background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
         }}>
-          De lijn is je <strong style={{ color: '#fff' }}>geschatte 1RM</strong>: het gewicht dat je
-          één keer zou kunnen tillen, berekend uit je beste set van die training —
-          gewicht × (1 + herhalingen ÷ 30).
+          De lijn is het gewicht dat je op <strong style={{ color: '#fff' }}>{REFERENTIE_REPS} herhalingen</strong> zou
+          halen, berekend uit je beste set van die training. Zo zijn sets met
+          verschillende herhalingen met elkaar te vergelijken, en staat er een getal
+          dat je herkent van de stang.
           <br /><br />
-          Daardoor telt ook vooruitgang in herhalingen mee. Ga je van 70 kg × 8 naar
-          70 kg × 11, dan gaat de lijn omhoog (88,7 → 95,7) terwijl er geen schijf bij ging.
-          Je bent immers sterker geworden.
+          Daardoor telt vooruitgang in herhalingen ook mee. Ga je van 70 kg × 8 naar
+          70 kg × 11, dan gaat de lijn van 70 naar 75,6 terwijl er geen schijf bij ging —
+          je bent immers sterker geworden. Doe je 8 herhalingen, dan staat er gewoon je
+          eigen gewicht.
           <br /><br />
           Boven de twaalf herhalingen rekenen we alsof het er twaalf waren: daarboven
           meet je vooral je conditie en wordt de schatting onbetrouwbaar. In de tooltip
