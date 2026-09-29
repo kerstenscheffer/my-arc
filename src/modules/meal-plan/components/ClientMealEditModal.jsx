@@ -49,6 +49,35 @@ export default function ClientMealEditModal({
     return () => { alive = false }
   }, [])
 
+  // Waar staat deze maaltijd nog meer in de week? Nodig om bij elke keuze te
+  // kunnen tonen wat hij raakt. Zonder dat is "alle dezelfde maaltijden" een
+  // gok: het kan één plek zijn of je hele week.
+  const [plekken, setPlekken] = useState(null)
+  useEffect(() => {
+    if (phase !== 'scope' || !planId || !db?.supabase) return
+    let weg = false
+    const mealId = meal?.meal_id || meal?.id
+    db.supabase
+      .from('client_meal_plans')
+      .select('week_structure')
+      .eq('id', planId)
+      .single()
+      .then(r => r, () => ({ data: null }))
+      .then(({ data }) => {
+        if (weg || !data?.week_structure) { if (!weg) setPlekken([]) ; return }
+        const uit = []
+        Object.entries(data.week_structure).forEach(([dag, slots]) => {
+          if (!slots || typeof slots !== 'object') return
+          Object.entries(slots).forEach(([slotKey, m]) => {
+            if (!m || typeof m !== 'object') return
+            if ((m.meal_id || m.id) === mealId) uit.push({ dag, slot: slotKey })
+          })
+        })
+        setPlekken(uit)
+      })
+    return () => { weg = true }
+  }, [phase, planId, db, meal])
+
   const persist = async (scopeKey) => {
     setSaving(scopeKey); setError(null)
     try {
@@ -94,6 +123,9 @@ export default function ClientMealEditModal({
           meal={enriched}
           pending={pending}
           isToday={isToday}
+          plekken={plekken}
+          dayName={dayName}
+          slot={slot}
           saving={saving}
           error={error}
           isMobile={isMobile}
@@ -109,32 +141,64 @@ export default function ClientMealEditModal({
   return createPortal(overlay, document.body)
 }
 
-function ScopeChooser({ meal, pending, isToday, saving, error, isMobile, onBack, onClose, onChoose }) {
+const DAG_KORT = {
+  monday: 'ma', tuesday: 'di', wednesday: 'wo', thursday: 'do',
+  friday: 'vr', saturday: 'za', sunday: 'zo',
+}
+const DAG_VOLUIT = {
+  monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', thursday: 'donderdag',
+  friday: 'vrijdag', saturday: 'zaterdag', sunday: 'zondag',
+}
+const SLOT_KORT = {
+  breakfast: 'ontbijt', lunch: 'lunch', dinner: 'diner',
+  snack1: 'snack', snack2: 'snack', snack3: 'snack', pre_workout: 'pre-workout',
+}
+
+function ScopeChooser({ meal, pending, isToday, plekken, dayName, slot, saving, error, isMobile, onBack, onClose, onChoose }) {
   const busy = !!saving
   const diff = {
     kcal: Math.round((pending?.calories || 0) - (meal?.calories || 0)),
   }
+
+  // Wat elke keuze concreet raakt. Dit is het hele punt van dit scherm: de
+  // titels ("alle dezelfde maaltijden") zeggen niet of dat er één is of zeven.
+  const aantal = plekken?.length ?? null
+  const plekkenTekst = plekken === null
+    ? 'even kijken waar deze maaltijd staat…'
+    : aantal === 0
+      ? 'staat verder nergens in je week'
+      : plekken
+          .map(p => `${DAG_KORT[p.dag] || p.dag} ${SLOT_KORT[p.slot] || p.slot}`)
+          .join(' · ')
+
+  const vandaag = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  const dagVoluit = DAG_VOLUIT[dayName] || dayName || 'deze dag'
+
   const options = [
     {
-      key: 'all', color: '#FFD700', Icon: Repeat,
-      title: 'Alle dezelfde maaltijden',
-      sub: 'Overal in je weekplan waar deze maaltijd staat',
+      key: 'all', Icon: Repeat,
+      title: aantal && aantal > 1 ? `Overal (${aantal}×)` : 'Overal in je week',
+      sub: 'blijvend, elke week',
+      effect: plekkenTekst,
+      uit: aantal === 0,
     },
     {
-      key: 'day', color: '#10b981', Icon: CalendarDays,
-      title: 'Alleen deze dag',
-      sub: 'Elke week op deze dag, blijvend',
+      key: 'day', Icon: CalendarDays,
+      title: `Alleen ${dagVoluit}`,
+      sub: 'blijvend, elke week op deze dag',
+      effect: `past ${dagVoluit} ${SLOT_KORT[slot] || slot} aan, de andere dagen blijven zoals ze zijn`,
     },
     ...(isToday ? [{
-      key: 'today', color: '#3b82f6', Icon: Zap,
-      title: 'Eenmalig — alleen vandaag',
-      sub: 'Je weekplan blijft ongewijzigd',
+      key: 'today', Icon: Zap,
+      title: 'Alleen vandaag',
+      sub: `eenmalig, ${vandaag}`,
+      effect: 'je weekplan verandert niet; morgen staat het oude er weer',
     }] : []),
   ]
 
   return (
     <div style={{
-      background: '#0a0a0a', borderTop: '1px solid rgba(255,215,0,0.18)',
+      background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.12)',
       borderTopLeftRadius: isMobile ? 16 : 12, borderTopRightRadius: isMobile ? 16 : 12,
       maxWidth: isMobile ? '100%' : 620, width: '100%', margin: '0 auto',
       display: 'flex', flexDirection: 'column', maxHeight: '80vh', overflow: 'hidden',
@@ -159,7 +223,12 @@ function ScopeChooser({ meal, pending, isToday, saving, error, isMobile, onBack,
 
       {/* Prompt */}
       <div style={{ padding: '0.85rem 1rem 0.4rem' }}>
-        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Waar wil je deze wijziging opslaan?</div>
+        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+          Waar geldt deze wijziging?
+        </div>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+          Je kunt dit later altijd weer aanpassen.
+        </div>
       </div>
 
       {/* Options */}
@@ -170,23 +239,41 @@ function ScopeChooser({ meal, pending, isToday, saving, error, isMobile, onBack,
           return (
             <button
               key={opt.key}
-              onClick={() => !busy && onChoose(opt.key)}
-              disabled={busy}
+              onClick={() => !busy && !opt.uit && onChoose(opt.key)}
+              disabled={busy || opt.uit}
               style={{
-                display: 'flex', alignItems: 'center', gap: '0.7rem', textAlign: 'left',
-                padding: '0.8rem 0.85rem', borderRadius: 10, cursor: busy ? 'default' : 'pointer',
-                background: `${opt.color}12`, border: `1px solid ${opt.color}35`,
-                opacity: busy && !isSaving ? 0.4 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                display: 'flex', alignItems: 'flex-start', gap: '0.75rem', textAlign: 'left',
+                padding: '0.85rem 0.9rem', borderRadius: 12,
+                cursor: (busy || opt.uit) ? 'default' : 'pointer',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                opacity: (busy && !isSaving) || opt.uit ? 0.35 : 1,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                fontFamily: 'inherit',
               }}
             >
-              <div style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, background: `${opt.color}1a`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: 10, flexShrink: 0, marginTop: 1,
+                background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
                 {isSaving
-                  ? <div style={{ width: 16, height: 16, border: `2px solid ${opt.color}40`, borderTopColor: opt.color, borderRadius: '50%', animation: 'cmeSpin 0.8s linear infinite' }} />
-                  : <Icon size={18} color={opt.color} />}
+                  ? <div style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'cmeSpin 0.8s linear infinite' }} />
+                  : <Icon size={17} color="#fff" strokeWidth={2.4} />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>{opt.title}</div>
-                <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>{opt.sub}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{opt.title}</span>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{opt.sub}</span>
+                </div>
+                {/* Wat er daadwerkelijk verandert. Dit is de regel waarop je
+                    kiest; de titel alleen zegt niet of het één plek is of zeven. */}
+                <div style={{
+                  fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)',
+                  marginTop: 4, lineHeight: 1.35,
+                }}>
+                  {opt.effect}
+                </div>
               </div>
             </button>
           )

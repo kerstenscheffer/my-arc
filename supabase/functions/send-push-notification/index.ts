@@ -1,6 +1,8 @@
 // send-push-notification/index.ts
-// APNs push. Config komt uit de apns_config-tabel (service-role leest 'm), met
-// fallback op env-vars. Beveiliging: shared secret (x-push-secret) van de DB-trigger.
+// Meldingen naar iPhone (APNs) en Android (Firebase Cloud Messaging). De
+// Apple-config komt uit apns_config, het Google-serviceaccount uit fcm_config;
+// allebei leest de service-role ze. Beveiliging: shared secret (x-push-secret)
+// van de DB-trigger.
 //
 // 18 sep 2026: dit bestand liep achter op wat er live stond (het las de config
 // alleen uit env-vars). Opnieuw opgehaald uit de deployment en daarna pas de
@@ -83,6 +85,107 @@ async function sendApns(
   return { ok: false, error: lastError };
 }
 
+// ── Android: Firebase Cloud Messaging ─────────────────────────────────────
+//
+// Apple en Google spreken een ander protocol. Bij Apple onderteken je elk
+// verzoek zelf met een JWT; bij Google ruil je een ondertekende JWT eerst in
+// voor een toegangstoken en stuur je dáármee. Vandaar twee aparte paden.
+//
+// Het toegangstoken is een uur geldig. We bewaren het in de isolate, zodat
+// tien meldingen achter elkaar niet tien keer een token gaan halen.
+let fcmToken: { waarde: string; verlooptOp: number } | null = null;
+
+async function buildGoogleJwt(clientEmail: string, privateKey: string): Promise<string> {
+  const nu = Math.floor(Date.now() / 1000);
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: clientEmail,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: nu,
+    exp: nu + 3600,
+  };
+  const encode = (obj: object) =>
+    btoa(JSON.stringify(obj)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const unsigned = `${encode(header)}.${encode(payload)}`;
+
+  // De sleutel komt uit JSON, dus met \n als letterlijke tekens.
+  const pem = privateKey
+    .replace(/\\n/g, "\n")
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\s/g, "");
+  const keyBytes = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8", keyBytes,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false, ["sign"],
+  );
+  const sigBytes = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(unsigned),
+  );
+  const sig = btoa(String.fromCharCode(...new Uint8Array(sigBytes)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${unsigned}.${sig}`;
+}
+
+async function getFcmAccessToken(sa: { client_email: string; private_key: string }): Promise<string> {
+  if (fcmToken && fcmToken.verlooptOp > Date.now() + 60_000) return fcmToken.waarde;
+  const jwt = await buildGoogleJwt(sa.client_email, sa.private_key);
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.access_token) {
+    throw new Error(`FCM-token halen mislukt: ${res.status} ${JSON.stringify(json)}`);
+  }
+  fcmToken = { waarde: json.access_token, verlooptOp: Date.now() + (json.expires_in ?? 3600) * 1000 };
+  return fcmToken.waarde;
+}
+
+async function sendFcm(
+  sa: { project_id: string; client_email: string; private_key: string } | null,
+  token: string, title: string, body: string, data: Record<string, unknown> = {},
+): Promise<{ ok: boolean; error?: string }> {
+  if (!sa?.private_key || !sa?.client_email || !sa?.project_id) {
+    return { ok: false, error: "FCM niet geconfigureerd (fcm_config leeg)" };
+  }
+  try {
+    const access = await getFcmAccessToken(sa);
+    // FCM eist dat alles in `data` tekst is; getallen of objecten worden
+    // geweigerd met een vage 400.
+    const dataTekst: Record<string, string> = {};
+    for (const [k, v] of Object.entries(data ?? {})) {
+      dataTekst[k] = typeof v === "string" ? v : JSON.stringify(v);
+    }
+    const res = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${access}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          message: {
+            token,
+            notification: { title, body },
+            data: dataTekst,
+            android: { priority: "high", notification: { sound: "default" } },
+          },
+        }),
+      },
+    );
+    if (res.ok) return { ok: true };
+    const tekst = await res.text();
+    return { ok: false, error: `FCM ${res.status}: ${tekst.slice(0, 200)}` };
+  } catch (e) {
+    return { ok: false, error: `FCM: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -99,6 +202,13 @@ serve(async (req) => {
     bundleId: row?.bundle_id ?? Deno.env.get("APNS_BUNDLE_ID") ?? "com.myarcfitness.app",
   };
   const hookSecret = row?.hook_secret ?? Deno.env.get("PUSH_HOOK_SECRET") ?? "";
+
+  // Serviceaccount voor Android. Staat in een eigen tabel omdat het een heel
+  // ander soort sleutel is dan die van Apple.
+  const { data: fcmRow } = await supabaseAdmin
+    .from("fcm_config").select("service_account").eq("id", 1).maybeSingle();
+  const sa = (fcmRow?.service_account ?? null) as
+    { project_id: string; client_email: string; private_key: string } | null;
 
   if (hookSecret && req.headers.get("x-push-secret") !== hookSecret) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
@@ -124,18 +234,29 @@ serve(async (req) => {
         status: 400, headers: { ...CORS, "content-type": "application/json" },
       });
     }
+    // Alle toestellen van deze gebruiker, ongeacht platform. Hier stond een
+    // filter op "ios", waardoor een Android-klant nooit iets kreeg -- ook niet
+    // als zijn toestel keurig geregistreerd stond.
     const { data: rows, error: tokenError } = await supabaseAdmin
-      .from("device_push_tokens").select("token").eq("user_id", resolvedUserId).eq("platform", "ios");
+      .from("device_push_tokens").select("token, platform").eq("user_id", resolvedUserId);
     if (tokenError) throw tokenError;
     if (!rows || rows.length === 0) {
       return new Response(JSON.stringify({ sent: 0, note: "No device tokens registered" }), {
         headers: { ...CORS, "content-type": "application/json" },
       });
     }
-    const results = await Promise.all(rows.map((r) => sendApns(cfg, r.token, title, body, data ?? {})));
+    const results = await Promise.all(rows.map((r) =>
+      r.platform === "android"
+        ? sendFcm(sa, r.token, title, body, data ?? {})
+        : sendApns(cfg, r.token, title, body, data ?? {})
+    ));
     const sent = results.filter((r) => r.ok).length;
     const errors = results.filter((r) => !r.ok).map((r) => r.error);
-    return new Response(JSON.stringify({ sent, errors }), {
+    const perPlatform = {
+      ios: rows.filter((r) => r.platform !== "android").length,
+      android: rows.filter((r) => r.platform === "android").length,
+    };
+    return new Response(JSON.stringify({ sent, errors, toestellen: perPlatform }), {
       headers: { ...CORS, "content-type": "application/json" },
     });
   } catch (err) {

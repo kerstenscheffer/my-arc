@@ -219,13 +219,13 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
       ? {}
       : { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 10000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div onClick={e => e.stopPropagation()} style={embedded
-        ? { background: '#0a0a0a', width: '100%', maxHeight: m ? '68vh' : '58vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderTop: '1px solid rgba(255,215,0,0.18)' }
+        ? { background: '#0a0a0a', width: '100%', maxHeight: m ? '68vh' : '58vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderTop: '1px solid rgba(255,255,255,0.12)' }
         : { background: '#0a0a0a', borderRadius: m ? '16px 16px 0 0' : '12px', width: '100%', maxWidth: '620px', maxHeight: m ? '95vh' : '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', ...(m?{}:{margin:'auto',alignSelf:'center'}) }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: m ? '0.45rem 0.7rem' : '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <input value={mealName} onChange={e => setMealName(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 800, width: '100%', fontFamily: 'inherit', borderBottom: '1px solid rgba(255,215,0,0.2)', paddingBottom: '0.1rem' }} />
+            <input value={mealName} onChange={e => setMealName(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 800, width: '100%', fontFamily: 'inherit', borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '0.15rem' }} />
           </div>
           <button onClick={onClose} style={{ width: '32px', height: '32px', borderRadius: '6px', flexShrink: 0, background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={16} /></button>
         </div>
@@ -376,11 +376,13 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
                 {ingredients.length === 0 && <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)' }}>Geen ingrediënten — voeg er een toe</div>}
 
                 {ingredients.map((ing, idx) => (
-                  <div key={`${ing.ingredient_id}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: m?'0.4rem 0.75rem':'0.45rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: idx%2===0?'transparent':'rgba(255,255,255,0.015)' }}>
-                    <div style={{ width: m?30:34, height: m?30:34, flexShrink: 0, borderRadius: 6, background: `url(${resolveFoodImage(ing, { size: 80 })}) center/cover`, border: '1px solid rgba(255,255,255,0.08)' }} />
+                  <div key={`${ing.ingredient_id}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: m?'0.6rem 0.75rem':'0.7rem 0.95rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ width: m?38:42, height: m?38:42, flexShrink: 0, borderRadius: 10, background: `url(${resolveFoodImage(ing, { size: 80 })}) center/cover`, border: '1px solid rgba(255,255,255,0.1)' }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: m?'0.78rem':'0.82rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>{ing.name}</div>
-                      <div style={{ fontSize: m?'0.58rem':'0.6rem', color: 'rgba(255,255,255,0.4)', marginTop: 1, fontWeight: 600 }}>{Math.round(ing.cal)}/100g · {Math.round(ing.prot)}E · {Math.round(ing.carbs)}K · {Math.round(ing.fat)}V</div>
+                      <div style={{ fontSize: m?'0.85rem':'0.9rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.015em' }}>{ing.name}</div>
+                      <div style={{ fontSize: m?'0.64rem':'0.68rem', color: 'rgba(255,255,255,0.4)', marginTop: 2, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.7)' }}>{Math.round(ing.cal)}</span> kcal · {Math.round(ing.prot)}g eiwit <span style={{ opacity: 0.6 }}>per 100g</span>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem', flexShrink: 0 }}>
                       <button onClick={() => stepAmount(idx, -1)} style={stepAmtBtn(m)}>−</button>
@@ -411,8 +413,8 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
               const hasDiff = Math.abs(diff) >= 1
               return (
                 <div key={i} style={{ flex: 1, padding: m?'0.35rem 0.5rem':'0.45rem 0.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: i<3?'1px solid rgba(255,255,255,0.05)':'none' }}>
-                  <span style={{ fontSize: m?'0.5rem':'0.55rem', fontWeight: 800, color: 'rgba(255,215,0,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</span>
-                  <span style={{ fontSize: m?'1rem':'1.15rem', fontWeight: 900, color: '#FFD700', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
+                  <span style={{ fontSize: m?'0.52rem':'0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>{s.label}</span>
+                  <span style={{ fontSize: m?'1.05rem':'1.2rem', fontWeight: 900, color: '#fff', lineHeight: 1.15, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
                     {Math.round(s.val)}<span style={{ fontSize: '0.55em', opacity: 0.6 }}>{s.unit}</span>
                     {hasDiff && <span style={{ fontSize: '0.5em', fontWeight: 800, marginLeft: 3, color: diff>0?'#10b981':'#ef4444' }}>{diff>0?'+':''}{Math.round(diff)}</span>}
                   </span>
@@ -427,15 +429,15 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
           {saveError && <div style={{ fontSize: '0.55rem', color: '#ef4444', margin: m?'0.4rem 0.6rem 0':'0.4rem 0.85rem 0', padding: '0.3rem 0.5rem', background: 'rgba(239,68,68,0.08)', borderRadius: '4px' }}>{saveError}</div>}
           {clientMode ? (
             <div style={{ display: 'flex' }}>
-              <button onClick={() => handleSave('client')} disabled={saving} style={saveBtn(m,'#FFD700',saving,false)} title="Ga verder om te kiezen waar je dit opslaat">
+              <button onClick={() => handleSave('client')} disabled={saving} style={saveBtn(m,'#fff',saving,false)} title="Ga verder om te kiezen waar je dit opslaat">
                 <Save size={13}/><span>{saving ? 'Bezig...' : 'Opslaan →'}</span>
               </button>
             </div>
           ) : (
             <div style={{ display: 'flex' }}>
               <button onClick={() => handleSave('plan')} disabled={saving} style={saveBtn(m,'#fff',saving,false)} title="Alleen in dit plan — niet in database"><Zap size={13}/><span>Plan</span></button>
-              <button onClick={() => handleSave('permanent')} disabled={saving||!meal.id} style={saveBtn(m,'#FFD700',saving||!meal.id,true)} title="Overschrijf permanent in database"><Save size={13}/><span>Overschrijf</span></button>
-              <button onClick={() => handleSave('copy')} disabled={saving} style={saveBtn(m,'#10b981',saving,true)} title="Sla op als nieuwe meal in database"><Copy size={13}/><span>Kopie</span></button>
+              <button onClick={() => handleSave('permanent')} disabled={saving||!meal.id} style={saveBtn(m,'secundair',saving||!meal.id,true)} title="Overschrijf permanent in database"><Save size={13}/><span>Overschrijf</span></button>
+              <button onClick={() => handleSave('copy')} disabled={saving} style={saveBtn(m,'secundair',saving,true)} title="Sla op als nieuwe meal in database"><Copy size={13}/><span>Kopie</span></button>
             </div>
           )}
         </div>
@@ -449,8 +451,10 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
 }
 
 function stepAmtBtn(m) {
-  const s = m ? 24 : 26
-  return { width: s, height: s, flexShrink: 0, padding: 0, background: 'transparent', border: 'none', color: 'rgba(255,215,0,0.7)', fontSize: m?'1.3rem':'1.4rem', fontWeight: 700, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }
+  // Een omlijnd vlak in plaats van een los teken: je moet kunnen zien dat het
+  // een knop is, en er met een duim op kunnen mikken.
+  const s = m ? 28 : 30
+  return { width: s, height: s, flexShrink: 0, padding: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, color: '#fff', fontSize: m?'1.1rem':'1.15rem', fontWeight: 900, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }
 }
 
 function stepBtn(disabled) {
@@ -458,5 +462,20 @@ function stepBtn(disabled) {
 }
 
 function saveBtn(m, color, disabled, divider) {
-  return { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: m?'0.55rem 0.3rem':'0.65rem 0.4rem', background: 'transparent', border: 'none', borderLeft: divider ? '1px solid rgba(255,255,255,0.06)' : 'none', color: disabled?'rgba(255,255,255,0.18)':color, fontSize: m?'0.66rem':'0.72rem', fontWeight: 800, cursor: disabled?'not-allowed':'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit', letterSpacing: '-0.01em' }
+  // `color` bepaalt nog of het de hoofdactie is (wit vlak) of een tweede keuze
+  // (kaal, grijs). Het gouden vlak is eruit; dit venster staat in dezelfde
+  // taal als de rest van de app.
+  const hoofd = color === '#FFD700' || color === '#fff'
+  return {
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    minHeight: m ? 44 : 48, padding: m?'0 0.4rem':'0 0.5rem',
+    background: disabled ? 'rgba(255,255,255,0.06)' : (hoofd ? '#fff' : 'transparent'),
+    border: 'none',
+    borderLeft: divider ? '1px solid rgba(255,255,255,0.1)' : 'none',
+    color: disabled ? 'rgba(255,255,255,0.25)' : (hoofd ? '#0a0a0a' : 'rgba(255,255,255,0.6)'),
+    fontSize: m?'0.78rem':'0.82rem', fontWeight: 900,
+    cursor: disabled?'not-allowed':'pointer',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    fontFamily: 'inherit', letterSpacing: '-0.01em',
+  }
 }
