@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -57,6 +58,23 @@
     </queries>
 
     <!-- Permissions -->
+
+    <!-- capacitor-health declareert in zijn eigen manifest twaalf leesrechten.
+         Wij gebruiken er maar een: READ_STEPS (zie telefoonStappen.js). Google
+         Play laat je elk gezondheidsrecht apart verantwoorden en weigert rechten
+         die de app niet gebruikt; READ_EXERCISE_ROUTE heeft zelfs een eigen
+         goedkeuringstraject. Daarom strepen we de rest hier weg. Voeg een recht
+         hier pas weer toe als de app het ook echt opvraagt. -->
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_LEAN_BODY_MASS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" tools:node="remove" />
 
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
