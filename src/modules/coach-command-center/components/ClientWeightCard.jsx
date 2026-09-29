@@ -49,6 +49,35 @@ const GOAL_LABELS = {
   fitness: 'Fitter worden', general_fitness: 'Fitter worden',
 }
 
+// Hoe lang ligt de langst wachtende check-in er al, en wat betekent dat voor
+// de stip?
+//
+// Een check-in komt wekelijks binnen. Dezelfde dag reageren is netjes, na een
+// paar dagen wordt het vervelend, en ligt hij er een week, dan heeft de klant
+// zijn week ingeleverd zonder ooit antwoord te krijgen. Die oploop zit in de
+// kleur, zodat je in één blik ziet wie het langst wacht in plaats van alleen
+// dát er iemand wacht.
+//
+// De stip groeit ook een beetje mee: kleur alleen is lastig te zien op een
+// donkere kaart met een oogopslag van een halve seconde.
+const CHECKIN_TRAPPEN = [
+  { vanaf: 0, kleur: '#ffffff', maat: 9,  gloed: 6 },   // vandaag of gisteren
+  { vanaf: 2, kleur: '#fbbf24', maat: 10, gloed: 7 },   // begint te liggen
+  { vanaf: 4, kleur: '#f59e0b', maat: 11, gloed: 8 },   // bijna een week
+  { vanaf: 7, kleur: '#ef4444', maat: 12, gloed: 10 },  // een hele week niets gehoord
+]
+
+function checkinStip(open) {
+  const datum = open?.oudste || open?.laatste
+  if (!datum) return { ...CHECKIN_TRAPPEN[0], dagen: null }
+  const toen = new Date(`${String(datum).slice(0, 10)}T00:00:00`).getTime()
+  if (!Number.isFinite(toen)) return { ...CHECKIN_TRAPPEN[0], dagen: null }
+  const nu = new Date(); nu.setHours(0, 0, 0, 0)
+  const dagen = Math.max(0, Math.round((nu.getTime() - toen) / 86400000))
+  const trap = [...CHECKIN_TRAPPEN].reverse().find(t => dagen >= t.vanaf) || CHECKIN_TRAPPEN[0]
+  return { ...trap, dagen }
+}
+
 export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange }) {
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
@@ -341,25 +370,28 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       display: 'flex', alignItems: 'stretch',
     }}>
 
-      {/* Wit bolletje rechtsboven: deze klant heeft een check-in ingediend die
-          jij nog niet hebt nagekeken. Bewust niet meer dan een stip — je scant
-          de lijst op wie aandacht nodig heeft, en een badge met tekst maakt van
-          elke kaart een mededeling. Verdwijnt zodra je de check-in in het
-          check-in-scherm afhandelt (status wordt dan 'reviewed'). */}
-      {client.openCheckin?.aantal > 0 && (
-        <div
-          title={client.openCheckin.aantal === 1
-            ? 'Check-in wacht op je'
-            : `${client.openCheckin.aantal} check-ins wachten op je`}
-          style={{
-            position: 'absolute', top: 8, right: 8, zIndex: 3,
-            width: 9, height: 9, borderRadius: '50%',
-            background: '#fff',
-            boxShadow: '0 0 0 3px #0a0a0a, 0 2px 8px rgba(0,0,0,0.6)',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
+      {/* Bolletje rechtsboven: deze klant heeft een check-in ingediend die jij
+          nog niet hebt ingezien. Bewust niet meer dan een stip — je scant de
+          lijst op wie aandacht nodig heeft, en een badge met tekst maakt van
+          elke kaart een mededeling.
+          Verdwijnt zodra je zijn check-ins opent in het inzichtpaneel. Het
+          kleurt mee met hoe lang de langst wachtende er al ligt: vers is wit,
+          een week oud is rood. */}
+      {client.openCheckin?.aantal > 0 && (() => {
+        const stip = checkinStip(client.openCheckin)
+        return (
+          <div
+            title={`${client.openCheckin.aantal === 1 ? 'Check-in wacht op je' : `${client.openCheckin.aantal} check-ins wachten op je`}${stip.dagen != null ? ` · ${stip.dagen} dag${stip.dagen === 1 ? '' : 'en'}` : ''}`}
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 3,
+              width: stip.maat, height: stip.maat, borderRadius: '50%',
+              background: stip.kleur,
+              boxShadow: `0 0 0 3px #0a0a0a, 0 0 ${stip.gloed}px ${stip.kleur}`,
+              pointerEvents: 'none',
+            }}
+          />
+        )
+      })()}
 
       {/* Foto-strook. Een tiende van de breedte: genoeg om een gezicht te
           herkennen, niet zoveel dat het een fotoalbum wordt. Geen foto →

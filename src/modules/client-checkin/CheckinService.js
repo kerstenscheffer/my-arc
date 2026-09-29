@@ -261,6 +261,24 @@ export default class CheckinService {
   /**
    * Get all check-ins for coach
    */
+  // De coach heeft de check-ins van deze klant ingezien.
+  //
+  // Zet alleen coach_gezien_at, niet status. Ingezien is niet afgehandeld: het
+  // bolletje op de klantkaart mag weg, maar de check-in blijft in je lijst
+  // staan tot je hem echt behandelt.
+  async markeerGezien(clientId) {
+    if (!clientId) return { aantal: 0 }
+    const { data, error } = await this.supabase
+      .from('client_checkins')
+      .update({ coach_gezien_at: new Date().toISOString() })
+      .eq('client_id', clientId)
+      .eq('status', 'submitted')
+      .is('coach_gezien_at', null)
+      .select('id')
+    if (error) { console.warn('check-in als gezien markeren mislukt:', error.message); return { aantal: 0 } }
+    return { aantal: (data || []).length }
+  }
+
   async getCoachCheckins(coachId, filters = {}) {
     try {
       let query = this.supabase

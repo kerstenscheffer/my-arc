@@ -80,6 +80,18 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   // weight + coaching logs + rest in achtergrond. setLoading=false
   // gebeurt zodra clients binnen zijn — niet pas na de 18-maand
   // weight-query voor ALLE klanten (= de oude flessenhals).
+  // De check-in-kolom in het inzichtpaneel meldt dat hij ze heeft ingezien.
+  // Dan hoort het bolletje meteen weg, zonder de hele lijst opnieuw te laden.
+  useEffect(() => {
+    const opGezien = (e) => {
+      const id = e?.detail?.clientId
+      if (!id) return
+      setClientsWithData(prev => prev.map(c => (c.id === id ? { ...c, openCheckin: null } : c)))
+    }
+    window.addEventListener('myarc:checkin-gezien', opGezien)
+    return () => window.removeEventListener('myarc:checkin-gezien', opGezien)
+  }, [])
+
   const loadData = async () => {
     setLoading(true)
     try {
@@ -134,13 +146,21 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           .select('client_id, checkin_date')
           .in('client_id', clientIds)
           .eq('status', 'submitted')
+          .is('coach_gezien_at', null)
           .order('checkin_date', { ascending: false })
           .then(r => {
             const perKlant = {}
             r.data?.forEach(row => {
               const huidig = perKlant[row.client_id]
-              if (!huidig) perKlant[row.client_id] = { aantal: 1, laatste: row.checkin_date }
-              else huidig.aantal += 1
+              // `oudste` voedt de kleur van het bolletje: hoe lang ligt de
+              // langst wachtende check-in er al? De nieuwste zegt daar niets
+              // over -- iemand die vorige week en deze week inleverde heeft
+              // een probleem van vorige week.
+              if (!huidig) perKlant[row.client_id] = { aantal: 1, laatste: row.checkin_date, oudste: row.checkin_date }
+              else {
+                huidig.aantal += 1
+                if (row.checkin_date < huidig.oudste) huidig.oudste = row.checkin_date
+              }
             })
             return perKlant
           }, (e) => { console.warn('open check-ins laden mislukt:', e?.message); return {} })

@@ -379,6 +379,14 @@ export default function CheckinsColumn({ client, db, isMobile }) {
       .then(rows => { if (!cancelled) setCheckins(rows || []) })
       .catch(() => { if (!cancelled) setCheckins([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
+
+    // Je hebt ze nu voor je: het bolletje op de klantkaart mag weg. Het
+    // command-center staat in een eigen componentboom en kan deze state niet
+    // zien, vandaar één bericht op window — zelfde patroon als bij de macro's.
+    service.markeerGezien(client.id).then(({ aantal }) => {
+      if (cancelled || !aantal) return
+      window.dispatchEvent(new CustomEvent('myarc:checkin-gezien', { detail: { clientId: client.id } }))
+    })
     return () => { cancelled = true }
   }, [client?.id, db])
 
