@@ -759,7 +759,7 @@ function getTitleStyle(isMobile) {
   return {
     fontSize: isMobile ? '1.25rem' : '1.5rem',
     fontWeight: '700',
-    background: 'linear-gradient(135deg, #C9A55A 0%, #FFA500 100%)',
+    background: 'linear-gradient(135deg, #C9A55A 0%, #fff 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     margin: 0,
@@ -1037,7 +1037,7 @@ function getPrimaryButtonStyle(isMobile, copied) {
     padding: isMobile ? '0.75rem 1.5rem' : '0.875rem 2rem',
     background: copied 
       ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-      : 'linear-gradient(135deg, #C9A55A 0%, #FFA500 100%)',
+      : 'linear-gradient(135deg, #C9A55A 0%, #fff 100%)',
     border: 'none',
     borderRadius: '10px',
     color: copied ? '#fff' : '#000',

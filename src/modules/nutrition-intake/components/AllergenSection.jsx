@@ -81,8 +81,8 @@ export default function AllergenSection({ value, onChange, onComplete, isMobile 
             return (
               <button key={opt.id} onClick={() => setDietPreference(opt.id)} style={{
                 padding: 0, overflow: 'hidden',
-                background: sel ? 'rgba(255,215,0,0.06)' : '#0a0a0a',
-                border: `1px solid ${sel ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                background: sel ? 'rgba(255,255,255,0.06)' : '#0a0a0a',
+                border: `1px solid ${sel ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.06)'}`,
                 borderRadius: isMobile ? '10px' : '12px',
                 cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -90,10 +90,10 @@ export default function AllergenSection({ value, onChange, onComplete, isMobile 
               }}>
                 <div style={{ width: '100%', height: isMobile ? '50px' : '60px', backgroundImage: `url(${opt.image})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
                   <div style={{ position: 'absolute', inset: 0, background: sel ? 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 100%)' : 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 100%)' }} />
-                  {sel && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #FFD700, #FFA500)' }} />}
+                  {sel && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #fff, #fff)' }} />}
                 </div>
                 <div style={{ padding: isMobile ? '0.4rem 0.5rem' : '0.5rem 0.6rem' }}>
-                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: sel ? 800 : 700, color: sel ? '#FFD700' : '#fff' }}>{opt.label}</span>
+                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: sel ? 800 : 700, color: sel ? '#fff' : '#fff' }}>{opt.label}</span>
                 </div>
               </button>
             )
@@ -134,9 +134,9 @@ export default function AllergenSection({ value, onChange, onComplete, isMobile 
       <div style={{ padding: r(isMobile, '0.6rem 1rem', '0.75rem 1.25rem'), borderBottom: `1px solid ${t.colors.border}` }}>
         <div style={{ fontSize: r(isMobile, '0.55rem', '0.6rem'), fontWeight: 700, color: t.colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>Andere allergieën?</div>
         <input type="text" value={customAllergens} onChange={e => setCustomAllergens(e.target.value)} placeholder="Bijv: sesam, selderij, mosterd"
-          style={{ width: '100%', padding: r(isMobile, '0.6rem 0.75rem', '0.65rem 0.85rem'), background: t.colors.inputBg, border: `1px solid ${customAllergens ? 'rgba(255,215,0,0.25)' : t.colors.borderVisible}`, borderRadius: '8px', color: customAllergens ? '#FFD700' : t.colors.white, fontSize: r(isMobile, '0.8rem', '0.85rem'), fontWeight: customAllergens ? 800 : 600, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
-          onFocus={e => { e.target.style.borderColor = '#FFD700' }}
-          onBlur={e => { e.target.style.borderColor = customAllergens ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)' }}
+          style={{ width: '100%', padding: r(isMobile, '0.6rem 0.75rem', '0.65rem 0.85rem'), background: t.colors.inputBg, border: `1px solid ${customAllergens ? 'rgba(255,255,255,0.25)' : t.colors.borderVisible}`, borderRadius: '8px', color: customAllergens ? '#fff' : t.colors.white, fontSize: r(isMobile, '0.8rem', '0.85rem'), fontWeight: customAllergens ? 800 : 600, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+          onFocus={e => { e.target.style.borderColor = '#fff' }}
+          onBlur={e => { e.target.style.borderColor = customAllergens ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)' }}
         />
       </div>
 
@@ -152,8 +152,8 @@ export default function AllergenSection({ value, onChange, onComplete, isMobile 
       <div style={{ padding: r(isMobile, '0.6rem 1rem', '0.75rem 1.25rem') }}>
         <button onClick={handleConfirm} style={{
           width: '100%', padding: r(isMobile, '0.65rem', '0.7rem'),
-          background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)',
-          borderRadius: '8px', color: '#FFD700',
+          background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+          borderRadius: '8px', color: '#fff',
           fontSize: r(isMobile, '0.72rem', '0.76rem'), fontWeight: 800,
           cursor: 'pointer', minHeight: '40px',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'

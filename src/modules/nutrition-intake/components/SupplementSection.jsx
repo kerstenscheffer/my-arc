@@ -106,9 +106,9 @@ export default function SupplementSection({ value, onChange, isMobile, allergenD
             return (
               <button key={opt.id} onClick={() => update('openness', opt.id)} style={{
                 padding: r(isMobile, '0.5rem 0.6rem', '0.55rem 0.7rem'),
-                background: sel ? 'rgba(255,215,0,0.06)' : t.colors.inputBg,
-                border: `1px solid ${sel ? 'rgba(255,215,0,0.35)' : t.colors.borderVisible}`,
-                borderRadius: '8px', color: sel ? '#FFD700' : t.colors.textSecondary,
+                background: sel ? 'rgba(255,255,255,0.06)' : t.colors.inputBg,
+                border: `1px solid ${sel ? 'rgba(255,255,255,0.35)' : t.colors.borderVisible}`,
+                borderRadius: '8px', color: sel ? '#fff' : t.colors.textSecondary,
                 fontSize: r(isMobile, '0.7rem', '0.74rem'), fontWeight: sel ? 800 : 600,
                 cursor: 'pointer', minHeight: '40px',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -128,9 +128,9 @@ export default function SupplementSection({ value, onChange, isMobile, allergenD
               return (
                 <button key={opt.id} onClick={() => update('supp_budget', opt.id)} style={{
                   padding: r(isMobile, '0.5rem 0.5rem', '0.55rem 0.6rem'),
-                  background: sel ? 'rgba(255,215,0,0.06)' : t.colors.inputBg,
-                  border: `1px solid ${sel ? 'rgba(255,215,0,0.35)' : t.colors.borderVisible}`,
-                  borderRadius: '8px', color: sel ? '#FFD700' : t.colors.textSecondary,
+                  background: sel ? 'rgba(255,255,255,0.06)' : t.colors.inputBg,
+                  border: `1px solid ${sel ? 'rgba(255,255,255,0.35)' : t.colors.borderVisible}`,
+                  borderRadius: '8px', color: sel ? '#fff' : t.colors.textSecondary,
                   fontSize: r(isMobile, '0.7rem', '0.74rem'), fontWeight: sel ? 800 : 600,
                   cursor: 'pointer', minHeight: '40px',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -150,13 +150,13 @@ export default function SupplementSection({ value, onChange, isMobile, allergenD
             style={{
               width: '100%', padding: r(isMobile, '0.6rem 0.75rem', '0.65rem 0.85rem'),
               background: t.colors.inputBg,
-              border: `1px solid ${data.current_supps ? 'rgba(255,215,0,0.25)' : t.colors.borderVisible}`,
-              borderRadius: '8px', color: data.current_supps ? '#FFD700' : t.colors.white,
+              border: `1px solid ${data.current_supps ? 'rgba(255,255,255,0.25)' : t.colors.borderVisible}`,
+              borderRadius: '8px', color: data.current_supps ? '#fff' : t.colors.white,
               fontSize: r(isMobile, '0.8rem', '0.85rem'), fontWeight: data.current_supps ? 700 : 600,
               fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box'
             }}
-            onFocus={e => { e.target.style.borderColor = '#FFD700' }}
-            onBlur={e => { e.target.style.borderColor = data.current_supps ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)' }}
+            onFocus={e => { e.target.style.borderColor = '#fff' }}
+            onBlur={e => { e.target.style.borderColor = data.current_supps ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)' }}
           />
         </QRow>
       )}
@@ -242,7 +242,7 @@ export default function SupplementSection({ value, onChange, isMobile, allergenD
               fontSize: r(isMobile, '0.8rem', '0.85rem'), fontFamily: 'inherit',
               outline: 'none', resize: 'vertical', lineHeight: 1.4, boxSizing: 'border-box'
             }}
-            onFocus={e => { e.target.style.borderColor = '#FFD700' }}
+            onFocus={e => { e.target.style.borderColor = '#fff' }}
             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)' }}
           />
         </QRow>
@@ -252,9 +252,9 @@ export default function SupplementSection({ value, onChange, isMobile, allergenD
       <div style={{ padding: r(isMobile, '0.6rem 1rem', '0.75rem 1.25rem'), borderTop: `1px solid ${t.colors.border}` }}>
         <button onClick={handleConfirm} disabled={!isComplete} style={{
           width: '100%', padding: r(isMobile, '0.65rem', '0.7rem'),
-          background: isComplete ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)',
-          border: `1px solid ${isComplete ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.04)'}`,
-          borderRadius: '8px', color: isComplete ? '#FFD700' : t.colors.textMuted,
+          background: isComplete ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+          border: `1px solid ${isComplete ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.04)'}`,
+          borderRadius: '8px', color: isComplete ? '#fff' : t.colors.textMuted,
           fontSize: r(isMobile, '0.72rem', '0.76rem'), fontWeight: 800,
           cursor: isComplete ? 'pointer' : 'default', minHeight: '40px',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',

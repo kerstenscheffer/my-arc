@@ -29,7 +29,7 @@ export default function ProgressBar({ sections, currentSection, completedSection
               padding: isMobile ? '0.65rem 0.75rem' : '0.7rem 1rem',
               fontSize: isMobile ? '0.55rem' : '0.58rem',
               fontWeight: isActive ? 800 : 600,
-              color: isActive ? '#FFD700' : isCompleted ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)',
+              color: isActive ? '#fff' : isCompleted ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)',
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
@@ -40,14 +40,14 @@ export default function ProgressBar({ sections, currentSection, completedSection
               display: 'flex', alignItems: 'center', gap: '0.3rem',
             }}>
               {isCompleted && !isActive && (
-                <span style={{ color: '#FFD700', fontSize: '0.5rem' }}>✓</span>
+                <span style={{ color: '#fff', fontSize: '0.5rem' }}>✓</span>
               )}
               {section.label || section.title || section}
               {/* Gouden streep onderaan actieve tab */}
               {isActive && (
                 <div style={{
                   position: 'absolute', bottom: 0, left: isMobile ? '0.75rem' : '1rem', right: isMobile ? '0.75rem' : '1rem',
-                  height: '2px', background: 'linear-gradient(90deg, #FFD700, #FFA500)',
+                  height: '2px', background: 'linear-gradient(90deg, #fff, #fff)',
                   borderRadius: '1px 1px 0 0',
                 }} />
               )}
@@ -73,9 +73,9 @@ export default function ProgressBar({ sections, currentSection, completedSection
                   height: '3px',
                   borderRadius: '2px',
                   background: isCompleted
-                    ? '#FFD700'
+                    ? '#fff'
                     : isActive
-                      ? 'rgba(255,215,0,0.5)'
+                      ? 'rgba(255,255,255,0.5)'
                       : 'rgba(255,255,255,0.08)',
                   transition: 'all 0.25s ease',
                   flexShrink: 0,
@@ -88,7 +88,7 @@ export default function ProgressBar({ sections, currentSection, completedSection
             <span style={{
               fontSize: isMobile ? '0.5rem' : '0.52rem',
               fontWeight: 700,
-              color: 'rgba(255,215,0,0.5)',
+              color: 'rgba(255,255,255,0.5)',
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
               marginLeft: '0.25rem',

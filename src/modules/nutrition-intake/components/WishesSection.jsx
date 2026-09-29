@@ -67,9 +67,9 @@ export default function WishesSection({ value, onChange, onComplete, isMobile, g
       <div style={{ padding: r(isMobile, '0.6rem 1rem', '0.75rem 1.25rem'), borderTop: `1px solid ${t.colors.border}` }}>
         <button onClick={handleConfirm} disabled={!isComplete()} style={{
           width: '100%', padding: r(isMobile, '0.65rem', '0.7rem'),
-          background: isComplete() ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)',
-          border: `1px solid ${isComplete() ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.04)'}`,
-          borderRadius: '8px', color: isComplete() ? '#FFD700' : t.colors.textMuted,
+          background: isComplete() ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+          border: `1px solid ${isComplete() ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.04)'}`,
+          borderRadius: '8px', color: isComplete() ? '#fff' : t.colors.textMuted,
           fontSize: r(isMobile, '0.72rem', '0.76rem'), fontWeight: 800,
           cursor: isComplete() ? 'pointer' : 'default', minHeight: '40px',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -92,15 +92,15 @@ function TextQuestion({ label, placeholder, value, onChange, isMobile, multiline
         rows={multiline ? 3 : undefined} type={multiline ? undefined : 'text'}
         style={{
           width: '100%', padding: r(isMobile, '0.6rem 0.75rem', '0.65rem 0.85rem'),
-          background: t.colors.inputBg, border: `1px solid ${value ? 'rgba(255,215,0,0.25)' : t.colors.borderVisible}`,
-          borderRadius: '8px', color: value ? '#FFD700' : t.colors.white,
+          background: t.colors.inputBg, border: `1px solid ${value ? 'rgba(255,255,255,0.25)' : t.colors.borderVisible}`,
+          borderRadius: '8px', color: value ? '#fff' : t.colors.white,
           fontSize: r(isMobile, '0.8rem', '0.85rem'), fontWeight: value ? 700 : 600,
           fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
           resize: multiline ? 'vertical' : 'none', lineHeight: multiline ? 1.4 : 'normal',
           transition: 'border-color 0.2s ease'
         }}
-        onFocus={e => { e.target.style.borderColor = '#FFD700'; e.target.style.background = 'rgba(255,215,0,0.03)' }}
-        onBlur={e => { e.target.style.borderColor = value ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)'; e.target.style.background = '#111' }}
+        onFocus={e => { e.target.style.borderColor = '#fff'; e.target.style.background = 'rgba(255,255,255,0.03)' }}
+        onBlur={e => { e.target.style.borderColor = value ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'; e.target.style.background = '#111' }}
       />
     </div>
   )

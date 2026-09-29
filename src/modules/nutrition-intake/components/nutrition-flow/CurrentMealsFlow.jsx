@@ -171,7 +171,7 @@ function MealSlot({
               style={{
                 background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
                 color: 'rgba(255,255,255,0.75)', fontSize: isMobile ? '0.67rem' : '0.7rem',
-                fontWeight: 600, cursor: 'pointer', padding: '0.25rem 0.6rem',
+                fontWeight: 800, cursor: 'pointer', padding: '0.25rem 0.6rem',
                 fontFamily: 'inherit', touchAction: 'manipulation',
                 transition: 'background 0.15s ease',
               }}

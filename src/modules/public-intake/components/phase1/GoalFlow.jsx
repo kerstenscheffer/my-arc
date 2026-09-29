@@ -38,7 +38,7 @@ function BfPhotoGrid({ value, onChange, isMobile, extraOption }) {
               onClick={() => onChange(opt.value)}
               style={{
                 background: 'transparent',
-                border: `2px solid ${isSelected ? '#FFD700' : 'rgba(255,255,255,0.06)'}`,
+                border: `2px solid ${isSelected ? '#fff' : 'rgba(255,255,255,0.06)'}`,
                 borderRadius: '8px', overflow: 'hidden',
                 cursor: 'pointer', padding: 0,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -56,13 +56,13 @@ function BfPhotoGrid({ value, onChange, isMobile, extraOption }) {
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0,
                 padding: '0.35rem 0.25rem',
-                background: isSelected ? 'rgba(255,215,0,0.9)' : 'rgba(0,0,0,0.75)'
+                background: isSelected ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.75)'
               }}>
                 <div style={{ fontSize: isMobile ? '0.65rem' : '0.68rem', fontWeight: 800, color: isSelected ? '#000' : '#fff', textAlign: 'center' }}>{opt.label}</div>
                 <div style={{ fontSize: '0.42rem', color: isSelected ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.3, marginTop: '0.1rem' }}>{opt.sub}</div>
               </div>
               {isSelected && (
-                <div style={{ position: 'absolute', top: '0.3rem', right: '0.3rem', width: '16px', height: '16px', borderRadius: '50%', background: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'absolute', top: '0.3rem', right: '0.3rem', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#000' }}>✓</span>
                 </div>
               )}
@@ -73,20 +73,20 @@ function BfPhotoGrid({ value, onChange, isMobile, extraOption }) {
       {extraOption && (
         <button onClick={() => onChange('geen')} style={{
           width: '100%', padding: '0.65rem 1rem',
-          background: value === 'geen' ? 'rgba(255,215,0,0.07)' : '#0d0d0d',
-          border: `1px solid ${value === 'geen' ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
-          borderLeft: value === 'geen' ? '3px solid #FFD700' : '1px solid rgba(255,255,255,0.07)',
+          background: value === 'geen' ? 'rgba(255,255,255,0.07)' : '#0d0d0d',
+          border: `1px solid ${value === 'geen' ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
+          borderLeft: value === 'geen' ? '3px solid #fff' : '1px solid rgba(255,255,255,0.07)',
           borderRadius: value === 'geen' ? '0 8px 8px 0' : '8px',
           cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
           display: 'flex', alignItems: 'center', gap: '0.75rem',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
         }}>
-          <div style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${value === 'geen' ? '#FFD700' : 'rgba(255,255,255,0.15)'}`, background: value === 'geen' ? '#FFD700' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${value === 'geen' ? '#fff' : 'rgba(255,255,255,0.15)'}`, background: value === 'geen' ? '#fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {value === 'geen' && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#000' }} />}
           </div>
           <div>
-            <div style={{ fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 700, color: value === 'geen' ? '#FFD700' : 'rgba(255,255,255,0.8)' }}>Geen voorkeur</div>
-            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 500, marginTop: '0.15rem' }}>Coach bepaalt wat haalbaar is</div>
+            <div style={{ fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 700, color: value === 'geen' ? '#fff' : 'rgba(255,255,255,0.8)' }}>Geen voorkeur</div>
+            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: '0.15rem' }}>Coach bepaalt wat haalbaar is</div>
           </div>
         </button>
       )}
@@ -117,7 +117,7 @@ function MusclePhotoGrid({ value, onChange, isMobile }) {
               onClick={() => onChange(opt.value)}
               style={{
                 background: 'transparent',
-                border: `2px solid ${isSelected ? '#FFD700' : 'rgba(255,255,255,0.06)'}`,
+                border: `2px solid ${isSelected ? '#fff' : 'rgba(255,255,255,0.06)'}`,
                 borderRadius: '8px', overflow: 'hidden',
                 cursor: 'pointer', padding: 0,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -135,13 +135,13 @@ function MusclePhotoGrid({ value, onChange, isMobile }) {
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0,
                 padding: '0.35rem 0.25rem',
-                background: isSelected ? 'rgba(255,215,0,0.9)' : 'rgba(0,0,0,0.75)'
+                background: isSelected ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.75)'
               }}>
                 <div style={{ fontSize: isMobile ? '0.62rem' : '0.65rem', fontWeight: 800, color: isSelected ? '#000' : '#fff', textAlign: 'center' }}>{opt.label}</div>
                 <div style={{ fontSize: '0.42rem', color: isSelected ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.3, marginTop: '0.1rem' }}>{opt.sub}</div>
               </div>
               {isSelected && (
-                <div style={{ position: 'absolute', top: '0.3rem', right: '0.3rem', width: '16px', height: '16px', borderRadius: '50%', background: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'absolute', top: '0.3rem', right: '0.3rem', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#000' }}>✓</span>
                 </div>
               )}
@@ -151,20 +151,20 @@ function MusclePhotoGrid({ value, onChange, isMobile }) {
       </div>
       <button onClick={() => onChange('geen')} style={{
         width: '100%', padding: '0.65rem 1rem',
-        background: value === 'geen' ? 'rgba(255,215,0,0.07)' : '#0d0d0d',
-        border: `1px solid ${value === 'geen' ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
-        borderLeft: value === 'geen' ? '3px solid #FFD700' : '1px solid rgba(255,255,255,0.07)',
+        background: value === 'geen' ? 'rgba(255,255,255,0.07)' : '#0d0d0d',
+        border: `1px solid ${value === 'geen' ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
+        borderLeft: value === 'geen' ? '3px solid #fff' : '1px solid rgba(255,255,255,0.07)',
         borderRadius: value === 'geen' ? '0 8px 8px 0' : '8px',
         cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
         display: 'flex', alignItems: 'center', gap: '0.75rem',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
       }}>
-        <div style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${value === 'geen' ? '#FFD700' : 'rgba(255,255,255,0.15)'}`, background: value === 'geen' ? '#FFD700' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${value === 'geen' ? '#fff' : 'rgba(255,255,255,0.15)'}`, background: value === 'geen' ? '#fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {value === 'geen' && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#000' }} />}
         </div>
         <div>
-          <div style={{ fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 700, color: value === 'geen' ? '#FFD700' : 'rgba(255,255,255,0.8)' }}>Geen voorkeur</div>
-          <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 500, marginTop: '0.15rem' }}>Coach bepaalt wat haalbaar is</div>
+          <div style={{ fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 700, color: value === 'geen' ? '#fff' : 'rgba(255,255,255,0.8)' }}>Geen voorkeur</div>
+          <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: '0.15rem' }}>Coach bepaalt wat haalbaar is</div>
         </div>
       </button>
     </div>

@@ -90,8 +90,8 @@ export default function GuidanceLevelSection({ value, onChange, onComplete, isMo
               style={{
                 padding: 0,
                 overflow: 'hidden',
-                background: isSelected ? 'rgba(255,215,0,0.04)' : '#0a0a0a',
-                border: `1.5px solid ${isSelected ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                background: isSelected ? 'rgba(255,255,255,0.04)' : '#0a0a0a',
+                border: `1.5px solid ${isSelected ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.06)'}`,
                 borderRadius: isMobile ? '10px' : '12px',
                 cursor: 'pointer',
                 textAlign: 'left',
@@ -128,7 +128,7 @@ export default function GuidanceLevelSection({ value, onChange, onComplete, isMo
                     position: 'absolute',
                     top: 0, left: 0, right: 0,
                     height: '2px',
-                    background: 'linear-gradient(90deg, #FFD700, #FFA500)'
+                    background: 'linear-gradient(90deg, #fff, #fff)'
                   }} />
                 )}
 
@@ -139,12 +139,12 @@ export default function GuidanceLevelSection({ value, onChange, onComplete, isMo
                     top: isMobile ? '0.4rem' : '0.5rem',
                     right: isMobile ? '0.4rem' : '0.5rem',
                     padding: '0.15rem 0.5rem',
-                    background: 'rgba(255,215,0,0.15)',
-                    border: '1px solid rgba(255,215,0,0.3)',
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.3)',
                     borderRadius: '3px',
                     fontSize: r(isMobile, '0.5rem', '0.52rem'),
                     fontWeight: 800,
-                    color: '#FFD700',
+                    color: '#fff',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
                   }}>
@@ -160,8 +160,8 @@ export default function GuidanceLevelSection({ value, onChange, onComplete, isMo
                   width: '22px',
                   height: '22px',
                   borderRadius: '50%',
-                  border: `2px solid ${isSelected ? '#FFD700' : 'rgba(255,255,255,0.2)'}`,
-                  background: isSelected ? '#FFD700' : 'transparent',
+                  border: `2px solid ${isSelected ? '#fff' : 'rgba(255,255,255,0.2)'}`,
+                  background: isSelected ? '#fff' : 'transparent',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -180,7 +180,7 @@ export default function GuidanceLevelSection({ value, onChange, onComplete, isMo
                 <div style={{
                   fontSize: r(isMobile, '0.82rem', '0.9rem'),
                   fontWeight: 800,
-                  color: isSelected ? '#FFD700' : '#fff',
+                  color: isSelected ? '#fff' : '#fff',
                   lineHeight: 1.2,
                   marginBottom: '0.15rem'
                 }}>
@@ -189,7 +189,7 @@ export default function GuidanceLevelSection({ value, onChange, onComplete, isMo
                 <div style={{
                   fontSize: r(isMobile, '0.6rem', '0.65rem'),
                   fontWeight: 600,
-                  color: isSelected ? 'rgba(255,215,0,0.6)' : t.colors.textSecondary,
+                  color: isSelected ? 'rgba(255,255,255,0.6)' : t.colors.textSecondary,
                   lineHeight: 1.35,
                   marginBottom: '0.1rem'
                 }}>
@@ -219,10 +219,10 @@ export default function GuidanceLevelSection({ value, onChange, onComplete, isMo
           style={{
             width: '100%',
             padding: r(isMobile, '0.65rem', '0.7rem'),
-            background: selected ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)',
-            border: `1px solid ${selected ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.04)'}`,
+            background: selected ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+            border: `1px solid ${selected ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.04)'}`,
             borderRadius: '8px',
-            color: selected ? '#FFD700' : t.colors.textMuted,
+            color: selected ? '#fff' : t.colors.textMuted,
             fontSize: r(isMobile, '0.72rem', '0.76rem'),
             fontWeight: 800,
             cursor: selected ? 'pointer' : 'default',

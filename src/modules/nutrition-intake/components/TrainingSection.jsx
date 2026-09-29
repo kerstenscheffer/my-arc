@@ -76,9 +76,9 @@ export default function TrainingSection({ value, onChange, onComplete, isMobile,
             return (
               <button key={day.id} onClick={() => toggleDay(day.id)} style={{
                 flex: 1, padding: r(isMobile, '0.5rem 0', '0.55rem 0'),
-                background: sel ? 'rgba(255,215,0,0.08)' : t.colors.inputBg,
-                border: `1px solid ${sel ? 'rgba(255,215,0,0.35)' : t.colors.borderVisible}`,
-                borderRadius: '6px', color: sel ? '#FFD700' : t.colors.textMuted,
+                background: sel ? 'rgba(255,255,255,0.08)' : t.colors.inputBg,
+                border: `1px solid ${sel ? 'rgba(255,255,255,0.35)' : t.colors.borderVisible}`,
+                borderRadius: '6px', color: sel ? '#fff' : t.colors.textMuted,
                 fontSize: r(isMobile, '0.6rem', '0.65rem'), fontWeight: sel ? 800 : 600,
                 cursor: 'pointer', minHeight: '36px',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -103,13 +103,13 @@ export default function TrainingSection({ value, onChange, onComplete, isMobile,
               return (
                 <button key={preset.id} onClick={() => { update('default_time', preset.id); update('varies_per_day', false) }} style={{
                   padding: r(isMobile, '0.45rem 0.5rem', '0.5rem 0.6rem'),
-                  background: sel ? 'rgba(255,215,0,0.06)' : t.colors.inputBg,
-                  border: `1px solid ${sel ? 'rgba(255,215,0,0.35)' : t.colors.borderVisible}`,
+                  background: sel ? 'rgba(255,255,255,0.06)' : t.colors.inputBg,
+                  border: `1px solid ${sel ? 'rgba(255,255,255,0.35)' : t.colors.borderVisible}`,
                   borderRadius: '8px', cursor: 'pointer', minHeight: '40px',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   transition: 'all 0.15s ease', textAlign: 'left', fontFamily: 'inherit'
                 }}>
-                  <div style={{ fontSize: r(isMobile, '0.7rem', '0.74rem'), fontWeight: sel ? 800 : 600, color: sel ? '#FFD700' : t.colors.textSecondary }}>{preset.label}</div>
+                  <div style={{ fontSize: r(isMobile, '0.7rem', '0.74rem'), fontWeight: sel ? 800 : 600, color: sel ? '#fff' : t.colors.textSecondary }}>{preset.label}</div>
                   <div style={{ fontSize: r(isMobile, '0.48rem', '0.5rem'), fontWeight: 500, color: t.colors.textMuted, marginTop: '0.05rem' }}>{preset.sub}</div>
                 </button>
               )
@@ -118,9 +118,9 @@ export default function TrainingSection({ value, onChange, onComplete, isMobile,
           <button onClick={() => update('varies_per_day', !data.varies_per_day)} style={{
             width: '100%', marginTop: r(isMobile, '0.3rem', '0.35rem'),
             padding: r(isMobile, '0.45rem 0.5rem', '0.5rem 0.6rem'),
-            background: data.varies_per_day ? 'rgba(255,215,0,0.06)' : 'transparent',
-            border: `1px solid ${data.varies_per_day ? 'rgba(255,215,0,0.35)' : t.colors.borderVisible}`,
-            borderRadius: '8px', color: data.varies_per_day ? '#FFD700' : t.colors.textMuted,
+            background: data.varies_per_day ? 'rgba(255,255,255,0.06)' : 'transparent',
+            border: `1px solid ${data.varies_per_day ? 'rgba(255,255,255,0.35)' : t.colors.borderVisible}`,
+            borderRadius: '8px', color: data.varies_per_day ? '#fff' : t.colors.textMuted,
             fontSize: r(isMobile, '0.65rem', '0.7rem'), fontWeight: data.varies_per_day ? 800 : 600,
             cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '38px'
@@ -137,16 +137,16 @@ export default function TrainingSection({ value, onChange, onComplete, isMobile,
               const selTime = data.per_day_times?.[dayId]
               return (
                 <div key={dayId} style={{ display: 'flex', alignItems: 'center', gap: r(isMobile, '0.3rem', '0.4rem'), padding: r(isMobile, '0.3rem 0', '0.35rem 0'), borderBottom: `1px solid ${t.colors.border}` }}>
-                  <span style={{ fontSize: r(isMobile, '0.65rem', '0.7rem'), fontWeight: 800, color: '#FFD700', minWidth: '24px' }}>{day?.label}</span>
+                  <span style={{ fontSize: r(isMobile, '0.65rem', '0.7rem'), fontWeight: 800, color: '#fff', minWidth: '24px' }}>{day?.label}</span>
                   <div style={{ flex: 1, display: 'flex', gap: '0.15rem', flexWrap: 'wrap' }}>
                     {TIME_PRESETS.map(preset => {
                       const active = selTime === preset.id
                       return (
                         <button key={preset.id} onClick={() => setPerDayTime(dayId, preset.id)} style={{
                           padding: r(isMobile, '0.25rem 0.35rem', '0.3rem 0.4rem'),
-                          background: active ? 'rgba(255,215,0,0.06)' : 'transparent',
-                          border: `1px solid ${active ? 'rgba(255,215,0,0.3)' : t.colors.borderVisible}`,
-                          borderRadius: '4px', color: active ? '#FFD700' : t.colors.textMuted,
+                          background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
+                          border: `1px solid ${active ? 'rgba(255,255,255,0.3)' : t.colors.borderVisible}`,
+                          borderRadius: '4px', color: active ? '#fff' : t.colors.textMuted,
                           fontSize: r(isMobile, '0.45rem', '0.48rem'), fontWeight: active ? 800 : 600,
                           cursor: 'pointer', fontFamily: 'inherit',
                           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '24px'
@@ -165,9 +165,9 @@ export default function TrainingSection({ value, onChange, onComplete, isMobile,
       <div style={{ padding: r(isMobile, '0.6rem 1rem', '0.75rem 1.25rem'), borderTop: `1px solid ${t.colors.border}` }}>
         <button onClick={handleConfirm} disabled={!isComplete} style={{
           width: '100%', padding: r(isMobile, '0.65rem', '0.7rem'),
-          background: isComplete ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)',
-          border: `1px solid ${isComplete ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.04)'}`,
-          borderRadius: '8px', color: isComplete ? '#FFD700' : t.colors.textMuted,
+          background: isComplete ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+          border: `1px solid ${isComplete ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.04)'}`,
+          borderRadius: '8px', color: isComplete ? '#fff' : t.colors.textMuted,
           fontSize: r(isMobile, '0.72rem', '0.76rem'), fontWeight: 800,
           cursor: isComplete ? 'pointer' : 'default', minHeight: '40px',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',

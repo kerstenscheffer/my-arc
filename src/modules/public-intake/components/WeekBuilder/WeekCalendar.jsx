@@ -40,10 +40,10 @@ export default function WeekCalendar({ schedule, isMobile, highlightDays = [] })
             fontSize: isMobile ? '0.48rem' : '0.5rem',
             fontWeight: 800,
             letterSpacing: '0.04em',
-            color: highlightDays.includes(day) ? '#FFD700' : 'rgba(255,255,255,0.3)',
+            color: highlightDays.includes(day) ? '#fff' : 'rgba(255,255,255,0.3)',
             paddingBottom: '2px',
             borderBottom: highlightDays.includes(day)
-              ? '1.5px solid rgba(255,215,0,0.4)'
+              ? '1.5px solid rgba(255,255,255,0.4)'
               : '1px solid rgba(255,255,255,0.04)'
           }}>
             {DAY_LABELS[day]}

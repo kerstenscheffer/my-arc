@@ -69,7 +69,7 @@ export default function SubmitSection({ onSubmit, isSubmitting, isSuccess, isMob
       <button onClick={onSubmit} disabled={isSubmitting} style={{
         width: '100%', padding: r(isMobile, '0.8rem', '0.9rem'),
         fontSize: r(isMobile, '0.85rem', '0.9rem'), fontWeight: 800,
-        color: '#000', background: isSubmitting ? 'rgba(255,215,0,0.5)' : t.colors.gold,
+        color: '#000', background: isSubmitting ? 'rgba(255,255,255,0.5)' : t.colors.gold,
         border: 'none', borderRadius: '8px',
         cursor: isSubmitting ? 'not-allowed' : 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',

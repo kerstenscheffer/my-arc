@@ -19,7 +19,7 @@ export const WORK_TYPES = {
 export const BLOCK_TYPES = {
   ...WORK_TYPES,
   slaap:    { label: 'Slaap',     color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)'  },
-  training: { label: 'Training',  color: '#FFD700', bg: 'rgba(255,215,0,0.12)'   },
+  training: { label: 'Training',  color: '#fff', bg: 'rgba(255,255,255,0.12)'   },
   vrij:     { label: 'Vrij',      color: '#6B7280', bg: 'rgba(107,114,128,0.06)' },
 }
 

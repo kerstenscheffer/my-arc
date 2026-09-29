@@ -119,9 +119,9 @@ export default function PracticalFlow({ data, onChange, isMobile, onNext, onBack
           style={{
             width: '100%', padding: isMobile ? '0.75rem' : '0.85rem',
             background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${data.gym_name ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
+            border: `1px solid ${data.gym_name ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
             borderRadius: '8px',
-            color: data.gym_name ? '#FFD700' : '#fff',
+            color: data.gym_name ? '#fff' : '#fff',
             fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 600,
             fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
             marginTop: '1rem'
@@ -164,7 +164,7 @@ export default function PracticalFlow({ data, onChange, isMobile, onNext, onBack
           </span>
           <button onClick={handleSelectAll} style={{
             background: 'transparent', border: 'none',
-            color: allSelected ? 'rgba(255,215,0,0.45)' : 'rgba(255,215,0,0.7)',
+            color: allSelected ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.7)',
             fontSize: '0.52rem', fontWeight: 700, cursor: 'pointer',
             fontFamily: 'inherit', padding: '0.1rem 0.25rem',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
@@ -182,9 +182,9 @@ export default function PracticalFlow({ data, onChange, isMobile, onNext, onBack
             return (
               <button key={opt.value} onClick={() => toggleEquipment(opt.value)} style={{
                 padding: '0.65rem 0.75rem', borderRadius: '8px',
-                background: sel ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${sel ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
-                color: sel ? '#FFD700' : 'rgba(255,255,255,0.55)',
+                background: sel ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${sel ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                color: sel ? '#fff' : 'rgba(255,255,255,0.55)',
                 fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: sel ? 700 : 600,
                 cursor: 'pointer', minHeight: '44px',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',

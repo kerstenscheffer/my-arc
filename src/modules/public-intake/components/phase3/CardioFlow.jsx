@@ -122,9 +122,9 @@ export default function CardioFlow({ data, onChange, isMobile, onNext, onBack, i
             return (
               <button key={opt.value} onClick={() => toggleType(opt.value)} style={{
                 padding: '0.65rem 0.75rem', borderRadius: '8px',
-                background: sel ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${sel ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
-                color: sel ? '#FFD700' : 'rgba(255,255,255,0.55)',
+                background: sel ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${sel ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                color: sel ? '#fff' : 'rgba(255,255,255,0.55)',
                 fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: sel ? 700 : 600,
                 cursor: 'pointer', minHeight: '44px',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',

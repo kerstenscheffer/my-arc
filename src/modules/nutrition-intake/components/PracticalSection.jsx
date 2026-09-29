@@ -126,13 +126,13 @@ export default function PracticalSection({ value, onChange, onComplete, isMobile
           placeholder="Bijv: Lactose-intolerant, Noten allergie"
           style={{
             width: '100%', padding: r(isMobile, '0.6rem 0.75rem', '0.65rem 0.85rem'),
-            background: t.colors.inputBg, border: `1px solid ${allergies ? 'rgba(255,215,0,0.25)' : t.colors.borderVisible}`,
-            borderRadius: '8px', color: allergies ? '#FFD700' : t.colors.white,
+            background: t.colors.inputBg, border: `1px solid ${allergies ? 'rgba(255,255,255,0.25)' : t.colors.borderVisible}`,
+            borderRadius: '8px', color: allergies ? '#fff' : t.colors.white,
             fontSize: r(isMobile, '0.8rem', '0.85rem'), fontWeight: allergies ? 800 : 600,
             fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box'
           }}
-          onFocus={e => { e.target.style.borderColor = '#FFD700' }}
-          onBlur={e => { e.target.style.borderColor = allergies ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)' }}
+          onFocus={e => { e.target.style.borderColor = '#fff' }}
+          onBlur={e => { e.target.style.borderColor = allergies ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)' }}
         />
       </div>
 
@@ -150,7 +150,7 @@ export default function PracticalSection({ value, onChange, onComplete, isMobile
             fontSize: r(isMobile, '0.8rem', '0.85rem'), fontFamily: 'inherit',
             outline: 'none', resize: 'vertical', lineHeight: 1.4, boxSizing: 'border-box'
           }}
-          onFocus={e => { e.target.style.borderColor = '#FFD700' }}
+          onFocus={e => { e.target.style.borderColor = '#fff' }}
           onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)' }}
         />
       </div>

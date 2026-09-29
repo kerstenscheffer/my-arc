@@ -146,20 +146,20 @@ function MotivationReminder({ personalData, isMobile }) {
   if (!personalData?.primary_goal && !personalData?.motivation) return null
   return (
     <div style={{
-      borderBottom: '1px solid rgba(255,215,0,0.06)',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
       padding: isMobile ? '0.6rem 1rem' : '0.7rem 1.25rem',
       display: 'flex', gap: '0.75rem', alignItems: 'flex-start'
     }}>
-      <div style={{ width: '2px', background: 'rgba(255,215,0,0.35)', borderRadius: '2px', alignSelf: 'stretch', flexShrink: 0 }} />
+      <div style={{ width: '2px', background: 'rgba(255,255,255,0.35)', borderRadius: '2px', alignSelf: 'stretch', flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         {personalData.primary_goal && (
-          <div style={{ fontSize: '0.42rem', fontWeight: 800, color: 'rgba(255,215,0,0.5)', letterSpacing: '0.08em', marginBottom: '0.15rem' }}>
+          <div style={{ fontSize: '0.42rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', marginBottom: '0.15rem' }}>
             {GOAL_LABELS[personalData.primary_goal] || personalData.primary_goal}
             {personalData.target_weight ? ` · ${personalData.target_weight} kg` : ''}
           </div>
         )}
         {personalData.motivation ? (
-          <div style={{ fontSize: isMobile ? '0.62rem' : '0.65rem', color: 'rgba(255,255,255,0.35)', fontWeight: 500, lineHeight: 1.5, fontStyle: 'italic', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          <div style={{ fontSize: isMobile ? '0.62rem' : '0.65rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, lineHeight: 1.5, fontStyle: 'italic', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
             "{personalData.motivation}"
           </div>
         ) : personalData.first_name ? (
@@ -614,7 +614,7 @@ export default function PublicIntakePage() {
               <div style={{
                 fontSize: isMobile ? '0.42rem' : '0.45rem',
                 fontWeight: isActive ? 800 : 600,
-                color: isActive ? '#FFD700' : isCompleted ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.18)',
+                color: isActive ? '#fff' : isCompleted ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.18)',
                 textTransform: 'uppercase', letterSpacing: '0.07em',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem'
               }}>
@@ -624,7 +624,7 @@ export default function PublicIntakePage() {
               {isActive && (
                 <div style={{
                   position: 'absolute', bottom: 0, left: '15%', right: '15%',
-                  height: '2px', background: 'linear-gradient(90deg, #FFD700, #FFA500)',
+                  height: '2px', background: 'linear-gradient(90deg, #fff, #fff)',
                   borderRadius: '1px 1px 0 0'
                 }} />
               )}
@@ -642,7 +642,7 @@ export default function PublicIntakePage() {
             <div style={{ fontSize: isMobile ? '1.4rem' : '1.6rem', fontWeight: 900, color: '#fff', lineHeight: 1.15, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>
               Welkom bij MY ARC
             </div>
-            <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', color: 'rgba(255,255,255,0.35)', fontWeight: 500, lineHeight: 1.6 }}>
+            <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, lineHeight: 1.6 }}>
               Bekijk dit korte filmpje voordat je begint. Daarna vul je het formulier in zodat we het perfecte plan voor je kunnen maken.
             </div>
           </div>
@@ -658,7 +658,7 @@ export default function PublicIntakePage() {
             {/* Gouden top-accent over de iframe */}
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: '2px', zIndex: 2,
-              background: 'linear-gradient(90deg, #FFD700, rgba(255,165,0,0.3), transparent)',
+              background: 'linear-gradient(90deg, #fff, rgba(255,255,255,0.3), transparent)',
               pointerEvents: 'none',
             }} />
             <iframe
@@ -677,7 +677,7 @@ export default function PublicIntakePage() {
           {/* Beginnen knop */}
           <button onClick={() => setPhase(1)} style={{
             width: '100%', padding: isMobile ? '0.9rem' : '0.95rem',
-            background: 'linear-gradient(90deg, #FFD700, #FFA500)',
+            background: 'linear-gradient(90deg, #fff, #fff)',
             border: 'none', borderRadius: '0',
             color: '#000', fontSize: isMobile ? '0.8rem' : '0.85rem',
             fontWeight: 800, letterSpacing: '0.04em',
@@ -697,8 +697,8 @@ export default function PublicIntakePage() {
           <IntakePhase1 data={personalData} onChange={setPersonalData} onComplete={handlePhase1Complete} isMobile={isMobile} />
           {saving && (
             <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.6rem', color: 'rgba(255,215,0,0.6)', fontWeight: 700 }}>Opslaan...</span>
+              <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>Opslaan...</span>
             </div>
           )}
           {errorType && (
@@ -729,7 +729,7 @@ export default function PublicIntakePage() {
             window.location.href = '/nutritionintake'
           }} style={{
             width: '100%', padding: isMobile ? '0.9rem' : '0.95rem',
-            background: 'linear-gradient(90deg, #FFD700, #FFA500)',
+            background: 'linear-gradient(90deg, #fff, #fff)',
             border: 'none', borderRadius: '0',
             color: '#000', fontSize: isMobile ? '0.8rem' : '0.85rem',
             fontWeight: 800, letterSpacing: '0.04em',
@@ -759,8 +759,8 @@ export default function PublicIntakePage() {
 
           {saving && (
             <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.6rem', color: 'rgba(255,215,0,0.6)', fontWeight: 700 }}>Opslaan...</span>
+              <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>Opslaan...</span>
             </div>
           )}
           {errorType && (
@@ -774,11 +774,11 @@ export default function PublicIntakePage() {
         <div style={{ maxWidth: '520px', margin: '0 auto', padding: isMobile ? '3rem 1rem 4rem' : '4rem 1.25rem 5rem', textAlign: 'center' }}>
 
           {/* Check */}
-          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
-            <span style={{ fontSize: '1.2rem', color: '#FFD700' }}>✓</span>
+          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+            <span style={{ fontSize: '1.2rem', color: '#fff' }}>✓</span>
           </div>
 
-          <div style={{ fontSize: isMobile ? '1.4rem' : '1.6rem', fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em', marginBottom: '0.4rem' }}>
+          <div style={{ fontSize: isMobile ? '1.4rem' : '1.6rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: '0.4rem' }}>
             Alles ingevuld{personalData.first_name ? `, ${personalData.first_name}` : ''}!
           </div>
           <div style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6, marginBottom: '2rem' }}>
@@ -787,15 +787,15 @@ export default function PublicIntakePage() {
 
           {/* Missie kaart */}
           {(personalData.primary_goal || personalData.motivation) && (
-            <div style={{ background: 'rgba(255,215,0,0.02)', border: '1px solid rgba(255,215,0,0.08)', marginBottom: '1.5rem', textAlign: 'left', overflow: 'hidden' }}>
-              <div style={{ padding: '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,215,0,0.06)' }}>
-                <div style={{ fontSize: '0.4rem', fontWeight: 800, color: 'rgba(255,215,0,0.4)', letterSpacing: '0.1em' }}>JOUW MISSIE</div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.5rem', textAlign: 'left', overflow: 'hidden' }}>
+              <div style={{ padding: '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.4rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>JOUW MISSIE</div>
               </div>
               {personalData.primary_goal && (
                 <div style={{ padding: '0.65rem 0.85rem', borderBottom: personalData.motivation ? '1px solid rgba(255,255,255,0.04)' : 'none', display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.2)', fontWeight: 600, marginBottom: '0.15rem' }}>DOEL</div>
-                    <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, color: '#FFD700' }}>
+                    <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, color: '#fff' }}>
                       {GOAL_LABELS[personalData.primary_goal] || personalData.primary_goal}
                     </div>
                   </div>
@@ -804,7 +804,7 @@ export default function PublicIntakePage() {
                       <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.06)' }} />
                       <div>
                         <div style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.2)', fontWeight: 600, marginBottom: '0.15rem' }}>STREEF</div>
-                        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, color: '#FFD700' }}>{personalData.target_weight} kg</div>
+                        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, color: '#fff' }}>{personalData.target_weight} kg</div>
                       </div>
                     </>
                   )}

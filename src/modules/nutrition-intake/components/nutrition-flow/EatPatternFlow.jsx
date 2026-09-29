@@ -32,7 +32,7 @@ function MealItemCounter({ count, skipped, label }) {
 
   const bg = skipped
     ? 'rgba(75,85,99,0.95)'
-    : done ? 'rgba(16,185,129,0.95)' : 'rgba(255,215,0,0.97)'
+    : done ? 'rgba(16,185,129,0.95)' : 'rgba(255,255,255,0.97)'
   const fg = skipped ? '#fff' : done ? '#fff' : '#000'
   const text = skipped
     ? `${label || 'Maaltijd'} overgeslagen ✓`
@@ -261,8 +261,8 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
             {/* Card */}
             <button onClick={() => toggleCat(cat.id)} style={{
               width: '100%', padding: 0, overflow: 'hidden',
-              background: isSel ? 'rgba(255,215,0,0.04)' : '#0a0a0a',
-              border: `1px solid ${isSel ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.06)'}`,
+              background: isSel ? 'rgba(255,255,255,0.04)' : '#0a0a0a',
+              border: `1px solid ${isSel ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
               borderRadius: isMobile ? '8px' : '10px',
               cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -274,18 +274,18 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
               {/* Foto — vaste hoogte */}
               <div style={{ width: '100%', height: isMobile ? '70px' : '80px', backgroundImage: `url(${cat.image})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', flexShrink: 0 }}>
                 <div style={{ position: 'absolute', inset: 0, background: isSel ? 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.15))' : 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.3))' }} />
-                {isSel && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.5), transparent)' }} />}
-                <div style={{ position: 'absolute', bottom: '0.35rem', right: '0.35rem', width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${isSel ? '#FFD700' : 'rgba(255,255,255,0.2)'}`, background: isSel ? '#FFD700' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}>
+                {isSel && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)' }} />}
+                <div style={{ position: 'absolute', bottom: '0.35rem', right: '0.35rem', width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${isSel ? '#fff' : 'rgba(255,255,255,0.2)'}`, background: isSel ? '#fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}>
                   {isSel && <span style={{ fontSize: '0.48rem', fontWeight: 800, color: '#000' }}>✓</span>}
                 </div>
               </div>
               {/* Label */}
               <div style={{ padding: isMobile ? '0.4rem 0.5rem' : '0.45rem 0.6rem' }}>
-                <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 800, color: isSel ? '#FFD700' : '#fff', lineHeight: 1.2, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 800, color: isSel ? '#fff' : '#fff', lineHeight: 1.2, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {cat.label}
                 </div>
                 {isSel && cat.subs.length > 0 && (
-                  <div style={{ fontSize: '0.48rem', fontWeight: 700, color: subCount > 0 ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.2)', marginTop: '0.1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div style={{ fontSize: '0.48rem', fontWeight: 700, color: subCount > 0 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', marginTop: '0.1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {subCount > 0 ? `${subCount} ↓` : 'Kies ↓'}
                   </div>
                 )}
@@ -294,14 +294,14 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
 
             {/* Subcategorieen — zelfde breedte als card */}
             {isSel && cat.subs.length > 0 && (
-              <div style={{ marginTop: '0.15rem', border: '1px solid rgba(255,255,255,0.06)', borderLeft: '2px solid rgba(255,215,0,0.2)', borderRadius: '0 6px 6px 0', overflow: 'hidden' }}>
+              <div style={{ marginTop: '0.15rem', border: '1px solid rgba(255,255,255,0.06)', borderLeft: '2px solid rgba(255,255,255,0.2)', borderRadius: '0 6px 6px 0', overflow: 'hidden' }}>
                 {/* Vaste subs */}
                 {cat.subs.map((sub, i) => {
                   const isSubSel = selSubs.includes(sub.id)
                   return (
                     <button key={sub.id} onClick={() => toggleSub(sub.id)} style={{
                       width: '100%', display: 'flex', alignItems: 'stretch',
-                      background: isSubSel ? 'rgba(255,215,0,0.04)' : 'transparent',
+                      background: isSubSel ? 'rgba(255,255,255,0.04)' : 'transparent',
                       border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
                       cursor: 'pointer', fontFamily: 'inherit',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -315,7 +315,7 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
                       </div>
                       {isSubSel && (
                         <div style={{ width: '32px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span style={{ fontSize: '0.42rem', fontWeight: 800, color: '#000' }}>✓</span>
                           </div>
                         </div>
@@ -328,10 +328,10 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
                 {(customItems[cat.id] || []).map(val => {
                   const isSubSel = selSubs.includes(`${cat.id}_custom_${val}`)
                   return (
-                    <div key={val} style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: '40px', background: isSubSel ? 'rgba(255,215,0,0.04)' : 'transparent' }}>
+                    <div key={val} style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: '40px', background: isSubSel ? 'rgba(255,255,255,0.04)' : 'transparent' }}>
                       <button onClick={() => toggleCustom(cat.id, val)} style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                         <div style={{ width: '40px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span style={{ fontSize: '0.42rem', fontWeight: 700, color: 'rgba(255,215,0,0.4)', textTransform: 'uppercase' }}>EIGEN</span>
+                          <span style={{ fontSize: '0.42rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>EIGEN</span>
                         </div>
                         <span style={{ fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: isSubSel ? 800 : 600, color: isSubSel ? '#fff' : 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>{val}</span>
                       </button>
@@ -387,8 +387,8 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
                   value={textFields[cat.id] || ''}
                   onChange={e => updateText(cat.id, e.target.value)}
                   autoFocus
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '0.6rem 0.65rem', background: '#111', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '2px solid rgba(255,215,0,0.3)', borderRadius: '0 6px 6px 0', color: '#fff', fontSize: isMobile ? '0.78rem' : '0.82rem', fontFamily: 'inherit', outline: 'none' }}
-                  onFocus={e => { e.target.style.borderColor = 'rgba(255,215,0,0.4)'; e.target.style.background = 'rgba(255,215,0,0.03)' }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '0.6rem 0.65rem', background: '#111', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '2px solid rgba(255,255,255,0.3)', borderRadius: '0 6px 6px 0', color: '#fff', fontSize: isMobile ? '0.78rem' : '0.82rem', fontFamily: 'inherit', outline: 'none' }}
+                  onFocus={e => { e.target.style.borderColor = 'rgba(255,255,255,0.4)'; e.target.style.background = 'rgba(255,255,255,0.03)' }}
                   onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.background = '#111' }}
                 />
               </div>
@@ -478,7 +478,7 @@ export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobil
           <input type="text" placeholder="Wat deed je toen?"
             value={data.wat_werkte_toelichting || ''}
             onChange={e => update('wat_werkte_toelichting', e.target.value)}
-            style={{ width: '100%', boxSizing: 'border-box', padding: isMobile ? '0.8rem 0.9rem' : '0.85rem 1rem', background: '#0d0d0d', border: '1px solid rgba(255,215,0,0.2)', borderLeft: '2px solid rgba(255,215,0,0.4)', borderRadius: '0 8px 8px 0', color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem', fontFamily: 'inherit', outline: 'none' }}
+            style={{ width: '100%', boxSizing: 'border-box', padding: isMobile ? '0.8rem 0.9rem' : '0.85rem 1rem', background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.2)', borderLeft: '2px solid rgba(255,255,255,0.4)', borderRadius: '0 8px 8px 0', color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem', fontFamily: 'inherit', outline: 'none' }}
           />
         </div>
       )}

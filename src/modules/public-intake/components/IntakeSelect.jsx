@@ -14,15 +14,15 @@ export function IntakeSelect({ label, value, onChange, options, error, required,
         textTransform: 'uppercase', letterSpacing: '0.05em',
         marginBottom: '0.35rem'
       }}>
-        {label}{required && <span style={{ color: '#FFD700', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
+        {label}{required && <span style={{ color: '#fff', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
       </label>
       <select value={value || ''} onChange={e => onChange(e.target.value)} style={{
         width: '100%',
         padding: isMobile ? '0.65rem 0.75rem' : '0.7rem 0.85rem',
         background: '#111',
-        border: `1px solid ${error ? '#dc2626' : value ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)'}`,
+        border: `1px solid ${error ? '#dc2626' : value ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
         borderRadius: 0,
-        color: value ? '#FFD700' : 'rgba(255,255,255,0.3)',
+        color: value ? '#fff' : 'rgba(255,255,255,0.3)',
         fontSize: isMobile ? '16px' : '0.9rem',
         fontWeight: value ? 800 : 600,
         outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
@@ -56,7 +56,7 @@ export function IntakeOptionGrid({ label, value, onChange, options, columns = 2,
         letterSpacing: '0.01em',
         marginBottom: '0.5rem'
       }}>
-        {label}{required && <span style={{ color: '#FFD700', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
+        {label}{required && <span style={{ color: '#fff', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
       </label>
       <div style={{
         display: 'grid',
@@ -68,10 +68,10 @@ export function IntakeOptionGrid({ label, value, onChange, options, columns = 2,
           return (
             <button key={o.value} onClick={() => onChange(o.value)} style={{
               padding: 0,
-              background: active ? 'rgba(255,215,0,0.06)' : '#0a0a0a',
-              border: `1px solid ${active ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.06)'}`,
+              background: active ? 'rgba(255,255,255,0.06)' : '#0a0a0a',
+              border: `1px solid ${active ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.06)'}`,
               borderRadius: 0,
-              color: active ? '#FFD700' : 'rgba(255,255,255,0.5)',
+              color: active ? '#fff' : 'rgba(255,255,255,0.5)',
               cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               overflow: 'hidden', position: 'relative',
@@ -97,7 +97,7 @@ export function IntakeOptionGrid({ label, value, onChange, options, columns = 2,
                   {active && (
                     <div style={{
                       position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
-                      background: 'linear-gradient(90deg, #FFD700, #FFA500)'
+                      background: 'linear-gradient(90deg, #fff, #fff)'
                     }} />
                   )}
                 </div>
@@ -112,20 +112,20 @@ export function IntakeOptionGrid({ label, value, onChange, options, columns = 2,
                 {o.icon && !o.image && (
                   <o.icon
                     size={isMobile ? 16 : 18}
-                    color={active ? '#FFD700' : 'rgba(255,255,255,0.3)'}
+                    color={active ? '#fff' : 'rgba(255,255,255,0.3)'}
                     style={{ marginBottom: '0.15rem' }}
                   />
                 )}
                 <span style={{
                   fontSize: isMobile ? '0.75rem' : '0.8rem',
                   fontWeight: active ? 800 : 700,
-                  color: active ? '#FFD700' : '#fff',
+                  color: active ? '#fff' : '#fff',
                   lineHeight: 1.2
                 }}>{o.label}</span>
                 {o.sub && (
                   <span style={{
                     fontSize: isMobile ? '0.5rem' : '0.52rem',
-                    color: active ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.25)',
+                    color: active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)',
                     fontWeight: 500, lineHeight: 1.3
                   }}>{o.sub}</span>
                 )}
@@ -135,7 +135,7 @@ export function IntakeOptionGrid({ label, value, onChange, options, columns = 2,
               {active && !o.image && (
                 <div style={{
                   position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
-                  background: 'linear-gradient(90deg, #FFD700, #FFA500)'
+                  background: 'linear-gradient(90deg, #fff, #fff)'
                 }} />
               )}
             </button>
@@ -163,7 +163,7 @@ export function IntakeSlider({ label, value, onChange, min = 1, max = 10, step =
         }}>{label}</label>
         <span style={{
           fontSize: isMobile ? '1rem' : '1.1rem',
-          fontWeight: 900, color: '#FFD700', lineHeight: 1
+          fontWeight: 900, color: '#fff', lineHeight: 1
         }}>
           {value || min}
           <span style={{ fontSize: '0.5rem', fontWeight: 600, opacity: 0.5, marginLeft: '0.1rem' }}>{suffix}</span>
@@ -178,7 +178,7 @@ export function IntakeSlider({ label, value, onChange, min = 1, max = 10, step =
         }}>
           <div style={{
             width: `${pct}%`, height: '100%',
-            background: 'linear-gradient(90deg, #FFD700, #FFA500)',
+            background: 'linear-gradient(90deg, #fff, #fff)',
             borderRadius: '2px', transition: 'width 0.1s ease'
           }} />
         </div>
@@ -216,11 +216,11 @@ export function IntakeDatePicker({ label, value, onChange, error, required, isMo
       <div>
         <label style={{
           display: 'block', fontSize: '0.55rem',
-          fontWeight: 700, color: focused ? '#FFD700' : 'rgba(255,255,255,0.5)',
+          fontWeight: 700, color: focused ? '#fff' : 'rgba(255,255,255,0.5)',
           textTransform: 'uppercase', letterSpacing: '0.05em',
           marginBottom: '0.3rem'
         }}>
-          {label}{required && <span style={{ color: '#FFD700', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
+          {label}{required && <span style={{ color: '#fff', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
         </label>
         <input
           type="date"
@@ -233,11 +233,11 @@ export function IntakeDatePicker({ label, value, onChange, error, required, isMo
           style={{
             width: '100%',
             padding: '0.7rem 0.75rem',
-            background: focused ? 'rgba(255,215,0,0.03)' : hasValue ? '#0d0d0d' : '#111',
-            border: `1px solid ${error ? '#dc2626' : focused ? '#FFD700' : hasValue ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
-            borderLeft: hasValue || focused ? '3px solid #FFD700' : `1px solid ${error ? '#dc2626' : 'rgba(255,255,255,0.06)'}`,
+            background: focused ? 'rgba(255,255,255,0.03)' : hasValue ? '#0d0d0d' : '#111',
+            border: `1px solid ${error ? '#dc2626' : focused ? '#fff' : hasValue ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+            borderLeft: hasValue || focused ? '3px solid #fff' : `1px solid ${error ? '#dc2626' : 'rgba(255,255,255,0.06)'}`,
             borderRadius: 0,
-            color: hasValue ? '#FFD700' : 'rgba(255,255,255,0.15)',
+            color: hasValue ? '#fff' : 'rgba(255,255,255,0.15)',
             fontSize: '16px', fontWeight: hasValue ? 800 : 400,
             outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
             WebkitAppearance: 'none', appearance: 'none',
@@ -286,9 +286,9 @@ export function IntakeDatePicker({ label, value, onChange, error, required, isMo
     flex: 1,
     padding: '0.7rem 0.5rem',
     background: hasVal ? '#0d0d0d' : '#111',
-    border: `1px solid ${error ? '#dc2626' : hasVal ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
+    border: `1px solid ${error ? '#dc2626' : hasVal ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
     borderRadius: 0,
-    color: hasVal ? '#FFD700' : 'rgba(255,255,255,0.15)',
+    color: hasVal ? '#fff' : 'rgba(255,255,255,0.15)',
     fontSize: '0.85rem', fontWeight: hasVal ? 800 : 400,
     fontStyle: hasVal ? 'normal' : 'italic',
     outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
@@ -307,7 +307,7 @@ export function IntakeDatePicker({ label, value, onChange, error, required, isMo
         textTransform: 'uppercase', letterSpacing: '0.05em',
         marginBottom: '0.3rem'
       }}>
-        {label}{required && <span style={{ color: '#FFD700', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
+        {label}{required && <span style={{ color: '#fff', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
       </label>
       <div style={{ display: 'flex', gap: '0.3rem' }}>
         <select value={day} onChange={e => { setDay(e.target.value); handleChange(e.target.value, month, year) }} style={selectStyle(!!day)}>

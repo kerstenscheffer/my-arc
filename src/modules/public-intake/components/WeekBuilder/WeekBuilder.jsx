@@ -32,7 +32,7 @@ function Q({ children, isMobile }) {
 
 function Hint({ children, isMobile }) {
   return (
-    <div style={{ fontSize: isMobile ? '0.72rem' : '0.75rem', color: 'rgba(255,255,255,0.3)', fontWeight: 500, lineHeight: 1.5, marginBottom: '0.5rem', marginTop: '-0.3rem' }}>
+    <div style={{ fontSize: isMobile ? '0.72rem' : '0.75rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, lineHeight: 1.5, marginBottom: '0.5rem', marginTop: '-0.3rem' }}>
       {children}
     </div>
   )
@@ -55,7 +55,7 @@ const eigenVeld = (isMobile) => ({
 function BackBtn({ onBack }) {
   if (!onBack) return null
   return (
-    <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '0.1rem 0', marginBottom: '0.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+    <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: '0.1rem 0', marginBottom: '0.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
       ← Terug
     </button>
   )
@@ -67,10 +67,10 @@ function NextBtn({ onClick, label = 'VOLGENDE →', disabled, isMobile }) {
       onClick={disabled ? null : onClick}
       style={{
         width: '100%', padding: isMobile ? '0.85rem' : '0.9rem',
-        background: disabled ? 'rgba(255,215,0,0.04)' : 'linear-gradient(90deg, #FFD700, #FFA500)',
-        border: disabled ? '1px solid rgba(255,215,0,0.1)' : 'none',
+        background: disabled ? 'rgba(255,255,255,0.04)' : 'linear-gradient(90deg, #fff, #fff)',
+        border: disabled ? '1px solid rgba(255,255,255,0.1)' : 'none',
         borderRadius: '8px',
-        color: disabled ? 'rgba(255,215,0,0.2)' : '#000',
+        color: disabled ? 'rgba(255,255,255,0.2)' : '#000',
         fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800,
         cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
         letterSpacing: '0.02em', marginTop: '0.5rem',
@@ -89,21 +89,20 @@ function BigOption({ label, sub, onClick, selected, isMobile }) {
   return (
     <button onClick={onClick} style={{
       width: '100%', padding: isMobile ? '0.85rem 1rem' : '0.95rem 1rem',
-      background: selected ? 'rgba(255,215,0,0.07)' : '#0d0d0d',
-      border: `1px solid ${selected ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
-      borderLeft: selected ? '3px solid #FFD700' : '1px solid rgba(255,255,255,0.07)',
-      borderRadius: selected ? '0 8px 8px 0' : '8px',
+      background: selected ? '#fff' : 'rgba(255,255,255,0.04)',
+      border: `1px solid ${selected ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+      borderRadius: 12,
       cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
       display: 'flex', alignItems: 'center', gap: '0.75rem',
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       transition: 'all 0.15s ease'
     }}>
-      <div style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${selected ? '#FFD700' : 'rgba(255,255,255,0.15)'}`, background: selected ? '#FFD700' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${selected ? '#fff' : 'rgba(255,255,255,0.15)'}`, background: selected ? '#fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {selected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#000' }} />}
       </div>
       <div>
-        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 700, color: selected ? '#FFD700' : 'rgba(255,255,255,0.85)', lineHeight: 1.25 }}>{label}</div>
-        {sub && <div style={{ fontSize: isMobile ? '0.65rem' : '0.68rem', color: 'rgba(255,255,255,0.3)', fontWeight: 500, marginTop: '0.2rem' }}>{sub}</div>}
+        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 700, color: selected ? '#fff' : 'rgba(255,255,255,0.85)', lineHeight: 1.25 }}>{label}</div>
+        {sub && <div style={{ fontSize: isMobile ? '0.65rem' : '0.68rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: '0.2rem' }}>{sub}</div>}
       </div>
     </button>
   )
@@ -118,10 +117,10 @@ function DayPicker({ selected, onToggle, disabledDays = [], isMobile }) {
         return (
           <button key={day} onClick={() => { if (!isDisabled) onToggle(day) }} style={{
             flex: 1, padding: isMobile ? '0.55rem 0' : '0.6rem 0',
-            background: isSelected ? 'rgba(255,215,0,0.1)' : '#0d0d0d',
-            border: `${isSelected ? '2px' : '1px'} solid ${isSelected ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.07)'}`,
+            background: isSelected ? 'rgba(255,255,255,0.1)' : '#0d0d0d',
+            border: `${isSelected ? '2px' : '1px'} solid ${isSelected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.07)'}`,
             borderRadius: '8px',
-            color: isSelected ? '#FFD700' : isDisabled ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.35)',
+            color: isSelected ? '#fff' : isDisabled ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.35)',
             fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: isSelected ? 800 : 600,
             cursor: isDisabled ? 'default' : 'pointer', fontFamily: 'inherit',
             position: 'relative', overflow: 'hidden',
@@ -145,15 +144,15 @@ function WorkTypePicker({ value, onChange, isMobile }) {
       {WORK_TYPES.map(t => (
         <button key={t.id} onClick={() => onChange(t.id)} style={{
           padding: isMobile ? '0.7rem 1rem' : '0.75rem 1rem',
-          background: value === t.id ? 'rgba(255,215,0,0.07)' : '#0d0d0d',
-          border: `1px solid ${value === t.id ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
+          background: value === t.id ? 'rgba(255,255,255,0.07)' : '#0d0d0d',
+          border: `1px solid ${value === t.id ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
           borderLeft: value === t.id ? `3px solid ${t.color}` : '1px solid rgba(255,255,255,0.07)',
           borderRadius: value === t.id ? '0 8px 8px 0' : '8px',
           cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           transition: 'all 0.15s ease'
         }}>
-          <span style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: value === t.id ? 800 : 600, color: value === t.id ? '#FFD700' : 'rgba(255,255,255,0.75)' }}>
+          <span style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: value === t.id ? 800 : 600, color: value === t.id ? '#fff' : 'rgba(255,255,255,0.75)' }}>
             {value === t.id && '✓ '}{t.label}
           </span>
         </button>
@@ -179,7 +178,7 @@ function TimeGrid({ options, value, value2, onChange, onChange2, isMobile }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
       {value && !value2 && (
-        <div style={{ fontSize: isMobile ? '0.7rem' : '0.72rem', color: 'rgba(255,215,0,0.5)', fontWeight: 600 }}>
+        <div style={{ fontSize: isMobile ? '0.7rem' : '0.72rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
           Weet je het niet precies? Klik er nog één aan.
         </div>
       )}
@@ -194,9 +193,9 @@ function TimeGrid({ options, value, value2, onChange, onChange2, isMobile }) {
           return (
             <button key={t} onClick={() => handleClick(t)} style={{
               padding: isMobile ? '0.55rem 0.6rem' : '0.6rem 0.7rem',
-              background: sel ? 'rgba(255,215,0,0.1)' : '#0d0d0d',
-              border: `${sel ? '2px' : '1px'} solid ${sel ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.07)'}`,
-              borderRadius: '8px', color: sel ? '#FFD700' : 'rgba(255,255,255,0.45)',
+              background: sel ? 'rgba(255,255,255,0.1)' : '#0d0d0d',
+              border: `${sel ? '2px' : '1px'} solid ${sel ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.07)'}`,
+              borderRadius: '8px', color: sel ? '#fff' : 'rgba(255,255,255,0.45)',
               fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: sel ? 800 : 600,
               cursor: 'pointer', fontFamily: 'inherit',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -206,9 +205,9 @@ function TimeGrid({ options, value, value2, onChange, onChange2, isMobile }) {
         })}
         <button onClick={() => setShowCustom(v => !v)} style={{
           padding: isMobile ? '0.55rem 0.6rem' : '0.6rem 0.7rem',
-          background: (showCustom || isCustom) ? 'rgba(255,215,0,0.08)' : '#0d0d0d',
-          border: `1px solid ${(showCustom || isCustom) ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
-          borderRadius: '8px', color: (showCustom || isCustom) ? '#FFD700' : 'rgba(255,255,255,0.3)',
+          background: (showCustom || isCustom) ? 'rgba(255,255,255,0.08)' : '#0d0d0d',
+          border: `1px solid ${(showCustom || isCustom) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
+          borderRadius: '8px', color: (showCustom || isCustom) ? '#fff' : 'rgba(255,255,255,0.3)',
           fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 600,
           cursor: 'pointer', fontFamily: 'inherit',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '48px'
@@ -217,7 +216,7 @@ function TimeGrid({ options, value, value2, onChange, onChange2, isMobile }) {
         </button>
       </div>
       {(showCustom || isCustom) && (
-        <input type="time" value={isCustom ? value : ''} onChange={e => { onChange(e.target.value); onChange2(null) }} style={{ background: '#0d0d0d', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, padding: '0.6rem 0.75rem', fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: '48px' }} autoFocus />
+        <input type="time" value={isCustom ? value : ''} onChange={e => { onChange(e.target.value); onChange2(null) }} style={{ background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.25)', borderRadius: '8px', color: '#fff', fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, padding: '0.6rem 0.75rem', fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box', minHeight: '48px' }} autoFocus />
       )}
     </div>
   )
@@ -567,7 +566,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
             {[{ l: 'Ma–Vr', d: ['ma','di','wo','do','vr'] }, { l: 'Ma–Za', d: ['ma','di','wo','do','vr','za'] }, { l: 'Weekend', d: ['za','zo'] }].map(p => {
               const active = JSON.stringify([...workDays].sort()) === JSON.stringify([...p.d].sort())
               return (
-                <button key={p.l} onClick={() => setWorkDays(p.d)} style={{ padding: '0.35rem 0.75rem', background: active ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.07)'}`, borderRadius: '20px', color: active ? '#FFD700' : 'rgba(255,255,255,0.3)', fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>{p.l}</button>
+                <button key={p.l} onClick={() => setWorkDays(p.d)} style={{ padding: '0.35rem 0.75rem', background: active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`, borderRadius: '20px', color: active ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>{p.l}</button>
               )
             })}
           </div>
@@ -578,7 +577,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
             </div>
           )}
           <NextBtn onClick={() => { setJobGroups([]); go('all_same') }} disabled={workDays.length === 0} isMobile={isMobile} />
-          <button onClick={() => go('training_days')} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginTop: '0.4rem', padding: '0.2rem 0', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>Ik werk niet →</button>
+          <button onClick={() => go('training_days')} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: '0.4rem', padding: '0.2rem 0', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>Ik werk niet →</button>
         </>
       )
     }
@@ -675,10 +674,10 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
               return (
                 <button key={day} onClick={() => { if (inRemaining) toggleMoreSel(day) }} style={{
                   flex: 1, padding: isMobile ? '0.55rem 0' : '0.6rem 0',
-                  background: isSelected ? 'rgba(255,215,0,0.1)' : '#0d0d0d',
-                  border: `${isSelected ? '2px' : '1px'} solid ${isSelected ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.07)'}`,
+                  background: isSelected ? 'rgba(255,255,255,0.1)' : '#0d0d0d',
+                  border: `${isSelected ? '2px' : '1px'} solid ${isSelected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.07)'}`,
                   borderRadius: '8px',
-                  color: isSelected ? '#FFD700' : inRemaining ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)',
+                  color: isSelected ? '#fff' : inRemaining ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)',
                   fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: isSelected ? 800 : 600,
                   cursor: inRemaining ? 'pointer' : 'default', fontFamily: 'inherit',
                   position: 'relative', overflow: 'hidden',
@@ -817,7 +816,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
             <div style={{ fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 800, color: '#10b981' }}>Week opgeslagen</div>
             <div style={{ fontSize: isMobile ? '0.6rem' : '0.62rem', color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>Je schema staat vast.</div>
           </div>
-          <button onClick={() => setSaved(false)} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '0.6rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          <button onClick={() => setSaved(false)} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             Aanpassen →
           </button>
         </div>
@@ -841,8 +840,8 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
           return (
             <React.Fragment key={label}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: isDone ? '#10b981' : isCurrent ? '#FFD700' : 'rgba(255,255,255,0.12)', transition: 'background 0.2s ease' }} />
-                <span style={{ fontSize: '0.52rem', fontWeight: isCurrent ? 800 : 500, color: isDone ? '#10b981' : isCurrent ? '#FFD700' : 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap' }}>
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: isDone ? '#10b981' : isCurrent ? '#fff' : 'rgba(255,255,255,0.12)', transition: 'background 0.2s ease' }} />
+                <span style={{ fontSize: '0.52rem', fontWeight: isCurrent ? 800 : 500, color: isDone ? '#10b981' : isCurrent ? '#fff' : 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap' }}>
                   {isDone ? `✓ ${label}` : label}
                 </span>
               </div>

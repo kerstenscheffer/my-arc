@@ -6,11 +6,11 @@ import React, { useState } from 'react'
 const inputBase = (m, error, hasValue, focused) => ({
   width: '100%',
   padding: m ? '0.7rem 0.75rem' : '0.75rem 0.85rem',
-  background: focused ? 'rgba(255,215,0,0.03)' : hasValue ? '#0d0d0d' : '#111',
-  border: `1px solid ${error ? '#dc2626' : focused ? '#FFD700' : hasValue ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
-  borderLeft: hasValue && !error ? '3px solid #FFD700' : focused ? '3px solid #FFD700' : `1px solid ${error ? '#dc2626' : 'rgba(255,255,255,0.06)'}`,
+  background: focused ? 'rgba(255,255,255,0.03)' : hasValue ? '#0d0d0d' : '#111',
+  border: `1px solid ${error ? '#dc2626' : focused ? '#fff' : hasValue ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+  borderLeft: hasValue && !error ? '3px solid #fff' : focused ? '3px solid #fff' : `1px solid ${error ? '#dc2626' : 'rgba(255,255,255,0.06)'}`,
   borderRadius: 0,
-  color: hasValue ? '#FFD700' : '#fff',
+  color: hasValue ? '#fff' : '#fff',
   fontSize: m ? '16px' : '0.9rem',
   fontWeight: hasValue ? 800 : 500,
   outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
@@ -38,11 +38,11 @@ export default function IntakeField({
     <div style={half ? { flex: 1, minWidth: 0 } : undefined}>
       <label style={{
         display: 'block', fontSize: isMobile ? '0.55rem' : '0.6rem',
-        fontWeight: 700, color: focused ? '#FFD700' : 'rgba(255,255,255,0.5)',
+        fontWeight: 700, color: focused ? '#fff' : 'rgba(255,255,255,0.5)',
         textTransform: 'uppercase', letterSpacing: '0.05em',
         marginBottom: '0.3rem'
       }}>
-        {label}{required && <span style={{ color: '#FFD700', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
+        {label}{required && <span style={{ color: '#fff', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
       </label>
       {multiline ? (
         <textarea
@@ -118,11 +118,11 @@ export function IntakePhoneField({ label, value, onChange, error, required, isMo
     <div>
       <label style={{
         display: 'block', fontSize: isMobile ? '0.55rem' : '0.6rem',
-        fontWeight: 700, color: focused ? '#FFD700' : 'rgba(255,255,255,0.5)',
+        fontWeight: 700, color: focused ? '#fff' : 'rgba(255,255,255,0.5)',
         textTransform: 'uppercase', letterSpacing: '0.05em',
         marginBottom: '0.3rem'
       }}>
-        {label}{required && <span style={{ color: '#FFD700', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
+        {label}{required && <span style={{ color: '#fff', marginLeft: '0.2rem', fontSize: '0.5rem' }}>*</span>}
       </label>
       <div style={{ display: 'flex', gap: 0 }}>
         {/* Country code */}
@@ -130,11 +130,11 @@ export function IntakePhoneField({ label, value, onChange, error, required, isMo
           width: isMobile ? '72px' : '80px',
           padding: isMobile ? '0.7rem 0.4rem' : '0.75rem 0.5rem',
           background: '#0a0a0a',
-          borderTop: `1px solid ${error ? '#dc2626' : focused ? '#FFD700' : hasValue ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
-          borderBottom: `1px solid ${error ? '#dc2626' : focused ? '#FFD700' : hasValue ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
-          borderLeft: `1px solid ${error ? '#dc2626' : focused ? '#FFD700' : hasValue ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
+          borderTop: `1px solid ${error ? '#dc2626' : focused ? '#fff' : hasValue ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+          borderBottom: `1px solid ${error ? '#dc2626' : focused ? '#fff' : hasValue ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+          borderLeft: `1px solid ${error ? '#dc2626' : focused ? '#fff' : hasValue ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
           borderRadius: 0,
-          color: '#FFD700', fontSize: isMobile ? '14px' : '0.8rem', fontWeight: 800,
+          color: '#fff', fontSize: isMobile ? '14px' : '0.8rem', fontWeight: 800,
           outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
           WebkitAppearance: 'none', appearance: 'none',
           textAlign: 'center',
@@ -155,11 +155,11 @@ export function IntakePhoneField({ label, value, onChange, error, required, isMo
           style={{
             flex: 1, minWidth: 0,
             padding: isMobile ? '0.7rem 0.75rem' : '0.75rem 0.85rem',
-            background: focused ? 'rgba(255,215,0,0.03)' : hasValue ? '#0d0d0d' : '#111',
-            border: `1px solid ${error ? '#dc2626' : focused ? '#FFD700' : hasValue ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
-            borderLeft: hasValue || focused ? '2px solid #FFD700' : `1px solid ${error ? '#dc2626' : 'rgba(255,255,255,0.06)'}`,
+            background: focused ? 'rgba(255,255,255,0.03)' : hasValue ? '#0d0d0d' : '#111',
+            border: `1px solid ${error ? '#dc2626' : focused ? '#fff' : hasValue ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+            borderLeft: hasValue || focused ? '2px solid #fff' : `1px solid ${error ? '#dc2626' : 'rgba(255,255,255,0.06)'}`,
             borderRadius: 0,
-            color: hasValue ? '#FFD700' : '#fff',
+            color: hasValue ? '#fff' : '#fff',
             fontSize: isMobile ? '16px' : '0.9rem',
             fontWeight: hasValue ? 800 : 500,
             outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',

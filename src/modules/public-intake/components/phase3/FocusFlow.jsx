@@ -93,8 +93,8 @@ function FocusCard({ opt, selected, onClick, isMobile }) {
     <button onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: '0.75rem',
       padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 1rem',
-      background: selected ? 'rgba(255,215,0,0.06)' : 'rgba(255,255,255,0.02)',
-      border: `1px solid ${selected ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.06)'}`,
+      background: selected ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+      border: `1px solid ${selected ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
       borderRadius: '10px', cursor: 'pointer', textAlign: 'left',
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       transition: 'all 0.15s ease', minHeight: '44px'
@@ -105,11 +105,11 @@ function FocusCard({ opt, selected, onClick, isMobile }) {
         filter: selected ? 'none' : 'brightness(0.6)', transition: 'filter 0.15s ease'
       }} />
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, color: selected ? '#FFD700' : '#fff', marginBottom: '0.15rem' }}>{opt.label}</div>
-        <div style={{ fontSize: isMobile ? '0.62rem' : '0.65rem', color: selected ? 'rgba(255,215,0,0.65)' : 'rgba(255,255,255,0.35)', fontWeight: 500, lineHeight: 1.4 }}>{opt.sub}</div>
+        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, color: selected ? '#fff' : '#fff', marginBottom: '0.15rem' }}>{opt.label}</div>
+        <div style={{ fontSize: isMobile ? '0.62rem' : '0.65rem', color: selected ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)', fontWeight: 500, lineHeight: 1.4 }}>{opt.sub}</div>
       </div>
       {selected && (
-        <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#000' }}>✓</span>
         </div>
       )}

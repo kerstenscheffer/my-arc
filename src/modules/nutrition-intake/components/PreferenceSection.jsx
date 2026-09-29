@@ -113,13 +113,13 @@ export default function PreferenceSection({
             placeholder="Scheid met komma's: Tonijn, Kalkoen, Tofu"
             style={{
               width: '100%', padding: r(isMobile, '0.6rem 0.75rem', '0.65rem 0.85rem'),
-              background: t.colors.inputBg, border: `1px solid ${additions ? 'rgba(255,215,0,0.25)' : t.colors.borderVisible}`,
-              borderRadius: '8px', color: additions ? '#FFD700' : t.colors.white,
+              background: t.colors.inputBg, border: `1px solid ${additions ? 'rgba(255,255,255,0.25)' : t.colors.borderVisible}`,
+              borderRadius: '8px', color: additions ? '#fff' : t.colors.white,
               fontSize: r(isMobile, '0.8rem', '0.85rem'), fontWeight: additions ? 800 : 600,
               fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box'
             }}
-            onFocus={e => { e.target.style.borderColor = '#FFD700' }}
-            onBlur={e => { e.target.style.borderColor = additions ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)' }}
+            onFocus={e => { e.target.style.borderColor = '#fff' }}
+            onBlur={e => { e.target.style.borderColor = additions ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)' }}
           />
           {addCount > 0 && <div style={{ marginTop: '0.2rem', fontSize: '0.5rem', color: t.colors.green, fontWeight: 700 }}>+{addCount} toegevoegd</div>}
         </div>
@@ -138,7 +138,7 @@ export default function PreferenceSection({
               fontSize: r(isMobile, '0.8rem', '0.85rem'), fontFamily: 'inherit',
               outline: 'none', resize: 'vertical', lineHeight: 1.4, boxSizing: 'border-box'
             }}
-            onFocus={e => { e.target.style.borderColor = '#FFD700' }}
+            onFocus={e => { e.target.style.borderColor = '#fff' }}
             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)' }}
           />
         </div>
@@ -148,8 +148,8 @@ export default function PreferenceSection({
       <div style={{ padding: r(isMobile, '0.6rem 1rem', '0.75rem 1.25rem'), borderTop: `1px solid ${t.colors.border}` }}>
         <button onClick={handleConfirm} style={{
           width: '100%', padding: r(isMobile, '0.65rem', '0.7rem'),
-          background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)',
-          borderRadius: '8px', color: '#FFD700',
+          background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+          borderRadius: '8px', color: '#fff',
           fontSize: r(isMobile, '0.72rem', '0.76rem'), fontWeight: 800,
           cursor: 'pointer', minHeight: '40px',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'

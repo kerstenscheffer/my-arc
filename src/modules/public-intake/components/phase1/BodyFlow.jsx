@@ -125,7 +125,7 @@ export default function BodyFlow({ data, onChange, onNext, onBack, isMobile }) {
                   title={opt.sub}
                   style={{
                     background: 'transparent',
-                    border: `2px solid ${isSelected ? '#FFD700' : isFirstEmpty ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                    border: `2px solid ${isSelected ? '#fff' : isFirstEmpty ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
                     borderRadius: '8px', overflow: 'hidden',
                     cursor: 'pointer', padding: 0,
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -144,20 +144,20 @@ export default function BodyFlow({ data, onChange, onNext, onBack, isMobile }) {
                   <div style={{
                     position: 'absolute', bottom: 0, left: 0, right: 0,
                     padding: '0.3rem 0.25rem',
-                    background: isSelected ? 'rgba(255,215,0,0.88)' : 'rgba(0,0,0,0.72)'
+                    background: isSelected ? 'rgba(255,255,255,0.88)' : 'rgba(0,0,0,0.72)'
                   }}>
                     <div style={{ fontSize: isMobile ? '0.55rem' : '0.58rem', fontWeight: 800, color: isSelected ? '#000' : '#fff', textAlign: 'center' }}>{opt.label}</div>
                     <div style={{ fontSize: '0.42rem', color: isSelected ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.3, marginTop: '0.1rem' }}>{opt.sub}</div>
                   </div>
                   {isSelected && (
-                    <div style={{ position: 'absolute', top: '0.3rem', right: '0.3rem', width: '16px', height: '16px', borderRadius: '50%', background: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ position: 'absolute', top: '0.3rem', right: '0.3rem', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ fontSize: '0.48rem', fontWeight: 800, color: '#000' }}>
                         {isBetween ? (data.current_body_fat === opt.value ? '1' : '2') : '✓'}
                       </span>
                     </div>
                   )}
                   {nothingSelected && (
-                    <div style={{ position: 'absolute', top: '0.3rem', left: '0.3rem', padding: '0.15rem 0.3rem', background: 'rgba(255,215,0,0.85)', borderRadius: '3px' }}>
+                    <div style={{ position: 'absolute', top: '0.3rem', left: '0.3rem', padding: '0.15rem 0.3rem', background: 'rgba(255,255,255,0.85)', borderRadius: '3px' }}>
                       <span style={{ fontSize: '0.4rem', fontWeight: 800, color: '#000', letterSpacing: '0.02em' }}>TAP</span>
                     </div>
                   )}
@@ -167,7 +167,7 @@ export default function BodyFlow({ data, onChange, onNext, onBack, isMobile }) {
           </div>
 
           {data.current_body_fat && data.current_body_fat_2 && (
-            <div style={{ fontSize: '0.6rem', color: 'rgba(255,215,0,0.6)', fontWeight: 600, textAlign: 'center' }}>
+            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600, textAlign: 'center' }}>
               Tussenin — we rekenen met ~{Math.round((data.current_body_fat + data.current_body_fat_2) / 2)}%
             </div>
           )}
@@ -180,7 +180,7 @@ export default function BodyFlow({ data, onChange, onNext, onBack, isMobile }) {
 
           <style>{`
             @keyframes bfPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.85)} }
-            @keyframes bfBorderPulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,0);border-color:rgba(255,215,0,0.35)} 50%{box-shadow:0 0 0 3px rgba(255,215,0,0.08);border-color:rgba(255,215,0,0.6)} }
+            @keyframes bfBorderPulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,0);border-color:rgba(255,255,255,0.35)} 50%{box-shadow:0 0 0 3px rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.6)} }
           `}</style>
         </>
 

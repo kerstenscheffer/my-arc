@@ -58,8 +58,8 @@ export default function LimitationsFlow({ data, onChange, isMobile, onNext, onBa
           style={{
             width: '100%', padding: isMobile ? '0.75rem' : '0.85rem',
             background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${data.injuries ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
-            borderRadius: '8px', color: data.injuries ? '#FFD700' : '#fff',
+            border: `1px solid ${data.injuries ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: '8px', color: data.injuries ? '#fff' : '#fff',
             fontSize: isMobile ? '0.82rem' : '0.87rem', fontWeight: 600,
             fontFamily: 'inherit', outline: 'none',
             boxSizing: 'border-box', resize: 'vertical', lineHeight: 1.5, marginTop: '1rem'
@@ -87,9 +87,9 @@ export default function LimitationsFlow({ data, onChange, isMobile, onNext, onBa
             return (
               <button key={label} onClick={() => togglePill(label)} style={{
                 padding: '0.4rem 0.75rem', borderRadius: '20px',
-                background: sel ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${sel ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                color: sel ? '#FFD700' : 'rgba(255,255,255,0.5)',
+                background: sel ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${sel ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                color: sel ? '#fff' : 'rgba(255,255,255,0.5)',
                 fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: sel ? 700 : 500,
                 cursor: 'pointer', touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
@@ -110,8 +110,8 @@ export default function LimitationsFlow({ data, onChange, isMobile, onNext, onBa
           style={{
             width: '100%', padding: isMobile ? '0.65rem 0.75rem' : '0.7rem 0.85rem',
             background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${data.avoided_exercises ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
-            borderRadius: '8px', color: data.avoided_exercises ? '#FFD700' : '#fff',
+            border: `1px solid ${data.avoided_exercises ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: '8px', color: data.avoided_exercises ? '#fff' : '#fff',
             fontSize: isMobile ? '0.82rem' : '0.87rem', fontWeight: 600,
             fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box'
           }}
@@ -159,8 +159,8 @@ export default function LimitationsFlow({ data, onChange, isMobile, onNext, onBa
           style={{
             width: '100%', padding: isMobile ? '0.75rem' : '0.85rem',
             background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${data.other_limitations ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
-            borderRadius: '8px', color: data.other_limitations ? '#FFD700' : '#fff',
+            border: `1px solid ${data.other_limitations ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: '8px', color: data.other_limitations ? '#fff' : '#fff',
             fontSize: isMobile ? '0.82rem' : '0.87rem', fontWeight: 600,
             fontFamily: 'inherit', outline: 'none',
             boxSizing: 'border-box', resize: 'vertical', lineHeight: 1.5, marginTop: '1rem'

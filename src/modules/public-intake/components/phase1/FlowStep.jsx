@@ -31,7 +31,7 @@ export function SectionLabel({ children }) {
   return (
     <div style={{
       fontSize: '0.45rem', fontWeight: 800,
-      color: 'rgba(255,215,0,0.5)',
+      color: 'rgba(255,255,255,0.5)',
       letterSpacing: '0.1em', textTransform: 'uppercase',
       marginBottom: '0.5rem'
     }}>{children}</div>
@@ -93,7 +93,7 @@ export function BackBtn({ onBack }) {
     <button onClick={onBack} style={{
       background: 'transparent', border: 'none',
       color: 'rgba(255,255,255,0.25)', fontSize: '0.72rem',
-      fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+      fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
       padding: '0.1rem 0', marginBottom: '0.4rem',
       display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
@@ -116,13 +116,13 @@ export function SkipBtn({ onClick, label, isMobile }) {
 // ── Grote keuze-optie ─────────────────────────────────────────────────────────
 
 export function BigOption({ label, sub, onClick, selected, isMobile, color }) {
-  const accentColor = color || '#FFD700'
+  const accentColor = color || '#fff'
   return (
     <button onClick={onClick} style={{
       width: '100%',
       padding: isMobile ? '0.85rem 1rem' : '0.95rem 1rem',
-      background: selected ? 'rgba(255,215,0,0.07)' : '#0d0d0d',
-      border: `1px solid ${selected ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
+      background: selected ? 'rgba(255,255,255,0.07)' : '#0d0d0d',
+      border: `1px solid ${selected ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
       borderLeft: selected ? `3px solid ${accentColor}` : '1px solid rgba(255,255,255,0.07)',
       borderRadius: selected ? '0 8px 8px 0' : '8px',
       cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
@@ -143,7 +143,7 @@ export function BigOption({ label, sub, onClick, selected, isMobile, color }) {
         <div style={{
           fontSize: isMobile ? '0.85rem' : '0.9rem',
           fontWeight: 700,
-          color: selected ? '#FFD700' : 'rgba(255,255,255,0.85)',
+          color: selected ? '#fff' : 'rgba(255,255,255,0.85)',
           lineHeight: 1.25
         }}>{label}</div>
         {sub && (
@@ -173,8 +173,8 @@ export function OptionGrid({ options, value, onChange, isMobile, columns = 2 }) 
         return (
           <button key={opt.value} onClick={() => onChange(opt.value)} style={{
             padding: isMobile ? '0.7rem 0.5rem' : '0.75rem 0.6rem',
-            background: isSelected ? 'rgba(255,215,0,0.07)' : '#0d0d0d',
-            border: `1px solid ${isSelected ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
+            background: isSelected ? 'rgba(255,255,255,0.07)' : '#0d0d0d',
+            border: `1px solid ${isSelected ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
             borderRadius: '8px',
             cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -183,7 +183,7 @@ export function OptionGrid({ options, value, onChange, isMobile, columns = 2 }) 
             <div style={{
               fontSize: isMobile ? '0.78rem' : '0.82rem',
               fontWeight: isSelected ? 800 : 600,
-              color: isSelected ? '#FFD700' : 'rgba(255,255,255,0.75)',
+              color: isSelected ? '#fff' : 'rgba(255,255,255,0.75)',
               lineHeight: 1.25, marginBottom: opt.sub ? '0.15rem' : 0
             }}>
               {isSelected && '✓ '}{opt.label}
@@ -208,9 +208,9 @@ export function TextField({ placeholder, value, onChange, multiline, isMobile, a
   const base = {
     width: '100%', boxSizing: 'border-box',
     padding: isMobile ? '0.8rem 0.9rem' : '0.85rem 1rem',
-    background: focused ? 'rgba(255,215,0,0.03)' : '#0d0d0d',
-    border: `1px solid ${focused ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
-    borderLeft: focused ? '3px solid #FFD700' : '1px solid rgba(255,255,255,0.08)',
+    background: focused ? 'rgba(255,255,255,0.03)' : '#0d0d0d',
+    border: `1px solid ${focused ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
+    borderLeft: focused ? '3px solid #fff' : '1px solid rgba(255,255,255,0.08)',
     borderRadius: '8px',
     color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem',
     fontWeight: 500, fontFamily: 'inherit', outline: 'none',
@@ -256,11 +256,11 @@ export function NumberField({ placeholder, value, onChange, unit, min, max, isMo
         style={{
           flex: 1,
           padding: isMobile ? '0.8rem 0.9rem' : '0.85rem 1rem',
-          background: focused ? 'rgba(255,215,0,0.03)' : '#0d0d0d',
-          border: `1px solid ${focused ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
-          borderLeft: focused ? '3px solid #FFD700' : '1px solid rgba(255,255,255,0.08)',
+          background: focused ? 'rgba(255,255,255,0.03)' : '#0d0d0d',
+          border: `1px solid ${focused ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
+          borderLeft: focused ? '3px solid #fff' : '1px solid rgba(255,255,255,0.08)',
           borderRadius: '8px',
-          color: value ? '#FFD700' : '#fff',
+          color: value ? '#fff' : '#fff',
           fontSize: isMobile ? '1.2rem' : '1.3rem',
           fontWeight: value ? 800 : 500,
           fontFamily: 'inherit', outline: 'none',
@@ -292,10 +292,10 @@ export function DayPicker({ selected, onToggle, isMobile }) {
         return (
           <button key={day} onClick={() => onToggle(day)} style={{
             flex: 1, padding: isMobile ? '0.65rem 0' : '0.7rem 0',
-            background: isSelected ? 'rgba(255,215,0,0.1)' : '#0d0d0d',
-            border: `${isSelected ? '2px' : '1px'} solid ${isSelected ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.07)'}`,
+            background: isSelected ? 'rgba(255,255,255,0.1)' : '#0d0d0d',
+            border: `${isSelected ? '2px' : '1px'} solid ${isSelected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.07)'}`,
             borderRadius: '8px',
-            color: isSelected ? '#FFD700' : 'rgba(255,255,255,0.35)',
+            color: isSelected ? '#fff' : 'rgba(255,255,255,0.35)',
             fontSize: isMobile ? '0.75rem' : '0.8rem',
             fontWeight: isSelected ? 800 : 600,
             cursor: 'pointer', fontFamily: 'inherit',
@@ -318,14 +318,14 @@ export function Slider({ label, value, onChange, min, max, step = 1, suffix, isM
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <div style={{ fontSize: isMobile ? '0.72rem' : '0.75rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{label}</div>
-        <div style={{ fontSize: isMobile ? '1.4rem' : '1.5rem', fontWeight: 900, color: '#FFD700', lineHeight: 1 }}>
+        <div style={{ fontSize: isMobile ? '1.4rem' : '1.5rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
           {value || min}
           {suffix && <span style={{ fontSize: '0.6rem', opacity: 0.5, marginLeft: '0.15rem' }}>{suffix}</span>}
         </div>
       </div>
       <div style={{ position: 'relative', height: '32px', display: 'flex', alignItems: 'center' }}>
         <div style={{ position: 'absolute', left: 0, right: 0, height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #FFD700, #FFA500)', borderRadius: '2px' }} />
+          <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #fff, #fff)', borderRadius: '2px' }} />
         </div>
         <input type="range" min={min} max={max} step={step} value={value || min}
           onChange={e => onChange(parseInt(e.target.value))}
@@ -350,8 +350,8 @@ export function PhotoGrid({ options, value, onChange, isMobile, columns = 2 }) {
         const isSelected = value === opt.value
         return (
           <button key={opt.value} onClick={() => onChange(opt.value)} style={{
-            padding: 0, background: isSelected ? 'rgba(255,215,0,0.06)' : '#0a0a0a',
-            border: `1px solid ${isSelected ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.06)'}`,
+            padding: 0, background: isSelected ? 'rgba(255,255,255,0.06)' : '#0a0a0a',
+            border: `1px solid ${isSelected ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.06)'}`,
             borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit',
             textAlign: 'left', overflow: 'hidden', position: 'relative',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -371,16 +371,16 @@ export function PhotoGrid({ options, value, onChange, isMobile, columns = 2 }) {
                     : 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.3))'
                 }} />
                 {isSelected && (
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #FFD700, #FFA500)' }} />
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #fff, #fff)' }} />
                 )}
               </div>
             )}
             <div style={{ padding: isMobile ? '0.5rem 0.6rem' : '0.6rem 0.7rem' }}>
-              <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: isSelected ? 800 : 700, color: isSelected ? '#FFD700' : '#fff', lineHeight: 1.2, marginBottom: '0.1rem' }}>
+              <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: isSelected ? 800 : 700, color: isSelected ? '#fff' : '#fff', lineHeight: 1.2, marginBottom: '0.1rem' }}>
                 {opt.label}
               </div>
               {opt.sub && (
-                <div style={{ fontSize: isMobile ? '0.52rem' : '0.55rem', color: isSelected ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.25)', fontWeight: 500 }}>
+                <div style={{ fontSize: isMobile ? '0.52rem' : '0.55rem', color: isSelected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)', fontWeight: 500 }}>
                   {opt.sub}
                 </div>
               )}
@@ -404,10 +404,10 @@ export function FlowProgress({ sections, currentSection, isMobile }) {
           <React.Fragment key={label}>
             <div style={{
               padding: '0.22rem 0.6rem',
-              background: isDone ? 'rgba(16,185,129,0.08)' : isCurrent ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)',
-              border: `1px solid ${isDone ? 'rgba(16,185,129,0.2)' : isCurrent ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.04)'}`,
+              background: isDone ? 'rgba(16,185,129,0.08)' : isCurrent ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${isDone ? 'rgba(16,185,129,0.2)' : isCurrent ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.04)'}`,
               borderRadius: '20px', fontSize: '0.48rem', fontWeight: 800,
-              color: isDone ? '#10b981' : isCurrent ? '#FFD700' : 'rgba(255,255,255,0.15)',
+              color: isDone ? '#10b981' : isCurrent ? '#fff' : 'rgba(255,255,255,0.15)',
               whiteSpace: 'nowrap'
             }}>
               {isDone ? `✓ ${label}` : label}

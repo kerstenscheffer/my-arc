@@ -163,8 +163,8 @@ export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile
               onClick={() => update('guidance_level', opt.value)}
               style={{
                 padding: 0, overflow: 'hidden',
-                background: isSelected ? 'rgba(255,215,0,0.04)' : '#0a0a0a',
-                border: `1.5px solid ${isSelected ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                background: isSelected ? 'rgba(255,255,255,0.04)' : '#0a0a0a',
+                border: `1.5px solid ${isSelected ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.06)'}`,
                 borderRadius: '10px', cursor: 'pointer', textAlign: 'left',
                 fontFamily: 'inherit', touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent', transition: 'all 0.2s ease',
@@ -174,19 +174,19 @@ export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile
               {/* Foto */}
               <div style={{ width: '100%', height: isMobile ? '60px' : '70px', backgroundImage: `url(${opt.image})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
                 <div style={{ position: 'absolute', inset: 0, background: isSelected ? 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.15))' : 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.3))' }} />
-                {isSelected && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #FFD700, #FFA500)' }} />}
+                {isSelected && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #fff, #fff)' }} />}
                 {opt.badge && (
-                  <div style={{ position: 'absolute', top: '0.4rem', right: '0.4rem', padding: '0.15rem 0.5rem', background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '3px', fontSize: '0.5rem', fontWeight: 800, color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{opt.badge}</div>
+                  <div style={{ position: 'absolute', top: '0.4rem', right: '0.4rem', padding: '0.15rem 0.5rem', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '3px', fontSize: '0.5rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{opt.badge}</div>
                 )}
                 {/* Check */}
-                <div style={{ position: 'absolute', bottom: '0.4rem', right: '0.4rem', width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? '#FFD700' : 'rgba(255,255,255,0.2)'}`, background: isSelected ? '#FFD700' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease' }}>
+                <div style={{ position: 'absolute', bottom: '0.4rem', right: '0.4rem', width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? '#fff' : 'rgba(255,255,255,0.2)'}`, background: isSelected ? '#fff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease' }}>
                   {isSelected && <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#000' }}>✓</span>}
                 </div>
               </div>
               {/* Tekst */}
               <div style={{ padding: isMobile ? '0.45rem 0.65rem' : '0.5rem 0.75rem' }}>
-                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800, color: isSelected ? '#FFD700' : '#fff', marginBottom: '0.1rem' }}>{opt.label}</div>
-                <div style={{ fontSize: isMobile ? '0.58rem' : '0.62rem', color: isSelected ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.3)', fontWeight: 500 }}>{opt.sub}</div>
+                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800, color: isSelected ? '#fff' : '#fff', marginBottom: '0.1rem' }}>{opt.label}</div>
+                <div style={{ fontSize: isMobile ? '0.58rem' : '0.62rem', color: isSelected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)', fontWeight: 500 }}>{opt.sub}</div>
               </div>
             </button>
           )
