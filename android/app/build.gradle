@@ -23,8 +23,10 @@ android {
         applicationId "com.myarcfitness.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        // versionCode moet bij elke Play-upload omhoog; versionName is wat de
+        // gebruiker ziet en loopt gelijk met de iOS-versie.
         versionCode 1
-        versionName "1.0"
+        versionName "1.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
