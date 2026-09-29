@@ -6,3 +6,23 @@ api/test.js
 api/stripe-webhook.backup.js
 api/stripe-webhook-complex.js
 api/calendly-webhook.js.backup
+
+# ── Mobiele builds horen niet op het web ─────────────────────────────────
+# De Capacitor-mappen zijn samen ruim 600 MB en bevatten bouwresultaten die
+# Vercel nooit nodig heeft. Eén tussenbestand van de Android-build is 101 MB
+# en dat is precies één megabyte over de uploadlimiet: dan klapt `vercel --prod`
+# eruit met "File size limit exceeded (100 MB)" zonder te zeggen wélk bestand.
+android
+ios
+
+# Losse app-pakketten, waar ze ook staan.
+*.aab
+*.apk
+*.ipa
+
+# Vercel bouwt de site zelf uit de bron; het lokale resultaat meesturen is
+# 87 MB aan dubbel werk.
+dist
+
+# Materiaal voor de winkelvermeldingen (iconen, feature-graphic, teksten).
+store-assets
