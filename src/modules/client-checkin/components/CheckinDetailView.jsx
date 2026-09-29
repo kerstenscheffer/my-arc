@@ -90,7 +90,8 @@ export default function CheckinDetailView({
   // Versie 2 en 3 zijn allebei het nieuwe formulier; 3 toont de cijfers in
   // plaats van ze te vragen, dus daar komen ze uit week_cijfers in plaats van
   // uit losse kolommen.
-  const isV2 = checkin.formulier_versie === 2 || checkin.formulier_versie === 3
+  const isV2 = [2, 3, 4].includes(checkin.formulier_versie)
+  const isV4 = checkin.formulier_versie === 4
   const nietLeeg = (v) => v !== null && v !== undefined && v !== ''
   const wc = checkin.week_cijfers || null
   const teken = (n) => `${n > 0 ? '+' : ''}${n}`
@@ -122,6 +123,23 @@ export default function CheckinDetailView({
   // Gemeten eerst: dat is de harde stand. Wat de klant zelf opgaf (alcohol,
   // slaap, sets tot falen) staat eronder.
   const cijfersRegels = [...v3Cijfers, ...v2Cijfers]
+  // Versie 4 heeft een eigen volgorde: die van het formulier, zodat je leest in
+  // de volgorde waarin de klant het heeft opgeschreven.
+  const v4Open = isV4 ? [
+    { label: 'Hoe het gaat',                  waarde: checkin.hoe_gaat_het },
+    { label: 'Over de cijfers',               waarde: checkin.cijfers_toelichting },
+    { label: 'Over zijn doelen',              waarde: checkin.doelen_toelichting },
+    { label: 'Doelen afgelopen week',         waarde: checkin.doelen_vrij },
+    { label: 'Trots op',                      waarde: checkin.trots_op },
+    { label: 'Kon beter',                     waarde: checkin.kon_beter },
+    { label: 'Over het hele traject',         waarde: checkin.traject_toelichting },
+    { label: 'Gaat komende week anders doen', waarde: checkin.volgende_week_beter },
+    { label: 'Vraagt van jou',                waarde: checkin.hulp_van_coach },
+    { label: 'Komende week speelt',           waarde: checkin.komende_week },
+    { label: 'Fijnste aan de coaching',       waarde: checkin.coaching_fijnste, feedback: true },
+    { label: 'Kan beter aan de coaching',     waarde: checkin.coaching_verbeterpunt, feedback: true },
+  ].filter(r => nietLeeg(r.waarde)) : []
+
   const v2Open = [
     { label: 'Hoe het gaat',            waarde: checkin.hoe_gaat_het },
     { label: 'Kostte de meeste moeite', waarde: checkin.struggles },
@@ -373,7 +391,7 @@ export default function CheckinDetailView({
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-            gap: '0.6rem', marginBottom: v2Open.length ? '1rem' : 0,
+            gap: '0.6rem', marginBottom: (isV4 ? v4Open : v2Open).length ? '1rem' : 0,
           }}>
             {cijfersRegels.map(r => (
               <div key={r.label} style={{
@@ -387,7 +405,7 @@ export default function CheckinDetailView({
               </div>
             ))}
           </div>
-          {v2Open.map(r => (
+          {(isV4 ? v4Open : v2Open).map(r => (
             <div key={r.label} style={{ marginBottom: '0.6rem' }}>
               <div style={{
                 fontSize: '0.75rem', fontWeight: 800, marginBottom: 3,

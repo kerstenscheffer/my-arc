@@ -15,6 +15,10 @@ import { useState, useEffect } from 'react'
 import { CheckCircle } from 'lucide-react'
 import CheckinService from './CheckinService'
 import { laadWeekCijfers, oordeel, gewichtOordeel } from './weekCijfers'
+import {
+  DOEL_TYPES, typeVan, doelTekst, bereidTerugkoppelingVoor,
+  BEHAALD_OPTIES, leegDoel,
+} from './doelen'
 
 const KAART = '#161616'
 const RAND = '#2a2a2a'
@@ -28,8 +32,6 @@ const SECTIES = [
     velden: [
       {
         id: 'hoe_gaat_het', type: 'tekst',
-        // {naam} wordt bij het renderen vervangen door de voornaam. Staat
-        // bewust vóór de cijfers: eerst even mens, dan pas de week doorrekenen.
         vraag: 'Hoe gaat het met je, {naam}?',
         hulp: 'We gaan straks in op de cijfers, maar eerst even dit.',
         placeholder: 'Hoe zit je erbij deze week?',
@@ -42,103 +44,88 @@ const SECTIES = [
       {
         // Geen vraag maar een scherm: dit hadden we afgesproken, dit is er
         // gebeurd. Hier stonden vijf vragen die de klant uit zijn hoofd moest
-        // beantwoorden terwijl de app het precies wist — hoeveel trainingen,
-        // hoeveel keer gewogen, hoeveel dagen volgens plan. Een herinnering
-        // van een week oud is altijd te positief, en je hoeft er niet naar te
-        // vragen als je het kunt laten zien.
+        // beantwoorden terwijl de app het precies wist.
         id: 'week_cijfers_scherm', type: 'cijfers',
         vraag: 'Dit is je week',
-        hulp: 'Afgesproken tegenover gedaan, de afgelopen zeven dagen.',
+        hulp: 'De afgelopen zeven dagen, zoals de app ze heeft geteld.',
+      },
+      {
+        id: 'cijfers_toelichting', type: 'tekst',
+        vraag: 'Wil je iets toelichten over deze cijfers?',
+        hulp: 'Alleen als er iets bij hoort. Anders overslaan.',
+        placeholder: 'Bijvoorbeeld: dinsdag ziek geweest.',
       },
     ],
   },
   {
-    kop: 'Wat de app niet ziet',
+    // Blok 3 wordt bij het renderen gevuld: staan er doelen van vorige week,
+    // dan komt de terugkoppeling; zo niet, dan één open vraag.
+    kop: 'Je doelen van afgelopen week',
     velden: [
       {
-        id: 'training_falen', type: 'keuze',
-        vraag: 'Heb je je sets tot falen gebracht?',
-        hulp: 'Tot falen betekent: geen herhaling meer met goede techniek.',
-        opties: ['Elke set', 'Meeste sets', 'Soms', 'Niet'],
+        id: 'doelen_vorige_week', type: 'doelen-terugkoppeling',
+        vraag: 'Heb je je doelen gehaald?',
+        hulp: 'We hebben alvast ingevuld wat de app ervan meet. Klopt het niet, zet het om.',
       },
       {
-        id: 'alcohol_aantal', type: 'aantal',
-        vraag: 'Hoeveel alcoholische drankjes heb je gehad?', slot: 'deze week',
-      },
-      {
-        id: 'slaap_uren_gem', type: 'aantal',
-        vraag: 'Hoeveel uur sliep je gemiddeld per nacht?', slot: 'uur', max: 14, step: 0.5,
-      },
-    ],
-  },
-  {
-    kop: 'Wat in de weg zat',
-    velden: [
-      {
-        id: 'struggles', type: 'tekst',
-        vraag: 'Wat kostte je deze week de meeste moeite?',
-        hulp: 'Waar je tegenop zag, wat je bleef uitstellen, wat gedoe opleverde.',
-        placeholder: 'Schrijf op wat als eerste in je opkomt.',
-      },
-      {
-        id: 'vastgelopen', type: 'tekst',
-        vraag: 'Waar ben je op vastgelopen?',
-        hulp: 'Iets wat niet lukte of niet duidelijk was.',
-        placeholder: 'Ook als je denkt dat het onbelangrijk is.',
-      },
-    ],
-  },
-  {
-    kop: 'Wat goed ging',
-    velden: [
-      {
-        id: 'wins', type: 'tekst',
-        vraag: 'Wat ging er afgelopen week goed?',
-        hulp: 'Groot of klein, alles telt — en dit is wat je volgende week wilt herhalen.',
+        id: 'doelen_toelichting', type: 'tekst',
+        vraag: 'Waarom wel of waarom niet?',
+        hulp: 'Wat hielp, en wat zat in de weg.',
         placeholder: 'In je eigen woorden.',
       },
     ],
   },
   {
-    // De twee vragen die vooruitkijken. Ze staan na de cijfers en na "wat ging
-    // goed", zodat je ze beantwoordt met je eigen week vers in beeld in plaats
-    // van uit het niets.
-    kop: 'Volgende week',
+    kop: 'Terugblik',
     velden: [
       {
+        id: 'trots_op', type: 'tekst',
+        vraag: 'Wat ging er goed, waar ben je trots op?',
+        hulp: 'Groot of klein, alles telt.',
+        placeholder: 'In je eigen woorden.',
+      },
+      {
+        id: 'kon_beter', type: 'tekst',
+        vraag: 'Wat kon er beter?',
+        hulp: 'Waar je tegenop zag, wat je bleef uitstellen, wat gedoe opleverde.',
+        placeholder: 'Schrijf op wat als eerste in je opkomt.',
+      },
+      {
+        id: 'traject_score', type: 'schaal',
+        vraag: 'Hoe voel je je over je hele traject tot nu toe?',
+        hulp: '1 is slecht, 10 is uitstekend.',
+      },
+      {
+        id: 'traject_toelichting', type: 'tekst',
+        vraag: 'Wil je dat cijfer toelichten?',
+        hulp: 'Alleen als je er iets bij wilt zeggen.',
+        placeholder: 'Optioneel.',
+      },
+    ],
+  },
+  {
+    kop: 'Focus voor komende week',
+    velden: [
+      {
+        id: 'doelen_komende_week', type: 'doelen-stellen',
+        vraag: 'Wat zijn je doelen voor komende week?',
+        hulp: 'Maak ze specifiek en meetbaar. Eén tot drie doelen.',
+      },
+      {
         id: 'volgende_week_beter', type: 'tekst',
-        vraag: 'Wat ga je volgende week anders doen om je doel wél te halen?',
+        vraag: 'Wat ga je deze week anders doen zodat je je doelen wél haalt?',
         hulp: 'Eén ding dat je echt gaat doen is meer waard dan een lijstje goede voornemens.',
         placeholder: 'Bijvoorbeeld: zondagavond mijn eten voorbereiden.',
       },
       {
         id: 'hulp_van_coach', type: 'tekst',
-        vraag: 'Hoe kan ik jou komende week zo goed mogelijk helpen?',
-        hulp: 'Waar heb je iets aan van mij? Een aanpassing in je plan, uitleg, of gewoon dat ik je eraan herinner.',
+        vraag: 'Wat kan ik als coach doen om je te helpen je doelen te halen?',
+        hulp: 'Een aanpassing in je plan, uitleg, of gewoon dat ik je eraan herinner.',
         placeholder: 'Zeg het gerust rechtstreeks.',
       },
-    ],
-  },
-  {
-    kop: 'Energie',
-    velden: [
-      {
-        id: 'energie_score', type: 'schaal',
-        vraag: 'Hoeveel energie had je deze week?',
-        hulp: '1 is uitgeput, 10 is topfit.',
-      },
-    ],
-  },
-  // Als laatste, want dit gaat over de planning van de week die komt.
-  //
-  // Een tekstveld en geen ja/nee: "ja" zonder te weten wát er speelt levert
-  // geen gesprek op, en dan moet de coach het alsnog vragen.
-  {
-    kop: 'Komende week',
-    velden: [
       {
         id: 'komende_week', type: 'tekst',
-        vraag: 'Heb je volgende week een activiteit of iets waardoor je het plan niet kan volgen?',
+        vraag: 'Is er komende week iets waardoor je het plan niet kan volgen?',
         hulp: 'Bijvoorbeeld een bruiloft, weekend weg, drukke werkweek of vakantie.',
         placeholder: 'Zo niet, laat leeg.',
       },
@@ -214,6 +201,10 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // De gemeten week. Null zolang hij laadt; het scherm toont dan een regel dat
   // de cijfers worden opgehaald in plaats van lege streepjes.
   const [cijfers, setCijfers] = useState(null)
+  // De doelen die de klant vorige keer stelde, met de terugkoppeling erbij.
+  // null = nog aan het laden, [] = die zijn er niet (eerste keer, of de vorige
+  // check-in was nog het oude formulier).
+  const [vorigeDoelen, setVorigeDoelen] = useState(null)
 
   const service = new CheckinService(db)
 
@@ -225,14 +216,34 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // De cijfers van de afgelopen zeven dagen. Mislukt dit, dan blijft het bij
   // een lege kaart — nooit een blokkade, want de open vragen zijn het echte
   // doel van de check-in.
+  //
+  // De doelen van vorige week hangen hieraan: pas als de cijfers er zijn kun je
+  // een voorstel doen voor "heb je dit gehaald".
   useEffect(() => {
     let weg = false
     if (!client?.id) return undefined
-    laadWeekCijfers(db, client)
-      .then(c => { if (!weg) setCijfers(c) })
-      .catch(e => { console.error('Weekcijfers laden mislukt:', e); if (!weg) setCijfers(null) })
+    ;(async () => {
+      let c = null
+      try { c = await laadWeekCijfers(db, client) } catch (e) { console.error('Weekcijfers laden mislukt:', e) }
+      if (weg) return
+      setCijfers(c)
+
+      const vorige = await service.getLaatsteMetDoelen(client.id)
+      if (weg) return
+      const klaar = bereidTerugkoppelingVoor(vorige?.doelen_komende_week, c)
+      setVorigeDoelen(klaar)
+      // Het formulier begint met wat er al ingevuld is: de terugkoppeling met
+      // het voorstel, en de nieuwe doelen met die van vorige week als start.
+      setFormData(prev => ({
+        ...prev,
+        doelen_vorige_week: klaar,
+        doelen_komende_week: prev.doelen_komende_week
+          ?? (klaar.length ? klaar.map(d => ({ type: d.type, doel_getal: d.doel_getal, tekst: d.tekst })) : [leegDoel()]),
+      }))
+    })()
     return () => { weg = true }
-  }, [db, client])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, client?.id])
 
   const checkExistingCheckin = async () => {
     setLoading(true)
@@ -258,11 +269,40 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
 
   const updateField = (id, value) => setFormData(prev => ({ ...prev, [id]: value }))
 
+  // Een doel telt mee als er iets in staat: een getal bij de meetbare soorten,
+  // of tekst bij een eigen doel.
+  const geldigDoel = (d) => {
+    if (!d?.type) return false
+    if (d.type === 'eigen') return !!String(d.tekst || '').trim()
+    return Number(d.doel_getal) > 0
+  }
+
+  const zetDoel = (i, patch) => setFormData(prev => {
+    const lijst = [...(prev.doelen_komende_week || [])]
+    lijst[i] = { ...lijst[i], ...patch }
+    return { ...prev, doelen_komende_week: lijst }
+  })
+  const voegDoelToe = () => setFormData(prev => {
+    const lijst = [...(prev.doelen_komende_week || [])]
+    if (lijst.length >= 3) return prev
+    return { ...prev, doelen_komende_week: [...lijst, leegDoel()] }
+  })
+  const verwijderDoel = (i) => setFormData(prev => ({
+    ...prev,
+    doelen_komende_week: (prev.doelen_komende_week || []).filter((_, n) => n !== i),
+  }))
+  const zetBehaald = (i, waarde) => setFormData(prev => {
+    const lijst = [...(prev.doelen_vorige_week || [])]
+    lijst[i] = { ...lijst[i], behaald: waarde }
+    return { ...prev, doelen_vorige_week: lijst }
+  })
+
   const buildPayload = () => ({
     coach_id: client.coach_id || client.trainer_id || null,
     // Zodat de coach-weergave weet welke vragen bij deze check-in hoorden.
-    // 3 = dit formulier: de cijfers worden getoond in plaats van gevraagd.
-    formulier_versie: 3,
+    // 4 = dit formulier: de klant stelt eigen weekdoelen en koppelt de week
+    // erna terug of hij ze gehaald heeft.
+    formulier_versie: 4,
     // De stand zoals de klant hem zag toen hij dit invulde. Wordt later niet
     // meer herrekend, ook niet als er nog wordt nagelogd.
     week_cijfers: cijfers || null,
@@ -277,12 +317,18 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     // Alleen de energiescore is verplicht. De rest mag leeg: een half
     // ingevulde check-in zegt meer dan geen check-in, en de oude versie
     // blokkeerde op zes verplichte scores.
-    if (!formData.energie_score) {
-      alert('Geef nog even aan hoeveel energie je had deze week.')
+    // Eén ding is verplicht: minstens één doel voor komende week. Zonder doel
+    // heeft de volgende check-in niets om op terug te komen, en dan valt het
+    // hele idee om.
+    const doelen = (formData.doelen_komende_week || []).filter(d => geldigDoel(d))
+    if (doelen.length === 0) {
+      alert('Kies minstens één doel voor komende week.')
       return
     }
 
     setSubmitting(true)
+    // Alleen doelen met inhoud opslaan; een lege derde regel is geen doel.
+    formData.doelen_komende_week = doelen
 
     // Stap 1 — alléén de daadwerkelijke opslag. Alleen híer mag een fout als
     // "versturen mislukt" getoond worden.
@@ -342,6 +388,173 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
             {v.hulp}
           </div>
         )}
+
+        {/* ── Terugkoppeling op de doelen van vorige week ── */}
+        {v.type === 'doelen-terugkoppeling' && (() => {
+          const lijst = formData.doelen_vorige_week || []
+          if (vorigeDoelen === null) {
+            return <div style={{ marginTop: '2.2vh', color: GRIJS, fontSize: 14, fontWeight: 700 }}>Je doelen worden opgehaald…</div>
+          }
+          // Geen doelen van vorige week: dan één open vraag, zodat de klant
+          // toch kan vertellen waar hij op mikte.
+          if (lijst.length === 0) {
+            return (
+              <div style={{ marginTop: '2.2vh' }}>
+                <textarea
+                  value={formData.doelen_vrij || ''}
+                  onChange={e => updateField('doelen_vrij', e.target.value)}
+                  placeholder="Wat waren je doelen voor afgelopen week?"
+                  rows={4}
+                  style={{ ...invoerStijl(true), resize: 'vertical' }}
+                />
+                <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
+                  Vanaf nu kies je aan het eind van deze check-in je doelen, en komen ze
+                  hier volgende week vanzelf terug.
+                </div>
+              </div>
+            )
+          }
+          return (
+            <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
+              {lijst.map((d, i) => (
+                <div key={i} style={{
+                  padding: '12px 14px', marginBottom: 8,
+                  background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <span style={{ flex: 1, fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                      {doelTekst(d)}
+                    </span>
+                    {d.gemeten != null && (
+                      <span style={{ fontSize: 13, fontWeight: 800, color: GRIJS, fontVariantNumeric: 'tabular-nums' }}>
+                        gemeten: {d.gemeten}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                    {BEHAALD_OPTIES.map(o => {
+                      const aan = d.behaald === o.key
+                      return (
+                        <button
+                          key={o.key}
+                          type="button"
+                          onClick={() => zetBehaald(i, o.key)}
+                          style={{
+                            flex: 1, minHeight: 40, borderRadius: 10,
+                            background: aan ? o.kleur : 'transparent',
+                            border: `1px solid ${aan ? o.kleur : RAND}`,
+                            color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                            fontSize: 14, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          }}
+                        >
+                          {o.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 6, lineHeight: 1.5 }}>
+                Wat de app kon meten staat al ingevuld. Klopt het niet met hoe jouw week
+                ging, zet het gerust om.
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* ── Doelen kiezen voor komende week ── */}
+        {v.type === 'doelen-stellen' && (() => {
+          const lijst = formData.doelen_komende_week || []
+          return (
+            <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
+              {lijst.map((d, i) => {
+                const t = typeVan(d.type)
+                return (
+                  <div key={i} style={{
+                    padding: '12px 14px', marginBottom: 8,
+                    background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 900, color: GRIJS, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Doel {i + 1}
+                      </span>
+                      {lijst.length > 1 && (
+                        <button type="button" onClick={() => verwijderDoel(i)} style={{
+                          background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
+                          fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0,
+                        }}>verwijder</button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+                      {DOEL_TYPES.map(dt => {
+                        const aan = d.type === dt.key
+                        return (
+                          <button
+                            key={dt.key}
+                            type="button"
+                            onClick={() => zetDoel(i, { type: dt.key, doel_getal: dt.standaard, tekst: '' })}
+                            style={{
+                              minHeight: 34, padding: '0 12px', borderRadius: 999,
+                              background: aan ? '#fff' : 'transparent',
+                              border: `1px solid ${aan ? '#fff' : RAND}`,
+                              color: aan ? '#0A0A0A' : 'rgba(255,255,255,0.6)',
+                              fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            }}
+                          >
+                            {dt.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {d.type === 'eigen' ? (
+                      <input
+                        value={d.tekst || ''}
+                        onChange={e => zetDoel(i, { tekst: e.target.value })}
+                        placeholder="Bijvoorbeeld: om 23:00 in bed"
+                        style={invoerStijl(true)}
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={d.doel_getal ?? ''}
+                          min={1}
+                          max={t?.max || 99}
+                          step={t?.stap || 1}
+                          onChange={e => zetDoel(i, { doel_getal: e.target.value === '' ? null : Number(e.target.value) })}
+                          style={{ ...invoerStijl(false), width: 110, textAlign: 'center' }}
+                        />
+                        <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
+                          {t?.eenheid}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {lijst.length < 3 && (
+                <button type="button" onClick={voegDoelToe} style={{
+                  width: '100%', minHeight: 44, borderRadius: 12,
+                  background: 'transparent', border: `1px dashed ${RAND}`,
+                  color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 800,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                }}>
+                  + Doel erbij
+                </button>
+              )}
+              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
+                Deze doelen komen volgende week terug in je check-in, en staan tot die tijd
+                op je startscherm.
+              </div>
+            </div>
+          )
+        })()}
 
         {v.type === 'cijfers' && (() => {
           if (!cijfers) {

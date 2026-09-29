@@ -31,6 +31,29 @@ export default class CheckinService {
     }
   }
 
+  // De laatste check-in van deze klant die met versie 4 is ingevuld. Nodig om
+  // de doelen van vorige week terug te kunnen tonen: alleen vanaf versie 4
+  // staan die er, dus filteren op versie in plaats van gewoon de laatste
+  // pakken (die kan van het oude formulier zijn en heeft dan geen doelen).
+  async getLaatsteMetDoelen(clientId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('client_checkins')
+        .select('id, checkin_date, doelen_komende_week')
+        .eq('client_id', clientId)
+        .eq('formulier_versie', 4)
+        .not('doelen_komende_week', 'is', null)
+        .order('checkin_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw error
+      return data || null
+    } catch (error) {
+      console.warn('Vorige doelen ophalen mislukt:', error?.message)
+      return null
+    }
+  }
+
   async getLatestCheckin(clientId) {
     try {
       const { data, error } = await this.supabase
