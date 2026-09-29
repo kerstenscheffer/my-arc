@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Search, Plus, Trash2, Save, Copy, Zap, ChefHat } from 'lucide-react'
+import { X, Search, Plus, Trash2, Save, Copy, Zap, ChefHat, Check } from 'lucide-react'
 import { resolveFoodImage } from '../../../meal-plan/foodImageFallback'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -244,48 +244,128 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: m?'0.4rem 0.75rem':'0.45rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <span style={{ fontSize: m?'0.65rem':'0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ingrediënten ({ingredients.length})</span>
-                  <button onClick={() => { setShowSearch(!showSearch); setTimeout(() => searchRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', background: showSearch?'rgba(255,215,0,0.12)':'rgba(255,255,255,0.04)', border: `1px solid ${showSearch?'rgba(255,215,0,0.3)':'rgba(255,255,255,0.1)'}`, borderRadius: 6, color: showSearch?'#FFD700':'rgba(255,255,255,0.7)', fontSize: m?'0.7rem':'0.75rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <button onClick={() => { setShowSearch(!showSearch); setTimeout(() => searchRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', background: showSearch?'#fff':'rgba(255,255,255,0.06)', border: `1px solid ${showSearch?'#fff':'rgba(255,255,255,0.14)'}`, borderRadius: 8, color: showSearch?'#0a0a0a':'#fff', fontSize: m?'0.72rem':'0.78rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <Plus size={13} /> Toevoegen
                   </button>
                 </div>
 
                 {showSearch && (
-                  <div style={{ padding: m?'0.4rem 0.75rem':'0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,215,0,0.02)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '6px' }}>
-                      <Search size={12} color="rgba(255,215,0,0.4)" />
-                      <input ref={searchRef} type="text" value={searchQuery} onChange={e => handleSearch(e.target.value)} placeholder="Zoek ingrediënt..." style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m?'0.75rem':'0.8rem', fontFamily: 'inherit' }} />
-                      {searching && <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.1)', borderTopColor: '#FFD700', animation: 'spin 0.8s linear infinite' }} />}
+                  <div style={{ padding: m?'0.6rem 0.75rem':'0.7rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', height: 42, padding: '0 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10 }}>
+                      <Search size={15} color="rgba(255,255,255,0.45)" />
+                      <input ref={searchRef} type="text" value={searchQuery} onChange={e => handleSearch(e.target.value)} placeholder="Zoek ingrediënt" style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m?'0.9rem':'0.92rem', fontWeight: 700, fontFamily: 'inherit' }} />
+                      {searching && <div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} />}
                     </div>
-                    {/* Toggle: canonieke set vs. hele database (voor wanneer er geen canoniek ingrediënt te vinden is) */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
-                      <button onClick={toggleFullBase} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.55rem', background: searchFullBase?'rgba(168,85,247,0.12)':'rgba(255,255,255,0.04)', border: `1px solid ${searchFullBase?'rgba(168,85,247,0.4)':'rgba(255,255,255,0.1)'}`, borderRadius: '5px', color: searchFullBase?'#c084fc':'rgba(255,255,255,0.45)', fontSize: m?'0.55rem':'0.6rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: searchFullBase?'#c084fc':'rgba(255,255,255,0.2)' }} />
-                        {searchFullBase ? 'Hele database' : 'Alleen canoniek'}
-                      </button>
-                      <span style={{ fontSize: m?'0.5rem':'0.52rem', color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>
-                        {searchFullBase ? 'óók openfoodfacts — controleer macro’s' : 'gecureerde coach-set'}
-                      </span>
+
+                    {/* Twee standen naast elkaar in plaats van één knop die
+                        omklapt. Bij een schakelaar die zijn eigen stand als
+                        label toont weet je nooit of je leest wat er áán staat
+                        of wat er gebeurt als je drukt. */}
+                    <div style={{ display: 'flex', gap: 3, marginTop: 8, padding: 3, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10 }}>
+                      {[
+                        { aan: false, titel: 'Jouw set', sub: 'gecureerd' },
+                        { aan: true,  titel: 'Alles',    sub: '37k producten' },
+                      ].map(optie => {
+                        const actief = searchFullBase === optie.aan
+                        return (
+                          <button
+                            key={optie.titel}
+                            onClick={() => { if (!actief) toggleFullBase() }}
+                            style={{
+                              flex: 1, minHeight: 34, borderRadius: 8, border: 'none',
+                              background: actief ? '#fff' : 'transparent',
+                              color: actief ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
+                              fontFamily: 'inherit', cursor: 'pointer',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            }}
+                          >
+                            <span style={{ fontSize: m?'0.75rem':'0.78rem', fontWeight: 900, letterSpacing: '-0.01em' }}>{optie.titel}</span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 700, opacity: actief ? 0.55 : 0.75 }}>{optie.sub}</span>
+                          </button>
+                        )
+                      })}
                     </div>
+                    {searchFullBase && (
+                      <div style={{ marginTop: 6, fontSize: m?'0.62rem':'0.66rem', fontWeight: 700, color: '#f59e0b', lineHeight: 1.35 }}>
+                        Buiten je eigen set staan producten uit openfoodfacts. Controleer de macro's voor je ze gebruikt.
+                      </div>
+                    )}
                     {searchResults.length > 0 && (
                       <div
                         onWheel={e => e.stopPropagation()}
-                        style={{ marginTop: '0.35rem', maxHeight: '180px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', WebkitOverflowScrolling: 'touch' }}>
-                        {searchResults.map(row => {
-                          const added = ingredients.some(i => i.ingredient_id === row.id)
+                        style={{ marginTop: 8, maxHeight: 260, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, WebkitOverflowScrolling: 'touch' }}>
+                        {searchResults.map((row, i) => {
+                          const added = ingredients.some(x => x.ingredient_id === row.id)
+                          const extern = row.source && row.source !== 'coach'
+                          // Kopregel op de overgang van jouw set naar de rest.
+                          // Eén badge per rij is te makkelijk over het hoofd te
+                          // zien als je door twintig treffers scrolt.
+                          const vorigeExtern = i > 0 && searchResults[i - 1].source && searchResults[i - 1].source !== 'coach'
+                          const eersteExterne = extern && !vorigeExtern
                           return (
-                            <button key={row.id} onClick={() => !added && addIngredient(row)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: m?'0.5rem 0.75rem':'0.6rem 0.85rem', background: added?'rgba(16,185,129,0.08)':'rgba(255,255,255,0.025)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: added?'default':'pointer', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', gap: '0.5rem' }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
-                                <span style={{ fontSize: m?'0.8rem':'0.85rem', fontWeight: 700, color: added?'#10b981':'#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.name}</span>
-                                {row.source && row.source !== 'coach' && (
-                                  <span style={{ flexShrink: 0, fontSize: '0.45rem', fontWeight: 800, color: '#c084fc', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', padding: '0.05rem 0.25rem', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>extern</span>
-                                )}
-                              </span>
-                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
-                                <span style={{ fontSize: m?'0.65rem':'0.7rem', fontWeight: 800, color: '#FFD700' }}>{row.calories_per_100g}<span style={{ fontSize: '0.7em', opacity: 0.6 }}>/100g</span></span>
-                                <span style={{ fontSize: m?'0.65rem':'0.7rem', color: '#10b981', fontWeight: 700 }}>{row.protein_per_100g}E</span>
-                                {added ? <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 900 }}>✓</span> : <Plus size={14} color="rgba(255,215,0,0.6)" />}
-                              </div>
-                            </button>
+                            <div key={row.id}>
+                              {eersteExterne && (
+                                <div style={{
+                                  padding: '0.4rem 0.85rem',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  borderTop: i > 0 ? '1px solid rgba(255,255,255,0.09)' : 'none',
+                                  borderBottom: '1px solid rgba(255,255,255,0.07)',
+                                  fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.08em',
+                                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)',
+                                }}>
+                                  Uit openfoodfacts
+                                </div>
+                              )}
+                              {i === 0 && !extern && (
+                                <div style={{
+                                  padding: '0.4rem 0.85rem',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  borderBottom: '1px solid rgba(255,255,255,0.07)',
+                                  fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.08em',
+                                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)',
+                                }}>
+                                  Jouw set
+                                </div>
+                              )}
+                              <button
+                                onClick={() => !added && addIngredient(row)}
+                                style={{
+                                  width: '100%', display: 'flex', alignItems: 'center', gap: '0.6rem',
+                                  padding: m?'0.6rem 0.85rem':'0.7rem 0.95rem',
+                                  background: added ? 'rgba(16,185,129,0.1)' : 'transparent',
+                                  border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                  cursor: added ? 'default' : 'pointer', textAlign: 'left',
+                                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{
+                                    fontSize: m?'0.85rem':'0.9rem', fontWeight: 800,
+                                    color: added ? '#10b981' : '#fff', letterSpacing: '-0.015em',
+                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                  }}>{row.name}</div>
+                                  <div style={{
+                                    marginTop: 2, display: 'flex', gap: 10,
+                                    fontSize: m?'0.66rem':'0.7rem', fontWeight: 700,
+                                    color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums',
+                                  }}>
+                                    <span><span style={{ color: '#fff', fontWeight: 900 }}>{row.calories_per_100g}</span> kcal</span>
+                                    <span>{row.protein_per_100g}g eiwit</span>
+                                    <span>per 100g</span>
+                                  </div>
+                                </div>
+                                {added
+                                  ? <Check size={16} color="#10b981" strokeWidth={3} style={{ flexShrink: 0 }} />
+                                  : (
+                                    <span style={{
+                                      flexShrink: 0, width: 26, height: 26, borderRadius: '50%',
+                                      background: '#fff', color: '#0a0a0a',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}><Plus size={15} strokeWidth={3} /></span>
+                                  )}
+                              </button>
+                            </div>
                           )
                         })}
                       </div>
