@@ -290,26 +290,27 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
           background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
         }}>
           De lijn is het gewicht dat je op <strong style={{ color: '#fff' }}>{REFERENTIE_REPS} herhalingen</strong> zou
-          halen, berekend uit je beste set van die training. Zo zijn sets met
-          verschillende herhalingen met elkaar te vergelijken, en staat er een getal
-          dat je herkent van de stang.
-          <br /><br />
-          Daardoor telt vooruitgang in herhalingen ook mee. Ga je van 70 kg × 8 naar
-          70 kg × 11, dan gaat de lijn van 70 naar 75,6 terwijl er geen schijf bij ging —
-          je bent immers sterker geworden. Doe je 8 herhalingen, dan staat er gewoon je
-          eigen gewicht.
-          <br /><br />
-          Boven de twaalf herhalingen rekenen we alsof het er twaalf waren: daarboven
-          meet je vooral je conditie en wordt de schatting onbetrouwbaar. In de tooltip
-          zie je altijd wat je die dag echt hebt getild.
+          halen. Zo zijn sets met verschillende herhalingen te vergelijken.
+          <div style={{
+            margin: '8px 0', padding: '0.5rem 0.6rem', borderRadius: 8,
+            background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 800,
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            70 kg × 8 = 70,0<br />
+            70 kg × 11 = 75,5
+            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>
+              drie herhalingen erbij op hetzelfde gewicht telt als 5,5 kg sterker
+            </div>
+          </div>
+          <strong style={{ color: '#fff' }}>Waarom zo:</strong> hiermee zie je dat je sterker
+          wordt, ook als je meer herhalingen haalt en niet alleen als er kilo's bij komen.
           {norm?.faseDoel && (
-            <>
-              <br /><br />
-              De band en de streeplijn horen bij je <strong style={{ color: '#fff' }}>{norm.faseDoel}</strong>-fase:
+            <div style={{ marginTop: 8 }}>
+              Band en streeplijn horen bij je <strong style={{ color: '#fff' }}>{norm.faseDoel}</strong>-fase:
               {norm.faseDoel === 'cut'
-                ? ' in een tekort is kracht vasthouden het doel, een lichte daling hoort erbij.'
+                ? ' kracht vasthouden is daar het doel.'
                 : ' daar hoort je kracht op te lopen.'}
-            </>
+            </div>
           )}
         </div>
       )}
