@@ -21,20 +21,45 @@ import { useEffect, useState } from 'react'
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, Info } from 'lucide-react'
 import { metBandFases, faseSamenvatting, KLEUR_VOOR, oordeelTekst } from '../krachtBand'
 
 const LIJN = 'rgba(255,255,255,0.1)'
 const GROEN = '#10b981'
 const ROOD = '#ef4444'
 
-// Het zwaarste gewicht van een sessie; bij gelijk gewicht de meeste reps.
+// Geschat 1RM volgens Epley: het gewicht dat je één keer zou kunnen tillen,
+// afgeleid uit een set die je wél hebt gedaan.
+//
+//   1RM ≈ gewicht × (1 + reps / 30)
+//
+// Waarom niet gewoon het zwaarste gewicht: dan zie je vooruitgang alleen als er
+// een schijf bij gaat. Ga je van 70 kg × 8 naar 70 kg × 11, dan ben je sterker
+// geworden en bleef de lijn vlak — precies het gat dat dit dicht.
+//
+// Boven de twaalf herhalingen wordt de schatting onbetrouwbaar (je loopt dan
+// eerder tegen je conditie aan dan tegen je kracht), dus daar rekenen we mee
+// alsof het er twaalf waren. Een set van dertig telt dus niet als een 1RM van
+// het dubbele.
+const MAX_REPS_VOOR_SCHATTING = 12
+
+export const geschat1RM = (gewicht, reps) => {
+  const g = Number(gewicht) || 0
+  const r = Math.min(Math.max(Number(reps) || 1, 1), MAX_REPS_VOOR_SCHATTING)
+  if (!g) return 0
+  return Math.round(g * (1 + r / 30) * 10) / 10
+}
+
+// De set die het meest zegt over je kracht die dag: de hoogste schatting, niet
+// per se het zwaarste gewicht. 70 kg × 8 (schatting 88,7) telt dus zwaarder dan
+// 80 kg × 1 (schatting 82,7) — acht herhalingen op zeventig is meer werk dan
+// één zware poging.
 const besteSet = (sets) => (sets || []).reduce((beste, set) => {
   const gewicht = Number(set?.weight) || 0
   const reps = Number(set?.reps) || 0
-  if (!beste) return { gewicht, reps }
-  if (gewicht > beste.gewicht) return { gewicht, reps }
-  if (gewicht === beste.gewicht && reps > beste.reps) return { gewicht, reps }
+  if (!gewicht) return beste
+  const score = geschat1RM(gewicht, reps)
+  if (!beste || score > beste.score) return { gewicht, reps, score }
   return beste
 }, null)
 
@@ -61,7 +86,10 @@ function Kaartje({ active, payload }) {
         {p.label}
       </div>
       <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff' }}>
-        {p.gewicht} kg × {p.reps}
+        {p.gewicht} kg geschat 1RM
+      </div>
+      <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+        gedaan: {p.ruwGewicht} kg × {p.reps}
       </div>
       {p.doel != null && (
         <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
@@ -93,6 +121,7 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
   // cutte en nu bouwt hoort een doellijn te zien die tijdens de cut vlak loopt
   // en pas vanaf de build klimt.
   const [fases, setFases] = useState([])
+  const [uitleg, setUitleg] = useState(false)
 
   useEffect(() => {
     let leeft = true
@@ -133,7 +162,10 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
             const beste = besteSet(r.sets)
             const datum = perSessie.get(r.session_id)
             if (!beste || !beste.gewicht || !datum) return null
-            return { datum, gewicht: beste.gewicht, reps: beste.reps }
+            // `gewicht` is bewust de schátting: de band, het oordeel en de
+            // as rekenen daarop. Wat je die dag echt tilde bewaren we ernaast
+            // voor de tooltip.
+            return { datum, gewicht: beste.score, ruwGewicht: beste.gewicht, reps: beste.reps }
           })
           .filter(Boolean)
           // Eén punt per dag: twee rijen op dezelfde dag is dezelfde training.
@@ -174,6 +206,7 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
     )
   }
 
+  // De reeks geschatte 1RM's: de maat waarop de band, het oordeel en de PR gaan.
   const gewichten = punten.map(p => p.gewicht)
   const max = Math.max(...gewichten)
   const min = Math.min(...gewichten)
@@ -245,13 +278,58 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
         <TrendingUp size={14} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0, alignSelf: 'center' }} />
-        <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
           Krachtverloop
         </span>
+        <button
+          onClick={() => setUitleg(v => !v)}
+          title="Hoe dit gerekend wordt"
+          aria-label="Uitleg"
+          style={{
+            width: 20, height: 20, padding: 0, borderRadius: 6, alignSelf: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none',
+            color: uitleg ? '#fff' : 'rgba(255,255,255,0.35)',
+            cursor: 'pointer', touchAction: 'manipulation',
+          }}
+        >
+          <Info size={13} />
+        </button>
+        <span style={{ flex: 1 }} />
         <span style={{ fontSize: '0.85rem', fontWeight: 900, color: kleur }}>
           {verschil > 0 ? '+' : ''}{verschil} kg
         </span>
       </div>
+
+      {uitleg && (
+        <div style={{
+          fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)',
+          lineHeight: 1.5, marginBottom: 8,
+          padding: '0.6rem 0.7rem', borderRadius: 10,
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+        }}>
+          De lijn is je <strong style={{ color: '#fff' }}>geschatte 1RM</strong>: het gewicht dat je
+          één keer zou kunnen tillen, berekend uit je beste set van die training —
+          gewicht × (1 + herhalingen ÷ 30).
+          <br /><br />
+          Daardoor telt ook vooruitgang in herhalingen mee. Ga je van 70 kg × 8 naar
+          70 kg × 11, dan gaat de lijn omhoog (88,7 → 95,7) terwijl er geen schijf bij ging.
+          Je bent immers sterker geworden.
+          <br /><br />
+          Boven de twaalf herhalingen rekenen we alsof het er twaalf waren: daarboven
+          meet je vooral je conditie en wordt de schatting onbetrouwbaar. In de tooltip
+          zie je altijd wat je die dag echt hebt getild.
+          {norm?.faseDoel && (
+            <>
+              <br /><br />
+              De band en de streeplijn horen bij je <strong style={{ color: '#fff' }}>{norm.faseDoel}</strong>-fase:
+              {norm.faseDoel === 'cut'
+                ? ' in een tekort is kracht vasthouden het doel, een lichte daling hoort erbij.'
+                : ' daar hoort je kracht op te lopen.'}
+            </>
+          )}
+        </div>
+      )}
 
       <div style={{ width: '100%', height: isMobile ? 190 : 230 }}>
         <ResponsiveContainer>

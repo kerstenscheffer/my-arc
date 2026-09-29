@@ -67,7 +67,8 @@ export default function PrivacyPolicy() {
           <ul>
             <li><strong>Identiteitsgegevens</strong> — naam, e-mailadres, geboortedatum</li>
             <li><strong>Lichaamsgegevens</strong> — gewicht, lengte, vetpercentage, voortgangs­foto's</li>
-            <li><strong>Gezondheid & fitness</strong> — calorie- en macrodoelen, voedingslog, trainingsdata, workouts</li>
+            <li><strong>Gezondheid &amp; fitness</strong> — calorie- en macrodoelen, voedingslog, trainingsdata, workouts</li>
+            <li><strong>Stappen uit je telefoon</strong> — alleen als je de koppeling met Apple Health (iPhone) of Health Connect (Android) zelf aanzet</li>
             <li><strong>Communicatie</strong> — berichten tussen coach en cliënt binnen het platform</li>
             <li><strong>Gebruiksgegevens</strong> — inlogtijden, app-activiteit</li>
           </ul>
@@ -91,11 +92,30 @@ export default function PrivacyPolicy() {
           <p>Wij verkopen jouw gegevens nooit aan derden. Wij gebruiken geen advertentienetwerken.</p>
         </Section>
 
-        <Section title="5. Bewaartermijn">
+        <Section title="5. Koppeling met Apple Health en Health Connect">
+          <p>
+            Je kunt de app koppelen aan Apple Health (iPhone) of Health Connect (Android). Die koppeling
+            zet je zelf aan en je kunt hem op elk moment weer uitzetten.
+          </p>
+          <ul>
+            <li><strong>Wat we lezen</strong> — uitsluitend je dagelijkse aantal stappen. Niets anders: geen hartslag, geen slaap, geen locatie, geen work-outs uit andere apps.</li>
+            <li><strong>Waarvoor</strong> — om je stappen naast je trainingen en je gewicht te tonen, zodat jij en je coach zien hoe actief je week was.</li>
+            <li><strong>Wat we schrijven</strong> — niets. De app schrijft geen enkele waarde terug naar Apple Health of Health Connect.</li>
+            <li><strong>Waar het terechtkomt</strong> — het aantal stappen per dag wordt opgeslagen in je eigen profiel in onze database, zichtbaar voor jou en je coach.</li>
+            <li><strong>Nooit voor advertenties</strong> — deze gegevens worden niet gedeeld met derden, niet verkocht en niet gebruikt voor reclame of profilering.</li>
+          </ul>
+          <p>
+            Intrekken kan altijd: op een iPhone via Instellingen → Privacy &amp; beveiliging → Health → MY ARC,
+            op Android via de app Health Connect → App-rechten. Daarna stopt het ophalen direct. Je eerder
+            opgeslagen stappen verwijder je door je account te verwijderen, of door je coach te vragen ze te wissen.
+          </p>
+        </Section>
+
+        <Section title="6. Bewaartermijn">
           Jouw gegevens worden bewaard zolang je een actief account hebt. Na verwijdering van je account worden jouw gegevens binnen 30 dagen definitief gewist uit onze systemen.
         </Section>
 
-        <Section title="6. Jouw rechten">
+        <Section title="7. Jouw rechten">
           <p>Je hebt het recht om:</p>
           <ul>
             <li>Jouw gegevens in te zien</li>
@@ -106,15 +126,15 @@ export default function PrivacyPolicy() {
           <p>Je kunt jouw account direct verwijderen vanuit de app via <strong>Profiel → Account verwijderen</strong>. Voor overige verzoeken kun je contact opnemen via info@myarcfitness.com</p>
         </Section>
 
-        <Section title="7. Beveiliging">
+        <Section title="8. Beveiliging">
           Wij nemen passende technische en organisatorische maatregelen om jouw gegevens te beschermen. Alle verbindingen zijn versleuteld via HTTPS. Toegang tot gegevens is beperkt via Row Level Security in onze database.
         </Section>
 
-        <Section title="8. Wijzigingen">
+        <Section title="9. Wijzigingen">
           Wij kunnen dit privacybeleid aanpassen. Bij belangrijke wijzigingen ontvang je een melding via de app of per e-mail. De meest actuele versie is altijd beschikbaar op myarcfitness.com/privacy.
         </Section>
 
-        <Section title="9. Contact">
+        <Section title="10. Contact">
           Vragen over dit privacybeleid? Neem contact op via info@myarcfitness.com
         </Section>
 
