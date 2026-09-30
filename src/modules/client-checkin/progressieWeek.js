@@ -21,6 +21,7 @@
 //   de gewicht-header in coach insight.
 
 import { est8Rep } from '../coach-command-center/components/insight/workoutChartUtils'
+import { gewichtOordeel } from './weekCijfers'
 import { zaterdagTempo, laatsteZaterdag, vensterGemiddelde } from '../weight-tracker/utils/coachingBand'
 import { lokaleDatum } from '../../utils/tijd'
 
@@ -258,8 +259,17 @@ function bouwVoeding(stand, maaltijden, plan) {
 // Eerst zaterdag tegen vorige zaterdag. Lukt dat niet — te weinig weken, of
 // vorige zaterdag niets gemeten — dan tegen de start van de fase. Lukt dat ook
 // niet, dan geven we null terug en verdwijnt de regel.
+// Welke kant hoort het op? Zonder fase weten we het niet, en dan kleuren we
+// het verschil ook niet: 0,4 kg eraf is goed in een cut en fout in een bulk.
+function richtingVan(fase) {
+  if (fase?.doel === 'cut') return 'afvallen'
+  if (fase?.doel === 'build') return 'aankomen'
+  return 'stabiel'
+}
+
 function bouwGewicht(wegingen, fase, client) {
   if (!wegingen.length) return null
+  const doel = fase?.week_doel_kg != null ? Number(fase.week_doel_kg) : null
 
   // De losse wegingen binnen een venster, voor het uitlegvenster: welke
   // getallen zitten er in dit gemiddelde?
@@ -287,7 +297,10 @@ function bouwGewicht(wegingen, fase, client) {
       wegingenNu: inVenster(tempo.zaterdag),
       wegingenEerder: inVenster(tempo.vorigeZaterdag),
       // Het afgesproken tempo, zodat de klant ziet of dit verschil goed is.
-      doelPerWeek: fase?.week_doel_kg != null ? Number(fase.week_doel_kg) : null,
+      doelPerWeek: doel,
+      // Hetzelfde oordeel als de coach-kant gebruikt, zodat de kleur die de
+      // klant ziet niet af kan wijken van wat in coach insight staat.
+      oordeel: gewichtOordeel(tempo.verschil, doel, richtingVan(fase)),
     }
   }
 

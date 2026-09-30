@@ -19,6 +19,9 @@ import { Info, ChevronDown } from 'lucide-react'
 import GewichtBandGrafiek from '../coach-command-center/components/insight/GewichtBandGrafiek'
 
 const GROEN = '#10b981'
+// Zelfde drie kleuren als het coach-overzicht: haalde je het afgesproken
+// tempo, zat je er net onder, of ging het de verkeerde kant op.
+const OORDEEL_KLEUR = { goed: '#10b981', bijna: '#f59e0b', niet: '#ef4444' }
 const GRIJS = 'rgba(255,255,255,0.55)'
 const RAND = '#2a2a2a'
 
@@ -73,27 +76,30 @@ function InfoKnop({ open, onClick, label }) {
 function Uitleg({ children }) {
   return (
     <div style={{
-      marginTop: 10, padding: '12px 14px',
+      marginTop: 10, padding: '10px 12px',
       background: 'rgba(255,255,255,0.04)', borderRadius: 12,
-      fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6,
+      fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5,
     }}>
       {children}
     </div>
   )
 }
 
-function Wegingen({ titel, lijst }) {
-  if (!lijst?.length) return null
+// Eén regel per week: het gemiddelde vet, de losse wegingen erachter. Twee
+// koppen met daaronder een rij maakte het venster twee keer zo hoog zonder
+// dat er meer in stond.
+function WeekRegel({ tot, gemiddelde, lijst }) {
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 12, fontWeight: 800, color: GRIJS, marginBottom: 4 }}>{titel}</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-        {lijst.map(w => (
-          <span key={w.datum} style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
-            {kortDatum(w.datum)} <span style={{ color: GRIJS }}>{nl(w.kg, 1)}</span>
-          </span>
-        ))}
-      </div>
+    <div style={{ marginTop: 6, fontSize: 12.5, lineHeight: 1.5 }}>
+      <span style={{ fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+        {nl(gemiddelde, 1)} kg
+      </span>
+      <span style={{ color: GRIJS, fontWeight: 700 }}> tot {kortDatum(tot)}</span>
+      {lijst?.length > 0 && (
+        <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>
+          {' · '}{lijst.map(w => nl(w.kg, 1)).join(' · ')}
+        </span>
+      )}
     </div>
   )
 }
@@ -136,10 +142,11 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              fontSize: 38, fontWeight: 900, color: '#fff',
+              fontSize: 38, fontWeight: 900,
+              color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : '#fff',
               lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
             }}>
-              {metTeken(gewicht.verschil)}<span style={{ fontSize: '0.5em', marginLeft: 6, color: GRIJS }}>kg</span>
+              {metTeken(gewicht.verschil)}<span style={{ fontSize: '0.5em', marginLeft: 6, opacity: 0.6 }}>kg</span>
             </div>
             <InfoKnop
               open={gewichtUit}
@@ -147,29 +154,32 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
               label="Hoe is dit berekend?"
             />
           </div>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: GRIJS, marginTop: 7, lineHeight: 1.5 }}>
-            {gewicht.soort === 'week'
-              ? `sinds vorige zaterdag · ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`
-              : `sinds je start · ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`}
-            {gewicht.doelPerWeek != null && ` · afgesproken ${metTeken(gewicht.doelPerWeek)} per week`}
-          </div>
 
           {gewichtUit && (
             <Uitleg>
+              {/* De regel die eerst onder het getal stond. Hij hoort hier: op
+                  het scherm zelf telt alleen het getal en de kleur. */}
+              <div style={{ fontWeight: 800, color: '#fff' }}>
+                {gewicht.soort === 'week'
+                  ? `Sinds vorige zaterdag: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`
+                  : `Sinds je start: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`}
+                {gewicht.doelPerWeek != null && `, afgesproken ${metTeken(gewicht.doelPerWeek)} per week`}
+              </div>
+
               {gewicht.soort === 'week' ? (
                 <>
-                  Niet twee losse wegingen tegen elkaar, want die schommelen een kilo of twee
-                  per ochtend. We nemen het gemiddelde van de week die eindigt op zaterdag,
-                  en leggen dat naast het gemiddelde van de week ervoor.
-                  <Wegingen titel={`Week tot ${kortDatum(gewicht.zaterdag)} · gemiddeld ${nl(gewicht.nu, 1)} kg`} lijst={gewicht.wegingenNu} />
-                  <Wegingen titel={`Week tot ${kortDatum(gewicht.vorigeZaterdag)} · gemiddeld ${nl(gewicht.eerder, 1)} kg`} lijst={gewicht.wegingenEerder} />
+                  <div style={{ marginTop: 8 }}>
+                    Het gemiddelde van de week tot zaterdag, tegen dat van de week ervoor.
+                    Twee losse wegingen schelen een kilo of twee per ochtend.
+                  </div>
+                  <WeekRegel tot={gewicht.zaterdag} gemiddelde={gewicht.nu} lijst={gewicht.wegingenNu} />
+                  <WeekRegel tot={gewicht.vorigeZaterdag} gemiddelde={gewicht.eerder} lijst={gewicht.wegingenEerder} />
                 </>
               ) : (
-                <>
-                  Er zijn nog geen twee volle weken om te vergelijken, dus dit is je
-                  gemiddelde van nu ({nl(gewicht.nu, 1)} kg) tegenover je startgewicht
-                  ({nl(gewicht.eerder, 1)} kg).
-                </>
+                <div style={{ marginTop: 8 }}>
+                  Nog geen twee volle weken om te vergelijken, dus dit is je gemiddelde
+                  van nu tegenover je startgewicht.
+                </div>
               )}
             </Uitleg>
           )}
