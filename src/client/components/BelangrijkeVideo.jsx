@@ -331,6 +331,33 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
               }} />
 
               {/* Titel bovenaan in de video. */}
+              {/* Afvinken kan ook hiervandaan, zonder eerst de lijst in te
+                  hoeven. Gaat langs dezelfde bevestiging: afspelen of een tik
+                  hier streept nooit zomaar iets weg. */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setBevestig(item) }}
+                disabled={bezig === item.video_id}
+                style={{
+                  position: 'absolute', right: isMobile ? 10 : 12, bottom: isMobile ? 10 : 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: isMobile ? '0.32rem 0.55rem' : '0.36rem 0.62rem',
+                  background: 'rgba(10,10,10,0.6)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 8, color: '#fff',
+                  fontSize: isMobile ? '0.64rem' : '0.68rem', fontWeight: 900,
+                  fontFamily: 'inherit', letterSpacing: '-0.01em',
+                  backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+                  cursor: 'pointer', touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  opacity: bezig === item.video_id ? 0.5 : 1,
+                }}
+              >
+                {bezig === item.video_id
+                  ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Check size={12} strokeWidth={3.2} />}
+                Bekeken
+              </button>
+
               <div style={{
                 position: 'absolute', top: isMobile ? 10 : 12,
                 left: isMobile ? 12 : 14, right: titelRechts,

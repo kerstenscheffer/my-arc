@@ -281,8 +281,8 @@ export default function VideoPlayerModal({ item, onClose }) {
                   onClick={() => setStartSec(Number(h.tijd) || 0)}
                   disabled={!videoId}
                   style={{
-                    width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10,
-                    padding: '0.55rem 0', minHeight: 40,
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '0.5rem 0', minHeight: 40,
                     background: 'transparent', border: 'none',
                     borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)',
                     color: '#fff', fontFamily: 'inherit', textAlign: 'left',
@@ -290,31 +290,25 @@ export default function VideoPlayerModal({ item, onClose }) {
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   }}
                 >
+                  {/* De tijd als wit knopje: dat is het deel waar je op tikt
+                      om te springen, en dat moet je kunnen zien. */}
                   <span style={{
-                    flexShrink: 0, minWidth: 38,
-                    fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 900,
-                    color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums',
-                    paddingTop: 1,
+                    flexShrink: 0,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    minWidth: 46, padding: '0.25rem 0.45rem',
+                    background: '#fff', borderRadius: 7,
+                    fontSize: isMobile ? '0.7rem' : '0.74rem', fontWeight: 900,
+                    color: '#0a0a0a', fontVariantNumeric: 'tabular-nums',
+                    letterSpacing: '-0.01em',
                   }}>
                     {tijdLabel(h.tijd)}
                   </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{
-                      display: 'block',
-                      fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 800,
-                      color: '#fff', lineHeight: 1.35, letterSpacing: '-0.01em',
-                    }}>
-                      {h.titel}
-                    </span>
-                    {h.uitleg && (
-                      <span style={{
-                        display: 'block', marginTop: 2,
-                        fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: 600,
-                        color: 'rgba(255,255,255,0.45)', lineHeight: 1.4,
-                      }}>
-                        {h.uitleg}
-                      </span>
-                    )}
+                  <span style={{
+                    flex: 1, minWidth: 0,
+                    fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 800,
+                    color: '#fff', lineHeight: 1.35, letterSpacing: '-0.01em',
+                  }}>
+                    {h.titel}
                   </span>
                 </button>
               ))}
