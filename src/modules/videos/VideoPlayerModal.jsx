@@ -4,21 +4,37 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../coach/ModalHost'
-import { X, Star, Play, ExternalLink } from 'lucide-react'
+import { X, Star, Play, ExternalLink, ListVideo } from 'lucide-react'
 import clientVideoService from './ClientVideoService'
 import { extractYouTubeId, getYouTubeEmbedUrl, getZoomEmbedUrl, getInstagramEmbedUrl, getBronMeta } from './utils/youtubeHelpers'
+
+// mm:ss uit een aantal seconden. Boven het uur telt YouTube zelf ook in
+// h:mm:ss, maar zo lang is geen van deze video's.
+const tijdLabel = (sec) => {
+  const n = Math.max(0, Math.floor(Number(sec) || 0))
+  return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`
+}
 
 export default function VideoPlayerModal({ item, onClose }) {
   const modalHost = useModalHost()
   const [rating, setRating] = useState(item?.client_rating || 0)
   const [hoverRating, setHoverRating] = useState(0)
+  // Vanaf welke seconde de speler moet starten. Tikken op een hoofdstuk zet dit
+  // en laadt het frame opnieuw; de key eronder dwingt dat af, want alleen de
+  // src veranderen herlaadt een iframe niet altijd.
+  const [startSec, setStartSec] = useState(0)
   const openTimeRef = useRef(Date.now())
   const markedRef = useRef(false)
   const isMobile = window.innerWidth <= 768
 
   const video = item?.video
+  // Vorm: { waarom, hoofdstukken: [{ tijd (seconden), titel, uitleg? }] }.
+  // Kan ontbreken of oude rommel bevatten; alles hieronder gaat uit van niets.
+  const inhoud = (video?.video_inhoud && typeof video.video_inhoud === 'object')
+    ? video.video_inhoud
+    : null
   const videoId = extractYouTubeId(video?.video_url)
-  const embedUrl = videoId ? getYouTubeEmbedUrl(videoId, { autoplay: true, mute: false }) : null
+  const embedUrl = videoId ? getYouTubeEmbedUrl(videoId, { autoplay: true, mute: false, start: startSec }) : null
   // Zoom Clips embedden via /clips/embed/ (wél embedbaar).
   const zoomEmbed = getZoomEmbedUrl(video?.video_url)
   // Instagram Reels: /embed/ is wél in te sluiten (geen x-frame-options,
@@ -167,6 +183,7 @@ export default function VideoPlayerModal({ item, onClose }) {
         }}>
           {playerEmbed ? (
             <iframe
+              key={startSec}
               referrerPolicy="strict-origin-when-cross-origin"
               src={playerEmbed}
               style={{
@@ -224,6 +241,86 @@ export default function VideoPlayerModal({ item, onClose }) {
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
         }}>
+          {/* WAT JE GAAT LEREN — inhoudsopgave met context.
+              Staat bovenaan en niet onder de beschrijving: iemand die net op
+              play heeft gedrukt wil meteen weten waar het heen gaat en waarom
+              hij hier zit. Komt uit coach_videos.video_inhoud, zodat de coach
+              het per video kan zetten zonder dat er iets uitgerold hoeft.
+              Tikken op een hoofdstuk springt naar dat punt in de video. */}
+          {(inhoud?.waarom || inhoud?.hoofdstukken?.length > 0) && (
+            <div style={{
+              padding: isMobile ? '0.9rem 0.875rem' : '1.1rem 1.25rem',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                marginBottom: inhoud?.waarom ? '0.5rem' : '0.7rem',
+              }}>
+                <ListVideo size={15} color="#fff" strokeWidth={2.6} />
+                <span style={{
+                  fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 900, color: '#fff',
+                  textTransform: 'uppercase', letterSpacing: '0.1em',
+                }}>
+                  Wat je gaat leren
+                </span>
+              </div>
+
+              {inhoud?.waarom && (
+                <p style={{
+                  margin: '0 0 0.85rem',
+                  fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.78)', lineHeight: 1.5,
+                }}>
+                  {inhoud.waarom}
+                </p>
+              )}
+
+              {(inhoud?.hoofdstukken || []).map((h, i) => (
+                <button
+                  key={`${h.tijd}-${i}`}
+                  onClick={() => setStartSec(Number(h.tijd) || 0)}
+                  disabled={!videoId}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10,
+                    padding: '0.55rem 0', minHeight: 40,
+                    background: 'transparent', border: 'none',
+                    borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                    color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+                    cursor: videoId ? 'pointer' : 'default',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <span style={{
+                    flexShrink: 0, minWidth: 38,
+                    fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 900,
+                    color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums',
+                    paddingTop: 1,
+                  }}>
+                    {tijdLabel(h.tijd)}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{
+                      display: 'block',
+                      fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 800,
+                      color: '#fff', lineHeight: 1.35, letterSpacing: '-0.01em',
+                    }}>
+                      {h.titel}
+                    </span>
+                    {h.uitleg && (
+                      <span style={{
+                        display: 'block', marginTop: 2,
+                        fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: 600,
+                        color: 'rgba(255,255,255,0.45)', lineHeight: 1.4,
+                      }}>
+                        {h.uitleg}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {video.description && (
             <div style={{
               padding: isMobile ? '0.75rem 0.875rem' : '1rem 1.25rem',

@@ -64,6 +64,10 @@ export const getYouTubeEmbedUrl = (videoId, options = {}) => {
     // Geen annotaties/kaartjes over het beeld.
     iv_load_policy: '3',
   })
+  // Springen naar een hoofdstuk uit de inhoudsopgave onder de speler.
+  if (Number.isFinite(options.start) && options.start > 0) {
+    params.set('start', String(Math.floor(options.start)))
+  }
   // youtube-nocookie.com in plaats van youtube.com: dat domein is toegestaan
   // zonder dat de player een geldige referrer-configuratie nodig heeft. In een
   // webview (Capacitor) stuurt de browser die header niet mee zoals YouTube
