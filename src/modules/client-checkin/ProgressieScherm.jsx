@@ -149,8 +149,8 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
               {metTeken(gewicht.verschil)}<span style={{ fontSize: '0.5em', marginLeft: 6, opacity: 0.6 }}>kg</span>
             </div>
             {gewicht.doelBereik && (
-              <div style={{ fontSize: 13.5, fontWeight: 800, color: GRIJS, lineHeight: 1.3 }}>
-                doel<br />
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: GRIJS, whiteSpace: 'nowrap' }}>
+                doel{' '}
                 <span style={{ color: 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums' }}>
                   {gewicht.doelBereik}
                 </span>
