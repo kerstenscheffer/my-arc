@@ -40,7 +40,7 @@ function Blok({ titel, rechts, children }) {
   return (
     <div style={{ paddingTop: 14, marginTop: 14, borderTop: `1px solid ${RAND}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: GRIJS }}>{titel}</div>
+        <div style={{ flex: 1, fontSize: 21, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{titel}</div>
         {rechts}
       </div>
       {children}
@@ -212,18 +212,12 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
       {/* ── Training ── */}
       {training?.sessies > 0 && (
         <Blok titel="Training">
-          <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', lineHeight: 1.35 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
             {training.sessies} {training.sessies === 1 ? 'training' : 'trainingen'}
             {training.oefeningen > 0 && ` · ${training.oefeningen} oefeningen`}
             {training.sets > 0 && ` · ${training.sets} sets`}
           </div>
-          {training.halfGelogd > 0 && (
-            <div style={{ fontSize: 13, fontWeight: 700, color: GRIJS, marginTop: 5, lineHeight: 1.5 }}>
-              {training.halfGelogd === 1
-                ? 'Bij 1 training staat maar een deel van je sets gelogd'
-                : `Bij ${training.halfGelogd} trainingen staat maar een deel van je sets gelogd`}
-            </div>
-          )}
+
 
           {training.sterker?.length > 0 && (
             <div style={{ marginTop: 10 }}>
@@ -233,10 +227,9 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
                 aria-expanded={sterkerUit}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                  padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
-                  background: 'rgba(16,185,129,0.1)',
-                  border: '1px solid rgba(16,185,129,0.35)',
-                  color: GROEN, fontSize: 14, fontWeight: 900, fontFamily: 'inherit',
+                  padding: '6px 0', cursor: 'pointer',
+                  background: 'transparent', border: 'none',
+                  color: '#fff', fontSize: 16, fontWeight: 900, fontFamily: 'inherit',
                   textAlign: 'left',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
@@ -289,7 +282,7 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
           titel="Voeding"
           rechts={<InfoKnop open={voedingUit} onClick={() => setVoedingUit(v => !v)} label="Wat telt hier mee?" />}
         >
-          <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', lineHeight: 1.35 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
             Bijgehouden op {voeding.bijgehouden} van {voeding.van} dagen
           </div>
           {voeding.gemKcal != null && (
@@ -317,7 +310,7 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
       {/* ── Wegen ── */}
       {wegingen?.dezeWeek != null && (
         <Blok titel="Wegen">
-          <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', lineHeight: 1.35 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
             {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
           </div>
         </Blok>
