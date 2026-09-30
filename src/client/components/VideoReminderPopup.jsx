@@ -8,25 +8,29 @@
 // voedingsplan dus nooit. Deze herinnering staat op elke pagina en noemt álle
 // openstaande video's, met de pagina waar ze thuishoren.
 //
-// Drie fases, zelfde patroon als de check-in-nudge:
+// Drie fases, exact hetzelfde patroon en dezelfde kaart als de check-in-nudge:
 //
-//   1. kaart — schuift vanaf rechts in beeld, blijft aan die rand plakken.
+//   1. kaart — schuift vanaf rechts in beeld, met de foto van de coach.
 //   2. pill  — smal tabje tegen de rechterrand zodra de kaart is weggeklikt.
 //              Blijft staan zolang er video's open zijn en schudt af en toe.
 //   3. lijst — sheet met alle openstaande video's; een tik speelt er één af.
 //
-// Bewust géén donkere waas over de pagina en bewust niet onderaan gecentreerd:
-// de check-in-nudge doet dat al, en twee elementen die om dezelfde plek en
-// dezelfde aandacht vechten maken ze beide makkelijker te negeren.
+// Het belangrijkste ontwerpbesluit zit in wat een video wegstreept. Afspelen
+// doet dat níet: je kunt een video openzetten, tien seconden kijken en weer
+// sluiten, en dan is de boodschap niet aangekomen terwijl de herinnering wel
+// weg zou zijn. Alleen het vinkje streept weg, en dat vraagt eerst nog een
+// bevestiging midden in beeld. Antwoordt de klant "ik kijk hem later", dan
+// blijft de video gewoon openstaan.
 //
 // Bewust geen localStorage-snooze: deze video's moeten gezien worden. Wegklikken
 // verplaatst de herinnering naar de pill, hij verdwijnt pas als alles bekeken is.
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { PlayCircle, X, ArrowRight, Check } from 'lucide-react'
+import { PlayCircle, X, ArrowRight, Check, Play } from 'lucide-react'
 import videoService from '../../modules/videos/VideoService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
+import { getThumbnailFromUrl } from '../../modules/videos/utils/youtubeHelpers'
 
 // Hoe de pagina's heten tegen de klant.
 const PAGINA_NAAM = {
@@ -39,6 +43,10 @@ const paginaLabel = (paginas) => (paginas || [])
   .filter(Boolean)
   .join(' · ')
 
+// De thumbnail staat lang niet altijd op de video-rij; voor een YouTube-link
+// valt hij af te leiden uit de URL. Zonder deze terugval blijft het vakje leeg.
+const thumbVan = (v) => v?.thumbnail_url || getThumbnailFromUrl(v?.video_url) || null
+
 // Even wachten voordat de kaart komt: meteen bij het openen van de app schuift
 // er al genoeg in beeld, en dan is dit het zoveelste ding dat wegklikt moet.
 const WACHT_VOOR_KAART = 2600
@@ -50,6 +58,7 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
   const [items, setItems] = useState([])
   const [fase, setFase] = useState('init')   // 'init' | 'kaart' | 'pill' | 'lijst'
   const [speler, setSpeler] = useState(null)
+  const [bevestig, setBevestig] = useState(null)  // item waarvoor "echt gekeken?" openstaat
   const [bezig, setBezig] = useState(null)
   const [schudt, setSchudt] = useState(false)
   // Is de kaart deze sessie al geweest? Dan niet opnieuw bij elke herlading van
@@ -87,35 +96,98 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
     return () => clearInterval(i)
   }, [fase])
 
-  const afvinken = async (item, via) => {
+  // Alleen hiermee gaat een video weg, en alleen na de bevestiging hieronder.
+  const echtGezien = async (item) => {
+    setBevestig(null)
     setBezig(item.video_id)
-    await videoService.markeerVideoGezien(client.id, item.video_id, via, item.assignment_id)
+    await videoService.markeerVideoGezien(client.id, item.video_id, 'knop', item.assignment_id)
     const over = items.filter(i => i.video_id !== item.video_id)
     setItems(over)
     setBezig(null)
-    // Laatste video bekeken → alles weg. Anders blijft de lijst open zodat de
-    // klant er meteen nog een kan pakken.
     if (over.length === 0) setFase('init')
-    // De pagina zelf leest dezelfde lijst; die mag meteen bijwerken.
+    // Het blok op de pagina zelf leest dezelfde lijst; dat mag meteen bij.
     window.dispatchEvent(new CustomEvent('myarc:video-gezien', { detail: { videoId: item.video_id } }))
   }
 
-  const sluitSpeler = async () => {
-    const item = speler
-    setSpeler(null)
-    if (item) await afvinken(item, 'speler')
-  }
-
-  if (!client?.id || items.length === 0 || fase === 'init') {
-    return speler ? <VideoPlayerModal item={{ id: speler.assignment_id, video: speler.video }} onClose={sluitSpeler} /> : null
-  }
-
-  const aantal = items.length
-  const meervoud = aantal !== 1
+  // De speler sluiten doet niets. Dat is het hele punt: wie hem heeft
+  // afgespeeld moet zelf bevestigen dat hij hem ook echt heeft uitgekeken.
+  const sluitSpeler = () => setSpeler(null)
 
   const speler_ = speler && (
     <VideoPlayerModal item={{ id: speler.assignment_id, video: speler.video }} onClose={sluitSpeler} />
   )
+
+  // ── BEVESTIGING ──────────────────────────────────────────────────────────
+  // Midden in beeld, boven alles heen. Bewust twee volwaardige knoppen en geen
+  // klein kruisje: "nee, later" is een echt antwoord, geen ontsnapping.
+  const bevestiging = bevestig && createPortal(
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2147483300,
+        background: 'rgba(0,0,0,0.82)',
+        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1.25rem',
+      }}
+    >
+      <div style={{
+        width: '100%', maxWidth: 380,
+        background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.14)',
+        borderRadius: 18, padding: isMobile ? '1.25rem 1.1rem' : '1.5rem 1.35rem',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
+      }}>
+        <div style={{
+          fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff',
+          letterSpacing: '-0.025em', lineHeight: 1.25, marginBottom: 6,
+        }}>
+          Heb je deze video echt gekeken?
+        </div>
+        <div style={{
+          fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 700,
+          color: 'rgba(255,255,255,0.5)', lineHeight: 1.45, marginBottom: '1.1rem',
+        }}>
+          {bevestig.video?.title}
+        </div>
+
+        <button
+          onClick={() => echtGezien(bevestig)}
+          style={{
+            width: '100%', minHeight: 48, marginBottom: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            background: '#fff', border: 'none', borderRadius: 12,
+            color: '#0a0a0a', fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Check size={16} strokeWidth={3} />
+          Ja, helemaal gekeken
+        </button>
+
+        <button
+          onClick={() => setBevestig(null)}
+          style={{
+            width: '100%', minHeight: 48,
+            background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 12, color: 'rgba(255,255,255,0.65)',
+            fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 800,
+            fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Nee, ik kijk hem later helemaal
+        </button>
+      </div>
+    </div>,
+    document.body
+  )
+
+  if (!client?.id || items.length === 0 || fase === 'init') {
+    return <>{speler_}{bevestiging}</>
+  }
+
+  const aantal = items.length
+  const meervoud = aantal !== 1
 
   // ── LIJST ────────────────────────────────────────────────────────────────
   if (fase === 'lijst') {
@@ -156,76 +228,86 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
             </div>
 
             <p style={{
-              fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.55,
-              color: 'rgba(255,255,255,0.5)', margin: '0 0 1rem',
+              fontSize: '0.82rem', fontWeight: 800, lineHeight: 1.5,
+              color: 'rgba(255,255,255,0.78)', margin: '0 0 1rem',
             }}>
-              Deze horen bij je plan. Kort, en je haalt er daarna meer uit.
+              Enorm belangrijk dat je deze {aantal} video{meervoud ? "'s" : ''} nog bekijkt.
             </p>
 
-            {items.map((item, i) => (
-              <div
-                key={item.video_id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '0.8rem 0',
-                  borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                  opacity: bezig === item.video_id ? 0.4 : 1,
-                }}
-              >
-                <button
-                  onClick={() => setSpeler(item)}
-                  disabled={!!bezig}
+            {items.map((item, i) => {
+              const thumb = thumbVan(item.video)
+              return (
+                <div
+                  key={item.video_id}
                   style={{
-                    flex: 1, display: 'flex', alignItems: 'center', gap: 11,
-                    background: 'transparent', border: 'none', padding: 0,
-                    cursor: 'pointer', textAlign: 'left', minHeight: 48,
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '0.8rem 0',
+                    borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                    opacity: bezig === item.video_id ? 0.4 : 1,
                   }}
                 >
-                  <div style={{
-                    width: 62, height: 40, borderRadius: 8, flexShrink: 0,
-                    background: item.video?.thumbnail_url
-                      ? `url(${item.video.thumbnail_url}) center/cover`
-                      : 'rgba(255,255,255,0.08)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {!item.video?.thumbnail_url && <PlayCircle size={18} color="rgba(255,255,255,0.4)" />}
-                  </div>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{
-                      display: 'block', fontSize: '0.87rem', fontWeight: 900, color: '#fff',
-                      letterSpacing: '-0.015em', lineHeight: 1.3,
+                  <button
+                    onClick={() => setSpeler(item)}
+                    disabled={!!bezig}
+                    style={{
+                      flex: 1, display: 'flex', alignItems: 'center', gap: 11,
+                      background: 'transparent', border: 'none', padding: 0,
+                      cursor: 'pointer', textAlign: 'left', minHeight: 48,
+                    }}
+                  >
+                    <div style={{
+                      position: 'relative', width: 78, height: 48, borderRadius: 9, flexShrink: 0,
+                      overflow: 'hidden', backgroundColor: '#1a1a1a',
+                      backgroundImage: thumb ? `url(${thumb})` : 'none',
+                      backgroundSize: 'cover', backgroundPosition: 'center',
                     }}>
-                      {item.video?.title || 'Video'}
-                    </span>
-                    {paginaLabel(item.paginas) && (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
-                        {paginaLabel(item.paginas)}
+                      <div style={{
+                        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+                        width: 24, height: 24, borderRadius: '50%', background: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 3px 10px rgba(0,0,0,0.5)',
+                      }}>
+                        <Play size={11} fill="#0a0a0a" strokeWidth={0} style={{ marginLeft: 1 }} />
+                      </div>
+                    </div>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{
+                        display: 'block', fontSize: '0.87rem', fontWeight: 900, color: '#fff',
+                        letterSpacing: '-0.015em', lineHeight: 1.3,
+                      }}>
+                        {item.video?.title || 'Video'}
                       </span>
-                    )}
-                  </span>
-                </button>
+                      {paginaLabel(item.paginas) && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
+                          {paginaLabel(item.paginas)}
+                        </span>
+                      )}
+                    </span>
+                  </button>
 
-                {/* Zelf afvinken mag: wie de video al buiten de app heeft gezien
-                    hoeft er niet nog een keer door. */}
-                <button
-                  onClick={() => afvinken(item, 'knop')}
-                  disabled={!!bezig}
-                  aria-label="Al bekeken"
-                  style={{
-                    flexShrink: 0, width: 38, height: 38, borderRadius: 10,
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Check size={15} color="rgba(255,255,255,0.6)" strokeWidth={2.8} />
-                </button>
-              </div>
-            ))}
+                  {/* Het vinkje is de enige route naar weg — en vraagt eerst
+                      nog of hij 'm echt helemaal gekeken heeft. */}
+                  <button
+                    onClick={() => setBevestig(item)}
+                    disabled={!!bezig}
+                    aria-label="Ik heb 'm gekeken"
+                    style={{
+                      flexShrink: 0, width: 38, height: 38, borderRadius: 10,
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Check size={15} color="rgba(255,255,255,0.6)" strokeWidth={2.8} />
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </div>
         {speler_}
+        {bevestiging}
       </>,
       document.body
     )
@@ -271,77 +353,115 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
           }
         `}</style>
         {speler_}
+        {bevestiging}
       </>,
       document.body
     )
   }
 
   // ── KAART ────────────────────────────────────────────────────────────────
-  // Geen waas over de pagina: dit is een duwtje, geen blokkade. De check-in
-  // dimt wel, en die mag de enige zijn die dat doet.
+  // Zelfde vorm, maat en foto als de check-in-nudge: rechts ingeschoven kaart
+  // met de coach erop. Alleen de plek op het scherm verschilt, zodat de twee
+  // niet over elkaar heen vallen als ze tegelijk in beeld staan.
   const breedte = isMobile ? 'min(330px, 88vw)' : 380
+  const hoogte = isMobile ? 84 : 94
 
   return createPortal(
     <>
+      <div
+        onClick={() => setFase('pill')}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 93,
+          background: 'rgba(0,0,0,0.62)',
+          backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
+          animation: 'videoDim 0.3s ease both',
+        }}
+      />
       <div
         onClick={() => setFase('lijst')}
         style={{
           position: 'fixed',
           right: 0,
-          // Onder de check-in-melding (die zit op 180/214 en is ~90 hoog),
-          // zodat ze niet over elkaar heen vallen als ze samen in beeld staan.
+          // Onder de check-in-melding (die zit op 180/214 en is ~90 hoog).
           top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 300px)' : 330,
           zIndex: 94,
-          width: breedte,
+          width: breedte, height: hoogte,
           borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
           background: '#0a0a0a',
-          border: '1px solid rgba(255,255,255,0.14)',
+          border: '1px solid rgba(255,255,255,0.12)',
           borderRight: 'none',
-          boxShadow: '0 16px 44px rgba(0,0,0,0.7)',
-          cursor: 'pointer', touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-          animation: 'videoKaartIn 0.42s cubic-bezier(0.22,1,0.36,1) both',
-          padding: isMobile ? '0.85rem 0.95rem' : '1rem 1.1rem',
+          boxShadow: '0 16px 44px rgba(0,0,0,0.75), 0 0 0 100px rgba(0,0,0,0.28)',
+          cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          animation: 'videoSchuifIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 5 }}>
-          <PlayCircle size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0 }} />
-          <span style={{
-            flex: 1, fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 900,
-            color: '#fff', letterSpacing: '-0.02em',
-          }}>
-            Heb je deze video{meervoud ? "'s" : ''} al bekeken?
-          </span>
-          <button
-            onClick={(e) => { e.stopPropagation(); setFase('pill') }}
-            aria-label="Later"
-            style={{
-              flexShrink: 0, background: 'transparent', border: 'none',
-              padding: 4, cursor: 'pointer', display: 'flex',
-            }}
-          >
-            <X size={15} color="rgba(255,255,255,0.4)" />
-          </button>
-        </div>
         <div style={{
-          fontSize: isMobile ? '0.74rem' : '0.79rem', fontWeight: 700,
-          color: 'rgba(255,255,255,0.5)', lineHeight: 1.45,
-          display: 'flex', alignItems: 'center', gap: 6,
+          position: 'absolute', top: 0, right: 0, bottom: 0,
+          width: '30%',
+          backgroundImage: 'url(/coach-compliment.jpg)',
+          backgroundSize: 'cover', backgroundPosition: 'center 30%',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 56%, rgba(10,10,10,0.85) 70%, rgba(10,10,10,0.4) 86%, rgba(10,10,10,0) 100%)',
+        }} />
+
+        <div style={{
+          position: 'absolute', top: 0, bottom: 0, left: 0,
+          width: '76%',
+          padding: isMobile ? '0.5rem 0.4rem 0.5rem 0.9rem' : '0.6rem 0.5rem 0.6rem 1.1rem',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3,
         }}>
-          <span style={{ flex: 1 }}>
-            {aantal} video{meervoud ? "'s" : ''} die bij je plan hoort{meervoud ? 'en' : ''}.
-          </span>
-          <ArrowRight size={14} strokeWidth={2.8} style={{ flexShrink: 0 }} />
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: isMobile ? '0.98rem' : '1.1rem',
+            fontWeight: 900, color: '#fff',
+            letterSpacing: '-0.025em', lineHeight: 1.1,
+            textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+          }}>
+            <PlayCircle size={isMobile ? 15 : 17} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+            Nog {aantal} openstaand
+          </div>
+          <div style={{
+            fontSize: isMobile ? '0.7rem' : '0.76rem',
+            fontWeight: 800, color: 'rgba(255,255,255,0.72)',
+            lineHeight: 1.3,
+            overflow: 'hidden', textOverflow: 'ellipsis',
+            display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+            textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+          }}>
+            Enorm belangrijk dat je deze nog bekijkt.
+            <ArrowRight size={11} strokeWidth={3} style={{ marginLeft: 4, verticalAlign: -1 }} />
+          </div>
         </div>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); setFase('pill') }}
+          aria-label="Later"
+          style={{
+            position: 'absolute', top: 5, right: 6,
+            width: 24, height: 24, padding: 0,
+            background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: 7,
+            color: '#fff', opacity: 0.85,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <X size={13} strokeWidth={2.8} />
+        </button>
+
+        <style>{`
+          @keyframes videoSchuifIn {
+            from { transform: translateX(105%); opacity: 0; }
+            to   { transform: translateX(0);    opacity: 1; }
+          }
+          @keyframes videoDim { from { opacity: 0; } to { opacity: 1; } }
+        `}</style>
       </div>
-      <style>{`
-        @keyframes videoKaartIn {
-          from { transform: translateX(100%); opacity: 0; }
-          to   { transform: translateX(0); opacity: 1; }
-        }
-      `}</style>
       {speler_}
+      {bevestiging}
     </>,
     document.body
   )
