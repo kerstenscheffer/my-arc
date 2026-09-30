@@ -141,6 +141,53 @@ const videoService = {
     }
   },
 
+  // Alle belangrijke video's die deze klant nog niet gezien heeft, ongeacht op
+  // welke pagina ze horen. Dit voedt de overkoepelende herinnering: de video op
+  // de pagina zelf zie je alleen als je daar toevallig komt, en juist bij de
+  // uitleg-video's is het de bedoeling dat niemand eronderuit komt.
+  //
+  // Zelfde bronnen en zelfde filters als getBelangrijkeVideosVoorPagina, zodat
+  // een video niet in de herinnering staat terwijl hij op zijn pagina al weg is.
+  // `paginas` gaat mee zodat de herinnering kan zeggen waar hij thuishoort.
+  getOpenBelangrijkeVideos: async (clientId) => {
+    if (!clientId) return []
+    try {
+      const [alleBelangrijk, toewijzingen, gezien] = await Promise.all([
+        supabase.from('coach_videos').select('*').eq('is_belangrijk', true).eq('is_active', true)
+          .then(r => r, () => ({ data: [] })),
+        supabase.from('video_assignments').select('id, video_id, page_context').eq('client_id', clientId)
+          .then(r => r, () => ({ data: [] })),
+        supabase.from('video_gezien').select('video_id').eq('client_id', clientId)
+          .then(r => r, () => ({ data: [] })),
+      ])
+
+      const videos = alleBelangrijk.data || []
+      if (!videos.length) return []
+
+      const alGezien = new Set((gezien.data || []).map(r => r.video_id))
+      const toegewezen = new Map()
+      for (const t of (toewijzingen.data || [])) {
+        if (t.page_context) toegewezen.set(t.video_id, t.id)
+      }
+
+      return videos
+        .filter(v => !alGezien.has(v.id))
+        // Een video zonder pagina en zonder toewijzing hoort nergens; die laten
+        // we buiten de herinnering, anders nag je over iets wat de klant
+        // nergens in de app tegenkomt.
+        .filter(v => toegewezen.has(v.id) || (v.default_pages || []).length > 0)
+        .map(v => ({
+          video_id: v.id,
+          video: v,
+          assignment_id: toegewezen.get(v.id) || null,
+          paginas: (v.default_pages || []).map(p => (p === 'progress' ? 'tracking' : p)),
+        }))
+    } catch (e) {
+      console.error('Openstaande belangrijke video\'s laden mislukt:', e)
+      return []
+    }
+  },
+
   // `via`: 'knop' als de klant zelf afvinkt, 'speler' als hij de video heeft
   // afgespeeld. Het onderscheid zegt iets over hoe hard het bewijs is.
   markeerVideoGezien: async (clientId, videoId, via = 'knop', assignmentId = null) => {

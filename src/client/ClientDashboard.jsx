@@ -24,6 +24,7 @@ import BelangrijkeVideo from './components/BelangrijkeVideo'
 import WaterFles from './components/WaterFles'
 import { syncStappen } from '../modules/steps/stappenSync'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
+import VideoReminderPopup from './components/VideoReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import ClientAgendaView from '../modules/client-agenda/ClientAgendaView'
 
@@ -322,6 +323,16 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         isMobile={isMobile}
         onOpen={() => setShowCheckinModal(true)}
         version={checkinVersion}
+      />}
+
+      {/* Overkoepelende video-herinnering. Staat los van het blok op de pagina
+          zelf: dat zie je alleen als je die pagina bezoekt, en juist bij de
+          uitleg-video's is het de bedoeling dat niemand eronderuit komt.
+          Schuift rechts in, valt daarna terug op een tabje aan de rechterrand
+          zodat hij niet met de check-in-pill onderaan vecht. */}
+      {!ingebed && <VideoReminderPopup
+        client={client}
+        isMobile={isMobile}
       />}
 
       {/* ── Main Content ── */}
