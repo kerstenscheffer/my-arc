@@ -51,7 +51,7 @@ function Blok({ waarde, label, accent, m }) {
       }}>
         {waarde}
       </div>
-      <div style={{ fontSize: m ? '0.72rem' : '0.76rem', fontWeight: 700, color: colors.textMuted, marginTop: 3 }}>
+      <div style={{ fontSize: m ? '0.78rem' : '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
         {label}
       </div>
     </div>
@@ -110,10 +110,10 @@ export default function StappenInzichtModal({ isOpen, onClose, client, db, isMob
               style={{
                 flex: 1, padding: m ? '9px 12px' : '10px 14px',
                 borderRadius: radius.btn, cursor: 'pointer',
-                background: actief ? colors.accent : 'transparent',
-                border: `1px solid ${actief ? colors.accent : colors.borderSubtle}`,
-                color: actief ? colors.onAccent : colors.textSecondary,
-                fontSize: m ? '0.85rem' : '0.9rem', fontWeight: 800,
+                background: actief ? colors.textPrimary : 'transparent',
+                border: `1px solid ${actief ? colors.textPrimary : 'rgba(255,255,255,0.18)'}`,
+                color: actief ? colors.bg : 'rgba(255,255,255,0.7)',
+                fontSize: m ? '0.88rem' : '0.92rem', fontWeight: 800,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
@@ -124,7 +124,7 @@ export default function StappenInzichtModal({ isOpen, onClose, client, db, isMob
       </div>
 
       {laden && dagen.length === 0 ? (
-        <div style={{ padding: space[8], textAlign: 'center', color: colors.textMuted, fontSize: '0.9rem' }}>
+        <div style={{ padding: space[8], textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>
           Laden…
         </div>
       ) : (
@@ -162,7 +162,7 @@ export default function StappenInzichtModal({ isOpen, onClose, client, db, isMob
               )
             })}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: m ? '0.7rem' : '0.74rem', color: colors.textMuted, fontWeight: 700 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: m ? '0.76rem' : '0.8rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>
             <span>{staven[0]?.label}</span>
             <span>{periode >= 90 ? 'per week' : 'per dag'}</span>
             <span>{staven[staven.length - 1]?.label}</span>
@@ -171,18 +171,16 @@ export default function StappenInzichtModal({ isOpen, onClose, client, db, isMob
           {/* Energie over de periode */}
           {cijfers.kcal !== null && (
             <div style={{
-              marginTop: space[6], padding: space[4],
-              background: 'rgba(255,255,255,0.03)',
-              border: `1px solid ${colors.borderSubtle}`,
-              borderRadius: radius.card,
+              marginTop: space[6], paddingTop: space[4],
+              borderTop: `1px solid ${colors.borderSubtle}`,
               display: 'flex', alignItems: 'center', gap: space[3],
             }}>
-              <Flame size={m ? 20 : 22} color={colors.accent} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+              <Flame size={m ? 20 : 22} color="rgba(255,255,255,0.75)" strokeWidth={2.2} style={{ flexShrink: 0 }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: m ? '1.1rem' : '1.25rem', fontWeight: 900, color: colors.textPrimary, lineHeight: 1.15 }}>
                   ± {nl(cijfers.kcal)} kcal
                 </div>
-                <div style={{ fontSize: m ? '0.76rem' : '0.8rem', color: colors.textMuted, fontWeight: 700, marginTop: 3 }}>
+                <div style={{ fontSize: m ? '0.78rem' : '0.82rem', color: 'rgba(255,255,255,0.55)', fontWeight: 700, marginTop: 4 }}>
                   extra verbrand in {periode} dagen · ongeveer {nl(Math.round(cijfers.kcal / (periode / 7)))} per week
                 </div>
               </div>

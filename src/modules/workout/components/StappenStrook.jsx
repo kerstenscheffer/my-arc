@@ -168,8 +168,8 @@ export default function StappenStrook({ client, db, isMobile }) {
       <div style={{
         marginTop: 12, display: 'flex', alignItems: 'center',
         gap: 10, flexWrap: 'wrap',
-        fontSize: m ? '0.75rem' : '0.78rem', fontWeight: 700,
-        color: 'rgba(255,255,255,0.4)',
+        fontSize: m ? '0.78rem' : '0.81rem', fontWeight: 700,
+        color: 'rgba(255,255,255,0.55)',
       }}>
         <span>Doel {nl(doel)} per dag</span>
 
@@ -177,7 +177,7 @@ export default function StappenStrook({ client, db, isMobile }) {
           <>
             <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <Flame size={m ? 13 : 14} color="#ffd700" strokeWidth={2.4} />
+              <Flame size={m ? 13 : 14} color="rgba(255,255,255,0.7)" strokeWidth={2.4} />
               <span style={{ color: 'rgba(255,255,255,0.72)' }}>± {nl(kcal)} kcal</span>
               <button
                 onClick={() => setToonUitleg(true)}
@@ -186,7 +186,7 @@ export default function StappenStrook({ client, db, isMobile }) {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   width: 22, height: 22, padding: 0, borderRadius: 999,
                   background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: 'rgba(255,255,255,0.4)',
+                  color: 'rgba(255,255,255,0.5)',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
               >

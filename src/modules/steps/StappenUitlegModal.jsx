@@ -15,13 +15,13 @@ export default function StappenUitlegModal({ isOpen, onClose, isMobile }) {
   const m = isMobile
 
   const kop = {
-    fontSize: m ? '0.72rem' : '0.75rem', fontWeight: 800,
-    textTransform: 'uppercase', letterSpacing: '0.08em',
-    color: colors.accent, marginBottom: space[2],
+    fontSize: m ? '0.95rem' : '1rem', fontWeight: 900,
+    letterSpacing: '-0.01em',
+    color: colors.textPrimary, marginBottom: space[2],
   }
   const tekst = {
-    fontSize: m ? '0.88rem' : '0.92rem', lineHeight: 1.6,
-    color: colors.textSecondary, margin: 0,
+    fontSize: m ? '0.9rem' : '0.94rem', lineHeight: 1.6,
+    color: 'rgba(255,255,255,0.7)', margin: 0,
   }
 
   return (
@@ -83,20 +83,18 @@ export default function StappenUitlegModal({ isOpen, onClose, isMobile }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  display: 'block', padding: space[3],
-                  background: 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${colors.borderSubtle}`,
-                  borderRadius: radius.btn,
+                  display: 'block', paddingBottom: space[3],
+                  borderBottom: `1px solid ${colors.borderSubtle}`,
                   textDecoration: 'none',
                 }}
               >
                 <div style={{ fontSize: m ? '0.86rem' : '0.9rem', fontWeight: 700, color: colors.textPrimary, lineHeight: 1.35 }}>
                   {b.titel}
                 </div>
-                <div style={{ fontSize: m ? '0.76rem' : '0.79rem', color: colors.textMuted, marginTop: 4 }}>
+                <div style={{ fontSize: m ? '0.78rem' : '0.81rem', color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
                   {b.auteurs} · {b.waar}
                 </div>
-                <div style={{ fontSize: m ? '0.79rem' : '0.83rem', color: colors.textSecondary, marginTop: 6, lineHeight: 1.45 }}>
+                <div style={{ fontSize: m ? '0.83rem' : '0.86rem', color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.45 }}>
                   {b.waarvoor}
                 </div>
               </a>
