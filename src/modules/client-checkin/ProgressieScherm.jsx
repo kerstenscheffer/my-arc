@@ -35,14 +35,34 @@ const kortDatum = (iso) => {
   } catch { return iso }
 }
 
-function Blok({ titel, rechts, children }) {
+// Een sectie met links een vierkante foto. De foto is decoratie, geen
+// informatie: daarom een vaste maat en alt="" zodat een schermlezer hem
+// overslaat in plaats van "intro-workout" voor te lezen.
+function Blok({ titel, foto, rechts, children }) {
   return (
-    <div style={{ paddingTop: 14, marginTop: 14, borderTop: `1px solid ${RAND}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <div style={{ flex: 1, fontSize: 21, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{titel}</div>
-        {rechts}
+    <div style={{
+      display: 'flex', gap: 12, alignItems: 'flex-start',
+      paddingTop: 14, marginTop: 14, borderTop: `1px solid ${RAND}`,
+    }}>
+      {foto && (
+        <img
+          src={foto}
+          alt=""
+          style={{
+            width: 56, height: 56, flexShrink: 0,
+            borderRadius: 12, objectFit: 'cover',
+            // Iets gedempt: de foto hoort de kop niet te overstemmen.
+            opacity: 0.85,
+          }}
+        />
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <div style={{ flex: 1, fontSize: 21, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{titel}</div>
+          {rechts}
+        </div>
+        {children}
       </div>
-      {children}
     </div>
   )
 }
@@ -164,6 +184,12 @@ export default function ProgressieScherm({ progressie }) {
             />
           </div>
 
+          {wegingen?.dezeWeek != null && (
+            <div style={{ fontSize: 14, fontWeight: 800, color: GRIJS, marginTop: 10 }}>
+              {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
+            </div>
+          )}
+
           {gewichtUit && (
             <Uitleg>
               {/* De regel die eerst onder het getal stond. Hij hoort hier: op
@@ -198,7 +224,7 @@ export default function ProgressieScherm({ progressie }) {
 
       {/* ── Training ── */}
       {training?.sessies > 0 && (
-        <Blok titel="Training">
+        <Blok titel="Training" foto="/intro-workout.jpg">
           <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
             {training.sessies} {training.sessies === 1 ? 'training' : 'trainingen'}
             {training.oefeningen > 0 && ` · ${training.oefeningen} oefeningen`}
@@ -267,6 +293,7 @@ export default function ProgressieScherm({ progressie }) {
       {voeding && voeding.bijgehouden > 0 && (
         <Blok
           titel="Voeding"
+          foto="/intro-meal.jpg"
           rechts={<InfoKnop open={voedingUit} onClick={() => setVoedingUit(v => !v)} label="Wat telt hier mee?" />}
         >
           <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
@@ -291,15 +318,6 @@ export default function ProgressieScherm({ progressie }) {
               en dat zegt dus niets over je week.
             </Uitleg>
           )}
-        </Blok>
-      )}
-
-      {/* ── Wegen ── */}
-      {wegingen?.dezeWeek != null && (
-        <Blok titel="Wegen">
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
-            {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
-          </div>
         </Blok>
       )}
     </div>

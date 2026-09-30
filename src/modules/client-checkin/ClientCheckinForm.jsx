@@ -52,8 +52,11 @@ const SECTIES = [
         // vragen die de klant uit zijn hoofd moest beantwoorden terwijl de app
         // het precies wist.
         id: 'week_cijfers_scherm', type: 'progressie',
-        vraag: 'Dit was je progressie van afgelopen week',
+        vraag: 'Je progressie afgelopen week',
         hulp: null,
+        // Deze kop hoort bij het blok eronder, niet midden op het scherm als
+        // vraag: er valt niets te beantwoorden.
+        kopRechts: true,
       },
       {
         id: 'cijfers_toelichting', type: 'tekst',
@@ -423,7 +426,14 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
             {aanhef}
           </div>
         )}
-        <div style={{ fontSize: isMobile ? 19 : 23, fontWeight: 800, color: '#fff' }}>
+        <div style={{
+          fontSize: v.kopRechts ? (isMobile ? 24 : 30) : (isMobile ? 19 : 23),
+          fontWeight: v.kopRechts ? 900 : 800,
+          color: '#fff',
+          textAlign: v.kopRechts ? 'right' : 'center',
+          letterSpacing: v.kopRechts ? '-0.03em' : undefined,
+          lineHeight: v.kopRechts ? 1.15 : undefined,
+        }}>
           {vraagTekst}
         </div>
         {v.hulp && (
