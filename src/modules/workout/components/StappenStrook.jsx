@@ -9,11 +9,18 @@
 // Alleen lezen. De telefoon vult ze (zie telefoonStappen.js) en aanpassen doe
 // je op de home-pagina of met de knop Stappen hiernaast; twee plekken om
 // hetzelfde getal te wijzigen is er één te veel.
+//
+// Geen kader eromheen: de cijfers en de staafjes staan los op de pagina. Een
+// kaartje eromheen voegde niets toe behalve een rand, en op een telefoon werd
+// de cardio-sectie daar hokkerig van.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Footprints } from 'lucide-react'
+import { Footprints, Flame, Info, BarChart3 } from 'lucide-react'
 import StappenService, { STANDAARD_DOEL, vandaagIso } from '../../steps/StappenService'
 import { STAPPEN_EVENT } from '../../steps/stappenSync'
+import { kcalVanStappen } from '../../steps/stappenEnergie'
+import StappenInzichtModal from '../../steps/StappenInzichtModal'
+import StappenUitlegModal from '../../steps/StappenUitlegModal'
 
 const nl = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n || 0))
 
@@ -21,6 +28,9 @@ export default function StappenStrook({ client, db, isMobile }) {
   const m = isMobile
   const [week, setWeek] = useState([])
   const [doel, setDoel] = useState(STANDAARD_DOEL)
+  const [gewichtKg, setGewichtKg] = useState(null)
+  const [toonInzicht, setToonInzicht] = useState(false)
+  const [toonUitleg, setToonUitleg] = useState(false)
 
   const laad = useCallback(async () => {
     if (!client?.id || !db?.supabase) return
@@ -31,6 +41,33 @@ export default function StappenStrook({ client, db, isMobile }) {
     setWeek(dagen || [])
     setDoel(d || STANDAARD_DOEL)
   }, [db, client?.id])
+
+  // Voor de calorieschatting. Eerst de laatste weging, want die is actueler
+  // dan het veld op de klantkaart; dat blijft staan tot iemand het bijwerkt.
+  // Kennen we het gewicht niet, dan tonen we geen getal — een calorieschatting
+  // zonder gewicht is een slag in de lucht.
+  useEffect(() => {
+    let afgebroken = false
+    const haal = async () => {
+      if (!client?.id || !db?.supabase) return
+      const { data } = await db.supabase
+        .from('weight_tracking')
+        .select('weight')
+        .eq('client_id', client.id)
+        .order('date', { ascending: false })
+        .limit(1)
+      if (afgebroken) return
+      const weging = Number(data?.[0]?.weight)
+      const kaart = Number(client.current_weight)
+      setGewichtKg(
+        Number.isFinite(weging) && weging > 0 ? weging
+        : Number.isFinite(kaart) && kaart > 0 ? kaart
+        : null
+      )
+    }
+    haal()
+    return () => { afgebroken = true }
+  }, [db, client?.id, client?.current_weight])
 
   useEffect(() => { laad() }, [laad])
 
@@ -51,17 +88,12 @@ export default function StappenStrook({ client, db, isMobile }) {
   const gemiddeld = metStappen.length ? Math.round(totaal / metStappen.length) : 0
   const max = Math.max(doel, ...week.map(d => d.steps || 0), 1)
   const dagenGehaald = gelopen.filter(d => (d.steps || 0) >= doel).length
+  const kcal = kcalVanStappen(totaal, gewichtKg)
 
   const hoogte = m ? 54 : 66
 
   return (
-    <div style={{
-      marginBottom: m ? '0.9rem' : '1.1rem',
-      padding: m ? '0.9rem 1rem 1rem' : '1.05rem 1.25rem 1.15rem',
-      background: 'rgba(255,255,255,0.035)',
-      border: '1px solid rgba(255,255,255,0.09)',
-      borderRadius: 14,
-    }}>
+    <div style={{ marginBottom: m ? '1.1rem' : '1.35rem' }}>
       {/* Kop: het weektotaal is het nieuws, het woord ernaast de uitleg. */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: m ? 12 : 14 }}>
         <Footprints size={m ? 16 : 18} color="rgba(255,255,255,0.55)" strokeWidth={2.4} style={{ flexShrink: 0, marginBottom: 3 }} />
@@ -130,9 +162,72 @@ export default function StappenStrook({ client, db, isMobile }) {
         })}
       </div>
 
-      <div style={{ marginTop: 10, fontSize: m ? '0.75rem' : '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
-        Doel {nl(doel)} per dag
+      {/* Onderregel: links het doel, rechts de knop naar de lange lijn. De
+          calorieschatting staat ertussen met een eigen info-knop — zonder die
+          uitleg is het een getal dat mensen voor een meting aanzien. */}
+      <div style={{
+        marginTop: 12, display: 'flex', alignItems: 'center',
+        gap: 10, flexWrap: 'wrap',
+        fontSize: m ? '0.75rem' : '0.78rem', fontWeight: 700,
+        color: 'rgba(255,255,255,0.4)',
+      }}>
+        <span>Doel {nl(doel)} per dag</span>
+
+        {kcal !== null && kcal > 0 && (
+          <>
+            <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <Flame size={m ? 13 : 14} color="#ffd700" strokeWidth={2.4} />
+              <span style={{ color: 'rgba(255,255,255,0.72)' }}>± {nl(kcal)} kcal</span>
+              <button
+                onClick={() => setToonUitleg(true)}
+                aria-label="Hoe is deze schatting berekend?"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 22, height: 22, padding: 0, borderRadius: 999,
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.4)',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Info size={m ? 13 : 14} strokeWidth={2.4} />
+              </button>
+            </span>
+          </>
+        )}
+
+        <button
+          onClick={() => setToonInzicht(true)}
+          style={{
+            marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: m ? '6px 10px' : '7px 12px', borderRadius: 999,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.75)',
+            fontSize: m ? '0.74rem' : '0.77rem', fontWeight: 800,
+            cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <BarChart3 size={m ? 13 : 14} strokeWidth={2.4} />
+          30 &amp; 90 dagen
+        </button>
       </div>
+
+      <StappenInzichtModal
+        isOpen={toonInzicht}
+        onClose={() => setToonInzicht(false)}
+        client={client}
+        db={db}
+        isMobile={m}
+        gewichtKg={gewichtKg}
+        doel={doel}
+      />
+      <StappenUitlegModal
+        isOpen={toonUitleg}
+        onClose={() => setToonUitleg(false)}
+        isMobile={m}
+      />
     </div>
   )
 }
