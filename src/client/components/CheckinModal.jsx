@@ -6,6 +6,20 @@
 import React, { useEffect } from 'react'
 import { X } from 'lucide-react'
 import ClientCheckinForm from '../../modules/client-checkin/ClientCheckinForm'
+import { laatsteZaterdag } from '../../modules/weight-tracker/utils/coachingBand'
+
+// "wk 39 · 20 t/m 26 sep" — de week waar de check-in over gaat, die tot en
+// met de afgelopen zaterdag loopt. Zelfde ankerpunt als de terugblik en als
+// de gewicht-header in coach insight.
+const periodeLabel = () => {
+  const tot = new Date(`${laatsteZaterdag()}T00:00:00`)
+  const van = new Date(tot.getTime() - 6 * 86400000)
+  const d = new Date(tot)
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7))
+  const week = Math.ceil(((d - new Date(d.getFullYear(), 0, 1)) / 86400000 + 1) / 7)
+  const kort = (x) => x.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  return `wk ${week} · ${kort(van)} t/m ${kort(tot)}`
+}
 
 export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db, isMobile: propMobile }) {
   const isMobile = propMobile ?? window.innerWidth <= 768
@@ -57,8 +71,15 @@ export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db,
           fontWeight: 900,
           color: '#fff',
           letterSpacing: '-0.02em',
+          minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           Wekelijkse check-in
+          {/* Over welke week gaat dit. Hier in de kop, zodat het boven elk
+              scherm van het formulier blijft staan en niet alleen boven de
+              terugblik. De week loopt tot en met de afgelopen zaterdag. */}
+          <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+            {' · '}{periodeLabel()}
+          </span>
         </div>
         <button
           onClick={onClose}

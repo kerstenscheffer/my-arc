@@ -22,7 +22,7 @@
 
 import { est8Rep } from '../coach-command-center/components/insight/workoutChartUtils'
 import { gewichtOordeel } from './weekCijfers'
-import { zaterdagTempo, laatsteZaterdag, vensterGemiddelde } from '../weight-tracker/utils/coachingBand'
+import { zaterdagTempo, laatsteZaterdag, vensterGemiddelde, maakConfig, bereikTekst } from '../weight-tracker/utils/coachingBand'
 import { lokaleDatum } from '../../utils/tijd'
 
 const dagInMs = 86400000
@@ -296,8 +296,10 @@ function bouwGewicht(wegingen, fase, client) {
       vorigeZaterdag: tempo.vorigeZaterdag,
       wegingenNu: inVenster(tempo.zaterdag),
       wegingenEerder: inVenster(tempo.vorigeZaterdag),
-      // Het afgesproken tempo, zodat de klant ziet of dit verschil goed is.
-      doelPerWeek: doel,
+      // Niet één afgesproken getal maar de band eromheen: tussen te langzaam
+      // en te snel. Een concreet doel van -0,5 laat -0,45 als mislukking
+      // ogen, terwijl dat precies goed is.
+      doelBereik: bereikTekst(maakConfig(client, fase)),
       // Hetzelfde oordeel als de coach-kant gebruikt, zodat de kleur die de
       // klant ziet niet af kan wijken van wat in coach insight staat.
       oordeel: gewichtOordeel(tempo.verschil, doel, richtingVan(fase)),

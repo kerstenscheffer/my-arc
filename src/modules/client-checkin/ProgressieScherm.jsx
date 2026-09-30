@@ -30,15 +30,6 @@ const nl = (n, cijfers = 0) =>
 
 const metTeken = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${nl(Math.abs(n), 1)}`
 
-// ISO-weeknummer: donderdag van die week bepaalt in welk jaar en welke week
-// hij valt. Zonder die regel klopt de jaarwisseling niet.
-const weekNummer = (iso) => {
-  const d = new Date(`${iso}T00:00:00`)
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7))
-  const jan1 = new Date(d.getFullYear(), 0, 1)
-  return Math.ceil(((d - jan1) / 86400000 + 1) / 7)
-}
-
 const kortDatum = (iso) => {
   try {
     return new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
@@ -146,27 +137,6 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
   return (
     <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
 
-      {/* Welke week kijk je naar, en wat was er afgesproken. Beide even groot:
-          een doel dat kleiner staat dan de periode lees je niet. */}
-      {progressie.periode && (
-        <div style={{
-          display: 'flex', alignItems: 'baseline', gap: 12,
-          paddingBottom: 12, marginBottom: 14, borderBottom: `1px solid ${RAND}`,
-        }}>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 900, color: '#fff' }}>
-            Wk {weekNummer(progressie.periode.tot)}
-            <span style={{ fontWeight: 700, color: GRIJS }}>
-              {' · '}{kortDatum(progressie.periode.van)} t/m {kortDatum(progressie.periode.tot)}
-            </span>
-          </div>
-          {gewicht?.doelPerWeek != null && (
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-              doel <span style={{ color: GRIJS }}>{metTeken(gewicht.doelPerWeek)} kg</span>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── Gewicht ── */}
       {gewicht && (
         <div>
@@ -178,6 +148,14 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
             }}>
               {metTeken(gewicht.verschil)}<span style={{ fontSize: '0.5em', marginLeft: 6, opacity: 0.6 }}>kg</span>
             </div>
+            {gewicht.doelBereik && (
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: GRIJS, lineHeight: 1.3 }}>
+                doel<br />
+                <span style={{ color: 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums' }}>
+                  {gewicht.doelBereik}
+                </span>
+              </div>
+            )}
             <InfoKnop
               open={gewichtUit}
               onClick={() => setGewichtUit(v => !v)}
@@ -193,7 +171,7 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
                 {gewicht.soort === 'week'
                   ? `Sinds vorige zaterdag: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`
                   : `Sinds je start: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`}
-                {gewicht.doelPerWeek != null && `, afgesproken ${metTeken(gewicht.doelPerWeek)} per week`}
+                {gewicht.doelBereik && `. Goed tempo is ${gewicht.doelBereik} kg per week`}
               </div>
 
               {gewicht.soort === 'week' ? (
