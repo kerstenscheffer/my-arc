@@ -19,6 +19,7 @@
 import { useState } from 'react'
 import { Info, ChevronDown } from 'lucide-react'
 import { colors, radius, space } from '../../ui/tokens'
+import SterkerKaart from './SterkerKaart'
 
 // Oordeelkleuren. Groen en rood komen uit de tokens; oranje bestaat daar niet
 // en is hier "net niet", tussen behaald en misgegaan in.
@@ -152,7 +153,7 @@ function WeekRegel({ tot, gemiddelde, lijst }) {
   )
 }
 
-export default function ProgressieScherm({ progressie, isMobile }) {
+export default function ProgressieScherm({ progressie, isMobile, db, clientId }) {
   const [gewichtUit, setGewichtUit] = useState(false)
   const [sterkerUit, setSterkerUit] = useState(false)
   const [voedingUit, setVoedingUit] = useState(false)
@@ -265,26 +266,18 @@ export default function ProgressieScherm({ progressie, isMobile }) {
 
               {sterkerUit && (
                 <div>
-                  {training.sterker.map(s => (
-                    <div key={s.oefening} style={{
-                      display: 'flex', alignItems: 'baseline', gap: space[3], paddingBottom: space[2],
-                    }}>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: colors.textPrimary }}>
-                          {s.oefening}
-                        </span>
-                        <span style={{ ...LABEL, display: 'block', marginTop: space[1] }}>
-                          {nl(s.vorig, 1)} naar {nl(s.nu, 1)} kg
-                        </span>
-                      </span>
-                      <span style={{
-                        fontSize: 15, fontWeight: 800, color: colors.success,
-                        fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-                      }}>
-                        +{s.pct}%
-                      </span>
-                    </div>
-                  ))}
+                  {/* Oefeningkaarten zoals in de log-modal, met lijn erboven en
+                      eronder; zo leest het als "oefeningen" en niet als een
+                      lijstje tekst. */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], marginTop: space[2] }}>
+                    {training.sterker.map(s => (
+                      <SterkerKaart
+                        key={s.oefening}
+                        oefening={s.oefening} vorig={s.vorig} nu={s.nu} pct={s.pct}
+                        db={db} clientId={clientId} isMobile={isMobile}
+                      />
+                    ))}
+                  </div>
                   <div style={{ ...BODY_ZACHT, marginTop: space[2] }}>
                     Vergeleken op je zwaarste set, omgerekend naar wat je voor 8 herhalingen
                     zou kunnen. Zo telt 100 kg voor 5 net zo goed mee als 80 kg voor 12.
