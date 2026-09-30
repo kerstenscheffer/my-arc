@@ -403,14 +403,26 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     // Aanloop op het eerste scherm: waar in de fase zit je. Pas zodra de fase
     // bekend is, anders zou er even een andere zin staan die daarna verspringt.
     // Geen fase ingesteld betekent gewoon de kale vraag.
-    if (v.toonFase && fase) {
-      vraagTekst = `Week ${fase.weken}, ${fase.naam}fase. ${vraagTekst}`
-    }
+    // De aanhef staat als eigen regel boven de vraag. Zonder ingestelde fase
+    // blijft het bij de begroeting; een weeknummer verzinnen we niet.
+    const aanhef = v.toonFase && voornaam
+      ? (fase
+          ? `Heyy ${voornaam}, we zitten nu in week ${fase.weken} ${fase.naam}fase.`
+          : `Heyy ${voornaam}.`)
+      : null
     return (
       // Eén vraag per scherm, dus die hoort in het midden te staan en niet
       // tegen de bovenrand met een half scherm leegte eronder. Het blok blijft
       // smal (560px) zodat een vraag van twee regels leesbaar blijft.
       <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
+        {aanhef && (
+          <div style={{
+            fontSize: isMobile ? 16 : 18, fontWeight: 800,
+            color: 'rgba(255,255,255,0.7)', marginBottom: '1.2vh', lineHeight: 1.4,
+          }}>
+            {aanhef}
+          </div>
+        )}
         <div style={{ fontSize: isMobile ? 19 : 23, fontWeight: 800, color: '#fff' }}>
           {vraagTekst}
         </div>
