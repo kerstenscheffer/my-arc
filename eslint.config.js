@@ -27,4 +27,13 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    // De serverless functies in /api draaien op Node, niet in de browser.
+    // Zonder deze uitzondering meldt de linter `process is not defined` in elk
+    // van die bestanden, en die ruis verbergt echte fouten.
+    files: ['api/**/*.js', 'scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
 ])

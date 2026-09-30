@@ -1,8 +1,9 @@
 // src/client/pages/ClientProfile.jsx
 import { useState, useEffect } from 'react'
-import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, Weight } from 'lucide-react'
+import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, Weight, Camera } from 'lucide-react'
 import DatabaseService from '../../services/DatabaseService'
 import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/arc-ui'
+import FotoCredits from '../../modules/ingredient-photos/FotoCredits'
 const db = DatabaseService
 
 // MY ARC modal-stijl: zwart met wit accent. Het goud dat hier overal in de
@@ -27,6 +28,7 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showFotoCredits, setShowFotoCredits] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
 
@@ -394,6 +396,11 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
                 onClick: () => window.open('https://myarcfitness.com/privacy', '_blank'),
               },
               {
+                // Verplichte attributie voor de Unsplash-foto's in de app.
+                Icon: Camera, label: 'Fotocredits',
+                onClick: () => setShowFotoCredits(true),
+              },
+              {
                 Icon: Trash2, label: 'Account verwijderen', gevaar: true,
                 onClick: () => setShowDeleteModal(true),
               },
@@ -441,6 +448,10 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
       </button>
 
       {/* Account verwijderen — zelfde venster als de rest van de app. */}
+      {showFotoCredits && (
+        <FotoCredits db={db} onClose={() => setShowFotoCredits(false)} />
+      )}
+
       {showDeleteModal && (
         <Venster isMobile={isMobile} onClose={() => { setShowDeleteModal(false); setDeleteConfirm('') }} maxWidth={420} zIndex={9999}>
           <VensterKop
