@@ -319,16 +319,20 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
                   <button
                     onClick={() => setBevestig(item)}
                     disabled={!!bezig}
-                    aria-label="Ik heb 'm gekeken"
                     style={{
-                      flexShrink: 0, width: 38, height: 38, borderRadius: 10,
+                      flexShrink: 0,
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      minHeight: 38, padding: '0 0.7rem', borderRadius: 10,
                       background: 'rgba(255,255,255,0.05)',
                       border: '1px solid rgba(255,255,255,0.12)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer',
+                      color: '#fff', fontSize: '0.72rem', fontWeight: 900,
+                      fontFamily: 'inherit', letterSpacing: '-0.01em',
+                      cursor: 'pointer', touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <Check size={15} color="rgba(255,255,255,0.6)" strokeWidth={2.8} />
+                    <Check size={14} strokeWidth={3.2} />
+                    Bekeken
                   </button>
                 </div>
               )

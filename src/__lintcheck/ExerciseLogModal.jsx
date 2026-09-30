@@ -11,9 +11,6 @@ import BladModal from './BladModal'
 import RustTimer from './RustTimer'
 import { rusttijdVoor, timerStaatAan, bewaarTimerAan } from '../rusttijd'
 import ExerciseService from '../../../../../services/ExerciseService'
-import OpwarmPoort from './OpwarmPoort'
-import { isOpgewarmd, zetOpgewarmd } from '../opwarmen'
-import VideoPlayerModal from '../../../../videos/VideoPlayerModal'
 
 // ========== SCROLL NUMBER PICKER ==========
 function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'kg', onConfirm, halfStep = null }) {
@@ -429,10 +426,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const eenheid = actieveGym?.eenheid === 'lb' ? 'lb' : 'kg'
 
   const [showWizard, setShowWizard] = useState(false)
-  // De opwarmvraag komt vóór je eerste set van deze oefening, en alleen als je
-  // 'm vandaag nog niet beantwoord hebt.
-  const [poortOpen, setPoortOpen] = useState(false)
-  const [opwarmVideo, setOpwarmVideo] = useState(null)
   const [editingIndex, setEditingIndex] = useState(null) // ✅ Nieuw: track welke set wordt bewerkt
   const [dropsetIndex, setDropsetIndex] = useState(null)
   const [exerciseNote, setExerciseNote] = useState('')
@@ -701,19 +694,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // `notitie` expliciet meegeven waar het om de notitie gaat: setState is
   // asynchroon, dus vlak na een setExerciseNote staat de oude tekst nog in de
   // state en zou die worden opgeslagen.
-  // Een nieuwe set beginnen. Is dit je eerste set van deze oefening vandaag,
-  // dan komt eerst de opwarmvraag ertussen. Twee knoppen leiden hierheen (de
-  // lege setregel en de grote knop eronder), dus dat moet op één plek staan —
-  // anders is de ene ingang wel beveiligd en de andere niet.
-  const startSet = () => {
-    setEditingIndex(null)
-    if (loggedSets.length === 0 && !isOpgewarmd(exercise.name)) {
-      setPoortOpen(true)
-      return
-    }
-    setShowWizard(true)
-  }
-
   const saveToDatabase = async (sets, notitie = exerciseNote) => {
     if (!client?.id || !db) return
     setSaving(true)
@@ -1145,7 +1125,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 />
               ) : (
                 <LegeSetRow key={i} index={i} vorige={vorige} isMobile={isMobile} eenheid={eenheid}
-                  onClick={startSet}
+                  onClick={() => { setEditingIndex(null); setShowWizard(true) }}
                 />
               )
             })}
@@ -1194,7 +1174,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 padding: isMobile ? '1.4rem 1rem 0.8rem' : '1.6rem 1.25rem 0.9rem',
               }}>
                 <button
-                  onClick={startSet}
+                  onClick={() => { setEditingIndex(null); setShowWizard(true) }}
                   style={{
                     flex: 1, minHeight: 52, padding: '0 1rem',
                     background: '#fff', border: '1px solid #fff', borderRadius: 14,
@@ -1286,31 +1266,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             />
 
             {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} eenheid={eenheid} />}
-
-            {poortOpen && (
-              <div style={{ padding: isMobile ? '0 1rem 0.8rem' : '0 1.25rem 0.9rem' }}>
-                <OpwarmPoort
-                  oefeningNaam={exercise.name}
-                  werkgewicht={lastSet?.weight ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.weight ?? 0}
-                  eenheid={eenheid}
-                  isMobile={isMobile}
-                  db={db}
-                  onVideo={(v) => setOpwarmVideo(v)}
-                  onKlaar={() => {
-                    zetOpgewarmd(exercise.name)
-                    setPoortOpen(false)
-                    setShowWizard(true)
-                  }}
-                />
-              </div>
-            )}
-
-            {opwarmVideo && (
-              <VideoPlayerModal
-                item={{ id: null, video: opwarmVideo }}
-                onClose={() => setOpwarmVideo(null)}
-              />
-            )}
 
             {wizardActive && (
               <SetInputWizard
