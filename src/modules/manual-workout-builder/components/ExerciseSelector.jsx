@@ -110,9 +110,9 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
   const handleSelectClient = (ex) => {
     onSelect({
       name: ex.name,
-      sets: ex.sets || 3,
-      reps: ex.reps || '10',
-      rest: ex.rest || '90s',
+      sets: ex.sets || 2,
+      reps: ex.reps || '8-12',
+      rest: ex.rest || '2 min',
       primairSpieren: ex.muscle_group || '',
       type: 'custom',
       _isCustom: true
@@ -122,9 +122,11 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
   const handleSelectDb = (ex) => {
     onSelect({
       name: ex.name,
-      sets: 3,
-      reps: ex.reps || '10',
-      rest: '90s',
+      // Standaard van de coach: 2 sets, 8-12 reps, 2 minuten rust. Brengt de
+      // oefening zelf iets eigens mee, dan gaat dat voor.
+      sets: ex.suggested_sets || ex.sets || 2,
+      reps: ex.suggested_reps || ex.reps || '8-12',
+      rest: ex.suggested_rest || ex.rest || '2 min',
       primairSpieren: ex.primairSpieren || ex.muscle || '',
       equipment: ex.equipment || '',
       difficulty: ex.difficulty || ''
@@ -273,7 +275,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
                 <>
                   {coachExercises.filter(ex => !searchTerm || ex.name.toLowerCase().includes(searchTerm.toLowerCase())).map(ex => (
                     <div key={ex.id} style={{ display: 'flex', alignItems: 'center', padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', gap: '0.75rem' }}>
-                      <div onClick={() => onSelect({ name: ex.name, sets: 3, reps: '10', rest: '90s', primairSpieren: ex.muscle_group || '', equipment: ex.equipment || '', type: 'custom', _isCustom: true })}
+                      <div onClick={() => onSelect({ name: ex.name, sets: 2, reps: '8-12', rest: '2 min', primairSpieren: ex.muscle_group || '', equipment: ex.equipment || '', type: 'custom', _isCustom: true })}
                         style={{ flex: 1, minWidth: 0, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                         onMouseEnter={e => { if (window.innerWidth > 768) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
                         onMouseLeave={e => { if (window.innerWidth > 768) e.currentTarget.style.background = 'transparent' }}>

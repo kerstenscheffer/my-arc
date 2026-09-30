@@ -65,7 +65,7 @@ export default function BuilderExerciseCard({
   // Read-only samenvatting van de stats.
   const statText = isCardio
     ? [exercise.duration, exercise.distance, exercise.intensity].filter(Boolean).join(' · ') || 'Cardio'
-    : `${exercise.sets ?? 3} × ${exercise.reps ?? '10'}  ·  ${exercise.rust ?? exercise.rest ?? '90s'} rust`
+    : `${exercise.sets ?? 2} × ${exercise.reps ?? '8-12'}  ·  ${exercise.rust ?? exercise.rest ?? '2 min'} rust`
 
   return (
     <div onClick={stop} style={{
@@ -214,7 +214,7 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.6rem' }}>
                 <div><label style={label}>Sets</label><input type="number" min={1} max={30} value={exercise.sets ?? 3} onChange={(e) => onField('sets', parseInt(e.target.value) || 1)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
                 <div><label style={label}>Reps</label><input value={exercise.reps ?? '10'} onChange={(e) => onField('reps', e.target.value)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
-                <div><label style={label}>Rust</label><input value={exercise.rust ?? exercise.rest ?? '90s'} onChange={(e) => onField('rust', e.target.value)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
+                <div><label style={label}>Rust</label><input value={exercise.rust ?? exercise.rest ?? '2 min'} onChange={(e) => onField('rust', e.target.value)} style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
                 <div><label style={label}>RIR</label><input value={exercise.rpe ?? ''} onChange={(e) => onField('rpe', e.target.value)} placeholder="7-8" style={{ ...input, textAlign: 'center', padding: '0.55rem 0.3rem' }} /></div>
               </div>
 

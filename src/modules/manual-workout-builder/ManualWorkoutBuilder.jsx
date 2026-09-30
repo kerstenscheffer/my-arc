@@ -301,7 +301,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           duration: ex.duration || '', distance: ex.distance || '', intensity: ex.intensity || '',
           notes: ex.notes || ''
         }) : ({
-          name: ex.name, sets: parseInt(ex.sets) || 3, reps: ex.reps, rust: ex.rust, rpe: ex.rpe,
+          name: ex.name, sets: parseInt(ex.sets) || 2, reps: ex.reps, rust: ex.rust, rpe: ex.rpe,
           equipment: ex.equipment, primairSpieren: ex.primairSpieren, notes: ex.notes || '',
           type: ex.type || 'compound', stretch: ex.stretch || false, priority: ex.priority || 1, goalPriority: ex.goalPriority || false
         }))

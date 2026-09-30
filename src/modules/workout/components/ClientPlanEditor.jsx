@@ -182,7 +182,7 @@ export default function ClientPlanEditor({ schema, client, db, weekSchedule: ini
     mutate(s => {
       if (!s[workoutKey].exercises) s[workoutKey].exercises = []
       s[workoutKey].exercises.push({
-        name: ex.name, sets: 3, reps: '10', rust: '90s',
+        name: ex.name, sets: 2, reps: '8-12', rust: '2 min',
         primairSpieren: ex.primair_spieren || null,
         equipment: ex.equipment || null,
         image_url: ex.image_url || null,
