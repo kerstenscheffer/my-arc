@@ -122,37 +122,53 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
       // Macros uit base_macros of directe kolommen
       const macros = template.base_macros || {}
 
+      // Trainingsdagen van déze klant: workout_schedule gefilterd op de dagen
+      // die in zijn actieve schema bestaan, anders preferred_training_days.
+      // Beide kopieerpaden hieronder hebben ze nodig.
+      const lib = new TemplateLibrary(db.supabase)
+      const { data: clientData } = await db.supabase
+        .from('clients')
+        .select('workout_schedule, training_time, preferred_training_days, assigned_schema_id')
+        .eq('id', clientId)
+        .single()
+
+      let validDagKeys = null
+      if (clientData?.assigned_schema_id) {
+        const { data: schema } = await db.supabase
+          .from('workout_schemas')
+          .select('week_structure')
+          .eq('id', clientData.assigned_schema_id)
+          .single()
+        if (schema?.week_structure && typeof schema.week_structure === 'object') {
+          validDagKeys = new Set(Object.keys(schema.week_structure))
+        }
+      }
+      const clientTrainingDays = lib.resolveClientTrainingDays(clientData, validDagKeys)
+      const trainingTime = clientData?.training_time || null
+
       let expandedWeek
       if (template.plan_type === 'full_week' || isFullWeekStructure(template.week_structure)) {
-        // Full-week-plan: al per-dag mét volledige meal-objecten opgeslagen →
-        // direct kopiëren (de analyzer hydrateert 'm verder bij het laden).
-        expandedWeek = template.week_structure
+        // Full-week-plan: al per-dag mét volledige meal-objecten opgeslagen.
+        // Werd letterlijk gekopieerd, dus ook de trainingsdagen en de
+        // pre-workout van de klant voor wie het sjabloon ooit gemaakt is.
+        // Bij Casper stond daardoor op zondag een pre-workout terwijl hij
+        // zondag niet traint. Nu: is_training_day uit het schema van de
+        // klant zelf, en pre_workout weg op rustdagen.
+        const dagen = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        expandedWeek = {}
+        Object.entries(template.week_structure).forEach(([dag, dagPlan]) => {
+          if (!dagPlan || typeof dagPlan !== 'object') { expandedWeek[dag] = dagPlan; return }
+          const idx = dagen.indexOf(dag)
+          const isTraining = idx >= 0 ? clientTrainingDays.includes(idx) : !!dagPlan.is_training_day
+          const kopie = { ...dagPlan, is_training_day: isTraining }
+          if (!isTraining) delete kopie.pre_workout
+          expandedWeek[dag] = kopie
+        })
       } else {
         // Oud setA/setB-template → expand naar per-dag, mét volledige meal-objecten
         // (anders geen namen in de agenda). Trainingsdagen uit de client.
-        const lib = new TemplateLibrary(db.supabase)
         const mealIds = lib.extractMealIds(template.week_structure)
         const meals = await lib.loadMealsByIds(mealIds)
-
-        const { data: clientData } = await db.supabase
-          .from('clients')
-          .select('workout_schedule, training_time, preferred_training_days, assigned_schema_id')
-          .eq('id', clientId)
-          .single()
-
-        let validDagKeys = null
-        if (clientData?.assigned_schema_id) {
-          const { data: schema } = await db.supabase
-            .from('workout_schemas')
-            .select('week_structure')
-            .eq('id', clientData.assigned_schema_id)
-            .single()
-          if (schema?.week_structure && typeof schema.week_structure === 'object') {
-            validDagKeys = new Set(Object.keys(schema.week_structure))
-          }
-        }
-        const clientTrainingDays = lib.resolveClientTrainingDays(clientData, validDagKeys)
-        const trainingTime = clientData?.training_time || null
 
         // scaleFactor = 1 → kopie van de template-macros, geen herschaling.
         expandedWeek = lib.buildScaledWeek(
