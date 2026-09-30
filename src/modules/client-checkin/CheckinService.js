@@ -1,5 +1,6 @@
 // src/modules/client-checkin/CheckinService.js
 import { trajectLoopt, TRAJECT_KOLOMMEN } from './trajectStatus'
+import { lokaleDatum } from '../../utils/tijd'
 // UPDATED: Support voor section_details JSONB
 // Features: Per-sectie struggles, afspraken, coach notes
 
@@ -90,7 +91,7 @@ export default class CheckinService {
         .from('client_checkins')
         .select('id')
         .eq('client_id', clientId)
-        .gte('checkin_date', lastFriday.toISOString().split('T')[0])
+        .gte('checkin_date', lokaleDatum(lastFriday))
         .in('status', ['submitted', 'reviewed'])
         .limit(1)
       if (error) throw error
@@ -171,7 +172,7 @@ export default class CheckinService {
         .from('client_checkins')
         .select('id, checkin_date, status')
         .eq('client_id', clientId)
-        .gte('checkin_date', weekStart.toISOString().split('T')[0])
+        .gte('checkin_date', lokaleDatum(weekStart))
         .in('status', ['submitted', 'reviewed'])
 
       if (error) throw error
@@ -196,7 +197,7 @@ export default class CheckinService {
       
       const insertData = {
         ...baseData,
-        checkin_date: new Date().toISOString().split('T')[0],
+        checkin_date: lokaleDatum(),
         status: checkinData.status || 'submitted',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

@@ -112,3 +112,25 @@ export function wandklokNL(waarde, leeg = '—') {
     hour: '2-digit', minute: '2-digit',
   })
 }
+
+/**
+ * Een Date als kalenderdatum "JJJJ-MM-DD", gelezen in de lokale tijdzone.
+ *
+ * Waarom niet `toISOString().split('T')[0]`: die rekent eerst om naar UTC.
+ * In Nederlandse zomertijd is middernacht lokaal gelijk aan 22:00 UTC van de
+ * dág ervoor, dus je krijgt stelselmatig een dag te vroeg terug. Dat is stil:
+ * geen foutmelding, alleen een datum die er net naast zit.
+ *
+ * Aanleiding (30 sep 2026): de check-in-herinnering berekende de laatste
+ * vrijdag goed (25 sep) maar vroeg de database om ">= 24 sep". Een check-in
+ * van donderdag telde daardoor mee als "deze week al ingevuld", en de klant
+ * kreeg geen herinnering. Zelfde fout zat in het wegschrijven van
+ * checkin_date, waar iemand die na middernacht invulde de dag ervoor kreeg.
+ *
+ * @param {Date} [d] standaard vandaag
+ * @returns {string} "2026-09-25"
+ */
+export const lokaleDatum = (d = new Date()) => {
+  const x = new Date(d)
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+}
