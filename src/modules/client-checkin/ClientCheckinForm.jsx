@@ -15,7 +15,7 @@ import { useState, useEffect } from 'react'
 import { CheckCircle } from 'lucide-react'
 import CheckinService from './CheckinService'
 import { laadWeekCijfers } from './weekCijfers'
-import { laadProgressie, wekenBezig } from './progressieWeek'
+import { laadProgressie, haalFase } from './progressieWeek'
 import ProgressieScherm from './ProgressieScherm'
 import {
   DOEL_TYPES, typeVan, doelTekst, bereidTerugkoppelingVoor,
@@ -37,9 +37,9 @@ const SECTIES = [
         // iemand erin zit, want dat antwoord kleurt anders zodra je er een
         // gewicht of een aantal trainingen naast legt.
         id: 'hoe_gaat_het', type: 'tekst',
-        toonWeken: true,
-        vraag: 'Hoe zit je in de wedstrijd, {naam}?',
-        hulp: 'Even zonder cijfers — hoe gaat het nu met je?',
+        toonFase: true,
+        vraag: 'Hoe gaat het met jou?',
+        hulp: 'Even zonder cijfers, die komen op het volgende scherm.',
         placeholder: 'Schrijf op wat als eerste in je opkomt.',
       },
     ],
@@ -210,18 +210,26 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // De terugblik van slide 2. Apart van `cijfers`: die telt wat er gebeurd is
   // (vier trainingen), dit laat zien waar het heen beweegt (sterker geworden).
   const [progressie, setProgressie] = useState(null)
+  // De lopende fase, voor de aanloopzin op het eerste scherm. Apart opgehaald
+  // omdat dat scherm meteen in beeld staat.
+  const [fase, setFase] = useState(null)
   // De doelen die de klant vorige keer stelde, met de terugkoppeling erbij.
   // null = nog aan het laden, [] = die zijn er niet (eerste keer, of de vorige
   // check-in was nog het oude formulier).
   const [vorigeDoelen, setVorigeDoelen] = useState(null)
 
-  // Hoeveelste week van het traject. Puur uit de klantrij, dus geen query.
-  const weken = wekenBezig(client)
-
   const service = new CheckinService(db)
 
   useEffect(() => {
     if (client?.id) checkExistingCheckin()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id])
+
+  useEffect(() => {
+    let weg = false
+    if (!client?.id) return undefined
+    haalFase(db, client.id).then(f => { if (!weg) setFase(f) })
+    return () => { weg = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id])
 
@@ -391,9 +399,17 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     // Zonder bekende voornaam wordt "Hoe gaat het met je, {naam}?" netjes
     // "Hoe gaat het met je?" in plaats van een lege komma.
     const voornaam = (client?.first_name || '').trim()
-    const vraagTekst = v.vraag.includes('{naam}')
+    let vraagTekst = v.vraag.includes('{naam}')
       ? (voornaam ? v.vraag.replace('{naam}', voornaam) : v.vraag.replace(', {naam}', ''))
       : v.vraag
+
+    // Aanloop op het eerste scherm: waar in de fase zit je. Pas zodra de fase
+    // bekend is, anders zou er even een andere zin staan die daarna verspringt.
+    // Geen fase ingesteld betekent gewoon de kale vraag.
+    if (v.toonFase && fase) {
+      const n = fase.weken === 1 ? '1 week' : `${fase.weken} weken`
+      vraagTekst = `We zitten nu ${n} in een ${fase.naam}fase, ${vraagTekst.charAt(0).toLowerCase()}${vraagTekst.slice(1)}`
+    }
     return (
       // Eén vraag per scherm, dus die hoort in het midden te staan en niet
       // tegen de bovenrand met een half scherm leegte eronder. Het blok blijft

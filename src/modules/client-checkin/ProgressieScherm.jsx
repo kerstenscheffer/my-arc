@@ -53,7 +53,7 @@ export default function ProgressieScherm({ progressie }) {
           Deze week staat er nog niets geregistreerd.
         </div>
         <div style={{ fontSize: 13.5, fontWeight: 700, color: GRIJS, marginTop: 8, lineHeight: 1.55 }}>
-          Geen probleem — vul de check-in gewoon in. Vanaf de week dat je logt, laat
+          Geen probleem, vul de check-in gewoon in. Vanaf de week dat je logt, laat
           dit scherm je vooruitgang zien.
         </div>
       </div>
@@ -63,7 +63,7 @@ export default function ProgressieScherm({ progressie }) {
   return (
     <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
 
-      {/* Gewicht — het getal waar de meeste mensen als eerste naar kijken. */}
+      {/* Gewicht: het getal waar de meeste mensen als eerste naar kijken. */}
       {gewicht && (
         <div>
           <div style={{
@@ -140,7 +140,7 @@ export default function ProgressieScherm({ progressie }) {
       {gewicht && (
         <div style={{ fontSize: 12.5, fontWeight: 700, color: GRIJS, marginTop: 14, lineHeight: 1.55 }}>
           Het gewicht is het gemiddelde van je wegingen rond zaterdag, niet één losse
-          meting — die schommelt te veel om er iets uit af te lezen.
+          meting, want die schommelt te veel om er iets uit af te lezen.
         </div>
       )}
     </div>

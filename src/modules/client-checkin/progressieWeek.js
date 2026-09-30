@@ -52,6 +52,42 @@ export function wekenBezig(client, nu = new Date()) {
   }
 }
 
+// Hoe de klant zijn fase genoemd hoort te zien. In de database staat 'cut' en
+// 'build'; dat laatste heet in de app overal 'bulk'.
+const FASE_NAAM = { cut: 'cut', build: 'bulk', recomp: 'recomp', maintain: 'onderhoud' }
+
+/**
+ * De lopende fase van deze klant, met hoelang hij er al in zit.
+ * Aparte query omdat het eerste scherm van de check-in er meteen op wacht en
+ * niet op de hele terugblik hoeft te blijven hangen.
+ *
+ * @returns {Promise<{naam: string, weken: number}|null>}
+ */
+export async function haalFase(db, clientId, nu = new Date()) {
+  if (!db?.supabase || !clientId) return null
+  const { data } = await db.supabase
+    .from('client_phases')
+    .select('doel, started_on')
+    .eq('client_id', clientId)
+    .is('ended_on', null)
+    .order('started_on', { ascending: false })
+    .limit(1)
+    .then(r => r, () => ({ data: null }))
+
+  const fase = (data || [])[0]
+  if (!fase?.doel || !fase?.started_on) return null
+
+  const begin = new Date(`${fase.started_on}T00:00:00`)
+  if (Number.isNaN(begin.getTime())) return null
+  const dagen = Math.floor((nu.getTime() - begin.getTime()) / dagInMs)
+  if (dagen < 0) return null
+
+  return {
+    naam: FASE_NAAM[fase.doel] || fase.doel,
+    weken: Math.floor(dagen / 7) + 1,
+  }
+}
+
 // Het zwaarste geschatte 8RM binnen één oefening-log.
 const besteVanSets = (sets) => {
   if (!Array.isArray(sets)) return null

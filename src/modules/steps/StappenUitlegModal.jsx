@@ -34,7 +34,7 @@ export default function StappenUitlegModal({ isOpen, onClose, isMobile }) {
             Je stappen worden eerst omgerekend naar looptijd: bij ongeveer{' '}
             <strong style={{ color: colors.textPrimary }}>{AANNAMES.stappenPerMinuut} stappen per minuut</strong>{' '}
             loop je op matige intensiteit. Dat tempo staat gelijk aan{' '}
-            <strong style={{ color: colors.textPrimary }}>{AANNAMES.metWandelen} MET</strong> — drie keer je
+            <strong style={{ color: colors.textPrimary }}>{AANNAMES.metWandelen} MET</strong>, drie keer je
             verbruik in rust. Daar gaat vervolgens {AANNAMES.metRust} MET vanaf, want dat had je op de bank
             ook verbrand.
           </p>
@@ -63,10 +63,10 @@ export default function StappenUitlegModal({ isOpen, onClose, isMobile }) {
             Wat de uitkomst verschuift:
           </p>
           <ul style={{ ...tekst, paddingLeft: '1.1rem', marginTop: space[2] }}>
-            <li><strong style={{ color: colors.textPrimary }}>Tempo</strong> — stevig doorstappen op 130 stappen per minuut kost al snel het dubbele van slenteren.</li>
-            <li><strong style={{ color: colors.textPrimary }}>Hellingen en ondergrond</strong> — bergop of door zand kost fors meer dan een vlakke stoep.</li>
-            <li><strong style={{ color: colors.textPrimary }}>Je bouw</strong> — beenlengte en pasgrootte bepalen hoeveel meters één stap oplevert.</li>
-            <li><strong style={{ color: colors.textPrimary }}>Getraindheid</strong> — wie veel loopt doet het efficiënter en verbrandt bij hetzelfde tempo iets minder.</li>
+            <li><strong style={{ color: colors.textPrimary }}>Tempo.</strong> Stevig doorstappen op 130 stappen per minuut kost al snel het dubbele van slenteren.</li>
+            <li><strong style={{ color: colors.textPrimary }}>Hellingen en ondergrond.</strong> Bergop of door zand kost fors meer dan een vlakke stoep.</li>
+            <li><strong style={{ color: colors.textPrimary }}>Je bouw.</strong> Beenlengte en pasgrootte bepalen hoeveel meters één stap oplevert.</li>
+            <li><strong style={{ color: colors.textPrimary }}>Getraindheid.</strong> Wie veel loopt doet het efficiënter en verbrandt bij hetzelfde tempo iets minder.</li>
           </ul>
           <p style={{ ...tekst, marginTop: space[3] }}>
             Gebruik het dus voor de lijn over weken, niet om één dag mee dicht te rekenen.
