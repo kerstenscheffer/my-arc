@@ -40,7 +40,7 @@ const kortDatum = (iso) => {
 // Geen groot hero-getal: alle regels dezelfde maat, dik en wit. Een 38px
 // cijfer naast een 15px zin oogde als twee schermen door elkaar.
 const TITEL = { fontSize: 18, fontWeight: 800, color: colors.textPrimary, lineHeight: 1.25 }
-const BODY = { fontSize: 15, fontWeight: 700, lineHeight: 1.35, color: colors.textPrimary }
+const BODY = { fontSize: 15, fontWeight: 700, lineHeight: 1.3, color: colors.textPrimary }
 const BODY_ZACHT = { ...BODY, color: colors.textSecondary }
 const LABEL = {
   fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
@@ -90,7 +90,7 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
         />
       )}
       <div style={{ position: 'relative', minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[1] }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: 0 }}>
           <div style={{ ...TITEL, flex: 1, textShadow: '0 1px 2px rgba(0,0,0,0.95)' }}>{titel}</div>
           {rechts}
         </div>
@@ -197,7 +197,7 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
           </div>
 
           {wegingen?.dezeWeek != null && (
-            <div style={{ ...BODY, marginTop: space[1] }}>
+            <div style={{ ...BODY, marginTop: 2 }}>
               {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
             </div>
           )}
@@ -248,7 +248,7 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
                 aria-expanded={sterkerUit}
                 style={{
                   display: 'flex', alignItems: 'center', gap: space[2], width: '100%',
-                  minHeight: 44, padding: 0, marginTop: space[2],
+                  minHeight: 32, padding: 0, marginTop: 2,
                   background: 'transparent', border: 'none', cursor: 'pointer',
                   color: colors.textPrimary, fontFamily: 'inherit', textAlign: 'left',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -301,7 +301,7 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
             Bijgehouden op {voeding.bijgehouden} van {voeding.van} dagen
           </div>
           {voeding.gemKcal != null && (
-            <div style={{ ...BODY, marginTop: space[1] }}>
+            <div style={{ ...BODY, marginTop: 2 }}>
               Op je {voeding.compleet} complete {voeding.compleet === 1 ? 'dag' : 'dagen'} gemiddeld{' '}
               <strong style={{ color: colors.textPrimary }}>{nl(voeding.gemKcal)} kcal</strong>
               {voeding.doelKcal ? ` van je ${nl(voeding.doelKcal)}` : ''}
