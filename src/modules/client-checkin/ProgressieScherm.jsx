@@ -65,25 +65,24 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
       position: 'relative',
       marginTop: eerste ? space[4] : space[8],
       marginLeft: -rand,
-      paddingLeft: rand + FOTO_BREEDTE - space[6],
+      paddingLeft: rand + Math.round(FOTO_BREEDTE * 0.6),
       minHeight: 96,
     }}>
       {foto && (
-        <>
-          <img
-            src={foto}
-            alt=""
-            style={{
-              position: 'absolute', left: 0, top: 0, bottom: 0,
-              width: FOTO_BREEDTE, height: '100%', objectFit: 'cover',
-            }}
-          />
-          {/* De fade naar de paginakleur; ligt óp de foto, onder de tekst. */}
-          <div style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: FOTO_BREEDTE,
-            background: `linear-gradient(90deg, rgba(0,0,0,0) 35%, ${colors.bg} 100%)`,
-          }} />
-        </>
+        <img
+          src={foto}
+          alt=""
+          style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0,
+            width: FOTO_BREEDTE, height: '100%', objectFit: 'cover',
+            // De fade zit in de foto zelf: rechts loopt hij weg in de
+            // paginakleur. Een los zwart laagje erover bleek in de praktijk
+            // niet zichtbaar; een masker op het element kan niet verkeerd
+            // stapelen en werkt ook in Safari (vandaar de -webkit-variant).
+            WebkitMaskImage: 'linear-gradient(90deg, #000 30%, transparent 100%)',
+            maskImage: 'linear-gradient(90deg, #000 30%, transparent 100%)',
+          }}
+        />
       )}
       <div style={{ position: 'relative', minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[2] }}>
