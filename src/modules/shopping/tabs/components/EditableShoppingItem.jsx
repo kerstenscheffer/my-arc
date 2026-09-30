@@ -1,212 +1,123 @@
-// src/modules/shopping/tabs/components/EditableShoppingItem.jsx - V3 CLEAN
+// src/modules/shopping/tabs/components/EditableShoppingItem.jsx
+//
+// Dezelfde regel als ShoppingItem, maar dan in bewerkstand: foto en naam blijven
+// staan, rechts komen min/plus, een invoerveld en verwijderen. Alles wit op
+// zwart — de rode min-knop van vroeger schreeuwde harder dan wat hij deed.
+
 import React, { useState } from 'react'
 import { Check, Plus, Minus, Trash2 } from 'lucide-react'
+import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 
-export default function EditableShoppingItem({ 
-  item, 
-  checked, 
-  editedAmount,
-  onCheck, 
-  onAmountChange,
-  onDelete,
-  color,
-  gradient,
-  isMobile,
-  delay = 0
+const knop = (extra = {}) => ({
+  width: 30, height: 30, borderRadius: 9, padding: 0,
+  background: 'transparent', border: '1px solid rgba(255,255,255,0.18)',
+  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  outline: 'none', flexShrink: 0,
+  ...extra,
+})
+
+export default function EditableShoppingItem({
+  item, checked, editedAmount, onCheck, onAmountChange, onDelete, isMobile,
 }) {
+  const [localAmount, setLocalAmount] = useState(
+    editedAmount ?? item?.displayAmount ?? item?.totalAmount ?? 0
+  )
   if (!item) return null
 
-  const [localAmount, setLocalAmount] = useState(editedAmount || item.displayAmount || item.totalAmount)
-
-  const handleIncrement = () => {
-    const newAmount = localAmount + 50
-    setLocalAmount(newAmount)
-    onAmountChange(item.id, newAmount)
+  const zet = (n) => {
+    const v = Math.max(0, n)
+    setLocalAmount(v)
+    onAmountChange(item.id, v)
   }
 
-  const handleDecrement = () => {
-    const newAmount = Math.max(0, localAmount - 50)
-    setLocalAmount(newAmount)
-    onAmountChange(item.id, newAmount)
-  }
-
-  const handleInputChange = (e) => {
-    const value = parseFloat(e.target.value) || 0
-    setLocalAmount(value)
-    onAmountChange(item.id, value)
-  }
-
-  const originalAmount = item.displayAmount || item.totalAmount
+  const originalAmount = item.displayAmount || item.totalAmount || 1
   const costPerUnit = (item.estimatedCost || 0) / originalAmount
   const editedCost = localAmount * costPerUnit
+  const foto = foodImageFallback(item.name, null, 120)
+  const maat = isMobile ? 46 : 52
 
   return (
     <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: isMobile ? '0.375rem' : '0.5rem',
-      padding: isMobile ? '0.5rem 0' : '0.625rem 0',
-      minHeight: '40px',
-      opacity: checked ? 0.45 : 1,
-      transition: 'opacity 0.2s ease'
+      display: 'flex', alignItems: 'center',
+      gap: isMobile ? 10 : 14,
+      padding: isMobile ? '0.6rem 0' : '0.7rem 0',
+      minHeight: maat + 16,
+      opacity: checked ? 0.4 : 1,
+      transition: 'opacity 0.2s ease',
     }}>
-      {/* Checkbox */}
       <div
         onClick={onCheck}
         style={{
-          width: '22px',
-          height: '22px',
-          borderRadius: '5px',
-          background: checked ? color : 'transparent',
-          border: checked 
-            ? `1px solid ${color}` 
-            : '1px solid rgba(255, 255, 255, 0.12)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-          flexShrink: 0,
-          transition: 'all 0.2s ease'
+          width: maat, height: maat, borderRadius: 12, flexShrink: 0, cursor: 'pointer',
+          backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center',
+          backgroundColor: '#1a1a1a', position: 'relative',
+          filter: checked ? 'grayscale(1)' : 'none',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {checked && <Check size={12} color="#fff" strokeWidth={3} />}
+        {checked && (
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: 12,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Check size={18} color="#fff" strokeWidth={3.2} />
+          </div>
+        )}
       </div>
 
-      {/* Name + cost */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          color: checked ? 'rgba(255, 255, 255, 0.3)' : '#fff',
-          fontSize: isMobile ? '0.75rem' : '0.85rem',
-          fontWeight: '600',
+          color: '#fff', fontSize: isMobile ? '0.9rem' : '0.96rem',
+          fontWeight: 900, letterSpacing: '-0.015em', lineHeight: 1.25,
           textDecoration: checked ? 'line-through' : 'none',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {item.name}
         </div>
         <div style={{
-          color: checked ? 'rgba(255, 255, 255, 0.2)' : color,
-          fontSize: isMobile ? '0.55rem' : '0.6rem',
-          fontWeight: '800',
-          marginTop: '0.1rem'
+          marginTop: 3, color: 'rgba(255,255,255,0.5)',
+          fontSize: isMobile ? '0.74rem' : '0.78rem', fontWeight: 700,
+          fontVariantNumeric: 'tabular-nums',
         }}>
           €{editedCost.toFixed(2)}
         </div>
       </div>
 
-      {/* Amount controls */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        flexShrink: 0
-      }}>
-        {/* Minus */}
-        <button
-          onClick={handleDecrement}
-          style={{
-            width: '26px',
-            height: '26px',
-            borderRadius: '5px',
-            background: 'transparent',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            outline: 'none',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <Minus size={11} color="#ef4444" strokeWidth={2.5} />
+      {/* Hoeveelheid: min · veld · eenheid · plus · weg */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+        <button onClick={() => zet(localAmount - 50)} aria-label="Minder" style={knop()}>
+          <Minus size={13} strokeWidth={2.8} />
         </button>
-
-        {/* Input */}
         <input
           type="number"
+          inputMode="decimal"
           value={Math.round(localAmount)}
-          onChange={handleInputChange}
+          onChange={(e) => zet(parseFloat(e.target.value) || 0)}
           style={{
-            width: isMobile ? '48px' : '56px',
-            height: '26px',
-            padding: '0 0.25rem',
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '5px',
-            color: '#fff',
-            fontSize: isMobile ? '0.65rem' : '0.7rem',
-            fontWeight: '700',
-            textAlign: 'center',
-            outline: 'none'
-          }}
-          onFocus={(e) => {
-            e.target.style.borderColor = color
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+            width: isMobile ? 50 : 58, height: 30, padding: '0 0.25rem',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 9, color: '#fff', fontSize: '0.78rem', fontWeight: 900,
+            textAlign: 'center', outline: 'none', fontFamily: 'inherit',
+            fontVariantNumeric: 'tabular-nums',
           }}
         />
-
-        {/* Unit */}
         <span style={{
-          color: 'rgba(255, 255, 255, 0.3)',
-          fontSize: '0.5rem',
-          fontWeight: '600',
-          minWidth: '14px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em'
+          color: 'rgba(255,255,255,0.45)', fontSize: '0.62rem', fontWeight: 800,
+          minWidth: 16, textTransform: 'uppercase', letterSpacing: '0.05em',
         }}>
           {item.unit}
         </span>
-
-        {/* Plus */}
-        <button
-          onClick={handleIncrement}
-          style={{
-            width: '26px',
-            height: '26px',
-            borderRadius: '5px',
-            background: 'transparent',
-            border: `1px solid ${color}40`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            outline: 'none',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <Plus size={11} color={color} strokeWidth={2.5} />
+        <button onClick={() => zet(localAmount + 50)} aria-label="Meer" style={knop()}>
+          <Plus size={13} strokeWidth={2.8} />
         </button>
-
-        {/* Delete */}
         <button
           onClick={() => onDelete(item.id)}
-          style={{
-            width: '26px',
-            height: '26px',
-            borderRadius: '5px',
-            background: 'transparent',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            outline: 'none',
-            transition: 'all 0.2s ease',
-            marginLeft: '0.125rem'
-          }}
+          aria-label="Verwijderen"
+          style={knop({ color: 'rgba(255,255,255,0.55)', marginLeft: 2 })}
         >
-          <Trash2 size={11} color="#ef4444" strokeWidth={2.5} />
+          <Trash2 size={13} strokeWidth={2.6} />
         </button>
       </div>
     </div>

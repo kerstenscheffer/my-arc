@@ -93,7 +93,7 @@ export default function FloatingActionButtons({
       gap: 12,
       zIndex: 100,
     }}>
-      {/* Add Item — primaire actie, gouden gradient pill */}
+      {/* Add Item — primaire actie, volle witte knop zoals de log-knop op Meal */}
       <button
         onClick={onAddItem}
         aria-label="Eigen ingredient toevoegen"
@@ -101,14 +101,14 @@ export default function FloatingActionButtons({
           width: isMobile ? 64 : 72,
           height: isMobile ? 64 : 72,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+          background: '#fff',
           border: 'none',
           color: '#0a0a0a',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexDirection: 'column', gap: 0,
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          boxShadow: '0 14px 36px rgba(255,215,0,0.4), 0 4px 12px rgba(0,0,0,0.5)',
+          boxShadow: '0 14px 36px rgba(0,0,0,0.55)',
           transition: 'transform 0.15s ease',
         }}
         onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)' }}
@@ -135,13 +135,13 @@ export default function FloatingActionButtons({
           background: 'rgba(10,10,10,0.92)',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          border: '1.5px solid rgba(255,215,0,0.55)',
-          color: '#FFD700',
+          border: '1.5px solid rgba(255,255,255,0.35)',
+          color: '#fff',
           cursor: 'pointer',
           position: 'relative',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          boxShadow: '0 6px 18px rgba(255,215,0,0.18), 0 4px 12px rgba(0,0,0,0.45)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
         }}
       >
         <Share2 size={isMobile ? 20 : 22} strokeWidth={2.4} />
@@ -152,7 +152,7 @@ export default function FloatingActionButtons({
             minWidth: 22, height: 22,
             padding: '0 6px',
             borderRadius: 11,
-            background: '#FFD700',
+            background: '#fff',
             border: '2px solid #0a0a0a',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '0.7rem', fontWeight: 900,

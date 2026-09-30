@@ -10,55 +10,22 @@ import { createPortal } from 'react-dom'
 import CompactShoppingCategory from './components/CompactShoppingCategory'
 import FloatingActionButtons from './components/FloatingActionButtons'
 import AddCustomItemModal from './components/AddCustomItemModal'
-import ShoppingSelector from './components/ShoppingSelector'
-import ShoppingDailyStats from './components/ShoppingDailyStats'
+import MealDayNavHeader from '../../meal-plan/components/MealDayNavHeader'
+import { categorizeIngredient } from '../constants/shoppingConstants'
 
 // Budget components
 import BudgetTab from '../components/BudgetTab'
 import BudgetService from '../BudgetService'
 
-// Sticky dag-header — zelfde patroon als home/tracking pagina's.
-function ShoppingDayHeader({ isMobile }) {
-  const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
-  const months = ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
-                  'juli', 'augustus', 'september', 'oktober', 'november', 'december']
-  const today = new Date()
-  const dayName = days[today.getDay()]
-  const dateLabel = `${today.getDate()} ${months[today.getMonth()]}`
+// Foto boven de pagina — dezelfde opbouw als de Meal-pagina: compacte foto,
+// de dag met de pijlen eroverheen, daaronder de rest.
+const SHOPPING_BANNER_URL = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=700&fit=crop&q=80'
 
-  return (
-    <div style={{
-      position: 'sticky', top: 0, zIndex: 50,
-      background: 'rgba(10,10,10,0.92)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      paddingTop: 'env(safe-area-inset-top, 0)',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
-    }}>
-      <div style={{
-        padding: isMobile ? '0.85rem 1rem' : '1rem 1.5rem',
-        textAlign: 'center',
-      }}>
-        <div style={{
-          fontSize: isMobile ? '1.2rem' : '1.35rem',
-          fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em',
-          lineHeight: 1.1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        }}>
-          {dayName}
-          <span style={{
-            fontSize: '0.62rem', fontWeight: 800,
-            color: 'rgba(0,0,0,0.85)', background: '#FFD700',
-            padding: '2px 7px', borderRadius: 4,
-            letterSpacing: '0.04em', textTransform: 'uppercase',
-          }}>
-            {dateLabel}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
+const WEEK_OPTIES = [
+  { id: 1, label: '1 week' },
+  { id: 2, label: '2 weken' },
+  { id: 3, label: '3 weken' },
+]
 
 // Sectie-titel met bold witte tekst (vervangt de oude tiny gouden uppercase
 // label). Past bij de rest van het opgeruimde DNA.
@@ -66,8 +33,9 @@ function SectionTitle({ children, isMobile }) {
   return (
     <div style={{
       padding: isMobile ? '0 1rem' : '0 1.5rem',
-      marginBottom: isMobile ? '0.7rem' : '0.85rem',
-      fontSize: isMobile ? '1.05rem' : '1.2rem',
+      marginBottom: isMobile ? '0.2rem' : '0.3rem',
+      marginTop: isMobile ? '0.9rem' : '1.1rem',
+      fontSize: isMobile ? '1.15rem' : '1.3rem',
       fontWeight: 900, color: '#fff',
       letterSpacing: '-0.02em',
     }}>
@@ -76,26 +44,9 @@ function SectionTitle({ children, isMobile }) {
   )
 }
 
-// Categorization
-let categorizeIngredient
-try {
-  const shoppingConstants = require('../constants/shoppingConstants')
-  categorizeIngredient = shoppingConstants.categorizeIngredient
-} catch (e) {
-  categorizeIngredient = (name) => {
-    if (!name) return 'other'
-    const n = name.toLowerCase()
-    if (n.includes('kip') || n.includes('whey') || n.includes('protein') || n.includes('ei')) return 'protein'
-    if (n.includes('rijst') || n.includes('haver') || n.includes('pasta')) return 'carbs'
-    if (n.includes('broccoli') || n.includes('spinazie') || n.includes('groente')) return 'vegetables'
-    if (n.includes('bes') || n.includes('appel') || n.includes('banaan')) return 'fruit'
-    if (n.includes('melk') || n.includes('yoghurt') || n.includes('kaas')) return 'dairy'
-    if (n.includes('olie') || n.includes('avocado') || n.includes('noten')) return 'fats'
-    if (n.includes('saus') || n.includes('bbq') || n.includes('teriyaki')) return 'sauces'
-    return 'other'
-  }
-}
-
+// Categorisering komt uit de gedeelde constanten. Dit was een `require()` in een
+// try/catch — in de browser bestaat `require` niet, dus die gooide altijd en
+// viel stil terug op een grove lijst met zeven trefwoorden. Nu de echte.
 // De sleutels in het meal-plan zijn Engels; op het scherm hoort Nederlands.
 // Zonder deze omzetting stond er "Boodschappenlijst — monday".
 const DAG_NL = {
@@ -405,8 +356,8 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
       bottom: isMobile ? '90px' : '20px',
       left: '50%',
       transform: 'translateX(-50%)',
-      background: '#FFD700',
-      color: 'white',
+      background: '#fff',
+      color: '#0a0a0a',
       padding: '0.625rem 1rem',
       borderRadius: '6px',
       fontWeight: '700',
@@ -432,11 +383,11 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
           <div style={{
             width: 56, height: 56, margin: '0 auto 1.25rem',
             borderRadius: '50%',
-            background: 'rgba(255,215,0,0.08)',
-            border: '1px solid rgba(255,215,0,0.2)',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.15)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <AlertCircle size={24} color="#FFD700" strokeWidth={2.2} />
+            <AlertCircle size={24} color="#fff" strokeWidth={2.2} />
           </div>
           <div style={{
             fontSize: isMobile ? '1.05rem' : '1.2rem',
@@ -466,69 +417,94 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
 
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', paddingBottom: isMobile ? '5rem' : '2rem' }}>
-      {/* 0. DAG-HEADER — sticky, identiek aan home/tracking-pagina's */}
-      <ShoppingDayHeader isMobile={isMobile} />
-
-      {/* 1. SELECTOR — TodaysWorkoutCard-stijl: foto-banner + info + gouden chevron */}
-      <ShoppingSelector
-        selectedDay={selectedDay}
-        onDayChange={setSelectedDay}
-        weekMultiplier={weekMultiplier}
-        onWeekMultiplierChange={setWeekMultiplier}
-        isMobile={isMobile}
-      />
-
-      {/* 2. OVERZICHT — floating stat-card met margin van de zijkanten */}
-      <div style={{ marginTop: isMobile ? '1.75rem' : '2.25rem' }}>
-        <SectionTitle isMobile={isMobile}>Overzicht deze lijst</SectionTitle>
+      {/* ════ KOP MET FOTO — zelfde vorm als de Meal-pagina ════
+          De dag met de pijlen ligt op de foto. De pijlen zetten de lijst op
+          één dag; "Hele week" eronder zet hem weer op de hele week. */}
+      <div style={{ position: 'relative', width: '100%', height: isMobile ? 124 : 165, flexShrink: 0 }}>
         <div style={{
-          margin: isMobile ? '0 1rem' : '0 1.5rem',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 14,
-          overflow: 'hidden',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-        }}>
-          <ShoppingDailyStats
-            totalCost={stats.totalCost}
-            totalItems={stats.totalItems}
-            checkedPercentage={stats.progress}
-            categoriesCount={stats.categoriesCount}
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${SHOPPING_BANNER_URL})`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.12) 18%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.88) 72%, #0a0a0a 100%)',
+        }} />
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: isMobile ? 6 : 10 }}>
+          <MealDayNavHeader
+            selectedDay={selectedDay || 'today'}
+            onDayChange={setSelectedDay}
+            onOpenSummary={() => {}}
             isMobile={isMobile}
+            opFoto
+            weekOffset={weekOffset}
+            onWeekOffsetChange={setWeekOffset}
           />
         </div>
       </div>
 
-      {/* 3. BOODSCHAPPENLIJST — container vak rond de categorieën, bold witte titel */}
-      <div style={{ marginTop: isMobile ? '1.75rem' : '2.25rem' }}>
+      {/* Bereik van de lijst: deze dag of de hele week, en voor hoeveel weken.
+          Zelfde regel als de knoppenbalk op Meal: geen kaders, haarlijnen. */}
+      <div style={{
+        display: 'flex', alignItems: 'stretch',
+        height: isMobile ? 44 : 48,
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        margin: isMobile ? '0.25rem 0 0' : '0.4rem 0 0',
+      }}>
+        {[
+          { id: 'dag',  label: 'Deze dag',  aan: !!selectedDay, klik: () => setSelectedDay(prev => prev || 'monday') },
+          { id: 'week', label: 'Hele week', aan: !selectedDay,  klik: () => setSelectedDay(null) },
+        ].map(k => (
+          <button key={k.id} onClick={k.klik} style={{
+            padding: isMobile ? '0 0.9rem' : '0 1.2rem',
+            background: 'transparent', border: 'none',
+            borderRight: '1px solid rgba(255,255,255,0.1)',
+            color: k.aan ? '#fff' : 'rgba(255,255,255,0.45)',
+            fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 900, letterSpacing: '-0.015em',
+            fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            {k.label}
+          </button>
+        ))}
+        <div style={{ flex: 1 }} />
+        {WEEK_OPTIES.map(w => (
+          <button key={w.id} onClick={() => setWeekMultiplier(w.id)} style={{
+            padding: isMobile ? '0 0.7rem' : '0 0.9rem',
+            background: 'transparent', border: 'none',
+            borderLeft: '1px solid rgba(255,255,255,0.1)',
+            color: weekMultiplier === w.id ? '#fff' : 'rgba(255,255,255,0.45)',
+            fontSize: isMobile ? '0.78rem' : '0.84rem', fontWeight: 900, letterSpacing: '-0.015em',
+            fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+            fontVariantNumeric: 'tabular-nums',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            {w.label}
+          </button>
+        ))}
+      </div>
+
+      {/* BOODSCHAPPENLIJST — geen vak eromheen: de categoriekop en de
+          haarlijnen tussen de regels zijn de structuur. */}
+      <div style={{ marginTop: isMobile ? '0.5rem' : '0.75rem' }}>
         <SectionTitle isMobile={isMobile}>{listLabel}</SectionTitle>
-        <div style={{
-          margin: isMobile ? '0 1rem' : '0 1.5rem',
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 14,
-          overflow: 'hidden',
-        }}>
-          {Object.entries(groupedItems).map(([category, items], index) => (
-            <CompactShoppingCategory
-              key={category}
-              category={category}
-              items={items}
-              checkedItems={checkedItems}
-              editedAmounts={editedAmounts}
-              deletedItems={deletedItems}
-              editMode={editModeCategories[category] === true}
-              onCheckItem={handleCheckItem}
-              onCheckAll={() => handleCheckCategory(category, items)}
-              onAmountChange={handleAmountChange}
-              onDeleteItem={handleDeleteItem}
-              onToggleEditMode={toggleEditMode}
-              service={service}
-              isMobile={isMobile}
-              delay={index * 0.02}
-            />
-          ))}
-        </div>
+        {Object.entries(groupedItems).map(([category, items]) => (
+          <CompactShoppingCategory
+            key={category}
+            category={category}
+            items={items}
+            checkedItems={checkedItems}
+            editedAmounts={editedAmounts}
+            deletedItems={deletedItems}
+            editMode={editModeCategories[category] === true}
+            onCheckItem={handleCheckItem}
+            onCheckAll={() => handleCheckCategory(category, items)}
+            onAmountChange={handleAmountChange}
+            onDeleteItem={handleDeleteItem}
+            onToggleEditMode={toggleEditMode}
+            isMobile={isMobile}
+          />
+        ))}
       </div>
 
       {/* 4. EXTRA-ACTIES — Budget + Shop tips als duidelijke icon-action-cards */}
@@ -621,8 +597,8 @@ function ActionRow({ icon: Icon, title, description, onClick, isMobile }) {
         transition: 'background 0.15s ease, border-color 0.15s ease',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(255,215,0,0.06)'
-        e.currentTarget.style.borderColor = 'rgba(255,215,0,0.32)'
+        e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
@@ -632,11 +608,11 @@ function ActionRow({ icon: Icon, title, description, onClick, isMobile }) {
       <div style={{
         width: isMobile ? 38 : 42, height: isMobile ? 38 : 42,
         borderRadius: '50%',
-        background: 'rgba(255,215,0,0.14)',
-        border: '1px solid rgba(255,215,0,0.4)',
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.22)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
-        color: '#FFD700',
+        color: '#fff',
       }}>
         <Icon size={isMobile ? 18 : 20} strokeWidth={2.4} />
       </div>
@@ -657,7 +633,7 @@ function ActionRow({ icon: Icon, title, description, onClick, isMobile }) {
           {description}
         </div>
       </div>
-      <ChevronRight size={isMobile ? 18 : 20} color="rgba(255,215,0,0.7)" strokeWidth={2.4} />
+      <ChevronRight size={isMobile ? 18 : 20} color="rgba(255,255,255,0.6)" strokeWidth={2.4} />
     </button>
   )
 }
@@ -685,7 +661,7 @@ function SimpleModal({ title, onClose, isMobile, children }) {
           width: '100%',
           maxWidth: 560,
           background: '#0a0a0a',
-          borderTop: '1px solid rgba(255,215,0,0.25)',
+          borderTop: '1px solid rgba(255,255,255,0.15)',
           borderRadius: '20px 20px 0 0',
           padding: `1.1rem 0 calc(env(safe-area-inset-bottom, 0px) + 1.25rem)`,
           boxShadow: '0 -16px 40px rgba(0,0,0,0.7)',

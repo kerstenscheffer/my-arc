@@ -98,8 +98,8 @@ export default function ShoppingHub({ client, db, onNavigate }) {
           <div style={{
             width: '32px',
             height: '32px',
-            border: '3px solid rgba(255, 215, 0, 0.15)',
-            borderTopColor: '#FFD700',
+            border: '3px solid rgba(255, 255, 255, 0.15)',
+            borderTopColor: '#fff',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
             margin: '0 auto 1rem'
