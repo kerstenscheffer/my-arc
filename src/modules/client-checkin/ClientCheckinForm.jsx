@@ -419,20 +419,15 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // smal (560px) zodat een vraag van twee regels leesbaar blijft.
       <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
         {aanhef && (
-          <div style={{
-            fontSize: isMobile ? 16 : 18, fontWeight: 800,
-            color: 'rgba(255,255,255,0.7)', marginBottom: '1.2vh', lineHeight: 1.4,
-          }}>
+          <div style={{ fontSize: 15, lineHeight: 1.5, color: '#9ca3af', marginBottom: 8 }}>
             {aanhef}
           </div>
         )}
         <div style={{
-          fontSize: v.kopRechts ? (isMobile ? 24 : 30) : (isMobile ? 19 : 23),
-          fontWeight: v.kopRechts ? 900 : 800,
+          fontSize: v.kopRechts ? 22 : (isMobile ? 19 : 23),
+          fontWeight: 800,
           color: '#fff',
           textAlign: v.kopRechts ? 'right' : 'center',
-          letterSpacing: v.kopRechts ? '-0.03em' : undefined,
-          lineHeight: v.kopRechts ? 1.15 : undefined,
         }}>
           {vraagTekst}
         </div>

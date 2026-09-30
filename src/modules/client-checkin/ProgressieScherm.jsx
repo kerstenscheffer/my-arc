@@ -1,28 +1,28 @@
 // src/modules/client-checkin/ProgressieScherm.jsx
 //
-// Slide 2 van de check-in: "Dit was je progressie van afgelopen week."
+// Slide 2 van de check-in: "Je progressie afgelopen week."
 //
-// Geen vraag maar een terugblik. De klant hoeft hier niets in te vullen; hij
-// leest wat er gebeurd is voordat hij erover gaat schrijven. Dat scheelt
-// giswerk, want mensen schatten hun eigen week systematisch te rooskleurig in.
+// De ene vraag die dit scherm beantwoordt (wet 7 uit DESIGN-CONTRACT.md):
+// ging het de goede kant op? Alles wat die vraag niet dient is kleiner
+// gemaakt, ingeklapt of weggelaten.
 //
-// Regels die de opbouw bepalen:
-//   · Een regel zonder data verdwijnt. Liever drie regels die kloppen dan zes
-//     met streepjes erin.
-//   · Elk getal is na te rekenen. Achter het gewicht en achter de voeding zit
-//     een uitlegvenster met de onderliggende metingen; een getal dat je niet
-//     kunt controleren ga je op den duur wantrouwen.
-//   · Dik wit. Kleur alleen waar hij betekenis draagt.
+// Opbouw volgens het contract:
+//   · Drie tekstgroottes, niet meer: het hero-getal, de sectiekop (title),
+//     en body. Daarnaast het stat-label van 11px, dat is een eigen rol.
+//   · Geen dividers tussen secties, maar 32px lucht (wet 4).
+//   · Eén surface-niveau: de uitlegblokken zijn --surface, verder niets
+//     geneste (wet 2).
+//   · Geel komt hier niet voor. Kleur is groen voor behaald en rood voor de
+//     verkeerde kant op, en dat is semantiek, geen decoratie (wet 1).
+//   · Wat secundair is zit achter een accordion of een info-knop (wet 5).
 
 import { useState } from 'react'
 import { Info, ChevronDown } from 'lucide-react'
+import { colors, radius, space } from '../../ui/tokens'
 
-const GROEN = '#10b981'
-// Zelfde drie kleuren als het coach-overzicht: haalde je het afgesproken
-// tempo, zat je er net onder, of ging het de verkeerde kant op.
-const OORDEEL_KLEUR = { goed: '#10b981', bijna: '#f59e0b', niet: '#ef4444' }
-const GRIJS = 'rgba(255,255,255,0.55)'
-const RAND = '#2a2a2a'
+// Oordeelkleuren. Groen en rood komen uit de tokens; oranje bestaat daar niet
+// en is hier "net niet", tussen behaald en misgegaan in.
+const OORDEEL_KLEUR = { goed: colors.success, bijna: '#f59e0b', niet: colors.danger }
 
 const nl = (n, cijfers = 0) =>
   new Intl.NumberFormat('nl-NL', { minimumFractionDigits: cijfers, maximumFractionDigits: cijfers }).format(n)
@@ -35,30 +35,36 @@ const kortDatum = (iso) => {
   } catch { return iso }
 }
 
-// Een sectie met links een vierkante foto. De foto is decoratie, geen
-// informatie: daarom een vaste maat en alt="" zodat een schermlezer hem
-// overslaat in plaats van "intro-workout" voor te lezen.
-function Blok({ titel, foto, rechts, children }) {
+// ── De drie tekstrollen ───────────────────────────────────────────────────
+const HERO = {
+  fontSize: 38, fontWeight: 800, color: colors.textPrimary,
+  lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+}
+const TITEL = { fontSize: 22, fontWeight: 800, color: colors.textPrimary }
+const BODY = { fontSize: 15, lineHeight: 1.5, color: colors.textSecondary }
+const LABEL = {
+  fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+  letterSpacing: '0.06em', color: colors.textMuted,
+}
+
+// Sectie: foto links, bold witte kop, content eronder. Geen rand, geen
+// divider: de 32px lucht ertussen doet het werk.
+function Sectie({ titel, foto, rechts, children }) {
   return (
-    <div style={{
-      display: 'flex', gap: 12, alignItems: 'flex-start',
-      paddingTop: 14, marginTop: 14, borderTop: `1px solid ${RAND}`,
-    }}>
+    <div style={{ display: 'flex', gap: space[3], alignItems: 'flex-start', marginTop: space[8] }}>
       {foto && (
         <img
           src={foto}
           alt=""
           style={{
-            width: 56, height: 56, flexShrink: 0,
-            borderRadius: 12, objectFit: 'cover',
-            // Iets gedempt: de foto hoort de kop niet te overstemmen.
-            opacity: 0.85,
+            width: 48, height: 48, flexShrink: 0,
+            borderRadius: radius.btn, objectFit: 'cover',
           }}
         />
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <div style={{ flex: 1, fontSize: 21, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{titel}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[2] }}>
+          <div style={{ ...TITEL, flex: 1 }}>{titel}</div>
           {rechts}
         </div>
         {children}
@@ -67,8 +73,7 @@ function Blok({ titel, foto, rechts, children }) {
   )
 }
 
-// Een rond knopje van 32px. Groot genoeg om op een telefoon te raken zonder
-// dat het naast het getal gaat staan schreeuwen.
+// Rond knopje van 44px, de minimale tap-target uit het contract.
 function InfoKnop({ open, onClick, label }) {
   return (
     <button
@@ -78,44 +83,42 @@ function InfoKnop({ open, onClick, label }) {
       aria-expanded={open}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 32, height: 32, padding: 0, flexShrink: 0,
-        borderRadius: 999, cursor: 'pointer',
-        background: open ? 'rgba(255,255,255,0.12)' : 'transparent',
-        border: `1px solid ${open ? 'rgba(255,255,255,0.3)' : RAND}`,
-        color: open ? '#fff' : GRIJS,
+        width: 44, height: 44, padding: 0, flexShrink: 0,
+        borderRadius: radius.pill, cursor: 'pointer',
+        background: open ? colors.surfaceHover : 'transparent',
+        border: `1px solid ${colors.borderSubtle}`,
+        color: open ? colors.textPrimary : colors.textMuted,
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <Info size={15} strokeWidth={2.4} />
+      <Info size={16} strokeWidth={2.2} />
     </button>
   )
 }
 
-// Uitklapbaar tekstblok onder een getal.
+// Uitlegblok: één surface-niveau, dus --surface en verder niets erin.
 function Uitleg({ children }) {
   return (
     <div style={{
-      marginTop: 10, padding: '10px 12px',
-      background: 'rgba(255,255,255,0.04)', borderRadius: 12,
-      fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5,
+      marginTop: space[3], padding: space[4],
+      background: colors.surface, borderRadius: radius.card,
+      border: `1px solid ${colors.borderSubtle}`,
+      ...BODY,
     }}>
       {children}
     </div>
   )
 }
 
-// Eén regel per week: het gemiddelde vet, de losse wegingen erachter. Twee
-// koppen met daaronder een rij maakte het venster twee keer zo hoog zonder
-// dat er meer in stond.
 function WeekRegel({ tot, gemiddelde, lijst }) {
   return (
-    <div style={{ marginTop: 6, fontSize: 12.5, lineHeight: 1.5 }}>
-      <span style={{ fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+    <div style={{ marginTop: space[2], ...BODY }}>
+      <strong style={{ color: colors.textPrimary, fontVariantNumeric: 'tabular-nums' }}>
         {nl(gemiddelde, 1)} kg
-      </span>
-      <span style={{ color: GRIJS, fontWeight: 700 }}> tot {kortDatum(tot)}</span>
+      </strong>
+      {` tot ${kortDatum(tot)}`}
       {lijst?.length > 0 && (
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>
+        <span style={{ color: colors.textMuted }}>
           {' · '}{lijst.map(w => nl(w.kg, 1)).join(' · ')}
         </span>
       )}
@@ -129,81 +132,62 @@ export default function ProgressieScherm({ progressie }) {
   const [voedingUit, setVoedingUit] = useState(false)
 
   if (!progressie) {
-    return (
-      <div style={{ marginTop: '2.2vh', color: GRIJS, fontSize: 14, fontWeight: 700 }}>
-        Je week wordt opgehaald…
-      </div>
-    )
+    return <div style={{ ...BODY, marginTop: space[4] }}>Je week wordt opgehaald…</div>
   }
 
   const { gewicht, training, voeding, wegingen } = progressie
-  const heeftIets = gewicht || training?.sessies > 0 || voeding?.bijgehouden > 0 || wegingen?.dezeWeek > 0
+  const heeftIets = gewicht || training?.sessies > 0 || voeding?.bijgehouden > 0
 
+  // Empty state is een uitnodiging, geen leeg vlak (wet 6).
   if (!heeftIets) {
     return (
-      <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', lineHeight: 1.5 }}>
-          Deze week staat er nog niets geregistreerd.
-        </div>
-        <div style={{ fontSize: 13.5, fontWeight: 700, color: GRIJS, marginTop: 8, lineHeight: 1.55 }}>
-          Geen probleem, vul de check-in gewoon in. Vanaf de week dat je logt, laat
-          dit scherm je vooruitgang zien.
+      <div style={{ marginTop: space[4], textAlign: 'left' }}>
+        <div style={TITEL}>Deze week staat er nog niets geregistreerd.</div>
+        <div style={{ ...BODY, marginTop: space[2] }}>
+          Vul de check-in gewoon in. Vanaf de week dat je je trainingen en wegingen
+          bijhoudt, laat dit scherm je vooruitgang zien.
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
+    <div style={{ marginTop: space[4], textAlign: 'left' }}>
 
       {/* ── Gewicht ── */}
       {gewicht && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              fontSize: 38, fontWeight: 900,
-              color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : '#fff',
-              lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
-            }}>
-              {metTeken(gewicht.verschil)}<span style={{ fontSize: '0.5em', marginLeft: 6, opacity: 0.6 }}>kg</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: space[4], flexWrap: 'wrap' }}>
+            <div style={{ ...HERO, color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : colors.textPrimary }}>
+              {metTeken(gewicht.verschil)}
+              <span style={{ fontSize: '0.42em', marginLeft: space[2], opacity: 0.6 }}>kg</span>
             </div>
             {gewicht.doelBereik && (
-              <div style={{
-                fontSize: 38, fontWeight: 900, color: '#fff',
-                lineHeight: 1, letterSpacing: '-0.03em',
-                fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
-              }}>
-                <span style={{ fontSize: '0.42em', color: GRIJS, marginRight: 8 }}>doel</span>
+              <div style={{ ...HERO, whiteSpace: 'nowrap' }}>
+                <span style={{ ...LABEL, marginRight: space[2] }}>doel</span>
                 {gewicht.doelBereik}
               </div>
             )}
-            <InfoKnop
-              open={gewichtUit}
-              onClick={() => setGewichtUit(v => !v)}
-              label="Hoe is dit berekend?"
-            />
+            <InfoKnop open={gewichtUit} onClick={() => setGewichtUit(v => !v)} label="Hoe is dit berekend?" />
           </div>
 
           {wegingen?.dezeWeek != null && (
-            <div style={{ fontSize: 14, fontWeight: 800, color: GRIJS, marginTop: 10 }}>
+            <div style={{ ...BODY, marginTop: space[3] }}>
               {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
             </div>
           )}
 
           {gewichtUit && (
             <Uitleg>
-              {/* De regel die eerst onder het getal stond. Hij hoort hier: op
-                  het scherm zelf telt alleen het getal en de kleur. */}
-              <div style={{ fontWeight: 800, color: '#fff' }}>
+              <strong style={{ color: colors.textPrimary }}>
                 {gewicht.soort === 'week'
                   ? `Sinds vorige zaterdag: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`
                   : `Sinds je start: ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`}
                 {gewicht.doelBereik && `. Goed tempo is ${gewicht.doelBereik} kg per week`}
-              </div>
-
+              </strong>
               {gewicht.soort === 'week' ? (
                 <>
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: space[2] }}>
                     Het gemiddelde van de week tot zaterdag, tegen dat van de week ervoor.
                     Twee losse wegingen schelen een kilo of twee per ochtend.
                   </div>
@@ -211,101 +195,100 @@ export default function ProgressieScherm({ progressie }) {
                   <WeekRegel tot={gewicht.vorigeZaterdag} gemiddelde={gewicht.eerder} lijst={gewicht.wegingenEerder} />
                 </>
               ) : (
-                <div style={{ marginTop: 8 }}>
+                <div style={{ marginTop: space[2] }}>
                   Nog geen twee volle weken om te vergelijken, dus dit is je gemiddelde
                   van nu tegenover je startgewicht.
                 </div>
               )}
             </Uitleg>
           )}
-
         </div>
       )}
 
       {/* ── Training ── */}
       {training?.sessies > 0 && (
-        <Blok titel="Training" foto="/intro-workout.jpg">
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
+        <Sectie titel="Training" foto="/intro-workout.jpg">
+          <div style={BODY}>
             {training.sessies} {training.sessies === 1 ? 'training' : 'trainingen'}
             {training.oefeningen > 0 && ` · ${training.oefeningen} oefeningen`}
             {training.sets > 0 && ` · ${training.sets} sets`}
           </div>
 
-
           {training.sterker?.length > 0 && (
-            <div style={{ marginTop: 10 }}>
+            <>
+              {/* Accordion: standaard ingeklapt, kop met chevron (wet 5). */}
               <button
                 type="button"
                 onClick={() => setSterkerUit(v => !v)}
                 aria-expanded={sterkerUit}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                  padding: '6px 0', cursor: 'pointer',
-                  background: 'transparent', border: 'none',
-                  color: '#fff', fontSize: 16, fontWeight: 900, fontFamily: 'inherit',
-                  textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: space[2], width: '100%',
+                  minHeight: 44, padding: 0, marginTop: space[2],
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: colors.textPrimary, fontFamily: 'inherit', textAlign: 'left',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <span style={{ flex: 1 }}>
+                <span style={{ flex: 1, fontSize: 15, fontWeight: 800 }}>
                   Sterker geworden op {training.sterker.length + training.meerOefeningen}
                   {training.sterker.length + training.meerOefeningen === 1 ? ' oefening' : ' oefeningen'}
                 </span>
                 <ChevronDown
-                  size={17} strokeWidth={2.6}
+                  size={18} strokeWidth={2.4}
                   style={{ transform: sterkerUit ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
                 />
               </button>
 
               {sterkerUit && (
-                <div style={{ marginTop: 8 }}>
+                <div>
                   {training.sterker.map(s => (
                     <div key={s.oefening} style={{
-                      display: 'flex', alignItems: 'baseline', gap: 10,
-                      padding: '8px 12px', borderBottom: `1px solid ${RAND}`,
+                      display: 'flex', alignItems: 'baseline', gap: space[3], paddingBottom: space[2],
                     }}>
-                      <span style={{ flex: 1, fontSize: 14.5, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>
-                        {s.oefening}
-                        <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: GRIJS, marginTop: 2 }}>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: colors.textPrimary }}>
+                          {s.oefening}
+                        </span>
+                        <span style={{ ...LABEL, display: 'block', marginTop: space[1] }}>
                           {nl(s.vorig, 1)} naar {nl(s.nu, 1)} kg
                         </span>
                       </span>
                       <span style={{
-                        fontSize: 15, fontWeight: 900, color: GROEN,
+                        fontSize: 15, fontWeight: 800, color: colors.success,
                         fontVariantNumeric: 'tabular-nums', flexShrink: 0,
                       }}>
                         +{s.pct}%
                       </span>
                     </div>
                   ))}
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: GRIJS, marginTop: 8, lineHeight: 1.55 }}>
+                  <div style={{ ...BODY, color: colors.textMuted }}>
                     Vergeleken op je zwaarste set, omgerekend naar wat je voor 8 herhalingen
                     zou kunnen. Zo telt 100 kg voor 5 net zo goed mee als 80 kg voor 12.
                   </div>
                 </div>
               )}
-            </div>
+            </>
           )}
-        </Blok>
+        </Sectie>
       )}
 
       {/* ── Voeding ── */}
-      {voeding && voeding.bijgehouden > 0 && (
-        <Blok
+      {voeding?.bijgehouden > 0 && (
+        <Sectie
           titel="Voeding"
           foto="/intro-meal.jpg"
           rechts={<InfoKnop open={voedingUit} onClick={() => setVoedingUit(v => !v)} label="Wat telt hier mee?" />}
         >
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
+          <div style={BODY}>
             Bijgehouden op {voeding.bijgehouden} van {voeding.van} dagen
           </div>
           {voeding.gemKcal != null && (
-            <div style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ ...BODY, marginTop: space[1] }}>
               Op je {voeding.compleet} complete {voeding.compleet === 1 ? 'dag' : 'dagen'} gemiddeld{' '}
-              <strong style={{ color: '#fff' }}>{nl(voeding.gemKcal)} kcal</strong>
+              <strong style={{ color: colors.textPrimary }}>{nl(voeding.gemKcal)} kcal</strong>
               {voeding.doelKcal ? ` van je ${nl(voeding.doelKcal)}` : ''}
               {voeding.gemEiwit != null && (
-                <> en <strong style={{ color: '#fff' }}>{nl(voeding.gemEiwit)}g eiwit</strong>
+                <> en <strong style={{ color: colors.textPrimary }}>{nl(voeding.gemEiwit)}g eiwit</strong>
                 {voeding.doelEiwit ? ` van je ${nl(voeding.doelEiwit)}` : ''}</>
               )}
             </div>
@@ -318,7 +301,7 @@ export default function ProgressieScherm({ progressie }) {
               en dat zegt dus niets over je week.
             </Uitleg>
           )}
-        </Blok>
+        </Sectie>
       )}
     </div>
   )
