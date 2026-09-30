@@ -427,7 +427,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
           fontSize: v.kopRechts ? 18 : (isMobile ? 19 : 23),
           fontWeight: 800,
           color: '#fff',
-          textAlign: v.kopRechts ? 'right' : 'center',
+          textAlign: v.kopRechts ? 'left' : 'center',
         }}>
           {vraagTekst}
         </div>

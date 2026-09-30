@@ -38,8 +38,8 @@ const kortDatum = (iso) => {
 // ── De drie tekstrollen ───────────────────────────────────────────────────
 // Geen groot hero-getal: alle regels dezelfde maat, dik en wit. Een 38px
 // cijfer naast een 15px zin oogde als twee schermen door elkaar.
-const TITEL = { fontSize: 18, fontWeight: 800, color: colors.textPrimary, lineHeight: 1.3 }
-const BODY = { fontSize: 15, fontWeight: 700, lineHeight: 1.5, color: colors.textPrimary }
+const TITEL = { fontSize: 18, fontWeight: 800, color: colors.textPrimary, lineHeight: 1.25 }
+const BODY = { fontSize: 15, fontWeight: 700, lineHeight: 1.35, color: colors.textPrimary }
 const BODY_ZACHT = { ...BODY, color: colors.textSecondary }
 const LABEL = {
   fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
@@ -62,9 +62,14 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
   return (
     <div style={{
       position: 'relative',
-      marginTop: eerste ? space[4] : space[8],
+      marginTop: space[4],
       marginLeft: -rand,
-      paddingLeft: rand + Math.round(FOTO_BREEDTE * 0.55),
+      // Verticale padding op de band, niet op de tekst: de foto zit op de
+      // padding-box en steekt daardoor 8px boven en onder de tekst uit.
+      padding: `${space[2]}px 0 ${space[2]}px ${rand + Math.round(FOTO_BREEDTE * 0.55)}px`,
+      // Lijn tussen de secties. Bewust lichter dan --border-subtle: die is
+      // op zwart met een foto ernaast niet te zien.
+      borderTop: eerste ? 'none' : '1px solid rgba(255,255,255,0.18)',
       minHeight: 88,
     }}>
       {foto && (
@@ -84,7 +89,7 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
         />
       )}
       <div style={{ position: 'relative', minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[2] }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[1] }}>
           <div style={{ ...TITEL, flex: 1, textShadow: '0 1px 2px rgba(0,0,0,0.95)' }}>{titel}</div>
           {rechts}
         </div>
