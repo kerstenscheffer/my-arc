@@ -16,7 +16,6 @@
 
 import { useState } from 'react'
 import { Info, ChevronDown } from 'lucide-react'
-import GewichtBandGrafiek from '../coach-command-center/components/insight/GewichtBandGrafiek'
 
 const GROEN = '#10b981'
 // Zelfde drie kleuren als het coach-overzicht: haalde je het afgesproken
@@ -104,7 +103,7 @@ function WeekRegel({ tot, gemiddelde, lijst }) {
   )
 }
 
-export default function ProgressieScherm({ progressie, client, isMobile }) {
+export default function ProgressieScherm({ progressie }) {
   const [gewichtUit, setGewichtUit] = useState(false)
   const [sterkerUit, setSterkerUit] = useState(false)
   const [voedingUit, setVoedingUit] = useState(false)
@@ -117,7 +116,7 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
     )
   }
 
-  const { gewicht, training, voeding, wegingen, grafiek } = progressie
+  const { gewicht, training, voeding, wegingen } = progressie
   const heeftIets = gewicht || training?.sessies > 0 || voeding?.bijgehouden > 0 || wegingen?.dezeWeek > 0
 
   if (!heeftIets) {
@@ -149,11 +148,13 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
               {metTeken(gewicht.verschil)}<span style={{ fontSize: '0.5em', marginLeft: 6, opacity: 0.6 }}>kg</span>
             </div>
             {gewicht.doelBereik && (
-              <div style={{ fontSize: 13.5, fontWeight: 800, color: GRIJS, whiteSpace: 'nowrap' }}>
-                doel{' '}
-                <span style={{ color: 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums' }}>
-                  {gewicht.doelBereik}
-                </span>
+              <div style={{
+                fontSize: 38, fontWeight: 900, color: '#fff',
+                lineHeight: 1, letterSpacing: '-0.03em',
+                fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+              }}>
+                <span style={{ fontSize: '0.42em', color: GRIJS, marginRight: 8 }}>doel</span>
+                {gewicht.doelBereik}
               </div>
             )}
             <InfoKnop
@@ -192,20 +193,6 @@ export default function ProgressieScherm({ progressie, client, isMobile }) {
             </Uitleg>
           )}
 
-          {/* De grafiek met de band eromheen: dezelfde als in coach insight, zodat
-              jij en je coach naar hetzelfde plaatje kijken. */}
-          {grafiek?.history?.length > 1 && (
-            <div style={{ marginTop: 16 }}>
-              <GewichtBandGrafiek
-                client={client}
-                history={grafiek.history}
-                fase={grafiek.fase}
-                fases={grafiek.fases}
-                isMobile={isMobile}
-                klantModus
-              />
-            </div>
-          )}
         </div>
       )}
 

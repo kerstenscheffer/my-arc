@@ -599,7 +599,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
           )
         })()}
 
-        {v.type === 'progressie' && <ProgressieScherm progressie={progressie} client={client} isMobile={isMobile} />}
+        {v.type === 'progressie' && <ProgressieScherm progressie={progressie} />}
 
         {(v.type === 'aantal' || v.type === 'aantal-van') && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: '2.2vh', flexWrap: 'wrap' }}>

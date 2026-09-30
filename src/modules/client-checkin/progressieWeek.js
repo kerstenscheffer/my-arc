@@ -128,7 +128,7 @@ export async function laadProgressie(db, client) {
   // de hele Promise.all en krijgt de klant een leeg scherm.
   const vang = (q) => q.then(r => r, () => ({ data: null }))
 
-  const [stand, gewichtRes, sessiesRes, faseRes, maaltijdRes, fasesRes, maaltijdenRes] = await Promise.all([
+  const [stand, gewichtRes, sessiesRes, faseRes, maaltijdRes, maaltijdenRes] = await Promise.all([
     vang(sb.rpc('get_challenge_stand', {
       p_client_id: client.id,
       p_start: weekStart,
@@ -155,11 +155,6 @@ export async function laadProgressie(db, client) {
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1)),
-    // Alle fases: de band-grafiek tekent per fase een eigen doellijn.
-    vang(sb.from('client_phases')
-      .select('*')
-      .eq('client_id', client.id)
-      .order('started_on', { ascending: true })),
     // Wat er echt gegeten is. De teller uit get_challenge_stand zegt alleen
     // hoeveel dagen er afgevinkt zijn; deze rijen zeggen hoeveel er in zat.
     vang(sb.from('consumed_meals')
@@ -198,12 +193,6 @@ export async function laadProgressie(db, client) {
       // De losse wegingen van deze week, voor het uitlegvenster achter het
       // gewicht. Zo kan de klant zien welke getallen het gemiddelde vormen.
       dagen: (s.weeg_dagen || []).slice(),
-    },
-    // Voor de band-grafiek onder het getal: dezelfde invoer als coach insight.
-    grafiek: {
-      history: wegingen,
-      fase,
-      fases: fasesRes.data || [],
     },
   }
 }
