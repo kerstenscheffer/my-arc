@@ -53,8 +53,15 @@ export function wekenBezig(client, nu = new Date()) {
 }
 
 // Hoe de klant zijn fase genoemd hoort te zien. In de database staat 'cut' en
-// 'build'; dat laatste heet in de app overal 'bulk'.
-const FASE_NAAM = { cut: 'cut', build: 'bulk', recomp: 'recomp', maintain: 'onderhoud' }
+// 'build'. Naar de klant toe zeggen we waar het over gaat in plaats van het
+// jargon: niemand hoeft te weten wat een cut is om te snappen dat hij aan het
+// afvallen is.
+const FASE_NAAM = {
+  cut: 'vetverlies',
+  build: 'spieropbouw',
+  recomp: 'recomp',
+  maintain: 'onderhouds',
+}
 
 /**
  * De lopende fase van deze klant, met hoelang hij er al in zit.
