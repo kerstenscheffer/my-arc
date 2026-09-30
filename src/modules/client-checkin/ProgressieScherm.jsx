@@ -36,12 +36,11 @@ const kortDatum = (iso) => {
 }
 
 // ── De drie tekstrollen ───────────────────────────────────────────────────
-const HERO = {
-  fontSize: 38, fontWeight: 800, color: colors.textPrimary,
-  lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
-}
-const TITEL = { fontSize: 22, fontWeight: 800, color: colors.textPrimary }
-const BODY = { fontSize: 15, lineHeight: 1.5, color: colors.textSecondary }
+// Geen groot hero-getal: alle regels dezelfde maat, dik en wit. Een 38px
+// cijfer naast een 15px zin oogde als twee schermen door elkaar.
+const TITEL = { fontSize: 18, fontWeight: 800, color: colors.textPrimary, lineHeight: 1.3 }
+const BODY = { fontSize: 15, fontWeight: 700, lineHeight: 1.5, color: colors.textPrimary }
+const BODY_ZACHT = { ...BODY, color: colors.textSecondary }
 const LABEL = {
   fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
   letterSpacing: '0.06em', color: colors.textMuted,
@@ -65,8 +64,8 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
       position: 'relative',
       marginTop: eerste ? space[4] : space[8],
       marginLeft: -rand,
-      paddingLeft: rand + Math.round(FOTO_BREEDTE * 0.6),
-      minHeight: 96,
+      paddingLeft: rand + Math.round(FOTO_BREEDTE * 0.55),
+      minHeight: 88,
     }}>
       {foto && (
         <img
@@ -75,12 +74,12 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
           style={{
             position: 'absolute', left: 0, top: 0, bottom: 0,
             width: FOTO_BREEDTE, height: '100%', objectFit: 'cover',
-            // De fade zit in de foto zelf: rechts loopt hij weg in de
-            // paginakleur. Een los zwart laagje erover bleek in de praktijk
-            // niet zichtbaar; een masker op het element kan niet verkeerd
-            // stapelen en werkt ook in Safari (vandaar de -webkit-variant).
-            WebkitMaskImage: 'linear-gradient(90deg, #000 30%, transparent 100%)',
-            maskImage: 'linear-gradient(90deg, #000 30%, transparent 100%)',
+            // Gedimd én weglopend: de foto is sfeer, de tekst is de inhoud.
+            // De fade zit in de foto zelf (masker), niet als laagje erover:
+            // dat kan niet verkeerd stapelen en werkt ook in Safari.
+            filter: 'brightness(0.55)',
+            WebkitMaskImage: 'linear-gradient(90deg, #000 15%, transparent 92%)',
+            maskImage: 'linear-gradient(90deg, #000 15%, transparent 92%)',
           }}
         />
       )}
@@ -105,11 +104,11 @@ function InfoKnop({ open, onClick, label }) {
       aria-expanded={open}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 44, height: 44, padding: 0, flexShrink: 0,
+        width: 40, height: 40, padding: 0, flexShrink: 0,
         borderRadius: radius.pill, cursor: 'pointer',
         background: open ? colors.surfaceHover : 'transparent',
-        border: `1px solid ${colors.borderSubtle}`,
-        color: open ? colors.textPrimary : colors.textMuted,
+        border: 'none',
+        color: open ? colors.textPrimary : colors.textSecondary,
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >
@@ -125,7 +124,7 @@ function Uitleg({ children }) {
       marginTop: space[3], padding: space[4],
       background: colors.surface, borderRadius: radius.card,
       border: `1px solid ${colors.borderSubtle}`,
-      ...BODY,
+      ...BODY_ZACHT,
     }}>
       {children}
     </div>
@@ -134,7 +133,7 @@ function Uitleg({ children }) {
 
 function WeekRegel({ tot, gemiddelde, lijst }) {
   return (
-    <div style={{ marginTop: space[2], ...BODY }}>
+    <div style={{ marginTop: space[2], ...BODY_ZACHT }}>
       <strong style={{ color: colors.textPrimary, fontVariantNumeric: 'tabular-nums' }}>
         {nl(gemiddelde, 1)} kg
       </strong>
@@ -179,22 +178,20 @@ export default function ProgressieScherm({ progressie, isMobile }) {
       {/* ── Gewicht ── */}
       {gewicht && (
         <Sectie titel="Gewicht" foto="/checkin/gewicht.jpg" eerste isMobile={isMobile}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: space[4], flexWrap: 'wrap' }}>
-            <div style={{ ...HERO, color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : colors.textPrimary }}>
-              {metTeken(gewicht.verschil)}
-              <span style={{ fontSize: '0.42em', marginLeft: space[2], opacity: 0.6 }}>kg</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: space[2] }}>
+            <div style={{ ...BODY, flex: 1, minWidth: 0 }}>
+              <span style={{ color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : colors.textPrimary }}>
+                {metTeken(gewicht.verschil)} kg
+              </span>
+              {gewicht.doelBereik && (
+                <span style={BODY_ZACHT}>{' · doel '}{gewicht.doelBereik}</span>
+              )}
             </div>
-            {gewicht.doelBereik && (
-              <div style={{ ...HERO, whiteSpace: 'nowrap' }}>
-                <span style={{ ...LABEL, marginRight: space[2] }}>doel</span>
-                {gewicht.doelBereik}
-              </div>
-            )}
             <InfoKnop open={gewichtUit} onClick={() => setGewichtUit(v => !v)} label="Hoe is dit berekend?" />
           </div>
 
           {wegingen?.dezeWeek != null && (
-            <div style={{ ...BODY, marginTop: space[3] }}>
+            <div style={{ ...BODY, marginTop: space[1] }}>
               {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
             </div>
           )}
@@ -283,7 +280,7 @@ export default function ProgressieScherm({ progressie, isMobile }) {
                       </span>
                     </div>
                   ))}
-                  <div style={{ ...BODY, color: colors.textMuted }}>
+                  <div style={{ ...BODY_ZACHT, marginTop: space[2] }}>
                     Vergeleken op je zwaarste set, omgerekend naar wat je voor 8 herhalingen
                     zou kunnen. Zo telt 100 kg voor 5 net zo goed mee als 80 kg voor 12.
                   </div>
