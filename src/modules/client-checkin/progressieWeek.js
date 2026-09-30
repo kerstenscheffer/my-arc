@@ -354,8 +354,18 @@ function bouwTraining(sessies, oefeningen, weekStart, stand) {
 
   const sets = oefDezeWeek.reduce((n, o) => n + (Array.isArray(o.sets) ? o.sets.length : 0), 0)
 
+  // Hoe vaak stond je in de sportschool. Niet workouts.geldig: die telt alleen
+  // sessies waarin minstens 70% van de geplande sets gelogd is, en dat is een
+  // drempel voor de challenge-stand. Wie vijf keer traint en twee keer de helft
+  // logt, heeft vijf keer getraind; "3 trainingen" is dan gewoon onjuist.
+  const alleDagen = stand?.workouts?.dagen || []
+  const half = alleDagen.filter(d => d.telt === false && Number(d.gedaan) > 0)
+
   return {
-    sessies: stand?.workouts?.geldig ?? dezeWeek.filter(x => x.is_completed).length,
+    sessies: stand?.workouts?.sessies ?? dezeWeek.length,
+    // Sessies waarin duidelijk minder is gelogd dan gepland. Niet als verwijt,
+    // maar omdat het verklaart waarom een week mager oogt in de cijfers.
+    halfGelogd: half.length,
     oefeningen: new Set(oefDezeWeek.map(o => o.exercise_name)).size,
     sets,
     // Hooguit drie: een lijst van tien "sterker geworden op" leest niemand,
