@@ -57,7 +57,7 @@ export default function AIDaySchedule({
   dagRefreshKey = 0,
   // Roept de ouder aan zodra de klant een dag bewaart, zodat het dagen-paneel
   // hem meteen in de lijst heeft staan.
-  onDagBewaard,
+  onDagBewaard, onOpenDagen,
   // Callback waarmee AIMealDashboard op de hoogte gesteld wordt als een
   // verleden-dag-log gewijzigd is (zodat MacroHero-cache ongeldig gemaakt wordt).
   onPastDayUpdate,
@@ -756,6 +756,7 @@ export default function AIDaySchedule({
           isMobile={isMobile}
           verversSleutel={dagRefreshKey}
           onBewaard={onDagBewaard}
+          onOpenDagen={onOpenDagen}
         />
       )}
 

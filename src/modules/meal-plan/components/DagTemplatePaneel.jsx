@@ -58,8 +58,15 @@ const maaltijdNamen = (t) => Object.entries(slotsVanTemplate(t))
 
 export default function DagTemplatePaneel({
   db, client, activePlan, isMobile, dagIndex = 0, weekOffset = 0, onToegepast,
+  // Van buitenaf bediend: geef `open` en `onOpenChange` mee, dan verdwijnt de
+  // eigen tab tegen de linkerrand en bepaalt de aanroeper wanneer het paneel
+  // opengaat. Zonder die props gedraagt hij zich als vanouds.
+  open: openProp, onOpenChange,
 }) {
-  const [open, setOpen] = useState(false)
+  const extern = typeof onOpenChange === 'function'
+  const [openIntern, setOpenIntern] = useState(false)
+  const open = extern ? !!openProp : openIntern
+  const setOpen = extern ? onOpenChange : setOpenIntern
   const [templates, setTemplates] = useState([])
   const [laden, setLaden] = useState(true)
   const [gekozen, setGekozen] = useState(null)
@@ -131,7 +138,10 @@ export default function DagTemplatePaneel({
     : []
 
   // ── De tab tegen de linkerrand ────────────────────────────────────────
+  // Alleen als niemand anders het paneel opent; anders zou er een tweede
+  // ingang naast de knop op de dag staan.
   if (!open) {
+    if (extern) return null
     return (
       <button
         onClick={() => setOpen(true)}

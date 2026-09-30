@@ -9,14 +9,20 @@
 // naam blijven staan bij een dag die allang iets anders is.
 
 import { useState, useEffect, useCallback } from 'react'
-import { Bookmark, Check, CalendarDays, X } from 'lucide-react'
+import { Bookmark, Check, CalendarDays, X, ChevronRight } from 'lucide-react'
 import {
   getKlantDagTemplates, getEigenDagen, bewaarEigenDag, vindDag, BRON_KLANT,
 } from '../DayTemplateService'
 
 const LIJN = 'rgba(255,255,255,0.1)'
 
-export default function DagBewaarBalk({ db, client, maaltijden, isMobile, onBewaard, verversSleutel = 0 }) {
+export default function DagBewaarBalk({
+  db, client, maaltijden, isMobile, onBewaard, verversSleutel = 0,
+  // Deze regel is ook de ingang naar de bewaarde dagen: een tik op de naam
+  // links opent dat paneel. Vroeger zat dat achter een verticale tab tegen de
+  // linkerrand van het scherm, en die viel niemand op.
+  onOpenDagen,
+}) {
   const [dagen, setDagen] = useState([])
   const [invoer, setInvoer] = useState(false)
   const [naam, setNaam] = useState('')
@@ -62,18 +68,36 @@ export default function DagBewaarBalk({ db, client, maaltijden, isMobile, onBewa
     borderBottom: `1px solid ${LIJN}`,
   }
 
+  // Het linkerdeel van de regel — icoon plus naam — is de knop naar de dagen.
+  const linkerKnop = {
+    flex: 1, minWidth: 0,
+    display: 'flex', alignItems: 'center', gap: 10,
+    background: 'transparent', border: 'none', padding: 0,
+    color: 'inherit', fontFamily: 'inherit', textAlign: 'left',
+    cursor: onOpenDagen ? 'pointer' : 'default',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+
   // Deze dag heeft een naam: laten zien welke, en waar hij vandaan komt.
   if (herkend && !invoer) {
     const vanMij = herkend.bron === BRON_KLANT
     return (
       <div style={rij}>
-        <CalendarDays size={16} color="rgba(255,255,255,0.5)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
-        <span style={{
-          flex: 1, minWidth: 0, fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 800,
-          color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {herkend.name || herkend.template_name}
-        </span>
+        <button onClick={() => onOpenDagen?.()} disabled={!onOpenDagen} style={linkerKnop}>
+          <CalendarDays size={16} color="rgba(255,255,255,0.5)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+          <span style={{
+            minWidth: 0, fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 800,
+            color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {herkend.name || herkend.template_name}
+          </span>
+          {onOpenDagen && (
+            <ChevronRight size={16} strokeWidth={3.4} color="#fff" style={{ flexShrink: 0 }} />
+          )}
+          {/* Duwt het label rechts naar de rand; het pijltje blijft zo tegen
+              de naam aan staan in plaats van aan de andere kant van de regel. */}
+          <span style={{ flex: 1 }} />
+        </button>
         <span style={{
           flexShrink: 0, fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.06em',
           textTransform: 'uppercase', padding: '3px 7px', borderRadius: 6,
@@ -146,10 +170,16 @@ export default function DagBewaarBalk({ db, client, maaltijden, isMobile, onBewa
   // Niets herkend: deze dag is nieuw, dus je kunt hem bewaren.
   return (
     <div style={rij}>
-      <Bookmark size={16} color="rgba(255,255,255,0.4)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.85rem' : '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-        Deze dag staat nog niet bij je dagen
-      </span>
+      <button onClick={() => onOpenDagen?.()} disabled={!onOpenDagen} style={linkerKnop}>
+        <Bookmark size={16} color="rgba(255,255,255,0.4)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+        <span style={{ minWidth: 0, fontSize: isMobile ? '0.85rem' : '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          Deze dag staat nog niet bij je dagen
+        </span>
+        {onOpenDagen && (
+          <ChevronRight size={16} strokeWidth={3.4} color="#fff" style={{ flexShrink: 0 }} />
+        )}
+        <span style={{ flex: 1 }} />
+      </button>
       <button
         onClick={() => setInvoer(true)}
         style={{

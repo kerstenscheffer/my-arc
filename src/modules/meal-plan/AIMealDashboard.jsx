@@ -38,6 +38,9 @@ const DAYS_OF_WEEK = [
 // Kop van de voedingspagina: foto die onderin dood loopt in het zwart, met de
 // titel eroverheen. Zelfde vorm als de kop van de workout-pagina, zodat de
 // twee pagina's op elkaar lijken.
+// Haarlijn in de bovenbalk van de maaltijdpagina.
+const LIJN_BOVENBALK = 'rgba(255,255,255,0.12)'
+
 const MEAL_BANNER_URL = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1200&h=700&fit=crop&q=80'
 
 const getTodayIndex = () => {
@@ -94,6 +97,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   // De boodschappenlijst hoort bij je eten, niet in een apart tabblad achter
   // "Meer". Hij opent nu vanaf de kop van deze pagina.
   const [shopOpen, setShopOpen] = useState(false)
+  // Het dagen-paneel wordt nu geopend vanaf de dagnaam in de kop, niet meer
+  // vanaf een tab tegen de linkerrand van het scherm.
+  const [dagenOpen, setDagenOpen] = useState(false)
   const [showWeekPlanner, setShowWeekPlanner] = useState(false)
   const [showWizard, setShowWizard] = useState(false)
   // Counter dat AIDaySchedule's FoodLogModal triggert wanneer de FAB
@@ -575,10 +581,64 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       animation: 'fadeIn 0.5s ease'
     }}>
 
+      {/* ════ ZWARTE BALK BOVEN DE FOTO ════
+          Twee knoppen zonder kader, elk over de volle hoogte van de regel,
+          gescheiden door een dun lijntje aan weerszijden van het midden.
+          Eerder lagen het als pillen op de foto rechtsboven, onder elkaar —
+          dat maakte de kop druk en de tweede knop viel half weg in het beeld. */}
+      <div style={{
+        flexShrink: 0,
+        display: 'flex', alignItems: 'stretch',
+        height: isMobile ? 48 : 54,
+        paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
+        boxSizing: 'content-box',
+        background: '#0a0a0a',
+        borderBottom: `1px solid ${LIJN_BOVENBALK}`,
+      }}>
+        {(() => {
+          const knop = (aan, kant) => ({
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: isMobile ? '0 0.9rem' : '0 1.2rem',
+            background: 'transparent', border: 'none',
+            // Alleen een haarlijn aan de binnenkant; geen doos om de knop.
+            [kant === 'links' ? 'borderRight' : 'borderLeft']: `1px solid ${LIJN_BOVENBALK}`,
+            color: aan ? '#fff' : 'rgba(255,255,255,0.55)',
+            fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 900,
+            letterSpacing: '-0.015em',
+            fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          })
+          return (
+            <>
+              <button onClick={() => setShopOpen(true)} title="Boodschappenlijst" style={knop(true, 'links')}>
+                <ShoppingCart size={16} strokeWidth={2.8} />
+                Boodschappen
+              </button>
+              {/* Lege ruimte tussen de twee lijntjes. */}
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={toggleMealPlanVisible}
+                disabled={savingVisibility}
+                role="switch"
+                aria-checked={mealPlanVisible}
+                title={mealPlanVisible ? 'Maaltijdplan verbergen' : 'Maaltijdplan tonen'}
+                style={{ ...knop(mealPlanVisible, 'rechts'), opacity: savingVisibility ? 0.6 : 1 }}
+              >
+                {mealPlanVisible
+                  ? <Eye size={16} strokeWidth={2.8} />
+                  : <EyeOff size={16} strokeWidth={2.8} />}
+                Plan tonen
+              </button>
+            </>
+          )
+        })()}
+      </div>
+
       {/* ════ KOP MET FOTO — zelfde vorm als de workout-pagina ════
           De dag met de pijlen ligt op de foto, in plaats van een losse titel
-          erboven en een balk eronder. */}
-      <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250, flexShrink: 0 }}>
+          erboven en een balk eronder. Lager dan voorheen, want de knoppen
+          staan nu in de balk erboven. */}
+      <div style={{ position: 'relative', width: '100%', height: isMobile ? 150 : 195, flexShrink: 0 }}>
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: `url(${MEAL_BANNER_URL})`,
@@ -590,51 +650,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           position: 'absolute', inset: 0, pointerEvents: 'none',
           background: 'linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.12) 18%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.88) 72%, #0a0a0a 100%)',
         }} />
-        {/* Twee knoppen rechtsboven op de foto, onder elkaar: de
-            boodschappenlijst en de schakelaar voor het plan. Zelfde pil, zodat
-            ze als één setje lezen in plaats van een knop naast een los
-            schuifje. */}
-        <div style={{
-          position: 'absolute', top: 0, right: 0, zIndex: 2,
-          padding: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 0.5rem) 1rem 0' : '0.7rem 1.5rem 0',
-          display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6,
-        }}>
-          {(() => {
-            const pil = (aan) => ({
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              minHeight: 32, padding: '0 0.7rem', borderRadius: 999,
-              background: aan ? '#fff' : 'rgba(0,0,0,0.45)',
-              border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.25)'}`,
-              backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-              color: aan ? '#0a0a0a' : '#fff',
-              fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900,
-              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-              textShadow: aan ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            })
-            return (
-              <>
-                <button onClick={() => setShopOpen(true)} title="Boodschappenlijst" style={pil(false)}>
-                  <ShoppingCart size={14} strokeWidth={2.8} />
-                  Boodschappen
-                </button>
-                <button
-                  onClick={toggleMealPlanVisible}
-                  disabled={savingVisibility}
-                  role="switch"
-                  aria-checked={mealPlanVisible}
-                  title={mealPlanVisible ? 'Maaltijdplan verbergen' : 'Maaltijdplan tonen'}
-                  style={{ ...pil(mealPlanVisible), opacity: savingVisibility ? 0.6 : 1 }}
-                >
-                  {mealPlanVisible
-                    ? <Eye size={14} strokeWidth={2.8} />
-                    : <EyeOff size={14} strokeWidth={2.8} />}
-                  Maaltijdplan
-                </button>
-              </>
-            )
-          })()}
-        </div>
 
         <div style={{
           position: 'absolute', left: 0, right: 0, bottom: isMobile ? 6 : 10,
@@ -721,6 +736,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
 
       {/* ════ TIMELINE (overhaul phase 5: direct AIDaySchedule, mode-aware) ════ */}
       <AIDaySchedule
+        onOpenDagen={() => setDagenOpen(true)}
         mode={mealMode || 'plan'}
         hideTotalsBar
         activePlan={dashboardData.activePlan}
@@ -797,6 +813,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         isMobile={isMobile}
         dagIndex={dayKeyToIndex(selectedDay)}
         weekOffset={weekOffset}
+        open={dagenOpen}
+        onOpenChange={setDagenOpen}
         onToegepast={() => { setDagRefreshKey(k => k + 1); loadDashboardData() }}
       />
 
