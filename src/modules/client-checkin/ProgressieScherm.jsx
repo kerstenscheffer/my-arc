@@ -47,24 +47,47 @@ const LABEL = {
   letterSpacing: '0.06em', color: colors.textMuted,
 }
 
-// Sectie: foto links, bold witte kop, content eronder. Geen rand, geen
-// divider: de 32px lucht ertussen doet het werk.
-function Sectie({ titel, foto, rechts, children }) {
+// Sectie als band: de foto staat links tégen de schermrand, even hoog als
+// de sectie, en loopt naar rechts weg in zwart. De tekst begint al over dat
+// zwarte deel, zodat foto en tekst één blok vormen in plaats van twee
+// kolommen. Geen rand, geen divider: de 32px lucht ertussen doet het werk.
+//
+// De negatieve linkermarge is precies de zijpadding van het formulier
+// (16px mobiel, 24px desktop): anders blijft er een streepje zwart tussen
+// foto en rand staan.
+const FOTO_BREEDTE = 140
+const ZIJPADDING = { mobiel: 16, desktop: 24 }
+
+function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
+  const rand = isMobile ? ZIJPADDING.mobiel : ZIJPADDING.desktop
   return (
-    <div style={{ display: 'flex', gap: space[3], alignItems: 'flex-start', marginTop: space[8] }}>
+    <div style={{
+      position: 'relative',
+      marginTop: eerste ? space[4] : space[8],
+      marginLeft: -rand,
+      paddingLeft: rand + FOTO_BREEDTE - space[6],
+      minHeight: 96,
+    }}>
       {foto && (
-        <img
-          src={foto}
-          alt=""
-          style={{
-            width: 48, height: 48, flexShrink: 0,
-            borderRadius: radius.btn, objectFit: 'cover',
-          }}
-        />
+        <>
+          <img
+            src={foto}
+            alt=""
+            style={{
+              position: 'absolute', left: 0, top: 0, bottom: 0,
+              width: FOTO_BREEDTE, height: '100%', objectFit: 'cover',
+            }}
+          />
+          {/* De fade naar de paginakleur; ligt óp de foto, onder de tekst. */}
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: FOTO_BREEDTE,
+            background: `linear-gradient(90deg, rgba(0,0,0,0) 35%, ${colors.bg} 100%)`,
+          }} />
+        </>
       )}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ position: 'relative', minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[2] }}>
-          <div style={{ ...TITEL, flex: 1 }}>{titel}</div>
+          <div style={{ ...TITEL, flex: 1, textShadow: '0 1px 2px rgba(0,0,0,0.95)' }}>{titel}</div>
           {rechts}
         </div>
         {children}
@@ -126,7 +149,7 @@ function WeekRegel({ tot, gemiddelde, lijst }) {
   )
 }
 
-export default function ProgressieScherm({ progressie }) {
+export default function ProgressieScherm({ progressie, isMobile }) {
   const [gewichtUit, setGewichtUit] = useState(false)
   const [sterkerUit, setSterkerUit] = useState(false)
   const [voedingUit, setVoedingUit] = useState(false)
@@ -152,11 +175,11 @@ export default function ProgressieScherm({ progressie }) {
   }
 
   return (
-    <div style={{ marginTop: space[4], textAlign: 'left' }}>
+    <div style={{ textAlign: 'left' }}>
 
       {/* ── Gewicht ── */}
       {gewicht && (
-        <div>
+        <Sectie titel="Gewicht" foto="/checkin/gewicht.jpg" eerste isMobile={isMobile}>
           <div style={{ display: 'flex', alignItems: 'center', gap: space[4], flexWrap: 'wrap' }}>
             <div style={{ ...HERO, color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : colors.textPrimary }}>
               {metTeken(gewicht.verschil)}
@@ -202,12 +225,12 @@ export default function ProgressieScherm({ progressie }) {
               )}
             </Uitleg>
           )}
-        </div>
+        </Sectie>
       )}
 
       {/* ── Training ── */}
       {training?.sessies > 0 && (
-        <Sectie titel="Training" foto="/intro-workout.jpg">
+        <Sectie titel="Training" foto="/checkin/training.jpg" isMobile={isMobile}>
           <div style={BODY}>
             {training.sessies} {training.sessies === 1 ? 'training' : 'trainingen'}
             {training.oefeningen > 0 && ` · ${training.oefeningen} oefeningen`}
@@ -276,7 +299,8 @@ export default function ProgressieScherm({ progressie }) {
       {voeding?.bijgehouden > 0 && (
         <Sectie
           titel="Voeding"
-          foto="/intro-meal.jpg"
+          foto="/checkin/voeding.jpg"
+          isMobile={isMobile}
           rechts={<InfoKnop open={voedingUit} onClick={() => setVoedingUit(v => !v)} label="Wat telt hier mee?" />}
         >
           <div style={BODY}>
