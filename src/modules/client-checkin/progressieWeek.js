@@ -31,6 +31,12 @@ const minDagen = (iso, n) =>
 
 // Hoeveelste week van het traject loopt nu? Eén-gebaseerd: de eerste zeven
 // dagen zijn week 1, niet week 0.
+//
+// Afgekapt op de trajectlengte, net als de balk op de home-pagina
+// (ClientHome). Loopt iemands periode door na de einddatum — en dat komt
+// vaak voor, de coach sluit hem lang niet altijd af — dan zou je anders
+// "week 21 van 12" krijgen. Twee schermen die een ander weeknummer noemen is
+// erger dan een teller die blijft staan.
 export function wekenBezig(client, nu = new Date()) {
   const start = client?.coaching_start_date
   if (!start) return null
@@ -38,9 +44,11 @@ export function wekenBezig(client, nu = new Date()) {
   if (Number.isNaN(begin.getTime())) return null
   const dagen = Math.floor((nu.getTime() - begin.getTime()) / dagInMs)
   if (dagen < 0) return null
+  const totaal = Number(client?.coaching_total_weeks) || null
+  const verstreken = Math.floor(dagen / 7) + 1
   return {
-    week: Math.floor(dagen / 7) + 1,
-    totaal: Number(client?.coaching_total_weeks) || null,
+    week: totaal ? Math.min(totaal, verstreken) : verstreken,
+    totaal,
   }
 }
 

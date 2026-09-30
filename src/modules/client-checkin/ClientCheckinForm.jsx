@@ -14,7 +14,9 @@
 import { useState, useEffect } from 'react'
 import { CheckCircle } from 'lucide-react'
 import CheckinService from './CheckinService'
-import { laadWeekCijfers, oordeel, gewichtOordeel } from './weekCijfers'
+import { laadWeekCijfers } from './weekCijfers'
+import { laadProgressie, wekenBezig } from './progressieWeek'
+import ProgressieScherm from './ProgressieScherm'
 import {
   DOEL_TYPES, typeVan, doelTekst, bereidTerugkoppelingVoor,
   BEHAALD_OPTIES, leegDoel,
@@ -31,27 +33,31 @@ const SECTIES = [
     kop: 'Even bijpraten',
     velden: [
       {
+        // Bewust zonder cijfers: die komen op het volgende scherm. Eerst hoe
+        // iemand erin zit, want dat antwoord kleurt anders zodra je er een
+        // gewicht of een aantal trainingen naast legt.
         id: 'hoe_gaat_het', type: 'tekst',
-        vraag: 'Hoe gaat het met je, {naam}?',
-        hulp: 'We gaan straks in op de cijfers, maar eerst even dit.',
-        placeholder: 'Hoe zit je erbij deze week?',
+        toonWeken: true,
+        vraag: 'Hoe zit je in de wedstrijd, {naam}?',
+        hulp: 'Even zonder cijfers — hoe gaat het nu met je?',
+        placeholder: 'Schrijf op wat als eerste in je opkomt.',
       },
     ],
   },
   {
-    kop: 'Je week in cijfers',
+    kop: 'Je progressie',
     velden: [
       {
-        // Geen vraag maar een scherm: dit hadden we afgesproken, dit is er
-        // gebeurd. Hier stonden vijf vragen die de klant uit zijn hoofd moest
-        // beantwoorden terwijl de app het precies wist.
-        id: 'week_cijfers_scherm', type: 'cijfers',
-        vraag: 'Dit is je week',
-        hulp: 'De afgelopen zeven dagen, zoals de app ze heeft geteld.',
+        // Geen vraag maar een terugblik: dit is er gebeurd. Hier stonden vijf
+        // vragen die de klant uit zijn hoofd moest beantwoorden terwijl de app
+        // het precies wist.
+        id: 'week_cijfers_scherm', type: 'progressie',
+        vraag: 'Dit was je progressie van afgelopen week',
+        hulp: null,
       },
       {
         id: 'cijfers_toelichting', type: 'tekst',
-        vraag: 'Wil je iets toelichten over deze cijfers?',
+        vraag: 'Wil je hier iets over kwijt?',
         hulp: 'Alleen als er iets bij hoort. Anders overslaan.',
         placeholder: 'Bijvoorbeeld: dinsdag ziek geweest.',
       },
@@ -201,10 +207,16 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // De gemeten week. Null zolang hij laadt; het scherm toont dan een regel dat
   // de cijfers worden opgehaald in plaats van lege streepjes.
   const [cijfers, setCijfers] = useState(null)
+  // De terugblik van slide 2. Apart van `cijfers`: die telt wat er gebeurd is
+  // (vier trainingen), dit laat zien waar het heen beweegt (sterker geworden).
+  const [progressie, setProgressie] = useState(null)
   // De doelen die de klant vorige keer stelde, met de terugkoppeling erbij.
   // null = nog aan het laden, [] = die zijn er niet (eerste keer, of de vorige
   // check-in was nog het oude formulier).
   const [vorigeDoelen, setVorigeDoelen] = useState(null)
+
+  // Hoeveelste week van het traject. Puur uit de klantrij, dus geen query.
+  const weken = wekenBezig(client)
 
   const service = new CheckinService(db)
 
@@ -227,6 +239,13 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       try { c = await laadWeekCijfers(db, client) } catch (e) { console.error('Weekcijfers laden mislukt:', e) }
       if (weg) return
       setCijfers(c)
+
+      // Los van de weekcijfers: mislukt de terugblik, dan blijft slide 2 leeg
+      // maar loopt de rest van de check-in gewoon door.
+      try {
+        const pr = await laadProgressie(db, client)
+        if (!weg) setProgressie(pr)
+      } catch (e) { console.error('Progressie laden mislukt:', e) }
 
       const vorige = await service.getLaatsteMetDoelen(client.id)
       if (weg) return
@@ -380,6 +399,18 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // tegen de bovenrand met een half scherm leegte eronder. Het blok blijft
       // smal (560px) zodat een vraag van twee regels leesbaar blijft.
       <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
+        {/* Waar in het traject sta je? Alleen op het eerste scherm, als
+            aanloop naar de vraag. Zonder startdatum blijft de regel weg — dan
+            weten we het niet en is "week 1" een gok. */}
+        {v.toonWeken && weken && (
+          <div style={{
+            fontSize: 13, fontWeight: 800, color: GRIJS,
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+            marginBottom: '1.1vh',
+          }}>
+            {weken.totaal ? `Week ${weken.week} van ${weken.totaal}` : `Week ${weken.week}`}
+          </div>
+        )}
         <div style={{ fontSize: isMobile ? 19 : 23, fontWeight: 800, color: '#fff' }}>
           {vraagTekst}
         </div>
@@ -556,73 +587,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
           )
         })()}
 
-        {v.type === 'cijfers' && (() => {
-          if (!cijfers) {
-            return (
-              <div style={{ marginTop: '2.2vh', color: GRIJS, fontSize: 14, fontWeight: 700 }}>
-                Je cijfers worden opgehaald…
-              </div>
-            )
-          }
-          const KLEUR = { goed: '#10b981', bijna: '#f59e0b', niet: '#ef4444' }
-          const g = cijfers.gewicht
-          const tekenen = (n) => `${n > 0 ? '+' : ''}${n}`
-          const regels = [
-            {
-              label: 'Trainingen',
-              waarde: cijfers.trainingen.gedaan != null ? String(cijfers.trainingen.gedaan) : '—',
-              doel: cijfers.trainingen.gepland != null ? `${cijfers.trainingen.gepland} gepland` : null,
-              staat: oordeel(cijfers.trainingen.gedaan, cijfers.trainingen.gepland),
-            },
-            {
-              label: 'Gewogen',
-              waarde: cijfers.wegingen.gedaan != null ? String(cijfers.wegingen.gedaan) : '—',
-              doel: 'van 7 dagen',
-              staat: oordeel(cijfers.wegingen.gedaan, 7),
-            },
-            {
-              label: 'Voeding op plan',
-              waarde: cijfers.voeding.dagen != null ? String(cijfers.voeding.dagen) : '—',
-              doel: 'van 7 dagen',
-              staat: oordeel(cijfers.voeding.dagen, 7),
-            },
-            {
-              label: 'Gewicht',
-              waarde: g.verschil != null ? `${tekenen(g.verschil)} kg` : '—',
-              doel: g.tempoDoel != null ? `afgesproken ${tekenen(g.tempoDoel)} kg/wk` : null,
-              staat: gewichtOordeel(g.verschil, g.tempoDoel, g.richting),
-            },
-          ]
-          return (
-            <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
-              {regels.map(r => (
-                <div key={r.label} style={{
-                  display: 'flex', alignItems: 'baseline', gap: 10,
-                  padding: '12px 14px', marginBottom: 8,
-                  background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
-                }}>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff' }}>
-                    {r.label}
-                  </span>
-                  {r.doel && (
-                    <span style={{ fontSize: 12, fontWeight: 700, color: GRIJS }}>{r.doel}</span>
-                  )}
-                  <span style={{
-                    fontSize: 19, fontWeight: 900,
-                    color: r.staat ? KLEUR[r.staat] : '#fff',
-                    fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right',
-                  }}>
-                    {r.waarde}
-                  </span>
-                </div>
-              ))}
-              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 10, lineHeight: 1.5 }}>
-                Het gewicht is het verschil tussen je 7-daags gemiddelde van nu en dat van een
-                week geleden — niet twee losse wegingen, want die schommelen.
-              </div>
-            </div>
-          )
-        })()}
+        {v.type === 'progressie' && <ProgressieScherm progressie={progressie} />}
 
         {(v.type === 'aantal' || v.type === 'aantal-van') && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: '2.2vh', flexWrap: 'wrap' }}>
