@@ -151,28 +151,29 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
           height: '28%', pointerEvents: 'none',
           background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.75) 55%, #0a0a0a 100%)',
         }} />
+        {/* Stappen rechtsboven op de foto. Stond eerst naast de begroeting,
+            maar dat vroeg daar zoveel marge dat "Goedemiddag, Kersten" op een
+            telefoon over twee regels brak. */}
+        <div style={{
+          position: 'absolute', zIndex: 2,
+          top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 0.6rem)' : '0.9rem',
+          right: isMobile ? '0.9rem' : '1.5rem',
+        }}>
+          <StappenPil client={client} db={db} isMobile={isMobile} />
+        </div>
       </div>
 
       <div style={{
         padding: isMobile ? '0.1rem 1rem 0' : '0.25rem 1.5rem 0',
         textAlign: 'center',
       }}>
-        {/* De begroeting blijft gecentreerd; de stappen hangen ernaast in de
-            rechtermarge. Vandaar absoluut en niet in de tekstregel: anders
-            duwt een lange naam het getal scheef. */}
-        <div style={{ position: 'relative' }}>
-          <div style={{
-            fontSize: isMobile ? '1.35rem' : '1.6rem',
-            fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1,
-            padding: '0 4.5rem',
-          }}>
-            {getGreeting()}, {firstName}
-          </div>
-          <div style={{
-            position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
-          }}>
-            <StappenPil client={client} db={db} isMobile={isMobile} />
-          </div>
+        {/* Volle breedte nu de stappen op de foto staan, en op de telefoon een
+            maat kleiner: "Goedemiddag" plus een naam past dan op één regel. */}
+        <div style={{
+          fontSize: isMobile ? '1.15rem' : '1.6rem',
+          fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.15,
+        }}>
+          {getGreeting()}, {firstName}
         </div>
         <div style={{
           marginTop: 5,

@@ -50,7 +50,32 @@ const thumbVan = (v) => v?.thumbnail_url || getThumbnailFromUrl(v?.video_url) ||
 // Even wachten voordat de kaart komt: meteen bij het openen van de app schuift
 // er al genoeg in beeld, en dan is dit het zoveelste ding dat wegklikt moet.
 const WACHT_VOOR_KAART = 2600
-const SCHUD_INTERVAL = 26000
+
+// De herinnering wordt dringender naarmate het account ouder is. Iemand die
+// gisteren begon krijgt een rustig wit tabje; wie na twee weken de uitleg nog
+// niet gekeken heeft, krijgt rood dat vaker beweegt. Geteld vanaf het aanmaken
+// van het account, want dat is het moment waarop deze video's klaarstonden.
+const GRENS_ORANJE_DAGEN = 7
+const GRENS_ROOD_DAGEN = 14
+
+const TOON = {
+  rustig:   { kleur: '#ffffff', rand: 'rgba(255,255,255,0.22)', vlak: '#0a0a0a',                 schud: 26000 },
+  laat:     { kleur: '#f59e0b', rand: 'rgba(245,158,11,0.55)',  vlak: 'rgba(24,16,4,0.96)',      schud: 16000 },
+  dringend: { kleur: '#ef4444', rand: 'rgba(239,68,68,0.6)',    vlak: 'rgba(26,8,8,0.96)',       schud: 10000 },
+}
+
+const dagenSinds = (datum) => {
+  if (!datum) return 0
+  const t = new Date(datum).getTime()
+  if (!Number.isFinite(t)) return 0
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
+}
+
+const toonVoor = (dagen) => {
+  if (dagen >= GRENS_ROOD_DAGEN) return 'dringend'
+  if (dagen >= GRENS_ORANJE_DAGEN) return 'laat'
+  return 'rustig'
+}
 
 export default function VideoReminderPopup({ client, isMobile: propMobile, version = 0 }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
@@ -64,6 +89,10 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
   // Is de kaart deze sessie al geweest? Dan niet opnieuw bij elke herlading van
   // de lijst — anders springt hij terug in beeld nadat je hem net wegklikte.
   const kaartGeweest = useRef(false)
+
+  const dagenOud = dagenSinds(client?.created_at)
+  const toonNaam = toonVoor(dagenOud)
+  const toon = TOON[toonNaam]
 
   useEffect(() => {
     let weg = false
@@ -92,9 +121,9 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
     const i = setInterval(() => {
       setSchudt(true)
       setTimeout(() => setSchudt(false), 900)
-    }, SCHUD_INTERVAL)
+    }, toon.schud)
     return () => clearInterval(i)
-  }, [fase])
+  }, [fase, toon.schud])
 
   // Alleen hiermee gaat een video weg, en alleen na de bevestiging hieronder.
   const echtGezien = async (item) => {
@@ -314,8 +343,10 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
   }
 
   // ── PILL ─────────────────────────────────────────────────────────────────
-  // Tegen de rechterrand en verticaal in het midden: de bottom-bar en de
-  // check-in-pill zitten onderaan, daar is het al vol.
+  // Zelfde vorm als de check-in-pill: afgeronde balk met de coach-foto rechts,
+  // een fade eroverheen en de tekst links daar bovenop. Staat iets hoger dan
+  // die van de check-in (86), zodat ze netjes boven elkaar staan als ze allebei
+  // in beeld zijn in plaats van over elkaar heen.
   if (fase === 'pill') {
     return createPortal(
       <>
@@ -324,32 +355,64 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
           aria-label={`${aantal} video's nog te bekijken`}
           style={{
             position: 'fixed',
-            right: 0,
-            top: '46%',
-            zIndex: 95,
-            display: 'flex', alignItems: 'center', gap: 7,
-            padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 0.9rem',
+            bottom: 142,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 90,
+            width: isMobile ? 260 : 290,
+            height: isMobile ? 46 : 50,
+            padding: 0,
+            overflow: 'hidden',
             background: '#0a0a0a',
-            border: '1px solid rgba(255,255,255,0.22)',
-            borderRight: 'none',
-            borderRadius: '12px 0 0 12px',
-            color: '#fff', fontWeight: 900,
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            letterSpacing: '-0.02em',
-            cursor: 'pointer', touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            boxShadow: '-6px 0 20px rgba(0,0,0,0.55)',
-            animation: schudt ? 'videoNudge 0.9s cubic-bezier(.36,.07,.19,.97) both' : 'none',
+            border: `1px solid ${toon.rand}`,
+            borderRadius: 999,
+            cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 -8px 24px rgba(0,0,0,0.5), 0 -2px 8px rgba(0,0,0,0.4)',
+            animation: schudt
+              ? 'videoNudge 0.85s cubic-bezier(.36,.07,.19,.97) both'
+              : (toonNaam === 'dringend' ? 'videoKlop 2.4s ease-in-out infinite' : 'none'),
+            transition: 'transform 0.18s ease',
           }}
         >
-          <PlayCircle size={isMobile ? 16 : 18} strokeWidth={2.6} style={{ flexShrink: 0 }} />
-          {aantal}
+          {/* Foto rechts, fade naar links, tekst eroverheen. */}
+          <div style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: '38%',
+            backgroundImage: 'url(/coach-compliment.jpg)',
+            backgroundSize: 'cover', backgroundPosition: 'center 30%',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 44%, rgba(10,10,10,0.85) 60%, rgba(10,10,10,0.35) 82%, rgba(10,10,10,0) 100%)',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: isMobile ? '0 0.9rem' : '0 1.1rem',
+            color: toon.kleur,
+            fontWeight: 900,
+            fontSize: isMobile ? '0.82rem' : '0.9rem',
+            letterSpacing: '-0.02em',
+            whiteSpace: 'nowrap',
+            textShadow: '0 2px 10px rgba(0,0,0,0.85)',
+          }}>
+            <PlayCircle size={isMobile ? 15 : 17} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+            {aantal} Te bekijken video{meervoud ? "'s" : ''}!
+            <ArrowRight size={isMobile ? 14 : 16} strokeWidth={2.8} style={{ flexShrink: 0 }} />
+          </div>
         </button>
         <style>{`
+          /* De pill staat gecentreerd via translateX(-50%); die offset moet in
+             de keyframes mee, anders springt hij bij elke beweging opzij. */
           @keyframes videoNudge {
-            0%, 100% { transform: translateX(0); }
-            15%, 45%, 75% { transform: translateX(-6px); }
-            30%, 60%, 90% { transform: translateX(0); }
+            0%, 100% { transform: translateX(-50%) rotate(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(calc(-50% - 4px)) rotate(-1.2deg); }
+            20%, 40%, 60%, 80%      { transform: translateX(calc(-50% + 4px)) rotate(1.2deg); }
+          }
+          /* Rustige hartslag tussen de schudmomenten door, alleen bij rood. */
+          @keyframes videoKlop {
+            0%, 100% { opacity: 1; transform: translateX(-50%); }
+            50%      { opacity: 0.72; transform: translateX(-50%); }
           }
         `}</style>
         {speler_}
@@ -389,7 +452,7 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
           borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
           background: '#0a0a0a',
-          border: '1px solid rgba(255,255,255,0.12)',
+          border: `1px solid ${toonNaam === 'rustig' ? 'rgba(255,255,255,0.12)' : toon.rand}`,
           borderRight: 'none',
           boxShadow: '0 16px 44px rgba(0,0,0,0.75), 0 0 0 100px rgba(0,0,0,0.28)',
           cursor: 'pointer',
@@ -417,7 +480,7 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             fontSize: isMobile ? '0.98rem' : '1.1rem',
-            fontWeight: 900, color: '#fff',
+            fontWeight: 900, color: toon.kleur,
             letterSpacing: '-0.025em', lineHeight: 1.1,
             textShadow: '0 2px 10px rgba(0,0,0,0.8)',
           }}>
@@ -432,7 +495,11 @@ export default function VideoReminderPopup({ client, isMobile: propMobile, versi
             display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
             textShadow: '0 2px 8px rgba(0,0,0,0.8)',
           }}>
-            Enorm belangrijk dat je deze nog bekijkt.
+            {toonNaam === 'dringend'
+              ? `Al ${dagenOud} dagen niet bekeken. Dit is de basis van je plan.`
+              : toonNaam === 'laat'
+                ? 'Je bent nu een week bezig — deze horen er echt bij.'
+                : 'Enorm belangrijk dat je deze nog bekijkt.'}
             <ArrowRight size={11} strokeWidth={3} style={{ marginLeft: 4, verticalAlign: -1 }} />
           </div>
         </div>
