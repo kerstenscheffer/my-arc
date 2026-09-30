@@ -651,13 +651,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         </div>
       </div>
 
-      {/* Belangrijke video van de coach: tussen de dag en de macro's. Dit
-          scherm staat vast (position: fixed, eigen scrollgebied), dus een blok
-          dat ClientDashboard erboven zet valt erachter — hij hoort hier. */}
-      <div style={{ flexShrink: 0 }}>
-        <BelangrijkeVideo client={client} pagina="meal" isMobile={isMobile} compact />
-      </div>
-
       {/* ════ NEW MACRO HERO — selected-day aware ════
           flexShrink: 0 — in de flex-kolom van het vaste scherm zou dit blok
           anders indrukken zodra de lijst eronder om ruimte vraagt, en dan
@@ -682,6 +675,14 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           />
         )
       })()}
+      </div>
+
+      {/* Belangrijke video van de coach, onder de macro's. Dit scherm staat
+          vast (position: fixed, eigen scrollgebied), dus een blok dat
+          ClientDashboard erboven zet valt erachter — hij hoort hier. Zelfde
+          formaat als op de workout-pagina; één stijl op alle pagina's. */}
+      <div style={{ flexShrink: 0 }}>
+        <BelangrijkeVideo client={client} pagina="meal" isMobile={isMobile} />
       </div>
 
       {/* Alles hieronder scrolt; de kop erboven blijft staan. */}

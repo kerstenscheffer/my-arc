@@ -353,10 +353,10 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                 want een video die je moet zien hoort niet onder een scherm
                 grafieken te liggen. */}
             {/* Meal, Workout en Home plaatsen dit blok zelf, elk op de plek
-                waar het hoort: op Meal tussen de dag en de macro's (dat scherm
-                staat vast en zou alles hier eronder leggen), op Workout onder
-                de training van vandaag, op Home onder de dagkiezer. De overige
-                pagina's krijgen hem hier bovenaan. */}
+                waar het hoort: op Meal onder de macro's (dat scherm staat vast
+                en zou alles hier eronder leggen), op Workout onder de training
+                van vandaag, op Home onder de dagkiezer. De overige pagina's
+                krijgen hem hier bovenaan. */}
             {!focusMode && !['meal', 'workout', 'home'].includes(currentView) && (
               <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
             )}

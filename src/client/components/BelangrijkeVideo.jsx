@@ -296,6 +296,9 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
         const item = huidig
         const v = item.video
         const thumb = v.thumbnail_url || getThumbnailFromUrl(v.video_url)
+        // Ruimte vrijhouden rechtsboven voor de teller, anders schuift een
+        // lange titel eronderdoor.
+        const titelRechts = totaal > 1 ? (isMobile ? 58 : 62) : (isMobile ? 12 : 14)
         return (
           <div
             key={item.video_id}
@@ -321,21 +324,35 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
                 backgroundColor: '#1a1a1a',
               }}
             >
-              {/* Zwarte fade zodat de titel op elke thumbnail leesbaar is. */}
+              {/* Fade vanaf de bovenkant, want daar staat de titel nu. */}
               <div style={{
                 position: 'absolute', inset: 0,
-                background: 'linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.6) 45%, rgba(10,10,10,0.15) 100%)',
+                background: 'linear-gradient(to bottom, #0a0a0a 0%, rgba(10,10,10,0.55) 40%, rgba(10,10,10,0.1) 100%)',
               }} />
 
+              {/* Titel bovenaan in de video. */}
               <div style={{
-                position: 'absolute', top: isMobile ? 10 : 12, left: isMobile ? 12 : 14,
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0.2rem 0.5rem', borderRadius: 999,
-                background: '#fff', color: '#0a0a0a',
-                fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 900,
-                textTransform: 'uppercase', letterSpacing: '0.08em',
+                position: 'absolute', top: isMobile ? 10 : 12,
+                left: isMobile ? 12 : 14, right: titelRechts,
               }}>
-                Bekijk dit
+                <div style={{
+                  fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: '#fff',
+                  letterSpacing: '-0.02em', lineHeight: 1.2,
+                  textShadow: '0 2px 10px rgba(0,0,0,0.9)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {v.title}
+                </div>
+                {v.description && (
+                  <div style={{
+                    fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.6)', marginTop: 2,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    textShadow: '0 1px 8px rgba(0,0,0,0.9)',
+                  }}>
+                    {v.description}
+                  </div>
+                )}
               </div>
 
               {/* Teller rechtsboven, zodat meteen duidelijk is dat er meer is. */}
@@ -392,53 +409,7 @@ export default function BelangrijkeVideo({ client, pagina, isMobile = false, com
                 </button>
                 )
               })}
-
-              <div style={{
-                position: 'absolute', left: isMobile ? 12 : 14, right: isMobile ? 12 : 14,
-                bottom: isMobile ? 10 : 12,
-              }}>
-                <div style={{
-                  fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: '#fff',
-                  letterSpacing: '-0.02em', lineHeight: 1.2,
-                  textShadow: '0 2px 10px rgba(0,0,0,0.9)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {v.title}
-                </div>
-                {v.description && (
-                  <div style={{
-                    fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
-                    color: 'rgba(255,255,255,0.6)', marginTop: 2,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    textShadow: '0 1px 8px rgba(0,0,0,0.9)',
-                  }}>
-                    {v.description}
-                  </div>
-                )}
-              </div>
             </div>
-
-            {/* Zelf afvinken. Klein en onderaan: afspelen is de bedoeling, dit
-                is voor wie hem elders al gezien heeft. */}
-            <button
-              onClick={() => setBevestig(item)}
-              disabled={bezig === item.video_id}
-              style={{
-                width: '100%', minHeight: 40,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: 'transparent', border: 'none',
-                borderTop: '1px solid rgba(255,255,255,0.08)',
-                color: 'rgba(255,255,255,0.5)',
-                fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 800,
-                fontFamily: 'inherit', cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {bezig === item.video_id
-                ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                : <Check size={13} strokeWidth={3} />}
-              Ik heb 'm gezien
-            </button>
           </div>
         )
       })()}
