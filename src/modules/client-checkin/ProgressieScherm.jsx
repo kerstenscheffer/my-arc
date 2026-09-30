@@ -4,37 +4,105 @@
 //
 // Geen vraag maar een terugblik. De klant hoeft hier niets in te vullen; hij
 // leest wat er gebeurd is voordat hij erover gaat schrijven. Dat scheelt
-// giswerk — mensen schatten hun eigen week systematisch te rooskleurig in.
+// giswerk, want mensen schatten hun eigen week systematisch te rooskleurig in.
 //
 // Regels die de opbouw bepalen:
 //   · Een regel zonder data verdwijnt. Liever drie regels die kloppen dan zes
 //     met streepjes erin.
-//   · Eén getal per blok groot, de rest eromheen klein. Wie scrollt moet in
-//     één oogopslag zien of het de goede kant op ging.
-//   · Dik wit. Kleur alleen waar hij betekenis draagt: groen voor een
-//     vooruitgang die de klant verdiend heeft.
+//   · Elk getal is na te rekenen. Achter het gewicht en achter de voeding zit
+//     een uitlegvenster met de onderliggende metingen; een getal dat je niet
+//     kunt controleren ga je op den duur wantrouwen.
+//   · Dik wit. Kleur alleen waar hij betekenis draagt.
+
+import { useState } from 'react'
+import { Info, ChevronDown } from 'lucide-react'
+import GewichtBandGrafiek from '../coach-command-center/components/insight/GewichtBandGrafiek'
 
 const GROEN = '#10b981'
 const GRIJS = 'rgba(255,255,255,0.55)'
 const RAND = '#2a2a2a'
 
-const getal = (n, cijfers = 1) =>
+const nl = (n, cijfers = 0) =>
   new Intl.NumberFormat('nl-NL', { minimumFractionDigits: cijfers, maximumFractionDigits: cijfers }).format(n)
 
-const metTeken = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${getal(Math.abs(n))}`
+const metTeken = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${nl(Math.abs(n), 1)}`
 
-function Blok({ titel, children }) {
+const kortDatum = (iso) => {
+  try {
+    return new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  } catch { return iso }
+}
+
+function Blok({ titel, rechts, children }) {
   return (
     <div style={{ paddingTop: 14, marginTop: 14, borderTop: `1px solid ${RAND}` }}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: GRIJS, marginBottom: 8 }}>
-        {titel}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: GRIJS }}>{titel}</div>
+        {rechts}
       </div>
       {children}
     </div>
   )
 }
 
-export default function ProgressieScherm({ progressie }) {
+// Een rond knopje van 32px. Groot genoeg om op een telefoon te raken zonder
+// dat het naast het getal gaat staan schreeuwen.
+function InfoKnop({ open, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-expanded={open}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 32, height: 32, padding: 0, flexShrink: 0,
+        borderRadius: 999, cursor: 'pointer',
+        background: open ? 'rgba(255,255,255,0.12)' : 'transparent',
+        border: `1px solid ${open ? 'rgba(255,255,255,0.3)' : RAND}`,
+        color: open ? '#fff' : GRIJS,
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <Info size={15} strokeWidth={2.4} />
+    </button>
+  )
+}
+
+// Uitklapbaar tekstblok onder een getal.
+function Uitleg({ children }) {
+  return (
+    <div style={{
+      marginTop: 10, padding: '12px 14px',
+      background: 'rgba(255,255,255,0.04)', borderRadius: 12,
+      fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function Wegingen({ titel, lijst }) {
+  if (!lijst?.length) return null
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: GRIJS, marginBottom: 4 }}>{titel}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
+        {lijst.map(w => (
+          <span key={w.datum} style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+            {kortDatum(w.datum)} <span style={{ color: GRIJS }}>{nl(w.kg, 1)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function ProgressieScherm({ progressie, client, isMobile }) {
+  const [gewichtUit, setGewichtUit] = useState(false)
+  const [sterkerUit, setSterkerUit] = useState(false)
+  const [voedingUit, setVoedingUit] = useState(false)
+
   if (!progressie) {
     return (
       <div style={{ marginTop: '2.2vh', color: GRIJS, fontSize: 14, fontWeight: 700 }}>
@@ -43,8 +111,8 @@ export default function ProgressieScherm({ progressie }) {
     )
   }
 
-  const { gewicht, training, voeding, wegingen } = progressie
-  const heeftIets = gewicht || training?.sessies > 0 || voeding?.dagen > 0 || wegingen?.dezeWeek > 0
+  const { gewicht, training, voeding, wegingen, grafiek } = progressie
+  const heeftIets = gewicht || training?.sessies > 0 || voeding?.bijgehouden > 0 || wegingen?.dezeWeek > 0
 
   if (!heeftIets) {
     return (
@@ -63,24 +131,67 @@ export default function ProgressieScherm({ progressie }) {
   return (
     <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
 
-      {/* Gewicht: het getal waar de meeste mensen als eerste naar kijken. */}
+      {/* ── Gewicht ── */}
       {gewicht && (
         <div>
-          <div style={{
-            fontSize: 38, fontWeight: 900, color: '#fff',
-            lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
-          }}>
-            {metTeken(gewicht.verschil)}<span style={{ fontSize: '0.5em', marginLeft: 6, color: GRIJS }}>kg</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              fontSize: 38, fontWeight: 900, color: '#fff',
+              lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+            }}>
+              {metTeken(gewicht.verschil)}<span style={{ fontSize: '0.5em', marginLeft: 6, color: GRIJS }}>kg</span>
+            </div>
+            <InfoKnop
+              open={gewichtUit}
+              onClick={() => setGewichtUit(v => !v)}
+              label="Hoe is dit berekend?"
+            />
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 700, color: GRIJS, marginTop: 7, lineHeight: 1.5 }}>
             {gewicht.soort === 'week'
-              ? `sinds vorige zaterdag · ${getal(gewicht.eerder)} → ${getal(gewicht.nu)} kg`
-              : `sinds je start · ${getal(gewicht.eerder)} → ${getal(gewicht.nu)} kg`}
+              ? `sinds vorige zaterdag · ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`
+              : `sinds je start · ${nl(gewicht.eerder, 1)} naar ${nl(gewicht.nu, 1)} kg`}
+            {gewicht.doelPerWeek != null && ` · afgesproken ${metTeken(gewicht.doelPerWeek)} per week`}
           </div>
+
+          {gewichtUit && (
+            <Uitleg>
+              {gewicht.soort === 'week' ? (
+                <>
+                  Niet twee losse wegingen tegen elkaar, want die schommelen een kilo of twee
+                  per ochtend. We nemen het gemiddelde van de week die eindigt op zaterdag,
+                  en leggen dat naast het gemiddelde van de week ervoor.
+                  <Wegingen titel={`Week tot ${kortDatum(gewicht.zaterdag)} · gemiddeld ${nl(gewicht.nu, 1)} kg`} lijst={gewicht.wegingenNu} />
+                  <Wegingen titel={`Week tot ${kortDatum(gewicht.vorigeZaterdag)} · gemiddeld ${nl(gewicht.eerder, 1)} kg`} lijst={gewicht.wegingenEerder} />
+                </>
+              ) : (
+                <>
+                  Er zijn nog geen twee volle weken om te vergelijken, dus dit is je
+                  gemiddelde van nu ({nl(gewicht.nu, 1)} kg) tegenover je startgewicht
+                  ({nl(gewicht.eerder, 1)} kg).
+                </>
+              )}
+            </Uitleg>
+          )}
+
+          {/* De grafiek met de band eromheen: dezelfde als in coach insight, zodat
+              jij en je coach naar hetzelfde plaatje kijken. */}
+          {grafiek?.history?.length > 1 && (
+            <div style={{ marginTop: 16 }}>
+              <GewichtBandGrafiek
+                client={client}
+                history={grafiek.history}
+                fase={grafiek.fase}
+                fases={grafiek.fases}
+                isMobile={isMobile}
+                klantModus
+              />
+            </div>
+          )}
         </div>
       )}
 
-      {/* Training */}
+      {/* ── Training ── */}
       {training?.sessies > 0 && (
         <Blok titel="Training">
           <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', lineHeight: 1.35 }}>
@@ -91,27 +202,55 @@ export default function ProgressieScherm({ progressie }) {
 
           {training.sterker?.length > 0 && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: GROEN, marginBottom: 6 }}>
-                Sterker geworden op
-              </div>
-              {training.sterker.map(s => (
-                <div key={s.oefening} style={{
-                  display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4,
-                }}>
-                  <span style={{ flex: 1, fontSize: 14.5, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>
-                    {s.oefening}
-                  </span>
-                  <span style={{
-                    fontSize: 14.5, fontWeight: 900, color: GROEN,
-                    fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-                  }}>
-                    +{s.pct}%
-                  </span>
-                </div>
-              ))}
-              {training.meerOefeningen > 0 && (
-                <div style={{ fontSize: 13, fontWeight: 700, color: GRIJS, marginTop: 5 }}>
-                  en op nog {training.meerOefeningen} {training.meerOefeningen === 1 ? 'oefening' : 'oefeningen'}
+              <button
+                type="button"
+                onClick={() => setSterkerUit(v => !v)}
+                aria-expanded={sterkerUit}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
+                  background: 'rgba(16,185,129,0.1)',
+                  border: '1px solid rgba(16,185,129,0.35)',
+                  color: GROEN, fontSize: 14, fontWeight: 900, fontFamily: 'inherit',
+                  textAlign: 'left',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <span style={{ flex: 1 }}>
+                  Sterker geworden op {training.sterker.length + training.meerOefeningen}
+                  {training.sterker.length + training.meerOefeningen === 1 ? ' oefening' : ' oefeningen'}
+                </span>
+                <ChevronDown
+                  size={17} strokeWidth={2.6}
+                  style={{ transform: sterkerUit ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                />
+              </button>
+
+              {sterkerUit && (
+                <div style={{ marginTop: 8 }}>
+                  {training.sterker.map(s => (
+                    <div key={s.oefening} style={{
+                      display: 'flex', alignItems: 'baseline', gap: 10,
+                      padding: '8px 12px', borderBottom: `1px solid ${RAND}`,
+                    }}>
+                      <span style={{ flex: 1, fontSize: 14.5, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>
+                        {s.oefening}
+                        <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: GRIJS, marginTop: 2 }}>
+                          {nl(s.vorig, 1)} naar {nl(s.nu, 1)} kg
+                        </span>
+                      </span>
+                      <span style={{
+                        fontSize: 15, fontWeight: 900, color: GROEN,
+                        fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+                      }}>
+                        +{s.pct}%
+                      </span>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: GRIJS, marginTop: 8, lineHeight: 1.55 }}>
+                    Vergeleken op je zwaarste set, omgerekend naar wat je voor 8 herhalingen
+                    zou kunnen. Zo telt 100 kg voor 5 net zo goed mee als 80 kg voor 12.
+                  </div>
                 </div>
               )}
             </div>
@@ -119,29 +258,44 @@ export default function ProgressieScherm({ progressie }) {
         </Blok>
       )}
 
-      {/* Voeding */}
-      {voeding?.dagen != null && (
-        <Blok titel="Voeding">
+      {/* ── Voeding ── */}
+      {voeding && voeding.bijgehouden > 0 && (
+        <Blok
+          titel="Voeding"
+          rechts={<InfoKnop open={voedingUit} onClick={() => setVoedingUit(v => !v)} label="Wat telt hier mee?" />}
+        >
           <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', lineHeight: 1.35 }}>
-            {voeding.dagen} van {voeding.van} dagen op plan
+            Bijgehouden op {voeding.bijgehouden} van {voeding.van} dagen
           </div>
+          {voeding.gemKcal != null && (
+            <div style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 6, lineHeight: 1.5 }}>
+              Op je {voeding.compleet} complete {voeding.compleet === 1 ? 'dag' : 'dagen'} gemiddeld{' '}
+              <strong style={{ color: '#fff' }}>{nl(voeding.gemKcal)} kcal</strong>
+              {voeding.doelKcal ? ` van je ${nl(voeding.doelKcal)}` : ''}
+              {voeding.gemEiwit != null && (
+                <> en <strong style={{ color: '#fff' }}>{nl(voeding.gemEiwit)}g eiwit</strong>
+                {voeding.doelEiwit ? ` van je ${nl(voeding.doelEiwit)}` : ''}</>
+              )}
+            </div>
+          )}
+          {voedingUit && (
+            <Uitleg>
+              Dit telt wat je in de app hebt afgevinkt, niet wat je hebt gegeten. Een dag
+              heet compleet zodra je minstens 70% van je geplande maaltijden hebt
+              aangetikt. Eet je goed maar vink je niets af, dan blijft het hier leeg,
+              en dat zegt dus niets over je week.
+            </Uitleg>
+          )}
         </Blok>
       )}
 
-      {/* Wegen */}
+      {/* ── Wegen ── */}
       {wegingen?.dezeWeek != null && (
         <Blok titel="Wegen">
           <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', lineHeight: 1.35 }}>
             {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
           </div>
         </Blok>
-      )}
-
-      {gewicht && (
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: GRIJS, marginTop: 14, lineHeight: 1.55 }}>
-          Het gewicht is het gemiddelde van je wegingen rond zaterdag, niet één losse
-          meting, want die schommelt te veel om er iets uit af te lezen.
-        </div>
       )}
     </div>
   )

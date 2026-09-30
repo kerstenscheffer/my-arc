@@ -29,6 +29,9 @@ const dagInMs = 86400000
 const minDagen = (iso, n) =>
   lokaleDatum(new Date(new Date(`${iso}T00:00:00`).getTime() - n * dagInMs))
 
+const plusDag = (iso) =>
+  lokaleDatum(new Date(new Date(`${iso}T00:00:00`).getTime() + dagInMs))
+
 // Hoeveelste week van het traject loopt nu? Eén-gebaseerd: de eerste zeven
 // dagen zijn week 1, niet week 0.
 //
@@ -124,7 +127,7 @@ export async function laadProgressie(db, client) {
   // de hele Promise.all en krijgt de klant een leeg scherm.
   const vang = (q) => q.then(r => r, () => ({ data: null }))
 
-  const [stand, gewichtRes, sessiesRes, faseRes] = await Promise.all([
+  const [stand, gewichtRes, sessiesRes, faseRes, maaltijdRes, fasesRes, maaltijdenRes] = await Promise.all([
     vang(sb.rpc('get_challenge_stand', {
       p_client_id: client.id,
       p_start: weekStart,
@@ -140,16 +143,36 @@ export async function laadProgressie(db, client) {
       .gte('workout_date', vorigeWeekStart)
       .lte('workout_date', zaterdag)),
     vang(sb.from('client_phases')
-      .select('started_on, start_gewicht')
+      .select('started_on, start_gewicht, week_doel_kg, doel')
       .eq('client_id', client.id)
       .order('started_on', { ascending: false })
       .limit(1)),
+    // De macrodoelen staan op het actieve maaltijdplan, niet op de klantrij.
+    vang(sb.from('client_meal_plans')
+      .select('daily_calories, daily_protein')
+      .eq('client_id', client.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)),
+    // Alle fases: de band-grafiek tekent per fase een eigen doellijn.
+    vang(sb.from('client_phases')
+      .select('*')
+      .eq('client_id', client.id)
+      .order('started_on', { ascending: true })),
+    // Wat er echt gegeten is. De teller uit get_challenge_stand zegt alleen
+    // hoeveel dagen er afgevinkt zijn; deze rijen zeggen hoeveel er in zat.
+    vang(sb.from('consumed_meals')
+      .select('consumed_at, calories, protein')
+      .eq('client_id', client.id)
+      .gte('consumed_at', `${weekStart}T00:00:00`)
+      .lt('consumed_at', `${plusDag(zaterdag)}T00:00:00`)),
   ])
 
   const s = stand.data || {}
   const wegingen = gewichtRes.data || []
   const sessies = sessiesRes.data || []
   const fase = (faseRes.data || [])[0] || null
+  const plan = (maaltijdRes.data || [])[0] || null
 
   // ── Oefeningen van beide weken, voor de kracht-vergelijking ──
   const sessieIds = sessies.map(x => x.id)
@@ -167,14 +190,66 @@ export async function laadProgressie(db, client) {
     weken: wekenBezig(client),
     gewicht: bouwGewicht(wegingen, fase, client),
     training: bouwTraining(sessies, oefeningen, weekStart, s),
-    voeding: {
-      dagen: s.voeding?.geldige_dagen ?? null,
-      van: 7,
-    },
+    voeding: bouwVoeding(s, maaltijdenRes.data || [], plan),
     wegingen: {
       dezeWeek: s.wegingen ?? null,
       van: 7,
+      // De losse wegingen van deze week, voor het uitlegvenster achter het
+      // gewicht. Zo kan de klant zien welke getallen het gemiddelde vormen.
+      dagen: (s.weeg_dagen || []).slice(),
     },
+    // Voor de band-grafiek onder het getal: dezelfde invoer als coach insight.
+    grafiek: {
+      history: wegingen,
+      fase,
+      fases: fasesRes.data || [],
+    },
+  }
+}
+
+// ── Voeding ───────────────────────────────────────────────────────────────
+//
+// De teller uit get_challenge_stand telt dagen waarop minstens 70% van de
+// geplande maaltijden is afgevinkt. Dat is geen maat voor "op plan gegeten"
+// maar voor "bijgehouden in de app" — wie perfect eet zonder af te vinken
+// scoort nul. Daarom noemen we het hier ook zo, en zetten we er de cijfers
+// naast die wél iets zeggen.
+//
+// Het gemiddelde loopt alleen over de complete dagen. Een dag met één
+// afgevinkte maaltijd van 248 kcal hoort niet mee te wegen in "wat eet je op
+// een dag"; die trekt het gemiddelde omlaag zonder dat er minder gegeten is.
+function bouwVoeding(stand, maaltijden, plan) {
+  const perDag = new Map()
+  for (const m of maaltijden) {
+    const dag = String(m.consumed_at).slice(0, 10)
+    const r = perDag.get(dag) || { kcal: 0, eiwit: 0, n: 0 }
+    r.kcal += Number(m.calories) || 0
+    r.eiwit += Number(m.protein) || 0
+    r.n += 1
+    perDag.set(dag, r)
+  }
+
+  // Welke dagen golden als compleet? Die lijst komt uit dezelfde bron als de
+  // teller, zodat de twee niet uit elkaar kunnen lopen.
+  const compleet = new Set(
+    (stand?.voeding?.dagen || []).filter(d => d.telt).map(d => String(d.dag).slice(0, 10))
+  )
+  const volledig = [...perDag.entries()].filter(([dag]) => compleet.has(dag))
+
+  const gem = (kies) => {
+    if (!volledig.length) return null
+    const som = volledig.reduce((t, [, r]) => t + kies(r), 0)
+    return Math.round(som / volledig.length)
+  }
+
+  return {
+    bijgehouden: perDag.size,
+    compleet: compleet.size,
+    van: 7,
+    gemKcal: gem(r => r.kcal),
+    gemEiwit: gem(r => r.eiwit),
+    doelKcal: Number(plan?.daily_calories) || null,
+    doelEiwit: Number(plan?.daily_protein) || null,
   }
 }
 
@@ -186,6 +261,19 @@ export async function laadProgressie(db, client) {
 function bouwGewicht(wegingen, fase, client) {
   if (!wegingen.length) return null
 
+  // De losse wegingen binnen een venster, voor het uitlegvenster: welke
+  // getallen zitten er in dit gemiddelde?
+  const inVenster = (eindIso, dagen = 7) => {
+    const eind = new Date(`${eindIso}T00:00:00`).getTime()
+    const begin = eind - (dagen - 1) * dagInMs
+    return wegingen
+      .filter(w => {
+        const t = new Date(`${String(w.date).slice(0, 10)}T00:00:00`).getTime()
+        return t >= begin && t <= eind
+      })
+      .map(w => ({ datum: String(w.date).slice(0, 10), kg: Number(w.weight) }))
+  }
+
   const tempo = zaterdagTempo(wegingen)
   if (tempo.verschil !== null) {
     return {
@@ -194,6 +282,12 @@ function bouwGewicht(wegingen, fase, client) {
       eerder: Math.round(tempo.vorige.gemiddelde * 10) / 10,
       verschil: tempo.verschil,
       metingen: tempo.nu.metingen,
+      zaterdag: tempo.zaterdag,
+      vorigeZaterdag: tempo.vorigeZaterdag,
+      wegingenNu: inVenster(tempo.zaterdag),
+      wegingenEerder: inVenster(tempo.vorigeZaterdag),
+      // Het afgesproken tempo, zodat de klant ziet of dit verschil goed is.
+      doelPerWeek: fase?.week_doel_kg != null ? Number(fase.week_doel_kg) : null,
     }
   }
 
