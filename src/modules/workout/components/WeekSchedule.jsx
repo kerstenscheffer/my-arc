@@ -79,6 +79,26 @@ export default function WeekSchedule({
     } catch {}
   }
 
+  // De indeling van de week ervoor en erna. Die hebben we nodig voor de
+  // rust-waarschuwing: zondag botst met de dinsdag erna, niet met die ervoor.
+  //
+  // Let op de terugval op `vast`: een week zonder eigen planning ís de vaste
+  // indeling. Verschuif je dus iets in de huidige week, dan verandert daarmee
+  // ook wat de buurweken laten zien — en moet dit opnieuw geladen worden.
+  // Gebeurde dat niet, dan bleef de waarschuwing staan tegen de oude positie.
+  const laadBuurWeken = async (vastMee) => {
+    const vast = vastMee ?? await db.getClientWorkoutSchedule(clientId)
+    const buur = {}
+    await Promise.all([-1, 1].map(async (stap) => {
+      const d = new Date(getoondeMaandag)
+      d.setDate(d.getDate() + stap * 7)
+      const sleutel = WorkoutServiceNew.datumSleutel(d)
+      const eigenWeek = await WorkoutServiceNew.getWeekPlanning(clientId, sleutel, db)
+      buur[String(stap)] = eigenWeek || vast || null
+    }))
+    setBuurWeken(buur)
+  }
+
   const loadSavedSchedule = async () => {
     if (!clientId || !db) return
     setLoading(true)
@@ -98,17 +118,7 @@ export default function WeekSchedule({
       }
 
       const vast = await db.getClientWorkoutSchedule(clientId)
-      // Buurweken erbij: een vooruit geplande week kan afwijken, anders geldt
-      // de vaste indeling.
-      const buur = {}
-      await Promise.all([-1, 1].map(async (stap) => {
-        const d = new Date(getoondeMaandag)
-        d.setDate(d.getDate() + stap * 7)
-        const sleutel = WorkoutServiceNew.datumSleutel(d)
-        const eigenWeek = await WorkoutServiceNew.getWeekPlanning(clientId, sleutel, db)
-        buur[String(stap)] = eigenWeek || vast || null
-      }))
-      setBuurWeken(buur)
+      await laadBuurWeken(vast)
       // Een komende week begint bij de vaste indeling en wijkt daarvan af
       // zodra de klant hem verschuift.
       const eigen = isHuidigeWeek ? null : await WorkoutServiceNew.getWeekPlanning(clientId, weekSleutel, db)
@@ -126,6 +136,11 @@ export default function WeekSchedule({
 
   const handleAutoSave = async (newSchedule) => {
     if (!clientId || !db) return
+    // Meteen verschuiven, niet pas als de server antwoordt. Anders staat het
+    // tegeltje na de tik nog een halve seconde op zijn oude plek en lijkt de
+    // ui te blijven hangen. Mislukt het opslaan, dan zetten we het terug.
+    const vorige = tempSchedule
+    setTempSchedule(newSchedule)
     setSaving(true)
     try {
       if (isToekomst) {
@@ -136,10 +151,14 @@ export default function WeekSchedule({
         await db.updateClientWorkoutSchedule(clientId, newSchedule)
         if (onScheduleUpdate) onScheduleUpdate(newSchedule)
       }
-      setTempSchedule(newSchedule)
       setHasChanges(false)
+      // De buurweken erbij halen: bij een week zonder eigen planning is dit
+      // net dezelfde indeling die we zojuist hebben gewijzigd, en zonder deze
+      // stap waarschuwt de grafiek nog tegen de oude positie.
+      await laadBuurWeken(isToekomst ? undefined : newSchedule)
       if (navigator.vibrate) navigator.vibrate([30, 50, 30])
     } catch {
+      setTempSchedule(vorige)
       if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100])
       alert('⚠️ Opslaan mislukt.')
     } finally { setSaving(false) }
