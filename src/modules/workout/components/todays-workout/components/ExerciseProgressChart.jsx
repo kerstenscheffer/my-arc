@@ -88,7 +88,10 @@ function Kaartje({ active, payload }) {
   )
 }
 
-export default function ExerciseProgressChart({ db, client, exerciseName, isMobile }) {
+// `herlaadSleutel` gaat omhoog zodra de log-modal een set heeft weggeschreven.
+// Zonder dat blijft de grafiek op de stand van het moment dat hij openging en
+// zie je je net gelogde set pas na een harde refresh.
+export default function ExerciseProgressChart({ db, client, exerciseName, isMobile, herlaadSleutel = 0 }) {
   // Eigen id voor het kleurverloop: staan er twee van deze grafieken op één
   // pagina, dan pakken ze anders elkaars definitie.
   const velling = String(exerciseName || 'x').replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'x'
@@ -163,7 +166,7 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
     }
     laad()
     return () => { leeft = false }
-  }, [db, client?.id, exerciseName])
+  }, [db, client?.id, exerciseName, herlaadSleutel])
 
   if (laden) return null
 

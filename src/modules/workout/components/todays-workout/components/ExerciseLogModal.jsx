@@ -435,6 +435,11 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const [showHistory, setShowHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // Gaat één omhoog na elke geslaagde opslag. De krachtgrafiek hieronder heeft
+  // dit in zijn dependencies staan en haalt zijn punten dan opnieuw op, zodat
+  // je de set die je net logde er meteen in ziet staan zonder de pagina te
+  // verversen.
+  const [grafiekVersie, setGrafiekVersie] = useState(0)
   const [previousPerformance, setPreviousPerformance] = useState(null)
   const [attachmentUsed, setAttachmentUsed] = useState(null)
   const [machineSettings, setMachineSettings] = useState({})
@@ -711,6 +716,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
       } else {
         console.log('⚠️ Geen attachment/settings om op te slaan — attachment:', attachmentUsed, '| progress.id:', progress?.id)
       }
+
+      // Pas hier, na een geslaagde schrijfactie: bij een fout heeft de grafiek
+      // niets nieuws op te halen en zou hij alleen maar knipperen.
+      setGrafiekVersie(v => v + 1)
     } catch (e) { console.error('❌ Save failed:', e) }
     finally { setSaving(false) }
   }
@@ -1253,6 +1262,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               client={client}
               exerciseName={exercise.name}
               isMobile={isMobile}
+              herlaadSleutel={grafiekVersie}
             />
 
             {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} eenheid={eenheid} />}
