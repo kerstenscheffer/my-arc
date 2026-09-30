@@ -1288,8 +1288,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} eenheid={eenheid} />}
 
             {poortOpen && (
-              <div style={{ padding: isMobile ? '0 1rem 0.8rem' : '0 1.25rem 0.9rem' }}>
-                <OpwarmPoort
+              <OpwarmPoort
                   oefeningNaam={exercise.name}
                   werkgewicht={lastSet?.weight ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.weight ?? 0}
                   eenheid={eenheid}
@@ -1301,8 +1300,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                     setPoortOpen(false)
                     setShowWizard(true)
                   }}
-                />
-              </div>
+              />
             )}
 
             {opwarmVideo && (

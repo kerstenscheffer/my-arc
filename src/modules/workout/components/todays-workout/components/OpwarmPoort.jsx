@@ -21,10 +21,11 @@
 // precies zoals in de uitlegvideo.
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Flame, Check, Play, ArrowRight } from 'lucide-react'
 import { opwarmSets } from '../opwarmen'
+import { getThumbnailFromUrl } from '../../../../videos/utils/youtubeHelpers'
 
-const VLAK = 'rgba(255,255,255,0.04)'
 const LIJN = 'rgba(255,255,255,0.1)'
 
 export default function OpwarmPoort({
@@ -51,7 +52,7 @@ export default function OpwarmPoort({
     if (!db?.supabase) return undefined
     db.supabase
       .from('coach_videos')
-      .select('id, title, video_url, thumbnail_url, description')
+      .select('id, title, video_url, thumbnail_url, description, video_inhoud')
       .eq('rol', 'warming_up')
       .eq('is_active', true)
       .maybeSingle()
@@ -61,6 +62,31 @@ export default function OpwarmPoort({
   }, [db])
 
   const sets = opwarmSets(gewicht, eenheid)
+
+  // Over het scherm heen en niet in de pagina zelf: als los blok kwam de vraag
+  // onderaan de log-modal te staan, onder de grafiek, en dan moet je ernaartoe
+  // scrollen om te zien waarom er niets gebeurde na je tik.
+  //
+  // Lager dan de videospeler (2147483200), zodat de opwarmvideo hier bovenop
+  // opent en niet erachter verdwijnt.
+  const overlay = (inhoud) => createPortal(
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 2147483100,
+      background: 'rgba(0,0,0,0.82)',
+      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '1.25rem',
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 420,
+        maxHeight: '86vh', overflowY: 'auto',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.8)', borderRadius: 16,
+      }}>
+        {inhoud}
+      </div>
+    </div>,
+    document.body
+  )
 
   const knop = (vol) => ({
     flex: 1, minHeight: 50, padding: '0 1rem',
@@ -76,28 +102,52 @@ export default function OpwarmPoort({
 
   // ── De vraag ─────────────────────────────────────────────────────────────
   if (stap === 'vraag') {
-    return (
+    return overlay(
       <div style={{
-        padding: isMobile ? '1.1rem 1rem' : '1.35rem 1.25rem',
-        background: VLAK, border: `1px solid ${LIJN}`, borderRadius: 16,
+        background: '#0a0a0a', border: `1px solid ${LIJN}`, borderRadius: 16,
+        overflow: 'hidden',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
-          <Flame size={18} color="#fff" strokeWidth={2.6} />
-          <span style={{
-            fontSize: isMobile ? '1rem' : '1.08rem', fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.025em',
+        {/* Foto links, de vraag rechts ernaast. De foto loopt over de volle
+            hoogte van dit blok en vervaagt naar rechts in het zwart van de
+            kaart, zodat de tekst leesbaar blijft zonder harde rand. */}
+        <div style={{ display: 'flex', alignItems: 'stretch' }}>
+          <div style={{
+            position: 'relative', flexShrink: 0,
+            width: isMobile ? 118 : 138,
+            backgroundImage: 'url(/coach-compliment.jpg)',
+            backgroundSize: 'cover', backgroundPosition: 'center 28%',
           }}>
-            Heb je correct opgewarmd?
-          </span>
-        </div>
-        <p style={{
-          margin: '0 0 1rem', fontSize: isMobile ? '0.78rem' : '0.82rem',
-          fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5,
-        }}>
-          Voor {oefeningNaam || 'deze oefening'}. Koud zwaar tillen levert blessures op
-          in plaats van spiergroei.
-        </p>
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(90deg, rgba(10,10,10,0.15) 0%, rgba(10,10,10,0.1) 55%, rgba(10,10,10,0.75) 85%, #0a0a0a 100%)',
+            }} />
+          </div>
 
+          <div style={{
+            flex: 1, minWidth: 0,
+            padding: isMobile ? '1rem 1.15rem 0.9rem 0.9rem' : '1.2rem 1.35rem 1rem 1rem',
+            display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 7,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Flame size={isMobile ? 17 : 19} color="#fff" strokeWidth={2.8} style={{ flexShrink: 0 }} />
+              <span style={{
+                fontSize: isMobile ? '1rem' : '1.12rem', fontWeight: 900, color: '#fff',
+                letterSpacing: '-0.03em', lineHeight: 1.15,
+              }}>
+                Heb je correct opgewarmd?
+              </span>
+            </div>
+            <p style={{
+              margin: 0, fontSize: isMobile ? '0.75rem' : '0.8rem',
+              fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45,
+            }}>
+              Voor {oefeningNaam || 'deze oefening'}. Koud zwaar tillen levert blessures op
+              in plaats van spiergroei.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ padding: isMobile ? '0 1.15rem 1.25rem' : '0 1.35rem 1.5rem' }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={onKlaar} style={knop(true)}>
             <Check size={16} strokeWidth={3} />
@@ -108,15 +158,16 @@ export default function OpwarmPoort({
             <ArrowRight size={15} strokeWidth={3} />
           </button>
         </div>
+        </div>
       </div>
     )
   }
 
   // ── De opwarmroute ───────────────────────────────────────────────────────
-  return (
+  return overlay(
     <div style={{
-      padding: isMobile ? '1.1rem 1rem' : '1.35rem 1.25rem',
-      background: VLAK, border: `1px solid ${LIJN}`, borderRadius: 16,
+      padding: isMobile ? '1.25rem 1.15rem' : '1.5rem 1.35rem',
+      background: '#0a0a0a', border: `1px solid ${LIJN}`, borderRadius: 16,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
         <Flame size={18} color="#fff" strokeWidth={2.6} />
@@ -217,22 +268,45 @@ export default function OpwarmPoort({
         </div>
       )}
 
-      {video && (
-        <button
-          onClick={() => onVideo?.(video)}
-          style={{
-            width: '100%', minHeight: 44, marginBottom: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            background: 'transparent', border: `1px solid ${LIJN}`, borderRadius: 12,
-            color: 'rgba(255,255,255,0.75)', fontSize: '0.8rem', fontWeight: 900,
-            fontFamily: 'inherit', cursor: 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Play size={14} fill="currentColor" strokeWidth={0} />
-          {video.title || 'Bekijk hoe je opwarmt'}
-        </button>
-      )}
+      {video && (() => {
+        // Thumbnail uit het veld, of anders afgeleid uit de YouTube-link: op
+        // deze video staat geen thumbnail_url, net als op de andere.
+        const thumb = video.thumbnail_url || getThumbnailFromUrl(video.video_url)
+        return (
+          <button
+            onClick={() => onVideo?.(video)}
+            style={{
+              width: '100%', marginBottom: 8, padding: 6,
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: 'transparent', border: `1px solid ${LIJN}`, borderRadius: 12,
+              color: '#fff', fontSize: '0.82rem', fontWeight: 900,
+              fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span style={{
+              position: 'relative', flexShrink: 0,
+              width: 74, height: 46, borderRadius: 8, overflow: 'hidden',
+              backgroundColor: '#1a1a1a',
+              backgroundImage: thumb ? `url(${thumb})` : 'none',
+              backgroundSize: 'cover', backgroundPosition: 'center',
+              display: 'block',
+            }}>
+              <span style={{
+                position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+                width: 24, height: 24, borderRadius: '50%', background: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 3px 10px rgba(0,0,0,0.5)',
+              }}>
+                <Play size={11} fill="#0a0a0a" strokeWidth={0} style={{ marginLeft: 1 }} />
+              </span>
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              {video.title || 'Bekijk hoe je opwarmt'}
+            </span>
+          </button>
+        )
+      })()}
 
       <button onClick={onKlaar} style={{ ...knop(true), width: '100%' }}>
         <Check size={16} strokeWidth={3} />
