@@ -157,6 +157,7 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
   const [gewichtUit, setGewichtUit] = useState(false)
   const [sterkerUit, setSterkerUit] = useState(false)
   const [voedingUit, setVoedingUit] = useState(false)
+  const [trainingUit, setTrainingUit] = useState(false)
 
   if (!progressie) {
     return <div style={{ ...BODY, marginTop: space[4] }}>Je week wordt opgehaald…</div>
@@ -181,23 +182,24 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
   return (
     <div style={{ textAlign: 'left' }}>
 
+      {/* Elke sectie heeft hetzelfde skelet: kop met info-knop, regel A in
+          wit met het kerncijfer, regel B zacht met één regel context. Wat
+          daaronder uitklapt verschilt, het zichtbare deel niet. */}
+
       {/* ── Gewicht ── */}
       {gewicht && (
-        <Sectie titel="Gewicht" foto="/checkin/gewicht.jpg" eerste isMobile={isMobile}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: space[2] }}>
-            <div style={{ ...BODY, flex: 1, minWidth: 0 }}>
-              <span style={{ color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : colors.textPrimary }}>
-                {metTeken(gewicht.verschil)} kg
-              </span>
-              {gewicht.doelBereik && (
-                <span style={BODY_ZACHT}>{' · doel '}{gewicht.doelBereik}</span>
-              )}
-            </div>
-            <InfoKnop open={gewichtUit} onClick={() => setGewichtUit(v => !v)} label="Hoe is dit berekend?" />
+        <Sectie
+          titel="Gewicht" foto="/checkin/gewicht.jpg" eerste isMobile={isMobile}
+          rechts={<InfoKnop open={gewichtUit} onClick={() => setGewichtUit(v => !v)} label="Hoe is dit berekend?" />}
+        >
+          <div style={BODY}>
+            <span style={{ color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : colors.textPrimary }}>
+              {metTeken(gewicht.verschil)} kg
+            </span>
+            {gewicht.doelBereik && <span style={BODY_ZACHT}>{' · doel '}{gewicht.doelBereik}</span>}
           </div>
-
           {wegingen?.dezeWeek != null && (
-            <div style={{ ...BODY, marginTop: 2 }}>
+            <div style={{ ...BODY_ZACHT, marginTop: 2 }}>
               {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
             </div>
           )}
@@ -232,59 +234,60 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
 
       {/* ── Training ── */}
       {training?.sessies > 0 && (
-        <Sectie titel="Training" foto="/checkin/training.jpg" isMobile={isMobile}>
+        <Sectie
+          titel="Training" foto="/checkin/training.jpg" isMobile={isMobile}
+          rechts={<InfoKnop open={trainingUit} onClick={() => setTrainingUit(v => !v)} label="Hoe wordt sterker gemeten?" />}
+        >
           <div style={BODY}>
             {training.sessies} {training.sessies === 1 ? 'training' : 'trainingen'}
             {training.oefeningen > 0 && ` · ${training.oefeningen} oefeningen`}
             {training.sets > 0 && ` · ${training.sets} sets`}
           </div>
 
-          {training.sterker?.length > 0 && (
-            <>
-              {/* Accordion: standaard ingeklapt, kop met chevron (wet 5). */}
-              <button
-                type="button"
-                onClick={() => setSterkerUit(v => !v)}
-                aria-expanded={sterkerUit}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: space[2], width: '100%',
-                  minHeight: 32, padding: 0, marginTop: 2,
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: colors.textPrimary, fontFamily: 'inherit', textAlign: 'left',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <span style={{ flex: 1, fontSize: 15, fontWeight: 800 }}>
-                  Sterker geworden op {training.sterker.length + training.meerOefeningen}
-                  {training.sterker.length + training.meerOefeningen === 1 ? ' oefening' : ' oefeningen'}
-                </span>
-                <ChevronDown
-                  size={18} strokeWidth={2.4}
-                  style={{ transform: sterkerUit ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
-                />
-              </button>
+          {training.sterker?.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setSterkerUit(v => !v)}
+              aria-expanded={sterkerUit}
+              style={{
+                display: 'flex', alignItems: 'center', gap: space[2], width: '100%',
+                padding: 0, marginTop: 2, background: 'transparent', border: 'none',
+                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                ...BODY_ZACHT,
+              }}
+            >
+              <span style={{ flex: 1 }}>
+                Sterker geworden op {training.sterker.length + training.meerOefeningen}
+                {training.sterker.length + training.meerOefeningen === 1 ? ' oefening' : ' oefeningen'}
+              </span>
+              <ChevronDown
+                size={16} strokeWidth={2.4}
+                style={{ flexShrink: 0, transform: sterkerUit ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+              />
+            </button>
+          ) : (
+            <div style={{ ...BODY_ZACHT, marginTop: 2 }}>Geen oefening zwaarder dan vorige week</div>
+          )}
 
-              {sterkerUit && (
-                <div>
-                  {/* Oefeningkaarten zoals in de log-modal, met lijn erboven en
-                      eronder; zo leest het als "oefeningen" en niet als een
-                      lijstje tekst. */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], marginTop: space[2] }}>
-                    {training.sterker.map(s => (
-                      <SterkerKaart
-                        key={s.oefening}
-                        oefening={s.oefening} vorig={s.vorig} nu={s.nu} pct={s.pct}
-                        db={db} clientId={clientId} isMobile={isMobile}
-                      />
-                    ))}
-                  </div>
-                  <div style={{ ...BODY_ZACHT, marginTop: space[2] }}>
-                    Vergeleken op je zwaarste set, omgerekend naar wat je voor 8 herhalingen
-                    zou kunnen. Zo telt 100 kg voor 5 net zo goed mee als 80 kg voor 12.
-                  </div>
-                </div>
-              )}
-            </>
+          {trainingUit && (
+            <Uitleg>
+              Vergeleken op je zwaarste set, omgerekend naar wat je voor 8 herhalingen
+              zou kunnen. Zo telt 100 kg voor 5 net zo goed mee als 80 kg voor 12.
+              Alles onder 3% verschil laten we weg: dat is ruis van een andere dag.
+            </Uitleg>
+          )}
+
+          {sterkerUit && training.sterker?.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], marginTop: space[2] }}>
+              {training.sterker.map(s => (
+                <SterkerKaart
+                  key={s.oefening}
+                  oefening={s.oefening} vorig={s.vorig} nu={s.nu} pct={s.pct}
+                  db={db} clientId={clientId} isMobile={isMobile}
+                />
+              ))}
+            </div>
           )}
         </Sectie>
       )}
@@ -292,31 +295,31 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
       {/* ── Voeding ── */}
       {voeding?.bijgehouden > 0 && (
         <Sectie
-          titel="Voeding"
-          foto="/checkin/voeding.jpg"
-          isMobile={isMobile}
+          titel="Voeding" foto="/checkin/voeding.jpg" isMobile={isMobile}
           rechts={<InfoKnop open={voedingUit} onClick={() => setVoedingUit(v => !v)} label="Wat telt hier mee?" />}
         >
           <div style={BODY}>
             Bijgehouden op {voeding.bijgehouden} van {voeding.van} dagen
           </div>
           {voeding.gemKcal != null && (
-            <div style={{ ...BODY, marginTop: 2 }}>
-              Op je {voeding.compleet} complete {voeding.compleet === 1 ? 'dag' : 'dagen'} gemiddeld{' '}
-              <strong style={{ color: colors.textPrimary }}>{nl(voeding.gemKcal)} kcal</strong>
-              {voeding.doelKcal ? ` van je ${nl(voeding.doelKcal)}` : ''}
+            <div style={{ ...BODY_ZACHT, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+              {nl(voeding.gemKcal)}{voeding.doelKcal ? ` / ${nl(voeding.doelKcal)}` : ''} kcal
               {voeding.gemEiwit != null && (
-                <> en <strong style={{ color: colors.textPrimary }}>{nl(voeding.gemEiwit)}g eiwit</strong>
-                {voeding.doelEiwit ? ` van je ${nl(voeding.doelEiwit)}` : ''}</>
+                <>{' · '}{nl(voeding.gemEiwit)}{voeding.doelEiwit ? ` / ${nl(voeding.doelEiwit)}` : ''} g eiwit</>
               )}
             </div>
           )}
+
           {voedingUit && (
             <Uitleg>
-              Dit telt wat je in de app hebt afgevinkt, niet wat je hebt gegeten. Een dag
-              heet compleet zodra je minstens 70% van je geplande maaltijden hebt
-              aangetikt. Eet je goed maar vink je niets af, dan blijft het hier leeg,
-              en dat zegt dus niets over je week.
+              <strong style={{ color: colors.textPrimary }}>
+                Gemiddelde van je {voeding.compleet} complete {voeding.compleet === 1 ? 'dag' : 'dagen'}, tegen je dagdoel.
+              </strong>
+              <div style={{ marginTop: space[2] }}>
+                Dit telt wat je in de app hebt afgevinkt, niet wat je hebt gegeten. Een dag
+                heet compleet zodra je minstens 70% van je geplande maaltijden hebt
+                aangetikt. Eet je goed maar vink je niets af, dan blijft het hier leeg.
+              </div>
             </Uitleg>
           )}
         </Sectie>
