@@ -415,18 +415,6 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // tegen de bovenrand met een half scherm leegte eronder. Het blok blijft
       // smal (560px) zodat een vraag van twee regels leesbaar blijft.
       <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
-        {/* Waar in het traject sta je? Alleen op het eerste scherm, als
-            aanloop naar de vraag. Zonder startdatum blijft de regel weg — dan
-            weten we het niet en is "week 1" een gok. */}
-        {v.toonWeken && weken && (
-          <div style={{
-            fontSize: 13, fontWeight: 800, color: GRIJS,
-            textTransform: 'uppercase', letterSpacing: '0.08em',
-            marginBottom: '1.1vh',
-          }}>
-            {weken.totaal ? `Week ${weken.week} van ${weken.totaal}` : `Week ${weken.week}`}
-          </div>
-        )}
         <div style={{ fontSize: isMobile ? 19 : 23, fontWeight: 800, color: '#fff' }}>
           {vraagTekst}
         </div>
