@@ -492,13 +492,16 @@ export function zaterdagReeks(history, anker = new Date(), maxWeken = 26, dagen 
 }
 
 // Het afgesproken bereik als tekst: van het kleinste toegestane tempo naar het
-// grootste, allebei met het teken van de richting. "+0.2 – +0.4" bij een build,
-// "-0.15 – -0.9" bij een cut.
+// grootste, allebei met het teken van de richting. "+0.2 / +0.4" bij een build,
+// "-0.15 / -0.9" bij een cut.
+//
+// Schuine streep en geen gedachtestreepje: bij negatieve getallen staan er dan
+// drie streepjes achter elkaar ("-0.15 – -0.9") en dat leest als één som.
 export function bereikTekst(config) {
   if (!config || config.richting === 'stabiel') return null
   const teken = config.richting === 'aankomen' ? 1 : -1
   const f = (v) => `${teken > 0 ? '+' : '-'}${Math.round(Math.abs(v) * 100) / 100}`
-  return `${f(config.traagKg)} – ${f(config.snelKg)}`
+  return `${f(config.traagKg)} / ${f(config.snelKg)}`
 }
 
 // Tempo en stand kunnen los van elkaar kloppen. Gaat het tempo goed terwijl de
