@@ -94,6 +94,9 @@ const SECTIES = [
         id: 'progressie_tevreden', type: 'keuze-uitleg',
         vraag: 'Ben je tevreden met de progressie die je afgelopen week hebt gemaakt?',
         hulp: null,
+        // Zonder keuze en uitleg kun je niet verder: de rest van het formulier
+        // bouwt hierop voort.
+        verplicht: true,
         opties: TEVREDEN_OPTIES,
         uitlegId: 'cijfers_toelichting',
         uitlegLabel: 'Leg uit waarom',
@@ -460,7 +463,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // Eén vraag per scherm, dus die hoort in het midden te staan en niet
       // tegen de bovenrand met een half scherm leegte eronder. Het blok blijft
       // smal (560px) zodat een vraag van twee regels leesbaar blijft.
-      <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
+      <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'left' }}>
         <style>{LIJN_CSS}</style>
         {aanhef && (
           <div style={{ fontSize: 15, lineHeight: 1.5, color: '#9ca3af', marginBottom: 8 }}>
@@ -468,12 +471,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
           </div>
         )}
         <div style={{
-          fontSize: v.kopRechts ? 18 : (isMobile ? 19 : 23),
+          fontSize: v.kopRechts ? 18 : (isMobile ? 19 : 22),
           fontWeight: 800,
           color: '#fff',
-          textAlign: v.kopRechts ? 'left' : 'center',
+          textAlign: 'left',
         }}>
-          {vraagTekst}
+          {vraagTekst}{v.verplicht ? ' *' : ''}
         </div>
         {v.hulp && (
           <div style={{ color: GRIJS, fontSize: 14, fontWeight: 700, marginTop: '0.8vh' }}>
@@ -540,7 +543,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         {v.type === 'progressie' && <ProgressieScherm progressie={progressie} isMobile={isMobile} db={db} clientId={client?.id} />}
 
         {(v.type === 'aantal' || v.type === 'aantal-van') && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: '2.2vh', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 12, marginTop: '2.2vh', flexWrap: 'wrap' }}>
             <select
               className="ci-lijn"
               value={waarde ?? ''}
@@ -585,7 +588,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
                 <option key={o} value={o} style={{ background: '#1a1a1a' }}>{o}</option>
               ))}
             </select>
-            <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 16 }}>{v.uitlegLabel}</div>
+            <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 32 }}>{v.uitlegLabel}{v.verplicht ? ' *' : ''}</div>
             <LijnTekst
               placeholder={v.placeholder} value={formData[v.uitlegId]}
               onChange={val => updateField(v.uitlegId, val)}
@@ -595,7 +598,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         )}
 
         {v.type === 'keuze' && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: '2.2vh' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 10, marginTop: '2.2vh' }}>
             {v.opties.map(o => (
               <button key={o} type="button" onClick={() => updateField(v.id, waarde === o ? null : o)}
                 style={keuzeStijl(waarde === o)}>
@@ -606,7 +609,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         )}
 
         {v.type === 'schaal' && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: '2.2vh' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 8, marginTop: '2.2vh' }}>
             {SCHAAL.map(n => (
               <button key={n} type="button" onClick={() => updateField(v.id, n)}
                 style={keuzeStijl(waarde === n, 52)}>
@@ -766,6 +769,14 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     .filter(v => !(v.alleenMetDoelen && geenDoelen))
   const vraag = vragen[stap]
   const laatste = stap === vragen.length - 1
+  // Een verplichte slide is pas klaar als alles erop is ingevuld.
+  const ingevuld = (v) => {
+    if (!v?.verplicht) return true
+    if (v.type === 'keuze-uitleg') return !!formData[v.id] && !!String(formData[v.uitlegId] || '').trim()
+    const w = formData[v.id]
+    return w != null && String(w).trim() !== ''
+  }
+  const magVerder = ingevuld(vraag)
   // Voortgang telt de vraag waar je nu op staat mee, zodat de balk direct
   // beweegt als je begint in plaats van pas na de eerste stap.
   const voortgang = ((stap + 1) / vragen.length) * 100
@@ -818,11 +829,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         )}
         <div style={{ flex: 1 }} />
         {!laatste ? (
-          <button type="button" onClick={() => setStap(s => s + 1)}
+          <button type="button" onClick={() => { if (magVerder) setStap(s => s + 1) }} disabled={!magVerder}
             style={{
               background: '#fff', color: '#0A0A0A', border: 'none', borderRadius: 12,
               padding: '15px 30px', fontFamily: 'inherit', fontSize: 16, fontWeight: 900,
-              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              cursor: magVerder ? 'pointer' : 'default', opacity: magVerder ? 1 : 0.4,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
             Volgende
           </button>
