@@ -906,8 +906,15 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
           {titel}
         </div>
       )}
+      {/* Groen, en richting het eind steeds voller groen: het verloop staat
+          over de hele balk en de vulling knipt er een stuk van af. */}
       <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden', marginBottom: 32 }}>
-        <div style={{ width: `${voortgang}%`, height: '100%', background: 'rgba(255,255,255,0.55)', transition: 'width 0.25s ease' }} />
+        <div style={{ width: `${voortgang}%`, height: '100%', overflow: 'hidden', transition: 'width 0.25s ease' }}>
+          <div style={{
+            width: `${10000 / voortgang}%`, height: '100%',
+            background: 'linear-gradient(90deg, rgba(34,197,94,0.35), #22c55e)',
+          }} />
+        </div>
       </div>
 
       {/* De vraag */}
