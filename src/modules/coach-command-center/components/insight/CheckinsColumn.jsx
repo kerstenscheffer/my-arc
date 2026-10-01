@@ -4,6 +4,7 @@
 // that expands to show all section scores + notes + coach fields.
 
 import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ClipboardCheck, ChevronDown, ChevronRight,
   Utensils, Beer, Moon, Dumbbell, Heart, Zap, Trophy, AlertTriangle,
@@ -12,6 +13,8 @@ import {
 import CheckinService from '../../../client-checkin/CheckinService'
 import { antwoordenVan } from '../../../client-checkin/checkinVragen'
 import { doelTekst, kleurVoorBehaald } from '../../../client-checkin/doelen'
+import ProgressieScherm from '../../../client-checkin/ProgressieScherm'
+import { laadProgressie } from '../../../client-checkin/progressieWeek'
 
 const G = {
   primary:    '#fff',
@@ -65,7 +68,7 @@ const SECTIONS = [
 ]
 
 // ── Single expandable check-in card ───────────────────────────────
-function CheckinCard({ checkin, isMobile, voornaam }) {
+function CheckinCard({ checkin, isMobile, voornaam, client, db }) {
   const [open, setOpen] = useState(false)
   const score = overallScore(checkin)
   const reviewed = !!checkin.reviewed_at
@@ -180,6 +183,8 @@ function CheckinCard({ checkin, isMobile, voornaam }) {
           {isV4 && antwoorden.map(a => (
             a.soort === 'tekst' ? (
               <VraagAntwoord key={a.id} vraag={a.vraag} antwoord={a.antwoord} feedback={a.feedback} />
+            ) : a.soort === 'progressie' ? (
+              <ProgressieKnop key={a.id} vraag={a.vraag} progressie={a.progressie} checkin={checkin} client={client} db={db} isMobile={isMobile} />
             ) : (
               <DoelenBlok key={a.id} vraag={a.vraag} doelen={a.doelen} terug={a.soort === 'doelen-terug'} />
             )
@@ -280,6 +285,80 @@ function CheckinCard({ checkin, isMobile, voornaam }) {
             </NoteBlock>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+// De terugblik "Je progressie afgelopen week" zoals de klant hem zag, achter
+// een knop op de plek waar die slide in het formulier zat. Zo weet je waar
+// het antwoord op de vraag erna over gaat. Check-ins van vóór de snapshot
+// hebben hem niet opgeslagen; dan rekenen we hem nu uit en zeggen dat erbij.
+function ProgressieKnop({ vraag, progressie, checkin, client, db, isMobile }) {
+  const [open, setOpen] = useState(false)
+  const [live, setLive] = useState(null)
+  const bewaard = !!progressie
+  useEffect(() => {
+    if (!open || bewaard || live || !client || !db) return
+    let weg = false
+    laadProgressie(db, client).then(p => { if (!weg) setLive(p) }).catch(() => { if (!weg) setLive(null) })
+    return () => { weg = true }
+  }, [open, bewaard, live, client, db])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+  const data = bewaard ? progressie : live
+  return (
+    <div style={{ padding: '0.45rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '0.4rem 0.7rem', borderRadius: 999,
+          background: '#fff', border: 'none', color: '#0A0A0A',
+          fontSize: '0.74rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {vraag} <ChevronRight size={12} />
+      </button>
+      {open && createPortal(
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-label={vraag}
+            style={{
+              width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box',
+              background: '#000', borderRadius: 16, padding: isMobile ? 16 : 24, color: '#fff',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <div style={{ flex: 1, fontSize: 18, fontWeight: 800 }}>{vraag}</div>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Sluiten" style={{
+                background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 22,
+                lineHeight: 1, cursor: 'pointer', padding: 4, fontFamily: 'inherit',
+              }}>×</button>
+            </div>
+            {!bewaard && (
+              <div style={{ fontSize: 13, fontWeight: 700, color: G.textDim, marginBottom: 8 }}>
+                Deze check-in heeft de terugblik niet opgeslagen; dit is de stand van nu.
+              </div>
+            )}
+            <ProgressieScherm progressie={data} isMobile={isMobile} db={db} clientId={checkin.client_id} />
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -492,7 +571,7 @@ export default function CheckinsColumn({ client, db, isMobile }) {
           </div>
         ) : (
           checkins.map(c => (
-            <CheckinCard key={c.id} checkin={c} isMobile={isMobile} voornaam={(client?.first_name || '').trim()} />
+            <CheckinCard key={c.id} checkin={c} isMobile={isMobile} voornaam={(client?.first_name || '').trim()} client={client} db={db} />
           ))
         )}
       </div>

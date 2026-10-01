@@ -402,6 +402,9 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
     // De stand zoals de klant hem zag toen hij dit invulde. Wordt later niet
     // meer herrekend, ook niet als er nog wordt nagelogd.
     week_cijfers: cijfers || null,
+    // De terugblik van slide "Je progressie afgelopen week", precies zoals
+    // de klant hem zag. De coach kan hem erbij pakken bij het lezen.
+    progressie: progressie || null,
     // Waren de coaching-vragen deze keer aan de beurt, dan gaan ze altijd mee
     // — desnoods leeg. Zo is "gesteld maar niet beantwoord" te onderscheiden
     // van "niet gesteld", en komt de vraag niet de week erna meteen terug.

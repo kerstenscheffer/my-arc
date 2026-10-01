@@ -199,6 +199,7 @@ export function antwoordenVan(checkin, voornaam = '') {
     const feedback = v.id === 'coaching_fijnste' || v.id === 'coaching_verbeterpunt'
     switch (v.type) {
       case 'progressie':
+        uit.push({ soort: 'progressie', id: v.id, vraag, progressie: checkin.progressie || null })
         break
       case 'keuze-uitleg': {
         if (!leeg(checkin[v.id])) uit.push({ soort: 'tekst', id: v.id, vraag, antwoord: checkin[v.id] })
