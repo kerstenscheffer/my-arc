@@ -22,7 +22,8 @@ import WidgetSidebar from '../components/WidgetSidebar'
 import VideoTeaser from './components/VideoTeaser'
 import BelangrijkeVideo from './components/BelangrijkeVideo'
 import WaterFles from './components/WaterFles'
-import { syncStappen } from '../modules/steps/stappenSync'
+import { syncStappen, resetStappenCooldown } from '../modules/steps/stappenSync'
+import { supabase } from '../lib/supabase'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
 import VideoReminderPopup from './components/VideoReminderPopup'
 import CheckinModal from './components/CheckinModal'
@@ -201,6 +202,21 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
     document.addEventListener('visibilitychange', opVoorgrond)
     return () => document.removeEventListener('visibilitychange', opVoorgrond)
   }, [client?.id])
+
+  // ── Auth-refresh na login op ander apparaat ──
+  // Na een TOKEN_REFRESHED-event is de sessie op dit apparaat bijgewerkt maar
+  // de clientdata niet. Hierdoor bleef bijv. gewicht op de oude waarde staan en
+  // werden stappen niet ververst. Door opnieuw te laden én de stap-cooldown te
+  // resetten pakt de volgende visibilitychange de verse data op.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED') {
+        resetStappenCooldown()
+        loadClientData()
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   const handleClientUpdate = (updatedClient) => {
     setClient(prev => ({ ...prev, ...updatedClient }))

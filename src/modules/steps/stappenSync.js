@@ -16,6 +16,10 @@ export const STAPPEN_EVENT = 'myarc:stappen-bijgewerkt'
 const RUST_MS = 5 * 60 * 1000
 let laatste = 0
 
+// Roep aan na een auth-wisseling zodat de volgende visibilitychange niet
+// geblokkeerd wordt door de cooldown.
+export function resetStappenCooldown() { laatste = 0 }
+
 // Hoeveel dagen we terugkijken bij het opstarten. Zeven: wie één keer per week
 // de app opent heeft dan nog steeds een kloppende week.
 const INHAAL_DAGEN = 7
