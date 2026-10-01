@@ -121,24 +121,33 @@ function LijnDropdown({ value, opties, placeholder, onChange, style }) {
   )
 }
 
-// Getal kiezen door te schuiven: een rol die altijd open staat, met het
-// gekozen getal groot in het midden, twee getallen erboven en twee eronder.
-// Scrollen snapt per getal; tikken op een getal kiest het direct.
+// Getal kiezen door te schuiven. Dicht is het alleen het getal op de lijn;
+// tik erop en op die plek klapt een rol open met het gekozen getal groot in
+// het midden, twee getallen erboven en twee eronder. Scrollen snapt per
+// getal; tikken op een getal kiest het en sluit de rol. Buiten tikken sluit
+// ook.
 const ROL_HOOGTE = 32
 const ROL_ZICHTBAAR = 5
 function GetalRol({ value, min = 1, max = 99, stap = 1, onChange, style }) {
+  const [open, setOpen] = useState(false)
+  const wrap = useRef(null)
   const rol = useRef(null)
   const timer = useRef(null)
   const waarden = []
   for (let n = min; n <= max; n += stap) waarden.push(n)
   const rand = ROL_HOOGTE * Math.floor(ROL_ZICHTBAAR / 2)
 
-  // Bij het opkomen op het huidige getal gaan staan.
   useEffect(() => {
+    if (!open) return
+    // Op het huidige getal beginnen.
     const idx = Math.max(0, waarden.findIndex(n => n === value))
     if (rol.current) rol.current.scrollTop = idx * ROL_HOOGTE
+    const dicht = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', dicht)
+    document.addEventListener('touchstart', dicht)
+    return () => { document.removeEventListener('mousedown', dicht); document.removeEventListener('touchstart', dicht) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [open])
 
   const bijScroll = () => {
     clearTimeout(timer.current)
@@ -150,12 +159,6 @@ function GetalRol({ value, min = 1, max = 99, stap = 1, onChange, style }) {
     }, 80)
   }
 
-  const kies = (n) => {
-    const idx = waarden.indexOf(n)
-    if (rol.current && idx >= 0) rol.current.scrollTo({ top: idx * ROL_HOOGTE, behavior: 'smooth' })
-    onChange(n)
-  }
-
   const stijlVoor = (n) => {
     const afstand = Math.abs(waarden.indexOf(n) - waarden.indexOf(value))
     if (afstand === 0) return { fontSize: 20, fontWeight: 800, color: '#fff' }
@@ -163,8 +166,26 @@ function GetalRol({ value, min = 1, max = 99, stap = 1, onChange, style }) {
     return { fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.28)' }
   }
 
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="listbox"
+        style={{
+          ...LIJN, textAlign: 'center', fontWeight: 800, cursor: 'pointer',
+          color: value == null ? 'rgba(255,255,255,0.3)' : '#fff',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          ...style,
+        }}
+      >
+        {value ?? '—'}
+      </button>
+    )
+  }
+
   return (
-    <div style={{ position: 'relative', height: ROL_HOOGTE * ROL_ZICHTBAAR, ...style }}>
+    <div ref={wrap} style={{ position: 'relative', height: ROL_HOOGTE * ROL_ZICHTBAAR, ...style }}>
       {/* Het venster in het midden: dit getal telt. */}
       <div aria-hidden style={{
         position: 'absolute', left: 0, right: 0, top: rand, height: ROL_HOOGTE,
@@ -188,7 +209,7 @@ function GetalRol({ value, min = 1, max = 99, stap = 1, onChange, style }) {
             type="button"
             role="option"
             aria-selected={n === value}
-            onClick={() => kies(n)}
+            onClick={() => { onChange(n); setOpen(false) }}
             style={{
               display: 'block', width: '100%', height: ROL_HOOGTE, scrollSnapAlign: 'center',
               background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit',
