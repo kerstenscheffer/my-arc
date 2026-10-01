@@ -589,7 +589,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       <div style={{
         flexShrink: 0,
         display: 'flex', alignItems: 'stretch',
-        height: isMobile ? 48 : 54,
+        height: isMobile ? 40 : 48,
         paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
         boxSizing: 'content-box',
         background: '#0a0a0a',
@@ -638,7 +638,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           De dag met de pijlen ligt op de foto, in plaats van een losse titel
           erboven en een balk eronder. Lager dan voorheen, want de knoppen
           staan nu in de balk erboven. */}
-      <div style={{ position: 'relative', width: '100%', height: isMobile ? 124 : 165, flexShrink: 0 }}>
+      <div style={{ position: 'relative', width: '100%', height: isMobile ? 100 : 150, flexShrink: 0 }}>
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: `url(${MEAL_BANNER_URL})`,

@@ -118,7 +118,7 @@ export default function MealDayNavHeader({
         margin: '0 auto',
         // Pijlen meer naar binnen: bredere zij-padding zodat ze niet aan
         // de rand kleven.
-        padding: isMobile ? '0.65rem 1.5rem' : '0.8rem 2.5rem',
+        padding: opFoto ? (isMobile ? '0.3rem 1.5rem' : '0.5rem 2.5rem') : (isMobile ? '0.65rem 1.5rem' : '0.8rem 2.5rem'),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -152,7 +152,7 @@ export default function MealDayNavHeader({
           <div style={{
             // Tekst groter — was 0.95/1.05rem, nu 1.15/1.3rem zodat de
             // dagnaam echt de blikvanger is.
-            fontSize: opFoto ? (isMobile ? '1.6rem' : '2.1rem') : (isMobile ? '1.15rem' : '1.3rem'),
+            fontSize: opFoto ? (isMobile ? '1.45rem' : '2rem') : (isMobile ? '1.15rem' : '1.3rem'),
             fontWeight: 900,
             color: opFoto ? '#fff' : '#FFD700',
             letterSpacing: opFoto ? '-0.03em' : '-0.02em',

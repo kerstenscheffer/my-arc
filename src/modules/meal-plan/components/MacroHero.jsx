@@ -343,8 +343,8 @@ export default function MacroHero({
   // 'boxes' = de 4 macro-vakken (zelfde als client-home), dag-bewust via `display`.
   if (variant === 'boxes') {
     return (
-      <div style={{ padding: isMobile ? '0 0.9rem 0.6rem' : '0 1.5rem 0.7rem', maxWidth: 1400, margin: '0 auto', opacity: showShim ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
-        <MacroBoxes consumed={display} targets={t} kaal={zonderKader} />
+      <div style={{ padding: isMobile ? '0 0.9rem 0.4rem' : '0 1.5rem 0.6rem', maxWidth: 1400, margin: '0 auto', opacity: showShim ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
+        <MacroBoxes consumed={display} targets={t} kaal={zonderKader} compact={zonderKader} />
       </div>
     )
   }
