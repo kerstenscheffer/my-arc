@@ -39,8 +39,8 @@ const LIJN = {
   padding: '10px 0', width: '100%', outline: 'none', textAlign: 'left',
 }
 
-// Tekstveld van een paar regels hoog dat meegroeit zodra de tekst verder
-// loopt. Geen sleepgreep.
+// Eén regel met een witte lijn eronder, direct onder de placeholder. Je typt
+// op die lijn; loopt de tekst om, dan zakt de lijn mee. Geen sleepgreep.
 function LijnTekst({ value, onChange, placeholder, style }) {
   const groei = (el) => { if (!el) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` }
   return (
@@ -51,7 +51,7 @@ function LijnTekst({ value, onChange, placeholder, style }) {
       placeholder={placeholder}
       value={value ?? ''}
       onChange={e => { groei(e.target); onChange(e.target.value) }}
-      style={{ ...LIJN, lineHeight: 1.5, minHeight: 72, resize: 'none', overflow: 'hidden', display: 'block', ...style }}
+      style={{ ...LIJN, lineHeight: 1.5, padding: '6px 0', resize: 'none', overflow: 'hidden', display: 'block', ...style }}
     />
   )
 }
