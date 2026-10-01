@@ -106,6 +106,7 @@ export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db,
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
         paddingBottom: 'env(safe-area-inset-bottom)',
+        display: 'flex', flexDirection: 'column',
       }}>
         <ClientCheckinForm
           db={db}

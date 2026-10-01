@@ -531,7 +531,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // Eén vraag per scherm, dus die hoort in het midden te staan en niet
       // tegen de bovenrand met een half scherm leegte eronder. Het blok blijft
       // smal (560px) zodat een vraag van twee regels leesbaar blijft.
-      <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'left' }}>
+      <div key={v.id} style={{ width: '100%', textAlign: 'left' }}>
         <style>{LIJN_CSS}</style>
         {aanhef && (
           <div style={{ fontSize: 15, lineHeight: 1.5, color: '#9ca3af', marginBottom: 8 }}>
@@ -892,11 +892,15 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       maxWidth: 820, margin: '0 auto', boxSizing: 'border-box',
       // Vult de hoogte van de modal, zodat de vraag in het midden kan staan en
       // de knoppen onderaan. Zonder dit zakte alles naar de bovenrand.
-      display: 'flex', flexDirection: 'column',
+      display: 'flex', flexDirection: 'column', flex: 1, width: '100%',
       minHeight: isMobile ? '100%' : 'max(100%, 420px)',
     }}>
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        width: '100%', maxWidth: 560, margin: '0 auto', padding: '2vh 0',
+      }}>
       {/* Voortgang */}
-      <div style={{ marginBottom: '2.5vh' }}>
+      <div style={{ marginBottom: 24 }}>
         <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden' }}>
           <div style={{ width: `${voortgang}%`, height: '100%', background: '#fff', transition: 'width 0.25s ease' }} />
         </div>
@@ -910,17 +914,11 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         </div>
       </div>
 
-      {/* De vraag — midden op de pagina */}
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        padding: '2vh 0',
-      }}>
-        {renderVeld(vraag)}
-      </div>
+      {/* De vraag */}
+      {renderVeld(vraag)}
 
       {/* Navigatie */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: '3vh' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 32 }}>
         {stap > 0 && (
           <button type="button" onClick={() => setStap(s => s - 1)}
             style={{
@@ -954,6 +952,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
             {submitting ? 'Versturen…' : 'Versturen'}
           </button>
         )}
+      </div>
       </div>
     </div>
   )
