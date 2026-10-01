@@ -101,17 +101,6 @@ const SECTIES = [
         hulp: 'Waar je tegenop zag, wat je bleef uitstellen, wat gedoe opleverde.',
         placeholder: 'Schrijf op wat als eerste in je opkomt.',
       },
-      {
-        id: 'traject_score', type: 'schaal',
-        vraag: 'Hoe voel je je over je hele traject tot nu toe?',
-        hulp: '1 is slecht, 10 is uitstekend.',
-      },
-      {
-        id: 'traject_toelichting', type: 'tekst',
-        vraag: 'Wil je dat cijfer toelichten?',
-        hulp: 'Alleen als je er iets bij wilt zeggen.',
-        placeholder: 'Optioneel.',
-      },
     ],
   },
   {
@@ -148,11 +137,22 @@ const SECTIES = [
 // dan wordt het een formaliteit en krijg je "gaat goed" terug. Eens per vier
 // weken heeft iemand genoeg meegemaakt om er iets zinnigs over te zeggen.
 //
-// Twee losse vragen en geen cijfer: een 8 vertelt je niet wat je moet houden
-// of veranderen.
+// Eerst het cijfer voor het hele traject, dan twee open vragen over de
+// coaching: een 8 alleen vertelt je niet wat je moet houden of veranderen.
 const COACHING_SECTIE = {
   kop: 'Over de coaching',
   velden: [
+    {
+      id: 'traject_score', type: 'schaal',
+      vraag: 'Hoe voel je je over je hele traject tot nu toe?',
+      hulp: '1 is slecht, 10 is uitstekend.',
+    },
+    {
+      id: 'traject_toelichting', type: 'tekst',
+      vraag: 'Wil je dat cijfer toelichten?',
+      hulp: 'Alleen als je er iets bij wilt zeggen.',
+      placeholder: 'Optioneel.',
+    },
     {
       id: 'coaching_fijnste', type: 'tekst',
       vraag: 'Wat vind je tot nu toe het fijnste aan de coaching?',
