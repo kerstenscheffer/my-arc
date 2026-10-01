@@ -11,8 +11,8 @@
 // client_checkins.formulier_versie zegt welk formulier is gebruikt (1 = oud,
 // 2 = dit). De coach-weergave leest dat om te weten welke velden gevuld zijn.
 
-import { useState, useEffect } from 'react'
-import { CheckCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { CheckCircle, ChevronDown } from 'lucide-react'
 import CheckinService from './CheckinService'
 import { laadWeekCijfers } from './weekCijfers'
 import { laadProgressie, haalFase } from './progressieWeek'
@@ -53,6 +53,70 @@ function LijnTekst({ value, onChange, placeholder, style }) {
       onChange={e => { groei(e.target); onChange(e.target.value) }}
       style={{ ...LIJN, lineHeight: 1.5, padding: '6px 0', resize: 'none', overflow: 'hidden', display: 'block', ...style }}
     />
+  )
+}
+
+// Eigen dropdown in plaats van <select>: de native popup gaat in deze
+// full-screen overlay op desktop op de verkeerde plek open. Deze klapt
+// gewoon onder de lijn uit en ziet er op elk apparaat hetzelfde uit.
+function LijnDropdown({ value, opties, placeholder, onChange, style }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const dicht = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', dicht)
+    document.addEventListener('touchstart', dicht)
+    return () => { document.removeEventListener('mousedown', dicht); document.removeEventListener('touchstart', dicht) }
+  }, [open])
+  const gekozen = opties.find(o => o.key === value)
+  return (
+    <div ref={ref} style={{ position: 'relative', ...style }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        style={{
+          ...LIJN, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+          color: gekozen ? '#fff' : 'rgba(255,255,255,0.3)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <span style={{ flex: 1, textAlign: 'left' }}>{gekozen ? gekozen.label : placeholder}</span>
+        <ChevronDown size={18} strokeWidth={2.4} color="#fff"
+          style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+      {open && (
+        <div role="listbox" style={{
+          position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20, marginTop: 4,
+          background: '#161616', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
+          padding: 4, boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+        }}>
+          {opties.map(o => {
+            const aan = o.key === value
+            return (
+              <button
+                key={o.key}
+                type="button"
+                role="option"
+                aria-selected={aan}
+                onClick={() => { onChange(o.key); setOpen(false) }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  background: aan ? 'rgba(255,255,255,0.08)' : 'transparent', border: 'none', borderRadius: 8,
+                  padding: '12px 12px', color: '#fff', fontFamily: 'inherit',
+                  fontSize: 15, fontWeight: aan ? 800 : 700, cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {o.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -577,17 +641,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
 
         {v.type === 'keuze-uitleg' && (
           <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
-            <select
-              className="ci-lijn"
-              value={waarde ?? ''}
-              onChange={e => updateField(v.id, e.target.value || null)}
-              style={{ ...invoerStijl(true), fontSize: 16, appearance: 'auto' }}
-            >
-              <option value="" style={{ background: '#1a1a1a' }}>Maak een keuze</option>
-              {v.opties.map(o => (
-                <option key={o} value={o} style={{ background: '#1a1a1a' }}>{o}</option>
-              ))}
-            </select>
+            <LijnDropdown
+              value={waarde ?? null}
+              opties={v.opties.map(o => ({ key: o, label: o }))}
+              placeholder="Maak een keuze"
+              onChange={val => updateField(v.id, val)}
+            />
             <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 32 }}>{v.uitlegLabel}{v.verplicht ? ' *' : ''}</div>
             <LijnTekst
               placeholder={v.placeholder} value={formData[v.uitlegId]}
@@ -656,19 +715,16 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
                     const t = typeVan(d.type)
                     return (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <select
-                          className="ci-lijn"
+                        <LijnDropdown
                           value={d.type || 'trainen'}
-                          onChange={e => {
-                            const dt = typeVan(e.target.value)
-                            zetDoel(i, { type: e.target.value, doel_getal: dt?.standaard ?? null, tekst: '' })
+                          opties={DOEL_TYPES.map(dt => ({ key: dt.key, label: dt.label }))}
+                          placeholder="Soort doel"
+                          onChange={key => {
+                            const dt = typeVan(key)
+                            zetDoel(i, { type: key, doel_getal: dt?.standaard ?? null, tekst: '' })
                           }}
-                          style={{ ...rij, flex: 1, appearance: 'auto' }}
-                        >
-                          {DOEL_TYPES.map(dt => (
-                            <option key={dt.key} value={dt.key} style={{ background: '#1a1a1a' }}>{dt.label}</option>
-                          ))}
-                        </select>
+                          style={{ flex: 1, minWidth: 0 }}
+                        />
                         {d.type === 'eigen' ? (
                           <input
                             className="ci-lijn"
