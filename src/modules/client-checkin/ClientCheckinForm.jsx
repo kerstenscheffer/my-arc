@@ -28,6 +28,8 @@ const GRIJS = '#8a8a8a'
 
 // Eén beschrijving van het formulier; de render leest hieruit. Zo staat de
 // vraagtekst op één plek en kan er niets uit de pas lopen met de opslag.
+const TEVREDEN_OPTIES = ['Heel erg tevreden', 'Een beetje tevreden', 'Niet tevreden']
+
 const SECTIES = [
   {
     kop: 'Even bijpraten',
@@ -59,17 +61,48 @@ const SECTIES = [
         kopRechts: true,
       },
       {
-        id: 'cijfers_toelichting', type: 'tekst',
-        vraag: 'Ben jij tevreden over de progressie die je hebt gemaakt afgelopen week? Zo niet, wat ga je volgende week anders doen om je doel te bereiken?',
+        // Eerst kiezen, dan uitleggen. De keuze komt verderop terug in de
+        // vraag wat de klant komende week anders gaat doen.
+        id: 'progressie_tevreden', type: 'keuze-uitleg',
+        vraag: 'Ben je tevreden met de progressie die je afgelopen week hebt gemaakt?',
         hulp: null,
+        opties: TEVREDEN_OPTIES,
+        uitlegId: 'cijfers_toelichting',
+        uitlegLabel: 'Leg uit waarom',
         placeholder: 'In je eigen woorden.',
       },
     ],
   },
   {
-    // Blok 3 komt alleen in het formulier als er doelen van vorige week zijn
-    // om af te vinken. Zonder doelen is er niets terug te koppelen; de vraag
-    // hierboven dekt dan al hoe de week ging.
+    kop: 'Terugblik',
+    velden: [
+      {
+        id: 'trots_op', type: 'tekst',
+        vraag: 'Wat ging er goed, waar ben je trots op?',
+        hulp: 'Groot of klein, alles telt.',
+        placeholder: 'In je eigen woorden.',
+      },
+      {
+        id: 'kon_beter', type: 'tekst',
+        vraag: 'Wat vond je lastig?',
+        hulp: null,
+        placeholder: 'Schrijf op wat als eerste in je opkomt.',
+      },
+      {
+        // Grijpt terug op de keuze van slide 3. Wie al heel erg tevreden is,
+        // hoeft niets "anders" te doen; die vragen we wat hij vasthoudt.
+        id: 'volgende_week_beter', type: 'tekst',
+        vraag: 'Je gaf aan dat je {tevreden} was over je progressie, wat ga je komende week anders doen om te zorgen dat je wel tevreden bent over je progressie?',
+        vraagTevreden: 'Je gaf aan dat je heel erg tevreden was over je progressie, wat ga je komende week doen om dat vast te houden?',
+        vraagZonderKeuze: 'Wat ga je komende week anders doen om tevreden te zijn over je progressie?',
+        hulp: null,
+        placeholder: 'Bijvoorbeeld: zondagavond mijn eten voorbereiden.',
+      },
+    ],
+  },
+  {
+    // Komt alleen in het formulier als er doelen van vorige week zijn om af
+    // te vinken. Zonder doelen is er niets terug te koppelen.
     kop: 'Je doelen van afgelopen week',
     alleenMetDoelen: true,
     velden: [
@@ -87,35 +120,12 @@ const SECTIES = [
     ],
   },
   {
-    kop: 'Terugblik',
-    velden: [
-      {
-        id: 'trots_op', type: 'tekst',
-        vraag: 'Wat ging er goed, waar ben je trots op?',
-        hulp: 'Groot of klein, alles telt.',
-        placeholder: 'In je eigen woorden.',
-      },
-      {
-        id: 'kon_beter', type: 'tekst',
-        vraag: 'Wat kon er beter?',
-        hulp: 'Waar je tegenop zag, wat je bleef uitstellen, wat gedoe opleverde.',
-        placeholder: 'Schrijf op wat als eerste in je opkomt.',
-      },
-    ],
-  },
-  {
     kop: 'Focus voor komende week',
     velden: [
       {
         id: 'doelen_komende_week', type: 'doelen-stellen',
         vraag: 'Wat zijn je doelen voor komende week?',
         hulp: 'Maak ze specifiek en meetbaar. Eén tot drie doelen.',
-      },
-      {
-        id: 'volgende_week_beter', type: 'tekst',
-        vraag: 'Wat ga je deze week anders doen zodat je je doelen wél haalt?',
-        hulp: 'Eén ding dat je echt gaat doen is meer waard dan een lijstje goede voornemens.',
-        placeholder: 'Bijvoorbeeld: zondagavond mijn eten voorbereiden.',
       },
       {
         id: 'hulp_van_coach', type: 'tekst',
@@ -404,6 +414,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     let vraagTekst = v.vraag.includes('{naam}')
       ? (voornaam ? v.vraag.replace('{naam}', voornaam) : v.vraag.replace(', {naam}', ''))
       : v.vraag
+    if (v.vraag.includes('{tevreden}')) {
+      const keuze = formData.progressie_tevreden
+      vraagTekst = !keuze ? v.vraagZonderKeuze
+        : keuze === TEVREDEN_OPTIES[0] ? v.vraagTevreden
+        : v.vraag.replace('{tevreden}', keuze.toLowerCase())
+    }
 
     // Aanloop op het eerste scherm: waar in de fase zit je. Pas zodra de fase
     // bekend is, anders zou er even een andere zin staan die daarna verspringt.
@@ -617,6 +633,32 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
               </>
             )}
             <span style={{ color: GRIJS, fontSize: 16, fontWeight: 800 }}>{v.slot}</span>
+          </div>
+        )}
+
+        {v.type === 'keuze-uitleg' && (
+          <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
+            <select
+              value={waarde ?? ''}
+              onChange={e => updateField(v.id, e.target.value || null)}
+              style={{ ...invoerStijl(true), fontSize: 16, appearance: 'auto' }}
+            >
+              <option value="" style={{ background: '#1a1a1a' }}>Maak een keuze</option>
+              {v.opties.map(o => (
+                <option key={o} value={o} style={{ background: '#1a1a1a' }}>{o}</option>
+              ))}
+            </select>
+            <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 16 }}>{v.uitlegLabel}</div>
+            <textarea
+              placeholder={v.placeholder} value={formData[v.uitlegId] ?? ''}
+              onChange={e => updateField(v.uitlegId, e.target.value)}
+              style={{
+                background: KAART, border: `1px solid ${RAND}`, borderRadius: 10,
+                color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
+                padding: 14, width: '100%', minHeight: 110, marginTop: 8,
+                resize: 'vertical', lineHeight: 1.5, outline: 'none', textAlign: 'left',
+              }}
+            />
           </div>
         )}
 

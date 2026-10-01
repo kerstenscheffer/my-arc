@@ -128,11 +128,12 @@ export default function CheckinDetailView({
   // de volgorde waarin de klant het heeft opgeschreven.
   const v4Open = isV4 ? [
     { label: 'Hoe het gaat',                  waarde: checkin.hoe_gaat_het },
-    { label: 'Over de cijfers',               waarde: checkin.cijfers_toelichting },
+    { label: 'Tevreden over progressie',      waarde: checkin.progressie_tevreden },
+    { label: 'Waarom',                        waarde: checkin.cijfers_toelichting },
     { label: 'Over zijn doelen',              waarde: checkin.doelen_toelichting },
     { label: 'Doelen afgelopen week',         waarde: checkin.doelen_vrij },
     { label: 'Trots op',                      waarde: checkin.trots_op },
-    { label: 'Kon beter',                     waarde: checkin.kon_beter },
+    { label: 'Vond lastig',                   waarde: checkin.kon_beter },
     { label: 'Over het hele traject',         waarde: checkin.traject_toelichting },
     { label: 'Gaat komende week anders doen', waarde: checkin.volgende_week_beter },
     { label: 'Vraagt van jou',                waarde: checkin.hulp_van_coach },
