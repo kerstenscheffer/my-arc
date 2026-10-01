@@ -276,6 +276,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
   const [moreGrpSel,  setMoreGrpSel]  = useState([])
 
   // ── Training ──
+  const [trainingFrequency, setTrainingFrequency] = useState(data?.preferred_training_frequency ?? null)
   const [trainingDays, setTrainingDays] = useState(data?.preferred_training_days || [])
   const [trainingTime, setTrainingTime] = useState(data?.training_time || null)
 
@@ -328,7 +329,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
       setMoreGrpSel([])
       go('work_days')
     } else {
-      go('training_days')
+      go('training_frequency')
     }
     return newSaved
   }
@@ -406,6 +407,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
       eigen_blokken: eigenBlokken || [],
       agenda_toelichting: toelichting || null,
       job_type: uniekeBanen.length ? uniekeBanen.join(', ') : null,
+      preferred_training_frequency: trainingFrequency,
       preferred_training_days: trainingDays,
       training_time: trainingTime || null,
       sleep_time: st, wake_time: wt,
@@ -419,7 +421,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
   // ── Progress sectie bepalen ──
   const getSection = () => {
     const slaapSteps = ['sleep_time','wake_time','weekend_diff','weekend_sleep','weekend_wake']
-    const werkSteps  = ['num_jobs','job_type_1','job_type_2','job_type_more','job_type_3','work_days','all_same','grp_days','grp_start','grp_end','more_groups','training_days']
+    const werkSteps  = ['num_jobs','job_type_1','job_type_2','job_type_more','job_type_3','work_days','all_same','grp_days','grp_start','grp_end','more_groups','training_frequency','training_days']
     if (slaapSteps.includes(step)) return 0
     if (werkSteps.includes(step))  return 1
     return 2
@@ -490,7 +492,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
         <Q isMobile={isMobile}>Hoeveel banen heb je?</Q>
         <BigOption label="Ik heb één baan" onClick={() => { setNumJobs(1); go('job_type_1') }} selected={numJobs === 1} isMobile={isMobile} />
         <BigOption label="Ik heb meerdere banen" sub="Bijv. een dagbaan én een bijbaan" onClick={() => { setNumJobs('meer'); go('job_type_1') }} selected={numJobs === 'meer'} isMobile={isMobile} />
-        <BigOption label="Ik heb geen baan" sub="Student, gepensioneerd of anders" onClick={() => { setNumJobs(0); go('training_days') }} selected={numJobs === 0} isMobile={isMobile} />
+        <BigOption label="Ik heb geen baan" sub="Student, gepensioneerd of anders" onClick={() => { setNumJobs(0); go('training_frequency') }} selected={numJobs === 0} isMobile={isMobile} />
       </>
     )
 
@@ -577,7 +579,7 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
             </div>
           )}
           <NextBtn onClick={() => { setJobGroups([]); go('all_same') }} disabled={workDays.length === 0} isMobile={isMobile} />
-          <button onClick={() => go('training_days')} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: '0.4rem', padding: '0.2rem 0', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>Ik werk niet →</button>
+          <button onClick={() => go('training_frequency')} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: '0.4rem', padding: '0.2rem 0', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>Ik werk niet →</button>
         </>
       )
     }
@@ -707,10 +709,42 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
 
     // ── TRAINING ──────────────────────────────────────────────────────────────
 
+    if (step === 'training_frequency') return (
+      <>
+        <BackBtn onBack={goBack} />
+        <Q isMobile={isMobile}>Hoeveel dagen per week wil je trainen?</Q>
+        {[
+          { label: '2x per week', sub: 'Solide basis', val: 2 },
+          { label: '3x per week', sub: 'Populairste keuze', val: 3 },
+          { label: '4x per week', sub: 'Serieuze opbouw', val: 4 },
+          { label: '5x of meer', sub: 'Intensief schema', val: 5 },
+        ].map(opt => (
+          <BigOption
+            key={opt.val}
+            label={opt.label}
+            sub={opt.sub}
+            onClick={() => { setTrainingFrequency(opt.val); go('training_days') }}
+            selected={trainingFrequency === opt.val}
+            isMobile={isMobile}
+          />
+        ))}
+        <BigOption
+          label="Maakt me niet uit — coach bepaalt"
+          sub="Je coach plant het aantal trainingsdagen in op basis van jouw week"
+          onClick={() => { setTrainingFrequency(0); go('training_days') }}
+          selected={trainingFrequency === 0}
+          isMobile={isMobile}
+        />
+      </>
+    )
+
     if (step === 'training_days') return (
       <>
         <BackBtn onBack={goBack} />
-        <Q isMobile={isMobile}>Op welke dagen wil of kan je trainen?</Q>
+        <Q isMobile={isMobile}>Op welke dagen wil je trainen?</Q>
+        {trainingFrequency > 0 && (
+          <Hint isMobile={isMobile}>Je wil {trainingFrequency}x per week — kies je voorkeursdagen.</Hint>
+        )}
         <DayPicker selected={trainingDays} onToggle={toggleTraining} isMobile={isMobile} />
         <BigOption
           label="Maakt me niet uit — coach bepaalt"

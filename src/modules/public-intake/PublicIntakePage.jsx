@@ -461,7 +461,7 @@ export default function PublicIntakePage() {
           await supabase.from('user_workout_preferences').upsert({
             user_id: userId,
             training_time: tijdOfNull(data.training_time),
-            default_days_per_week: data.preferred_training_days?.length || null,
+            default_days_per_week: data.preferred_training_frequency || data.preferred_training_days?.length || null,
           }, { onConflict: 'user_id' })
           console.log('✅ training_time opgeslagen:', data.training_time)
         } catch (e) {
