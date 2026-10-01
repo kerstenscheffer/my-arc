@@ -63,14 +63,13 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
   return (
     <div style={{
       position: 'relative',
-      marginTop: space[4],
+      // De drie banden sluiten op elkaar aan: geen ruimte en geen lijn
+      // ertussen. De foto's vormen samen één strook aan de linkerkant.
+      marginTop: eerste ? space[4] : 0,
       marginLeft: -rand,
       // Verticale padding op de band, niet op de tekst: de foto zit op de
       // padding-box en steekt daardoor 8px boven en onder de tekst uit.
       padding: `${space[2]}px 0 ${space[2]}px ${rand + Math.round(FOTO_BREEDTE * 0.55)}px`,
-      // Lijn tussen de secties. Bewust lichter dan --border-subtle: die is
-      // op zwart met een foto ernaast niet te zien.
-      borderTop: eerste ? 'none' : '1px solid rgba(255,255,255,0.18)',
       minHeight: 88,
     }}>
       {foto && (
