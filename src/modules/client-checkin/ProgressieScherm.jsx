@@ -250,14 +250,14 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
               onClick={() => setSterkerUit(v => !v)}
               aria-expanded={sterkerUit}
               style={{
-                display: 'flex', alignItems: 'center', gap: space[2], width: '100%',
+                display: 'inline-flex', alignItems: 'center', gap: space[1],
                 padding: 0, marginTop: 2, background: 'transparent', border: 'none',
                 cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                ...BODY_ZACHT,
+                ...BODY,
               }}
             >
-              <span style={{ flex: 1 }}>
+              <span>
                 Sterker geworden op {training.sterker.length + training.meerOefeningen}
                 {training.sterker.length + training.meerOefeningen === 1 ? ' oefening' : ' oefeningen'}
               </span>
