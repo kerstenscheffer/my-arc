@@ -174,9 +174,11 @@ const SECTIES = [
     kop: 'Terugblik',
     velden: [
       {
-        id: 'trots_op', type: 'tekst',
+        // Meerdere regels: elk ding dat goed ging op een eigen lijn. Wordt
+        // als één tekst met regeleinden opgeslagen in trots_op.
+        id: 'trots_op', type: 'tekst-lijst', verplicht: true,
         vraag: 'Wat ging er goed, waar ben je trots op?',
-        hulp: 'Groot of klein, alles telt.',
+        hulp: 'Meerdere dingen? Druk op de + voor een extra regel.',
         placeholder: 'In je eigen woorden.',
       },
       {
@@ -680,6 +682,48 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
           </div>
         )}
 
+        {v.type === 'tekst-lijst' && (() => {
+          const regels = String(waarde ?? '').split('\n')
+          const zet = (lijst) => updateField(v.id, lijst.join('\n'))
+          return (
+            <div style={{ marginTop: '2.2vh' }}>
+              {regels.map((regel, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: i < regels.length - 1 ? 8 : 0 }}>
+                  <input
+                    className="ci-lijn"
+                    value={regel}
+                    placeholder={i === 0 ? v.placeholder : 'Nog iets?'}
+                    autoFocus={i > 0 && regel === ''}
+                    onChange={e => { const l = [...regels]; l[i] = e.target.value.replace(/\n/g, ' '); zet(l) }}
+                    onKeyDown={e => {
+                      // Enter op de laatste regel = nieuwe regel; backspace op een
+                      // lege regel haalt hem weg.
+                      if (e.key === 'Enter') { e.preventDefault(); if (i === regels.length - 1) zet([...regels, '']) }
+                      if (e.key === 'Backspace' && regel === '' && regels.length > 1) { e.preventDefault(); zet(regels.filter((_, n) => n !== i)) }
+                    }}
+                    style={{ ...LIJN, padding: '6px 0', flex: 1, minWidth: 0 }}
+                  />
+                  {i === regels.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={() => zet([...regels, ''])}
+                      aria-label="Regel toevoegen"
+                      style={{
+                        width: 28, height: 28, borderRadius: 999, background: '#fff', border: 'none',
+                        color: '#0A0A0A', fontSize: 20, fontWeight: 800, lineHeight: 1, cursor: 'pointer',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+
         {v.type === 'tekst' && (
           <LijnTekst
             placeholder={v.placeholder} value={waarde}
@@ -832,6 +876,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   const ingevuld = (v) => {
     if (!isVerplicht(v)) return true
     if (v.type === 'keuze-uitleg') return !!formData[v.id] && !!String(formData[v.uitlegId] || '').trim()
+    if (v.type === 'tekst-lijst') return String(formData[v.id] || '').split('\n').some(r => r.trim())
     const w = formData[v.id]
     return w != null && String(w).trim() !== ''
   }
