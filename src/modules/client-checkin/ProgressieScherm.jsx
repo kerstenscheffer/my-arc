@@ -78,7 +78,7 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
         <span aria-hidden style={{
           position: 'absolute', top: 0,
           left: rand + Math.round(FOTO_BREEDTE * 0.55),
-          width: 24, height: 1, background: 'rgba(255,255,255,0.35)',
+          width: 48, height: 1, background: 'rgba(255,255,255,0.35)',
         }} />
       )}
       {foto && (
