@@ -61,35 +61,55 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
     }
   }
 
+  // Eerst het scherm, dan de database. Voorheen wachtte de stip tot de
+  // update terug was van de server, en op een trage verbinding leek de tik
+  // daardoor niets te doen. Mislukt het opslaan, dan zetten we het terug —
+  // anders zou de 30-secondenpoll hem stilletjes weer ongelezen maken.
   const markAsRead = async (notificationId) => {
+    let vorige = null
+    setNotifications(prev => {
+      vorige = prev
+      return prev.map(n => n.id === notificationId ? { ...n, read_status: true } : n)
+    })
+    setUnreadCount(prev => Math.max(0, prev - 1))
     try {
-      await db.supabase
+      const { data, error } = await db.supabase
         .from('coach_notifications')
         .update({ read_status: true })
         .eq('id', notificationId)
-
-      setNotifications(prev => prev.map(n =>
-        n.id === notificationId ? { ...n, read_status: true } : n
-      ))
-      setUnreadCount(prev => Math.max(0, prev - 1))
+        .select('id')
+      // Nul rijen is ook een fout: PostgREST geeft dan geen error, maar de
+      // melding staat na de volgende poll gewoon weer op ongelezen.
+      if (error || !data || data.length === 0) throw error || new Error('geen rij bijgewerkt')
     } catch (err) {
       console.error('❌ Mark as read failed:', err)
+      if (vorige) setNotifications(vorige)
+      setUnreadCount(prev => prev + 1)
     }
   }
 
   const markAllRead = async () => {
+    let vorige = null
+    let vorigeTelling = 0
+    setNotifications(prev => {
+      vorige = prev
+      vorigeTelling = prev.filter(n => !n.read_status).length
+      return prev.map(n => ({ ...n, read_status: true }))
+    })
+    setUnreadCount(0)
     try {
       const { data: { user } } = await db.supabase.auth.getUser()
-      await db.supabase
+      const { error } = await db.supabase
         .from('coach_notifications')
         .update({ read_status: true })
         .eq('coach_id', user.id)
         .eq('read_status', false)
-
-      setNotifications(prev => prev.map(n => ({ ...n, read_status: true })))
-      setUnreadCount(0)
+        .select('id')
+      if (error) throw error
     } catch (err) {
       console.error('❌ Mark all read failed:', err)
+      if (vorige) setNotifications(vorige)
+      setUnreadCount(vorigeTelling)
     }
   }
 
