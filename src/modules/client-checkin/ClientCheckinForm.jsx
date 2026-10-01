@@ -30,12 +30,11 @@ const GRIJS = '#8a8a8a'
 // vraagtekst op één plek en kan er niets uit de pas lopen met de opslag.
 // Invoer is een schrijfblok met een witte lijn eronder, geen kader.
 const LIJN_CSS = `
-  .ci-lijn { border-bottom: 1.5px solid #fff; }
   .ci-lijn::placeholder { color: rgba(255,255,255,0.3); }
   .ci-lijn option { background: #1a1a1a; }
 `
 const LIJN = {
-  background: 'transparent', border: 'none', borderRadius: 0,
+  background: 'transparent', border: 'none', borderBottom: '1.5px solid #fff', borderRadius: 0,
   color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
   padding: '10px 0', width: '100%', outline: 'none', textAlign: 'left',
 }
