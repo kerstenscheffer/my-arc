@@ -28,6 +28,37 @@ const GRIJS = '#8a8a8a'
 
 // Eén beschrijving van het formulier; de render leest hieruit. Zo staat de
 // vraagtekst op één plek en kan er niets uit de pas lopen met de opslag.
+// Invoer is een lijn waarop je typt, geen kader. De lijn licht op bij focus.
+// Eén class in plaats van per veld een onFocus/onBlur.
+const LIJN_CSS = `
+  .ci-lijn { border-bottom: 1px solid rgba(255,255,255,0.35); transition: border-color 0.15s; }
+  .ci-lijn:focus { border-bottom-color: #fff; }
+  .ci-lijn::placeholder { color: rgba(255,255,255,0.3); }
+  .ci-lijn option { background: #1a1a1a; }
+`
+const LIJN = {
+  background: 'transparent', border: 'none', borderRadius: 0,
+  color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
+  padding: '10px 0', width: '100%', outline: 'none', textAlign: 'left',
+}
+
+// Tekstveld dat meegroeit met wat erin staat: begint als één regel en wordt
+// hoger zodra de tekst omloopt. Geen vaste hoogte, geen sleepgreep.
+function LijnTekst({ value, onChange, placeholder, style }) {
+  const groei = (el) => { if (!el) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` }
+  return (
+    <textarea
+      className="ci-lijn"
+      ref={groei}
+      rows={1}
+      placeholder={placeholder}
+      value={value ?? ''}
+      onChange={e => { groei(e.target); onChange(e.target.value) }}
+      style={{ ...LIJN, lineHeight: 1.5, resize: 'none', overflow: 'hidden', display: 'block', ...style }}
+    />
+  )
+}
+
 const TEVREDEN_OPTIES = ['Heel erg tevreden', 'Een beetje tevreden', 'Niet tevreden']
 
 const SECTIES = [
@@ -391,11 +422,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   }
 
   // ── Bouwstenen ────────────────────────────────────────────────────────
-  const invoerStijl = (breed) => ({
-    background: KAART, border: `1px solid ${RAND}`, borderRadius: 10,
-    color: '#fff', fontFamily: 'inherit', fontWeight: 800, fontSize: 18,
-    padding: '12px 14px', width: breed ? '100%' : 90, outline: 'none',
-  })
+  const invoerStijl = (breed) => ({ ...LIJN, fontWeight: 800, width: breed ? '100%' : 90 })
 
   const keuzeStijl = (aan, vast) => ({
     border: `1px solid ${aan ? '#fff' : RAND}`,
@@ -437,6 +464,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // tegen de bovenrand met een half scherm leegte eronder. Het blok blijft
       // smal (560px) zodat een vraag van twee regels leesbaar blijft.
       <div key={v.id} style={{ width: '100%', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
+        <style>{LIJN_CSS}</style>
         {aanhef && (
           <div style={{ fontSize: 15, lineHeight: 1.5, color: '#9ca3af', marginBottom: 8 }}>
             {aanhef}
@@ -517,6 +545,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         {(v.type === 'aantal' || v.type === 'aantal-van') && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: '2.2vh', flexWrap: 'wrap' }}>
             <select
+              className="ci-lijn"
               value={waarde ?? ''}
               onChange={e => updateField(v.id, e.target.value === '' ? null : Number(e.target.value))}
               style={invoerStijl(false)}
@@ -530,6 +559,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
               <>
                 <span style={{ color: GRIJS, fontSize: 16, fontWeight: 800 }}>{v.na}</span>
                 <select
+                  className="ci-lijn"
                   value={formData[v.tweedeId] ?? ''}
                   onChange={e => updateField(v.tweedeId, e.target.value === '' ? null : Number(e.target.value))}
                   style={invoerStijl(false)}
@@ -548,6 +578,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         {v.type === 'keuze-uitleg' && (
           <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
             <select
+              className="ci-lijn"
               value={waarde ?? ''}
               onChange={e => updateField(v.id, e.target.value || null)}
               style={{ ...invoerStijl(true), fontSize: 16, appearance: 'auto' }}
@@ -558,15 +589,10 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
               ))}
             </select>
             <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 16 }}>{v.uitlegLabel}</div>
-            <textarea
-              placeholder={v.placeholder} value={formData[v.uitlegId] ?? ''}
-              onChange={e => updateField(v.uitlegId, e.target.value)}
-              style={{
-                background: KAART, border: `1px solid ${RAND}`, borderRadius: 10,
-                color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
-                padding: 14, width: '100%', minHeight: 110, marginTop: 8,
-                resize: 'vertical', lineHeight: 1.5, outline: 'none', textAlign: 'left',
-              }}
+            <LijnTekst
+              placeholder={v.placeholder} value={formData[v.uitlegId]}
+              onChange={val => updateField(v.uitlegId, val)}
+              style={{ marginTop: 4 }}
             />
           </div>
         )}
@@ -594,21 +620,16 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         )}
 
         {v.type === 'tekst' && (
-          <textarea
-            placeholder={v.placeholder} value={waarde ?? ''}
-            onChange={e => updateField(v.id, e.target.value)}
-            style={{
-              background: KAART, border: `1px solid ${RAND}`, borderRadius: 10,
-              color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
-              padding: 14, width: '100%', minHeight: 110, marginTop: '2.2vh',
-              resize: 'vertical', lineHeight: 1.5, outline: 'none', textAlign: 'left',
-            }}
+          <LijnTekst
+            placeholder={v.placeholder} value={waarde}
+            onChange={val => updateField(v.id, val)}
+            style={{ marginTop: '2.2vh' }}
           />
         )}
 
         {v.metDoelen && (() => {
           const lijst = formData.doelen_komende_week || []
-          const rij = { ...invoerStijl(true), width: 'auto', minWidth: 0, fontSize: 15, padding: '10px 12px' }
+          const rij = { ...invoerStijl(true), width: 'auto', minWidth: 0, fontSize: 15 }
           return (
             <div style={{ marginTop: 20, textAlign: 'left' }}>
               <div style={{ color: '#fff', fontSize: 15, fontWeight: 800 }}>
@@ -636,6 +657,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
                     return (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <select
+                          className="ci-lijn"
                           value={d.type || 'trainen'}
                           onChange={e => {
                             const dt = typeVan(e.target.value)
@@ -649,6 +671,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
                         </select>
                         {d.type === 'eigen' ? (
                           <input
+                            className="ci-lijn"
                             value={d.tekst || ''}
                             onChange={e => zetDoel(i, { tekst: e.target.value })}
                             placeholder="Bijvoorbeeld: om 23:00 in bed"
@@ -657,6 +680,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
                         ) : (
                           <>
                             <input
+                              className="ci-lijn"
                               type="number"
                               inputMode="numeric"
                               value={d.doel_getal ?? ''}
