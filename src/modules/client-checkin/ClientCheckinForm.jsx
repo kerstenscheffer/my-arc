@@ -899,24 +899,15 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
         flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
         width: '100%', maxWidth: 560, margin: '0 auto', padding: '2vh 0',
       }}>
+      {/* Zacht: de titel en de balk zijn context, de vraag eronder is het
+          enige dat moet opvallen. Geen sectiekop, geen teller. */}
       {titel && (
-        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 12, letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: GRIJS, marginBottom: 10 }}>
           {titel}
         </div>
       )}
-      {/* Voortgang */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ width: `${voortgang}%`, height: '100%', background: '#fff', transition: 'width 0.25s ease' }} />
-        </div>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-          marginTop: '1vh', fontSize: 12, fontWeight: 800, letterSpacing: '0.14em',
-          textTransform: 'uppercase', color: GRIJS,
-        }}>
-          <span style={{ color: '#fff' }}>{vraag.kop}</span>
-          <span>{stap + 1} / {vragen.length}</span>
-        </div>
+      <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden', marginBottom: 32 }}>
+        <div style={{ width: `${voortgang}%`, height: '100%', background: 'rgba(255,255,255,0.55)', transition: 'width 0.25s ease' }} />
       </div>
 
       {/* De vraag */}
