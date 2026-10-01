@@ -182,9 +182,9 @@ const SECTIES = [
         placeholder: 'In je eigen woorden.',
       },
       {
-        id: 'kon_beter', type: 'tekst',
+        id: 'kon_beter', type: 'tekst-lijst', verplicht: true,
         vraag: 'Wat vond je lastig?',
-        hulp: null,
+        hulp: 'Meerdere dingen? Druk op de + voor een extra regel.',
         placeholder: 'Schrijf op wat als eerste in je opkomt.',
       },
       {
