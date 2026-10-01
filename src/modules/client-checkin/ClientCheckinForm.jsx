@@ -121,29 +121,24 @@ function LijnDropdown({ value, opties, placeholder, onChange, style }) {
   )
 }
 
-// Getal kiezen door te schuiven: tik op het getal en er klapt een verticale
-// rol open (zoals een wieltje) waar je doorheen scrolt; het getal in het
-// midden telt. Tikken op een getal kiest het direct.
-const ROL_HOOGTE = 40
+// Getal kiezen door te schuiven: een rol die altijd open staat, met het
+// gekozen getal groot in het midden, twee getallen erboven en twee eronder.
+// Scrollen snapt per getal; tikken op een getal kiest het direct.
+const ROL_HOOGTE = 32
+const ROL_ZICHTBAAR = 5
 function GetalRol({ value, min = 1, max = 99, stap = 1, onChange, style }) {
-  const [open, setOpen] = useState(false)
-  const wrap = useRef(null)
   const rol = useRef(null)
   const timer = useRef(null)
   const waarden = []
   for (let n = min; n <= max; n += stap) waarden.push(n)
+  const rand = ROL_HOOGTE * Math.floor(ROL_ZICHTBAAR / 2)
 
+  // Bij het opkomen op het huidige getal gaan staan.
   useEffect(() => {
-    if (!open) return
-    // Op het huidige getal beginnen.
     const idx = Math.max(0, waarden.findIndex(n => n === value))
     if (rol.current) rol.current.scrollTop = idx * ROL_HOOGTE
-    const dicht = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', dicht)
-    document.addEventListener('touchstart', dicht)
-    return () => { document.removeEventListener('mousedown', dicht); document.removeEventListener('touchstart', dicht) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [])
 
   const bijScroll = () => {
     clearTimeout(timer.current)
@@ -155,63 +150,57 @@ function GetalRol({ value, min = 1, max = 99, stap = 1, onChange, style }) {
     }, 80)
   }
 
+  const kies = (n) => {
+    const idx = waarden.indexOf(n)
+    if (rol.current && idx >= 0) rol.current.scrollTo({ top: idx * ROL_HOOGTE, behavior: 'smooth' })
+    onChange(n)
+  }
+
+  const stijlVoor = (n) => {
+    const afstand = Math.abs(waarden.indexOf(n) - waarden.indexOf(value))
+    if (afstand === 0) return { fontSize: 20, fontWeight: 800, color: '#fff' }
+    if (afstand === 1) return { fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }
+    return { fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.28)' }
+  }
+
   return (
-    <div ref={wrap} style={{ position: 'relative', ...style }}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
+    <div style={{ position: 'relative', height: ROL_HOOGTE * ROL_ZICHTBAAR, ...style }}>
+      {/* Het venster in het midden: dit getal telt. */}
+      <div aria-hidden style={{
+        position: 'absolute', left: 0, right: 0, top: rand, height: ROL_HOOGTE,
+        borderTop: '1px solid rgba(255,255,255,0.25)', borderBottom: '1px solid rgba(255,255,255,0.25)',
+        pointerEvents: 'none',
+      }} />
+      <div
+        ref={rol}
+        role="listbox"
+        onScroll={bijScroll}
         style={{
-          ...LIJN, width: '100%', textAlign: 'center', fontWeight: 800, cursor: 'pointer',
-          color: value == null ? 'rgba(255,255,255,0.3)' : '#fff',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory',
+          padding: `${rand}px 0`, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+          maskImage: 'linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent)',
+          WebkitMaskImage: 'linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent)',
         }}
       >
-        {value ?? '—'}
-      </button>
-      {open && (
-        <div style={{
-          position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', zIndex: 30,
-          marginTop: 4, width: 88, height: ROL_HOOGTE * 3,
-          background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
-          boxShadow: '0 12px 32px rgba(0,0,0,0.6)', overflow: 'hidden',
-        }}>
-          {/* Het venster in het midden: dit getal telt. */}
-          <div aria-hidden style={{
-            position: 'absolute', left: 6, right: 6, top: ROL_HOOGTE, height: ROL_HOOGTE,
-            borderRadius: 8, background: 'rgba(255,255,255,0.08)', pointerEvents: 'none',
-          }} />
-          <div
-            ref={rol}
-            role="listbox"
-            onScroll={bijScroll}
+        {waarden.map(n => (
+          <button
+            key={n}
+            type="button"
+            role="option"
+            aria-selected={n === value}
+            onClick={() => kies(n)}
             style={{
-              height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory',
-              padding: `${ROL_HOOGTE}px 0`, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+              display: 'block', width: '100%', height: ROL_HOOGTE, scrollSnapAlign: 'center',
+              background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit',
+              fontVariantNumeric: 'tabular-nums', cursor: 'pointer', transition: 'font-size 0.12s, color 0.12s',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              ...stijlVoor(n),
             }}
           >
-            {waarden.map(n => (
-              <button
-                key={n}
-                type="button"
-                role="option"
-                aria-selected={n === value}
-                onClick={() => { onChange(n); setOpen(false) }}
-                style={{
-                  display: 'block', width: '100%', height: ROL_HOOGTE, scrollSnapAlign: 'center',
-                  background: 'transparent', border: 'none', fontFamily: 'inherit',
-                  fontSize: 16, fontWeight: n === value ? 800 : 700,
-                  color: n === value ? '#fff' : 'rgba(255,255,255,0.45)', cursor: 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+            {n}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -774,7 +763,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                                 max={t?.max || 99}
                                 stap={t?.stap || 1}
                                 onChange={n => zetDoel(i, { doel_getal: n })}
-                                style={{ width: 64, flex: 'none' }}
+                                style={{ width: 72, flex: 'none' }}
                               />
                               <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.6)', minWidth: 42 }}>
                                 {t?.eenheid}
