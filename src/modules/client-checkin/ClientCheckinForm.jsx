@@ -583,92 +583,150 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
         {v.metDoelen && (() => {
           const lijst = formData.doelen_komende_week || []
           const rij = { ...invoerStijl(true), width: 'auto', minWidth: 0, fontSize: 15 }
+          const gekozen = lijst.filter(d => geldigDoel(d))
+          const open = () => { setDoelenOpen(true); if (lijst.length === 0) voegDoelToe() }
           return (
             <div style={{ marginTop: 20, textAlign: 'left' }}>
               <div style={{ color: '#fff', fontSize: 15, fontWeight: 800 }}>
                 Doelen stellen voor jezelf kan het makkelijker maken.
               </div>
 
-              {!doelenOpen ? (
-                <button
-                  type="button"
-                  onClick={() => { setDoelenOpen(true); if (lijst.length === 0) voegDoelToe() }}
+              {/* Op de pagina zelf alleen de gekozen doelen; het invullen
+                  gebeurt in de sheet onderaan, zodat de focus op één plek
+                  blijft. */}
+              {gekozen.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  {gekozen.map((d, i) => (
+                    <div key={i} style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.85)', padding: '4px 0' }}>
+                      {doelTekst(d)}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={open}
+                style={gekozen.length > 0
+                  ? {
+                      marginTop: 6, padding: 0, background: 'none', border: 'none',
+                      color: '#fff', fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }
+                  : {
+                      marginTop: 10, minHeight: 44, padding: '0 20px', borderRadius: 12,
+                      background: '#fff', border: 'none', color: '#0A0A0A',
+                      fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+              >
+                {gekozen.length > 0 ? 'Doelen aanpassen' : 'Stel doel'}
+              </button>
+
+              {/* Sheet van onderaf. */}
+              {doelenOpen && (
+                <div
+                  onClick={() => setDoelenOpen(false)}
                   style={{
-                    marginTop: 10, minHeight: 44, padding: '0 20px', borderRadius: 12,
-                    background: '#fff', border: 'none', color: '#0A0A0A',
-                    fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    position: 'fixed', inset: 0, zIndex: 50,
+                    background: 'rgba(0,0,0,0.65)',
+                    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                    animation: 'checkinFadeIn 0.15s ease',
                   }}
                 >
-                  Stel doel
-                </button>
-              ) : (
-                <div style={{ marginTop: 10 }}>
-                  {/* Eén regel per doel: soort (dropdown), dan het aantal. */}
-                  {lijst.map((d, i) => {
-                    const t = typeVan(d.type)
-                    return (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <LijnDropdown
-                          value={d.type || 'trainen'}
-                          opties={DOEL_TYPES.map(dt => ({ key: dt.key, label: dt.label }))}
-                          placeholder="Soort doel"
-                          onChange={key => {
-                            const dt = typeVan(key)
-                            zetDoel(i, { type: key, doel_getal: dt?.standaard ?? null, tekst: '' })
-                          }}
-                          style={{ flex: 1, minWidth: 0 }}
-                        />
-                        {d.type === 'eigen' ? (
-                          <input
-                            className="ci-lijn"
-                            value={d.tekst || ''}
-                            onChange={e => zetDoel(i, { tekst: e.target.value })}
-                            placeholder="Bijvoorbeeld: om 23:00 in bed"
-                            style={{ ...rij, flex: 2 }}
+                  <div
+                    onClick={e => e.stopPropagation()}
+                    role="dialog"
+                    aria-label="Doelen voor komende week"
+                    style={{
+                      width: '100%', maxWidth: 560, boxSizing: 'border-box',
+                      background: '#141414', borderRadius: '16px 16px 0 0',
+                      padding: '16px 16px max(16px, env(safe-area-inset-bottom))',
+                      animation: 'checkinSheetUp 0.2s ease',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 12 }}>
+                      Doelen voor komende week
+                    </div>
+                    {/* Eén regel per doel: soort (dropdown), dan het aantal. */}
+                    {lijst.map((d, i) => {
+                      const t = typeVan(d.type)
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <LijnDropdown
+                            value={d.type || 'trainen'}
+                            opties={DOEL_TYPES.map(dt => ({ key: dt.key, label: dt.label }))}
+                            placeholder="Soort doel"
+                            onChange={key => {
+                              const dt = typeVan(key)
+                              zetDoel(i, { type: key, doel_getal: dt?.standaard ?? null, tekst: '' })
+                            }}
+                            style={{ flex: 1, minWidth: 0 }}
                           />
-                        ) : (
-                          <>
+                          {d.type === 'eigen' ? (
                             <input
                               className="ci-lijn"
-                              type="number"
-                              inputMode="numeric"
-                              value={d.doel_getal ?? ''}
-                              min={1}
-                              max={t?.max || 99}
-                              step={t?.stap || 1}
-                              onChange={e => zetDoel(i, { doel_getal: e.target.value === '' ? null : Number(e.target.value) })}
-                              style={{ ...rij, width: 64, flex: 'none', textAlign: 'center' }}
+                              value={d.tekst || ''}
+                              onChange={e => zetDoel(i, { tekst: e.target.value })}
+                              placeholder="Bijvoorbeeld: om 23:00 in bed"
+                              style={{ ...rij, flex: 2 }}
                             />
-                            <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.6)', minWidth: 42 }}>
-                              {t?.eenheid}
-                            </span>
-                          </>
-                        )}
-                        {lijst.length > 1 && (
-                          <button type="button" onClick={() => verwijderDoel(i)} aria-label="Doel verwijderen" style={{
-                            background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)',
-                            fontSize: 20, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-                            padding: '0 4px', lineHeight: 1,
-                          }}>×</button>
-                        )}
-                      </div>
-                    )
-                  })}
+                          ) : (
+                            <>
+                              <input
+                                className="ci-lijn"
+                                type="number"
+                                inputMode="numeric"
+                                value={d.doel_getal ?? ''}
+                                min={1}
+                                max={t?.max || 99}
+                                step={t?.stap || 1}
+                                onChange={e => zetDoel(i, { doel_getal: e.target.value === '' ? null : Number(e.target.value) })}
+                                style={{ ...rij, width: 64, flex: 'none', textAlign: 'center' }}
+                              />
+                              <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.6)', minWidth: 42 }}>
+                                {t?.eenheid}
+                              </span>
+                            </>
+                          )}
+                          {lijst.length > 1 && (
+                            <button type="button" onClick={() => verwijderDoel(i)} aria-label="Doel verwijderen" style={{
+                              background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)',
+                              fontSize: 20, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+                              padding: '0 4px', lineHeight: 1,
+                            }}>×</button>
+                          )}
+                        </div>
+                      )
+                    })}
 
-                  {lijst.length < 3 && (
-                    <button type="button" onClick={voegDoelToe} style={{
-                      background: 'none', border: 'none', padding: 0,
-                      color: '#fff', fontSize: 14, fontWeight: 800,
-                      fontFamily: 'inherit', cursor: 'pointer',
-                    }}>
-                      + Doel erbij
+                    {lijst.length < 3 && (
+                      <button type="button" onClick={voegDoelToe} style={{
+                        background: 'none', border: 'none', padding: 0,
+                        color: '#fff', fontSize: 14, fontWeight: 800,
+                        fontFamily: 'inherit', cursor: 'pointer',
+                      }}>
+                        + Doel erbij
+                      </button>
+                    )}
+                    <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
+                      Deze doelen komen volgende week terug in je check-in, en staan tot die tijd
+                      op je startscherm.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDoelenOpen(false)}
+                      style={{
+                        width: '100%', minHeight: 48, marginTop: 16, borderRadius: 12,
+                        background: '#fff', border: 'none', color: '#0A0A0A',
+                        fontSize: 16, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      Klaar
                     </button>
-                  )}
-                  <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
-                    Deze doelen komen volgende week terug in je check-in, en staan tot die tijd
-                    op je startscherm.
                   </div>
+                  <style>{'@keyframes checkinSheetUp { from { transform: translateY(100%); } to { transform: none; } }'}</style>
                 </div>
               )}
             </div>
