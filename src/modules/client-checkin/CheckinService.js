@@ -40,7 +40,7 @@ export default class CheckinService {
     try {
       const { data, error } = await this.supabase
         .from('client_checkins')
-        .select('id, checkin_date, doelen_komende_week')
+        .select('id, checkin_date, doelen_komende_week, volgende_week_beter')
         .eq('client_id', clientId)
         .eq('formulier_versie', 4)
         .not('doelen_komende_week', 'is', null)

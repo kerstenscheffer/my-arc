@@ -24,6 +24,24 @@ export const SECTIES = [
     ],
   },
   {
+    // Slide 2: terugkoppeling op vorige week. Komt alleen in het formulier
+    // als er toen doelen zijn gezet; zonder doelen is er niets terug te
+    // koppelen. Toont wat de klant toen opschreef ("dit ga ik anders doen")
+    // en zijn doelen met gehaald/niet, en vraagt waarom.
+    kop: 'Je doelen van afgelopen week',
+    alleenMetDoelen: true,
+    velden: [
+      {
+        id: 'doelen_vorige_week', type: 'doelen-terugkoppeling', verplicht: true,
+        vraag: 'Afgelopen week waren dit je doelen, is het gelukt deze uit te voeren?',
+        hulp: null,
+        uitlegId: 'doelen_toelichting',
+        uitlegLabel: 'Waarom wel/niet?',
+        placeholder: 'In je eigen woorden.',
+      },
+    ],
+  },
+  {
     kop: 'Je progressie',
     velden: [
       {
@@ -82,25 +100,6 @@ export const SECTIES = [
         // Het doelen-blok staat compact onder dit antwoord: wie net heeft
         // opgeschreven wat hij anders gaat doen, kan het meteen meetbaar maken.
         metDoelen: true,
-      },
-    ],
-  },
-  {
-    // Komt alleen in het formulier als er doelen van vorige week zijn om af
-    // te vinken. Zonder doelen is er niets terug te koppelen.
-    kop: 'Je doelen van afgelopen week',
-    alleenMetDoelen: true,
-    velden: [
-      {
-        id: 'doelen_vorige_week', type: 'doelen-terugkoppeling',
-        vraag: 'Heb je je doelen gehaald?',
-        hulp: 'We hebben alvast ingevuld wat de app ervan meet. Klopt het niet, zet het om.',
-      },
-      {
-        id: 'doelen_toelichting', type: 'tekst',
-        vraag: 'Waarom wel of waarom niet?',
-        hulp: 'Wat hielp, en wat zat in de weg.',
-        placeholder: 'In je eigen woorden.',
       },
     ],
   },
@@ -209,6 +208,7 @@ export function antwoordenVan(checkin, voornaam = '') {
       case 'doelen-terugkoppeling': {
         const d = checkin.doelen_vorige_week
         if (Array.isArray(d) && d.length) uit.push({ soort: 'doelen-terug', id: v.id, vraag, doelen: d })
+        if (!leeg(checkin[v.uitlegId])) uit.push({ soort: 'tekst', id: v.uitlegId, vraag: v.uitlegLabel, antwoord: checkin[v.uitlegId] })
         break
       }
       default: {

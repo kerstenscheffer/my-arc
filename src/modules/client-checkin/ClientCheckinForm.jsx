@@ -284,6 +284,9 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
   // null = nog aan het laden, [] = die zijn er niet (eerste keer, of de vorige
   // check-in was nog het oude formulier).
   const [vorigeDoelen, setVorigeDoelen] = useState(null)
+  // Wat de klant vorige week opschreef bij "wat ga je anders doen": komt
+  // terug op de terugkoppeling-slide, boven zijn doelen.
+  const [vorigeAnders, setVorigeAnders] = useState('')
 
   const service = new CheckinService(db)
 
@@ -326,6 +329,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
       if (weg) return
       const klaar = bereidTerugkoppelingVoor(vorige?.doelen_komende_week, c)
       setVorigeDoelen(klaar)
+      setVorigeAnders(String(vorige?.volgende_week_beter || '').trim())
       // Het formulier begint met wat er al ingevuld is: de terugkoppeling met
       // het voorstel, en de nieuwe doelen met die van vorige week als start.
       setFormData(prev => ({
@@ -513,6 +517,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
           }
           return (
             <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
+              {vorigeAnders && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ color: GRIJS, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Dit ging je anders doen</div>
+                  <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{vorigeAnders}</div>
+                </div>
+              )}
               {lijst.map((d, i) => (
                 <div key={i} style={{
                   padding: '12px 14px', marginBottom: 8,
@@ -556,6 +566,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                 Wat de app kon meten staat al ingevuld. Klopt het niet met hoe jouw week
                 ging, zet het gerust om.
               </div>
+              <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 24 }}>{v.uitlegLabel}{isVerplicht(v) ? ' *' : ''}</div>
+              <LijnTekst
+                placeholder={v.placeholder} value={formData[v.uitlegId]}
+                onChange={val => updateField(v.uitlegId, val)}
+                style={{ marginTop: 4 }}
+              />
             </div>
           )
         })()}
@@ -885,6 +901,10 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
     if (!isVerplicht(v)) return true
     if (v.type === 'keuze-uitleg') return !!formData[v.id] && !!String(formData[v.uitlegId] || '').trim()
     if (v.type === 'tekst-lijst') return String(formData[v.id] || '').split('\n').some(r => r.trim())
+    if (v.type === 'doelen-terugkoppeling') {
+      const lijst = formData.doelen_vorige_week || []
+      return lijst.every(d => d.behaald) && !!String(formData[v.uitlegId] || '').trim()
+    }
     const w = formData[v.id]
     return w != null && String(w).trim() !== ''
   }
