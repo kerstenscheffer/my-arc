@@ -60,16 +60,18 @@ const SECTIES = [
       },
       {
         id: 'cijfers_toelichting', type: 'tekst',
-        vraag: 'Hoe kijk je terug op de progressie van afgelopen week?',
+        vraag: 'Ben jij tevreden over de progressie die je hebt gemaakt afgelopen week? Zo niet, wat ga je volgende week anders doen om je doel te bereiken?',
         hulp: null,
-        placeholder: 'Bijvoorbeeld: tevreden, maar dinsdag ziek geweest.',
+        placeholder: 'In je eigen woorden.',
       },
     ],
   },
   {
-    // Blok 3 wordt bij het renderen gevuld: staan er doelen van vorige week,
-    // dan komt de terugkoppeling; zo niet, dan één open vraag.
+    // Blok 3 komt alleen in het formulier als er doelen van vorige week zijn
+    // om af te vinken. Zonder doelen is er niets terug te koppelen; de vraag
+    // hierboven dekt dan al hoe de week ging.
     kop: 'Je doelen van afgelopen week',
+    alleenMetDoelen: true,
     velden: [
       {
         id: 'doelen_vorige_week', type: 'doelen-terugkoppeling',
@@ -191,7 +193,7 @@ const reeksVoor = (v) => {
 // Eén vraag per scherm. De secties blijven als kopje boven de vraag staan,
 // zodat je weet in welk deel je zit, maar er is geen scherm meer met zeven
 // vragen tegelijk.
-const platteVragen = (secties) => secties.flatMap(sec => sec.velden.map(v => ({ ...v, kop: sec.kop })))
+const platteVragen = (secties) => secties.flatMap(sec => sec.velden.map(v => ({ ...v, kop: sec.kop, alleenMetDoelen: !!sec.alleenMetDoelen })))
 const VRAGEN_BASIS = platteVragen(SECTIES)
 const VRAGEN_MET_COACHING = platteVragen([...SECTIES, COACHING_SECTIE])
 
@@ -443,25 +445,6 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
           if (vorigeDoelen === null) {
             return <div style={{ marginTop: '2.2vh', color: GRIJS, fontSize: 14, fontWeight: 700 }}>Je doelen worden opgehaald…</div>
           }
-          // Geen doelen van vorige week: dan één open vraag, zodat de klant
-          // toch kan vertellen waar hij op mikte.
-          if (lijst.length === 0) {
-            return (
-              <div style={{ marginTop: '2.2vh' }}>
-                <textarea
-                  value={formData.doelen_vrij || ''}
-                  onChange={e => updateField('doelen_vrij', e.target.value)}
-                  placeholder="Wat waren je doelen voor afgelopen week?"
-                  rows={4}
-                  style={{ ...invoerStijl(true), resize: 'vertical' }}
-                />
-                <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
-                  Vanaf nu kies je aan het eind van deze check-in je doelen, en komen ze
-                  hier volgende week vanzelf terug.
-                </div>
-              </div>
-            )
-          }
           return (
             <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
               {lijst.map((d, i) => (
@@ -709,7 +692,11 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   }
 
   // ── Formulier — één vraag per scherm ──────────────────────────────────
-  const vragen = coachingRonde ? VRAGEN_MET_COACHING : VRAGEN_BASIS
+  // Zolang de doelen laden (vorigeDoelen === null) blijft het blok staan,
+  // anders springt het aantal schermen tijdens het invullen.
+  const geenDoelen = Array.isArray(vorigeDoelen) && vorigeDoelen.length === 0
+  const vragen = (coachingRonde ? VRAGEN_MET_COACHING : VRAGEN_BASIS)
+    .filter(v => !(v.alleenMetDoelen && geenDoelen))
   const vraag = vragen[stap]
   const laatste = stap === vragen.length - 1
   // Voortgang telt de vraag waar je nu op staat mee, zodat de balk direct
