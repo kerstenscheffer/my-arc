@@ -28,11 +28,9 @@ const GRIJS = '#8a8a8a'
 
 // Eén beschrijving van het formulier; de render leest hieruit. Zo staat de
 // vraagtekst op één plek en kan er niets uit de pas lopen met de opslag.
-// Invoer is een lijn waarop je typt, geen kader. De lijn licht op bij focus.
-// Eén class in plaats van per veld een onFocus/onBlur.
+// Invoer is een schrijfblok met een witte lijn eronder, geen kader.
 const LIJN_CSS = `
-  .ci-lijn { border-bottom: 1px solid rgba(255,255,255,0.35); transition: border-color 0.15s; }
-  .ci-lijn:focus { border-bottom-color: #fff; }
+  .ci-lijn { border-bottom: 1.5px solid #fff; }
   .ci-lijn::placeholder { color: rgba(255,255,255,0.3); }
   .ci-lijn option { background: #1a1a1a; }
 `
@@ -42,8 +40,8 @@ const LIJN = {
   padding: '10px 0', width: '100%', outline: 'none', textAlign: 'left',
 }
 
-// Tekstveld dat meegroeit met wat erin staat: begint als één regel en wordt
-// hoger zodra de tekst omloopt. Geen vaste hoogte, geen sleepgreep.
+// Tekstveld van een paar regels hoog dat meegroeit zodra de tekst verder
+// loopt. Geen sleepgreep.
 function LijnTekst({ value, onChange, placeholder, style }) {
   const groei = (el) => { if (!el) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` }
   return (
@@ -54,7 +52,7 @@ function LijnTekst({ value, onChange, placeholder, style }) {
       placeholder={placeholder}
       value={value ?? ''}
       onChange={e => { groei(e.target); onChange(e.target.value) }}
-      style={{ ...LIJN, lineHeight: 1.5, resize: 'none', overflow: 'hidden', display: 'block', ...style }}
+      style={{ ...LIJN, lineHeight: 1.5, minHeight: 72, resize: 'none', overflow: 'hidden', display: 'block', ...style }}
     />
   )
 }
