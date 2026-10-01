@@ -120,6 +120,8 @@ function LijnDropdown({ value, opties, placeholder, onChange, style }) {
   )
 }
 
+const isVerplicht = (v) => !!v && (v.verplicht ?? (v.type === 'tekst' && !v.optioneel))
+
 const TEVREDEN_OPTIES = ['Heel erg tevreden', 'Een beetje tevreden', 'Niet tevreden']
 
 const SECTIES = [
@@ -227,7 +229,7 @@ const SECTIES = [
         placeholder: 'Zeg het gerust rechtstreeks.',
       },
       {
-        id: 'komende_week', type: 'tekst',
+        id: 'komende_week', type: 'tekst', optioneel: true,
         vraag: 'Is er komende week iets waardoor je het plan niet kan volgen?',
         hulp: 'Bijvoorbeeld een bruiloft, weekend weg, drukke werkweek of vakantie.',
         placeholder: 'Zo niet, laat leeg.',
@@ -251,7 +253,7 @@ const COACHING_SECTIE = {
       hulp: '1 is slecht, 10 is uitstekend.',
     },
     {
-      id: 'traject_toelichting', type: 'tekst',
+      id: 'traject_toelichting', type: 'tekst', optioneel: true,
       vraag: 'Wil je dat cijfer toelichten?',
       hulp: 'Alleen als je er iets bij wilt zeggen.',
       placeholder: 'Optioneel.',
@@ -540,7 +542,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
           color: '#fff',
           textAlign: 'left',
         }}>
-          {vraagTekst}{v.verplicht ? ' *' : ''}
+          {vraagTekst}{isVerplicht(v) ? ' *' : ''}
         </div>
         {v.hulp && (
           <div style={{ color: GRIJS, fontSize: 14, fontWeight: 700, marginTop: '0.8vh' }}>
@@ -647,7 +649,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
               placeholder="Maak een keuze"
               onChange={val => updateField(v.id, val)}
             />
-            <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 32 }}>{v.uitlegLabel}{v.verplicht ? ' *' : ''}</div>
+            <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginTop: 32 }}>{v.uitlegLabel}{isVerplicht(v) ? ' *' : ''}</div>
             <LijnTekst
               placeholder={v.placeholder} value={formData[v.uitlegId]}
               onChange={val => updateField(v.uitlegId, val)}
@@ -825,9 +827,10 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     .filter(v => !(v.alleenMetDoelen && geenDoelen))
   const vraag = vragen[stap]
   const laatste = stap === vragen.length - 1
-  // Een verplichte slide is pas klaar als alles erop is ingevuld.
+  // Een verplichte slide is pas klaar als alles erop is ingevuld. Tekstvelden
+  // zijn standaard verplicht; alleen velden met optioneel: true niet.
   const ingevuld = (v) => {
-    if (!v?.verplicht) return true
+    if (!isVerplicht(v)) return true
     if (v.type === 'keuze-uitleg') return !!formData[v.id] && !!String(formData[v.uitlegId] || '').trim()
     const w = formData[v.id]
     return w != null && String(w).trim() !== ''
@@ -895,11 +898,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
             Volgende
           </button>
         ) : (
-          <button type="button" onClick={handleSubmit} disabled={submitting}
+          <button type="button" onClick={() => { if (magVerder) handleSubmit() }} disabled={submitting || !magVerder}
             style={{
               background: '#fff', color: '#0A0A0A', border: 'none', borderRadius: 12,
               padding: '15px 30px', fontFamily: 'inherit', fontSize: 16, fontWeight: 900,
-              cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.6 : 1,
+              cursor: submitting ? 'wait' : magVerder ? 'pointer' : 'default',
+              opacity: submitting ? 0.6 : magVerder ? 1 : 0.4,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
             {submitting ? 'Versturen…' : 'Versturen'}

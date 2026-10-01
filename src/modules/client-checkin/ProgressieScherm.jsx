@@ -261,10 +261,13 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
                 Sterker geworden op {training.sterker.length + training.meerOefeningen}
                 {training.sterker.length + training.meerOefeningen === 1 ? ' oefening' : ' oefeningen'}
               </span>
-              <ChevronDown
-                size={16} strokeWidth={2.4}
-                style={{ flexShrink: 0, transform: sterkerUit ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
-              />
+              <span style={{
+                width: 20, height: 20, borderRadius: radius.pill, background: '#fff',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                transform: sterkerUit ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s',
+              }}>
+                <ChevronDown size={14} strokeWidth={3} color={colors.bg} />
+              </span>
             </button>
           ) : (
             <div style={{ ...BODY_ZACHT, marginTop: 2 }}>Geen oefening zwaarder dan vorige week</div>
