@@ -60,9 +60,9 @@ const SECTIES = [
       },
       {
         id: 'cijfers_toelichting', type: 'tekst',
-        vraag: 'Wil je hier iets over kwijt?',
-        hulp: 'Alleen als er iets bij hoort. Anders overslaan.',
-        placeholder: 'Bijvoorbeeld: dinsdag ziek geweest.',
+        vraag: 'Hoe kijk je terug op de progressie van afgelopen week?',
+        hulp: null,
+        placeholder: 'Bijvoorbeeld: tevreden, maar dinsdag ziek geweest.',
       },
     ],
   },
