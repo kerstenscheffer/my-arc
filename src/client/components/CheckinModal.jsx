@@ -21,9 +21,7 @@ const periodeLabel = () => {
   return `wk ${week} · ${kort(van)} t/m ${kort(tot)}`
 }
 
-export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db, isMobile: propMobile }) {
-  const isMobile = propMobile ?? window.innerWidth <= 768
-
+export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db }) {
   // The "Sluiten"-button in the top bar is always available, so the user can
   // dismiss the modal at any time. The underlying ClientCheckinForm shows a
   // thank-you screen after submit; if/when we want auto-close, we'd need to
@@ -54,51 +52,26 @@ export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db,
         animation: 'checkinFadeIn 0.2s ease',
       }}
     >
-      {/* Top bar with close */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0.625rem 0.875rem',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
-        paddingTop: 'max(0.625rem, env(safe-area-inset-top))',
-        background: 'rgba(10, 10, 10, 0.95)',
-        backdropFilter: 'blur(12px)',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          fontSize: isMobile ? '0.9rem' : '1rem',
-          fontWeight: 900,
-          color: '#fff',
-          letterSpacing: '-0.02em',
-          minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          Wekelijkse check-in
-          {/* Over welke week gaat dit. Hier in de kop, zodat het boven elk
-              scherm van het formulier blijft staan en niet alleen boven de
-              terugblik. De week loopt tot en met de afgelopen zaterdag. */}
-          <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
-            {' · '}{periodeLabel()}
-          </span>
-        </div>
-        <button
-          onClick={onClose}
-          aria-label="Sluiten"
-          style={{
-            width: '34px', height: '34px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'none',
-            border: 'none',
-            borderRadius: '8px',
-            color: 'rgba(255, 255, 255, 0.6)',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <X size={16} />
-        </button>
-      </div>
+      {/* Alleen een sluitknop in de hoek. De titel staat in het gecentreerde
+          blok van het formulier, samen met de voortgang en de vraag. */}
+      <button
+        onClick={onClose}
+        aria-label="Sluiten"
+        style={{
+          position: 'absolute', top: 'max(0.625rem, env(safe-area-inset-top))', right: '0.875rem',
+          width: '34px', height: '34px', zIndex: 2,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'none',
+          border: 'none',
+          borderRadius: '8px',
+          color: 'rgba(255, 255, 255, 0.6)',
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <X size={16} />
+      </button>
 
       {/* Form body — scrollable */}
       <div style={{
@@ -106,11 +79,13 @@ export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db,
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
         paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingTop: 'env(safe-area-inset-top)',
         display: 'flex', flexDirection: 'column',
       }}>
         <ClientCheckinForm
           db={db}
           client={client}
+          titel={`Wekelijkse check-in · ${periodeLabel()}`}
           onClose={onClose}
           onSubmitted={() => {
             onSubmitted?.()

@@ -304,7 +304,7 @@ const platteVragen = (secties) => secties.flatMap(sec => sec.velden.map(v => ({ 
 const VRAGEN_BASIS = platteVragen(SECTIES)
 const VRAGEN_MET_COACHING = platteVragen([...SECTIES, COACHING_SECTIE])
 
-export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) {
+export default function ClientCheckinForm({ db, client, onSubmitted, onClose, titel }) {
   const isMobile = window.innerWidth <= 768
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -899,6 +899,11 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
         width: '100%', maxWidth: 560, margin: '0 auto', padding: '2vh 0',
       }}>
+      {titel && (
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 12, letterSpacing: '-0.01em' }}>
+          {titel}
+        </div>
+      )}
       {/* Voortgang */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden' }}>
