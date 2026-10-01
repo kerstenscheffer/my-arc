@@ -121,6 +121,101 @@ function LijnDropdown({ value, opties, placeholder, onChange, style }) {
   )
 }
 
+// Getal kiezen door te schuiven: tik op het getal en er klapt een verticale
+// rol open (zoals een wieltje) waar je doorheen scrolt; het getal in het
+// midden telt. Tikken op een getal kiest het direct.
+const ROL_HOOGTE = 40
+function GetalRol({ value, min = 1, max = 99, stap = 1, onChange, style }) {
+  const [open, setOpen] = useState(false)
+  const wrap = useRef(null)
+  const rol = useRef(null)
+  const timer = useRef(null)
+  const waarden = []
+  for (let n = min; n <= max; n += stap) waarden.push(n)
+
+  useEffect(() => {
+    if (!open) return
+    // Op het huidige getal beginnen.
+    const idx = Math.max(0, waarden.findIndex(n => n === value))
+    if (rol.current) rol.current.scrollTop = idx * ROL_HOOGTE
+    const dicht = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', dicht)
+    document.addEventListener('touchstart', dicht)
+    return () => { document.removeEventListener('mousedown', dicht); document.removeEventListener('touchstart', dicht) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const bijScroll = () => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      if (!rol.current) return
+      const idx = Math.round(rol.current.scrollTop / ROL_HOOGTE)
+      const n = waarden[Math.min(waarden.length - 1, Math.max(0, idx))]
+      if (n !== undefined && n !== value) onChange(n)
+    }, 80)
+  }
+
+  return (
+    <div ref={wrap} style={{ position: 'relative', ...style }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        style={{
+          ...LIJN, width: '100%', textAlign: 'center', fontWeight: 800, cursor: 'pointer',
+          color: value == null ? 'rgba(255,255,255,0.3)' : '#fff',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {value ?? '—'}
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', zIndex: 30,
+          marginTop: 4, width: 88, height: ROL_HOOGTE * 3,
+          background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.6)', overflow: 'hidden',
+        }}>
+          {/* Het venster in het midden: dit getal telt. */}
+          <div aria-hidden style={{
+            position: 'absolute', left: 6, right: 6, top: ROL_HOOGTE, height: ROL_HOOGTE,
+            borderRadius: 8, background: 'rgba(255,255,255,0.08)', pointerEvents: 'none',
+          }} />
+          <div
+            ref={rol}
+            role="listbox"
+            onScroll={bijScroll}
+            style={{
+              height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory',
+              padding: `${ROL_HOOGTE}px 0`, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            {waarden.map(n => (
+              <button
+                key={n}
+                type="button"
+                role="option"
+                aria-selected={n === value}
+                onClick={() => { onChange(n); setOpen(false) }}
+                style={{
+                  display: 'block', width: '100%', height: ROL_HOOGTE, scrollSnapAlign: 'center',
+                  background: 'transparent', border: 'none', fontFamily: 'inherit',
+                  fontSize: 16, fontWeight: n === value ? 800 : 700,
+                  color: n === value ? '#fff' : 'rgba(255,255,255,0.45)', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const isVerplicht = (v) => !!v && (v.verplicht ?? (v.type === 'tekst' && !v.optioneel))
 
 const SCHAAL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -673,16 +768,13 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                             />
                           ) : (
                             <>
-                              <input
-                                className="ci-lijn"
-                                type="number"
-                                inputMode="numeric"
-                                value={d.doel_getal ?? ''}
-                                min={1}
+                              <GetalRol
+                                value={d.doel_getal ?? null}
+                                min={t?.stap || 1}
                                 max={t?.max || 99}
-                                step={t?.stap || 1}
-                                onChange={e => zetDoel(i, { doel_getal: e.target.value === '' ? null : Number(e.target.value) })}
-                                style={{ ...rij, width: 64, flex: 'none', textAlign: 'center' }}
+                                stap={t?.stap || 1}
+                                onChange={n => zetDoel(i, { doel_getal: n })}
+                                style={{ width: 64, flex: 'none' }}
                               />
                               <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.6)', minWidth: 42 }}>
                                 {t?.eenheid}
