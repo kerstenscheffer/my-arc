@@ -97,6 +97,9 @@ const SECTIES = [
         vraagZonderKeuze: 'Wat ga je komende week anders doen om tevreden te zijn over je progressie?',
         hulp: null,
         placeholder: 'Bijvoorbeeld: zondagavond mijn eten voorbereiden.',
+        // Het doelen-blok staat compact onder dit antwoord: wie net heeft
+        // opgeschreven wat hij anders gaat doen, kan het meteen meetbaar maken.
+        metDoelen: true,
       },
     ],
   },
@@ -122,11 +125,6 @@ const SECTIES = [
   {
     kop: 'Focus voor komende week',
     velden: [
-      {
-        id: 'doelen_komende_week', type: 'doelen-stellen',
-        vraag: 'Wat zijn je doelen voor komende week?',
-        hulp: 'Maak ze specifiek en meetbaar. Eén tot drie doelen.',
-      },
       {
         id: 'hulp_van_coach', type: 'tekst',
         vraag: 'Wat kan ik als coach doen om je te helpen je doelen te halen?',
@@ -511,98 +509,6 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         })()}
 
         {/* ── Doelen kiezen voor komende week ── */}
-        {v.type === 'doelen-stellen' && (() => {
-          const lijst = formData.doelen_komende_week || []
-          return (
-            <div style={{ marginTop: '2.2vh', textAlign: 'left' }}>
-              {lijst.map((d, i) => {
-                const t = typeVan(d.type)
-                return (
-                  <div key={i} style={{
-                    padding: '12px 14px', marginBottom: 8,
-                    background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <span style={{ flex: 1, fontSize: 12, fontWeight: 900, color: GRIJS, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        Doel {i + 1}
-                      </span>
-                      {lijst.length > 1 && (
-                        <button type="button" onClick={() => verwijderDoel(i)} style={{
-                          background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
-                          fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0,
-                        }}>verwijder</button>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
-                      {DOEL_TYPES.map(dt => {
-                        const aan = d.type === dt.key
-                        return (
-                          <button
-                            key={dt.key}
-                            type="button"
-                            onClick={() => zetDoel(i, { type: dt.key, doel_getal: dt.standaard, tekst: '' })}
-                            style={{
-                              minHeight: 34, padding: '0 12px', borderRadius: 999,
-                              background: aan ? '#fff' : 'transparent',
-                              border: `1px solid ${aan ? '#fff' : RAND}`,
-                              color: aan ? '#0A0A0A' : 'rgba(255,255,255,0.6)',
-                              fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                            }}
-                          >
-                            {dt.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {d.type === 'eigen' ? (
-                      <input
-                        value={d.tekst || ''}
-                        onChange={e => zetDoel(i, { tekst: e.target.value })}
-                        placeholder="Bijvoorbeeld: om 23:00 in bed"
-                        style={invoerStijl(true)}
-                      />
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          value={d.doel_getal ?? ''}
-                          min={1}
-                          max={t?.max || 99}
-                          step={t?.stap || 1}
-                          onChange={e => zetDoel(i, { doel_getal: e.target.value === '' ? null : Number(e.target.value) })}
-                          style={{ ...invoerStijl(false), width: 110, textAlign: 'center' }}
-                        />
-                        <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
-                          {t?.eenheid}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {lijst.length < 3 && (
-                <button type="button" onClick={voegDoelToe} style={{
-                  width: '100%', minHeight: 44, borderRadius: 12,
-                  background: 'transparent', border: `1px dashed ${RAND}`,
-                  color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 800,
-                  fontFamily: 'inherit', cursor: 'pointer',
-                }}>
-                  + Doel erbij
-                </button>
-              )}
-              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
-                Deze doelen komen volgende week terug in je check-in, en staan tot die tijd
-                op je startscherm.
-              </div>
-            </div>
-          )
-        })()}
-
         {v.type === 'progressie' && <ProgressieScherm progressie={progressie} isMobile={isMobile} db={db} clientId={client?.id} />}
 
         {(v.type === 'aantal' || v.type === 'aantal-van') && (
@@ -696,6 +602,101 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
             }}
           />
         )}
+
+        {v.metDoelen && (() => {
+          const lijst = formData.doelen_komende_week || []
+          return (
+            <div style={{ marginTop: 20, textAlign: 'left' }}>
+              <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginBottom: 8 }}>
+                Doelen stellen voor jezelf kan het makkelijker maken.
+              </div>
+              {lijst.map((d, i) => {
+                const t = typeVan(d.type)
+                return (
+                  <div key={i} style={{
+                    padding: '10px 12px', marginBottom: 6,
+                    background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 900, color: GRIJS, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Doel {i + 1}
+                      </span>
+                      {lijst.length > 1 && (
+                        <button type="button" onClick={() => verwijderDoel(i)} style={{
+                          background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
+                          fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0,
+                        }}>verwijder</button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+                      {DOEL_TYPES.map(dt => {
+                        const aan = d.type === dt.key
+                        return (
+                          <button
+                            key={dt.key}
+                            type="button"
+                            onClick={() => zetDoel(i, { type: dt.key, doel_getal: dt.standaard, tekst: '' })}
+                            style={{
+                              minHeight: 34, padding: '0 12px', borderRadius: 999,
+                              background: aan ? '#fff' : 'transparent',
+                              border: `1px solid ${aan ? '#fff' : RAND}`,
+                              color: aan ? '#0A0A0A' : 'rgba(255,255,255,0.6)',
+                              fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            }}
+                          >
+                            {dt.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {d.type === 'eigen' ? (
+                      <input
+                        value={d.tekst || ''}
+                        onChange={e => zetDoel(i, { tekst: e.target.value })}
+                        placeholder="Bijvoorbeeld: om 23:00 in bed"
+                        style={invoerStijl(true)}
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={d.doel_getal ?? ''}
+                          min={1}
+                          max={t?.max || 99}
+                          step={t?.stap || 1}
+                          onChange={e => zetDoel(i, { doel_getal: e.target.value === '' ? null : Number(e.target.value) })}
+                          style={{ ...invoerStijl(false), width: 110, textAlign: 'center' }}
+                        />
+                        <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
+                          {t?.eenheid}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {lijst.length < 3 && (
+                <button type="button" onClick={voegDoelToe} style={{
+                  width: '100%', minHeight: 40, borderRadius: 12,
+                  background: 'transparent', border: `1px dashed ${RAND}`,
+                  color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 800,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                }}>
+                  + Doel erbij
+                </button>
+              )}
+              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
+                Deze doelen komen volgende week terug in je check-in, en staan tot die tijd
+                op je startscherm.
+              </div>
+            </div>
+          )
+        })()}
       </div>
     )
   }
