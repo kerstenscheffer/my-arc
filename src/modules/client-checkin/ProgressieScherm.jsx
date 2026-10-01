@@ -72,6 +72,15 @@ function Sectie({ titel, foto, rechts, eerste, isMobile, children }) {
       padding: `${space[2]}px 0 ${space[2]}px ${rand + Math.round(FOTO_BREEDTE * 0.55)}px`,
       minHeight: 88,
     }}>
+      {/* Klein streepje als overgang tussen de banden: kort, bij de tekst,
+          niet over de hele breedte en niet door de foto. */}
+      {!eerste && (
+        <span aria-hidden style={{
+          position: 'absolute', top: 0,
+          left: rand + Math.round(FOTO_BREEDTE * 0.55),
+          width: 24, height: 1, background: 'rgba(255,255,255,0.35)',
+        }} />
+      )}
       {foto && (
         <img
           src={foto}
