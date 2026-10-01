@@ -212,6 +212,9 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   const [submitted, setSubmitted] = useState(false)
   const [formData, setFormData] = useState({})
   const [stap, setStap] = useState(0)
+  // Het doelen-blok onder "wat ga je anders doen" staat dicht tot de klant op
+  // "Stel doel" tikt.
+  const [doelenOpen, setDoelenOpen] = useState(false)
   // Is het vier weken geleden dat de coaching-vragen gesteld zijn? Dan komen
   // ze er deze keer bij. De service rekent op de kalender vanaf de start van
   // het traject, niet op het aantal check-ins.
@@ -605,95 +608,95 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
 
         {v.metDoelen && (() => {
           const lijst = formData.doelen_komende_week || []
+          const rij = { ...invoerStijl(true), width: 'auto', minWidth: 0, fontSize: 15, padding: '10px 12px' }
           return (
             <div style={{ marginTop: 20, textAlign: 'left' }}>
-              <div style={{ color: '#fff', fontSize: 15, fontWeight: 800, marginBottom: 8 }}>
+              <div style={{ color: '#fff', fontSize: 15, fontWeight: 800 }}>
                 Doelen stellen voor jezelf kan het makkelijker maken.
               </div>
-              {lijst.map((d, i) => {
-                const t = typeVan(d.type)
-                return (
-                  <div key={i} style={{
-                    padding: '10px 12px', marginBottom: 6,
-                    background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span style={{ flex: 1, fontSize: 12, fontWeight: 900, color: GRIJS, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        Doel {i + 1}
-                      </span>
-                      {lijst.length > 1 && (
-                        <button type="button" onClick={() => verwijderDoel(i)} style={{
-                          background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
-                          fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0,
-                        }}>verwijder</button>
-                      )}
-                    </div>
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
-                      {DOEL_TYPES.map(dt => {
-                        const aan = d.type === dt.key
-                        return (
-                          <button
-                            key={dt.key}
-                            type="button"
-                            onClick={() => zetDoel(i, { type: dt.key, doel_getal: dt.standaard, tekst: '' })}
-                            style={{
-                              minHeight: 34, padding: '0 12px', borderRadius: 999,
-                              background: aan ? '#fff' : 'transparent',
-                              border: `1px solid ${aan ? '#fff' : RAND}`,
-                              color: aan ? '#0A0A0A' : 'rgba(255,255,255,0.6)',
-                              fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                            }}
-                          >
-                            {dt.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {d.type === 'eigen' ? (
-                      <input
-                        value={d.tekst || ''}
-                        onChange={e => zetDoel(i, { tekst: e.target.value })}
-                        placeholder="Bijvoorbeeld: om 23:00 in bed"
-                        style={invoerStijl(true)}
-                      />
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          value={d.doel_getal ?? ''}
-                          min={1}
-                          max={t?.max || 99}
-                          step={t?.stap || 1}
-                          onChange={e => zetDoel(i, { doel_getal: e.target.value === '' ? null : Number(e.target.value) })}
-                          style={{ ...invoerStijl(false), width: 110, textAlign: 'center' }}
-                        />
-                        <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
-                          {t?.eenheid}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {lijst.length < 3 && (
-                <button type="button" onClick={voegDoelToe} style={{
-                  width: '100%', minHeight: 40, borderRadius: 12,
-                  background: 'transparent', border: `1px dashed ${RAND}`,
-                  color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 800,
-                  fontFamily: 'inherit', cursor: 'pointer',
-                }}>
-                  + Doel erbij
+              {!doelenOpen ? (
+                <button
+                  type="button"
+                  onClick={() => { setDoelenOpen(true); if (lijst.length === 0) voegDoelToe() }}
+                  style={{
+                    marginTop: 10, minHeight: 44, padding: '0 20px', borderRadius: 12,
+                    background: '#fff', border: 'none', color: '#0A0A0A',
+                    fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  Stel doel
                 </button>
+              ) : (
+                <div style={{ marginTop: 10 }}>
+                  {/* Eén regel per doel: soort (dropdown), dan het aantal. */}
+                  {lijst.map((d, i) => {
+                    const t = typeVan(d.type)
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <select
+                          value={d.type || 'trainen'}
+                          onChange={e => {
+                            const dt = typeVan(e.target.value)
+                            zetDoel(i, { type: e.target.value, doel_getal: dt?.standaard ?? null, tekst: '' })
+                          }}
+                          style={{ ...rij, flex: 1, appearance: 'auto' }}
+                        >
+                          {DOEL_TYPES.map(dt => (
+                            <option key={dt.key} value={dt.key} style={{ background: '#1a1a1a' }}>{dt.label}</option>
+                          ))}
+                        </select>
+                        {d.type === 'eigen' ? (
+                          <input
+                            value={d.tekst || ''}
+                            onChange={e => zetDoel(i, { tekst: e.target.value })}
+                            placeholder="Bijvoorbeeld: om 23:00 in bed"
+                            style={{ ...rij, flex: 2 }}
+                          />
+                        ) : (
+                          <>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={d.doel_getal ?? ''}
+                              min={1}
+                              max={t?.max || 99}
+                              step={t?.stap || 1}
+                              onChange={e => zetDoel(i, { doel_getal: e.target.value === '' ? null : Number(e.target.value) })}
+                              style={{ ...rij, width: 64, flex: 'none', textAlign: 'center' }}
+                            />
+                            <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.6)', minWidth: 42 }}>
+                              {t?.eenheid}
+                            </span>
+                          </>
+                        )}
+                        {lijst.length > 1 && (
+                          <button type="button" onClick={() => verwijderDoel(i)} aria-label="Doel verwijderen" style={{
+                            background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)',
+                            fontSize: 20, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+                            padding: '0 4px', lineHeight: 1,
+                          }}>×</button>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {lijst.length < 3 && (
+                    <button type="button" onClick={voegDoelToe} style={{
+                      background: 'none', border: 'none', padding: 0,
+                      color: '#fff', fontSize: 14, fontWeight: 800,
+                      fontFamily: 'inherit', cursor: 'pointer',
+                    }}>
+                      + Doel erbij
+                    </button>
+                  )}
+                  <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
+                    Deze doelen komen volgende week terug in je check-in, en staan tot die tijd
+                    op je startscherm.
+                  </div>
+                </div>
               )}
-              <div style={{ color: GRIJS, fontSize: 12.5, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
-                Deze doelen komen volgende week terug in je check-in, en staan tot die tijd
-                op je startscherm.
-              </div>
             </div>
           )
         })()}
