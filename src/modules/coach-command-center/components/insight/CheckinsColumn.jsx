@@ -10,6 +10,8 @@ import {
   Calendar, MessageSquare,
 } from 'lucide-react'
 import CheckinService from '../../../client-checkin/CheckinService'
+import { antwoordenVan } from '../../../client-checkin/checkinVragen'
+import { doelTekst, kleurVoorBehaald } from '../../../client-checkin/doelen'
 
 const G = {
   primary:    '#fff',
@@ -63,10 +65,12 @@ const SECTIONS = [
 ]
 
 // ── Single expandable check-in card ───────────────────────────────
-function CheckinCard({ checkin, isMobile }) {
+function CheckinCard({ checkin, isMobile, voornaam }) {
   const [open, setOpen] = useState(false)
   const score = overallScore(checkin)
   const reviewed = !!checkin.reviewed_at
+  const isV4 = checkin.formulier_versie >= 4
+  const antwoorden = isV4 ? antwoordenVan(checkin, voornaam) : []
   return (
     <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
       {/* Header row — always visible */}
@@ -169,8 +173,20 @@ function CheckinCard({ checkin, isMobile }) {
             </div>
           )}
 
+          {/* Formulier versie 4: elke vraag letterlijk zoals de klant hem
+              zag, met het antwoord eronder, in de volgorde van het formulier.
+              Doelen van vorige week (met behaald) en voor komende week staan
+              er op hun plek tussen. */}
+          {isV4 && antwoorden.map(a => (
+            a.soort === 'tekst' ? (
+              <VraagAntwoord key={a.id} vraag={a.vraag} antwoord={a.antwoord} feedback={a.feedback} />
+            ) : (
+              <DoelenBlok key={a.id} vraag={a.vraag} doelen={a.doelen} terug={a.soort === 'doelen-terug'} />
+            )
+          ))}
+
           {/* Openingsvraag — staat vooraan omdat het de toon van de week zet. */}
-          {checkin.hoe_gaat_het && (
+          {!isV4 && checkin.hoe_gaat_het && (
             <NoteBlock label="Hoe het gaat" text={checkin.hoe_gaat_het} accent={G.primary}>
               <MessageSquare size={10} />
             </NoteBlock>
@@ -233,7 +249,7 @@ function CheckinCard({ checkin, isMobile }) {
           {/* Wat er komende week speelt. Boven de vraag-aan-jou, want dit is
               waar je het plan op aanpast voordat de week begint — niet iets
               om achteraf te lezen. */}
-          {checkin.komende_week && (
+          {!isV4 && checkin.komende_week && (
             <NoteBlock label="Komende week" text={checkin.komende_week} accent={G.primary}>
               <Calendar size={10} />
             </NoteBlock>
@@ -268,6 +284,47 @@ function CheckinCard({ checkin, isMobile }) {
     </div>
   )
 }
+
+// Vraag in het wit, antwoord eronder. Coachingfeedback (eens per vier weken)
+// in goud, anders scrol je eroverheen.
+const VraagAntwoord = ({ vraag, antwoord, feedback }) => (
+  <div style={{ padding: '0.45rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+    <div style={{
+      fontSize: '0.74rem', fontWeight: 800, lineHeight: 1.35,
+      color: feedback ? G.secondary : '#fff', marginBottom: '0.2rem',
+    }}>
+      {vraag}
+    </div>
+    <div style={{
+      fontSize: '0.76rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)',
+      lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+    }}>
+      {antwoord}
+    </div>
+  </div>
+)
+
+const DoelenBlok = ({ vraag, doelen, terug }) => (
+  <div style={{ padding: '0.45rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+    <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff', marginBottom: '0.3rem' }}>{vraag}</div>
+    {doelen.map((d, i) => (
+      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.2rem 0' }}>
+        {terug && (
+          <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: kleurVoorBehaald(d.behaald) }} />
+        )}
+        <span style={{ flex: 1, fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{doelTekst(d)}</span>
+        {terug && d.gemeten != null && (
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: G.textDim, fontVariantNumeric: 'tabular-nums' }}>gemeten {d.gemeten}</span>
+        )}
+        {terug && (
+          <span style={{ fontSize: '0.7rem', fontWeight: 900, color: kleurVoorBehaald(d.behaald), minWidth: 36, textAlign: 'right' }}>
+            {d.behaald === 'ja' ? 'Ja' : d.behaald === 'deels' ? 'Deels' : d.behaald === 'nee' ? 'Nee' : '—'}
+          </span>
+        )}
+      </div>
+    ))}
+  </div>
+)
 
 const ScorePill = ({ children, label, value }) => (
   <div style={{
@@ -435,7 +492,7 @@ export default function CheckinsColumn({ client, db, isMobile }) {
           </div>
         ) : (
           checkins.map(c => (
-            <CheckinCard key={c.id} checkin={c} isMobile={isMobile} />
+            <CheckinCard key={c.id} checkin={c} isMobile={isMobile} voornaam={(client?.first_name || '').trim()} />
           ))
         )}
       </div>
