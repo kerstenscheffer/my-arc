@@ -8,6 +8,7 @@ import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLi
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
+import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 const formatDaysAgo = (d) => { if (d === null || d === undefined) return 'Nooit'; if (d === 0) return 'Vandaag'; if (d === 1) return 'Gisteren'; return `${d}d geleden` }
@@ -388,12 +389,13 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
             ))}
           </div>
         )}
+        {/* Dezelfde krachtgrafiek als de klant in zijn log-modal ziet: 8RM-schatting,
+            doellijn per fase (cut/build) en de band van wat goed is. De oude
+            balkjes lieten alleen het beste gewicht zien, zonder reps of fase —
+            en de coach kijkt juist naar of iemand op tempo zit. */}
         {entries.length > 1 && (
-          <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: '0.2rem', alignItems: 'flex-end', justifyContent: 'center' }}>
-            {[...entries].reverse().slice(-12).map((e, ei, arr) => {
-              const mx = Math.max(...arr.map(x => x.bestWeight)), mn = Math.min(...arr.map(x => x.bestWeight)), rng = mx - mn || 1
-              return <div key={ei} title={`${formatDate(e.date)}: ${e.bestWeight}kg`} style={{ width: '10px', height: `${8 + ((e.bestWeight - mn) / rng) * 24}px`, borderRadius: '2px', background: ei === arr.length - 1 ? '#fff' : 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
-            })}
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '0.5rem' }}>
+            <ExerciseProgressChart db={db} client={client} exerciseName={selectedExercise} isMobile={isMobile} />
           </div>
         )}
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>

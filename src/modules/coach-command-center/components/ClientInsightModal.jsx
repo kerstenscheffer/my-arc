@@ -15,6 +15,7 @@ import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
 import { fotoWeergaveUrl } from '../../progress/fotoWeergave'
+import PhotoCompareModal from '../../progress/components/PhotoCompareModal'
 
 // Kopknop: kaal icoon, geen vak eromheen. Vier omkaderde knoppen met tekst
 // namen de halve kopregel in; als icoon met tooltip is het even duidelijk en
@@ -74,7 +75,10 @@ function groupPhotosByMonthAndDay(photos) {
 export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onSwitchToClientView }) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [photoZoom, setPhotoZoom] = useState(false)
-  const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
+  const [showGallery, setShowGallery] = useState(false)
+  // Vergelijken gaat via hetzelfde venster als op de tracking-pagina van de
+  // klant: hoek naast hoek, datums kiezen, downloaden.
+  const [showCompare, setShowCompare] = useState(false)
   const [mobileTab, setMobileTab] = useState('weight')
   // Desktop: welke secties naast elkaar staan. De kopregel vinkt ze aan en uit,
   // dus dit is een lijst en geen enkele keuze. Minimaal één blijft staan —
@@ -582,9 +586,17 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color: '#fff' }}>Alle foto's</div>
                 <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}><span className={PRIVE}>{effectiveClient.first_name}</span> · {photos.length} foto's</div>
               </div>
-              <button onClick={() => setShowGallery(false)} aria-label="Sluiten" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => setShowCompare(true)}
+                  style={{ height: 44, padding: '0 0.9rem', borderRadius: 12, background: '#fff', border: '1px solid #fff', color: '#0a0a0a', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, touchAction: 'manipulation', whiteSpace: 'nowrap' }}
+                >
+                  Vergelijken
+                </button>
+                <button onClick={() => setShowGallery(false)} aria-label="Sluiten" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                  <X size={20} />
+                </button>
+              </div>
             </div>
             {/* Grid — per maand (vanaf eerste foto), binnen maand per dag gegroepeerd */}
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -623,6 +635,10 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </div>
           </div>
         </div>
+      )}
+
+      {showCompare && (
+        <PhotoCompareModal db={db} client={effectiveClient} isMobile={isMobile} onClose={() => setShowCompare(false)} />
       )}
 
       {photoZoom && photos.length > 0 && (

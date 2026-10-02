@@ -18,6 +18,18 @@ function marketingVersie() {
   }
 }
 
+// Zelfde idee voor Android: versionName uit build.gradle, de versie die in
+// de Play Store staat.
+function androidVersie() {
+  try {
+    const gradle = readFileSync('./android/app/build.gradle', 'utf8')
+    const m = gradle.match(/versionName\s+"([0-9][0-9.]*)"/)
+    return m ? m[1] : '0'
+  } catch {
+    return '0'
+  }
+}
+
 // command === 'build' → productie: strip alle console.* + debugger (scheelt
 // overhead van logs die grote objecten serialiseren in hot paths en houdt de
 // prod-console schoon). In dev (`vite`) blijven de logs staan om te debuggen.
@@ -33,6 +45,7 @@ export default defineConfig(({ command }) => ({
   esbuild: command === 'build' ? { drop: ['console', 'debugger'] } : {},
   define: {
     __APP_VERSIE__: JSON.stringify(marketingVersie()),
+    __APP_VERSIE_ANDROID__: JSON.stringify(androidVersie()),
   },
   build: {
     minify: 'esbuild',
