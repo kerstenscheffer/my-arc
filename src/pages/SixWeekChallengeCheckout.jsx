@@ -38,9 +38,15 @@ const STRIPE_PRICE_ID = 'price_1UFdw6J3V4uXn1OkvJicc73b'
 const TERMIJN_BEDRAG = 148.5
 const STRIPE_PRICE_ID_2X = 'price_1UI2xdJ3V4uXn1OkOVZpVKTr'
 
+// Nieuwe prijs sinds 2 okt 2026: €497. Eigen pad (/6week-checkout-497) zodat
+// wie nog een link naar €297 heeft, daar gewoon kan afrekenen.
+const PRICE_497 = 497
+const STRIPE_PRICE_ID_497 = 'price_1UM4dsJ3V4uXn1OkBjz1e7wq'
+
 const VARIANT = {
   eenmalig: {
     plan: '6-week-challenge',
+    prijs: PRICE,
     priceId: STRIPE_PRICE_ID,
     mode: 'payment',
     cancelPath: '/6week-checkout',
@@ -48,8 +54,19 @@ const VARIANT = {
     balkKnop: `Maak investering · €${PRICE}`,
     prijsRegel: null,
   },
+  eenmalig497: {
+    plan: '6-week-challenge',
+    prijs: PRICE_497,
+    priceId: STRIPE_PRICE_ID_497,
+    mode: 'payment',
+    cancelPath: '/6week-checkout-497',
+    knop: `Start Nu · €${PRICE_497}`,
+    balkKnop: `Maak investering · €${PRICE_497}`,
+    prijsRegel: null,
+  },
   termijnen: {
     plan: '6-week-challenge-2x',
+    prijs: PRICE,
     priceId: STRIPE_PRICE_ID_2X,
     mode: 'subscription',
     cancelPath: '/6week-checkout-2x',
@@ -392,7 +409,7 @@ const BORG_EISEN = [
   "3 progressiefoto's gemaakt",
 ]
 
-function VoorwaardenVenster({ isMobile, onClose, onBetaal }) {
+function VoorwaardenVenster({ isMobile, onClose, onBetaal, prijs = PRICE }) {
   const banner = useFoto('/voorwaarden-banner.jpg', isMobile)
   useEffect(() => {
     const toets = (e) => { if (e.key === 'Escape') onClose() }
@@ -463,7 +480,7 @@ function VoorwaardenVenster({ isMobile, onClose, onBetaal }) {
             letterSpacing: '-0.035em', lineHeight: 1.1, textAlign: 'center',
             maxWidth: 820, margin: '0 auto',
           }}>
-            <span style={{ color: GOLD }}>€297 inleg</span>, die je terug krijgt.
+            <span style={{ color: GOLD }}>€{prijs} inleg</span>, die je terug krijgt.
           </div>
 
           {/* De eisen zelf: een kopje, daaronder de vijf regels genummerd.
@@ -679,8 +696,8 @@ function TrustpilotBadge({ size = 'sm', style }) {
   )
 }
 
-export default function SixWeekChallengeCheckout({ termijnen = false }) {
-  const variant = termijnen ? VARIANT.termijnen : VARIANT.eenmalig
+export default function SixWeekChallengeCheckout({ termijnen = false, prijs497 = false }) {
+  const variant = termijnen ? VARIANT.termijnen : prijs497 ? VARIANT.eenmalig497 : VARIANT.eenmalig
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -791,7 +808,7 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           plan: variant.plan,
-          price: PRICE,
+          price: variant.prijs,
           priceId: variant.priceId,
           mode: variant.mode,
           email: email.trim(),
@@ -1186,6 +1203,7 @@ export default function SixWeekChallengeCheckout({ termijnen = false }) {
       {/* De voorwaarden — schermvullend, zelfde opzet als de methode-slides. */}
       {open === 'voorwaarden' && (
         <VoorwaardenVenster
+          prijs={variant.prijs}
           isMobile={isMobile}
           onClose={() => setOpen(null)}
           onBetaal={() => { setOpen(null); setTimeout(scrollToForm, 60) }}

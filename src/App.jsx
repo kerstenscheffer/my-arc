@@ -276,6 +276,12 @@ function App() {
     return <SixWeekChallengeCheckout />
   }
 
+  // Zelfde challenge, nieuwe prijs €497 (sinds 2 okt 2026). Eigen pad: de
+  // €297-link hierboven blijft werken voor wie die nog moet betalen.
+  if (currentPath === '/6-week-checkout-497' || currentPath === '/6week-checkout-497') {
+    return <SixWeekChallengeCheckout prijs497 />
+  }
+
   // Zelfde challenge, in twee termijnen: nu €148,50 en over 3 weken nog eens.
   // Zelfde pagina, andere Stripe-prijs.
   if (currentPath === '/6-week-checkout-2x' || currentPath === '/6week-checkout-2x') {
