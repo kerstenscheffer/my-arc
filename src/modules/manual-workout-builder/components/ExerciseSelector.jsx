@@ -127,7 +127,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
   // zelf iets eigens mee, dan gaat dat voor.
   const kies = (ex) => onSelect({
     name: ex.name,
-    sets: ex.sets || 2,
+    sets: Number(ex.sets) || 2,   // suggested_sets is tekst in de tabel
     reps: ex.reps || '8-12',
     rest: ex.rest || '2 min',
     primairSpieren: ex.spier || '',

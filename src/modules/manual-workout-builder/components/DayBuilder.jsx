@@ -1,9 +1,10 @@
 // src/modules/manual-workout-builder/components/DayBuilder.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Trash2, Copy, Plus, ChevronDown, ChevronUp, Heart, BookmarkPlus, SlidersHorizontal } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
 import BuilderExerciseCard from './BuilderExerciseCard'
 import useSleepVolgorde from './useSleepVolgorde'
+import { voorstelDag } from '../dagTitel'
 
 export default function DayBuilder({
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate, onSaveTemplate,
@@ -36,8 +37,25 @@ export default function DayBuilder({
     setBulkSets(''); setBulkReps(''); setBulkRest(''); setBulkOpen(false)
   }
 
-  const handleSaveName = () => { onUpdate({ ...day, name: tempName || `Dag ${dayNumber}` }); setEditingName(false) }
-  const handleSaveFocus = () => { onUpdate({ ...day, focus: tempFocus || '' }); setEditingFocus(false) }
+  // Zelf getypt wint altijd: vanaf dan volgt de naam de oefeningen niet meer.
+  const handleSaveName = () => { onUpdate({ ...day, name: tempName || `Dag ${dayNumber}`, _autoNaam: false }); setEditingName(false) }
+  const handleSaveFocus = () => { onUpdate({ ...day, focus: tempFocus || '', _autoFocus: false }); setEditingFocus(false) }
+
+  // Naam en spiergroep in de vorm van de standaardplannen ("Push", "Upper
+  // borst", "Full body"), afgeleid uit de oefeningen. Zolang de coach niets
+  // zelf heeft getypt, groeit het voorstel mee met wat hij toevoegt; na een
+  // eigen naam blijft het staan.
+  useEffect(() => {
+    const v = voorstelDag(day.exercises)
+    if (!v) return
+    const naamAuto = !day.name || day._autoNaam
+    const focusAuto = !day.focus || day._autoFocus
+    if (!naamAuto && !focusAuto) return
+    const patch = {}
+    if (naamAuto && day.name !== v.name) { patch.name = v.name; patch._autoNaam = true }
+    if (focusAuto && day.focus !== v.focus) { patch.focus = v.focus; patch._autoFocus = true }
+    if (Object.keys(patch).length) onUpdate({ ...day, ...patch })
+  }, [day.exercises])  // eslint-disable-line react-hooks/exhaustive-deps
   const handleCancelName = () => { setTempName(day.name); setEditingName(false) }
   const handleCancelFocus = () => { setTempFocus(day.focus); setEditingFocus(false) }
 
@@ -55,7 +73,9 @@ export default function DayBuilder({
     onUpdate({ ...day, exercises: updated })
   }
 
-  const totalVolume = day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0)
+  // Number(): sets komt uit de bibliotheek als tekst ('2'), en 0 + '2' + '2'
+  // wordt '022' in plaats van 4.
+  const totalVolume = day.exercises.reduce((sum, ex) => sum + (Number(ex.sets) || 0), 0)
   const minuten = tempMinuten !== null ? tempMinuten : (parseInt(day.geschatteTijd, 10) || 60)
 
   // Compacte icon-knop (leadsysteem-stijl) voor de dag-acties.

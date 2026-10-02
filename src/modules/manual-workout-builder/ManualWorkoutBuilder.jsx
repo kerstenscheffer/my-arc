@@ -1,5 +1,6 @@
 // src/modules/manual-workout-builder/ManualWorkoutBuilder.jsx
 import { useState, useEffect } from 'react'
+import { voorstelPlan } from './dagTitel'
 import { createPortal } from 'react-dom'
 import useHistoryState from './hooks/useHistoryState'
 import { Undo2, Redo2 } from 'lucide-react'
@@ -266,7 +267,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const addExercise = (exercise) => {
     if (!activeDay) return
     const newExercise = {
-      id: Date.now(), name: exercise.name, sets: exercise.sets || 3, reps: exercise.reps || '8-12',
+      id: Date.now(), name: exercise.name, sets: Number(exercise.sets) || 2, reps: exercise.reps || '8-12',
       rust: exercise.rest || exercise.rust || '2 min', rpe: '7-8', equipment: exercise.equipment || '',
       primairSpieren: exercise.primairSpieren || exercise.muscle || '', notes: '',
       type: exercise.type || 'compound', stretch: false, priority: 1, goalPriority: false,
@@ -345,7 +346,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // opslaan en hem elders toewijzen. Precies bij de klant waar je het vaakst
   // een plan voor bouwt.
   const saveToClientSchema = async () => {
-    if (!workoutPlan.name) { alert('Geef het plan een naam'); return }
+    // Geen naam getypt: pak het voorstel ("3× PPL") in plaats van blokkeren.
+    const planNaam = workoutPlan.name || voorstelPlan(workoutPlan.days)
+    if (!planNaam) { alert('Geef het plan een naam'); return }
+    if (!workoutPlan.name) setWorkoutPlan(prev => ({ ...prev, name: planNaam }))
     if (workoutPlan.days.length === 0) { alert('Voeg minimaal één dag toe'); return }
 
     if (selectedSchemaId) {
@@ -353,7 +357,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       setSaving(true)
       try {
         const { error } = await db.supabase.from('workout_schemas').update({
-          name: workoutPlan.name, description: workoutPlan.description || '',
+          name: planNaam, description: workoutPlan.description || '',
           week_structure: buildWeekStructure(), days_per_week: workoutPlan.days.length,
           updated_at: new Date().toISOString()
         }).eq('id', selectedSchemaId)
@@ -374,7 +378,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       const user = await db.getCurrentUser()
       if (!user) { alert('Je moet ingelogd zijn'); return }
       const { data, error } = await db.supabase.from('workout_schemas').insert({
-        name: workoutPlan.name, description: workoutPlan.description || '',
+        name: planNaam, description: workoutPlan.description || '',
         user_id: user.id, client_id: klant.id, client_name: `${klant.first_name || ''} ${klant.last_name || ''}`.trim() || null,
         primary_goal: workoutPlan.primary_goal, experience_level: workoutPlan.experience_level,
         split_type: workoutPlan.split_type, days_per_week: workoutPlan.days.length, time_per_session: 60,
@@ -689,7 +693,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           {instellingenOpen && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.4rem' }}>
               <input type="text" placeholder="Workout naam *" value={workoutPlan.name}
-                onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={cInput} />
+                onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={cInput}  placeholder={voorstelPlan(workoutPlan.days) || 'Naam van het plan'}/>
               <input type="text" placeholder="Beschrijving" value={workoutPlan.description}
                 onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={cInput} />
               <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={{ ...cSelect, flex: 'none' }}>
