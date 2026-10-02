@@ -91,7 +91,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         : [...prev, id]
     ))
   }
-  const [showLog, setShowLog] = useState(false)
   const [showNotify, setShowNotify] = useState(false)
   const [showIntake, setShowIntake] = useState(false)
 
@@ -165,6 +164,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
     : null
 
   const SECTIES = [
+    { id: 'logboek', label: 'Logboek',  icon: BookOpen },
     { id: 'weight',  label: 'Gewicht',  icon: Scale },
     { id: 'workout', label: 'Training', icon: Dumbbell },
     { id: 'meals',   label: 'Voeding',  icon: UtensilsCrossed },
@@ -208,6 +208,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
     )
     if (id === 'checkin') return (
       <CheckinsColumn client={effectiveClient} db={db} isMobile={klein} />
+    )
+    if (id === 'logboek') return (
+      <CoachingLogModal inline client={effectiveClient} db={db} coachId={coachId} isMobile={klein} />
     )
     if (id === 'journey') return db ? (
       <ClientJourneyTimeline
@@ -328,7 +331,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={kopKnop()}>
                     <ClipboardCheck size={17} />
                   </button>
-                  <button onClick={() => setShowLog(true)} title="Logboek" style={kopKnop()}>
+                  <button onClick={() => toggleSectie('logboek')} title="Logboek" style={kopKnop()}>
                     <BookOpen size={17} />
                   </button>
                   <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={kopKnop(true)}>
@@ -406,7 +409,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <ClipboardCheck size={17} />
                 </button>
-                <button onClick={() => setShowLog(true)} title="Logboek" style={{ ...kopKnop(), width: 34, height: 34 }}>
+                <button onClick={() => toggleSectie('logboek')} title="Logboek" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <BookOpen size={17} />
                 </button>
                 <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{ ...kopKnop(true), width: 34, height: 34 }}>
@@ -692,17 +695,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             else if (naar === 'workout-builder') onNavigateWorkout?.(c.id)
             else onNavigateTab?.(naar, c)
           }}
-        />
-      )}
-
-      {/* ═══ COACHING LOG MODAL ═══ */}
-      {showLog && (
-        <CoachingLogModal
-          client={effectiveClient}
-          db={db}
-          coachId={coachId}
-          isMobile={isMobile}
-          onClose={() => setShowLog(false)}
         />
       )}
 

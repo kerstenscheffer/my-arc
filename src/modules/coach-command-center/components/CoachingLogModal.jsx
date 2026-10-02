@@ -57,7 +57,10 @@ function formatDate(iso) {
     ' · ' + d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function CoachingLogModal({ client, db, coachId, onClose, isMobile, onLogSaved }) {
+// `inline`: geen zwevend venster maar een paneel dat de ruimte van zijn
+// ouder vult. Zo staat het logboek als tabblad in Coach Insight naast
+// gewicht en training, in plaats van als los venster erbovenop.
+export default function CoachingLogModal({ client, db, coachId, onClose, isMobile, onLogSaved, inline = false }) {
   const modalHost = useModalHost()
   const [logs, setLogs]           = useState([])
   const [loading, setLoading]     = useState(true)
@@ -245,8 +248,9 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
 
   const filteredLogs = filterCat === 'all' ? logs : logs.filter(l => (l.category || 'algemeen') === filterCat)
 
+  const zwevend = !inline
   const modal = (
-    <div style={{
+    <div style={zwevend ? {
       position: 'fixed',
       left: isMobile ? 0 : pos.x,
       top:  isMobile ? 0 : pos.y,
@@ -267,34 +271,41 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
       // venster nog van de pagina eronder scheidt.
       boxShadow: isMobile ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
       cursor: isDragging ? 'grabbing' : 'default',
+    } : {
+      // Als tabblad: vult de kolom, geen rand of schaduw.
+      display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
     }}>
 
-      {/* Gold accent line */}
-      <div style={{ height: '2px', background: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
+      {zwevend && (
+        <>
+          {/* Gold accent line */}
+          <div style={{ height: '2px', background: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
 
-      {/* Header */}
-      <div
-        onMouseDown={!isMobile ? onDragStart : undefined}
-        onTouchStart={!isMobile ? onDragStart : undefined}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '0.35rem',
-          padding: '0.5rem 0.75rem',
-          borderBottom: '1px solid rgba(255,255,255,0.04)',
-          cursor: isMobile ? 'default' : 'grab',
-          flexShrink: 0, userSelect: 'none'
-        }}
-      >
-        {!isMobile && <GripVertical size={12} color="rgba(255,255,255,0.2)" style={{ flexShrink: 0 }} />}
-        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {client.first_name} {client.last_name}
-        </span>
-        <span style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          LOGBOEK
-        </span>
-        {!isMobile && <button onClick={() => setMinimized(p => !p)} style={iconBtnStyle}><Minus size={10} /></button>}
-        {!isMobile && <button onClick={() => { setPos(DEFAULT_POS); setSize(DEFAULT_SIZE) }} style={iconBtnStyle}><Maximize2 size={10} /></button>}
-        <button onClick={onClose} style={{ ...iconBtnStyle, marginLeft: '0.125rem' }}><X size={10} /></button>
-      </div>
+          {/* Header */}
+          <div
+            onMouseDown={!isMobile ? onDragStart : undefined}
+            onTouchStart={!isMobile ? onDragStart : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              padding: '0.5rem 0.75rem',
+              borderBottom: '1px solid rgba(255,255,255,0.04)',
+              cursor: isMobile ? 'default' : 'grab',
+              flexShrink: 0, userSelect: 'none'
+            }}
+          >
+            {!isMobile && <GripVertical size={12} color="rgba(255,255,255,0.2)" style={{ flexShrink: 0 }} />}
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {client.first_name} {client.last_name}
+            </span>
+            <span style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              LOGBOEK
+            </span>
+            {!isMobile && <button onClick={() => setMinimized(p => !p)} style={iconBtnStyle}><Minus size={10} /></button>}
+            {!isMobile && <button onClick={() => { setPos(DEFAULT_POS); setSize(DEFAULT_SIZE) }} style={iconBtnStyle}><Maximize2 size={10} /></button>}
+            <button onClick={onClose} style={{ ...iconBtnStyle, marginLeft: '0.125rem' }}><X size={10} /></button>
+          </div>
+        </>
+      )}
 
       {!minimized && (
         <>
@@ -567,6 +578,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   //
   // Op een telefoon vult het scherm zich toch helemaal, dus daar veranderde
   // de achtergrond sowieso niets.
+  if (inline) return modal
   return createPortal(modal, modalHost)
 }
 
