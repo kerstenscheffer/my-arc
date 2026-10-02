@@ -1,30 +1,40 @@
 // src/modules/app-update/appVersie.js
 //
-// Welke versie draait hier, en staat er een nieuwere in de App Store?
+// Welke versie draait hier, en staat er een nieuwere in de winkel? En: mag
+// deze versie nog gebruikt worden, of moet de klant eerst updaten?
 //
-// De versie van deze bundel komt uit het Xcode-project zelf: vite.config.js
-// leest MARKETING_VERSION uit project.pbxproj bij het bouwen. Eén bron, dus de
-// app kan niet beweren 1.3 te zijn terwijl hij als 1.2 in de store staat.
+// De versie van deze bundel komt uit de native projecten zelf: vite.config.js
+// leest MARKETING_VERSION uit het Xcode-project en versionName uit
+// build.gradle. Eén bron per platform, dus de app kan niet beweren 1.3 te zijn
+// terwijl hij als 1.2 in de store staat.
 //
-// De nieuwste versie vragen we aan Apple. Dat is met opzet geen waarde in onze
-// eigen database: dan zou er een updatemelding kunnen staan voor een build die
-// nog in review ligt en die niemand kan installeren. Apple weet als enige
-// wanneer een versie echt beschikbaar is — en jij hoeft niets bij te werken.
+// Nieuwste versie:
+//   iOS      → aan Apple gevraagd (itunes lookup). Apple weet als enige wanneer
+//              een versie echt te downloaden is; een build in review telt niet.
+//   Android  → uit app_release.latest_version. Google heeft daar geen publieke
+//              lijst voor, dus die zet de coach zelf (paneel "App-versies").
+//
+// Verplicht updaten: app_release.min_version per platform. Draait de klant
+// iets ouders, dan blokkeert de app tot hij geüpdatet heeft.
 
 import { Capacitor } from '@capacitor/core'
 
-export const APP_VERSIE = typeof __APP_VERSIE__ === 'string' ? __APP_VERSIE__ : '0'
+const IOS_VERSIE = typeof __APP_VERSIE__ === 'string' ? __APP_VERSIE__ : '0'
+const ANDROID_VERSIE = typeof __APP_VERSIE_ANDROID__ === 'string' ? __APP_VERSIE_ANDROID__ : '0'
+
+export const platform = () => (Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web')
+export const isNativeApp = () => Capacitor.isNativePlatform()
+export const isIosApp = () => platform() === 'ios'
+
+export const APP_VERSIE = platform() === 'android' ? ANDROID_VERSIE : IOS_VERSIE
 
 export const APP_STORE_URL = 'https://apps.apple.com/nl/app/my-arc/id6764539959'
+export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.myarcfitness.app'
+export const storeUrlVoor = (p) => (p === 'android' ? PLAY_STORE_URL : APP_STORE_URL)
 
 const LOOKUP = 'https://itunes.apple.com/lookup?bundleId=com.myarcfitness.app&country=nl'
 const CACHE_SLEUTEL = 'myarc_store_versie'
 const CACHE_UREN = 6
-
-// Alleen iOS: de Play Store heeft geen publieke lijst met versienummers, dus
-// daar zou deze balk niets te melden hebben.
-export const isIosApp = () =>
-  Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
 
 // "1.10" is nieuwer dan "1.9" — per getal vergelijken, niet als tekst.
 export function nieuwerDan(a, b) {
@@ -61,4 +71,44 @@ export async function haalStoreVersie() {
   } catch {
     return null   // geen internet, geen melding
   }
+}
+
+// De rij uit app_release voor dit platform. Null als er niets staat of de
+// database niet bereikbaar is; dan geen melding.
+export async function haalRelease(supabase, p = platform()) {
+  if (!supabase || p === 'web') return null
+  const { data } = await supabase
+    .from('app_release')
+    .select('platform, latest_version, min_version, store_url, bericht')
+    .eq('platform', p)
+    .maybeSingle()
+    .then(r => r, () => ({ data: null }))
+  return data || null
+}
+
+/**
+ * Wat moet de app doen met zijn versie?
+ *   { verplicht: true,  nieuwe, storeUrl, bericht }  → blokkeren tot update
+ *   { verplicht: false, nieuwe, storeUrl }            → zachte balk
+ *   null                                              → niets te melden
+ */
+export async function beoordeelVersie(supabase) {
+  const p = platform()
+  if (p === 'web') return null
+  const release = await haalRelease(supabase, p)
+  const storeUrl = release?.store_url || storeUrlVoor(p)
+
+  // Verplicht: onder de minimumversie.
+  if (release?.min_version && nieuwerDan(release.min_version, APP_VERSIE)) {
+    const nieuwe = release.latest_version && nieuwerDan(release.latest_version, release.min_version)
+      ? release.latest_version : release.min_version
+    return { verplicht: true, nieuwe, storeUrl, bericht: release.bericht || null }
+  }
+
+  // Zacht: er staat iets nieuwers klaar.
+  let nieuwe = null
+  if (p === 'ios') nieuwe = (await haalStoreVersie()) || release?.latest_version || null
+  else nieuwe = release?.latest_version || null
+  if (!nieuwe || !nieuwerDan(nieuwe, APP_VERSIE)) return null
+  return { verplicht: false, nieuwe, storeUrl, bericht: null }
 }

@@ -24,6 +24,7 @@ import CoachOutputDashboard from '../modules/output-planning/CoachOutputDashboar
 import ProductivityHub from '../modules/productivity/ProductivityHub'
 import { FunnelDashboard } from '../modules/qualification-funnel'
 import SpotsManager from '../modules/spots/SpotsManager'
+import AppVersiesPaneel from '../modules/app-update/AppVersiesPaneel'
 import NotificationHub from '../modules/notifications/NotificationHub'
 import TemplateManager from '../modules/meal-templates/TemplateManager'
 import IngredientPhotoManager from '../modules/ingredient-photos/IngredientPhotoManager'
@@ -58,7 +59,7 @@ import {
   Sparkles, Trophy, Video, Phone, Activity, BarChart3, LogOut,
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText, Columns2,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
-  Bell, Bug, Lightbulb, AlertCircle, Image as ImageIcon, FlaskConical,
+  Bell, Bug, Lightbulb, Smartphone, AlertCircle, Image as ImageIcon, FlaskConical,
   Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck
 } from 'lucide-react'
 
@@ -124,7 +125,8 @@ const MORE_CATEGORIES = [
   {
     label: 'Systeem',
     items: [
-      { id: 'notifications-hub', label: 'Meldingen', icon: Bell }
+      { id: 'notifications-hub', label: 'Meldingen', icon: Bell },
+      { id: 'app-versies', label: 'App-versies', icon: Smartphone }
     ]
   }
 ]
@@ -619,6 +621,8 @@ export default function CoachHub() {
         return <NotificationHub db={db} />
       case 'spots':
         return <SpotsManager db={db} compact={false} />
+      case 'app-versies':
+        return <AppVersiesPaneel db={db} />
       case 'lab':
         return <LabHub isMobile={isMobile} />
       default:
