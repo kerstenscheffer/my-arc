@@ -38,7 +38,7 @@ const STRIPE_PRICE_ID = 'price_1UFdw6J3V4uXn1OkvJicc73b'
 const TERMIJN_BEDRAG = 148.5
 const STRIPE_PRICE_ID_2X = 'price_1UI2xdJ3V4uXn1OkOVZpVKTr'
 
-// Nieuwe prijs sinds 2 okt 2026: €497. Eigen pad (/6week-checkout-497) zodat
+// Nieuwe prijs sinds 2 okt 2026: €497. Eigen pad (/6week-checkout-v2) zodat
 // wie nog een link naar €297 heeft, daar gewoon kan afrekenen.
 const PRICE_497 = 497
 const STRIPE_PRICE_ID_497 = 'price_1UM4dsJ3V4uXn1OkBjz1e7wq'
@@ -59,7 +59,7 @@ const VARIANT = {
     prijs: PRICE_497,
     priceId: STRIPE_PRICE_ID_497,
     mode: 'payment',
-    cancelPath: '/6week-checkout-497',
+    cancelPath: '/6week-checkout-v2',
     knop: `Start Nu · €${PRICE_497}`,
     balkKnop: `Maak investering · €${PRICE_497}`,
     prijsRegel: null,

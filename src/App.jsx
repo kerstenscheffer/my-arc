@@ -276,9 +276,9 @@ function App() {
     return <SixWeekChallengeCheckout />
   }
 
-  // Zelfde challenge, nieuwe prijs €497 (sinds 2 okt 2026). Eigen pad: de
+  // Zelfde challenge, nieuwe prijs €497 (sinds 2 okt 2026). Eigen pad (v2): de
   // €297-link hierboven blijft werken voor wie die nog moet betalen.
-  if (currentPath === '/6-week-checkout-497' || currentPath === '/6week-checkout-497') {
+  if (currentPath === '/6-week-checkout-v2' || currentPath === '/6week-checkout-v2') {
     return <SixWeekChallengeCheckout prijs497 />
   }
 
