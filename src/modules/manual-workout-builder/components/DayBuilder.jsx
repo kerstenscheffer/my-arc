@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Trash2, Copy, Plus, ChevronDown, ChevronUp, Heart, BookmarkPlus, SlidersHorizontal } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
 import BuilderExerciseCard from './BuilderExerciseCard'
+import useSleepVolgorde from './useSleepVolgorde'
 
 export default function DayBuilder({
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate, onSaveTemplate,
@@ -40,13 +41,14 @@ export default function DayBuilder({
   const handleCancelName = () => { setTempName(day.name); setEditingName(false) }
   const handleCancelFocus = () => { setTempFocus(day.focus); setEditingFocus(false) }
 
-  const moveExercise = (index, direction) => {
-    const newExercises = [...day.exercises]
-    const newIndex = direction === 'up' ? index - 1 : index + 1
-    if (newIndex < 0 || newIndex >= newExercises.length) return
-    ;[newExercises[index], newExercises[newIndex]] = [newExercises[newIndex], newExercises[index]]
-    onUpdate({ ...day, exercises: newExercises })
+  // Slepen: haal de kaart van `van` weg en zet hem op `naar`; de rest schuift op.
+  const herschik = (van, naar) => {
+    const lijst = [...day.exercises]
+    const [item] = lijst.splice(van, 1)
+    lijst.splice(naar, 0, item)
+    onUpdate({ ...day, exercises: lijst })
   }
+  const sleep = useSleepVolgorde(day.exercises.length, herschik)
 
   const handleExerciseField = (exerciseId, field, value) => {
     const updated = day.exercises.map(ex => ex.id === exerciseId ? { ...ex, [field]: value } : ex)
@@ -231,21 +233,23 @@ export default function DayBuilder({
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem', marginBottom: '1rem', maxHeight: isMobile ? '400px' : '440px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: day.exercises.length > 5 ? '0.4rem' : 0 }}>
+          {/* gap 10px: de sleep-hook rekent met diezelfde 10 om de andere
+              kaarten precies één plek op te schuiven. */}
+          <div ref={sleep.lijstRef} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: '1rem', marginBottom: '1rem', maxHeight: isMobile ? '400px' : '440px', overflowY: sleep.bezig ? 'hidden' : 'auto', WebkitOverflowScrolling: 'touch', paddingRight: day.exercises.length > 5 ? '0.4rem' : 0 }}>
             {day.exercises.map((exercise, index) => (
-              <BuilderExerciseCard
-                key={exercise.id}
-                exercise={exercise}
-                index={index}
-                total={day.exercises.length}
-                isMobile={isMobile}
-                db={db}
-                client={client}
-                onField={(field, value) => handleExerciseField(exercise.id, field, value)}
-                onMove={(dir) => moveExercise(index, dir)}
-                onDelete={() => onDeleteExercise(exercise.id)}
-                onVideo={() => setVideoEditing(exercise)}
-              />
+              <div key={exercise.id} data-sleep-index={index} style={sleep.kaartStijl(index)}>
+                <BuilderExerciseCard
+                  exercise={exercise}
+                  index={index}
+                  isMobile={isMobile}
+                  db={db}
+                  client={client}
+                  greep={sleep.greep(index)}
+                  onField={(field, value) => handleExerciseField(exercise.id, field, value)}
+                  onDelete={() => onDeleteExercise(exercise.id)}
+                  onVideo={() => setVideoEditing(exercise)}
+                />
+              </div>
             ))}
 
             {day.exercises.length === 0 && (

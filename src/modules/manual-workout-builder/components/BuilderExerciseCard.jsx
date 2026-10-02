@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
-import { Video, Trash2, ChevronUp, ChevronDown, Dumbbell, Pencil, X } from 'lucide-react'
+import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 
 // Module-level cache — one DB query per session, shared across all exercise cards
@@ -32,7 +32,7 @@ const EQUIPMENT_OPTIONS = [
 ]
 
 export default function BuilderExerciseCard({
-  exercise, index, total, isMobile, db, client, onField, onMove, onDelete, onVideo,
+  exercise, index, isMobile, db, client, greep, onField, onDelete, onVideo,
 }) {
   const { imageUrl, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
   const photoSize = isMobile ? 52 : 62
@@ -118,16 +118,23 @@ export default function BuilderExerciseCard({
         </div>
       </div>
 
-      {/* Volgorde — dun kolommetje */}
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flexShrink: 0 }}>
-        <button onClick={(e) => { stop(e); onMove('up') }} disabled={index === 0}
-          style={{ ...ctrlBtn('rgba(255,255,255,0.55)'), width: 24, height: 22, opacity: index === 0 ? 0.2 : 0.6, cursor: index === 0 ? 'not-allowed' : 'pointer' }}>
-          <ChevronUp size={15} />
-        </button>
-        <button onClick={(e) => { stop(e); onMove('down') }} disabled={index === total - 1}
-          style={{ ...ctrlBtn('rgba(255,255,255,0.55)'), width: 24, height: 22, opacity: index === total - 1 ? 0.2 : 0.6, cursor: index === total - 1 ? 'not-allowed' : 'pointer' }}>
-          <ChevronDown size={15} />
-        </button>
+      {/* Greep — vastpakken en slepen om de volgorde te veranderen. De
+          pointer-handlers komen uit useSleepVolgorde; touch-action none
+          zit er al in, anders scrolt de lijst mee met je vinger. */}
+      <div
+        {...greep}
+        aria-label="Versleep om te verplaatsen"
+        onClick={stop}
+        style={{
+          ...greep?.style,
+          width: 30, alignSelf: 'stretch', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'rgba(255,255,255,0.4)',
+          borderLeft: '1px solid rgba(255,255,255,0.05)',
+          WebkitTapHighlightColor: 'transparent', userSelect: 'none',
+        }}
+      >
+        <GripVertical size={16} strokeWidth={2.4} />
       </div>
 
       {/* Bewerken + verwijderen */}
