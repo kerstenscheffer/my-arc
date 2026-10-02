@@ -20,10 +20,28 @@ import { useState } from 'react'
 import { Info, ChevronDown } from 'lucide-react'
 import { colors, radius, space } from '../../ui/tokens'
 import SterkerKaart from './SterkerKaart'
+import { WEEK_EISEN } from '../challenge-monitor/challengeEisen'
 
 // Oordeelkleuren. Groen en rood komen uit de tokens; oranje bestaat daar niet
 // en is hier "net niet", tussen behaald en misgegaan in.
 const OORDEEL_KLEUR = { goed: colors.success, bijna: '#f59e0b', niet: colors.danger }
+
+// Drempels voor de tellers komen uit de challenge-eisen (één bron: 3× wegen,
+// 5 voedingsdagen). Gehaald = groen, 70% ervan = oranje, daaronder rood —
+// zodat je in één oogopslag ziet waar het deze week aan lag.
+const eis = (key, anders) => WEEK_EISEN.find(e => e.key === key)?.nodig ?? anders
+const DOEL_WEGINGEN = eis('wegingen', 3)
+const DOEL_VOEDING = eis('voeding', 5)
+const tellerOordeel = (gedaan, doel) => {
+  if (gedaan == null) return null
+  if (gedaan >= doel) return 'goed'
+  if (gedaan >= doel * 0.7) return 'bijna'
+  return 'niet'
+}
+const tellerKleur = (gedaan, doel) => {
+  const o = tellerOordeel(gedaan, doel)
+  return o ? OORDEEL_KLEUR[o] : undefined
+}
 
 const nl = (n, cijfers = 0) =>
   new Intl.NumberFormat('nl-NL', { minimumFractionDigits: cijfers, maximumFractionDigits: cijfers }).format(n)
@@ -207,8 +225,9 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
             {gewicht.doelBereik && <span style={BODY_ZACHT}>{' · doel '}{gewicht.doelBereik}</span>}
           </div>
           {wegingen?.dezeWeek != null && (
-            <div style={{ ...BODY_ZACHT, marginTop: 2 }}>
+            <div style={{ ...BODY_ZACHT, marginTop: 2, color: tellerKleur(wegingen.dezeWeek, DOEL_WEGINGEN) || BODY_ZACHT.color, fontWeight: 800 }}>
               {wegingen.dezeWeek} van {wegingen.van} dagen gewogen
+              {tellerOordeel(wegingen.dezeWeek, DOEL_WEGINGEN) === 'niet' && ` · minimaal ${DOEL_WEGINGEN}`}
             </div>
           )}
 
@@ -278,7 +297,7 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
               </span>
             </button>
           ) : (
-            <div style={{ ...BODY_ZACHT, marginTop: 2 }}>Geen oefening zwaarder dan vorige week</div>
+            <div style={{ ...BODY_ZACHT, marginTop: 2, color: OORDEEL_KLEUR.bijna, fontWeight: 800 }}>Geen oefening zwaarder dan vorige week</div>
           )}
 
           {trainingUit && (
@@ -309,8 +328,9 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
           titel="Voeding" foto="/checkin/voeding.jpg" isMobile={isMobile}
           rechts={<InfoKnop open={voedingUit} onClick={() => setVoedingUit(v => !v)} label="Wat telt hier mee?" />}
         >
-          <div style={BODY}>
+          <div style={{ ...BODY, color: tellerKleur(voeding.bijgehouden, DOEL_VOEDING) || BODY.color }}>
             Bijgehouden op {voeding.bijgehouden} van {voeding.van} dagen
+            {tellerOordeel(voeding.bijgehouden, DOEL_VOEDING) === 'niet' && <span style={BODY_ZACHT}>{` · minimaal ${DOEL_VOEDING}`}</span>}
           </div>
           {voeding.gemKcal != null && (
             <div style={{ ...BODY_ZACHT, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
