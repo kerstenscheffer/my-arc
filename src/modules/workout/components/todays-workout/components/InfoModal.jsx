@@ -3,6 +3,7 @@ import { X, Play, Info, Zap } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import ExerciseService from '../../../../../services/ExerciseService'
+import { appSafeEmbedUrl } from '../../../../videos/utils/youtubeHelpers'
 
 // `zIndex` omdat dit scherm ook bovenop het log-scherm geopend wordt. Stond
 // vast op 9999, en het log-scherm zit op 10000 — dan verscheen de video
@@ -64,9 +65,9 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab, z
 
   const getYouTubeEmbedUrl = (url) => {
     if (!url) return null
-    if (url.includes('youtube.com/embed/')) return url
+    if (url.includes('youtube.com/embed/')) return appSafeEmbedUrl(url)
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\s?]+)/)
-    if (match) return `https://www.youtube-nocookie.com/embed/${match[1]}`
+    if (match) return appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${match[1]}`)
     return url
   }
 

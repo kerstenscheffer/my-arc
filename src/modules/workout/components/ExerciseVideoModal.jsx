@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { X, Play, AlertCircle, ExternalLink } from 'lucide-react'
 import ExerciseService from '../../services/ExerciseService'
+import { appSafeEmbedUrl } from '../../videos/utils/youtubeHelpers'
 
 export default function ExerciseVideoModal({ exercise, onClose, isMobile }) {
   const [videoUrl, setVideoUrl] = useState(null)
@@ -40,12 +41,12 @@ export default function ExerciseVideoModal({ exercise, onClose, isMobile }) {
     if (!url) return null
     
     // Already embed URL
-    if (url.includes('youtube.com/embed/')) return url
+    if (url.includes('youtube.com/embed/')) return appSafeEmbedUrl(url)
     
     // Regular YouTube URL
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)
     if (match) {
-      return `https://www.youtube-nocookie.com/embed/${match[1]}`
+      return appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${match[1]}`)
     }
     
     return null

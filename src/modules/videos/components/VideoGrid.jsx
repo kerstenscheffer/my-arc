@@ -1,5 +1,6 @@
 import React from 'react'
 import { 
+import { appSafeEmbedUrl } from '../utils/youtubeHelpers'
   Video, Play, Eye, Star, Clock, Send, Edit, Camera,
   Zap, Target, Heart, Brain, Activity, Sparkles
 } from 'lucide-react'
@@ -41,7 +42,7 @@ export default function VideoGrid({
     
     if (youtubeId) {
       // FIX: mute=1 voor autoplay zonder geluid issues
-      return `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1&mute=1&cc_load_policy=0&iv_load_policy=3&enablejsapi=1`
+      return appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1&mute=1&cc_load_policy=0&iv_load_policy=3&enablejsapi=1`)
     }
     return video.video_url
   }

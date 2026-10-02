@@ -1,6 +1,7 @@
 // src/components/UpdateModal.jsx
 import { useState, useEffect } from 'react'
 import { X, Rocket, ChevronRight } from 'lucide-react'
+import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
 export default function UpdateModal({ db }) {
   const [showModal, setShowModal] = useState(false)
@@ -88,7 +89,7 @@ export default function UpdateModal({ db }) {
   const getYouTubeEmbedUrl = (url) => {
     // Extract video ID from various YouTube URL formats
     const videoId = 'Hx5nf0TQzLE' // Hardcoded for now
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}`
+    return appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}`)
   }
 
   return (

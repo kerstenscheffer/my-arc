@@ -8,7 +8,7 @@ import { useModalHost } from '../../coach/ModalHost'
 import { Play, X, Video, CheckCircle2, ChevronLeft, GraduationCap, Eye, ExternalLink } from 'lucide-react'
 import videoService from './VideoService'
 import PageFilesBlock from './PageFilesBlock'
-import { getZoomEmbedUrl } from './utils/youtubeHelpers'
+import { getZoomEmbedUrl, appSafeEmbedUrl } from './utils/youtubeHelpers'
 
 const GREEN = '#10b981'
 
@@ -743,9 +743,17 @@ function FullscreenPlayer({ item, onClose, onWatched, onCompleted }) {
         })
       } catch (err) { console.warn('YT player init failed:', err?.message) }
     })
+    // In de app zit de speler in onze eigen yt.html; die meldt "afgelopen"
+    // (state 0) via postMessage, want YT.Player kan daar niet bij.
+    const onMessage = (e) => {
+      const d = e?.data
+      if (d && d.source === 'myarc-yt' && d.videoId === videoId && d.state === 0) markWatched()
+    }
+    window.addEventListener('message', onMessage)
     return () => {
       cancelled = true
       if (poll) clearInterval(poll)
+      window.removeEventListener('message', onMessage)
       try { player && player.destroy && player.destroy() } catch { /* noop */ }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -766,7 +774,7 @@ function FullscreenPlayer({ item, onClose, onWatched, onCompleted }) {
       }
 
   const embedUrl = videoId
-    ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1&cc_load_policy=0&iv_load_policy=3&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1&cc_load_policy=0&iv_load_policy=3&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`)
     : null
   // Zoom Clips: /clips/share/ → /clips/embed/ is wél embedbaar (geen x-frame-options).
   const zoomEmbed = getZoomEmbedUrl(video?.video_url)

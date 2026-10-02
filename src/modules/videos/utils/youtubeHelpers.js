@@ -2,6 +2,44 @@
 // YouTube URL parsing — supports watch, youtu.be, embed, AND shorts
 // Fixes the bug where /shorts/ URLs returned null videoId
 
+import { Capacitor } from '@capacitor/core'
+
+/**
+ * Speler-pagina op onze eigen site, zie public/yt.html.
+ *
+ * In de native app draait de webview op capacitor://localhost. Voor dat schema
+ * stuurt WKWebView geen Referer-header mee, en YouTube weigert sinds 2025 elke
+ * embed zonder geldige https-referer met "foutcode 153". youtube-nocookie.com
+ * helpt daar niet tegen (26 sep 2026 geprobeerd, 2 okt nog steeds 153), en een
+ * https-schema kan Capacitor op iOS niet (WKWebView staat dat niet toe).
+ *
+ * Daarom laadt de app de YouTube-iframe niet rechtstreeks, maar via deze pagina
+ * op www.myarcfitness.com. Die pagina sluit de echte speler in, en díe krijgt
+ * wél een https-referer. In de browser is dit niet nodig en gaan we direct.
+ */
+export const APP_PLAYER_PAGE = 'https://www.myarcfitness.com/yt.html'
+
+const isNativeApp = () => {
+  try { return Capacitor.isNativePlatform() } catch { return false }
+}
+
+/**
+ * Maak een YouTube-embed-URL afspeelbaar in de native app.
+ * In de browser komt de URL ongewijzigd terug. Niet-YouTube-URL's ook.
+ *
+ *   https://www.youtube-nocookie.com/embed/<id>?autoplay=1
+ *   → https://www.myarcfitness.com/yt.html?autoplay=1&v=<id>
+ */
+export const appSafeEmbedUrl = (url) => {
+  if (!url || !isNativeApp()) return url
+  const m = String(url).match(/^https?:\/\/(?:www\.|m\.)?youtube(?:-nocookie)?\.com\/embed\/([\w-]+)(?:\?(.*))?$/)
+  if (!m) return url
+  const params = new URLSearchParams(m[2] || '')
+  params.delete('origin')   // yt.html zet z'n eigen origin
+  params.set('v', m[1])
+  return `${APP_PLAYER_PAGE}?${params.toString()}`
+}
+
 /**
  * Extract YouTube video ID from any URL format.
  * Supports: watch?v=, youtu.be/, embed/, shorts/, mobile (m.youtube.com)
@@ -68,11 +106,8 @@ export const getYouTubeEmbedUrl = (videoId, options = {}) => {
   if (Number.isFinite(options.start) && options.start > 0) {
     params.set('start', String(Math.floor(options.start)))
   }
-  // youtube-nocookie.com in plaats van youtube.com: dat domein is toegestaan
-  // zonder dat de player een geldige referrer-configuratie nodig heeft. In een
-  // webview (Capacitor) stuurt de browser die header niet mee zoals YouTube
-  // verwacht, en dan weigert de player met "error 153".
-  return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`
+  // In de app via onze speler-pagina (foutcode 153), zie appSafeEmbedUrl.
+  return appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`)
 }
 
 /**

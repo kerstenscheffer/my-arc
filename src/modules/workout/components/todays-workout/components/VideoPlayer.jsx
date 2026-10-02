@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Play, Pause } from 'lucide-react'
+import { appSafeEmbedUrl } from '../../../../videos/utils/youtubeHelpers'
 
 export default function VideoPlayer({ 
   youtubeId,
@@ -23,7 +24,7 @@ export default function VideoPlayer({
   
   // YouTube embed URL met autoplay + loop
   const embedUrl = videoId 
-    ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=0&playsinline=1&rel=0&modestbranding=1&controls=0&showinfo=0`
+    ? appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=0&playsinline=1&rel=0&modestbranding=1&controls=0&showinfo=0`)
     : null
 
   const handleTap = () => {

@@ -14,6 +14,7 @@ import ExerciseService from '../../../../../services/ExerciseService'
 import OpwarmPoort from './OpwarmPoort'
 import { isOpgewarmd, zetOpgewarmd } from '../opwarmen'
 import VideoPlayerModal from '../../../../videos/VideoPlayerModal'
+import { appSafeEmbedUrl } from '../../../../videos/utils/youtubeHelpers'
 
 // ========== SCROLL NUMBER PICKER ==========
 function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'kg', onConfirm, halfStep = null }) {
@@ -393,14 +394,14 @@ function DropsetInput({ onSave, onCancel, isMobile, eenheid = 'kg' }) {
 // iframe.
 function embedUrl(url) {
   if (!url) return null
-  if (url.includes('/embed/')) return url
+  if (url.includes('/embed/')) return appSafeEmbedUrl(url)
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\s?/]+)/)
   // playsinline: zonder dit gooit iOS de video in de systeemspeler op volledig
   // scherm zodra je op play drukt.
   // fs=0 zet de volledig-scherm-knop van YouTube uit. Bij een Short levert die
   // een zwarte speler met alleen knoppen op; we bieden er zelf een aan die het
   // wél doet.
-  return m ? `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&rel=0&playsinline=1&fs=0` : null
+  return m ? appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&rel=0&playsinline=1&fs=0`) : null
 }
 
 // De voorvertoning van een YouTube-video. Een coach die een filmpje aan een
