@@ -14,11 +14,16 @@ import { useState, useEffect, useRef } from 'react'
 import { Star, Lock, Mail, User, Phone, ChevronDown } from 'lucide-react'
 
 // Maandbedrag zoals het op de pagina staat.
-const PRICE = 125
+const PRICE_V1 = 125
 
 // Stripe Price ID van dit abonnement — de checkout rekent hiermee af, niet met
 // PRICE hierboven (die is alleen de weergegeven prijs op de pagina).
 const STRIPE_PRICE_ID = 'price_1U6oR6J3V4uXn1Ok29IM1ks0'
+
+// Nieuwe prijs sinds 2 okt 2026: 4 × €200, op /16week-monthly-checkout-v2.
+// De €125-link blijft bestaan voor wie daar nog moet betalen.
+const PRICE_V2 = 200
+const STRIPE_PRICE_ID_V2 = 'price_1UM4hCJ3V4uXn1OkrR8jSAVm'
 
 // Same Stripe publishable key as the other checkouts.
 const STRIPE_PK = 'pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54'
@@ -210,7 +215,9 @@ function PijlerSection({ isMobile, index }) {
   )
 }
 
-export default function SixteenWeekMonthlyCheckout() {
+export default function SixteenWeekMonthlyCheckout({ v2 = false }) {
+  const PRICE = v2 ? PRICE_V2 : PRICE_V1
+  const priceId = v2 ? STRIPE_PRICE_ID_V2 : STRIPE_PRICE_ID
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -317,7 +324,7 @@ export default function SixteenWeekMonthlyCheckout() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          priceId: STRIPE_PRICE_ID,
+          priceId,
           plan: '16-weken-maandelijks',
           email: email.trim(),
           name: name.trim(),

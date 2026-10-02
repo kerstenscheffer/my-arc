@@ -299,6 +299,12 @@ function App() {
     return <SixteenWeekMonthlyCheckout />
   }
 
+  // 16-weken maandelijks, nieuwe prijs 4 × €200 (sinds 2 okt 2026). Eigen
+  // pad (v2): de €125-link hierboven blijft werken.
+  if (currentPath === '/16-week-monthly-checkout-v2' || currentPath === '/16week-monthly-checkout-v2') {
+    return <SixteenWeekMonthlyCheckout v2 />
+  }
+
   if (currentPath === '/monthly-checkout') {
     return <MonthlySubscriptionCheckout />
   }
