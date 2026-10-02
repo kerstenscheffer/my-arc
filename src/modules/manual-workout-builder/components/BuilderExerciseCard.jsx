@@ -35,7 +35,7 @@ export default function BuilderExerciseCard({
   exercise, index, isMobile, db, client, greep, onField, onDelete, onVideo,
 }) {
   const { imageUrl, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
-  const photoSize = isMobile ? 52 : 62
+  const photoSize = isMobile ? 64 : 76
   const hasVid = hasVideo || !!exercise.video_url
   const isCardio = exercise.type === 'cardio'
   const [editing, setEditing] = useState(false)
@@ -68,14 +68,18 @@ export default function BuilderExerciseCard({
     : `${exercise.sets ?? 2} × ${exercise.reps ?? '8-12'}  ·  ${exercise.rust ?? exercise.rest ?? '2 min'} rust`
 
   return (
-    <div onClick={stop} style={{
-      background: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12,
-      overflow: 'hidden', display: 'flex', alignItems: 'stretch', flexShrink: 0, minWidth: 0,
-    }}>
-      {hasVid && <div style={{ width: 2, background: 'linear-gradient(180deg, transparent, rgba(255,215,0,0.5), transparent)', flexShrink: 0 }} />}
+    <div
+      {...greep}
+      onClick={stop}
+      style={{
+        ...greep?.style,
+        background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
+        overflow: 'hidden', display: 'flex', alignItems: 'stretch', flexShrink: 0, minWidth: 0,
+      }}
+    >
 
       {/* Foto — tik om video te koppelen */}
-      <div onClick={(e) => { stop(e); onVideo() }} style={{
+      <div data-geen-sleep onClick={(e) => { stop(e); onVideo() }} style={{
         width: photoSize, flexShrink: 0, position: 'relative', overflow: 'hidden',
         cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}>
@@ -90,7 +94,7 @@ export default function BuilderExerciseCard({
           <span style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', lineHeight: 1 }}>{index + 1}</span>
         </div>
         {hasVid && !loadingImage && (
-          <div style={{ position: 'absolute', bottom: 3, right: 3, width: 16, height: 16, borderRadius: '50%', background: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', bottom: 3, right: 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="6" height="6" viewBox="0 0 10 10" fill="rgba(0,0,0,0.85)"><polygon points="2,1 9,5 2,9" /></svg>
           </div>
         )}
@@ -99,52 +103,38 @@ export default function BuilderExerciseCard({
       {/* Info — read-only */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isMobile ? '0.4rem 0.55rem' : '0.45rem 0.7rem', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <span style={{ fontSize: isMobile ? '0.86rem' : '0.92rem', fontWeight: 800, color: '#fff', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.015em', minWidth: 0 }}>
+          <span style={{ fontSize: isMobile ? '0.92rem' : '0.98rem', fontWeight: 900, color: '#fff', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.015em', minWidth: 0 }}>
             {exercise.name || (isCardio ? 'Cardio' : 'Oefening')}
           </span>
           {(exercise.primairSpieren || exercise.muscle || isCardio) && (
-            <span style={{ flexShrink: 0, fontSize: '0.5rem', fontWeight: 900, color: '#000', background: isCardio ? '#f87171' : '#FFD700', padding: '2px 6px', borderRadius: 3, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+            <span style={{ flexShrink: 0, fontSize: '0.52rem', fontWeight: 900, color: isCardio ? '#f87171' : 'rgba(255,255,255,0.7)', background: 'transparent', border: `1px solid ${isCardio ? 'rgba(248,113,113,0.5)' : 'rgba(255,255,255,0.22)'}`, padding: '2px 6px', borderRadius: 5, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
               {isCardio ? 'Cardio' : (exercise.primairSpieren || exercise.muscle)}
             </span>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{statText}</span>
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{statText}</span>
           {!isCardio && exercise.equipment && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 5, padding: '1px 6px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 5, padding: '1px 6px' }}>
               <Dumbbell size={10} /> {exercise.equipment}
             </span>
           )}
         </div>
       </div>
 
-      {/* Greep — vastpakken en slepen om de volgorde te veranderen. De
-          pointer-handlers komen uit useSleepVolgorde; touch-action none
-          zit er al in, anders scrolt de lijst mee met je vinger. */}
-      <div
-        {...greep}
-        aria-label="Versleep om te verplaatsen"
-        onClick={stop}
-        style={{
-          ...greep?.style,
-          width: 30, alignSelf: 'stretch', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'rgba(255,255,255,0.4)',
-          borderLeft: '1px solid rgba(255,255,255,0.05)',
-          WebkitTapHighlightColor: 'transparent', userSelect: 'none',
-        }}
-      >
+      {/* Hint dat de kaart te verslepen is; de hele kaart is de greep. */}
+      <div aria-hidden style={{ width: 22, alignSelf: 'stretch', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.28)' }}>
         <GripVertical size={16} strokeWidth={2.4} />
       </div>
 
       {/* Bewerken + verwijderen */}
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5, flexShrink: 0, padding: '0 8px 0 4px' }}>
         <button onClick={(e) => { stop(e); setEditing(true) }} title="Bewerken"
-          style={ctrlBtn('#FFD700', 'rgba(255,215,0,0.12)', '1px solid rgba(255,215,0,0.35)')}>
+          style={ctrlBtn('#fff', 'transparent', '1px solid rgba(255,255,255,0.2)')}>
           <Pencil size={14} />
         </button>
         <button onClick={(e) => { stop(e); onDelete() }} title="Verwijder oefening"
-          style={ctrlBtn('#ef4444', 'rgba(239,68,68,0.1)', '1px solid rgba(239,68,68,0.25)')}>
+          style={ctrlBtn('rgba(255,255,255,0.55)', 'transparent', '1px solid rgba(255,255,255,0.14)')}>
           <Trash2 size={14} />
         </button>
       </div>
@@ -177,7 +167,7 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
 
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, maxHeight: isMobile ? '92vh' : '88vh', display: 'flex', flexDirection: 'column', background: '#111', border: '1px solid rgba(255,215,0,0.22)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, maxHeight: isMobile ? '92vh' : '88vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.14)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? 'calc(0.8rem + env(safe-area-inset-top)) 0.9rem 0.7rem' : '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ flex: 1, minWidth: 0, fontWeight: 800, fontSize: '0.95rem', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -248,14 +238,14 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
 
           {/* Video koppelen */}
           <button onClick={() => { onVideo(); onClose() }}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', padding: '0.7rem', borderRadius: 10, background: hasVid ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${hasVid ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.12)'}`, color: hasVid ? '#FFD700' : 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', padding: '0.7rem', borderRadius: 10, background: hasVid ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${hasVid ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)'}`, color: '#fff', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}>
             <Video size={15} /> {hasVid ? 'Video bewerken' : 'Video koppelen'}
           </button>
         </div>
 
         {/* Footer */}
         <div style={{ flexShrink: 0, padding: isMobile ? '0.75rem 1rem calc(0.9rem + env(safe-area-inset-bottom))' : '0.85rem 1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <button onClick={onClose} style={{ width: '100%', padding: '0.7rem', borderRadius: 10, background: 'rgba(255,215,0,0.16)', border: '1px solid rgba(255,215,0,0.4)', color: '#FFD700', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer' }}>Klaar</button>
+          <button onClick={onClose} style={{ width: '100%', padding: '0.7rem', borderRadius: 10, background: '#fff', border: '1px solid #fff', color: '#0a0a0a', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer' }}>Klaar</button>
         </div>
       </div>
     </div>,
