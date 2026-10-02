@@ -62,7 +62,18 @@ function LijnTekst({ value, onChange, placeholder, style }) {
 // gewoon onder de lijn uit en ziet er op elk apparaat hetzelfde uit.
 function LijnDropdown({ value, opties, placeholder, onChange, style }) {
   const [open, setOpen] = useState(false)
+  // Onderin het scherm (de doelen-sheet) valt een lijstje dat naar beneden
+  // uitklapt buiten beeld; dan klapt het naar boven.
+  const [naarBoven, setNaarBoven] = useState(false)
   const ref = useRef(null)
+  const toggle = () => {
+    if (!open && ref.current) {
+      const r = ref.current.getBoundingClientRect()
+      const nodig = opties.length * 44 + 16
+      setNaarBoven(window.innerHeight - r.bottom < nodig && r.top > nodig)
+    }
+    setOpen(o => !o)
+  }
   useEffect(() => {
     if (!open) return
     const dicht = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -75,7 +86,7 @@ function LijnDropdown({ value, opties, placeholder, onChange, style }) {
     <div ref={ref} style={{ position: 'relative', ...style }}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={toggle}
         aria-haspopup="listbox"
         aria-expanded={open}
         style={{
@@ -90,7 +101,8 @@ function LijnDropdown({ value, opties, placeholder, onChange, style }) {
       </button>
       {open && (
         <div role="listbox" style={{
-          position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20, marginTop: 4,
+          position: 'absolute', left: 0, right: 0, zIndex: 20,
+          ...(naarBoven ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
           background: '#161616', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
           padding: 4, boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
         }}>
