@@ -16,19 +16,24 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { Star, Lock, Mail, User, Phone, ChevronDown, X, Compass, ListChecks, Target, HelpCircle, Maximize2, Minimize2, ClipboardList, ShieldCheck, PartyPopper, Crosshair, Utensils, TrendingUp, ClipboardCheck, LineChart, SlidersHorizontal, Video } from 'lucide-react'
 
-// Eenmalige prijs.
-const PRICE = 497
+// Eenmalige prijs (v1).
+const PRICE_V1 = 497
 
 // Stripe Price ID van dit traject — de checkout rekent hiermee af, niet met
 // PRICE hierboven (die is alleen nog de weergegeven prijs op de pagina).
 const STRIPE_PRICE_ID = 'price_1U6oNiJ3V4uXn1Okl1DG5TDD'
+
+// Nieuwe prijs sinds 2 okt 2026: €750, op /16week-checkout-v2. De €497-link
+// hierboven blijft bestaan voor wie daar nog moet betalen.
+const PRICE_V2 = 750
+const STRIPE_PRICE_ID_V2 = 'price_1UM4gLJ3V4uXn1OknD6ALuVT'
 
 // Same Stripe publishable key as the other checkouts.
 const STRIPE_PK = 'pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54'
 
 // Wat er op de investering-sectie staat. Dit is het bedrag dat je hier ook
 // écht afrekent — op /16week staat een ander bedrag.
-const INVESTERING = { bedrag: `€${PRICE}`, periode: 'eenmalig · 4 maanden traject' }
+const investering = (prijs) => ({ bedrag: `€${prijs}`, periode: 'eenmalig · 4 maanden traject' })
 
 const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
@@ -570,7 +575,10 @@ function TrustpilotBadge({ size = 'sm', style }) {
   )
 }
 
-export default function SixteenWeekCheckout() {
+export default function SixteenWeekCheckout({ v2 = false }) {
+  const PRICE = v2 ? PRICE_V2 : PRICE_V1
+  const priceId = v2 ? STRIPE_PRICE_ID_V2 : STRIPE_PRICE_ID
+  const INVESTERING = investering(PRICE)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -681,7 +689,7 @@ export default function SixteenWeekCheckout() {
         body: JSON.stringify({
           plan: '16-week-program',
           price: PRICE,
-          ...(STRIPE_PRICE_ID ? { priceId: STRIPE_PRICE_ID } : {}),
+          ...(priceId ? { priceId } : {}),
           email: email.trim(),
           name: name.trim(),
           phone: phone.trim(),

@@ -270,6 +270,12 @@ function App() {
     return <SixteenWeekCheckout />
   }
 
+  // 16-weken checkout, nieuwe prijs €750 (sinds 2 okt 2026). Eigen pad (v2):
+  // de €497-link hierboven blijft werken voor wie daar nog moet betalen.
+  if (currentPath === '/16-week-checkout-v2' || currentPath === '/16week-checkout-v2') {
+    return <SixteenWeekCheckout v2 />
+  }
+
   // 6-weken challenge checkout — eenmalig €297, win your money back. Beide
   // schrijfwijzen, zodat een gedeelde link met of zonder streepje werkt.
   if (currentPath === '/6-week-checkout' || currentPath === '/6week-checkout') {
