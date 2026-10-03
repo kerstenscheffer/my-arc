@@ -174,7 +174,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
     setLoading(true)
     try {
       const [dbExercises, customResult] = await Promise.all([
-        ExerciseService.getAllExercises({ limit: 200 }),
+        ExerciseService.getAllExercises(),
         client?.id
           ? db.supabase.from('custom_exercises').select('*').eq('client_id', client.id).order('created_at', { ascending: false })
           : Promise.resolve({ data: [] })

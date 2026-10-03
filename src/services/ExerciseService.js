@@ -226,7 +226,10 @@ class ExerciseServiceClass {
 
   async getAllExercises(options = {}) {
     try {
-      const { homeOnly = false, equipment = null, limit = 200 } = options
+      // Geen krappe limiet: de bibliotheek had op 3 okt 2026 217 actieve
+      // oefeningen en de oude limiet van 200 liet alles na de "S" stilletjes
+      // weg uit de wissel- en toevoeg-modal (Triceps Pushdown, Walking Lunges…).
+      const { homeOnly = false, equipment = null, limit = 1000 } = options
       const cacheKey = `all_exercises_${homeOnly}_${equipment}`
       const cached = this.getCached(cacheKey)
       if (cached) return cached
