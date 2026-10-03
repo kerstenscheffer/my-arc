@@ -911,16 +911,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
               <button
                 onClick={speelVideo}
                 aria-label="Bekijk de video"
+                // Alleen het gouden driehoekje, geen cirkel eromheen (Kersten,
+                // 3 okt 2026). De knop zelf blijft 64px groot voor de duim; de
+                // schaduw houdt 'm leesbaar op een lichte foto.
                 style={{
                   position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)',
-                  width: 58, height: 58, borderRadius: '50%',
-                  background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                  border: '1.5px solid rgba(255,215,0,0.55)', color: '#FFD700',
+                  width: 64, height: 64, padding: 0,
+                  background: 'transparent', border: 'none', color: '#FFD700',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.6))',
                 }}
               >
-                <Play size={22} strokeWidth={2.4} fill="#FFD700" style={{ marginLeft: 3 }} />
+                <Play size={40} strokeWidth={0} fill="#FFD700" style={{ marginLeft: 4 }} />
               </button>
             )}
             {/* Twee knoppen tijdens het afspelen: terug naar de foto, of het
