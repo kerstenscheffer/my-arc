@@ -905,7 +905,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 harde rand aan komt te staan. */}
             {!toonVideo && <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
-              background: 'linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0) 35%, rgba(10,10,10,0.85) 100%)',
+              background: 'linear-gradient(180deg, rgba(10,10,10,0.18) 0%, rgba(10,10,10,0) 30%, rgba(10,10,10,0.55) 100%)',
             }} />}
             {heeftVideo && !toonVideo && (
               <button
