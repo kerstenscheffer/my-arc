@@ -1386,6 +1386,34 @@ export default function KanbanBoard({
     setStatsRefreshKey(k => k + 1)
   }
 
+  // Een close die op geld wachtte gaat toch niet door. De sale-verplaatsing
+  // krijgt een reverted-stempel (telt niet meer als sale, geld valt uit het
+  // betaalschema), de lead gaat naar Sale verloren en de objectie landt op die
+  // nieuwe rij. Zo klopt de close rate én de objectie-verdeling achteraf.
+  const handleSaleTerugdraaien = async (rij, reason) => {
+    setWachtBetaling(prev => prev.filter(r => r.movement_id !== rij.movement_id))
+    const res = await leadService.revertMovement(rij.movement_id)
+    if (!res?.success) {
+      setWachtBetaling(prev => (prev.some(r => r.movement_id === rij.movement_id) ? prev : [rij, ...prev]))
+      alert(res?.error || 'Terugdraaien mislukt')
+      return
+    }
+    const lead = sections.flatMap(s => s.leads || []).find(l => l.id === rij.lead_id)
+      || { id: rij.lead_id, first_name: rij.lead_name || '' }
+    const target = sections.find(s => s.id !== 'unassigned' && isSaleLostSectionTitle(s.title))
+    if (target) {
+      await handleMoveLeadToSection(lead, rij.to_section_id, target.id, true)
+      if (reason) {
+        try { await leadService.setMovementRejectionReason(rij.lead_id, reason) } catch (e) { console.error('Objectie opslaan mislukt:', e) }
+      }
+    } else {
+      console.warn('Geen Sale verloren-sectie gevonden; sale is wel teruggedraaid')
+      await loadBoard(false)
+    }
+    leadService.getAwaitingPayment(coachId).then(setWachtBetaling).catch(() => {})
+    setStatsRefreshKey(k => k + 1)
+  }
+
   // Openstaande-calls pop-up handmatig openen (ververst de lijst eerst).
   const openDueCalls = async () => {
     try {
@@ -2636,6 +2664,7 @@ export default function KanbanBoard({
           wachtBetaling={wachtBetaling}
           onOutcome={handleDueCallOutcome}
           onBetaling={handleBetalingBinnen}
+          onTerugdraaien={handleSaleTerugdraaien}
           onClose={() => setShowDueCalls(false)}
         />
       )}

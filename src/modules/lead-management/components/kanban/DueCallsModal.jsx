@@ -203,8 +203,11 @@ function CallRegel({ dc, onOutcome }) {
 // Een close die nog op geld wacht. Dichtgeklapt zie je wie en wanneer; open
 // staat hetzelfde sale-formulier als bij het afhandelen van de call, zodat de
 // bedragen op één manier gevraagd worden.
-function BetaalRegel({ rij, onBetaling }) {
+function BetaalRegel({ rij, onBetaling, onTerugdraaien }) {
   const [open, setOpen] = useState(false)
+  // Soms zegt een klant tóch af voordat er betaald is. Dan is de close geen
+  // close meer: sale terugdraaien en als verloren boeken, mét objectie.
+  const [verloren, setVerloren] = useState(false)
   // Staat het bedrag er al, dan is er meestal niets te vullen: je drukt op
   // "ontvangen" en klaar. Wijzigen zit eronder voor de keren dat het anders
   // liep dan afgesproken.
@@ -254,7 +257,17 @@ function BetaalRegel({ rij, onBetaling }) {
         />
       </button>
 
-      {open && bekend && !wijzigen && (
+      {open && verloren && (
+        <SaleLostReasonForm
+          leadName={rij.lead_name}
+          compact
+          vraag="Waarom gaat de sale toch niet door?"
+          onBack={() => setVerloren(false)}
+          onSave={(reason) => onTerugdraaien(rij, reason)}
+        />
+      )}
+
+      {open && !verloren && bekend && !wijzigen && (
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             style={{ ...knop('#10b981'), flex: 2, background: '#fff', border: 'none', color: '#0a0a0a' }}
@@ -268,7 +281,7 @@ function BetaalRegel({ rij, onBetaling }) {
         </div>
       )}
 
-      {open && (!bekend || wijzigen) && (
+      {open && !verloren && (!bekend || wijzigen) && (
         <SaleForm
           leadName={rij.lead_name}
           compact
@@ -276,6 +289,15 @@ function BetaalRegel({ rij, onBetaling }) {
           onCancel={() => { setWijzigen(false); if (!bekend) setOpen(false) }}
           onSave={(nieuw) => onBetaling(rij, nieuw)}
         />
+      )}
+
+      {open && !verloren && (
+        <button
+          style={{ ...knop('#ef4444'), width: '100%', minHeight: 34, marginTop: 6, fontSize: '0.74rem' }}
+          onClick={() => setVerloren(true)}
+        >
+          <XCircle size={13} strokeWidth={3} /> Toch verloren
+        </button>
       )}
     </div>
   )
@@ -295,7 +317,7 @@ function Kop({ tekst, aantal }) {
   )
 }
 
-export default function DueCallsModal({ dueCalls, wachtBetaling, onOutcome, onBetaling, onClose }) {
+export default function DueCallsModal({ dueCalls, wachtBetaling, onOutcome, onBetaling, onTerugdraaien, onClose }) {
   const modalHost = useModalHost()
   const lijst = dueCalls || []
   const betalingen = wachtBetaling || []
@@ -393,7 +415,7 @@ export default function DueCallsModal({ dueCalls, wachtBetaling, onOutcome, onBe
               </div>
             ) : (
               betalingen.map(rij => (
-                <BetaalRegel key={rij.movement_id} rij={rij} onBetaling={onBetaling} />
+                <BetaalRegel key={rij.movement_id} rij={rij} onBetaling={onBetaling} onTerugdraaien={onTerugdraaien} />
               ))
             )
           ) : lijst.length === 0 ? (
