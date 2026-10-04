@@ -48,9 +48,9 @@ export default function LastActivityView({ client, db, challengeData }) {
           .limit(1)
           .maybeSingle(),
         
-        // Last photo
+        // Laatste foto — uit ch8_progress_photos, de tabel die de klant-app vult.
         db.supabase
-          .from('progress_photos')
+          .from('ch8_progress_photos')
           .select('created_at, photo_type')
           .eq('client_id', client.id)
           .gte('created_at', startDate.toISOString())

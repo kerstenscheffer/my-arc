@@ -16,7 +16,10 @@
 --             NIET weight_logs — 8 rijen, laatst oktober 2025
 --   voeding   consumed_meals tegen de slots in het actieve maaltijdplan
 --   checkins  client_checkins
---   foto's    progress_photos
+--   foto's    ch8_progress_photos (waar de klant-app ze opslaat; sinds
+--             migratie `challenge_stand_fotos_uit_ch8`, 4 okt 2026)
+--             NIET alleen progress_photos — dood sinds okt 2025, 10 rijen;
+--             telt nog als vangnet mee. Eén dag = één foto.
 --   calls     client_calls met status 'completed'
 --
 -- Drempels zijn parameters: de regels horen bij de challenge, niet bij de query.
@@ -135,9 +138,18 @@ checkin_d as (
   select checkin_date as dag from client_checkins
    where client_id = p_client_id and checkin_date between p_start and p_eind
 ),
+-- Foto's: ch8_progress_photos is waar de klant-app ze opslaat; progress_photos
+-- is de oude tabel (dood sinds okt 2025) en telt alleen nog als vangnet mee.
+-- Per dag één: een set front/side/back op dezelfde dag is één fotomoment.
 foto_d as (
-  select coalesce(date, created_at::date) as dag from progress_photos
-   where client_id = p_client_id and coalesce(date, created_at::date) between p_start and p_eind
+  select distinct dag from (
+    select coalesce(photo_date, created_at::date) as dag from ch8_progress_photos
+     where client_id = p_client_id
+    union all
+    select coalesce(date, created_at::date) from progress_photos
+     where client_id = p_client_id
+  ) f
+  where dag between p_start and p_eind
 ),
 call_d as (
   select completed_date::date as dag from client_calls

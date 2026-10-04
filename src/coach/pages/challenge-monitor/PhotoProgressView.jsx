@@ -25,14 +25,17 @@ export default function PhotoProgressView({ client, db, challengeData }) {
       const startDate = new Date(challengeData.start_date)
       const endDate = new Date(challengeData.end_date)
       
-      // Load all progress photos
-      const { data: photos } = await db.supabase
-        .from('progress_photos')
+      // Uit ch8_progress_photos: daar zet de klant-app ze neer. progress_photos
+      // is dood sinds okt 2025, dus hier stond altijd nul.
+      const { data: ruw } = await db.supabase
+        .from('ch8_progress_photos')
         .select('*')
         .eq('client_id', client.id)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0])
-        .order('date', { ascending: false })
+        .gte('photo_date', startDate.toISOString().split('T')[0])
+        .lte('photo_date', endDate.toISOString().split('T')[0])
+        .order('photo_date', { ascending: false })
+      // De rest van dit scherm rekent met `date`; even gelijktrekken.
+      const photos = (ruw || []).map(p => ({ ...p, date: p.photo_date }))
 
       // Filter Friday photos
       const fridayPhotos = photos?.filter(p => {
