@@ -62,14 +62,20 @@ export default function MealCard({
   // gegeten — dat hoort te zien te zijn — maar hij is niet "afgevinkt", dus
   // de naam blijft gewoon leesbaar.
   gegeten = false,
+  // Lagere kaart voor lijsten waar je er veel onder elkaar ziet (het
+  // voedingspaneel van de coach): kleinere foto, minder ruimte eromheen.
+  compact = false,
+  // De hele kaart tikbaar maken (bijvoorbeeld: open de ingrediënten).
+  onTik = null,
 }) {
-  const photoSize = isMobile ? 78 : 90
+  const photoSize = compact ? (isMobile ? 60 : 66) : (isMobile ? 78 : 90)
   // Een lege string betekent bewust geen label op de foto (ingrediënten).
   const moment = momentLabel === '' ? '' : (momentLabel || getMealTypeLabel(meal))
   const tijd = tijdLabel || (typeof meal.timing === 'string' && /^\d{1,2}:\d{2}/.test(meal.timing) ? meal.timing : null)
   return (
-    <div style={{
-      margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
+    <div onClick={onTik || undefined} style={{
+      margin: compact ? (isMobile ? '0 0.9rem 0.4rem' : '0 1.25rem 0.45rem') : (isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem'),
+      cursor: onTik ? 'pointer' : undefined,
       background: geselecteerd ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.025)',
       border: `1px solid ${geselecteerd ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.05)'}`,
       borderRadius: 12,
@@ -145,7 +151,7 @@ export default function MealCard({
         <div style={{
           flex: 1, minWidth: 0,
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          padding: isMobile ? '0.45rem 0.7rem 0.35rem' : '0.55rem 0.95rem 0.45rem',
+          padding: compact ? (isMobile ? '0.3rem 0.65rem 0.25rem' : '0.35rem 0.8rem 0.3rem') : (isMobile ? '0.45rem 0.7rem 0.35rem' : '0.55rem 0.95rem 0.45rem'),
         }}>
           <div style={{
             fontSize: isMobile ? '0.9rem' : '0.98rem',
@@ -157,7 +163,7 @@ export default function MealCard({
             textOverflow: 'ellipsis',
             textDecoration: isChecked ? 'line-through' : 'none',
             letterSpacing: '-0.015em',
-            marginBottom: 4,
+            marginBottom: compact ? 2 : 4,
           }}>
             {meal.meal_name || meal.name || 'Maaltijd'}
           </div>

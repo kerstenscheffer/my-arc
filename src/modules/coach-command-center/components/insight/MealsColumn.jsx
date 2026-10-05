@@ -4,7 +4,7 @@
 // v1.2 — ClientDocumentsSection toegevoegd
 
 import React, { useEffect, useState } from 'react'
-import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet, Info } from 'lucide-react'
+import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet } from 'lucide-react'
 import GeneratePlanModal from './GeneratePlanModal'
 import MealCard from '../../../meal-plan/components/day-schedule/MealCard'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
@@ -301,7 +301,9 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                   // Een los product zonder ingrediënten: de hoeveelheid is wat je wilt weten.
                   ondertitel={(!meal.ingredients?.length && meal.amount > 0) ? `${Math.round(meal.amount * 10) / 10}${eenheid(meal.per_unit)}` : null}
                   isMobile={isMobile}
-                  acties={[{ icon: <Info size={isMobile ? 11 : 12} />, label: 'Info', onClick: () => openInfo(meal) }]}
+                  compact
+                  acties={[]}
+                  onTik={() => openInfo(meal)}
                 />
               ))}
             </div>
