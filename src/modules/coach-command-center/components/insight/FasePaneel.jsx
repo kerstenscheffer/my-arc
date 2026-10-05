@@ -92,17 +92,16 @@ export default function FasePaneel({
     return g ? g.w : (client?.current_weight ? parseFloat(client.current_weight) : '')
   })()
 
-  // Minstens/hoogstens die de app zelf bij dit tempo zou kiezen. Staat
-  // ingevuld zodra er een weektempo is, zodat je ziet waar je op stuurt en
-  // het meteen kunt bijstellen. Zodra de coach er zelf aan zit
+  // Minstens/hoogstens: het weektempo min en plus 0,2 kg (Kersten, 5 okt
+  // 2026). Staat ingevuld zodra er een tempo is, zodat je ziet waar je op
+  // stuurt en het meteen kunt bijstellen. Zodra de coach er zelf aan zit
   // (tempoAangeraakt), schuift het niet meer mee met het tempo.
   const autoBand = (n) => {
-    const c = maakConfig(client, {
-      doel: n.doel, week_doel_kg: n.week_doel_kg, start_gewicht: n.start_gewicht,
-      tempo_min_kg: '', tempo_max_kg: '',
-    })
-    if (c.richting === 'stabiel' || !Number.isFinite(c.traagKg)) return { tempo_min_kg: '', tempo_max_kg: '' }
-    return { tempo_min_kg: c.traagKg.toFixed(2), tempo_max_kg: c.snelKg.toFixed(2) }
+    const t = Math.abs(Number(n.week_doel_kg))
+    if (!Number.isFinite(t) || t === 0 || n.doel === 'recomp' || n.doel === 'maintain') {
+      return { tempo_min_kg: '', tempo_max_kg: '' }
+    }
+    return { tempo_min_kg: Math.max(t - 0.2, 0.05).toFixed(2), tempo_max_kg: (t + 0.2).toFixed(2) }
   }
   const metBand = (n) => (n.tempoAangeraakt ? n : { ...n, ...autoBand(n) })
 
