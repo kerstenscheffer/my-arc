@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Trash2, Pencil, Check, ChevronRight, Copy, Loader, AlertTriangle, Bookmark } from 'lucide-react'
+import { X, Trash2, Pencil, Check, ChevronRight, Copy, AlertTriangle, Bookmark } from 'lucide-react'
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
 
-export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onSaveAsTemplate, weekSaveState = 'idle', onClose, isMobile, embedded = false }) {
+export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onSaveAsTemplate, onClose, isMobile, embedded = false }) {
   const modalHost = useModalHost()
   const m = isMobile
   const [tab, setTab] = useState('client')
@@ -19,7 +19,6 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   const [renameValue, setRenameValue] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
 
-  const [templateNamen, setTemplateNamen] = useState({})
   const [templates, setTemplates] = useState([])
   const [loadingTemplates, setLoadingTemplates] = useState(false)
   const [copyingId, setCopyingId] = useState(null)
@@ -40,15 +39,6 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
       // binnen de rest) → de coach ziet direct in welk plan de klant zit.
       const sorted = (data || []).slice().sort((a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0))
       setPlans(sorted)
-      // Namen van de sjablonen waar deze plannen uit komen, zodat elke rij
-      // kan zeggen "uit sjabloon X".
-      const ids = [...new Set(sorted.map(p => p.template_id).filter(Boolean))]
-      if (ids.length > 0) {
-        const { data: tmpls } = await db.supabase
-          .from('meal_plan_templates').select('id, name').in('id', ids)
-          .then(r => r, () => ({ data: [] }))
-        setTemplateNamen(Object.fromEntries((tmpls || []).map(t => [t.id, t.name])))
-      }
     } catch (e) { console.error('PlanSwitcher load error:', e) }
     setLoadingPlans(false)
   }
@@ -188,7 +178,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
 
       const newPlan = {
         client_id: clientId,
-        template_name: `${template.emoji || '📋'} ${template.name} (kopie)`,
+        template_name: `${template.name} (kopie)`,
         template_id: template.id,
         daily_calories: template.daily_calories || macros.calories,
         daily_protein: template.daily_protein || macros.protein,
@@ -230,18 +220,6 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
     transition: 'opacity 0.15s ease',
   })
 
-  const saveCfg = {
-    saving: { color: 'rgba(255,255,255,0.55)', label: 'Bezig met opslaan…' },
-    saved:  { color: '#22c55e', label: 'Alle wijzigingen opgeslagen' },
-    error:  { color: '#ef4444', label: 'Laatste wijziging niet opgeslagen' },
-    idle:   { color: 'rgba(255,255,255,0.55)', label: 'Elke wijziging in de analyzer gaat direct in dit plan' },
-  }[weekSaveState] || { color: 'rgba(255,255,255,0.55)', label: 'Elke wijziging in de analyzer gaat direct in dit plan' }
-  // Het plan dat in de analyzer open staat (activePlanId), niet het plan dat
-  // de klant volgt. Die twee zijn verschillend zodra je een concept bewerkt,
-  // en dan stond hier het verkeerde plan.
-  const openPlan = plans.find(p => p.id === activePlanId) || null
-  const openSjabloon = openPlan?.template_id ? templateNamen[openPlan.template_id] : null
-
   const modal = (
     <div
       onClick={embedded ? undefined : (e) => e.target === e.currentTarget && onClose()}
@@ -253,25 +231,27 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
         ? { background: '#0a0a0a', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
         : { background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: m ? '16px 16px 0 0' : 16, width: m ? '100%' : 520, maxHeight: m ? '85vh' : '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Kop */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: m ? '0.75rem 1rem 0.25rem' : '1rem 1.5rem 0.25rem',
-          flexShrink: 0,
-        }}>
-          <div style={{ flex: 1, fontSize: m ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
-            Maaltijdplannen
-          </div>
-          <button onClick={onClose} aria-label="Sluit" style={{
-            width: 36, height: 36, flexShrink: 0,
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 10, color: '#fff', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        {/* Kop. In het zijvak niet: daar staat al 'Plannen' met een kruisje. */}
+        {!embedded && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: m ? '0.75rem 1rem 0.25rem' : '1rem 1.5rem 0.25rem',
+            flexShrink: 0,
           }}>
-            <X size={16} strokeWidth={2.5} />
-          </button>
-        </div>
+            <div style={{ flex: 1, fontSize: m ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
+              Maaltijdplannen
+            </div>
+            <button onClick={onClose} aria-label="Sluit" style={{
+              width: 36, height: 36, flexShrink: 0,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 10, color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <X size={16} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ display: 'flex', padding: m ? '0 1rem' : '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
@@ -288,31 +268,6 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
 
           {tab === 'client' && (
             <>
-              {/* Waar je nu in werkt, en dat elke wijziging direct wordt
-                  opgeslagen. Groen alleen als er net iets is opgeslagen. */}
-              <div style={{ padding: m ? '0.75rem 1rem' : '0.85rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
-                  Je bewerkt nu
-                </div>
-                <div style={{ fontSize: m ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.25 }}>
-                  {openPlan ? (openPlan.template_name || 'Naamloos plan') : 'Geen plan geopend'}
-                </div>
-                {openPlan && (
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.4 }}>
-                    {openPlan.is_active ? 'Actief: de klant ziet dit plan.' : 'Concept: alleen jij ziet dit plan.'}
-                    {openSjabloon ? ` Kopie van sjabloon "${openSjabloon}"; het sjabloon zelf verandert niet mee.` : ''}
-                  </div>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
-                  {weekSaveState === 'saving'
-                    ? <Loader size={12} color={saveCfg.color} style={{ animation: 'psmSpin 1s linear infinite' }} />
-                    : weekSaveState === 'error'
-                      ? <AlertTriangle size={12} color={saveCfg.color} />
-                      : <Check size={12} color={saveCfg.color} strokeWidth={3} />}
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: saveCfg.color }}>{saveCfg.label}</span>
-                </div>
-              </div>
-
               {loadingPlans && <Placeholder text="Laden…" />}
               {!loadingPlans && plans.length === 0 && (
                 <Placeholder text="Nog geen plannen voor deze klant. Kopieer een sjabloon of maak een plan via de wizard." />
@@ -323,8 +278,8 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                 const isRenaming = renamingId === plan.id
                 const isConfirmDel = confirmDelete === plan.id
                 const isOpen = plan.id === activePlanId
-                const sjabloon = plan.template_id ? templateNamen[plan.template_id] : null
-                const bron = sjabloon ? `uit sjabloon ${sjabloon}` : herkomst(plan.created_via, plan.ai_generated)
+                const sjabloon = !!plan.template_id
+                const bron = sjabloon ? 'uit sjabloon' : herkomst(plan.created_via, plan.ai_generated)
                 return (
                   <div key={plan.id} style={{
                     borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -357,7 +312,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                           onClick={() => { if (!isOpen) { onSelect(plan.id); onClose() } }}
                           title={isOpen ? 'Staat open in de analyzer' : 'Open in de analyzer'}
                           style={{
-                            width: '100%', display: 'block',
+                            width: '100%', display: 'flex', alignItems: 'flex-start', gap: 6,
                             background: 'none', border: 'none', padding: 0, textAlign: 'left',
                             fontFamily: 'inherit', cursor: isOpen ? 'default' : 'pointer',
                             fontSize: m ? '0.92rem' : '0.98rem', fontWeight: 900, color: '#fff',
@@ -365,11 +320,12 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                           }}
                         >
-                          {plan.template_name || 'Naamloos plan'}
+                          <span style={{ flex: 1, minWidth: 0 }}>{plan.template_name || 'Naamloos plan'}</span>
+                          {!isOpen && <ChevronRight size={16} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0, marginTop: 2 }} />}
                         </button>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
                           {isOpen && <Tag>Geopend</Tag>}
-                          {isActive && <Tag uit>Actief</Tag>}
+                          {isActive && <Tag uit>Klant ziet dit</Tag>}
                           <Meta inline items={[plan.daily_calories && `${plan.daily_calories} kcal`, plan.daily_protein && `${plan.daily_protein}g eiwit`, formatDate(plan.created_at), bron]} />
                         </div>
 
@@ -379,11 +335,6 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                             <PrimairKnop onClick={() => handleActivate(plan.id)} disabled={!!activating} dimmed={activating && activating !== plan.id}>
                               {activating === plan.id ? 'Activeren…' : 'Activeer voor klant'}
                             </PrimairKnop>
-                          )}
-                          {!isOpen && (
-                            <SecundairKnop onClick={() => { onSelect(plan.id); onClose() }}>
-                              Open <ChevronRight size={13} strokeWidth={2.5} />
-                            </SecundairKnop>
                           )}
                           <span style={{ flex: 1 }} />
                           <IconKnop onClick={() => handleRenameStart(plan)} title="Naam wijzigen"><Pencil size={14} /></IconKnop>
@@ -409,7 +360,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
           {tab === 'templates' && (
             <>
               <div style={{ padding: m ? '0.75rem 1rem' : '0.85rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>
-                Een sjabloon is de basis voor al je klanten. <span style={{ color: '#fff' }}>Gebruik</span> maakt er een kopie van als plan voor deze klant; die kopie bewerk je in de analyzer. Het sjabloon zelf verandert daarbij niet.
+<span style={{ color: '#fff' }}>Gebruik</span> maakt een kopie voor deze klant. Het sjabloon blijft zoals het is.
               </div>
               {loadingTemplates && <Placeholder text="Sjablonen laden…" />}
               {!loadingTemplates && templates.length === 0 && (
@@ -437,7 +388,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                           {tmpl.description}
                         </div>
                       )}
-                      <Meta items={[kcal && `${kcal} kcal`, protein && `${protein}g eiwit`, tmpl.meals_per_day && `${tmpl.meals_per_day}x per dag`, formatDate(tmpl.created_at), gebruikt > 0 && `al ${gebruikt}× gekopieerd voor deze klant`]} />
+                      <Meta items={[kcal && `${kcal} kcal`, protein && `${protein}g eiwit`, tmpl.meals_per_day && `${tmpl.meals_per_day}x per dag`, formatDate(tmpl.created_at), gebruikt > 0 && `${gebruikt}× gebruikt`]} />
                     </div>
                     {isCopied ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#22c55e', fontSize: '0.8rem', fontWeight: 900, flexShrink: 0 }}>
@@ -456,16 +407,15 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
         </div>
 
         {/* Voet */}
+        {tab === 'client' && onSaveAsTemplate && (
         <div style={{ padding: m ? '0.75rem 1rem' : '0.85rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          {tab === 'client' && onSaveAsTemplate && (
+          {(
             <SecundairKnop onClick={onSaveAsTemplate} breed>
-              <Bookmark size={14} strokeWidth={2.5} /> Bewaren als sjabloon voor andere klanten
+              <Bookmark size={14} strokeWidth={2.5} /> Bewaren als sjabloon
             </SecundairKnop>
           )}
-          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: tab === 'client' && onSaveAsTemplate ? 8 : 0 }}>
-            {tab === 'client' ? 'Geopend = staat in de analyzer. Actief = de klant ziet dit plan in de app.' : 'Gebruik = kopieert het sjabloon als nieuw concept voor deze klant.'}
-          </div>
         </div>
+        )}
       </div>
     </div>
   )
