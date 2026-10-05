@@ -9,6 +9,9 @@ import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
 import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
+import { workoutFoto } from '../../../../client/components/workoutFoto'
+import { getFallbackImage, youtubeThumb } from '../../../workout/utils/oefeningFoto'
+import { useEffect } from 'react'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 const formatDaysAgo = (d) => { if (d === null || d === undefined) return 'Nooit'; if (d === 0) return 'Vandaag'; if (d === 1) return 'Gisteren'; return `${d}d geleden` }
@@ -36,13 +39,55 @@ const parseSessionNote = (raw) => {
   }
 }
 
+// Eén set als cijferpaar, zelfde vorm als de macro's op de maaltijdkaart:
+// dik getal, klein grijs label.
 const SetDisplay = ({ s }) => (
-  <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.25rem', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', color: 'rgba(255,255,255,0.6)' }}>
-    {s.weight || 0}kg×{s.reps || 0}
-    {s.partials ? <span style={{ color: 'rgba(168,85,247,0.6)' }}>+{s.partials}p</span> : null}
-    {s.dropsets?.length > 0 ? s.dropsets.map((ds, di) => <span key={di} style={{ color: 'rgba(255,255,255,0.6)' }}> D{ds.weight}×{ds.reps}</span>) : null}
+  <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums' }}>
+      {s.weight || 0}<span style={{ fontSize: '0.56rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>kg</span>×{s.reps || 0}
+    </span>
+    {s.partials ? <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>+{s.partials}p</span> : null}
+    {s.dropsets?.length > 0 ? s.dropsets.map((ds, di) => <span key={di} style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>D{ds.weight}×{ds.reps}</span>) : null}
   </span>
 )
+
+// Foto per oefening, dezelfde keten als de oefeningkaart van de klant:
+// thumbnail van de coach, YouTube-thumb, foto uit de oefeningentabel, en
+// anders de stockfoto op naam. Eén query voor alle oefeningen van een sessie.
+function useOefeningFotos(db, namen) {
+  const sleutel = namen.join('|')
+  const [fotos, setFotos] = useState({})
+  useEffect(() => {
+    if (!db?.supabase || namen.length === 0) return
+    let weg = false
+    ;(async () => {
+      try {
+        const { data } = await db.supabase
+          .from('exercises')
+          .select('name, thumbnail_url, video_url, image_url')
+          .in('name', namen)
+        if (weg) return
+        const uit = {}
+        ;(data || []).forEach(ex => {
+          uit[ex.name] = ex.thumbnail_url || youtubeThumb(ex.video_url) || ex.image_url || null
+        })
+        setFotos(uit)
+      } catch (e) { console.warn('oefeningfoto\'s laden mislukt', e?.message) }
+    })()
+    return () => { weg = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, sleutel])
+  return (naam) => fotos[naam] || getFallbackImage({ name: naam })
+}
+
+// Kaartstijl van de workout-pagina van de klant.
+const KAART = {
+  margin: '0 0.9rem 0.45rem',
+  background: 'rgba(255,255,255,0.025)',
+  border: '1px solid rgba(255,255,255,0.05)',
+  borderRadius: 12, overflow: 'hidden', position: 'relative',
+}
+const SECTIEKOP = { padding: '0.3rem 0.9rem 0.45rem', fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }
 
 export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose }) {
   const [view, setView] = useState('sessions')
@@ -100,7 +145,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Dumbbell size={14} color="#fff" /><span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff', letterSpacing: '-0.01em' }}>Sessies</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Dumbbell size={15} color="#fff" /><span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Training</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {workoutData?.totalWorkouts > 0 && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>{workoutData.completedWorkouts}/{workoutData.totalWorkouts}</span>}
             <button
@@ -117,16 +162,16 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                 WebkitTapHighlightColor: 'transparent', minHeight: '24px'
               }}
             >
-              <BarChart3 size={11} /> OVERZICHT
+              <BarChart3 size={12} /> Overzicht
             </button>
           </div>
         </div>
         {workoutData?.totalWorkouts > 0 && (
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            {[{ label: 'VOLTOOID', val: workoutData.completedWorkouts, color: '#10b981' }, { label: 'TOTAAL', val: workoutData.totalWorkouts, color: '#fff' }, { label: 'LAATSTE', val: formatDaysAgo(workoutData.daysSinceWorkout), color: workoutData.daysSinceWorkout <= 3 ? '#10b981' : workoutData.daysSinceWorkout <= 7 ? '#f59e0b' : '#ef4444' }].map((s, i) => (
+            {[{ label: 'Voltooid', val: workoutData.completedWorkouts, color: '#fff' }, { label: 'Totaal', val: workoutData.totalWorkouts, color: '#fff' }, { label: 'Laatste', val: formatDaysAgo(workoutData.daysSinceWorkout), color: workoutData.daysSinceWorkout <= 3 ? '#fff' : workoutData.daysSinceWorkout <= 7 ? '#f59e0b' : '#ef4444' }].map((s, i) => (
               <div key={i} style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem 0.125rem' : '0.5rem 0.25rem', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em', marginBottom: '0.1rem' }}>{s.label}</div>
-                <div style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: '800', color: s.color, lineHeight: 1 }}>{s.val}</div>
+                <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: s.color, lineHeight: 1.1 }}>{s.val}</div>
+                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 3 }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -164,83 +209,84 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <StappenInsight db={db} client={client} isMobile={isMobile} />
           {/* Cardio die de client zelf logt (cardio_logs) — read-only voor coach */}
           <CardioInsightBlock db={db} client={client} isMobile={isMobile} />
+          {workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
           {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => {
             const parsed = parseSessionNote(w.notes)
             const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
             const FeelingIcon = feelingCfg?.icon
             const exerciseNotesCount = exerciseNotesBySession[w.id] || 0
-            const hasContent = !!(parsed.note || feelingCfg || exerciseNotesCount > 0)
+            const aantalOef = Object.values(exerciseProgress).filter(entries => entries.some(e => e.sessionId === w.id)).length
+              || (Array.isArray(w.exercises_completed) ? w.exercises_completed.length : 0)
+            const naam = w.day_name || 'Training'
+            const hoogte = isMobile ? 74 : 82
             return (
-            <button key={`${w.workout_date}-${idx}`} onClick={() => { setSelectedSession(w); setView('exercises') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', textAlign: 'left' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {/* Regel 1 — status, dag, feeling-pill */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minWidth: 0 }}>
-                  <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.25rem', borderRadius: '3px', fontWeight: '700', background: w.is_completed ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.12)', color: w.is_completed ? '#10b981' : '#fff' }}>{w.is_completed ? '✓' : '—'}</span>
-                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#fff' }}>{w.day_name}</span>
-                  {feelingCfg && (
-                    <span title={feelingCfg.label} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '0.15rem',
-                      padding: '0.1rem 0.3rem',
-                      background: `${feelingCfg.color}1a`,
-                      border: `1px solid ${feelingCfg.color}55`,
-                      borderRadius: '3px',
-                      color: feelingCfg.color,
-                      fontSize: '0.72rem', fontWeight: '700',
-                      letterSpacing: '0.03em',
-                      flexShrink: 0,
-                    }}>
-                      <FeelingIcon size={9} strokeWidth={2.5} />
-                      {feelingCfg.label}
-                    </span>
-                  )}
-                  {exerciseNotesCount > 0 && (
-                    <span title={`${exerciseNotesCount} oefening-notitie${exerciseNotesCount === 1 ? '' : 's'}`} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '0.15rem',
-                      padding: '0.1rem 0.3rem',
-                      background: 'rgba(255,255,255,0.12)',
-                      border: '1px solid rgba(255,255,255,0.35)',
-                      borderRadius: '3px',
-                      color: '#fff',
-                      fontSize: '0.72rem', fontWeight: '800',
-                      flexShrink: 0,
-                    }}>
-                      <MessageSquare size={9} strokeWidth={2.5} />
-                      {exerciseNotesCount}
-                    </span>
-                  )}
-                </div>
-                {/* Regel 2 — notitie-tekst (truncated, 2 regels) */}
-                {parsed.note && (
-                  <div style={{
-                    display: 'flex', alignItems: 'flex-start', gap: '0.3rem',
-                    marginTop: '0.25rem',
-                    paddingLeft: '0.05rem',
-                  }}>
-                    <MessageSquare size={9} color="rgba(255,255,255,0.3)" strokeWidth={2.2}
-                      style={{ flexShrink: 0, marginTop: '2px' }} />
+              <button
+                key={`${w.workout_date}-${idx}`}
+                onClick={() => { setSelectedSession(w); setView('exercises') }}
+                style={{
+                  ...KAART, display: 'block', width: 'calc(100% - 1.8rem)', height: hoogte,
+                  padding: 0, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {/* Foto als achtergrond met donker verloop, zoals de trainingskaart van de klant. */}
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  backgroundImage: `url(${workoutFoto(naam)})`,
+                  backgroundSize: 'cover', backgroundPosition: 'center',
+                  opacity: w.is_completed ? 0.85 : 1,
+                }} />
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 55%, rgba(0,0,0,0.85) 100%)',
+                }} />
+                <div style={{
+                  position: 'relative', height: '100%',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                  padding: isMobile ? '6px 10px' : '8px 12px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{
-                      fontSize: isMobile ? '0.62rem' : '0.66rem',
-                      color: 'rgba(255,255,255,0.5)',
-                      fontWeight: '500',
-                      lineHeight: 1.35,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      wordBreak: 'break-word',
+                      flex: 1, minWidth: 0,
+                      fontSize: isMobile ? '0.95rem' : '1.02rem', fontWeight: 900, color: '#fff',
+                      letterSpacing: '-0.02em', lineHeight: 1.15,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      textShadow: '0 2px 10px rgba(0,0,0,0.8)',
                     }}>
-                      {parsed.note}
+                      {naam}
+                    </span>
+                    {feelingCfg && (
+                      <span title={`Voelde zich ${feelingCfg.label.toLowerCase()}`} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
+                        fontSize: '0.62rem', fontWeight: 900, color: feelingCfg.color,
+                        textTransform: 'uppercase', letterSpacing: '0.06em',
+                        textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+                      }}>
+                        <FeelingIcon size={11} strokeWidth={2.6} />{feelingCfg.label}
+                      </span>
+                    )}
+                    {(parsed.note || exerciseNotesCount > 0) && (
+                      <span title={`${exerciseNotesCount + (parsed.note ? 1 : 0)} notitie(s)`} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0, fontSize: '0.62rem', fontWeight: 900, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+                        <MessageSquare size={11} strokeWidth={2.6} />{exerciseNotesCount + (parsed.note ? 1 : 0)}
+                      </span>
+                    )}
+                    <span style={{ flexShrink: 0, fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+                      {formatDate(w.workout_date)}
                     </span>
                   </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0, paddingTop: hasContent ? '0.1rem' : 0 }}>
-                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>{formatDate(w.workout_date)}</span>
-                <ChevronRight size={12} color="rgba(255,255,255,0.15)" />
-              </div>
-            </button>
+                  <span style={{
+                    fontSize: '0.58rem', fontWeight: 800,
+                    color: w.is_completed ? '#22c55e' : 'rgba(255,255,255,0.6)',
+                    textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 2,
+                    textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {w.is_completed ? 'Voltooid' : 'Training'}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}
+                  </span>
+                </div>
+              </button>
             )
-          }) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen workouts</div>}
+          }) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: 700 }}>Nog geen trainingen gelogd</div>}
         </div>
       </div>
     )
@@ -248,16 +294,36 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
 
   // ── EXERCISES ──
   if (view === 'exercises' && selectedSession) {
-    const exs = getSessionExercises()
+    return (
+      <SessieOefeningen
+        db={db} isMobile={isMobile} selectedSession={selectedSession}
+        exs={getSessionExercises()}
+        onBack={() => { setView('sessions'); setSelectedSession(null) }}
+        onKies={(naam) => { setSelectedExercise(naam); setView('progress') }}
+      />
+    )
+  }
+
+  // ── PROGRESS ──
+  if (view === 'progress' && selectedExercise) {
+    return <ProgressView db={db} client={client} isMobile={isMobile} selectedExercise={selectedExercise} entries={getExerciseHistory()} onBack={() => setView('exercises')} />
+  }
+  return null
+}
+
+function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }) {
+  const fotoVan = useOefeningFotos(db, exs.map(e => e.name).filter(Boolean))
+  const photoSize = isMobile ? 62 : 72
+  {
     const parsed = parseSessionNote(selectedSession.notes)
     const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
     const FeelingIcon = feelingCfg?.icon
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <button onClick={() => { setView('sessions'); setSelectedSession(null) }} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}><ArrowLeft size={14} /></button>
-          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>{selectedSession.day_name}</span>
-          <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>{formatDate(selectedSession.workout_date)}</span>
+          <button onClick={onBack} aria-label="Terug" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, minWidth: 28, minHeight: 28, touchAction: 'manipulation' }}><ArrowLeft size={16} /></button>
+          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{selectedSession.day_name || 'Training'}</span>
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{formatDate(selectedSession.workout_date)}</span>
         </div>
 
         {/* Client-notitie blok — toon feeling-pill + note tekst zoals de client
@@ -312,72 +378,83 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           </div>
         )}
 
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingTop: '0.5rem' }}>
           {exs.length > 0 ? exs.map((ex, idx) => (
-            <button key={idx} onClick={() => { setSelectedExercise(ex.name); setView('progress') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', textAlign: 'left' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: '0 1 auto', minWidth: 0 }}>{ex.name}</span>
+            <div key={idx} style={{ ...KAART, display: 'flex', alignItems: 'stretch' }}>
+              {/* Foto links met het nummer linksboven, zoals de oefeningkaart van de klant. */}
+              <div style={{ width: photoSize, alignSelf: 'stretch', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${fotoVan(ex.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
+                <div style={{
+                  position: 'absolute', top: 4, left: 4, width: 18, height: 18, borderRadius: 3,
+                  background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2,
+                }}>
+                  <span style={{ fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', lineHeight: 1 }}>{idx + 1}</span>
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isMobile ? '0.4rem 0.65rem' : '0.45rem 0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.15, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {ex.name}
+                  </span>
                   {ex.attachment_used && (
-                    <span style={{
-                      fontSize: '0.72rem', fontWeight: '700',
-                      color: 'rgba(255,255,255,0.55)',
-                      background: 'rgba(255,255,255,0.05)',
-                      padding: '0.1rem 0.3rem', borderRadius: '3px',
-                      textTransform: 'lowercase', letterSpacing: '0.02em',
-                      flexShrink: 0,
-                    }}>
-                      {ex.attachment_used.replace(/_/g, ' ')}
+                    <span style={{ flexShrink: 0, fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      {String(ex.attachment_used).replace(/_/g, ' ')}
                     </span>
                   )}
                 </div>
-                {ex.sets?.length > 0 && <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>{ex.sets.map((s, si) => <SetDisplay key={si} s={s} />)}</div>}
+                {ex.sets?.length > 0 ? (
+                  <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', marginTop: 3, flexWrap: 'wrap' }}>
+                    {ex.sets.map((st, si) => <SetDisplay key={si} s={st} />)}
+                  </div>
+                ) : ex.totalSets > 0 ? (
+                  <div style={{ marginTop: 3, fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>{ex.totalSets} sets</div>
+                ) : null}
                 {ex.notes && (
-                  <div style={{
-                    display: 'flex', alignItems: 'flex-start', gap: '0.3rem',
-                    marginTop: '0.3rem',
-                    padding: '0.35rem 0.5rem',
-                    background: 'rgba(255,255,255,0.04)',
-                    borderLeft: '2px solid rgba(255,255,255,0.4)',
-                    borderRadius: '0 4px 4px 0',
-                  }}>
-                    <MessageSquare size={9} color="rgba(255,255,255,0.6)" strokeWidth={2.2}
-                      style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span style={{
-                      fontSize: isMobile ? '0.62rem' : '0.66rem',
-                      color: 'rgba(255,255,255,0.7)',
-                      fontWeight: '500',
-                      lineHeight: 1.45,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                    }}>
-                      {ex.notes}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5, marginTop: 5, paddingLeft: 7, borderLeft: '2px solid rgba(255,255,255,0.4)' }}>
+                    <MessageSquare size={10} color="rgba(255,255,255,0.6)" strokeWidth={2.2} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{ex.notes}</span>
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0, paddingTop: '0.15rem' }}>
-                {ex.bestWeight > 0 && <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#fff' }}>{ex.bestWeight}kg</span>}
-                <ChevronRight size={12} color="rgba(255,255,255,0.15)" />
-              </div>
-            </button>
-          )) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen data</div>}
+              {/* Rechts: beste gewicht als vaste waarde, en de knop naar de progressie. */}
+              <button
+                onClick={() => onKies(ex.name)}
+                title="Progressie van deze oefening" aria-label="Progressie van deze oefening"
+                style={{
+                  flexShrink: 0, alignSelf: 'stretch', minWidth: 56,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                  padding: '0 0.6rem', background: 'transparent', border: 'none',
+                  borderLeft: '1px solid rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer',
+                  fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {ex.bestWeight > 0 && (
+                  <span style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', fontVariantNumeric: 'tabular-nums' }}>
+                    {ex.bestWeight}<span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>kg</span>
+                  </span>
+                )}
+                <TrendingUp size={14} color="rgba(255,255,255,0.55)" strokeWidth={2.4} />
+              </button>
+            </div>
+          )) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: 700 }}>Geen oefeningen gelogd in deze sessie</div>}
         </div>
       </div>
     )
   }
+}
 
-  // ── PROGRESS ──
-  if (view === 'progress' && selectedExercise) {
-    const entries = getExerciseHistory()
+function ProgressView({ db, client, isMobile, selectedExercise, entries, onBack }) {
+  {
     const first = entries.length > 0 ? entries[entries.length - 1] : null
     const latest = entries[0] || null
     const wDiff = (first && latest && entries.length >= 2) ? latest.bestWeight - first.bestWeight : null
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <button onClick={() => setView('exercises')} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}><ArrowLeft size={14} /></button>
-          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedExercise}</span>
+          <button onClick={onBack} aria-label="Terug" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, minWidth: 28, minHeight: 28, touchAction: 'manipulation' }}><ArrowLeft size={16} /></button>
+          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedExercise}</span>
         </div>
         {latest && (
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -400,18 +477,17 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
         )}
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {entries.map((e, idx) => (
-            <div key={idx} style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                <span style={{ fontSize: '0.72rem', color: idx === 0 ? '#fff' : 'rgba(255,255,255,0.35)' }}>{formatDate(e.date)}</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: '800', color: idx === 0 ? '#fff' : '#fff' }}>{e.bestWeight}kg <span style={{ fontWeight: '500', fontSize: '0.72rem', opacity: 0.5 }}>×{e.bestReps}</span></span>
+            <div key={idx} style={{ padding: isMobile ? '0.55rem 0.9rem' : '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: idx === 0 ? '#fff' : 'rgba(255,255,255,0.55)' }}>{formatDate(e.date)}</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{e.bestWeight}<span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>kg</span> <span style={{ fontWeight: 700, fontSize: '0.74rem', color: 'rgba(255,255,255,0.5)' }}>×{e.bestReps}</span></span>
               </div>
-              {e.sets?.length > 0 && <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap' }}>{e.sets.map((s, si) => <SetDisplay key={si} s={s} />)}</div>}
+              {e.sets?.length > 0 && <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', flexWrap: 'wrap' }}>{e.sets.map((st, si) => <SetDisplay key={si} s={st} />)}</div>}
             </div>
           ))}
-          {entries.length === 0 && <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen progressie</div>}
+          {entries.length === 0 && <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: 700 }}>Nog geen progressie voor deze oefening</div>}
         </div>
       </div>
     )
   }
-  return null
 }
