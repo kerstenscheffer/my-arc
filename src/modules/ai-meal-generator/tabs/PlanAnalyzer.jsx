@@ -752,8 +752,11 @@ export default function PlanAnalyzer({
     if (!swapState) return
     // Bewust niet schalen naar de kcal van de oude maaltijd: dat gaf
     // hoeveelheden als 122,5 g brood. De gekozen maaltijd komt er 1-op-1 in.
+    // Pre-workout heeft geen dag (dayIndex null): DAYS[null].full gooide
+    // hier een fout vóór het opslaan, dus de maaltijd kwam nooit aan.
+    const dagNaam = DAYS[swapState.dayIndex]?.full || 'pre-workout'
     await plaatsInSlot(newMeal, swapState.dayIndex, swapState.slot,
-      `Swap ${DAYS[swapState.dayIndex].full}: ${swapState.meal?.name || 'leeg'} → ${newMeal.name || '?'}`)
+      `Swap ${dagNaam}: ${swapState.meal?.name || 'leeg'} → ${newMeal.name || '?'}`)
     setSwapState(null)
   }
 
@@ -762,7 +765,7 @@ export default function PlanAnalyzer({
   const handleMakerSaved = async (meal) => {
     if (!makerState) return
     await plaatsInSlot(meal, makerState.dayIndex, makerState.slot,
-      `Gemaakt ${DAYS[makerState.dayIndex].full}: ${meal.name || '?'}`)
+      `Gemaakt ${DAYS[makerState.dayIndex]?.full || 'pre-workout'}: ${meal.name || '?'}`)
     setMakerState(null)
   }
   // "Dagen"-knop op een meal-card: open de dag-picker in het dock-vak.
