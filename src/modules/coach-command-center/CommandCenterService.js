@@ -150,7 +150,7 @@ export default class CommandCenterService {
           .order('workout_date', { ascending: false }),
         this.supabase
           .from('clients')
-          .select('id, assigned_schema_id')
+          .select('id, assigned_schema_id, workout_schedule')
           .in('id', clientIds)
       ])
 
@@ -165,7 +165,7 @@ export default class CommandCenterService {
       if (schemaIds.length > 0) {
         const { data: schemas, error: schemaErr } = await this.supabase
           .from('workout_schemas')
-          .select('id, name, days_per_week, experience_level')
+          .select('id, name, days_per_week, experience_level, week_structure')
           .in('id', schemaIds)
         if (schemaErr) console.error('❌ Schema fetch error:', schemaErr)
         schemasData = schemas || []
@@ -174,9 +174,42 @@ export default class CommandCenterService {
       const schemaMap = {}
       schemasData.forEach(s => { schemaMap[s.id] = s })
       const schemaByClient = {}
+      const scheduleByClient = {}
       clientsData.forEach(c => {
         schemaByClient[c.id] = c.assigned_schema_id ? (schemaMap[c.assigned_schema_id] || null) : null
+        scheduleByClient[c.id] = c.workout_schedule && typeof c.workout_schedule === 'object' ? c.workout_schedule : null
       })
+
+      // Welke training was dit? De sessie zelf bewaart alleen de weekdag
+      // ("Quick Log - 5-10-2026"). De naam (Push, Pull, Legs) zit in het
+      // schema. Twee aanwijzingen, in deze volgorde:
+      //   1. de gelogde oefeningen tegen de dagen van het schema — klopt ook
+      //      als de klant zijn training een dag verschoof;
+      //   2. het weekrooster van de klant (Monday → dag1) als er te weinig
+      //      overlap is om op te vertrouwen.
+      const namenVan = (lijst) => new Set((Array.isArray(lijst) ? lijst : [])
+        .map(e => String(e?.name || '').trim().toLowerCase()).filter(Boolean))
+      const trainingNaam = (w, schema, schedule) => {
+        const ws = schema?.week_structure
+        if (!ws || typeof ws !== 'object') return null
+        const gelogd = namenVan(w.exercises_completed)
+        let beste = null, besteScore = 0
+        Object.values(ws).forEach(dag => {
+          if (!dag || typeof dag !== 'object') return
+          const inDag = namenVan(dag.exercises)
+          let gedeeld = 0
+          gelogd.forEach(n => { if (inDag.has(n)) gedeeld++ })
+          if (gedeeld > besteScore) { besteScore = gedeeld; beste = dag }
+        })
+        const genoeg = gelogd.size > 0 && (besteScore >= 2 || besteScore / gelogd.size >= 0.5)
+        if (genoeg && (beste?.name || beste?.focus)) return beste.name || beste.focus
+        if (schedule && w.day_name) {
+          const sleutel = Object.keys(schedule).find(k => k.toLowerCase() === String(w.day_name).toLowerCase())
+          const dag = sleutel ? ws[schedule[sleutel]] : null
+          if (dag?.name || dag?.focus) return dag.name || dag.focus
+        }
+        return (beste?.name || beste?.focus) && besteScore > 0 ? (beste.name || beste.focus) : null
+      }
 
       const workoutsByClient = {}
       clientIds.forEach(id => {
@@ -186,6 +219,7 @@ export default class CommandCenterService {
       workouts?.forEach(w => {
         const cd = workoutsByClient[w.client_id]
         if (cd) {
+          w.workout_naam = trainingNaam(w, schemaByClient[w.client_id], scheduleByClient[w.client_id])
           cd.workouts.push(w); cd.totalWorkouts++
           if (w.is_completed) cd.completedWorkouts++
           if (!cd.lastWorkoutDate) {

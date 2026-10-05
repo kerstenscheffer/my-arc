@@ -14,6 +14,7 @@ import { getFallbackImage, youtubeThumb } from '../../../workout/utils/oefeningF
 import { useEffect } from 'react'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
+const WEEKDAG_NL = { monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', thursday: 'donderdag', friday: 'vrijdag', saturday: 'zaterdag', sunday: 'zondag' }
 const formatDaysAgo = (d) => { if (d === null || d === undefined) return 'Nooit'; if (d === 0) return 'Vandaag'; if (d === 1) return 'Gisteren'; return `${d}d geleden` }
 
 // Mirror of the feelings list in LogModal — client picks one of these +
@@ -217,7 +218,10 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
             const exerciseNotesCount = exerciseNotesBySession[w.id] || 0
             const aantalOef = Object.values(exerciseProgress).filter(entries => entries.some(e => e.sessionId === w.id)).length
               || (Array.isArray(w.exercises_completed) ? w.exercises_completed.length : 0)
-            const naam = w.day_name || 'Training'
+            // Naam van de training uit het schema (Push, Legs); zonder match
+            // de weekdag in het Nederlands.
+            const weekdag = WEEKDAG_NL[String(w.day_name || '').toLowerCase()] || w.day_name || ''
+            const naam = (w.workout_naam || '').trim() || weekdag || 'Training'
             const hoogte = isMobile ? 74 : 82
             return (
               <button
@@ -281,7 +285,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                     textShadow: '0 1px 6px rgba(0,0,0,0.9)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
-                    {w.is_completed ? 'Voltooid' : 'Training'}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}
+                    {w.is_completed ? 'Voltooid' : 'Training'}{w.workout_naam && weekdag ? ` · ${weekdag}` : ''}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}
                   </span>
                 </div>
               </button>
@@ -322,7 +326,7 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <button onClick={onBack} aria-label="Terug" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, minWidth: 28, minHeight: 28, touchAction: 'manipulation' }}><ArrowLeft size={16} /></button>
-          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{selectedSession.day_name || 'Training'}</span>
+          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{(selectedSession.workout_naam || '').trim() || WEEKDAG_NL[String(selectedSession.day_name || '').toLowerCase()] || selectedSession.day_name || 'Training'}</span>
           <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{formatDate(selectedSession.workout_date)}</span>
         </div>
 
