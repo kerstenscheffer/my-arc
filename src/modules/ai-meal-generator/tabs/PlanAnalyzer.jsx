@@ -7,7 +7,7 @@ import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import VezelsMicros from './plan-analyzer/VezelsMicros'
 import MealCard from './plan-analyzer/MealCard'
-import SwapModal from './plan-analyzer/SwapModal'
+import WisselModal from './plan-analyzer/WisselModal'
 import MealMakerModal from './plan-analyzer/MealMakerModal'
 import { PRE_WORKOUT_SLOT, totalenMetPreWorkout } from '../../meal-plan/utils/preWorkoutMeal'
 import { meldMaaltijdTijd, luisterMaaltijdTijd, meldPlanGewijzigd, luisterPlanGewijzigd } from '../../meal-plan/utils/mealSync'
@@ -731,7 +731,7 @@ export default function PlanAnalyzer({
     }
   }
 
-  // Een maaltijd in een slot zetten. Losgeknipt zodat kiezen (SwapModal) en
+  // Een maaltijd in een slot zetten. Losgeknipt zodat kiezen (WisselModal) en
   // zelf maken (MealMakerModal) exact dezelfde weg gaan — anders zou een
   // zelfgemaakte maaltijd bijvoorbeeld de tijd van de slot kunnen missen.
   const plaatsInSlot = async (newMeal, dayIndex, slot, omschrijving) => {
@@ -764,16 +764,6 @@ export default function PlanAnalyzer({
     await plaatsInSlot(meal, makerState.dayIndex, makerState.slot,
       `Gemaakt ${DAYS[makerState.dayIndex].full}: ${meal.name || '?'}`)
     setMakerState(null)
-  }
-  const handleMultiDaySelect = async (newMeal, slot, dayIndices) => {
-    if (!weekData) return
-    const updated = [...weekData]
-    dayIndices.forEach(di => {
-      updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: withSlotTiming(newMeal, slot, updated[di].meals[slot]) } }
-      updated[di].totals = calculateTotals(updated[di].meals)
-    })
-    await applyWeekUpdate(updated, `Swap ${slot} op ${dayIndices.length} dagen → ${newMeal.name}`)
-    setSwapState(null)
   }
   // "Dagen"-knop op een meal-card: open de dag-picker in het dock-vak.
   const handleApplyToDays = (dayIndex, slot, meal) => { if (meal) setApplyDaysState({ dayIndex, slot, meal }) }
@@ -1593,10 +1583,10 @@ export default function PlanAnalyzer({
               onSaved={handleMakerSaved}
               onClose={() => setMakerState(null)} />
           ) : swapState ? (
-            <SwapModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
-              dayIndex={swapState.dayIndex} dayTotals={dagTotalen} targets={targets}
-              trainingDays={trainingDayIndices}
-              onSelect={handleSwapSelect} onMultiDaySelect={handleMultiDaySelect}
+            <WisselModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
+              clientId={resolvedClientId || null}
+              targetCalories={targets?.calories || clientRecord?.target_calories || null}
+              onSelect={handleSwapSelect}
               onClose={() => setSwapState(null)} isMobile={m} />
           ) : applyDaysState ? (
             <ApplyDaysModal embedded meal={applyDaysState.meal} slot={applyDaysState.slot}
@@ -2069,7 +2059,7 @@ export default function PlanAnalyzer({
       </div>
 
       {/* ════════════ MODALS ════════════ */}
-      {/* SwapModal opent nu in het modal vak (zie boven), niet meer full-screen. */}
+      {/* WisselModal opent in het zijvak (zie boven), niet full-screen. */}
 
       {showWeekBalancer && weekData && (
         <WeekBalancer weekData={weekData} targets={targets}
