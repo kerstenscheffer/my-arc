@@ -4,7 +4,7 @@
 // v1.2 — ClientDocumentsSection toegevoegd
 
 import React, { useEffect, useState } from 'react'
-import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet } from 'lucide-react'
+import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet, Info } from 'lucide-react'
 import GeneratePlanModal from './GeneratePlanModal'
 import MealCard from '../../../meal-plan/components/day-schedule/MealCard'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
@@ -304,6 +304,21 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                   compact
                   acties={[]}
                   onTik={() => openInfo(meal)}
+                  rechts={
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openInfo(meal) }}
+                      title="Ingrediënten bekijken" aria-label="Ingrediënten bekijken"
+                      style={{
+                        width: 36, height: 36, padding: 0, borderRadius: 10,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                        color: '#fff', cursor: 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <Info size={15} strokeWidth={2.4} />
+                    </button>
+                  }
                 />
               ))}
             </div>
