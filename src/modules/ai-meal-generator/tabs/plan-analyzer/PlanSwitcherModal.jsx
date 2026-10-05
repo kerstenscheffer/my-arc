@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, CheckCircle, Circle, Trash2, Pencil, Check, Zap, ChevronRight, Copy, Loader, AlertTriangle, Bookmark } from 'lucide-react'
+import { X, Trash2, Pencil, Check, ChevronRight, Copy, Loader, AlertTriangle, Bookmark } from 'lucide-react'
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
 
 export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onSaveAsTemplate, weekSaveState = 'idle', onClose, isMobile, embedded = false }) {
@@ -205,176 +205,182 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   }
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' }) : '—'
+  // created_via is een interne sleutel; de coach leest liever waar het plan
+  // vandaan komt dan "template_copy".
+  const herkomst = (via, ai) => ai ? 'AI' : ({ template_copy: 'uit sjabloon', template: 'uit sjabloon', wizard: 'wizard', manual: null }[via] ?? null)
 
   const tabStyle = (active) => ({
-    flex: 1, padding: m ? '0.6rem 0.25rem' : '0.7rem 0.25rem',
+    flex: 1, minHeight: 44, padding: '0 0.25rem',
     background: 'none', border: 'none',
-    borderBottom: `2px solid ${active ? '#FFD700' : 'transparent'}`,
-    color: active ? '#FFD700' : 'rgba(255,255,255,0.6)',
-    fontSize: m ? '0.8rem' : '0.85rem', fontWeight: 800, letterSpacing: '-0.01em',
+    borderBottom: `2px solid ${active ? '#fff' : 'transparent'}`,
+    color: '#fff', opacity: active ? 1 : 0.45,
+    fontSize: m ? '0.82rem' : '0.86rem', fontWeight: 900, letterSpacing: '-0.01em',
+    fontFamily: 'inherit',
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-    transition: 'all 0.15s ease'
+    transition: 'opacity 0.15s ease',
   })
+
+  const saveCfg = {
+    saving: { color: 'rgba(255,255,255,0.55)', label: 'Bezig met opslaan…' },
+    saved:  { color: '#22c55e', label: 'Alle wijzigingen opgeslagen' },
+    error:  { color: '#ef4444', label: 'Laatste wijziging niet opgeslagen' },
+    idle:   { color: 'rgba(255,255,255,0.55)', label: 'Wijzigingen worden automatisch opgeslagen' },
+  }[weekSaveState] || { color: 'rgba(255,255,255,0.55)', label: 'Wijzigingen worden automatisch opgeslagen' }
+  const activePlan = plans.find(p => p.is_active)
 
   const modal = (
     <div
       onClick={embedded ? undefined : (e) => e.target === e.currentTarget && onClose()}
       style={embedded
         ? { display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#0a0a0a' }
-        : { position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? 0 : '1rem' }}
+        : { position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? 0 : '1rem' }}
     >
       <div style={embedded
         ? { background: '#0a0a0a', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
-        : { background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: m ? '16px 16px 0 0' : '12px', width: m ? '100%' : '520px', maxHeight: m ? '85vh' : '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        : { background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: m ? '16px 16px 0 0' : 16, width: m ? '100%' : 520, maxHeight: m ? '85vh' : '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Header */}
+        {/* Kop */}
         <div style={{
-          display: 'flex', alignItems: 'center',
-          padding: m ? '0.875rem 1rem 0.5rem' : '0.875rem 1.25rem 0.5rem',
-          flexShrink: 0
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: m ? '0.75rem 1rem 0.25rem' : '1rem 1.5rem 0.25rem',
+          flexShrink: 0,
         }}>
-          <div style={{ fontSize: m ? '1rem' : '1.1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
+          <div style={{ flex: 1, fontSize: m ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
             Maaltijdplannen
           </div>
-          <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'rgba(255,255,255,0.3)', padding: '0.25rem',
+          <button onClick={onClose} aria-label="Sluit" style={{
+            width: 36, height: 36, flexShrink: 0,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 10, color: '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            display: 'flex', alignItems: 'center', minHeight: '32px', minWidth: '32px', justifyContent: 'center'
           }}>
-            <X size={16} />
+            <X size={16} strokeWidth={2.5} />
           </button>
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', padding: '0 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', padding: m ? '0 1rem' : '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           <button style={tabStyle(tab === 'client')} onClick={() => setTab('client')}>
-            👤 Client ({plans.length})
+            Van deze klant{plans.length > 0 ? ` (${plans.length})` : ''}
           </button>
           <button style={tabStyle(tab === 'templates')} onClick={() => setTab('templates')}>
-            📋 Templates{templates.length > 0 ? ` (${templates.length})` : ''}
+            Sjablonen{templates.length > 0 ? ` (${templates.length})` : ''}
           </button>
         </div>
 
-        {/* Body */}
+        {/* Inhoud */}
         <div style={{ overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
 
-          {/* CLIENT PLANS */}
           {tab === 'client' && (
             <>
-              {/* Auto-save-bevestiging: maakt zichtbaar dat élke wijziging direct
-                  in het actieve plan wordt opgeslagen (geen aparte opslaan-actie). */}
-              {(() => {
-                const active = plans.find(p => p.is_active)
-                const saveCfg = {
-                  saving: { color: 'rgba(255,255,255,0.55)', label: 'Bezig met opslaan…' },
-                  saved:  { color: '#10b981', label: 'Alle wijzigingen opgeslagen' },
-                  error:  { color: '#ef4444', label: 'Let op: laatste wijziging niet opgeslagen' },
-                  idle:   { color: '#10b981', label: 'Wijzigingen worden automatisch opgeslagen' },
-                }[weekSaveState] || { color: '#10b981', label: 'Wijzigingen worden automatisch opgeslagen' }
-                return (
-                  <div style={{ padding: m ? '0.6rem 1rem' : '0.7rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(16,185,129,0.04)' }}>
-                    <div style={{ fontSize: m ? '0.6rem' : '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
-                      Je werkt nu in
-                    </div>
-                    <div style={{ fontSize: m ? '0.95rem' : '1rem', fontWeight: 800, color: '#FFD700', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {active ? (active.template_name || 'Naamloos plan') : 'Geen actief plan'}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                      {weekSaveState === 'saving'
-                        ? <Loader size={11} color={saveCfg.color} style={{ animation: 'psmSpin 1s linear infinite' }} />
-                        : weekSaveState === 'error'
-                          ? <AlertTriangle size={11} color={saveCfg.color} />
-                          : <Check size={11} color={saveCfg.color} strokeWidth={3} />}
-                      <span style={{ fontSize: m ? '0.62rem' : '0.66rem', fontWeight: 700, color: saveCfg.color }}>{saveCfg.label}</span>
-                    </div>
-                  </div>
-                )
-              })()}
-              {loadingPlans && <Placeholder text="Laden..." />}
-              {!loadingPlans && plans.length === 0 && <Placeholder text="Geen plannen voor deze client" />}
+              {/* Waar je nu in werkt, en dat elke wijziging direct wordt
+                  opgeslagen. Groen alleen als er net iets is opgeslagen. */}
+              <div style={{ padding: m ? '0.75rem 1rem' : '0.85rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                  Je werkt nu in
+                </div>
+                <div style={{ fontSize: m ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {activePlan ? (activePlan.template_name || 'Naamloos plan') : 'Geen actief plan'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                  {weekSaveState === 'saving'
+                    ? <Loader size={12} color={saveCfg.color} style={{ animation: 'psmSpin 1s linear infinite' }} />
+                    : weekSaveState === 'error'
+                      ? <AlertTriangle size={12} color={saveCfg.color} />
+                      : <Check size={12} color={saveCfg.color} strokeWidth={3} />}
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: saveCfg.color }}>{saveCfg.label}</span>
+                </div>
+              </div>
+
+              {loadingPlans && <Placeholder text="Laden…" />}
+              {!loadingPlans && plans.length === 0 && (
+                <Placeholder text="Nog geen plannen voor deze klant. Kopieer een sjabloon of maak een plan via de wizard." />
+              )}
+
               {plans.map(plan => {
                 const isActive = plan.is_active
                 const isRenaming = renamingId === plan.id
                 const isConfirmDel = confirmDelete === plan.id
+                const bron = herkomst(plan.created_via, plan.ai_generated)
                 return (
                   <div key={plan.id} style={{
-                    borderBottom: '1px solid rgba(255,255,255,0.04)',
-                    borderLeft: `3px solid ${isActive ? '#FFD700' : 'transparent'}`,
-                    background: isActive ? 'rgba(255,215,0,0.03)' : 'transparent'
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    borderLeft: `3px solid ${isActive ? '#fff' : 'transparent'}`,
+                    background: isActive ? 'rgba(255,255,255,0.03)' : 'transparent',
+                    padding: m ? '0.75rem 1rem 0.75rem calc(1rem - 3px)' : '0.85rem 1.5rem 0.85rem calc(1.5rem - 3px)',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: m ? '0.75rem 1rem' : '0.75rem 1.25rem' }}>
-                      <div style={{ flexShrink: 0 }}>
-                        {isActive ? <CheckCircle size={16} color="#FFD700" /> : <Circle size={16} color="rgba(255,255,255,0.12)" />}
+                    {isRenaming ? (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input
+                          autoFocus value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') handleRenameSave(plan.id); if (e.key === 'Escape') setRenamingId(null) }}
+                          style={{
+                            flex: 1, minWidth: 0, minHeight: 40, padding: '0 0.7rem',
+                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.25)',
+                            borderRadius: 10, color: '#fff', fontSize: '0.9rem', fontWeight: 800,
+                            fontFamily: 'inherit', outline: 'none',
+                          }}
+                        />
+                        <PrimairKnop onClick={() => handleRenameSave(plan.id)} compact><Check size={14} strokeWidth={3} /></PrimairKnop>
+                        <IconKnop onClick={() => setRenamingId(null)} title="Annuleren"><X size={15} /></IconKnop>
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {isRenaming ? (
-                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                            <input
-                              autoFocus value={renameValue}
-                              onChange={e => setRenameValue(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') handleRenameSave(plan.id); if (e.key === 'Escape') setRenamingId(null) }}
-                              style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '4px', padding: '0.25rem 0.5rem', color: '#fff', fontSize: '0.85rem', fontWeight: 700, outline: 'none' }}
-                            />
-                            <Btn gold onClick={() => handleRenameSave(plan.id)}><Check size={12} /></Btn>
-                            <Btn onClick={() => setRenamingId(null)}><X size={12} /></Btn>
-                          </div>
-                        ) : (
-                          <>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 800, color: isActive ? '#FFD700' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-                                {plan.template_name || 'Naamloos plan'}
-                              </span>
-                              {isActive && <Tag gold>ACTIEF</Tag>}
-                              {plan.ai_generated && <Zap size={12} color="rgba(255,215,0,0.6)" />}
-                            </div>
-                            <Meta items={[plan.daily_calories && `${plan.daily_calories} kcal`, plan.daily_protein && `${plan.daily_protein}g eiwit`, formatDate(plan.created_at), plan.created_via]} />
-                          </>
-                        )}
-                      </div>
-                      {!isRenaming && (
-                        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexShrink: 0 }}>
-                          <Btn onClick={() => handleRenameStart(plan)}><Pencil size={13} /></Btn>
-                          <Btn
+                    ) : (
+                      <>
+                        {/* Naam + tag op één regel; de hele regel opent het plan. */}
+                        <button
+                          onClick={() => { onSelect(plan.id); onClose() }}
+                          title="Bekijk in de analyzer"
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                            background: 'none', border: 'none', padding: 0, textAlign: 'left',
+                            fontFamily: 'inherit', cursor: 'pointer',
+                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          }}
+                        >
+                          <span style={{ flex: 1, minWidth: 0, fontSize: m ? '0.92rem' : '0.98rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {plan.template_name || 'Naamloos plan'}
+                          </span>
+                          {isActive && <Tag>Actief</Tag>}
+                          <ChevronRight size={15} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+                        </button>
+                        <Meta items={[plan.daily_calories && `${plan.daily_calories} kcal`, plan.daily_protein && `${plan.daily_protein}g eiwit`, formatDate(plan.created_at), bron]} />
+
+                        {/* Acties: één gevulde knop (Activeer), de rest kale iconen. */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                          {!isActive && (
+                            <PrimairKnop onClick={() => handleActivate(plan.id)} disabled={!!activating} dimmed={activating && activating !== plan.id}>
+                              {activating === plan.id ? 'Activeren…' : 'Activeer voor klant'}
+                            </PrimairKnop>
+                          )}
+                          <span style={{ flex: 1 }} />
+                          <IconKnop onClick={() => handleRenameStart(plan)} title="Naam wijzigen"><Pencil size={14} /></IconKnop>
+                          <IconKnop
                             danger={isConfirmDel}
                             onClick={() => isConfirmDel ? handleDelete(plan.id) : setConfirmDelete(plan.id)}
                             onBlur={() => setTimeout(() => setConfirmDelete(null), 200)}
+                            title={isConfirmDel ? 'Nogmaals om te verwijderen' : 'Verwijderen'}
                           >
-                            {isConfirmDel ? <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '0 0.2rem' }}>Zeker?</span> : <Trash2 size={13} />}
-                          </Btn>
-                          {!isActive && (
-                            <button
-                              onClick={() => handleActivate(plan.id)}
-                              disabled={!!activating}
-                              style={{
-                                background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.35)',
-                                borderRadius: '6px', padding: '0.4rem 0.7rem', cursor: 'pointer',
-                                color: '#FFD700', fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 800,
-                                letterSpacing: '-0.01em',
-                                display: 'flex', alignItems: 'center', gap: '0.2rem', minHeight: '32px',
-                                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                                opacity: activating && activating !== plan.id ? 0.4 : 1
-                              }}
-                            >
-                              {activating === plan.id ? 'Activeren…' : <><span>Activeer</span><ChevronRight size={13} /></>}
-                            </button>
-                          )}
-                          <Btn onClick={() => { onSelect(plan.id); onClose() }}><ChevronRight size={14} /></Btn>
+                            {isConfirmDel
+                              ? <span style={{ fontSize: '0.72rem', fontWeight: 900, padding: '0 0.3rem' }}>{deleting === plan.id ? 'Bezig…' : 'Zeker?'}</span>
+                              : <Trash2 size={14} />}
+                          </IconKnop>
                         </div>
-                      )}
-                    </div>
+                      </>
+                    )}
                   </div>
                 )
               })}
             </>
           )}
 
-          {/* TEMPLATES */}
           {tab === 'templates' && (
             <>
-              {loadingTemplates && <Placeholder text="Templates laden..." />}
-              {!loadingTemplates && templates.length === 0 && <Placeholder text="Nog geen opgeslagen plannen — bewaar er eerst een via 'Dit plan bewaren als template'." />}
+              {loadingTemplates && <Placeholder text="Sjablonen laden…" />}
+              {!loadingTemplates && templates.length === 0 && (
+                <Placeholder text="Nog geen sjablonen. Bewaar een plan via 'Bewaren als sjabloon' op het tabblad van de klant." />
+              )}
               {templates.map(tmpl => {
                 const isCopying = copyingId === tmpl.id
                 const isCopied = copiedId === tmpl.id
@@ -382,38 +388,31 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                 const kcal = tmpl.daily_calories || macros.calories
                 const protein = tmpl.daily_protein || macros.protein
                 return (
-                  <div key={tmpl.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: '3px solid transparent' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: m ? '0.75rem 1rem' : '0.75rem 1.25rem' }}>
-                      <div style={{ flexShrink: 0, fontSize: '1.2rem', lineHeight: 1 }}>{tmpl.emoji || '📋'}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-                          {tmpl.name || 'Naamloos template'}
-                        </div>
-                        {tmpl.description && (
-                          <div style={{ fontSize: m ? '0.65rem' : '0.7rem', color: 'rgba(255,255,255,0.55)', marginTop: '0.15rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {tmpl.description}
-                          </div>
-                        )}
-                        <Meta items={[kcal && `${kcal} kcal`, protein && `${protein}g eiwit`, tmpl.meals_per_day && `${tmpl.meals_per_day}x/dag`, formatDate(tmpl.created_at)]} />
+                  <div key={tmpl.id} style={{
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    padding: m ? '0.75rem 1rem' : '0.85rem 1.5rem',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: m ? '0.92rem' : '0.98rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {tmpl.name || 'Naamloos sjabloon'}
                       </div>
-                      <button
-                        onClick={() => !isCopied && handleCopyTemplate(tmpl)}
-                        disabled={isCopying || isCopied}
-                        style={{
-                          background: isCopied ? 'rgba(16,185,129,0.12)' : 'rgba(255,215,0,0.1)',
-                          border: `1px solid ${isCopied ? 'rgba(16,185,129,0.4)' : 'rgba(255,215,0,0.35)'}`,
-                          borderRadius: '6px', padding: '0.4rem 0.7rem',
-                          cursor: isCopied ? 'default' : 'pointer',
-                          color: isCopied ? '#10b981' : '#FFD700',
-                          fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 800, letterSpacing: '-0.01em',
-                          display: 'flex', alignItems: 'center', gap: '0.3rem', minHeight: '32px', flexShrink: 0,
-                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                          transition: 'all 0.2s ease', opacity: isCopying ? 0.6 : 1
-                        }}
-                      >
-                        {isCopied ? <><Check size={13} /> Gekopieerd</> : isCopying ? 'Kopiëren…' : <><Copy size={13} /> Gebruik</>}
-                      </button>
+                      {tmpl.description && (
+                        <div style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.6)', marginTop: 2, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {tmpl.description}
+                        </div>
+                      )}
+                      <Meta items={[kcal && `${kcal} kcal`, protein && `${protein}g eiwit`, tmpl.meals_per_day && `${tmpl.meals_per_day}x per dag`, formatDate(tmpl.created_at)]} />
                     </div>
+                    {isCopied ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#22c55e', fontSize: '0.8rem', fontWeight: 900, flexShrink: 0 }}>
+                        <Check size={14} strokeWidth={3} /> Gekopieerd
+                      </span>
+                    ) : (
+                      <SecundairKnop onClick={() => handleCopyTemplate(tmpl)} disabled={isCopying}>
+                        {isCopying ? 'Kopiëren…' : <><Copy size={13} strokeWidth={2.5} /> Gebruik</>}
+                      </SecundairKnop>
+                    )}
                   </div>
                 )
               })}
@@ -421,21 +420,15 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
           )}
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: m ? '0.5rem 1rem' : '0.5rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
+        {/* Voet */}
+        <div style={{ padding: m ? '0.75rem 1rem' : '0.85rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           {tab === 'client' && onSaveAsTemplate && (
-            <button onClick={onSaveAsTemplate} style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-              padding: '0.55rem', marginBottom: '0.5rem',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '7px',
-              color: 'rgba(255,255,255,0.7)', fontSize: m ? '0.7rem' : '0.75rem', fontWeight: 700,
-              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-              <Bookmark size={13} /> Dit plan bewaren als template (voor andere clients)
-            </button>
+            <SecundairKnop onClick={onSaveAsTemplate} breed>
+              <Bookmark size={14} strokeWidth={2.5} /> Bewaren als sjabloon voor andere klanten
+            </SecundairKnop>
           )}
-          <div style={{ fontSize: m ? '0.62rem' : '0.66rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
-            {tab === 'client' ? 'Activeer = client ziet dit plan · → = bekijk in analyzer' : 'Gebruik = kopieert als nieuw concept voor deze client'}
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: tab === 'client' && onSaveAsTemplate ? 8 : 0 }}>
+            {tab === 'client' ? 'Activeer = de klant ziet dit plan. Tik op een naam om het te openen.' : 'Gebruik = kopieert het sjabloon als nieuw plan voor deze klant.'}
           </div>
         </div>
       </div>
@@ -447,46 +440,73 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
 }
 
 function Placeholder({ text }) {
-  return <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 600 }}>{text}</div>
+  return <div style={{ padding: '2rem 1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: 700, lineHeight: 1.45 }}>{text}</div>
 }
 
 function Meta({ items }) {
   const filtered = (items || []).filter(Boolean)
+  if (filtered.length === 0) return null
   return (
-    <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
       {filtered.map((item, i) => (
         <React.Fragment key={i}>
-          <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>{item}</span>
-          {i < filtered.length - 1 && <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.25)' }}>·</span>}
+          <span style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>{item}</span>
+          {i < filtered.length - 1 && <span style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.25)' }}>·</span>}
         </React.Fragment>
       ))}
     </div>
   )
 }
 
-function Tag({ children, gold }) {
+function Tag({ children }) {
   return (
     <span style={{
-      fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
-      color: gold ? '#FFD700' : 'rgba(255,255,255,0.5)',
-      background: gold ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.06)',
-      border: `1px solid ${gold ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
-      borderRadius: '4px', padding: '0.12rem 0.4rem'
+      flexShrink: 0,
+      fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase',
+      color: '#000', background: '#fff',
+      borderRadius: 5, padding: '2px 7px',
     }}>{children}</span>
   )
 }
 
-function Btn({ children, onClick, onBlur, gold, danger, disabled }) {
+// Eén gevulde witte knop per rij.
+function PrimairKnop({ children, onClick, disabled, dimmed, compact }) {
   return (
-    <button onClick={onClick} onBlur={onBlur} disabled={disabled} style={{
-      background: danger ? 'rgba(239,68,68,0.12)' : gold ? 'rgba(255,215,0,0.1)' : 'none',
-      border: `1px solid ${danger ? 'rgba(239,68,68,0.3)' : gold ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.06)'}`,
-      borderRadius: '4px', padding: '0.25rem', cursor: 'pointer',
-      color: danger ? '#ef4444' : gold ? '#FFD700' : 'rgba(255,255,255,0.55)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '30px', minWidth: '30px',
+    <button onClick={onClick} disabled={disabled} style={{
+      minHeight: compact ? 40 : 40, padding: compact ? '0 0.7rem' : '0 0.9rem',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      background: '#fff', border: 'none', borderRadius: 10,
+      color: '#0a0a0a', fontSize: '0.8rem', fontWeight: 900, letterSpacing: '-0.01em',
+      fontFamily: 'inherit', cursor: disabled ? 'default' : 'pointer',
+      opacity: dimmed ? 0.4 : 1,
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      transition: 'all 0.15s ease', opacity: disabled ? 0.4 : 1
+    }}>{children}</button>
+  )
+}
+
+function SecundairKnop({ children, onClick, disabled, breed }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      width: breed ? '100%' : undefined, minHeight: breed ? 44 : 40, padding: '0 0.9rem', flexShrink: 0,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10,
+      color: '#fff', fontSize: '0.8rem', fontWeight: 900, letterSpacing: '-0.01em',
+      fontFamily: 'inherit', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
+      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    }}>{children}</button>
+  )
+}
+
+// Kale iconen zonder vakje. Rood alleen zolang je op "Zeker?" staat.
+function IconKnop({ children, onClick, onBlur, danger, title }) {
+  return (
+    <button onClick={onClick} onBlur={onBlur} title={title} aria-label={title} style={{
+      minHeight: 40, minWidth: 40, padding: 0,
+      background: 'none', border: 'none', borderRadius: 10,
+      color: danger ? '#ef4444' : 'rgba(255,255,255,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'inherit', cursor: 'pointer',
+      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
     }}>{children}</button>
   )
 }
