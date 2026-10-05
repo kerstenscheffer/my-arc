@@ -9,6 +9,8 @@ import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus,
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 import { meldMaaltijdTijd, luisterMaaltijdTijd, luisterPlanGewijzigd, meldPlanGewijzigd } from '../meal-plan/utils/mealSync'
 import WeekBudgetPaneel from './WeekBudgetPaneel'
+import { resolveFoodImage, foodImageFallback } from '../meal-plan/foodImageFallback'
+import { workoutFoto } from '../../client/components/workoutFoto'
 import { balkVak, balkVakActief, balkIconKnop, balkScheiding } from './werkbalkStijl'
 
 const COLORS = {
@@ -161,239 +163,209 @@ function layoutBlocks(blocks) {
   return [...achtergrond, ...uit]
 }
 
-function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus, rustig = false }) {
+// Dezelfde kaarten als in de dagagenda van de klant (client/components/
+// DagAgenda.jsx): maaltijd met de foto links en de naam ernaast, training met
+// de foto als achtergrond, de rest één rustige regel. Eén kleur voor alles:
+// wit. Werk is de achtergrond van de dag, niet een rood vlak.
+const kaartKnopStijl = {
+  flexShrink: 0, fontSize: '0.58rem', fontWeight: 800,
+  color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+}
+
+function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus }) {
   const top = minToTop(block.start)
-  const height = Math.max(2.2, minToTop(block.end) - top)
+  const heightPct = Math.max(0.1, minToTop(block.end) - top)
   const isPlaceholder = block.meta?.placeholder
   const isPlaceholderTime = block.meta?.placeholder_time
   const clickable = (block.editable || selectieModus) && onClick
   const sleepbaar = draggable && (!selectieModus || isSelected)
-  const durationMin = block.end - block.start
-
-  // Visuele dichtheid op basis van blokhoogte:
-  //   ≥ 45 min  → volle MealCard-look met foto + macros
-  //   30-44 min → compacte variant zonder foto
-  //   < 30 min  → enkele regel (icoon + label)
-  // Uitzondering: meal-blokken (incl. snacks van 15 min) krijgen altijd
-  // de foto+naam layout zodat het visueel consistent is.
-  const Icon = TYPE_ICON[block.type] || Calendar
-  // Hoeveel past er in het blok? Puur op duur; maaltijden kregen hiervoor
-  // altijd 'full' omdat ze een foto hadden, maar zonder foto is een blok
-  // van een kwartier gewoon een blok van een kwartier.
-  const sizeMode = durationMin >= 45 ? 'full' : durationMin >= 30 ? 'compact' : 'mini'
-  // Werk krijgt geen foto meer. Het is nu een gevuld gekleurd vlak, en een
-  // kantoorplaatje in de hoek daarvan maakt het alleen maar onrustiger —
-  // wat je wil weten is welke uren bezet zijn en waarmee.
-
-  // Slot/type label
-  const topLabel = block.type === 'meal'
-    ? block.label
-    : block.type === 'training' ? 'Training'
-    : block.type === 'sleep'    ? 'Slaap'
-    : block.type === 'work'     ? (block.label || 'Werk')
-    : block.type === 'supplement' ? (block.meta?.emojis || 'Supplementen')
-    : 'Custom'
-
-  // Hoofdnaam — meal-naam, workout-schema, of label voor sleep/work
-  const mainTitle = block.sublabel || block.label
-
-  // Achtergrondlaag: werk vult de kolom en ligt onder de rest.
+  const isMaaltijd = block.type === 'meal'
+  const isTraining = block.type === 'training'
   const isAchter = !!block._achter && !isGhost
+  const Icon = TYPE_ICON[block.type] || Calendar
 
-  return (
-    <div
-      title={`${topLabel}${mainTitle ? ` — ${mainTitle}` : ''}\n${formatTime(block.start)}–${formatTime(block.end)}${clickable ? '\n(tik om te bewerken · sleep voor 10-min verzet of andere dag)' : ''}`}
-      // In selectiemodus mag je een blok dat je hebt aangevinkt slepen: de
-      // hele selectie schuift dan mee. Blokken die nog niet aangevinkt zijn
-      // blijven op aantikken reageren, anders kun je ze niet meer kiezen.
-      //
-      // Nooit allebei tegelijk aanhangen: bij een tik zonder beweging roept
-      // de sleep-afhandeling handleBlockClick al aan, en met een onClick
-      // erbovenop zou je de selectie twee keer omzetten — dus per saldo niets.
-      onPointerDown={sleepbaar ? (e) => onPointerDownDrag?.(e, block) : undefined}
-      onClick={(!sleepbaar && clickable) ? () => onClick(block) : undefined}
-      style={{
-        position: 'absolute',
-        top: `${top}%`,
-        height: `${height}%`,
-        // Een maaltijd van een kwartier is 15 pixels hoog; daar past de
-        // regel met naam niet in. Ondergrens zodat hij leesbaar blijft.
-        minHeight: sizeMode === 'mini' ? 20 : undefined,
-        // Kolom binnen de overlap-groep. Eén blok = volle breedte, twee
-        // blokken = ieder de helft, enzovoort.
-        left: isAchter ? 1 : `calc(${((block._kolom || 0) / (block._kolommen || 1)) * 100}% + 3px)`,
-        width: isAchter ? 'calc(100% - 2px)' : `calc(${100 / (block._kolommen || 1)}% - 6px)`,
-        // Werk is een gevuld vlak, de rest een kaart erbovenop.
-        //
-        // Die kaarten moeten ondoorzichtig zijn. Ze stonden op 2,5% wit —
-        // vrijwel doorschijnend, wat prima was boven een lege kolom maar
-        // boven een rood werkblok het rood erdoorheen liet schijnen.
-        background: isSelected ? 'rgba(255,255,255,0.14)'
-          : isGhost ? `${block.color}33`
-          : isAchter ? `${block.color}b3`
-          : '#161616',
-        border: isSelected ? '1px solid #fff'
-          : isGhost ? `1px dashed ${block.color}`
-          : isAchter ? `1px solid ${block.color}`
-          : '1px solid rgba(255,255,255,0.09)',
-        boxShadow: isSelected ? '0 0 0 1px #fff inset'
-          : (!isAchter && !isGhost) ? '0 1px 4px rgba(0,0,0,0.45)' : undefined,
-        borderLeft: isAchter ? `1px solid ${block.color}` : `3px solid ${block.color}`,
-        borderRadius: 0,
-        overflow: 'hidden',
-        opacity: isDragSource ? 0.25 : isGhost ? 0.85 : (isPlaceholder ? 0.55 : 1),
-        cursor: sleepbaar ? 'grab' : (clickable ? 'pointer' : 'default'),
-        transition: isGhost ? 'none' : 'opacity 0.15s ease',
-        userSelect: 'none',
-        touchAction: sleepbaar ? 'none' : 'auto',
-        pointerEvents: isGhost ? 'none' : 'auto',
-        display: 'flex',
-        // Werk onderop, de rest erboven. Een blok dat je hebt aangevinkt
-        // komt wel naar voren: anders verdwijnt de witte rand die aangeeft
-        // dat het geselecteerd is achter een maaltijdkaart.
-        zIndex: isGhost ? 5 : isSelected ? 4 : isAchter ? 0 : 2,
-      }}
-    >
-      {/* Tekst-content rechts — bovenaan uitgelijnd zodat lange blokken
-          (bv. werk 8u) hun titel niet in het midden krijgen, en zodat
-          overlay-blokken de onderliggende titel niet verbergen. */}
-      <div style={{
-        flex: 1, minWidth: 0,
-        display: 'flex', flexDirection: 'column',
-        justifyContent: 'flex-start',
-        padding: isMobile
-          ? (sizeMode === 'mini' ? '2px 6px' : '5px 8px')
-          : (sizeMode === 'mini' ? '3px 8px' : '7px 10px'),
-        gap: sizeMode === 'mini' ? 0 : 2,
-      }}>
-        {/* Top: voor meals met foto staat het slot-label op de foto.
-            Voor andere blokken (of meals zonder foto) topLabel hier. */}
-        {(
+  // Ondergrens per soort, in pixels. Een maaltijd van een kwartier is op
+  // ware grootte een streepje; hij krijgt de ruimte van een half uur.
+  const pxPerMin = gridMinHoogte(isMobile) / MINUTES_VISIBLE
+  const minHoogte = isMaaltijd ? 30 : isTraining ? 46 : 22
+  const hoogte = Math.max(minHoogte, (block.end - block.start) * pxPerMin)
+  const ruim = hoogte >= 30
+  const slotOpFoto = hoogte >= 52
+  const metMacros = hoogte >= 74
+
+  const soort = isMaaltijd ? (block.label || 'Maaltijd')
+    : isTraining ? 'Training'
+    : block.type === 'sleep' ? 'Slaap'
+    : block.type === 'work' ? (block.label || 'Werk')
+    : block.type === 'supplement' ? (block.meta?.emojis || 'Supplementen')
+    : (block.label || 'Blok')
+  const naam = block.sublabel || (isMaaltijd ? null : block.label)
+  const tijdTekst = `${formatTime(block.start)}${isPlaceholderTime ? ' *' : ''}`
+
+  const buiten = {
+    position: 'absolute',
+    top: `${top}%`,
+    height: `${heightPct}%`,
+    minHeight: minHoogte,
+    left: isAchter ? 1 : `calc(${((block._kolom || 0) / (block._kolommen || 1)) * 100}% + 3px)`,
+    width: isAchter ? 'calc(100% - 2px)' : `calc(${100 / (block._kolommen || 1)}% - 6px)`,
+    background: isSelected ? 'rgba(255,255,255,0.14)'
+      : isGhost ? 'rgba(255,255,255,0.08)'
+      : isAchter ? 'rgba(255,255,255,0.05)'
+      : '#141414',
+    border: isSelected ? '1px solid #fff'
+      : isGhost ? '1px dashed rgba(255,255,255,0.6)'
+      : `1px solid ${isAchter ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
+    borderLeft: isSelected ? '3px solid #fff' : '3px solid rgba(255,255,255,0.85)',
+    borderRadius: 10,
+    boxShadow: isSelected ? '0 0 0 1px #fff inset' : undefined,
+    overflow: 'hidden',
+    opacity: isDragSource ? 0.25 : isGhost ? 0.85 : (isPlaceholder ? 0.6 : 1),
+    cursor: sleepbaar ? 'grab' : (clickable ? 'pointer' : 'default'),
+    transition: isGhost ? 'none' : 'opacity 0.15s ease',
+    userSelect: 'none',
+    touchAction: sleepbaar ? 'none' : 'auto',
+    pointerEvents: isGhost ? 'none' : 'auto',
+    zIndex: isGhost ? 5 : isSelected ? 4 : isAchter ? 0 : 2,
+    boxSizing: 'border-box',
+  }
+
+  const gedrag = {
+    title: `${soort}${naam ? ` — ${naam}` : ''}\n${formatTime(block.start)}–${formatTime(block.end)}${clickable ? '\n(tik om te bewerken · sleep voor 10-min verzet of andere dag)' : ''}`,
+    // In selectiemodus mag je een aangevinkt blok slepen; niet-aangevinkte
+    // blokken blijven op aantikken reageren. Nooit allebei tegelijk: bij een
+    // tik zonder beweging roept de sleep-afhandeling de klik al aan.
+    onPointerDown: sleepbaar ? (e) => onPointerDownDrag?.(e, block) : undefined,
+    onClick: (!sleepbaar && clickable) ? () => onClick(block) : undefined,
+  }
+
+  // ── Maaltijd: foto links, naam en macro's ernaast ──
+  if (isMaaltijd && ruim) {
+    const foto = resolveFoodImage({ image_url: block.meta?.image_url, name: naam })
+      || foodImageFallback(naam, block.meta?.slot, 200)
+    const macros = [
+      { val: block.meta?.kcal, label: 'kcal' },
+      { val: block.meta?.protein, label: 'E' },
+      { val: block.meta?.carbs, label: 'K' },
+      { val: block.meta?.fat, label: 'V' },
+    ].filter(x => Number(x.val) > 0)
+    return (
+      <div {...gedrag} style={{ ...buiten, display: 'flex', alignItems: 'stretch' }}>
+        <div style={{
+          width: Math.min(isMobile ? 48 : 64, Math.max(40, hoogte)), flexShrink: 0, alignSelf: 'stretch',
+          background: foto ? `url(${foto}) center/cover` : 'rgba(255,255,255,0.05)',
+          position: 'relative',
+        }}>
           <div style={{
-            display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', gap: 4,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-              {sizeMode === 'mini' && (
-                <Icon size={9} color={isAchter ? '#fff' : block.color} style={{ flexShrink: 0 }} />
-              )}
-              <span style={{
-                fontSize: isMobile ? '0.5rem' : '0.55rem',
-                fontWeight: rustig ? 900 : 800,
-                // Op het gevulde vlak wit: de vlakkleur als tekstkleur zou
-                // op zichzelf staan en dus onleesbaar zijn. In de rustige
-                // weergave staat alles in wit en doet de gekleurde streep
-                // links het werk.
-                color: isAchter ? 'rgba(255,255,255,0.9)' : (rustig ? '#fff' : block.color),
-                textTransform: 'uppercase', letterSpacing: '0.1em',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                opacity: rustig ? 0.75 : 0.9,
-              }}>
-                {topLabel}{isPlaceholderTime && ' *'}
-              </span>
-              {/* Bij de kleinste maat past er maar één regel, en die moet
-                  de naam bevatten — "SNACK" alleen zegt niets, "SNACK ·
-                  Magere kwark met blauwe bessen" wel. Horizontaal is er
-                  ruimte zat; verticaal niet. */}
-              {sizeMode === 'mini' && mainTitle && (
-                <span style={{
-                  fontSize: isMobile ? '0.58rem' : '0.68rem',
-                  fontWeight: 800, color: '#fff', minWidth: 0,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  letterSpacing: '-0.015em',
-                }}>
-                  {mainTitle}
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.75) 100%)',
+          }} />
+          {slotOpFoto && (
+            <span style={{
+              position: 'absolute', left: 5, right: 3, bottom: 4,
+              fontSize: '0.56rem', fontWeight: 900, color: '#fff',
+              textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {soort}
+            </span>
+          )}
+        </div>
+        <div style={{
+          flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          padding: metMacros ? (isMobile ? '5px 7px' : '6px 8px') : '2px 7px', gap: 3,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{
+              flex: 1, minWidth: 0,
+              fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.015em', lineHeight: 1.2,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {naam || soort}
+            </span>
+            <span style={kaartKnopStijl}>{tijdTekst}</span>
+          </div>
+          {metMacros && macros.length > 0 && (
+            <div style={{ display: 'flex', gap: isMobile ? '0.45rem' : '0.6rem', overflow: 'hidden' }}>
+              {macros.map(x => (
+                <span key={x.label} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{Math.round(x.val)}</span>
+                  <span style={{ fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>{x.label}</span>
                 </span>
-              )}
+              ))}
             </div>
-            {sizeMode !== 'mini' && (
-              <span style={{
-                fontSize: isMobile ? '0.48rem' : '0.52rem', fontWeight: 700,
-                color: isAchter ? 'rgba(255,255,255,0.75)' : COLORS.text25,
-                whiteSpace: 'nowrap', flexShrink: 0,
-              }}>
-                {formatTime(block.start)}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Hoofdnaam. Stond er voor maaltijden in een eigen variant naast
-            de foto; nu dezelfde regel voor elk bloktype. */}
-        {mainTitle && sizeMode !== 'mini' && (
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.78rem',
-            fontWeight: 800, color: '#fff',
-            lineHeight: 1.2,
-            letterSpacing: '-0.015em',
-            display: '-webkit-box',
-            WebkitLineClamp: sizeMode === 'full' ? 2 : 1,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}>
-            {mainTitle}
-          </div>
-        )}
-
-        {/* Macros worden niet in de agenda getoond — alleen foto + naam + tijd.
-            Macros bekijk je in de plan-analyzer. */}
-
-        {/* Oefenaantal voor workout — zelfde stijl als TodaysWorkoutCard
-            (X oefeningen + tijd). Fallback op split-naam als de exacte
-            workout niet bekend is. */}
-        {block.type === 'training' && sizeMode === 'full' && (
-          <div style={{
-            display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap',
-            marginTop: 1,
-          }}>
-            {block.meta?.exercise_count != null && block.meta.exercise_count > 0 && (
-              <div style={{
-                display: 'flex', alignItems: 'baseline', gap: 2,
-              }}>
-                <span style={{
-                  fontSize: isMobile ? '0.62rem' : '0.68rem',
-                  fontWeight: 800,
-                  color: 'rgba(255,255,255,0.7)',
-                }}>
-                  {block.meta.exercise_count}
-                </span>
-                <span style={{
-                  fontSize: isMobile ? '0.46rem' : '0.5rem',
-                  fontWeight: 700,
-                  color: 'rgba(255,255,255,0.3)',
-                  textTransform: 'uppercase',
-                }}>
-                  oefeningen
-                </span>
-              </div>
-            )}
-            {block.meta?.estimated_time && (
-              <div style={{
-                display: 'flex', alignItems: 'baseline', gap: 2,
-              }}>
-                <span style={{
-                  fontSize: isMobile ? '0.55rem' : '0.6rem',
-                  fontWeight: 700,
-                  color: 'rgba(255,255,255,0.5)',
-                }}>
-                  {block.meta.estimated_time}
-                </span>
-              </div>
-            )}
-            {!block.meta?.exercise_count && block.meta?.split && (
-              <span style={{
-                fontSize: isMobile ? '0.55rem' : '0.6rem',
-                fontWeight: 800,
-                color: 'rgba(255,255,255,0.7)',
-                textTransform: 'uppercase', letterSpacing: '0.04em',
-              }}>
-                {block.meta.split}
-              </span>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
+    )
+  }
+
+  // ── Training: foto als achtergrond, naam eroverheen ──
+  if (isTraining && ruim) {
+    const details = [
+      block.meta?.exercise_count > 0 ? `${block.meta.exercise_count} oefeningen` : null,
+      block.meta?.estimated_time || null,
+      (!block.meta?.exercise_count && block.meta?.split) ? block.meta.split : null,
+    ].filter(Boolean)
+    return (
+      <div {...gedrag} style={{ ...buiten, display: 'block' }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${workoutFoto(naam || soort)})`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 55%, rgba(0,0,0,0.85) 100%)',
+        }} />
+        <div style={{
+          position: 'relative', height: '100%',
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          padding: isMobile ? '5px 8px' : '7px 10px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{
+              flex: 1, minWidth: 0,
+              fontSize: isMobile ? '0.84rem' : '0.92rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.02em', lineHeight: 1.15,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+            }}>
+              {naam || 'Training'}
+            </span>
+            <span style={{ ...kaartKnopStijl, color: 'rgba(255,255,255,0.6)' }}>{tijdTekst}</span>
+          </div>
+          <span style={{
+            fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)',
+            textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 2,
+            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            Training{details.length > 0 ? ` · ${details.join(' · ')}` : ''}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // ── De rest: één rustige regel ──
+  return (
+    <div {...gedrag} style={{
+      ...buiten,
+      display: 'flex', alignItems: isAchter ? 'flex-start' : 'center', gap: 5,
+      padding: isMobile ? '3px 7px' : '4px 9px',
+    }}>
+      <Icon size={11} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
+      <span style={{
+        flex: 1, minWidth: 0,
+        fontSize: isMobile ? '0.7rem' : '0.76rem', fontWeight: 900, color: '#fff',
+        letterSpacing: '-0.015em',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {naam || soort}
+      </span>
+      <span style={kaartKnopStijl}>{tijdTekst}</span>
     </div>
   )
 }
@@ -410,10 +382,6 @@ function DayColumn({
   day, blocks, isMobile, onBlockClick, onAddClick,
   onBlockPointerDownDrag, isDropTarget, ghostBlock, sourceBlockId, groepSleep, gridRef,
   dateForHeader, isToday, geselecteerd, selectieModus, onGridClick, plaatsModus,
-  // Rustige weergave: labels in wit in plaats van de kleur van het bloktype.
-  // Voor de klant, die één dag leest; de coach scant er zeven en heeft juist
-  // baat bij kleur.
-  rustig = false,
   // Alleen gevuld als er één dag in beeld staat: dan bladeren de pijltjes
   // naast de datum naar de vorige of volgende dag. Met zeven kolommen naast
   // elkaar heeft dat geen betekenis.
@@ -426,7 +394,7 @@ function DayColumn({
         borderRight: `1px solid ${COLORS.border}`,
         position: 'relative',
         display: 'flex', flexDirection: 'column',
-        background: isDropTarget ? 'rgba(255,255,255,0.04)' : COLORS.panel,
+        background: isDropTarget ? 'rgba(255,255,255,0.04)' : 'transparent',
         transition: 'background 0.12s ease',
       }}>
       {/* Header */}
@@ -529,8 +497,8 @@ function DayColumn({
             to bottom,
             transparent 0,
             transparent calc(${100 / (HOURS.length - 1)}% - 1px),
-            ${COLORS.borderItem} calc(${100 / (HOURS.length - 1)}% - 1px),
-            ${COLORS.borderItem} ${100 / (HOURS.length - 1)}%
+            rgba(255,255,255,0.05) calc(${100 / (HOURS.length - 1)}% - 1px),
+            rgba(255,255,255,0.05) ${100 / (HOURS.length - 1)}%
           )`,
           outline: isDropTarget ? `2px dashed ${COLORS.gold}` : 'none',
           outlineOffset: -2,
@@ -547,7 +515,6 @@ function DayColumn({
             isDragSource={sourceBlockId === b.id || (groepSleep && !!geselecteerd?.has(b.id))}
             isSelected={!!geselecteerd?.has(b.id)}
             selectieModus={selectieModus}
-            rustig={rustig}
           />
         ))}
         {/* Bij een groepsverplaatsing staat hier de hele selectie in
@@ -2345,7 +2312,6 @@ export default function ClientAgendaView({
               onAddClick={isClient ? null : handleAddClick}
               onVorigeDag={eenDag ? () => verzetDag(-1) : null}
               onVolgendeDag={eenDag ? () => verzetDag(1) : null}
-              rustig={isClient}
               geselecteerd={geselecteerd}
               selectieModus={selectieModus}
               plaatsModus={!!teplaatsen}
