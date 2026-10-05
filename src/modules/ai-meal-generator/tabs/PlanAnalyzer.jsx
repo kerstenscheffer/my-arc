@@ -748,15 +748,51 @@ export default function PlanAnalyzer({
     await applyWeekUpdate(updated, omschrijving)
   }
 
-  const handleSwapSelect = async (newMeal) => {
+  // Waar staat de maaltijd die je wisselt verder nog in de week? Voor de
+  // vraag "alleen deze dag / overal / alle dagen" in het wisselvenster.
+  const plekkenVanMaaltijd = (meal) => {
+    const id = meal?.meal_id || meal?.id
+    if (!id || !weekData) return []
+    const uit = []
+    weekData.forEach((dag, di) => {
+      Object.entries(dag?.meals || {}).forEach(([s, m]) => {
+        if (m && (m.meal_id || m.id) === id) uit.push({ dag: DAYS[di]?.label || '', slot: s })
+      })
+    })
+    return uit
+  }
+
+  // Bewust niet schalen naar de kcal van de oude maaltijd: dat gaf
+  // hoeveelheden als 122,5 g brood. De gekozen maaltijd komt er 1-op-1 in.
+  // bereik: 'day' = alleen de open dag, 'all' = overal waar de oude maaltijd
+  // staat, 'week' = dit slot op alle zeven dagen.
+  const handleSwapSelect = async (newMeal, bereik = 'day') => {
     if (!swapState) return
-    // Bewust niet schalen naar de kcal van de oude maaltijd: dat gaf
-    // hoeveelheden als 122,5 g brood. De gekozen maaltijd komt er 1-op-1 in.
     // Pre-workout heeft geen dag (dayIndex null): DAYS[null].full gooide
     // hier een fout vóór het opslaan, dus de maaltijd kwam nooit aan.
     const dagNaam = DAYS[swapState.dayIndex]?.full || 'pre-workout'
-    await plaatsInSlot(newMeal, swapState.dayIndex, swapState.slot,
-      `Swap ${dagNaam}: ${swapState.meal?.name || 'leeg'} → ${newMeal.name || '?'}`)
+    const { slot, meal: oud } = swapState
+    if (bereik === 'day' || slot === PRE_WORKOUT_SLOT || !weekData) {
+      await plaatsInSlot(newMeal, swapState.dayIndex, slot,
+        `Swap ${dagNaam}: ${oud?.name || 'leeg'} → ${newMeal.name || '?'}`)
+    } else {
+      const oudId = oud?.meal_id || oud?.id
+      const updated = weekData.map(dag => ({ ...dag, meals: { ...(dag?.meals || {}) } }))
+      let geraakt = 0
+      updated.forEach(dag => {
+        Object.entries(dag.meals).forEach(([s, m]) => {
+          const raak = bereik === 'week' ? s === slot : (m && (m.meal_id || m.id) === oudId)
+          if (!raak) return
+          dag.meals[s] = withSlotTiming(newMeal, s, m)
+          geraakt++
+        })
+        dag.totals = calculateTotals(dag.meals)
+      })
+      const omschrijving = bereik === 'week'
+        ? `Swap ${slot} op alle dagen → ${newMeal.name || '?'}`
+        : `Swap overal (${geraakt}×): ${oud?.name || '?'} → ${newMeal.name || '?'}`
+      await applyWeekUpdate(updated, omschrijving)
+    }
     setSwapState(null)
   }
 
@@ -1588,6 +1624,8 @@ export default function PlanAnalyzer({
           ) : swapState ? (
             <WisselModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
               clientId={resolvedClientId || null}
+              dagNaam={DAYS[swapState.dayIndex]?.full?.toLowerCase() || null}
+              plekken={swapState.slot === PRE_WORKOUT_SLOT ? undefined : plekkenVanMaaltijd(swapState.meal)}
               targetCalories={targets?.calories || clientRecord?.target_calories || null}
               onSelect={handleSwapSelect}
               onClose={() => setSwapState(null)} isMobile={m} />
