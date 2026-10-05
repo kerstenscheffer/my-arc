@@ -17,7 +17,8 @@ import Keuze from '../../../meal-plan/components/Keuze'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 import { niveauVoorDoel } from '../../../meal-plan/DayTemplateService'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Info, SlidersHorizontal, Repeat, CalendarDays, CalendarRange } from 'lucide-react'
+import BereikKeuze from './BereikKeuze'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Info, SlidersHorizontal } from 'lucide-react'
 
 // Slots van het weekplan ('breakfast', 'snack2', 'pre_workout', …) naar de
 // zes momenten van de keuzelijst.
@@ -35,13 +36,6 @@ const SECTIE_NAAR_MOMENT = {
   ontbijt: 'breakfast', lunch: 'lunch', diner: 'dinner', avondeten: 'dinner',
   snack: 'snack', tussendoortje: 'snack', snacks: 'snack',
 }
-
-const SLOT_KORT = {
-  breakfast: 'ontbijt', lunch: 'lunch', dinner: 'diner',
-  snack1: 'snack 1', snack2: 'snack 2', snack3: 'snack 3', snack4: 'snack 4',
-  avondsnack: 'avondsnack', pre_workout: 'pre-workout',
-}
-const slotKort = (slot) => SLOT_KORT[slot] || String(slot || '').replace(/_/g, ' ')
 
 const MOMENT_OPTIES = [
   { id: 'alles', label: 'Alle maaltijden' },
@@ -409,31 +403,6 @@ export default function WisselModal({
   }
 
   const vraagBereik = plekken !== undefined && !!currentMeal
-  const aantalPlekken = Array.isArray(plekken) ? plekken.length : 0
-  const plekkenTekst = aantalPlekken === 0
-    ? 'staat verder nergens in de week'
-    : plekken.map(p => `${p.dag} ${slotKort(p.slot)}`).join(' · ')
-  const bereikOpties = [
-    {
-      key: 'day', Icon: CalendarDays,
-      title: `Alleen ${dagNaam || 'deze dag'}`,
-      sub: 'elke week op deze dag',
-      effect: `past ${dagNaam || 'deze dag'} ${slotKort(slot)} aan, de andere dagen blijven zoals ze zijn`,
-    },
-    {
-      key: 'all', Icon: Repeat,
-      title: aantalPlekken > 1 ? `Overal (${aantalPlekken}×)` : 'Overal in de week',
-      sub: `waar ${currentMeal?.name || 'deze maaltijd'} staat`,
-      effect: plekkenTekst,
-      uit: aantalPlekken === 0,
-    },
-    {
-      key: 'week', Icon: CalendarRange,
-      title: 'Alle dagen',
-      sub: `${slotKort(slot)} op 7 dagen`,
-      effect: `zet ${selectedMeal?.name || 'de nieuwe maaltijd'} als ${slotKort(slot)} op elke dag van de week`,
-    },
-  ]
 
   const filteredMeals = getFilteredMeals()
 
@@ -794,57 +763,13 @@ export default function WisselModal({
             )}
 
             {vraagBereik ? (
-              <>
-                <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: 2 }}>
-                  Waar geldt deze wissel?
-                </div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>
-                  Je kunt dit later altijd weer aanpassen.
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-                  {bereikOpties.map(opt => {
-                    const Icon = opt.Icon
-                    const isSaving = bezig === opt.key
-                    const uit = !!opt.uit
-                    return (
-                      <button
-                        key={opt.key}
-                        onClick={() => !bezig && !uit && bevestig(opt.key)}
-                        disabled={!!bezig || uit}
-                        style={{
-                          display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left',
-                          padding: '0.85rem 0.9rem', borderRadius: 12,
-                          cursor: (bezig || uit) ? 'default' : 'pointer',
-                          background: 'rgba(255,255,255,0.04)',
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          opacity: (bezig && !isSaving) || uit ? 0.35 : 1,
-                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                          fontFamily: 'inherit',
-                        }}
-                      >
-                        <div style={{
-                          width: 34, height: 34, borderRadius: 10, flexShrink: 0, marginTop: 1,
-                          background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          {isSaving
-                            ? <div style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'wisselSpin 0.8s linear infinite' }} />
-                            : <Icon size={17} color="#fff" strokeWidth={2.4} />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{opt.title}</span>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{opt.sub}</span>
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.35 }}>
-                            {opt.effect}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
+              <BereikKeuze
+                vraag="Waar geldt deze wissel?"
+                dagNaam={dagNaam} slot={slot}
+                oudeNaam={currentMeal?.name} nieuweNaam={selectedMeal?.name}
+                plekken={plekken} metAlleDagen
+                bezig={bezig} onKies={bevestig}
+              />
             ) : (
               <button
                 onClick={() => bevestig('day')}

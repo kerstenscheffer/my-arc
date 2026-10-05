@@ -72,6 +72,9 @@ function parseIngredients(ingredients) {
 export default function MealCard({
   db, meal, slot, dayIndex, mealSchedule, isPreWorkout,
   isEmpty, onSwap, onDelete, onAdd, onCreate, onUpdateMeal, onApplyToDays, conflicts, isMobile,
+  // Opslaan vanuit de bewerk-modal of de portie-schaler. Valt terug op
+  // onUpdateMeal; de analyzer hangt hier de vraag "waar geldt dit?" aan.
+  onEditSave = null,
 }) {
   const modalHost = useModalHost()
   const [expanded, setExpanded] = useState(false)
@@ -189,7 +192,7 @@ export default function MealCard({
       const newAmount = scalerAmounts[item.ingredient_id]
       return newAmount !== undefined ? { ...item, amount: newAmount } : item
     })
-    onUpdateMeal(dayIndex, slot, { ...meal, ...newMacros, ingredients_list: newIngredients, original_calories: meal.original_calories || meal.calories, original_protein: meal.original_protein || meal.protein, original_carbs: meal.original_carbs || meal.carbs, original_fat: meal.original_fat || meal.fat })
+    ;(onEditSave || onUpdateMeal)(dayIndex, slot, { ...meal, ...newMacros, ingredients_list: newIngredients, original_calories: meal.original_calories || meal.calories, original_protein: meal.original_protein || meal.protein, original_carbs: meal.original_carbs || meal.carbs, original_fat: meal.original_fat || meal.fat })
     setShowScaler(false); setScalerData(null)
   }
 
@@ -666,7 +669,7 @@ export default function MealCard({
         <MealEditModal
           embedded
           db={db} meal={meal} slot={slot} dayIndex={dayIndex}
-          onSave={(updatedMeal) => onUpdateMeal(dayIndex, slot, updatedMeal)}
+          onSave={(updatedMeal) => (onEditSave || onUpdateMeal)(dayIndex, slot, updatedMeal)}
           onClose={() => setShowEditModal(false)} isMobile={m}
         />
       )}

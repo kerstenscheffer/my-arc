@@ -8,6 +8,8 @@ import DayMacroBar from './plan-analyzer/DayMacroBar'
 import VezelsMicros from './plan-analyzer/VezelsMicros'
 import MealCard from './plan-analyzer/MealCard'
 import WisselModal from './plan-analyzer/WisselModal'
+import BereikKeuze from './plan-analyzer/BereikKeuze'
+import BladModal from '../../workout/components/todays-workout/components/BladModal'
 import MealMakerModal from './plan-analyzer/MealMakerModal'
 import { PRE_WORKOUT_SLOT, totalenMetPreWorkout } from '../../meal-plan/utils/preWorkoutMeal'
 import { meldMaaltijdTijd, luisterMaaltijdTijd, meldPlanGewijzigd, luisterPlanGewijzigd } from '../../meal-plan/utils/mealSync'
@@ -1036,13 +1038,25 @@ export default function PlanAnalyzer({
     setBlancoBezig(false)
   }
 
-  const handleUpdateMeal = async (dayIndex, slot, updatedMeal) => {
+  // bereik 'all' (standaard, ook voor kleine inline-wijzigingen zoals tijd
+  // of label): overal in de week waar dezelfde maaltijd staat.
+  // bereik 'day': alleen dit slot op deze dag.
+  const handleUpdateMeal = async (dayIndex, slot, updatedMeal, bereik = 'all') => {
     if (!weekData) return
     const updated = [...weekData]
     // Bij "Kopie" heeft updatedMeal een NIEUWE id; we matchen dan op de oude
     // (_replacesMealId) zodat de nieuwe meal de oude in het plan vervangt.
     const { _replacesMealId, ...cleanMeal } = updatedMeal
     const matchingMealId = _replacesMealId || cleanMeal.meal_id || cleanMeal.id
+
+    if (bereik === 'day') {
+      const m = updated[dayIndex]?.meals?.[slot]
+      if (!m) return
+      updated[dayIndex] = { ...updated[dayIndex], meals: { ...updated[dayIndex].meals, [slot]: { ...m, ...cleanMeal } } }
+      updated[dayIndex].totals = calculateTotals(updated[dayIndex].meals)
+      await applyWeekUpdate(updated, `Aangepast: ${cleanMeal.name} (${DAYS[dayIndex]?.full || 'één dag'})`)
+      return
+    }
 
     // Update alle slots in de hele week die dezelfde meal_id hebben
     updated.forEach((day, di) => {
@@ -1060,6 +1074,22 @@ export default function PlanAnalyzer({
     })
 
     await applyWeekUpdate(updated, `Aangepast: ${cleanMeal.name} (alle dagen)`)
+  }
+
+  // Na opslaan in de bewerk-modal (of de portie-schaler) eerst vragen waar
+  // de aanpassing geldt. Zelfde blad als na een wissel.
+  const [editBereik, setEditBereik] = useState(null) // { dayIndex, slot, meal }
+  const [editBereikBezig, setEditBereikBezig] = useState(null)
+  const handleEditSave = (dayIndex, slot, updatedMeal) => setEditBereik({ dayIndex, slot, meal: updatedMeal })
+  const kiesEditBereik = async (bereik) => {
+    if (!editBereik || editBereikBezig) return
+    setEditBereikBezig(bereik)
+    try {
+      await handleUpdateMeal(editBereik.dayIndex, editBereik.slot, editBereik.meal, bereik)
+      setEditBereik(null)
+    } finally {
+      setEditBereikBezig(null)
+    }
   }
   const handleWeekBalance = async (updatedWeekData, shouldClose = true) => {
     await applyWeekUpdate(updatedWeekData, 'Week gebalanceerd'); if (shouldClose) setShowWeekBalancer(false)
@@ -2024,7 +2054,7 @@ export default function PlanAnalyzer({
                     mealSchedule={mealSchedule} isPreWorkout={isPreWorkout}
                     isEmpty={!meal} onSwap={handleSwap} onDelete={handleDelete}
                     onAdd={handleAdd} onCreate={(di, sl) => setMakerState({ dayIndex: di, slot: sl })}
-                    onUpdateMeal={handleUpdateMeal} onApplyToDays={handleApplyToDays}
+                    onUpdateMeal={handleUpdateMeal} onEditSave={handleEditSave} onApplyToDays={handleApplyToDays}
                     conflicts={conflicts} isMobile={m} />
                 )
               })}
@@ -2100,6 +2130,26 @@ export default function PlanAnalyzer({
       </div>
 
       {/* ════════════ MODALS ════════════ */}
+      {/* Waar geldt een bewerking? Zelfde blad als na een wissel. */}
+      <BladModal
+        open={!!editBereik}
+        titel={editBereik?.meal?.name || 'Aanpassing'}
+        onClose={() => { if (!editBereikBezig) setEditBereik(null) }}
+        zIndex={10600}
+      >
+        {editBereik && (
+          <BereikKeuze
+            vraag="Waar geldt deze aanpassing?"
+            dagNaam={DAYS[editBereik.dayIndex]?.full?.toLowerCase() || null}
+            slot={editBereik.slot}
+            oudeNaam={weekData?.[editBereik.dayIndex]?.meals?.[editBereik.slot]?.name}
+            plekken={plekkenVanMaaltijd(weekData?.[editBereik.dayIndex]?.meals?.[editBereik.slot])}
+            bezig={editBereikBezig}
+            onKies={kiesEditBereik}
+          />
+        )}
+      </BladModal>
+
       {/* WisselModal opent in het zijvak (zie boven), niet full-screen. */}
 
       {showWeekBalancer && weekData && (
