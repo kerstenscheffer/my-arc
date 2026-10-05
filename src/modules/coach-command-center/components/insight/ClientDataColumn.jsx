@@ -317,7 +317,8 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
             <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(249,115,22,0.4)', letterSpacing: '-0.01em' }}>Training Voorkeuren</span>
           </div>
           <ReadRow isMobile={isMobile} label="Niveau"      value={wp.default_experience_level} />
-          <ReadRow isMobile={isMobile} label="Dagen/wk"    value={wp.default_days_per_week} />
+          {/* 0 = "coach bepaalt" in de intake, geen nul dagen. */}
+          <ReadRow isMobile={isMobile} label="Dagen/wk"    value={Number(wp.default_days_per_week) === 0 ? 'Coach bepaalt' : wp.default_days_per_week} />
           <ReadRow isMobile={isMobile} label="Tijd/sessie"  value={wp.default_time_per_session ? `${wp.default_time_per_session} min` : null} />
           <ReadRow isMobile={isMobile} label="Locatie"      value={wp.training_location} />
           <ReadRow isMobile={isMobile} label="Gym"          value={wp.gym_name} />

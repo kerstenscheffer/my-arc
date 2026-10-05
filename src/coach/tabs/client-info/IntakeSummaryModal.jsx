@@ -91,6 +91,10 @@ const fmtDate = (v) => {
   }
 }
 const fmtNum = (unit) => (v) => `${v}${unit ? ' ' + unit : ''}`
+// De intake slaat "Maakt me niet uit — coach bepaalt" op als 0 trainingsdagen.
+// Dat is een antwoord, geen nul: zo tonen, anders lijkt het alsof de klant
+// niet wil trainen.
+const fmtDagenPerWeek = (v) => (Number(v) === 0 ? 'Maakt me niet uit — coach bepaalt' : `${v} x`)
 
 const isEmpty = (v) =>
   v === null ||
@@ -445,7 +449,7 @@ const PART3_SECTIONS = [
   {
     title: 'Praktisch',
     fields: [
-      { key: 'default_days_per_week', label: 'Dagen per week', fmt: fmtNum('x') },
+      { key: 'default_days_per_week', label: 'Dagen per week', fmt: fmtDagenPerWeek },
       { key: 'default_time_per_session', label: 'Tijd per sessie', fmt: fmtNum('min') },
       { key: 'training_location', label: 'Locatie', fmt: fmtMap(MAPS.location) },
       { key: 'gym_name', label: 'Sportschool' },
