@@ -15,7 +15,6 @@ import { useEffect } from 'react'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 const WEEKDAG_NL = { monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', thursday: 'donderdag', friday: 'vrijdag', saturday: 'zaterdag', sunday: 'zondag' }
-const formatDaysAgo = (d) => { if (d === null || d === undefined) return 'Nooit'; if (d === 0) return 'Vandaag'; if (d === 1) return 'Gisteren'; return `${d}d geleden` }
 
 // Mirror of the feelings list in LogModal — client picks one of these +
 // optional free-text note. They get stored together in workout_sessions.notes
@@ -110,6 +109,48 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     return counts
   }, [exerciseProgress])
 
+  // Naam van de training (Push, Full body) voor een sessie. De sessie zelf
+  // bewaart alleen de weekdag; exercises_completed is vaak leeg omdat de
+  // oefeningen als losse voortgangslogs binnenkomen (exerciseProgress).
+  // Daarom hier, en niet in de service. Drie aanwijzingen, in volgorde:
+  //   1. overlap tussen de gelogde oefeningen en de dagen van het schema;
+  //   2. heeft het schema overal dezelfde naam (2× "Full body"), dan die;
+  //   3. het weekrooster van de klant (Monday → dag1).
+  const schemaDagen = useMemo(() => {
+    const ws = workoutData?.schema?.week_structure
+    if (!ws || typeof ws !== 'object') return []
+    return Object.entries(ws)
+      .filter(([, d]) => d && typeof d === 'object')
+      .map(([key, d]) => ({
+        key, naam: String(d.name || d.focus || '').trim(),
+        oefeningen: new Set((Array.isArray(d.exercises) ? d.exercises : []).map(e => String(e?.name || '').trim().toLowerCase()).filter(Boolean)),
+      }))
+  }, [workoutData?.schema])
+  const naamVoorSessie = (w) => {
+    if ((w.workout_naam || '').trim()) return w.workout_naam.trim()
+    if (schemaDagen.length === 0) return null
+    const gelogd = new Set([
+      ...Object.entries(exerciseProgress).filter(([, entries]) => entries.some(e => e.sessionId === w.id)).map(([n]) => n),
+      ...(Array.isArray(w.exercises_completed) ? w.exercises_completed.map(e => e?.name) : []),
+    ].map(n => String(n || '').trim().toLowerCase()).filter(Boolean))
+    let beste = null, besteScore = 0
+    schemaDagen.forEach(d => {
+      let gedeeld = 0
+      gelogd.forEach(n => { if (d.oefeningen.has(n)) gedeeld++ })
+      if (gedeeld > besteScore) { besteScore = gedeeld; beste = d }
+    })
+    if (beste?.naam && (besteScore >= 2 || besteScore / Math.max(1, gelogd.size) >= 0.5)) return beste.naam
+    const namen = [...new Set(schemaDagen.map(d => d.naam).filter(Boolean))]
+    if (namen.length === 1) return namen[0]
+    const schedule = workoutData?.schedule
+    if (schedule && w.day_name) {
+      const sleutel = Object.keys(schedule).find(k => k.toLowerCase() === String(w.day_name).toLowerCase())
+      const dag = sleutel ? schemaDagen.find(d => d.key === schedule[sleutel]) : null
+      if (dag?.naam) return dag.naam
+    }
+    return beste?.naam || null
+  }
+
   const getSessionExercises = () => {
     if (!selectedSession) return []
     const exercises = []
@@ -167,17 +208,6 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
             </button>
           </div>
         </div>
-        {workoutData?.totalWorkouts > 0 && (
-          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            {[{ label: 'Voltooid', val: workoutData.completedWorkouts, color: '#fff' }, { label: 'Totaal', val: workoutData.totalWorkouts, color: '#fff' }, { label: 'Laatste', val: formatDaysAgo(workoutData.daysSinceWorkout), color: workoutData.daysSinceWorkout <= 3 ? '#fff' : workoutData.daysSinceWorkout <= 7 ? '#f59e0b' : '#ef4444' }].map((s, i) => (
-              <div key={i} style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem 0.125rem' : '0.5rem 0.25rem', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: s.color, lineHeight: 1.1 }}>{s.val}</div>
-                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 3 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* ── BEKIJK PLAN KNOP — identiek aan MealsColumn ── */}
         {onNavigateWorkout && (
           <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -221,12 +251,13 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
             // Naam van de training uit het schema (Push, Legs); zonder match
             // de weekdag in het Nederlands.
             const weekdag = WEEKDAG_NL[String(w.day_name || '').toLowerCase()] || w.day_name || ''
-            const naam = (w.workout_naam || '').trim() || weekdag || 'Training'
+            const trainingNaam = naamVoorSessie(w)
+            const naam = trainingNaam || weekdag || 'Training'
             const hoogte = isMobile ? 74 : 82
             return (
               <button
                 key={`${w.workout_date}-${idx}`}
-                onClick={() => { setSelectedSession(w); setView('exercises') }}
+                onClick={() => { setSelectedSession({ ...w, workout_naam: trainingNaam || w.workout_naam || null }); setView('exercises') }}
                 style={{
                   ...KAART, display: 'block', width: 'calc(100% - 1.8rem)', height: hoogte,
                   padding: 0, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
@@ -285,7 +316,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                     textShadow: '0 1px 6px rgba(0,0,0,0.9)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
-                    {w.is_completed ? 'Voltooid' : 'Training'}{w.workout_naam && weekdag ? ` · ${weekdag}` : ''}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}
+                    {w.is_completed ? 'Voltooid' : 'Training'}{trainingNaam && weekdag ? ` · ${weekdag}` : ''}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}
                   </span>
                 </div>
               </button>

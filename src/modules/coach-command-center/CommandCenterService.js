@@ -213,7 +213,7 @@ export default class CommandCenterService {
 
       const workoutsByClient = {}
       clientIds.forEach(id => {
-        workoutsByClient[id] = { workouts: [], totalWorkouts: 0, completedWorkouts: 0, lastWorkoutDate: null, daysSinceWorkout: null, schema: schemaByClient[id] || null }
+        workoutsByClient[id] = { workouts: [], totalWorkouts: 0, completedWorkouts: 0, lastWorkoutDate: null, daysSinceWorkout: null, schema: schemaByClient[id] || null, schedule: scheduleByClient[id] || null }
       })
 
       workouts?.forEach(w => {
