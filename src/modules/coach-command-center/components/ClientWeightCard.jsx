@@ -124,7 +124,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     if (!r) return
     // In split screen is de gastheer een getransformeerde helft; position:fixed
     // rekent dan tegen díe helft. Daarom de coördinaten daarop omrekenen.
-    const h = modalHost?.getBoundingClientRect?.()
+    // Buiten split screen is de gastheer document.body, en die is hoger dan
+    // het scherm zodra de pagina scrollt: dan kwam het menu boven het beeld
+    // terecht en leek de knop kapot. Dan gewoon tegen het venster rekenen.
+    const h = (modalHost && modalHost !== document.body) ? modalHost.getBoundingClientRect() : null
     const breedte = h ? h.width : window.innerWidth
     const hoogte  = h ? h.height : window.innerHeight
     const dx = h ? h.left : 0
