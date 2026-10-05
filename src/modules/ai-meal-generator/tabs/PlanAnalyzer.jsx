@@ -42,7 +42,7 @@ const ZWEVENDE_NAV_HOOGTE = 105
 
 const DOCK_LABELS = {
   client: 'Client', timing: 'Tijden', swaps: 'Swaps',
-  library: 'Opslaan', supp: 'Supplementen', agenda: 'Agenda',
+  library: 'Plannen', supp: 'Supplementen', agenda: 'Agenda',
   dagen: 'Dagen bewaren',
 }
 
@@ -466,7 +466,17 @@ export default function PlanAnalyzer({
       // niet de macro's die in dit (opgeslagen) plan staan. De clientRecord-effect
       // hierboven is de enige bron van targets — anders kreeg je soms de plan-macro's
       // (race condition tussen plan-load en clientRecord-load).
-      setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated })
+      // Komt dit klantplan uit een sjabloon? Dan hoort de naam van dat
+      // sjabloon in de titelbalk: zo zie je dat je een kopie bewerkt en niet
+      // het sjabloon zelf.
+      let templateName = null
+      if (data.template_id) {
+        const { data: tmpl } = await db.supabase
+          .from('meal_plan_templates').select('name').eq('id', data.template_id).maybeSingle()
+          .then(r => r, () => ({ data: null }))
+        templateName = tmpl?.name || null
+      }
+      setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated, templateId: data.template_id || null, templateName })
       setPreWorkoutMeal(data.pre_workout_meal || null)
       setActivated(data.is_active || false)
       setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
@@ -1439,7 +1449,7 @@ export default function PlanAnalyzer({
     { id: 'week',   icon: <Grid3X3 size={18} />,   label: 'Week',    active: viewMode === 'week',        onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
     { id: 'agenda', icon: <Calendar size={18} />,  label: 'Agenda',  active: dockedSection === 'agenda', onClick: () => toggleDock('agenda') },
     { id: 'swaps',  icon: <Repeat size={18} />,    label: 'Swaps',   active: dockedSection === 'swaps',  onClick: () => toggleDock('swaps') },
-    { id: 'library', icon: <List size={18} />, label: 'Opslaan', active: dockedSection === 'library', onClick: () => toggleDock('library'), badge: allClientPlans.length > 0 ? allClientPlans.length : null },
+    { id: 'library', icon: <List size={18} />, label: 'Plannen', active: dockedSection === 'library', onClick: () => toggleDock('library'), badge: allClientPlans.length > 0 ? allClientPlans.length : null },
     { id: 'supp',   icon: <Pill size={18} />,   label: 'Supp',    active: dockedSection === 'supp',    onClick: () => toggleDock('supp'), badge: supplementen.length > 0 ? supplementen.length : null },
   ]
 
@@ -1817,6 +1827,8 @@ export default function PlanAnalyzer({
           <PlanTitleBar
             name={planMeta?.name}
             isActive={activated || planMeta?.isActive}
+            clientName={clientRecord?.first_name || ''}
+            templateName={planMeta?.templateName || null}
             canEdit={!!actievePlanId}
             onRename={handleRenamePlan}
             weekSaveState={weekSaveState}
