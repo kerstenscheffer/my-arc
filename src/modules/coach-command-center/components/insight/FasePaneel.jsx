@@ -76,7 +76,7 @@ export default function FasePaneel({
     if (c.richting === 'stabiel' || !Number.isFinite(c.traagKg)) return ''
     const teken = c.richting === 'aankomen' ? '+' : '−'
     return `Band: ${teken}${c.traagKg.toFixed(2)} tot ${teken}${c.snelKg.toFixed(2)} kg per week`
-      + (c.handmatig ? ' (zelf ingesteld)' : '')
+      + (nieuw.tempoAangeraakt ? ' (zelf ingesteld)' : '')
   })()
 
   const huidige = fases[0] || null
@@ -92,9 +92,23 @@ export default function FasePaneel({
     return g ? g.w : (client?.current_weight ? parseFloat(client.current_weight) : '')
   })()
 
+  // Minstens/hoogstens die de app zelf bij dit tempo zou kiezen. Staat
+  // ingevuld zodra er een weektempo is, zodat je ziet waar je op stuurt en
+  // het meteen kunt bijstellen. Zodra de coach er zelf aan zit
+  // (tempoAangeraakt), schuift het niet meer mee met het tempo.
+  const autoBand = (n) => {
+    const c = maakConfig(client, {
+      doel: n.doel, week_doel_kg: n.week_doel_kg, start_gewicht: n.start_gewicht,
+      tempo_min_kg: '', tempo_max_kg: '',
+    })
+    if (c.richting === 'stabiel' || !Number.isFinite(c.traagKg)) return { tempo_min_kg: '', tempo_max_kg: '' }
+    return { tempo_min_kg: c.traagKg.toFixed(2), tempo_max_kg: c.snelKg.toFixed(2) }
+  }
+  const metBand = (n) => (n.tempoAangeraakt ? n : { ...n, ...autoBand(n) })
+
   const startNieuw = () => {
     setFout(null)
-    setNieuw({
+    setNieuw(metBand({
       doel: huidige?.doel === 'cut' ? 'build' : 'cut',
       started_on: vandaag(),
       start_gewicht: laatsteGewicht || '',
@@ -105,7 +119,7 @@ export default function FasePaneel({
       // Het tekort of surplus dat bij dit weektempo hoort. Voorstel, geen wet:
       // de coach ziet het staan en past het aan voordat hij opslaat.
       surplus: String(kcalPerWeektempo(huidige?.doel === 'cut' ? 0.25 : -0.5)),
-    })
+    }))
   }
 
   const bewaar = async () => {
@@ -227,7 +241,7 @@ export default function FasePaneel({
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
             {Object.entries(DOELEN).map(([k, v]) => (
               <button key={k}
-                onClick={() => setNieuw(n => ({
+                onClick={() => setNieuw(n => metBand({
                   ...n, doel: k,
                   week_doel_kg: k === 'build' ? '0.25' : k === 'cut' ? '-0.5' : '0',
                 }))}
@@ -246,12 +260,12 @@ export default function FasePaneel({
             <Veld label="Startdatum" type="date" waarde={nieuw.started_on}
               zet={v => setNieuw(n => ({ ...n, started_on: v }))} isMobile={isMobile} />
             <Veld label="Startgewicht" type="number" suffix="kg" waarde={nieuw.start_gewicht}
-              zet={v => setNieuw(n => ({ ...n, start_gewicht: v }))} isMobile={isMobile} />
+              zet={v => setNieuw(n => metBand({ ...n, start_gewicht: v }))} isMobile={isMobile} />
             {/* Tempo en tekort horen bij elkaar: verander je het tempo, dan
                 schuift het voorgestelde tekort mee. Heb je het tekort zelf al
                 aangeraakt, dan blijft het staan. */}
             <Veld label="Per week" type="number" suffix="kg" stap="0.05" waarde={nieuw.week_doel_kg}
-              zet={v => setNieuw(n => ({
+              zet={v => setNieuw(n => metBand({
                 ...n, week_doel_kg: v,
                 surplus: n.surplusAangeraakt ? n.surplus : String(kcalPerWeektempo(v)),
               }))} isMobile={isMobile} />
@@ -269,9 +283,9 @@ export default function FasePaneel({
           {nieuw.doel !== 'recomp' && nieuw.doel !== 'maintain' && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <Veld label="Tempo minstens" type="number" suffix="kg/wk" stap="0.05" waarde={nieuw.tempo_min_kg}
-                zet={v => setNieuw(n => ({ ...n, tempo_min_kg: v }))} isMobile={isMobile} optioneel />
+                zet={v => setNieuw(n => ({ ...n, tempo_min_kg: v, tempoAangeraakt: true }))} isMobile={isMobile} optioneel />
               <Veld label="Tempo hoogstens" type="number" suffix="kg/wk" stap="0.05" waarde={nieuw.tempo_max_kg}
-                zet={v => setNieuw(n => ({ ...n, tempo_max_kg: v }))} isMobile={isMobile} optioneel />
+                zet={v => setNieuw(n => ({ ...n, tempo_max_kg: v, tempoAangeraakt: true }))} isMobile={isMobile} optioneel />
               <span style={{
                 flex: 1, minWidth: 150, fontSize: '0.66rem', fontWeight: 700,
                 color: 'rgba(255,255,255,0.3)', lineHeight: 1.4, paddingBottom: 6,
