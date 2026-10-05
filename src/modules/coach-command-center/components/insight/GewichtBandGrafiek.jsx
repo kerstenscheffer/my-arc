@@ -452,7 +452,9 @@ export default function GewichtBandGrafiek({
       ) : (
       <div style={{ width: '100%', height: isMobile ? 190 : 230 }}>
         <ResponsiveContainer>
-          <ComposedChart data={punten} margin={{ top: 6, right: 6, bottom: 0, left: -18 }}>
+          {/* Linkermarge op nul: met -18 viel het eerste cijfer van "116"
+              buiten beeld en las de as als 24, 21, 18. */}
+          <ComposedChart data={punten} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
             {/* De trendlijn kleurt mee: groen zolang hij in de band ligt, en
                 daarbuiten oplopend van oranje naar rood naarmate hij er verder
                 vanaf zit. Eén lijn met een verloop per meetpunt — twintig losse
@@ -475,7 +477,8 @@ export default function GewichtBandGrafiek({
             />
             <YAxis
               domain={[min, max]} tick={{ fontSize: 10, fill: '#fff', fontWeight: 800 }}
-              axisLine={false} tickLine={false} width={38}
+              tickFormatter={(v) => String(Math.round(v))}
+              axisLine={false} tickLine={false} width={34}
             />
             <Tooltip content={<Kaartje />} cursor={{ stroke: 'rgba(255,255,255,0.25)' }} />
             {/* Het vlak tussen te snel en te langzaam. */}
