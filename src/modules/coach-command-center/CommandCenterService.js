@@ -274,7 +274,7 @@ export default class CommandCenterService {
       const [mealsResult, plansResult] = await Promise.all([
         this.supabase
           .from('consumed_meals')
-          .select('client_id, consumed_at, calories, protein, carbs, fat, meal_type, meal_name')
+          .select('id, client_id, consumed_at, calories, protein, carbs, fat, meal_type, meal_name, meal_id, source, ingredients, image_url, amount, per_unit, notes')
           .in('client_id', clientIds)
           .gte('consumed_at', sevenDaysAgoStr)
           .order('consumed_at', { ascending: true }),
@@ -319,7 +319,17 @@ export default class CommandCenterService {
         cd.dailyLog[day].carbs    += parseFloat(m.carbs)   || 0
         cd.dailyLog[day].fat      += parseFloat(m.fat)     || 0
         cd.dailyLog[day].count++
-        cd.dailyLog[day].meals.push({ name: m.meal_name || 'Onbekend', type: m.meal_type || 'other', calories: m.calories || 0, protein: parseFloat(m.protein) || 0, carbs: parseFloat(m.carbs) || 0, fat: parseFloat(m.fat) || 0, time: m.consumed_at })
+        // Alles wat het inzicht-paneel nodig heeft om de maaltijd als kaart te
+        // tonen en open te klappen: ingrediënten (bij eigen maaltijden al
+        // uitgeschreven, bij planmaaltijden als verwijzing), foto, hoeveelheid.
+        cd.dailyLog[day].meals.push({
+          id: m.id, name: m.meal_name || 'Onbekend', type: m.meal_type || 'other',
+          calories: m.calories || 0, protein: parseFloat(m.protein) || 0, carbs: parseFloat(m.carbs) || 0, fat: parseFloat(m.fat) || 0,
+          time: m.consumed_at, meal_id: m.meal_id || null, source: m.source || null,
+          ingredients: Array.isArray(m.ingredients) ? m.ingredients : [],
+          image_url: m.image_url || null, amount: m.amount != null ? Number(m.amount) : null, per_unit: m.per_unit || null,
+          notes: m.notes || null,
+        })
         if (day === todayStr) {
           cd.todayMeals.push(m)
           cd.todayTotals.calories += m.calories || 0

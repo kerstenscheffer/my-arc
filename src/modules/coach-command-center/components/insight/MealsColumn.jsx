@@ -4,8 +4,11 @@
 // v1.2 — ClientDocumentsSection toegevoegd
 
 import React, { useEffect, useState } from 'react'
-import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet } from 'lucide-react'
+import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet, Info } from 'lucide-react'
 import GeneratePlanModal from './GeneratePlanModal'
+import MealCard from '../../../meal-plan/components/day-schedule/MealCard'
+import BladModal from '../../../workout/components/todays-workout/components/BladModal'
+import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 import ClientDocumentsSection from './ClientDocumentsSection'
 import SupplementTrouw from './SupplementTrouw'
 
@@ -157,10 +160,75 @@ const waterKnop = {
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
+const tijdVan = (iso) => {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// De gelogde ingrediënten zijn op twee manieren opgeslagen: eigen maaltijden
+// van de klant (my_meals) al uitgeschreven met naam en macro's; maaltijden
+// uit het plan (plan_check) als verwijzing naar ai_ingredients. Beide komen
+// hier uit als dezelfde vorm.
+async function schrijfIngredientenUit(db, lijst) {
+  const rijen = Array.isArray(lijst) ? lijst : []
+  if (rijen.length === 0) return []
+  const uitgeschreven = rijen.filter(r => r?.name)
+  if (uitgeschreven.length === rijen.length) {
+    return uitgeschreven.map(r => ({
+      name: r.name, amount: Number(r.amount) || 0, unit: r.unit || 'g',
+      calories: Number(r.calories) || 0, protein: Number(r.protein) || 0,
+      carbs: Number(r.carbs) || 0, fat: Number(r.fat) || 0,
+    }))
+  }
+  const ids = [...new Set(rijen.map(r => r?.ingredient_id).filter(Boolean))]
+  if (ids.length === 0 || !db?.supabase) return []
+  try {
+    const { data, error } = await db.supabase
+      .from('ai_ingredients')
+      .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g')
+      .in('id', ids)
+    if (error) throw error
+    const opId = new Map((data || []).map(i => [i.id, i]))
+    return rijen.map(r => {
+      const b = opId.get(r.ingredient_id)
+      if (!b) return null
+      const gram = Number(r.amount) || 0
+      const deel = gram / 100
+      return {
+        name: b.name, amount: gram, unit: r.unit || 'gram',
+        calories: Math.round((b.calories_per_100g || 0) * deel),
+        protein: Math.round((b.protein_per_100g || 0) * deel * 10) / 10,
+        carbs: Math.round((b.carbs_per_100g || 0) * deel * 10) / 10,
+        fat: Math.round((b.fat_per_100g || 0) * deel * 10) / 10,
+      }
+    }).filter(Boolean)
+  } catch (e) {
+    console.error('Ingrediënten uitschrijven mislukt:', e)
+    return []
+  }
+}
+
+const eenheid = (u) => (u === 'gram' || u === 'g') ? 'g' : u === 'ml' ? ' ml' : u === 'portion' ? ' portie' : ` ${u || ''}`
+
 export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan, onClose, db, coachId, onGeneratePlan }) {
   const [view, setView] = useState('days')
   const [selectedDay, setSelectedDay] = useState(null)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
+  // Gelogde maaltijd waarvan het info-blad open staat, plus zijn ingrediënten.
+  const [infoMeal, setInfoMeal] = useState(null)
+  const [infoIngredienten, setInfoIngredienten] = useState(null)
+
+  const openInfo = async (meal) => {
+    setInfoMeal(meal)
+    setInfoIngredienten(null)
+    const uit = await schrijfIngredientenUit(db, meal.ingredients)
+    setInfoIngredienten(uit)
+  }
+  const sluitInfo = () => { setInfoMeal(null); setInfoIngredienten(null) }
+
+  const bronLabel = { my_meals: 'Eigen maaltijd', plan_check: 'Uit het plan', myarc: 'Product', recent: 'Recent', recent_relog: 'Recent', quick_add: 'Snel toegevoegd' }
 
   const targets = mealData.targets
   const today = mealData.todayTotals
@@ -169,8 +237,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
 
   const pct = (val, target) => target > 0 ? Math.min(100, Math.round((val / target) * 100)) : 0
   const pctColor = (p) => p >= 90 ? '#10b981' : p >= 70 ? '#f59e0b' : '#ef4444'
-  const mealTypeLabel = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner', snack: 'Snack', quick_add: 'Quick Add', custom_meal: 'Custom', custom: 'Overig' }
-  const mealTypeColor = { breakfast: '#f59e0b', lunch: '#10b981', dinner: '#3b82f6', snack: '#a855f7', quick_add: '#6b7280' }
+  const mealTypeLabel = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner', snack: 'Snack', quick_add: 'Snel toegevoegd', custom_meal: 'Eigen maaltijd', custom: 'Overig', other: 'Overig' }
 
   const MacroBar = ({ items }) => (
     <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -204,8 +271,8 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <button onClick={() => { setView('days'); setSelectedDay(null) }} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}><ArrowLeft size={14} /></button>
-          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>{formatDate(selectedDay)}</span>
-          <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>{dayData.count} items</span>
+          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{formatDate(selectedDay)}</span>
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{dayData.count} gelogd</span>
         </div>
         {targets && <MacroBar items={[
           { label: 'KCAL', val: Math.round(dayData.calories), target: targets.calories },
@@ -213,27 +280,93 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
           { label: 'CARBS', val: Math.round(dayData.carbs), target: targets.carbs },
           { label: 'VET', val: Math.round(dayData.fat), target: targets.fat }
         ]} />}
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingTop: '0.5rem' }}>
           {sortedTypes.map(type => (
-            <div key={type}>
-              <div style={{ padding: isMobile ? '0.4rem 0.75rem' : '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: mealTypeColor[type] || 'rgba(255,255,255,0.3)' }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: '700', color: mealTypeColor[type] || 'rgba(255,255,255,0.4)', letterSpacing: '-0.01em' }}>{mealTypeLabel[type] || type}</span>
+            <div key={type} style={{ marginBottom: '0.5rem' }}>
+              {/* Sectiekop: bold wit, sentence case. Geen gekleurde stip; het
+                  moment staat ook al op de foto van elke kaart. */}
+              <div style={{ padding: isMobile ? '0.25rem 0.9rem 0.4rem' : '0.3rem 1.25rem 0.5rem', fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
+                {mealTypeLabel[type] || type}
               </div>
               {grouped[type].map((meal, mIdx) => (
-                <div key={mIdx} style={{ padding: isMobile ? '0.4rem 0.75rem 0.4rem 1.25rem' : '0.5rem 1rem 0.5rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.name}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#fff' }}>{meal.calories}</span>
-                    <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>E:{Math.round(meal.protein)}</span>
-                  </div>
-                </div>
+                <MealCard
+                  key={meal.id || mIdx}
+                  meal={{
+                    name: meal.name, image_url: meal.image_url,
+                    slot: type,
+                    calories: meal.calories, protein: meal.protein, carbs: meal.carbs, fat: meal.fat,
+                  }}
+                  momentLabel={mealTypeLabel[type] || type}
+                  tijdLabel={tijdVan(meal.time)}
+                  // Een los product zonder ingrediënten: de hoeveelheid is wat je wilt weten.
+                  ondertitel={(!meal.ingredients?.length && meal.amount > 0) ? `${Math.round(meal.amount * 10) / 10}${eenheid(meal.per_unit)}` : null}
+                  isMobile={isMobile}
+                  acties={[{ icon: <Info size={isMobile ? 11 : 12} />, label: 'Info', onClick: () => openInfo(meal) }]}
+                />
               ))}
             </div>
           ))}
         </div>
+
+        {/* Wat zat erin? Zelfde blad als in het wisselvenster van de klant. */}
+        <BladModal open={!!infoMeal} titel={infoMeal?.name || 'Maaltijd'} onClose={sluitInfo} zIndex={10600}>
+          {infoMeal && (
+            <>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: '0.75rem' }}>
+                {[bronLabel[infoMeal.source] || null, tijdVan(infoMeal.time), formatDate(selectedDay)].filter(Boolean).join(' · ')}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                {[
+                  { label: 'kcal', waarde: Math.round(infoMeal.calories || 0) },
+                  { label: 'eiwit', waarde: `${Math.round(infoMeal.protein || 0)}g` },
+                  { label: 'koolh', waarde: `${Math.round(infoMeal.carbs || 0)}g` },
+                  { label: 'vet', waarde: `${Math.round(infoMeal.fat || 0)}g` },
+                ].map(x => (
+                  <div key={x.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0.5rem 0.25rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>{x.waarde}</div>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{x.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {infoMeal.notes && (
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: '0.9rem', lineHeight: 1.4 }}>
+                  {infoMeal.notes}
+                </div>
+              )}
+
+              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>
+                Ingrediënten
+              </div>
+              {infoIngredienten === null ? (
+                <div style={{ padding: '1rem 0', color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem' }}>Laden…</div>
+              ) : infoIngredienten.length === 0 ? (
+                <div style={{ padding: '0.5rem 0 1rem', color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', fontWeight: 700 }}>
+                  {infoMeal.amount > 0
+                    ? `Los product: ${Math.round(infoMeal.amount * 10) / 10}${eenheid(infoMeal.per_unit)}.`
+                    : 'Van deze maaltijd zijn geen ingrediënten gelogd.'}
+                </div>
+              ) : (
+                <div style={{ margin: '0 -1.25rem 1rem' }}>
+                  {infoIngredienten.map((ing, i) => (
+                    <MealCard
+                      key={`${ing.name}-${i}`}
+                      meal={{
+                        name: ing.name,
+                        image_url: foodImageFallback(ing.name, null, 200),
+                        calories: ing.calories, protein: ing.protein, carbs: ing.carbs, fat: ing.fat,
+                      }}
+                      momentLabel=""
+                      rechts={`${ing.amount}${eenheid(ing.unit)}`}
+                      isMobile={isMobile}
+                      acties={[]}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </BladModal>
       </div>
     )
   }
