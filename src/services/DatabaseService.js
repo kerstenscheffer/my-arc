@@ -3,6 +3,7 @@
 
 import { supabase, signUpNewClient } from '../lib/supabase'
 import { KLASSIEKE_SJABLONEN_FILTER } from '../lib/mealTemplateTypes'
+import { standaardWeekindeling } from '../modules/client-agenda/standaardWeekindeling'
 import { extendDatabaseService } from './DatabaseServiceOptimized'
 import NotificationService from '../modules/notifications/NotificationService';
 
@@ -1301,16 +1302,12 @@ async getClientSchemas(clientId) {
     }
   }
 
-  // Default week-schedule uit een plan-structuur: verdeel de trainingsdagen over
-  // Ma/Wo/Vr/Zo/Di/Do/Za (zelfde volgorde als de client-app's default). Geeft de
-  // mapping { 'Monday': 'dag1', ... } terug (hoofdletter-weekdag = schema-formaat).
+  // Default week-schedule uit een plan-structuur: dezelfde spreiding als de
+  // agenda én de database-trigger `vul_workout_schedule_bij_toewijzing`
+  // (2x = ma/do, 3x = ma/wo/vr, …). Drie plekken, één regel. Geeft de mapping
+  // { 'Monday': 'dag1', ... } terug (hoofdletter-weekdag = schema-formaat).
   _defaultScheduleFromStructure(weekStructure) {
-    const days = (weekStructure && typeof weekStructure === 'object') ? Object.keys(weekStructure) : []
-    if (!days.length) return null
-    const slots = ['Monday', 'Wednesday', 'Friday', 'Sunday', 'Tuesday', 'Thursday', 'Saturday']
-    const schedule = {}
-    days.forEach((d, i) => { if (slots[i]) schedule[slots[i]] = d })
-    return schedule
+    return standaardWeekindeling(weekStructure)
   }
 
   // Wijs een template (is_template=true) toe aan een klant: maak een nieuwe

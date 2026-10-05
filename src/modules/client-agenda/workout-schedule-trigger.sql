@@ -1,0 +1,23 @@
+-- src/modules/client-agenda/workout-schedule-trigger.sql
+--
+-- Toegepast op de database via migratie `workout_schedule_bij_toewijzing`
+-- (5 okt 2026); hier bewaard zodat de regel in het repo staat.
+--
+-- Trigger op clients (BEFORE INSERT OR UPDATE OF assigned_schema_id): krijgt
+-- een klant een ander actief trainingsplan, dan vult de database meteen
+-- clients.workout_schedule — tenzij de schrijfactie zelf al een indeling
+-- meegeeft. Zo staat een toegewezen plan direct in de agenda, via welke knop
+-- of welk script de toewijzing ook binnenkomt.
+--
+-- Waarom: op 5 okt 2026 kreeg Erwin van den Bosch een 2x-plan via de
+-- Workout Builder, en die zette alleen assigned_schema_id. De dagen stonden
+-- nergens, dus de agenda bleef leeg terwijl de coach doorging met het
+-- maaltijdplan.
+--
+-- Zelfde keuze als standaardWeekindeling.js:
+--   1. voorkeursdagen van de klant (preferred_training_days, nl-afkortingen)
+--   2. een nette spreiding met rust ertussen (2x = ma/do, 3x = ma/wo/vr, …)
+--   3. de rest van de week
+--
+-- Definitie: zie de migratie (supabase migrations, naam hierboven). Bij
+-- wijzigen: migratie opnieuw aanmaken én dit bestand bijwerken.
