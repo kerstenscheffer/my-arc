@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, Plus, Trash2, Save, Copy, Zap, ChefHat, Check } from 'lucide-react'
 import { resolveFoodImage } from '../../../meal-plan/foodImageFallback'
+import { portieInfo, stapPortie, portieLabel, isHelePortie, portieUitleg } from './portie'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -50,7 +51,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
       let dbRows = {}
       if (uuids.length > 0 && db?.supabase) {
         const { data } = await db.supabase.from('ai_ingredients')
-          .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, min_portion_gram, max_portion_gram, default_portion_gram, scalable, unit_type')
+          .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, min_portion_gram, max_portion_gram, default_portion_gram, scalable, unit_type, eenheid, gram_per_eenheid')
           .in('id', uuids)
         if (data) data.forEach(r => { dbRows[r.id] = r })
       }
@@ -61,7 +62,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
         const amount = item.amount || d.default_portion_gram || 100
         // Geen min_portion_gram-ondergrens bij handmatig bewerken — de coach mag
         // vrij omlaag (0 = ondergrens). Voorheen zat je vast op bv. 100g.
-        return { ingredient_id: item.ingredient_id, name: d.name, amount, unit: item.unit || 'gram', cal: d.calories_per_100g, prot: d.protein_per_100g, carbs: d.carbs_per_100g, fat: d.fat_per_100g, min: 0, max: Infinity, scalable: d.scalable !== false }
+        return { ingredient_id: item.ingredient_id, name: d.name, amount, unit: item.unit || 'gram', cal: d.calories_per_100g, prot: d.protein_per_100g, carbs: d.carbs_per_100g, fat: d.fat_per_100g, min: 0, max: Infinity, scalable: d.scalable !== false, portie: portieInfo(d) }
       }).filter(Boolean)
       setIngredients(built)
 
@@ -110,13 +111,17 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
       return { ...i, amount: safe }
     }))
   }
-  // Stapgrootte schaalt mee met de portie: <50g→5, ≥50→10, ≥100→25, ≥200→50, ≥500→100
+  // Heeft het ingrediënt een eenheid (plakje, stuk, eetlepel), dan stapt de
+  // knop per hele portie: van 21g kaas met 13g per plak naar 26 of 13, niet
+  // naar 26 of 16. Zonder eenheid schaalt de stap mee met de hoeveelheid:
+  // <50g→5, ≥50→10, ≥100→25, ≥200→50, ≥500→100.
   const stepFor = (v) => v >= 500 ? 100 : v >= 200 ? 50 : v >= 100 ? 25 : v >= 50 ? 10 : 5
   const stepAmount = (idx, dir) => {
     setIngredients(prev => prev.map((i, n) => {
       if (n !== idx) return i
       const cur = parseFloat(i.amount) || 0
-      const next = Math.min(i.max, Math.max(i.min, cur + dir * stepFor(cur)))
+      const ruw = i.portie ? stapPortie(cur, i.portie, dir) : cur + dir * stepFor(cur)
+      const next = Math.min(i.max, Math.max(i.min, ruw))
       return { ...i, amount: next }
     }))
   }
@@ -131,7 +136,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
     setSearching(true)
     let query = db.supabase
       .from('ai_ingredients')
-      .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, min_portion_gram, max_portion_gram, default_portion_gram, scalable, source')
+      .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, min_portion_gram, max_portion_gram, default_portion_gram, scalable, source, eenheid, gram_per_eenheid')
       .ilike('name', `%${val}%`)
     if (!fullBase) query = query.eq('source', 'coach')
     const { data } = await query.order('source', { ascending: true }).limit(fullBase ? 40 : 20)
@@ -152,7 +157,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
 
   const addIngredient = (row) => {
     if (ingredients.some(i => i.ingredient_id === row.id)) return
-    setIngredients(prev => [...prev, { ingredient_id: row.id, name: row.name, amount: row.default_portion_gram||100, unit: 'gram', cal: row.calories_per_100g, prot: row.protein_per_100g, carbs: row.carbs_per_100g, fat: row.fat_per_100g, min: 0, max: Infinity, scalable: row.scalable!==false }])
+    setIngredients(prev => [...prev, { ingredient_id: row.id, name: row.name, amount: row.default_portion_gram||100, unit: 'gram', cal: row.calories_per_100g, prot: row.protein_per_100g, carbs: row.carbs_per_100g, fat: row.fat_per_100g, min: 0, max: Infinity, scalable: row.scalable!==false, portie: portieInfo(row) }])
     setDbCache(prev => ({ ...prev, [row.id]: row }))
     setSearchQuery(''); setSearchResults([]); setShowSearch(false)
   }
@@ -382,15 +387,25 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
                       <div style={{ fontSize: m?'0.85rem':'0.9rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.015em' }}>{ing.name}</div>
                       <div style={{ fontSize: m?'0.64rem':'0.68rem', color: 'rgba(255,255,255,0.4)', marginTop: 2, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                         <span style={{ color: 'rgba(255,255,255,0.7)' }}>{Math.round(ing.cal)}</span> kcal · {Math.round(ing.prot)}g eiwit <span style={{ opacity: 0.6 }}>per 100g</span>
+                        {ing.portie && <span style={{ opacity: 0.6 }}> · {portieUitleg(ing.portie)}</span>}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem', flexShrink: 0 }}>
-                      <button onClick={() => stepAmount(idx, -1)} style={stepAmtBtn(m)}>−</button>
-                      <span style={{ display: 'inline-flex', alignItems: 'baseline' }}>
-                        <input type="number" value={ing.amount} min={ing.min} max={ing.max} onChange={e => updateAmount(idx, e.target.value)} onBlur={() => commitAmount(idx)} onFocus={e => e.target.select()} style={{ width: m?'40px':'46px', textAlign: 'right', padding: 0, background: 'transparent', border: 'none', color: '#fff', fontSize: m?'0.95rem':'1.05rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none' }} />
-                        <span style={{ fontSize: m?'0.72rem':'0.78rem', color: '#fff', fontWeight: 800, marginLeft: 1 }}>g</span>
-                      </span>
-                      <button onClick={() => stepAmount(idx, 1)} style={stepAmtBtn(m)}>+</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
+                        <button onClick={() => stepAmount(idx, -1)} style={stepAmtBtn(m)}>−</button>
+                        <span style={{ display: 'inline-flex', alignItems: 'baseline' }}>
+                          <input type="number" value={ing.amount} min={ing.min} max={ing.max} onChange={e => updateAmount(idx, e.target.value)} onBlur={() => commitAmount(idx)} onFocus={e => e.target.select()} style={{ width: m?'40px':'46px', textAlign: 'right', padding: 0, background: 'transparent', border: 'none', color: '#fff', fontSize: m?'0.95rem':'1.05rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none' }} />
+                          <span style={{ fontSize: m?'0.72rem':'0.78rem', color: '#fff', fontWeight: 800, marginLeft: 1 }}>g</span>
+                        </span>
+                        <button onClick={() => stepAmount(idx, 1)} style={stepAmtBtn(m)}>+</button>
+                      </div>
+                      {ing.portie && (
+                        // Wit als het een hele portie is, gedimd als de grammen
+                        // ertussenin zitten (1,6 plakje). Niet blokkeren, wel laten zien.
+                        <span style={{ fontSize: m?'0.62rem':'0.66rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: isHelePortie(ing.amount, ing.portie) ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.35)' }}>
+                          {portieLabel(ing.amount, ing.portie)}
+                        </span>
+                      )}
                     </div>
                     <button onClick={() => removeIngredient(idx)} style={{ width: 30, height: 30, flexShrink: 0, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Trash2 size={14} /></button>
                   </div>
