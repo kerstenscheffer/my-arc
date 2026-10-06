@@ -4,6 +4,7 @@
 // Keeps ALL existing functionality, upgrades styling to golden theme
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { fotoWeergaveUrl } from '../fotoWeergave'
 import { 
   Camera, Upload, Trash2, ChevronLeft, ChevronRight,
   Calendar, Check, X, Loader2, Image, ZoomIn,
@@ -698,7 +699,7 @@ function CompareView({ photos, isMobile, onClose }) {
           }}>
             {photo && (photo.photo_url || photo.url || photo.image_url) ? (
               <img
-                src={photo.photo_url || photo.url || photo.image_url}
+                src={fotoWeergaveUrl(photo.photo_url || photo.url || photo.image_url, { breedte: 700 })}
                 alt={`Compare ${idx + 1}`}
                 style={{
                   width: '100%',

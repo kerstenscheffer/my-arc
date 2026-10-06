@@ -9,6 +9,7 @@
 // zijn, met de overlay eroverheen zodat het altijd branded oogt.
 
 import { useEffect, useRef, useState } from 'react'
+import { fotoWeergaveUrl } from '../fotoWeergave'
 import { Download, Loader } from 'lucide-react'
 
 const W = 1080, H = 1350
@@ -123,8 +124,8 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
     ;(async () => {
       try {
         const [imgA, imgB, overlay] = await Promise.all([
-          loadImg(pair.first.photo_url, true),
-          loadImg(pair.last.photo_url, true),
+          loadImg(fotoWeergaveUrl(pair.first.photo_url, { breedte: 1000, kwaliteit: 85 }), true),
+          loadImg(fotoWeergaveUrl(pair.last.photo_url, { breedte: 1000, kwaliteit: 85 }), true),
           loadImg(OVERLAY_SRC, false),
         ])
         if (cancelled) return

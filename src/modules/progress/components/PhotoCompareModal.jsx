@@ -12,6 +12,7 @@
 // twee foto's los in nieuwe tabbladen in plaats van stil te falen.
 
 import React, { useState, useEffect, useMemo } from 'react'
+import { fotoWeergaveUrl } from '../fotoWeergave'
 import { createPortal } from 'react-dom'
 import { X, ArrowRight, Download, ArrowLeftRight } from 'lucide-react'
 
@@ -141,7 +142,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4', borderRadius: 12, overflow: 'hidden', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}>
         {photo ? (
-          <img src={photo.photo_url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={fotoWeergaveUrl(photo.photo_url, { breedte: 900, kwaliteit: 85 })} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', fontWeight: 700 }}>Geen foto</div>
         )}

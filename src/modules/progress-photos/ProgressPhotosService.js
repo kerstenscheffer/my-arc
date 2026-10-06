@@ -1,4 +1,5 @@
 // src/modules/progress-photos/ProgressPhotosService.js
+import { naarJpeg } from '../progress/fotoWeergave'
 class ProgressPhotosService {
   constructor(databaseService) {
     this.db = databaseService
@@ -229,6 +230,9 @@ class ProgressPhotosService {
       
       console.log('Uploading:', { fileName, dbPhotoType, category })
       
+      // iPhone-HEIC eerst naar JPEG (lukt dat niet, dan het origineel).
+      file = await naarJpeg(file)
+
       // Upload to storage
       const { data: uploadData, error: uploadError } = await this.supabase.storage
         .from(this.bucketName)

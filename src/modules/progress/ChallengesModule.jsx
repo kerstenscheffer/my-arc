@@ -1,4 +1,5 @@
 import useIsMobile from '../../hooks/useIsMobile'
+import { fotoWeergaveUrl } from './fotoWeergave'
 import React, { useState, useEffect } from 'react'
 import { 
   Camera, Plus, Calendar, Lock, Unlock, Download,
@@ -110,7 +111,7 @@ export default function PhotosModule({ client, db }) {
         }}
       >
         <img
-          src={photo.signedUrl || photo.photo_url}
+          src={photo.signedUrl || fotoWeergaveUrl(photo.photo_url, { breedte: 900, kwaliteit: 85 })}
           alt={`Progress ${index + 1}`}
           style={{
             width: '100%',
@@ -442,7 +443,7 @@ export default function PhotosModule({ client, db }) {
               {index === 0 ? 'Voor' : 'Na'}
             </div>
             <img
-              src={photo.signedUrl || photo.photo_url}
+              src={photo.signedUrl || fotoWeergaveUrl(photo.photo_url, { breedte: 900, kwaliteit: 85 })}
               alt={index === 0 ? 'Before' : 'After'}
               style={{
                 width: '100%',

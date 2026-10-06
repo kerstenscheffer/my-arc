@@ -1,4 +1,5 @@
 import useIsMobile from '../../hooks/useIsMobile'
+import { fotoWeergaveUrl } from '../../modules/progress/fotoWeergave'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   TrendingUp, Target, Calendar, Activity, Award, Camera, Plus,
@@ -711,7 +712,7 @@ export default function ClientProgress({ client, db, onNavigate }) {
               <>
                 <div>
                   <img
-                    src={selectedPhotos[0].photo_url}
+                    src={fotoWeergaveUrl(selectedPhotos[0].photo_url, { breedte: 900, kwaliteit: 85 })}
                     alt="Before"
                     style={{
                       width: '100%',
@@ -725,7 +726,7 @@ export default function ClientProgress({ client, db, onNavigate }) {
                 </div>
                 <div>
                   <img
-                    src={selectedPhotos[1].photo_url}
+                    src={fotoWeergaveUrl(selectedPhotos[1].photo_url, { breedte: 900, kwaliteit: 85 })}
                     alt="After"
                     style={{
                       width: '100%',
@@ -768,7 +769,7 @@ export default function ClientProgress({ client, db, onNavigate }) {
                 }}
               >
                 <img
-                  src={photo.photo_url || `/api/placeholder/200/200`}
+                  src={photo.photo_url ? fotoWeergaveUrl(photo.photo_url, { breedte: 400 }) : `/api/placeholder/200/200`}
                   alt={`Progress ${index + 1}`}
                   style={{
                     width: '100%',

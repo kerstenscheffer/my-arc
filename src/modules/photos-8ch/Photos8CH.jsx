@@ -1,5 +1,6 @@
 // src/modules/photos-8ch/Photos8CH.jsx
 import React, { useState, useEffect } from 'react'
+import { fotoWeergaveUrl } from '../progress/fotoWeergave'
 import Photos8CHService from './Photos8CHService'
 import PhotoUploader from './components/PhotoUploader'
 import FridayTracker from './components/FridayTracker'
@@ -659,7 +660,7 @@ export default function Photos8CH({ db, client }) {
         background: '#0a0a0a'
       }}>
         <img
-          src={photo.photo_url}
+          src={fotoWeergaveUrl(photo.photo_url, { breedte: 900, kwaliteit: 85 })}
           alt={`${type} photo`}
           style={{
             width: '100%',
