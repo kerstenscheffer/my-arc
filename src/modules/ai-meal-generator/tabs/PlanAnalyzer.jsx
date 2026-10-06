@@ -26,6 +26,7 @@ import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
+import { pasSupplementenToe } from './plan-analyzer/sjabloonExtras'
 import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
@@ -958,11 +959,29 @@ export default function PlanAnalyzer({
   // Laad een opgeslagen full_week-plan uit de bibliotheek en pas het toe op het
   // huidige (client-)plan. Reconstrueert via dezelfde hydrate-helper als een
   // normale plan-load, en persisteert naar het actieve planMeta.id.
-  const handleLoadSavedPlan = async (ws, name) => {
+  //
+  // `extra` komt uit het sjabloon: de pre-workout maaltijd en de supplementen.
+  // De pre-workout gaat in de eigen kolom van het plan (en dus automatisch op
+  // de trainingsdagen van déze klant); de supplementen op het actieve
+  // supplementenplan van de klant, met de trainingsdagen-regel ingevuld.
+  const handleLoadSavedPlan = async (ws, name, extra = {}) => {
     if (!ws) return
     const days = await hydrateWeekStructure(ws)
     if (!days) return
     const planId = actievePlanId
+    const preWorkoutUitSjabloon = extra?.pre_workout_meal || null
+    const pasExtrasToe = async () => {
+      if (!extra?.supplements?.length || !resolvedClientId) return
+      try {
+        const geschreven = await pasSupplementenToe(db.supabase, {
+          clientId: resolvedClientId, coachId, items: extra.supplements, trainingDayKeys,
+        })
+        if (geschreven) {
+          laadSupplementen(db.supabase, resolvedClientId).then(setSupplementen)
+          setAgendaRefreshKey(k => k + 1)
+        }
+      } catch (e) { console.error('❌ Supplementen uit sjabloon toepassen mislukt:', e) }
+    }
     // Geen open plan maar wél een client (bv. een sjabloon toepassen op een verse
     // klant zoals Lisa) → maak direct een nieuw client_meal_plans-plan aan, zodat
     // het geladen sjabloon ook écht opslaat (persistWeekData no-opt zonder plan-id).
@@ -973,10 +992,12 @@ export default function PlanAnalyzer({
       try {
         const { data, error } = await db.supabase
           .from('client_meal_plans')
-          .insert([{ client_id: resolvedClientId, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false }])
+          .insert([{ client_id: resolvedClientId, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false, pre_workout_meal: preWorkoutUitSjabloon }])
           .select('id').single()
         if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
         setSelectedConceptId(data.id)
+        if (preWorkoutUitSjabloon) setPreWorkoutMeal(preWorkoutUitSjabloon)
+        await pasExtrasToe()
         loadAllPlanCount(resolvedClientId)
         setWeekData(days); pushHistory(days, `Plan geladen: ${name || 'sjabloon'}`)
         setAgendaRefreshKey(k => k + 1)
@@ -990,6 +1011,8 @@ export default function PlanAnalyzer({
       return
     }
     await applyWeekUpdate(days, `Plan geladen: ${name || 'opgeslagen plan'}`)
+    if (preWorkoutUitSjabloon) await bewaarPreWorkout(preWorkoutUitSjabloon)
+    await pasExtrasToe()
     setShowPlanLibrary(false)
     setDockedSection(null)
   }
@@ -1350,6 +1373,7 @@ export default function PlanAnalyzer({
         {showPlanLibrary && (
           <PlanLibraryModal db={db} coachId={coachId} isMobile={m}
             weekData={weekData} planMeta={planMeta}
+            preWorkoutMeal={preWorkoutMeal} supplementen={supplementen} trainingDayKeys={trainingDayKeys}
             clientName={clientRecord?.first_name || ''}
             onLoad={handleLoadSavedPlan}
             onClose={() => setShowPlanLibrary(false)} />
@@ -2197,6 +2221,7 @@ export default function PlanAnalyzer({
       {showPlanLibrary && (
         <PlanLibraryModal db={db} coachId={coachId} isMobile={m}
           weekData={weekData} planMeta={planMeta}
+          preWorkoutMeal={preWorkoutMeal} supplementen={supplementen} trainingDayKeys={trainingDayKeys}
           clientName={clientRecord?.first_name || ''}
           onLoad={handleLoadSavedPlan}
           onClose={() => setShowPlanLibrary(false)} />

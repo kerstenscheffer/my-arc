@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Trash2, Pencil, Check, ChevronRight, Copy, AlertTriangle, Bookmark } from 'lucide-react'
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
+import { pasSupplementenToe, dagIndicesNaarSleutels, extrasSamenvatting } from './sjabloonExtras'
 
 export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onSaveAsTemplate, onClose, isMobile, embedded = false }) {
   const modalHost = useModalHost()
@@ -53,7 +54,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
       // met coach_id = null zijn opgeslagen.
       let query = db.supabase
         .from('meal_plan_templates')
-        .select('id, name, emoji, description, plan_type, daily_calories, daily_protein, daily_carbs, daily_fat, base_macros, week_structure, created_at, meals_per_day')
+        .select('id, name, emoji, description, plan_type, daily_calories, daily_protein, daily_carbs, daily_fat, base_macros, week_structure, created_at, meals_per_day, pre_workout_meal, supplements')
         .order('created_at', { ascending: false })
       if (coachId) query = query.or(`coach_id.is.null,coach_id.eq.${coachId}`)
 
@@ -185,6 +186,9 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
         daily_carbs: template.daily_carbs || macros.carbs,
         daily_fat: template.daily_fat || macros.fat,
         week_structure: expandedWeek,
+        // Plan-brede pre-workout uit het sjabloon; de analyzer zet 'm vanzelf
+        // op de trainingsdagen van deze klant.
+        pre_workout_meal: template.pre_workout_meal || null,
         is_active: false,
         created_via: 'template_copy',
         ai_generated: false,
@@ -192,6 +196,16 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
       }
       const { data, error } = await db.supabase.from('client_meal_plans').insert([newPlan]).select('id').single()
       if (error) throw error
+      // Supplementen uit het sjabloon op het supplementenplan van de klant,
+      // met de trainingsdagen-regel ingevuld voor déze klant.
+      if (template.supplements?.length) {
+        try {
+          await pasSupplementenToe(db.supabase, {
+            clientId, coachId, items: template.supplements,
+            trainingDayKeys: dagIndicesNaarSleutels(clientTrainingDays),
+          })
+        } catch (e) { console.error('Supplementen uit sjabloon mislukt:', e) }
+      }
       await loadPlans()
       setCopiedId(template.id)
       // Laad de kopie direct in de analyzer (onSelect zet selectedConceptId +
@@ -389,6 +403,11 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                         </div>
                       )}
                       <Meta items={[kcal && `${kcal} kcal`, protein && `${protein}g eiwit`, tmpl.meals_per_day && `${tmpl.meals_per_day}x per dag`, formatDate(tmpl.created_at), gebruikt > 0 && `${gebruikt}× gebruikt`]} />
+                      {extrasSamenvatting(tmpl) && (
+                        <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', marginTop: 2, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {extrasSamenvatting(tmpl)}
+                        </div>
+                      )}
                     </div>
                     {isCopied ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#22c55e', fontSize: '0.8rem', fontWeight: 900, flexShrink: 0 }}>

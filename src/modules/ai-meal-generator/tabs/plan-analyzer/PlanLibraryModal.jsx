@@ -7,9 +7,13 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Bookmark, Trash2, Download, Loader } from 'lucide-react'
+import { supplementenVoorSjabloon, extrasSamenvatting } from './sjabloonExtras'
 
 export default function PlanLibraryModal({
   db, coachId, weekData, planMeta, clientName = '',
+  // Gaan mee in het sjabloon: de plan-brede pre-workout maaltijd en de
+  // supplementen van de klant (met trainingsdagen als regel, niet letterlijk).
+  preWorkoutMeal = null, supplementen = [], trainingDayKeys = [],
   onLoad, onClose, isMobile, embedded = false,
 }) {
   const modalHost = useModalHost()
@@ -28,7 +32,7 @@ export default function PlanLibraryModal({
     try {
       let q = db.supabase
         .from('meal_plan_templates')
-        .select('id, name, template_name, daily_calories, daily_protein, daily_carbs, daily_fat, week_structure, meals_per_day, created_at')
+        .select('id, name, template_name, daily_calories, daily_protein, daily_carbs, daily_fat, week_structure, meals_per_day, created_at, pre_workout_meal, supplements')
         .eq('plan_type', 'full_week')
         .order('created_at', { ascending: false })
       // Ook de plannen zonder coach tonen. Zeven van de tien full-week plannen
@@ -68,6 +72,8 @@ export default function PlanLibraryModal({
         daily_calories: cal, daily_protein: prot, daily_carbs: carb, daily_fat: fat,
         base_macros: { calories: cal, protein: prot, carbs: carb, fat: fat },
         meals_per_day: mpd,
+        pre_workout_meal: preWorkoutMeal || null,
+        supplements: supplementenVoorSjabloon(supplementen, trainingDayKeys),
         emoji: '📅',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -119,6 +125,11 @@ export default function PlanLibraryModal({
         <div style={{ fontSize: m ? '0.55rem' : '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginBottom: '0.4rem', lineHeight: 1.3 }}>
           Voor hergebruik bij andere clients — hernoemt dit plan niet.
         </div>
+        {extrasSamenvatting({ pre_workout_meal: preWorkoutMeal, supplements: supplementen }) && (
+          <div style={{ fontSize: m ? '0.6rem' : '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: '0.45rem' }}>
+            Gaat mee: {extrasSamenvatting({ pre_workout_meal: preWorkoutMeal, supplements: supplementen })}
+          </div>
+        )}
         <input
           value={name}
           onChange={e => { setName(e.target.value); setError('') }}
@@ -155,8 +166,13 @@ export default function PlanLibraryModal({
                 {p.meals_per_day ? <span>· {p.meals_per_day} meals</span> : null}
                 {p.created_at ? <span>· {fmtDate(p.created_at)}</span> : null}
               </div>
+              {extrasSamenvatting(p) && (
+                <div style={{ fontSize: m ? '0.55rem' : '0.6rem', marginTop: 2, color: 'rgba(255,255,255,0.55)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {extrasSamenvatting(p)}
+                </div>
+              )}
             </div>
-            <button onClick={() => onLoad?.(p.week_structure, p.name || p.template_name)} title="Dit plan laden in het huidige plan"
+            <button onClick={() => onLoad?.(p.week_structure, p.name || p.template_name, { pre_workout_meal: p.pre_workout_meal || null, supplements: p.supplements || [] })} title="Dit plan laden in het huidige plan"
               style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.6rem', flexShrink: 0, background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.35)', borderRadius: 6, color: '#FFD700', fontSize: m ? '0.68rem' : '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
               <Download size={13} /> Laden
             </button>
