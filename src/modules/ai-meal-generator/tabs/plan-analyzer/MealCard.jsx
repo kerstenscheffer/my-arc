@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays } from 'lucide-react'
+import { portieInfo, stapPortie, portieLabel, portieUitleg } from './portie'
 import MealEditModal from './MealEditModal'
 
 const GOLD = '#FFD700'
@@ -138,7 +139,7 @@ export default function MealCard({
     if (uuids.length === 0) return
     const load = async () => {
       setLoadingScaler(true)
-      const { data } = await db.supabase.from('ai_ingredients').select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, min_portion_gram, max_portion_gram, default_portion_gram, scalable').in('id', uuids)
+      const { data } = await db.supabase.from('ai_ingredients').select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, min_portion_gram, max_portion_gram, default_portion_gram, scalable, eenheid, gram_per_eenheid').in('id', uuids)
       if (data) {
         const map = {}; data.forEach(r => { map[r.id] = r }); setScalerData(map)
         const initial = {}; ingredientList.forEach(i => { if (i.id && UUID_REGEX.test(i.id)) initial[i.id] = i.amount }); setScalerAmounts(initial)
@@ -163,12 +164,16 @@ export default function MealCard({
     return min
   }
 
+  // Met een eenheid (plakje, stuk, eetlepel) stapt de knop per hele portie;
+  // anders per `delta` gram. Zie portie.js.
   const adjustAmount = (ingredientId, delta) => {
     const dbIng = scalerData?.[ingredientId]
     if (!dbIng || !dbIng.scalable) return
     const min = dbIng.min_portion_gram || 0; const max = dbIng.max_portion_gram || 500
     const current = scalerAmounts[ingredientId] || dbIng.default_portion_gram || 100
-    setScalerAmounts(prev => ({ ...prev, [ingredientId]: Math.min(max, Math.max(min, current + delta)) }))
+    const portie = portieInfo(dbIng)
+    const next = portie ? stapPortie(current, portie, delta) : current + delta
+    setScalerAmounts(prev => ({ ...prev, [ingredientId]: Math.min(max, Math.max(min, next)) }))
   }
 
   const calcScalerMacros = () => {
@@ -519,6 +524,7 @@ export default function MealCard({
             const currentAmount = scalerAmounts[ing.id] ?? ing.amount
             const step = getStep(dbIng); const min = dbIng.min_portion_gram || 0; const max = dbIng.max_portion_gram || 500
             const scalable = dbIng.scalable !== false; const changed = currentAmount !== ing.amount
+            const portie = portieInfo(dbIng)
             return (
               <div key={`${ing.id}-${i}`} style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -535,7 +541,7 @@ export default function MealCard({
                     {dbIng.name}
                   </div>
                   <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)' }}>
-                    {scalable ? `${min}–${max}g · stap ${step}g` : 'niet aanpasbaar'}
+                    {!scalable ? 'niet aanpasbaar' : portie ? `${portieUitleg(portie)} · ${portieLabel(currentAmount, portie)}` : `${min}–${max}g · stap ${step}g`}
                   </div>
                 </div>
                 {scalable ? (
