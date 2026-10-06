@@ -20,6 +20,19 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onCh
       onChange && await onChange()
     } catch (err) { console.error(err); alert('Archiveren mislukt: ' + (err?.message || err)) } finally { setBusy(null) }
   }
+  // Standaardplan: zichtbaar voor ÁLLE klanten in hun wisselvenster, zodat ze
+  // zelf een lichter plan kunnen pakken in een drukke week. De klant krijgt
+  // een eigen kopie (RPC kies_standaard_plan); het sjabloon blijft schoon.
+  const setStandaard = async (tpl, standaard, e) => {
+    e.stopPropagation()
+    if (busy) return
+    setBusy(tpl.id)
+    try {
+      const { error } = await sb.from('workout_schemas').update({ is_public: standaard }).eq('id', tpl.id).eq('is_template', true)
+      if (error) throw error
+      onChange && await onChange()
+    } catch (err) { console.error(err); alert('Opslaan mislukt: ' + (err?.message || err)) } finally { setBusy(null) }
+  }
   const remove = async (tpl, e) => {
     e.stopPropagation()
     if (busy) return
@@ -129,6 +142,11 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onCh
                     <div style={{ minWidth: 0 }}>
                       <h4 style={{ color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600', margin: '0 0 0.25rem 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {template.name}
+                        {template.is_public && (
+                          <span style={{ marginLeft: 8, verticalAlign: 'middle', fontSize: '0.6rem', fontWeight: 900, color: '#000', background: '#fff', borderRadius: 5, padding: '1px 7px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                            Standaard
+                          </span>
+                        )}
                       </h4>
                       <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: isMobile ? '0.8rem' : '0.85rem', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {template.description || 'Geen beschrijving'}
@@ -142,6 +160,11 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onCh
 
                   {/* Archiveer/herstel + verwijder */}
                   <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+                    <button onClick={(e) => setStandaard(template, !template.is_public, e)} disabled={busy === template.id}
+                      title={template.is_public ? 'Standaardplan: klanten kunnen dit zelf kiezen. Klik om uit te zetten.' : 'Maak standaardplan: klanten kunnen dit zelf kiezen in hun wisselvenster'}
+                      style={{ flex: 1, width: 42, background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', color: template.is_public ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: busy === template.id ? 0.4 : 1 }}>
+                      <Users size={16} strokeWidth={template.is_public ? 2.6 : 2} />
+                    </button>
                     <button onClick={(e) => setArchived(template, !template.is_archived, e)} disabled={busy === template.id}
                       title={template.is_archived ? 'Terug uit archief' : 'Archiveren'}
                       style={{ flex: 1, width: 42, background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: busy === template.id ? 0.4 : 1 }}>
