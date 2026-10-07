@@ -362,12 +362,6 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                           {richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)} <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>per week</span>
                         </div>
                       </div>
-                      {dagDoelKcal != null && (
-                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-                          Daarvoor past {getal(dagDoelKcal)} kcal per dag
-                          {tdee?.target_calories ? ` · target op de klant ${getal(tdee.target_calories)}` : ''}
-                        </div>
-                      )}
                     </>
                   ) : (
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
@@ -378,7 +372,42 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                 </div>
               )}
 
-              {regel('Plan geeft', `${getal(planWeek)} kcal`, `${getal(planWeek / 7)} per dag · zeven dagen bij elkaar`)}
+              {/* De drie getallen waar het om draait, per dag: wat hij
+                  verbrandt, wat het plan geeft, en wat hij mag eten om op
+                  het streeftempo te zitten (als de TDEE klopt). */}
+              {tdee !== undefined && (
+                <div style={{ display: 'flex', gap: 6, padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  {[
+                    { label: 'Verbrandt', sub: 'TDEE per dag', waarde: tdee?.tdee ? getal(tdee.tdee) : '?', kleur: '#fff' },
+                    { label: 'Plan geeft', sub: 'per dag', waarde: getal(planWeek / 7), kleur: '#fff' },
+                    {
+                      label: 'Mag eten', sub: 'voor streeftempo',
+                      waarde: dagDoelKcal != null ? getal(dagDoelKcal) : '?',
+                      kleur: dagDoelKcal != null ? (opTempo ? '#22c55e' : '#fff') : 'rgba(255,255,255,0.4)',
+                    },
+                  ].map(x => (
+                    <div key={x.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0.5rem 0.25rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 }}>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: x.kleur, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{x.waarde}</div>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', marginTop: 3, whiteSpace: 'nowrap' }}>{x.label}</div>
+                      <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>{x.sub}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {dagDoelKcal != null && planWeek != null && (
+                <div style={{ padding: '0.45rem 0 0', fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.4, color: Math.abs(planWeek / 7 - dagDoelKcal) <= 50 ? '#22c55e' : '#fff' }}>
+                  {Math.abs(planWeek / 7 - dagDoelKcal) <= 50
+                    ? 'Het plan zit per dag op wat hij mag eten.'
+                    : planWeek / 7 > dagDoelKcal
+                      ? `Het plan geeft ${getal(planWeek / 7 - dagDoelKcal)} kcal per dag meer dan hij mag eten voor het streeftempo.`
+                      : `Het plan geeft ${getal(dagDoelKcal - planWeek / 7)} kcal per dag minder dan hij mag eten; er is ruimte.`}
+                  {tdee?.target_calories && Math.abs(tdee.target_calories - dagDoelKcal) > 100
+                    ? ` De target op de klant staat op ${getal(tdee.target_calories)}; dat wijkt af van wat het tempo vraagt.`
+                    : ''}
+                </div>
+              )}
+
+              {regel('Plan geeft', `${getal(planWeek)} kcal`, 'zeven dagen bij elkaar')}
               {perDag?.eiwitGem > 0 && regel(
                 'Eiwit',
                 `${perDag.eiwitGem} g`,
