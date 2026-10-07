@@ -15,6 +15,7 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Flame } from 'lucide-react'
 import { balkVak, balkVakActief } from './werkbalkStijl'
+import { maakConfig } from '../weight-tracker/utils/coachingBand'
 
 // Vuistregel: ongeveer 7700 kcal per kilo vetweefsel. Een model, geen wet —
 // vandaar dat het scherm er "ongeveer" bij zet.
@@ -97,17 +98,24 @@ function planPerDag(mealPlan) {
 
   const preKcal = Number(mealPlan?.pre_workout_meal?.calories) || 0
 
+  const preEiwit = Number(mealPlan?.pre_workout_meal?.protein) || 0
+
   const dagen = DAGEN.map(dag => {
     const dagplan = week[dag]
     let kcal = Number(dagplan?.totals?.kcal) || 0
+    let eiwit = Number(dagplan?.totals?.protein) || 0
     const training = !!dagplan?.is_training_day
     // Alleen optellen als de dag geen eigen pre-workout slot heeft; anders
     // zit die maaltijd al in het dagtotaal en zou hij dubbel tellen.
-    if (training && preKcal && !dagplan?.[PRE_WORKOUT_SLOT]) kcal += preKcal
-    return { dag, label: DAG_KORT[dag], kcal: Math.round(kcal), training }
+    if (training && preKcal && !dagplan?.[PRE_WORKOUT_SLOT]) { kcal += preKcal; eiwit += preEiwit }
+    return { dag, label: DAG_KORT[dag], kcal: Math.round(kcal), eiwit: Math.round(eiwit), training }
   })
 
-  return { dagen, totaal: dagen.reduce((t, d) => t + d.kcal, 0) }
+  return {
+    dagen,
+    totaal: dagen.reduce((t, d) => t + d.kcal, 0),
+    eiwitGem: Math.round(dagen.reduce((t, d) => t + d.eiwit, 0) / 7),
+  }
 }
 
 // Plus/min-knopje met de afwijking ertussen. Toont bewust "+150" en niet de
@@ -153,6 +161,8 @@ const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   const [open, setOpen] = useState(false)
   const [tdee, setTdee] = useState(undefined)   // undefined = nog laden
+  // Actieve fase (client_phases): doel en streeftempo. null = geen fase.
+  const [fase, setFase] = useState(undefined)
 
   // Wat-als. Alle drie de knoppen zijn afwijkingen van de huidige situatie,
   // niet absolute waarden — zo blijft "terug naar nu" simpelweg alles op nul.
@@ -168,11 +178,20 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
     let leeft = true
     db.supabase
       .from('clients')
-      .select('tdee, target_calories, first_name, daily_steps, activity_level, current_weight')
+      .select('tdee, target_calories, target_protein, target_carbs, target_fat, primary_goal, first_name, daily_steps, activity_level, current_weight, body_fat_percentage, age')
       .eq('id', clientId)
       .maybeSingle()
       .then(({ data }) => { if (leeft) setTdee(data || null) },
             (e) => { console.warn('tdee laden mislukt:', e); if (leeft) setTdee(null) })
+    // Nieuwste fase is de actieve, net als in het fase-paneel.
+    db.supabase
+      .from('client_phases')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('started_on', { ascending: false })
+      .limit(1)
+      .then(({ data }) => { if (leeft) setFase(data?.[0] || null) },
+            (e) => { console.warn('fase laden mislukt:', e); if (leeft) setFase(null) })
     return () => { leeft = false }
   }, [open, tdee, db, clientId])
 
@@ -181,6 +200,31 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   const verbranding = tdee?.tdee ? tdee.tdee * 7 : null
   const tekort = (planWeek != null && verbranding != null) ? verbranding - planWeek : null
   const kilos = tekort != null ? tekort / KCAL_PER_KILO : null
+
+  // ── Doel en streeftempo uit de fase ──
+  // maakConfig is dezelfde rekenaar als de gewichtsgrafiek: richting
+  // (afvallen/aankomen/stabiel), weektempo en de band traag–snel.
+  const config = (tdee && fase !== undefined) ? maakConfig(tdee, fase) : null
+  const richting = config?.richting || null
+  const teken = richting === 'afvallen' ? -1 : richting === 'aankomen' ? 1 : 0
+  const streefKg = config ? teken * (config.tempoKg || 0) : null          // negatief = afvallen
+  const planKg = kilos != null ? -kilos : null                              // negatief = afvallen
+  // Tekort dat bij het streeftempo hoort (positief = minder eten dan verbranden).
+  const streefTekortWeek = streefKg != null ? -streefKg * KCAL_PER_KILO : null
+  const streefPlanWeek = (verbranding != null && streefTekortWeek != null) ? verbranding - streefTekortWeek : null
+  const dagDoelKcal = streefPlanWeek != null ? Math.round(streefPlanWeek / 7) : null
+  // Afwijking van het plan ten opzichte van het streefplan: positief = te veel.
+  const afwijkingWeek = (planWeek != null && streefPlanWeek != null) ? planWeek - streefPlanWeek : null
+  // Op tempo: binnen de band traag–snel, in de goede richting.
+  const opTempo = (() => {
+    if (planKg == null || !config) return null
+    if (richting === 'stabiel') return Math.abs(planKg) <= 0.15
+    const inRichting = teken === Math.sign(planKg) || planKg === 0
+    const abs = Math.abs(planKg)
+    return inRichting && abs >= (config.traagKg || 0) && abs <= (config.snelKg || Infinity)
+  })()
+  const doelLabel = richting === 'afvallen' ? 'Cut' : richting === 'aankomen' ? 'Build' : richting === 'stabiel' ? 'Onderhoud' : null
+  const kgTekst = (n) => `${n < 0 ? '−' : n > 0 ? '+' : ''}${Math.abs(n).toFixed(2)} kg`
 
   // ── Wat-als doorrekenen ──
   const gewicht = Number(tdee?.current_weight) || null
@@ -213,9 +257,9 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
       gap: 10, padding: '0.5rem 0', borderBottom: `1px solid rgba(255,255,255,0.05)`,
     }}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{label}</div>
+        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>{label}</div>
         {toelichting && (
-          <div style={{ fontSize: '0.62rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>{toelichting}</div>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{toelichting}</div>
         )}
       </div>
       <div style={{ fontSize: '0.95rem', fontWeight: 900, color: kleur, whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -254,7 +298,52 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
             </div>
           ) : (
             <>
-              {regel('Plan geeft', `${getal(planWeek)} kcal`, 'zeven dagen bij elkaar')}
+              {/* Doel en streeftempo. Dit is waar je op stuurt; de rest van
+                  het paneel vergelijkt het plan hiermee. */}
+              {fase !== undefined && tdee !== undefined && (
+                <div style={{ padding: '0.5rem 0 0.6rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  {config && doelLabel ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>Doel</div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>{doelLabel}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginTop: 6 }}>
+                        <div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>Streeftempo</div>
+                          {richting !== 'stabiel' && (config.traagKg || config.snelKg) ? (
+                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                              tussen {config.traagKg.toFixed(2)} en {config.snelKg.toFixed(2)} kg per week
+                            </div>
+                          ) : null}
+                        </div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>
+                          {richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)} <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>per week</span>
+                        </div>
+                      </div>
+                      {dagDoelKcal != null && (
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                          Daarvoor past {getal(dagDoelKcal)} kcal per dag
+                          {tdee?.target_calories ? ` · target op de klant ${getal(tdee.target_calories)}` : ''}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
+                      Geen fase ingesteld. Zet in het fase-paneel een doel en weektempo, dan vergelijkt dit paneel het plan daarmee.
+                      {tdee?.target_calories ? ` Target op de klant: ${getal(tdee.target_calories)} kcal.` : ''}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {regel('Plan geeft', `${getal(planWeek)} kcal`, `${getal(planWeek / 7)} per dag · zeven dagen bij elkaar`)}
+              {perDag?.eiwitGem > 0 && regel(
+                'Eiwit',
+                `${perDag.eiwitGem} g`,
+                tdee?.target_protein ? `gemiddeld per dag · target ${Math.round(tdee.target_protein)} g` : 'gemiddeld per dag',
+                tdee?.target_protein && perDag.eiwitGem < Math.round(tdee.target_protein) * 0.9 ? '#f59e0b' : '#fff'
+              )}
 
               {tdee === undefined && regel('Verbranding', '…', 'laden')}
 
@@ -308,17 +397,40 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                     tekort >= 0 ? '#10b981' : '#f59e0b'
                   )}
                   <div style={{ paddingTop: '0.55rem' }}>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
-                      Komt ongeveer neer op
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                      Dit plan komt neer op
                     </div>
-                    <div style={{
-                      fontSize: '1.25rem', fontWeight: 900, marginTop: 2,
-                      color: tekort >= 0 ? '#10b981' : '#f59e0b',
-                    }}>
-                      {tekort >= 0 ? '−' : '+'}{Math.abs(kilos).toFixed(2)} kg
-                      <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}> per week</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+                      <div style={{
+                        fontSize: '1.3rem', fontWeight: 900,
+                        color: opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : '#fff',
+                      }}>
+                        {kgTekst(planKg)}
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}> per week</span>
+                      </div>
+                      {streefKg != null && (
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
+                          streef {richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ fontSize: '0.58rem', fontWeight: 600, color: 'rgba(255,255,255,0.25)', marginTop: 3 }}>
+                    {/* De zin waar je mee stuurt: hoeveel kcal moet eraf of erbij
+                        om op het streeftempo te komen. */}
+                    {afwijkingWeek != null && (
+                      <div style={{
+                        marginTop: 6, fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.4,
+                        color: opTempo ? '#22c55e' : '#fff',
+                      }}>
+                        {opTempo
+                          ? 'Op tempo. Dit plan zit binnen de band.'
+                          : Math.abs(afwijkingWeek) < 100
+                            ? 'Vrijwel op het streeftempo.'
+                            : afwijkingWeek > 0
+                              ? `${getal(afwijkingWeek)} kcal per week te veel voor het streeftempo · ${getal(afwijkingWeek / 7)} per dag eraf`
+                              : `${getal(-afwijkingWeek)} kcal per week te weinig voor het streeftempo · ${getal(-afwijkingWeek / 7)} per dag erbij`}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
                       Schatting op 7700 kcal per kilo. Wat de weegschaal doet blijft leidend.
                     </div>
                   </div>
@@ -332,7 +444,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                     geschaald; trainingsdagen in goud, zodat een uitschieter
                     meteen te plaatsen is. */}
                 <div style={{ marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>
                     Per dag
                   </div>
                   {(() => {
@@ -340,7 +452,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   // zegt "erboven of eronder" niets. De schaal loopt daarom
                   // tot de hoogste van beide.
                   const dagTdee = tdee?.tdee || null
-                  const hoogste = Math.max(...perDag.dagen.map(x => x.kcal), dagTdee || 0, 1)
+                  const hoogste = Math.max(...perDag.dagen.map(x => x.kcal), dagTdee || 0, dagDoelKcal || 0, 1)
                   // Ruim hoog: het verschil tussen "vult het blok" en
                   // "blijft eronder" is de hele boodschap, en op 44px zag je
                   // dat nauwelijks.
@@ -381,8 +493,17 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                               <div style={{
                                 position: 'absolute', left: 0, right: 0, bottom: 0,
                                 height: hoogte,
-                                background: d.training ? '#FFD700' : (boven ? '#f59e0b' : 'rgba(255,255,255,0.55)'),
+                                background: d.training ? 'rgba(255,255,255,0.85)' : (boven ? '#f59e0b' : 'rgba(255,255,255,0.5)'),
                               }} />
+                              {/* Doellijn: zoveel mag de dag geven om op het
+                                  streeftempo te zitten. */}
+                              {dagDoelKcal != null && (
+                                <div style={{
+                                  position: 'absolute', left: 0, right: 0,
+                                  bottom: Math.round((dagDoelKcal / hoogste) * H),
+                                  borderTop: '2px solid #22c55e', pointerEvents: 'none',
+                                }} />
+                              )}
                             </div>
                           )
                         })}
@@ -390,19 +511,21 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
 
                       <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
                         {perDag.dagen.map(d => {
-                          const verschil = dagTdee != null ? d.kcal - dagTdee : null
+                          // Verschil met het doel per dag als er een fase is, anders met de verbranding.
+                          const ijk = dagDoelKcal ?? dagTdee
+                          const verschil = ijk != null ? d.kcal - ijk : null
                           return (
                             <div key={d.dag} style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+                              <div style={{ fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
                                 {d.label}
                               </div>
-                              <div style={{ fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.32)' }}>
+                              <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
                                 {d.kcal >= 1000 ? `${(d.kcal / 1000).toFixed(1)}k` : d.kcal}
                               </div>
                               {verschil != null && (
                                 <div style={{
-                                  fontSize: '0.52rem', fontWeight: 800,
-                                  color: verschil <= 0 ? '#10b981' : '#f59e0b',
+                                  fontSize: '0.62rem', fontWeight: 800,
+                                  color: Math.abs(verschil) <= 100 ? '#22c55e' : verschil < 0 ? 'rgba(255,255,255,0.6)' : '#f59e0b',
                                 }}>
                                   {verschil <= 0 ? '−' : '+'}{Math.abs(verschil) >= 1000
                                     ? `${(Math.abs(verschil) / 1000).toFixed(1)}k`
@@ -417,7 +540,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                       {dagTdee != null && (
                         <div style={{
                           display: 'flex', alignItems: 'center', gap: 5, marginTop: 6,
-                          fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
+                          fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)',
                         }}>
                           <span style={{
                             width: 12, height: 9,
@@ -429,6 +552,12 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                             boxSizing: 'border-box', flexShrink: 0,
                           }} />
                           Verbranding {getal(dagTdee)} kcal per dag
+                          {dagDoelKcal != null && (
+                            <>
+                              <span style={{ width: 12, borderTop: '2px solid #22c55e', flexShrink: 0, marginLeft: 6 }} />
+                              doel {getal(dagDoelKcal)}
+                            </>
+                          )}
                         </div>
                       )}
                     </>
