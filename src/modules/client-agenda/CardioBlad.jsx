@@ -47,6 +47,11 @@ export default function CardioBlad({
   tempoVoor = null,
   // Dagen + tijd gekozen: meteen in het plan en op die dagen in de agenda.
   onInplannen = null,
+  // Bestaande regel aangepast zonder dagen: plan bijwerken en de agenda
+  // bijtrekken (minder keer = blokken weg, andere duur = blokken aangepast).
+  onAanpassen = null,
+  // Hoeveel blokken van deze sport er nu in de agenda staan.
+  blokkenInAgenda = null,
 }) {
   const [soort, setSoort] = useState('Wandelen')
   const [keer, setKeer] = useState(3)
@@ -164,7 +169,15 @@ export default function CardioBlad({
           <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
             {dagen.length > 0
               ? `${dagen.length} dag${dagen.length === 1 ? '' : 'en'} · ${regel ? 'vervangt de cardio-blokken van deze sport in de agenda' : 'komt'} om ${tijd} in de agenda en in het cardioplan van de klant`
-              : regel ? 'Geen dagen gekozen: alleen de regel wordt aangepast, de agenda blijft.' : 'Geen dagen gekozen: dan blijft het een wat-als.'}
+              : regel?.id
+                ? (blokkenInAgenda == null
+                  ? 'Geen dagen gekozen: de regel wordt aangepast en de agenda trekt mee.'
+                  : effKeer < blokkenInAgenda
+                    ? `Geen dagen gekozen: van de ${blokkenInAgenda} blokken in de agenda blijven de eerste ${effKeer} staan.`
+                    : effKeer > blokkenInAgenda
+                      ? `Er staan ${blokkenInAgenda} blokken in de agenda; kies ${effKeer - blokkenInAgenda} dag${effKeer - blokkenInAgenda === 1 ? '' : 'en'} erbij voor de rest.`
+                      : 'Geen dagen gekozen: de regel wordt aangepast, de blokken in de agenda krijgen de nieuwe duur.')
+                : regel ? 'Geen dagen gekozen: alleen de regel in het wat-als wordt aangepast.' : 'Geen dagen gekozen: dan blijft het een wat-als.'}
           </div>
         </div>
       )}
@@ -204,6 +217,11 @@ export default function CardioBlad({
             try { await onInplannen(nieuw, dagen, tijdMin) } finally { setBezig(false) }
             return
           }
+          if (regel?.id && onAanpassen) {
+            setBezig(true)
+            try { await onAanpassen(nieuw) } finally { setBezig(false) }
+            return
+          }
           onOpslaan(nieuw)
         }}
         style={{
@@ -213,7 +231,7 @@ export default function CardioBlad({
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <Check size={16} strokeWidth={3} /> {bezig ? 'Bezig…' : dagen.length > 0 ? (regel ? 'Aanpassen en inplannen' : 'Inplannen en opslaan') : regel ? 'Aanpassen' : 'Toevoegen aan wat als'}
+        <Check size={16} strokeWidth={3} /> {bezig ? 'Bezig…' : dagen.length > 0 ? (regel ? 'Aanpassen en inplannen' : 'Inplannen en opslaan') : regel?.id ? 'Aanpassen in plan en agenda' : regel ? 'Aanpassen' : 'Toevoegen aan wat als'}
       </button>
       {regel && onVerwijder && (
         <button

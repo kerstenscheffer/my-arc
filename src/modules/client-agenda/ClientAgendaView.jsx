@@ -2304,7 +2304,30 @@ export default function ClientAgendaView({
           // Cardio opgeslagen in het weekbudget: meteen in plaatsmodus, zodat
           // de coach de dagen tikt waarop het moet gebeuren.
           onPlanCardio={({ label, duur }) => setTeplaatsen({ id: 'cardio', label, duur, kleur: '#06b6d4' })}
-          onPlanCardioDagen={async ({ label, duur, dagen, tijdMin, vervangLabels = [] }) => {
+          telBlokken={(label) => Object.values(data?.blocksByDay || {}).flat().filter(b => b.type === 'custom' && b.label === label).length}
+          onPlanCardioDagen={async ({ label, duur, dagen, tijdMin, vervangLabels = [], sync = null }) => {
+            // Aangepast zonder dagen: de agenda bijtrekken. Meer blokken dan
+            // keer per week → de laatste gaan weg (de eerste dagen blijven).
+            // Alle overgebleven blokken krijgen de nieuwe duur en het nieuwe label.
+            if (sync) {
+              const labels = [sync.label, ...(sync.oudLabel ? [sync.oudLabel] : [])]
+              const { data: rijen } = await db.supabase.from('client_agenda_blocks')
+                .select('id, day, start_time, end_time, label')
+                .eq('client_id', client.id).eq('type', 'custom').in('label', labels)
+                .then(r => r, () => ({ data: [] }))
+              const volgorde = (d) => DAYS.indexOf(d)
+              const gesorteerd = (rijen || []).sort((a, b) => volgorde(a.day) - volgorde(b.day) || String(a.start_time).localeCompare(String(b.start_time)))
+              const blijven = gesorteerd.slice(0, sync.keer)
+              const weg = gesorteerd.slice(sync.keer)
+              if (weg.length > 0) await db.supabase.from('client_agenda_blocks').delete().in('id', weg.map(b => b.id)).then(r => r, () => null)
+              for (const b of blijven) {
+                const [h, m] = String(b.start_time || '18:00').split(':').map(Number)
+                const start = (h || 0) * 60 + (m || 0)
+                await service.upsertBlock({ id: b.id, clientId: client.id, day: b.day, type: 'custom', label: sync.label, sublabel: null, startMin: start, endMin: Math.min(24 * 60, start + sync.duur), color: '#06b6d4' })
+              }
+              await reload()
+              return
+            }
             // Bij aanpassen of verwijderen eerst de oude blokken van die sport weg.
             if (vervangLabels.length > 0) {
               await db.supabase.from('client_agenda_blocks').delete()
