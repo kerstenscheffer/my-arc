@@ -14,6 +14,10 @@ export default function WeekGrid({
   cardioPerDag = {},
 }) {
   const cardioRij = Object.keys(cardioPerDag).length > 0
+  // Lege rustdagen smal, dagen met training of cardio breed: dan is er ruimte
+  // voor de naam van de sport in plaats van zeven even smalle vakjes.
+  const leeg = weekDays.map((day, i) => !tempSchedule[day] && !(cardioPerDag[i]?.length))
+  const kolommen = leeg.map(l => (l ? 'minmax(0, 0.55fr)' : 'minmax(0, 1.6fr)')).join(' ')
   const weekDaysDutch = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
   // Een komende week mag je wél indelen (pijltjes) maar niet openen: de
@@ -27,8 +31,8 @@ export default function WeekGrid({
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-      gap: isMobile ? '0.25rem' : '0.375rem',
+      gridTemplateColumns: kolommen,
+      gap: isMobile ? '0.2rem' : '0.375rem',
       marginBottom: isMobile ? '0.5rem' : '0.625rem',
       minWidth: 0, width: '100%',
     }}>
@@ -65,6 +69,7 @@ export default function WeekGrid({
             rust={rustPerDag[index] || null}
             cardio={cardioPerDag[index] || []}
             cardioRij={cardioRij}
+            smal={leeg[index]}
           />
         )
       })}

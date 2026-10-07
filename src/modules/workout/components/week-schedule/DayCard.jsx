@@ -32,6 +32,8 @@ export default function DayCard({
   // onderin dezelfde ruimte vrij zodat de rij gelijk blijft.
   cardio = [],
   cardioRij = false,
+  // Smalle kolom (lege rustdag): dag en 'Rust' klein, verder niets.
+  smal = false,
 }) {
   const isCustom = workoutKey?.startsWith('custom_')
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
@@ -160,7 +162,7 @@ export default function DayCard({
       lineHeight: 1,
       paddingBottom: isMobile ? 6 : 8,
     }}>
-      {weekDaysDutch[dayIndex]}{dateNum ? ` ${dateNum}` : ''}
+      {weekDaysDutch[dayIndex]}{dateNum && !smal ? ` ${dateNum}` : ''}
     </div>
   )
 
@@ -329,10 +331,10 @@ export default function DayCard({
         >
           {isToday ? todayPill : dayLabel}
           <div style={{
-            fontSize: isMobile ? '0.6rem' : '0.65rem',
+            fontSize: smal ? '0.5rem' : (isMobile ? '0.6rem' : '0.65rem'),
             fontWeight: 800,
             color: 'rgba(255,255,255,0.28)',
-            letterSpacing: '0.1em',
+            letterSpacing: smal ? '0.04em' : '0.1em',
             textTransform: 'uppercase',
             marginTop: 'auto',
             marginBottom: 'auto',

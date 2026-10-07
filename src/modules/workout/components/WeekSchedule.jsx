@@ -354,8 +354,8 @@ export default function WeekSchedule({
         })
         return (
           <>
-            {/* WeekGrid */}
-            <div style={{ padding: isMobile ? '0 0.75rem' : '0 1rem' }}>
+            {/* WeekGrid: tegen de schermrand aan, zodat de kaarten breed zijn. */}
+            <div style={{ padding: isMobile ? '0 0.4rem' : '0 1rem' }}>
               <WeekGrid
                 cardioPerDag={(() => {
                   const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
