@@ -15,6 +15,7 @@ let package = Package(
         .package(name: "CapacitorCommunityAppleSignIn", path: "../../../node_modules/@capacitor-community/apple-sign-in"),
         .package(name: "CapacitorPushNotifications", path: "../../../node_modules/@capacitor/push-notifications"),
         .package(name: "CapacitorStatusBar", path: "../../../node_modules/@capacitor/status-bar"),
+        .package(name: "CapawesomeCapacitorAppReview", path: "../../../node_modules/@capawesome/capacitor-app-review"),
         .package(name: "CapacitorHealth", path: "../../../node_modules/capacitor-health")
     ],
     targets: [
@@ -26,6 +27,7 @@ let package = Package(
                 .product(name: "CapacitorCommunityAppleSignIn", package: "CapacitorCommunityAppleSignIn"),
                 .product(name: "CapacitorPushNotifications", package: "CapacitorPushNotifications"),
                 .product(name: "CapacitorStatusBar", package: "CapacitorStatusBar"),
+                .product(name: "CapawesomeCapacitorAppReview", package: "CapawesomeCapacitorAppReview"),
                 .product(name: "CapacitorHealth", package: "CapacitorHealth")
             ]
         )
