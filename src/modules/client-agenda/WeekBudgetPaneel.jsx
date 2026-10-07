@@ -475,27 +475,24 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   {/* Tekort (cut) of overschot (build): wat het doeltempo
                       vraagt, en wat het plan nu geeft met het tempo dat daar
                       bij hoort. Het woord volgt de richting van de fase. */}
-                  {(() => {
-                    const woord = richting === 'aankomen' ? 'Overschot' : 'Tekort'
-                    const t = richting === 'aankomen' ? -1 : 1   // zodat 'huidig' positief leest in de eigen richting
-                    const doelKcal = streefTekortWeek != null ? t * streefTekortWeek : null
-                    const huidigKcal = t * tekort
-                    return (
-                      <>
-                        {doelKcal != null && regel(
-                          `${woord} voor doeltempo`,
-                          `${getal(doelKcal)} kcal`,
-                          `per week · ${getal(doelKcal / 7)} per dag · ${richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)} per week`
-                        )}
-                        {regel(
-                          `Huidig ${woord.toLowerCase()} in plan`,
-                          `${huidigKcal < 0 ? '−' : ''}${getal(Math.abs(huidigKcal))} kcal`,
-                          `per week · ${getal(Math.abs(huidigKcal) / 7)} per dag = ${kgTekst(planKg)} per week`,
-                          opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : '#fff'
-                        )}
-                      </>
-                    )
-                  })()}
+                  {/* Twee regels, elk met het woord dat bij het getal hoort:
+                      een plan dat meer geeft dan de verbranding heeft een
+                      overschot, ook in een cut. Eerst wat het doeltempo vraagt,
+                      dan wat het plan nu doet en welk tempo dat oplevert. */}
+                  {streefTekortWeek != null ? regel(
+                    `${streefTekortWeek >= 0 ? 'Tekort' : 'Overschot'} voor doeltempo`,
+                    `${getal(Math.abs(streefTekortWeek))} kcal`,
+                    `per week · ${getal(Math.abs(streefTekortWeek) / 7)} per dag · ${richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)} per week`
+                  ) : regel(
+                    'Doeltempo', 'geen fase',
+                    'stel in het fase-paneel een doel en weektempo in', 'rgba(255,255,255,0.4)'
+                  )}
+                  {regel(
+                    `Huidig ${tekort >= 0 ? 'tekort' : 'overschot'} in plan`,
+                    `${getal(Math.abs(tekort))} kcal`,
+                    `= ${kgTekst(planKg)} per week · ${getal(Math.abs(tekort) / 7)} per dag`,
+                    opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : '#fff'
+                  )}
                   {afwijkingWeek != null && (
                     <div style={{ padding: '0.5rem 0 0', fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.4, color: opTempo ? '#22c55e' : '#fff' }}>
                       {opTempo
