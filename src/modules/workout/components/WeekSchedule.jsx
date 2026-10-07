@@ -73,6 +73,45 @@ export default function WeekSchedule({
   const [trainingBlokken, setTrainingBlokken] = useState([])
   const [vasteTrainingstijd, setVasteTrainingstijd] = useState(null)
   const [cardioVersie, setCardioVersie] = useState(0)
+  // Gedane trainingen van de getoonde week: een sessie in workout_sessions
+  // met minstens één gelogde set. De oude bron (localStorage) werd nooit
+  // gevuld, waardoor 'Gedaan' nooit verscheen.
+  const [gedaneDagen, setGedaneDagen] = useState([]) // [{ workout_day }]
+  const [sessieVersie, setSessieVersie] = useState(0)
+  useEffect(() => {
+    const bump = () => setSessieVersie(v => v + 1)
+    window.addEventListener('myarc:workout-changed', bump)
+    return () => window.removeEventListener('myarc:workout-changed', bump)
+  }, [])
+  useEffect(() => {
+    if (!clientId || !db?.supabase) return
+    let weg = false
+    const maandag = (() => { const d = getThisMonday(); d.setDate(d.getDate() + weekOffset * 7); return d })()
+    const zondag = new Date(maandag); zondag.setDate(zondag.getDate() + 6)
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    ;(async () => {
+      const { data: sessies } = await db.supabase.from('workout_sessions').select('id, workout_date')
+        .eq('client_id', clientId).gte('workout_date', iso(maandag)).lte('workout_date', iso(zondag))
+        .then(r => r, () => ({ data: [] }))
+      const ids = (sessies || []).map(x => x.id)
+      let metSets = new Set()
+      if (ids.length) {
+        const { data: sets } = await db.supabase.from('workout_progress').select('session_id').in('session_id', ids)
+          .then(r => r, () => ({ data: [] }))
+        metSets = new Set((sets || []).map(x => x.session_id))
+      }
+      if (weg) return
+      const dagen = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      const uit = []
+      ;(sessies || []).filter(x => metSets.has(x.id)).forEach(x => {
+        const d = new Date(String(x.workout_date).slice(0, 10) + 'T12:00:00')
+        const idx = (d.getDay() + 6) % 7
+        if (!uit.some(u => u.workout_day === dagen[idx])) uit.push({ workout_day: dagen[idx], workout_date: x.workout_date })
+      })
+      setGedaneDagen(uit)
+    })()
+    return () => { weg = true }
+  }, [clientId, db, weekOffset, sessieVersie])
   useEffect(() => {
     const bump = () => setCardioVersie(v => v + 1)
     window.addEventListener('myarc:cardio-changed', bump)
@@ -552,7 +591,7 @@ export default function WeekSchedule({
                   return uit
                 })()}
                 tempSchedule={tempSchedule} weekDays={weekDays} todayIndex={todayIndex}
-                completedWorkouts={completedWorkouts} selectedWorkout={selectedWorkout}
+                completedWorkouts={[...gedaneDagen, ...(isHuidigeWeek && Array.isArray(completedWorkouts) ? completedWorkouts : [])]} selectedWorkout={selectedWorkout}
                 selectedForSwap={selectedForSwap} swapMode={swapMode} localSwapMode={localSwapMode}
                 getWorkoutData={getWorkoutData} onDayClick={onDayClick} onSwapClick={handleSwapClick}
                 onShift={handleShift}

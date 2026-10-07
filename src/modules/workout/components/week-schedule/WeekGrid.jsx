@@ -79,7 +79,9 @@ export default function WeekGrid({
         const assignedWorkout = tempSchedule[day]
         const workoutData = getWorkoutData(assignedWorkout)
         const isToday = kanOpenen && index === todayIndex
-        const isCompleted = kanOpenen && Array.isArray(completedWorkouts)
+        // Gedaan = er is in de getoonde week op die dag een sessie met
+        // gelogde sets; ook in een voorbije week zichtbaar.
+        const isCompleted = Array.isArray(completedWorkouts)
           && completedWorkouts.some(w => w.workout_day === day)
         const isSelected = selectedWorkout === assignedWorkout
           || (selectedForSwap && selectedForSwap.day === day)

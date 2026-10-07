@@ -237,6 +237,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   const loadTodaysLogs = async () => {
     if (!client?.id || !db) return
     try { setTodaysLogs(await db.getTodaysWorkoutLogs(client.id)) } catch { setTodaysLogs([]) }
+    // Het weekrooster luistert hiernaar om 'Gedaan' op de dag te zetten.
+    window.dispatchEvent(new CustomEvent('myarc:workout-changed'))
   }
 
   const triggerReload = () => setReloadKey(prev => prev + 1)
