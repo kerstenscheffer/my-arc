@@ -250,7 +250,11 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
     + ((kcalPerTraining || 0) * simTrainingen) / 7
     + ((kcalPerCardioMin || 0) * simCardio) / 7
   )
-  const simActief = simAan && extraPerDag !== 0
+  // Actief zodra er iets is ingesteld, ook als het blok dichtgeklapt is:
+  // je klapt het dicht om de tabel en de balken erboven te bekijken, en dan
+  // moet het effect juist blijven staan.
+  const simActief = extraPerDag !== 0
+  const simTerug = () => { setSimTdee(0); setSimTrainingen(0); setSimCardio(0); setSimStappen(null) }
   const tdeeNu = tdee?.tdee ? Number(tdee.tdee) : null
   const tdeeEff = tdeeNu != null ? tdeeNu + (simActief ? extraPerDag : 0) : null
 
@@ -353,6 +357,26 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
               <X size={13} />
             </button>
           </div>
+
+          {/* Zolang 'Wat als' iets doet: een regel bovenin, waar je ook kijkt. */}
+          {!ingeklapt && simActief && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0,
+              padding: '0.4rem 0.8rem', background: 'rgba(34,197,94,0.12)', borderBottom: '1px solid rgba(34,197,94,0.3)',
+            }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#22c55e' }}>
+                Wat als: verbranding {extraPerDag > 0 ? '+' : '−'}{getal(Math.abs(extraPerDag))} kcal per dag
+              </span>
+              <button onClick={simTerug} style={{
+                flexShrink: 0, minHeight: 28, padding: '0 0.6rem', borderRadius: 8,
+                background: 'transparent', border: '1px solid rgba(34,197,94,0.5)',
+                color: '#22c55e', fontFamily: 'inherit', fontSize: '0.68rem', fontWeight: 900, cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                Terug naar nu
+              </button>
+            </div>
+          )}
 
           {!ingeklapt && (
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.25rem 0.8rem 0.8rem' }}>
@@ -790,7 +814,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                         </span>
                         {simActief && (
                           <button
-                            onClick={() => { setSimTdee(0); setSimTrainingen(0); setSimCardio(0); setSimStappen(null) }}
+                            onClick={simTerug}
                             style={{
                               flexShrink: 0, minHeight: 32, padding: '0 0.7rem', borderRadius: 8,
                               background: 'transparent', border: '1px solid rgba(255,255,255,0.25)',
