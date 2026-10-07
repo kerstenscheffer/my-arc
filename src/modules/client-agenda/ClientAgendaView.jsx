@@ -5,7 +5,7 @@
 // lezen, zodat de coach in één blik ziet hoe de week eruit ziet.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
+import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat, Scale, ClipboardCheck, HeartPulse } from 'lucide-react'
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 import { meldMaaltijdTijd, luisterMaaltijdTijd, luisterPlanGewijzigd, meldPlanGewijzigd } from '../meal-plan/utils/mealSync'
 import WeekBudgetPaneel from './WeekBudgetPaneel'
@@ -91,6 +91,10 @@ const TYPE_ICON = {
   sleep: Moon,
   work: Briefcase,
   supplement: Pill,
+  // Realiteit: gelogde dingen.
+  weging: Scale,
+  checkin: ClipboardCheck,
+  cardio: HeartPulse,
 }
 
 // Geen foto's meer in de agenda.
@@ -198,6 +202,9 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
     : block.type === 'sleep' ? 'Slaap'
     : block.type === 'work' ? (block.label || 'Werk')
     : block.type === 'supplement' ? (block.meta?.emojis || 'Supplementen')
+    : block.type === 'weging' ? 'Weging'
+    : block.type === 'checkin' ? 'Check-in'
+    : block.type === 'cardio' ? 'Cardio'
     : (block.label || 'Blok')
   const naam = block.sublabel || (isMaaltijd ? null : block.label)
   const tijdTekst = `${formatTime(block.start)}${isPlaceholderTime ? ' *' : ''}`
@@ -1244,6 +1251,22 @@ export default function ClientAgendaView({
   // modus: buiten die modus opent een tik het bewerkvenster en werkt slepen,
   // en dat botst met aantikken om te selecteren.
   const [selectieModus, setSelectieModus] = useState(false)
+  // Plan of realiteit. Realiteit = wat er echt gelogd is deze week; niets
+  // daarvan is te verslepen of te bewerken.
+  const [weergave, setWeergave] = useState('plan')
+  const [realiteit, setRealiteit] = useState(null)
+  const [realiteitLaden, setRealiteitLaden] = useState(false)
+  useEffect(() => {
+    if (weergave !== 'realiteit' || !service || !client?.id) return
+    let weg = false
+    setRealiteitLaden(true)
+    service.loadRealiteit(client.id, weekAnchor)
+      .then(res => { if (!weg) setRealiteit(res) })
+      .catch(e => { console.error('realiteit laden mislukt:', e); if (!weg) setRealiteit(null) })
+      .finally(() => { if (!weg) setRealiteitLaden(false) })
+    return () => { weg = true }
+  }, [weergave, service, client?.id, weekAnchor, refreshKey])
+  const isRealiteit = weergave === 'realiteit'
   const [geselecteerd, setGeselecteerd] = useState(() => new Set())
   const [bulkBezig, setBulkBezig] = useState(false)
   // Iets inplannen: eerst een soort aanklikken, dan een plek in de agenda.
@@ -1965,6 +1988,7 @@ export default function ClientAgendaView({
   // anders verandert de hook-volgorde tussen renders en gooit React een
   // "Rendered more hooks than during the previous render"-fout.
   const blocksByDay = useMemo(() => {
+    if (isRealiteit) return realiteit?.blocksByDay || Object.fromEntries(DAYS.map(d => [d, []]))
     const raw = data?.blocksByDay
     if (!raw) return null
     if (!isClient) return raw
@@ -1973,7 +1997,7 @@ export default function ClientAgendaView({
       out[day] = blocks.map(b => b.type === 'meal' ? { ...b, editable: false } : b)
     })
     return out
-  }, [data, isClient])
+  }, [data, isClient, isRealiteit, realiteit])
 
   if (!client?.id) {
     return (
@@ -2054,6 +2078,15 @@ export default function ClientAgendaView({
           style={balkIconKnop(isMobile)}>
           <ChevronRight size={13} />
         </button>
+        {!isClient && (
+          <div style={{ display: 'flex', alignItems: 'center', marginLeft: 6, flexShrink: 0 }} title="Plan = wat er gepland staat. Realiteit = wat er deze week echt gelogd is.">
+            {[['plan', 'Plan'], ['realiteit', 'Realiteit']].map(([k, label]) => (
+              <button key={k} onClick={() => setWeergave(k)} style={(weergave === k ? balkVakActief : balkVak)(isMobile, { cursor: 'pointer', borderRightWidth: k === 'plan' ? 0 : undefined })}>
+                {label}{k === 'realiteit' && realiteitLaden && isRealiteit ? '…' : ''}
+              </button>
+            ))}
+          </div>
+        )}
         {!isThisWeek && (
           <button onClick={() => setWeekAnchor(getMondayOf(new Date()))} title="Naar deze week"
             style={balkVak(isMobile, {
@@ -2338,14 +2371,14 @@ export default function ClientAgendaView({
               onBlockClick={handleBlockClick}
               // Een klant plant niets bij; die knop hoort bij het gereedschap
               // van de coach.
-              onAddClick={isClient ? null : handleAddClick}
+              onAddClick={(isClient || isRealiteit) ? null : handleAddClick}
               onVorigeDag={eenDag ? () => verzetDag(-1) : null}
               onVolgendeDag={eenDag ? () => verzetDag(1) : null}
               geselecteerd={geselecteerd}
               selectieModus={selectieModus}
-              plaatsModus={!!teplaatsen}
+              plaatsModus={!isRealiteit && !!teplaatsen}
               onGridClick={plaatsOpGrid}
-              onBlockPointerDownDrag={handleBlockPointerDown}
+              onBlockPointerDownDrag={isRealiteit ? null : handleBlockPointerDown}
               isDropTarget={drag && drag.moved && drag.targetDay === day && drag.originDay !== day}
               ghostBlock={ghostByDay[day]}
               sourceBlockId={drag?.block?.id}

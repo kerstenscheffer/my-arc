@@ -176,6 +176,148 @@ const timeStrToMinutes = (str) => {
 export class ClientAgendaService {
   constructor(supabase) { this.supabase = supabase }
 
+  // ── Realiteit: wat er echt gelogd is, als blokken in dezelfde vorm ──
+  //
+  // Naast het plan wil je zien wat er gebeurd is: wanneer de weging
+  // binnenkwam en wat hij woog, wanneer de training begon en hoe lang hij
+  // duurde (tot de laatste gelogde oefening, met twee uur als plafond als
+  // iemand de laatste niet logt), wanneer welke maaltijd is gelogd (ook losse
+  // producten), wanneer de check-in is ingevuld, en welke cardio. Niets
+  // hiervan is sleepbaar: het is gebeurd.
+  async loadRealiteit(clientId, weekAnchor = null) {
+    const anchor = weekAnchor ? getMondayOf(weekAnchor) : getMondayOf(new Date())
+    const weekStart = toIsoDate(anchor)
+    const weekEindDatum = new Date(anchor); weekEindDatum.setDate(weekEindDatum.getDate() + 6)
+    const weekEnd = toIsoDate(weekEindDatum)
+    // Tijdstempels liggen in UTC; de grens van de week in lokale tijd.
+    const vanaf = new Date(anchor); vanaf.setHours(0, 0, 0, 0)
+    const tot = new Date(weekEindDatum); tot.setHours(23, 59, 59, 999)
+
+    const veilig = (q) => q.then(r => r, (e) => { console.warn('realiteit laden:', e?.message); return { data: [] } })
+    const [sessies, wegingen, maaltijden, checkins, cardio] = await Promise.all([
+      veilig(this.supabase.from('workout_sessions')
+        .select('id, workout_date, day_name, created_at, completed_at, duration_minutes, is_completed, exercises_completed')
+        .eq('client_id', clientId).gte('workout_date', weekStart).lte('workout_date', weekEnd)),
+      veilig(this.supabase.from('weight_challenge_logs')
+        .select('id, date, weight, time_of_day, created_at')
+        .eq('client_id', clientId).gte('date', weekStart).lte('date', weekEnd)),
+      veilig(this.supabase.from('consumed_meals')
+        .select('id, meal_name, meal_type, calories, protein, consumed_at, source, image_url, amount, per_unit')
+        .eq('client_id', clientId).gte('consumed_at', vanaf.toISOString()).lte('consumed_at', tot.toISOString())),
+      veilig(this.supabase.from('client_checkins')
+        .select('id, checkin_date, created_at, status')
+        .eq('client_id', clientId).gte('created_at', vanaf.toISOString()).lte('created_at', tot.toISOString())),
+      veilig(this.supabase.from('cardio_logs')
+        .select('id, cardio_type, duration_minutes, distance_km, steps, logged_date, created_at')
+        .eq('client_id', clientId).gte('logged_date', weekStart).lte('logged_date', weekEnd)),
+    ])
+
+    // Oefening-logs van deze sessies: einde van de training.
+    const sessieIds = (sessies.data || []).map(s => s.id)
+    let progress = []
+    if (sessieIds.length > 0) {
+      const r = await veilig(this.supabase.from('workout_progress').select('session_id, created_at').in('session_id', sessieIds))
+      progress = r.data || []
+    }
+    const laatsteLog = {}
+    const eersteLog = {}
+    const aantalLog = {}
+    progress.forEach(p => {
+      const t = new Date(p.created_at).getTime()
+      if (!Number.isFinite(t)) return
+      laatsteLog[p.session_id] = Math.max(laatsteLog[p.session_id] || 0, t)
+      eersteLog[p.session_id] = Math.min(eersteLog[p.session_id] || Infinity, t)
+      aantalLog[p.session_id] = (aantalLog[p.session_id] || 0) + 1
+    })
+
+    const dagVan = (ts) => {
+      const d = new Date(ts)
+      if (Number.isNaN(d.getTime())) return null
+      return DAYS[(d.getDay() + 6) % 7]
+    }
+    const minVan = (ts) => { const d = new Date(ts); return d.getHours() * 60 + d.getMinutes() }
+    const blocksByDay = {}
+    DAYS.forEach(d => { blocksByDay[d] = [] })
+    const push = (day, blok) => { if (day && blocksByDay[day]) blocksByDay[day].push(blok) }
+
+    ;(sessies.data || []).forEach(s => {
+      const startTs = eersteLog[s.id] ? Math.min(eersteLog[s.id], new Date(s.created_at).getTime()) : new Date(s.created_at).getTime()
+      const dag = dagVan(startTs) || (s.workout_date ? DAYS[(new Date(s.workout_date + 'T12:00:00').getDay() + 6) % 7] : null)
+      const start = minVan(startTs)
+      let eind
+      if (laatsteLog[s.id]) eind = minVan(laatsteLog[s.id]) + 5
+      else if (s.completed_at && s.completed_at !== s.created_at) eind = minVan(new Date(s.completed_at).getTime())
+      else eind = start + (Number(s.duration_minutes) || 60)
+      eind = Math.min(eind, start + 120, 24 * 60)
+      if (eind <= start) eind = Math.min(start + 45, 24 * 60)
+      const n = aantalLog[s.id] || (Array.isArray(s.exercises_completed) ? s.exercises_completed.length : 0)
+      push(dag, {
+        id: `echt-training-${s.id}`, day: dag, type: 'training',
+        label: 'Training', sublabel: s.day_name || 'Training',
+        start, end: eind, color: TRAINING_COLOR, source: 'realiteit', editable: false,
+        meta: { echt: true, exercise_count: n || null, estimated_time: `${eind - start} min`, afgerond: !!s.is_completed },
+      })
+    })
+
+    ;(wegingen.data || []).forEach(w => {
+      const ts = w.created_at
+      const dag = w.date ? DAYS[(new Date(w.date + 'T12:00:00').getDay() + 6) % 7] : dagVan(ts)
+      const start = ts ? minVan(ts) : 7 * 60
+      push(dag, {
+        id: `echt-weging-${w.id}`, day: dag, type: 'weging',
+        label: 'Weging', sublabel: `${Number(w.weight).toFixed(1).replace('.', ',')} kg`,
+        start, end: start + 15, color: '#a78bfa', source: 'realiteit', editable: false,
+        meta: { echt: true, gewicht: Number(w.weight), moment: w.time_of_day || null },
+      })
+    })
+
+    const BRON = { my_meals: 'eigen maaltijd', plan_check: 'uit het plan', myarc: 'product', recent: 'recent', recent_relog: 'recent', quick_add: 'snel toegevoegd', edit: 'bewerkt' }
+    ;(maaltijden.data || []).forEach(m => {
+      const dag = dagVan(m.consumed_at)
+      const start = minVan(m.consumed_at)
+      push(dag, {
+        id: `echt-maaltijd-${m.id}`, day: dag, type: 'meal',
+        label: BRON[m.source] || 'gelogd', sublabel: m.meal_name || 'Maaltijd',
+        start, end: start + 20, color: SLOT_COLOR, source: 'realiteit', editable: false,
+        meta: { echt: true, slot: m.meal_type || null, kcal: m.calories, protein: m.protein, image_url: m.image_url || null, bron: m.source || null },
+      })
+    })
+
+    ;(checkins.data || []).forEach(k => {
+      const dag = dagVan(k.created_at)
+      const start = minVan(k.created_at)
+      push(dag, {
+        id: `echt-checkin-${k.id}`, day: dag, type: 'checkin',
+        label: 'Check-in', sublabel: k.status === 'submitted' ? 'Check-in ingevuld' : `Check-in (${k.status || '?'})`,
+        start, end: start + 20, color: '#f59e0b', source: 'realiteit', editable: false,
+        meta: { echt: true },
+      })
+    })
+
+    ;(cardio.data || []).forEach(c => {
+      // De logdag is de dag van de cardio; het tijdstip komt van het loggen.
+      const dag = c.logged_date ? DAYS[(new Date(c.logged_date + 'T12:00:00').getDay() + 6) % 7] : dagVan(c.created_at)
+      const start = c.created_at ? minVan(c.created_at) : 18 * 60
+      const duur = Number(c.duration_minutes) || 30
+      const delen = [c.cardio_type, duur ? `${duur} min` : null, c.distance_km ? `${String(c.distance_km).replace('.', ',')} km` : null, c.steps ? `${c.steps} stappen` : null].filter(Boolean)
+      push(dag, {
+        id: `echt-cardio-${c.id}`, day: dag, type: 'cardio',
+        label: 'Cardio', sublabel: delen.join(' · '),
+        start, end: Math.min(start + duur, 24 * 60), color: '#06b6d4', source: 'realiteit', editable: false,
+        meta: { echt: true, soort: c.cardio_type, duur, km: c.distance_km || null },
+      })
+    })
+
+    Object.keys(blocksByDay).forEach(d => { blocksByDay[d] = sortAndAssign(blocksByDay[d]) })
+    return {
+      blocksByDay, weekAnchor: anchor, weekStart, weekEnd,
+      aantallen: {
+        trainingen: (sessies.data || []).length, wegingen: (wegingen.data || []).length,
+        maaltijden: (maaltijden.data || []).length, checkins: (checkins.data || []).length, cardio: (cardio.data || []).length,
+      },
+    }
+  }
+
   async loadWeek(clientId, weekAnchor = null, forcedMealPlanId = null) {
     const anchor = weekAnchor ? getMondayOf(weekAnchor) : getMondayOf(new Date())
     const weekStart = toIsoDate(anchor)
