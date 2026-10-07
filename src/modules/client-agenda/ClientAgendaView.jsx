@@ -1179,6 +1179,10 @@ export default function ClientAgendaView({
   // een meal swapt of verwijdert. Elke verandering aan deze waarde
   // triggert een fresh fetch van week_structure + blocks.
   refreshKey = 0,
+  // Coach: maaltijd toevoegen op een dag en tijd via "Inplannen… → Maaltijd"
+  // en dan een plek in het rooster tikken. Krijgt { day, timing: 'HH:MM' };
+  // de ouder (plan-analyzer) opent daarop zijn wisselvenster.
+  onMealAdd = null,
   // Callback wanneer een meal-blok wordt verschoven (timing edit). De
   // parent (plan-analyzer) gebruikt dit om z'n lokale week_structure
   // te herladen zodat de meal-card meteen de nieuwe tijd toont.
@@ -1390,6 +1394,10 @@ export default function ClientAgendaView({
   // Vaste keuzes voor wat je snel wil inplannen. Duur in minuten, want die
   // verschilt sterk: boodschappen doe je in een uur, meal prep kost er twee.
   const SNELKEUZES = [
+    // Een maaltijd is geen agendablok maar een slot in het weekplan: die
+    // gaat via onMealAdd naar de analyzer, zodat het dagtotaal en het
+    // weekbudget meteen meebewegen.
+    ...(onMealAdd ? [{ id: 'maaltijd', label: 'Maaltijd', duur: 30, kleur: '#fff', maaltijd: true }] : []),
     { id: 'boodschappen', label: 'Boodschappen', duur: 60,  kleur: '#22c55e' },
     { id: 'mealprep',     label: 'Meal prep',    duur: 120, kleur: '#f59e0b' },
     { id: 'cardio',       label: 'Cardio',       duur: 45,  kleur: '#06b6d4' },
@@ -1405,6 +1413,12 @@ export default function ClientAgendaView({
     if (!teplaatsen || bulkBezig) return
     const minuut = HOUR_START * 60 + Math.max(0, Math.min(1, fractie)) * MINUTES_VISIBLE
     const start = Math.round(minuut / 15) * 15
+    if (teplaatsen.maaltijd) {
+      // Eén maaltijd per keer: het wisselvenster gaat open, dus plaatsmodus uit.
+      setTeplaatsen(null)
+      onMealAdd?.({ day, timing: formatTime(Math.min(start, 23 * 60 + 45)) })
+      return
+    }
     const eind = Math.min(24 * 60, start + teplaatsen.duur)
     setBulkBezig(true)
     try {
@@ -2096,7 +2110,7 @@ export default function ClientAgendaView({
               <option value="" style={{ background: '#1a1a1a', color: '#ccc' }}>Inplannen…</option>
               {SNELKEUZES.map(k => (
                 <option key={k.id} value={k.id} style={{ background: '#1a1a1a', color: '#fff' }}>
-                  {k.label} · {k.duur} min
+                  {k.maaltijd ? k.label : `${k.label} · ${k.duur} min`}
                 </option>
               ))}
             </select>

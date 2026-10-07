@@ -785,6 +785,8 @@ export default function PlanAnalyzer({
     // hier een fout vóór het opslaan, dus de maaltijd kwam nooit aan.
     const dagNaam = DAYS[swapState.dayIndex]?.full || 'pre-workout'
     const { slot, meal: oud } = swapState
+    // Toegevoegd vanuit de agenda: de getikte tijd gaat mee op de maaltijd.
+    if (swapState.timing) newMeal = { ...newMeal, timing: swapState.timing }
     if (bereik === 'day' || slot === PRE_WORKOUT_SLOT || !weekData) {
       await plaatsInSlot(newMeal, swapState.dayIndex, slot,
         `Swap ${dagNaam}: ${oud?.name || 'leeg'} → ${newMeal.name || '?'}`)
@@ -807,6 +809,8 @@ export default function PlanAnalyzer({
       await applyWeekUpdate(updated, omschrijving)
     }
     setSwapState(null)
+    // Agenda (en daarmee het weekbudget-paneel) opnieuw laden.
+    setAgendaRefreshKey(k => k + 1)
   }
 
   // Zelf gemaakte maaltijd: al opgeslagen in ai_meals, hier alleen nog in
@@ -950,6 +954,18 @@ export default function PlanAnalyzer({
     setAgendaRefreshKey(k => k + 1)
   }
 
+  // Vanuit de agenda: "Inplannen… → Maaltijd" en dan een dag en tijd getikt.
+  // Eerste vrije slot van die dag, wisselvenster open met de tijd erbij; na
+  // het kiezen staat de maaltijd op die tijd en telt hij mee in dagtotaal en
+  // weekbudget.
+  const agendaMealAdd = ({ day, timing }) => {
+    const idx = DAYS.findIndex(d => d.id === day)
+    if (idx < 0 || !weekData?.[idx]) return
+    const vrij = SLOTS.filter(s => s !== PRE_WORKOUT_SLOT).find(s => !weekData[idx].meals?.[s])
+    if (!vrij) { alert('Deze dag heeft geen vrij slot meer.'); return }
+    setActiveDay(idx)
+    setSwapState({ dayIndex: idx, slot: vrij, meal: null, timing: timing || null })
+  }
   const agendaMealSelect = ({ day, slot, meal }) => {
     const idx = DAYS.findIndex(d => d.id === day)
     if (idx < 0 || !slot) return
@@ -1662,7 +1678,9 @@ export default function PlanAnalyzer({
             background: '#111',
           }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
-              {swapState ? `Maaltijd kiezen · ${swapState.slot}`
+              {swapState ? (swapState.timing
+                  ? `Maaltijd toevoegen · ${DAYS[swapState.dayIndex]?.full?.toLowerCase() || ''} ${swapState.timing}`
+                  : `Maaltijd kiezen · ${swapState.slot}`)
                 : makerState ? `Maaltijd maken · ${makerState.slot}`
                 : applyDaysState ? 'Toepassen op dagen'
                 : dockedSection ? DOCK_LABELS[dockedSection] || dockedSection
@@ -1689,6 +1707,7 @@ export default function PlanAnalyzer({
             <WisselModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
               clientId={resolvedClientId || null}
               dagNaam={DAYS[swapState.dayIndex]?.full?.toLowerCase() || null}
+              tijd={swapState.timing || null}
               plekken={swapState.slot === PRE_WORKOUT_SLOT ? undefined : plekkenVanMaaltijd(swapState.meal)}
               targetCalories={targets?.calories || clientRecord?.target_calories || null}
               onSelect={handleSwapSelect}
@@ -1795,6 +1814,7 @@ export default function PlanAnalyzer({
                   // langs dezelfde handlers als de meal-cards, zodat totalen
                   // herberekend worden en het plan één schrijfpad houdt.
                   onMealSelect={agendaMealSelect}
+                  onMealAdd={agendaMealAdd}
                   onMealDelete={agendaMealDelete}
                   onMealDeleteMany={agendaMealDeleteMany}
                   onMealTimingChange={({ day, slot, newTiming }) => {
@@ -1966,6 +1986,7 @@ export default function PlanAnalyzer({
                 refreshKey={agendaRefreshKey}
                 mealPlanId={actievePlanId}
                 onMealSelect={agendaMealSelect}
+                onMealAdd={agendaMealAdd}
                 onMealDelete={agendaMealDelete}
                 onMealDeleteMany={agendaMealDeleteMany}
                 onMealTimingChange={({ day, slot, newTiming }) => {

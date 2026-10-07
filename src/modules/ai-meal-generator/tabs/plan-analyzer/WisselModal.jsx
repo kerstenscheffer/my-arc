@@ -91,6 +91,8 @@ export default function WisselModal({
   // undefined (pre-workout: één maaltijd voor het hele plan), dan wordt de
   // vraag overgeslagen.
   dagNaam = null, plekken = undefined,
+  // Toegevoegd vanuit de agenda: de getikte tijd ('18:00').
+  tijd = null,
   onSelect, onClose, isMobile, embedded = false,
 }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -465,7 +467,7 @@ export default function WisselModal({
           </div>
         ) : (
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: '0.7rem' }}>
-            Dit slot is nog leeg.
+            {tijd ? `Nieuwe maaltijd op ${dagNaam || 'deze dag'} om ${tijd}.` : 'Dit slot is nog leeg.'}
           </div>
         )}
 
