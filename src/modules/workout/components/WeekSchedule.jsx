@@ -1,12 +1,13 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
-import { AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import WeekGrid from './week-schedule/WeekGrid'
 import WorkoutServiceNew from '../services/WorkoutServiceNew'
 import { rustWaarschuwingen, waarschuwingTekst, ROOD } from '../utils/rustWaarschuwing'
 import ActionButtons from './week-schedule/ActionButtons'
 import CardioService, { normaliseerSoort } from '../services/CardioService'
+import TrainingToevoegen from './TrainingToevoegen'
 
 // Bereken de maandag van de huidige week (lokale tijd).
 function getThisMonday() {
@@ -76,8 +77,10 @@ export default function WeekSchedule({
     const maandag = (() => { const d = getThisMonday(); d.setDate(d.getDate() + weekOffset * 7); return d })()
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     Promise.all([
-      db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time')
+      db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time, week_start')
         .eq('client_id', clientId).eq('type', 'custom').ilike('label', 'Cardio ·%')
+        // Vaste blokken (week_start leeg) elke week; eenmalige alleen in hun week.
+        .or(`week_start.is.null,week_start.eq.${iso(maandag)}`)
         .then(r => r, () => ({ data: [] })),
       CardioService.getLogs(clientId, iso(maandag), db),
       db.supabase.from('client_agenda_blocks').select('day, start_time').eq('client_id', clientId).eq('type', 'training')
@@ -226,6 +229,70 @@ export default function WeekSchedule({
     handleAutoSave(next)
   }
 
+  // ── Training toevoegen (knop onder de week) ──
+  const [toevoegenOpen, setToevoegenOpen] = useState(false)
+  const volgendeWeekSleutel = (() => { const d = new Date(getoondeMaandag); d.setDate(d.getDate() + 7); return WorkoutServiceNew.datumSleutel(d) })()
+
+  // Gym: 'standaard' = het vaste rooster (en de getoonde week als die een
+  // eigen planning heeft). 'eenmalig' in een komende week = alleen die week.
+  // 'eenmalig' in deze week: het vaste rooster nu aanpassen (zo klopt de
+  // workout van vandaag) en de oude indeling klaarzetten als planning voor
+  // volgende week, zodat het daarna vanzelf terugspringt — tenzij volgende
+  // week al een eigen planning heeft, dan blijft die.
+  const bewaarGym = async ({ workoutKey, day, bereik }) => {
+    const next = { ...tempSchedule, [day]: workoutKey }
+    if (isToekomst) {
+      const ok = await WorkoutServiceNew.saveWeekPlanning(clientId, weekSleutel, next, db)
+      if (!ok) throw new Error('niet opgeslagen')
+      if (bereik === 'standaard') {
+        const vast = (await db.getClientWorkoutSchedule(clientId)) || {}
+        await db.updateClientWorkoutSchedule(clientId, { ...vast, [day]: workoutKey })
+      }
+      setTempSchedule(next)
+      await loadCustomWorkoutsForSchedule(next)
+      await laadBuurWeken()
+      return
+    }
+    if (bereik === 'eenmalig') {
+      const eigenVolgende = await WorkoutServiceNew.getWeekPlanning(clientId, volgendeWeekSleutel, db)
+      if (!eigenVolgende) await WorkoutServiceNew.saveWeekPlanning(clientId, volgendeWeekSleutel, tempSchedule, db)
+    }
+    await handleAutoSave(next)
+    await loadCustomWorkoutsForSchedule(next)
+  }
+
+  // Cardio: blokken in de agenda op de gekozen dagen. Standaard = vast blok
+  // (elke week) én een regel in het cardioplan; eenmalig = blok met
+  // week_start, alleen zichtbaar in deze week.
+  const bewaarCardio = async ({ soort, duur, tijd, dagen, bereik }) => {
+    const label = `Cardio · ${soort}`
+    const [h, m] = String(tijd || '18:00').split(':').map(Number)
+    const startMin = (h || 0) * 60 + (m || 0)
+    const eindMin = Math.min(24 * 60, startMin + duur)
+    const tijdStr = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}:00`
+    const rijen = dagen.map(d => ({
+      client_id: clientId, day: d.toLowerCase(), type: 'custom', label, sublabel: null,
+      start_time: tijdStr(startMin), end_time: tijdStr(eindMin), color: '#06b6d4',
+      week_start: bereik === 'eenmalig' ? weekSleutel : null, updated_at: new Date().toISOString(),
+    }))
+    const { error } = await db.supabase.from('client_agenda_blocks').insert(rijen)
+    if (error) throw error
+    if (bereik === 'standaard') {
+      const plan = await CardioService.getPlan(clientId, db)
+      const bestaand = plan.find(p => normaliseerSoort(p.cardio_type) === normaliseerSoort(soort))
+      const { data: vaste } = await db.supabase.from('client_agenda_blocks').select('id')
+        .eq('client_id', clientId).eq('type', 'custom').eq('label', label).is('week_start', null)
+        .then(r => r, () => ({ data: null }))
+      await CardioService.savePlanItem({
+        id: bestaand?.id || null, client_id: clientId, cardio_type: soort,
+        times_per_week: (vaste || []).length || dagen.length, duration_minutes: duur,
+        intensity: bestaand?.intensity || null, notes: bestaand?.notes || null, sort_order: bestaand?.sort_order || 0,
+      }, db)
+    }
+    setCardioVersie(v => v + 1)
+    window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
+  }
+
   const handleSwapClick = (day, workoutKey) => {
     if (!hasValidSchema) return
     if (!localSwapMode) {
@@ -273,6 +340,29 @@ export default function WeekSchedule({
     dagDataVan: getWorkoutData,
     maandag: getoondeMaandag,
   })
+
+  // Cardio per dagindex voor de getoonde week: voor de dagkaarten en voor
+  // de dagkiezer in 'Training toevoegen'.
+  const cardioPerDagVan = (dayDates) => {
+    const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const uit = {}
+    sleutels.forEach((k, i) => {
+      const datum = dayDates?.[i] ? iso(dayDates[i]) : null
+      const lijst = cardioBlokken.filter(b => b.day === k)
+        .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)))
+        .map(b => {
+          const soort = String(b.label).replace(/^Cardio\s*·\s*/, '')
+          const [h, m] = String(b.start_time || '').split(':').map(Number)
+          const [eh, em] = String(b.end_time || '').split(':').map(Number)
+          const duur = Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null
+          const gedaan = !!datum && cardioLogs.some(l => String(l.logged_date).slice(0, 10) === datum && normaliseerSoort(l.cardio_type) === normaliseerSoort(soort))
+          return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, eenmalig: !!b.week_start }
+        })
+      if (lijst.length) uit[i] = lijst
+    })
+    return uit
+  }
 
   if (!hasValidSchema) {
     return (
@@ -362,31 +452,13 @@ export default function WeekSchedule({
         const dayDates = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(monday); d.setDate(d.getDate() + i); return d
         })
+        const cardioPerDag = cardioPerDagVan(dayDates)
         return (
           <>
             {/* WeekGrid: tegen de schermrand aan, zodat de kaarten breed zijn. */}
             <div style={{ padding: isMobile ? '0 0.4rem' : '0 1rem' }}>
               <WeekGrid
-                cardioPerDag={(() => {
-                  const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-                  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-                  const uit = {}
-                  sleutels.forEach((k, i) => {
-                    const datum = dayDates?.[i] ? iso(dayDates[i]) : null
-                    const lijst = cardioBlokken.filter(b => b.day === k)
-                      .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)))
-                      .map(b => {
-                        const soort = String(b.label).replace(/^Cardio\s*·\s*/, '')
-                        const [h, m] = String(b.start_time || '').split(':').map(Number)
-                        const [eh, em] = String(b.end_time || '').split(':').map(Number)
-                        const duur = Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null
-                        const gedaan = !!datum && cardioLogs.some(l => String(l.logged_date).slice(0, 10) === datum && normaliseerSoort(l.cardio_type) === normaliseerSoort(soort))
-                        return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan }
-                      })
-                    if (lijst.length) uit[i] = lijst
-                  })
-                  return uit
-                })()}
+                cardioPerDag={cardioPerDag}
                 onCardioShift={async (c, dir) => {
                   // Cardio-blok een dag opzij in de agenda, los van de training.
                   const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
@@ -491,6 +563,27 @@ export default function WeekSchedule({
                 Je plant vooruit. Dit geldt vanaf {fmt(monday)}
               </div>
             )}
+
+            {/* Training toevoegen: gym of cardio, standaard of eenmalig. */}
+            {kanPlannen && (
+              <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.25rem' : '0.625rem 1rem 0.375rem' }}>
+                <button onClick={() => setToevoegenOpen(true)} style={{
+                  width: '100%', minHeight: isMobile ? 46 : 50, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a',
+                  fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, letterSpacing: '-0.01em', fontFamily: 'inherit',
+                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  <Plus size={18} strokeWidth={3} /> Training toevoegen
+                </button>
+              </div>
+            )}
+            <TrainingToevoegen
+              open={toevoegenOpen} onClose={() => setToevoegenOpen(false)} isMobile={isMobile}
+              schema={schema} workoutService={workoutService} clientId={clientId}
+              tempSchedule={tempSchedule} getWorkoutData={getWorkoutData} dayDates={dayDates}
+              isHuidigeWeek={isHuidigeWeek} cardioPerDag={cardioPerDag}
+              onBewaarGym={bewaarGym} onBewaarCardio={bewaarCardio}
+            />
 
             {tussenBlok}
           </>

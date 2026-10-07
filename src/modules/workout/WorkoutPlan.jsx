@@ -11,7 +11,8 @@ import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
 import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
 import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 import WorkoutProgressToast from './components/WorkoutProgressToast'
-import CardioLogSection from './components/CardioLogSection'
+import StappenStrook from './components/StappenStrook'
+import CardioLogVanger from './components/CardioLogVanger'
 import WorkoutHistory from '../progress/WorkoutHistory'
 import BladModal from './components/todays-workout/components/BladModal'
 import FadeOnScroll from '../../components/FadeOnScroll'
@@ -234,7 +235,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
           onSwitchPlan={() => setShowPlanSwitch(true)}
           weekOffset={weekOffset}
           onWeekOffsetChange={setWeekOffset}
-          tussenBlok={<CardioLogSection client={client} db={db} isMobile={isMobile} />}
+          tussenBlok={<StappenStrook client={client} db={db} isMobile={isMobile} />}
         />
       </div></FadeOnScroll>}
 
@@ -244,6 +245,8 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       {/* Het compliment schuift zichzelf rechtsboven in beeld; het hoeft dus
           geen plek meer in de paginastroom. */}
       {!workoutOpen && <WorkoutProgressToast client={client} db={db} onViewChart={handleToastViewChart} />}
+      {/* Tik op een cardiotegel in het weekrooster → logblad. */}
+      <CardioLogVanger client={client} db={db} isMobile={isMobile} />
       {!workoutOpen && (
         <FadeOnScroll>
           <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>

@@ -1124,10 +1124,15 @@ export class ClientAgendaService {
   }
 
   async _loadCustomBlocks(clientId) {
+    // Eenmalige blokken (week_start gevuld) horen bij één week; hier tonen we
+    // alleen die van de lopende week, de vaste blokken altijd.
+    const nu = new Date(); const dag = nu.getDay(); nu.setDate(nu.getDate() + (dag === 0 ? -6 : 1 - dag))
+    const maandag = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, '0')}-${String(nu.getDate()).padStart(2, '0')}`
     const { data, error } = await this.supabase
       .from('client_agenda_blocks')
       .select('*')
       .eq('client_id', clientId)
+      .or(`week_start.is.null,week_start.eq.${maandag}`)
     if (error) { console.warn('loadCustomBlocks', error); return [] }
     return data || []
   }
