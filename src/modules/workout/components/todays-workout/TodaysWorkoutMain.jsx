@@ -147,8 +147,9 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       const sessie = await db.getOrCreateWorkoutSession(client.id, todayStr, {
         day_display_name: todaysWorkout?.name || 'Workout',
       })
+      const naam = todaysWorkout?.name || todaysWorkout?.focus || null
       await db.supabase.from('workout_sessions')
-        .update({ duration_minutes: durationMin })
+        .update({ duration_minutes: durationMin, ...(naam && /^quick log/i.test(sessie?.day_display_name || '') ? { day_display_name: naam } : {}) })
         .eq('id', sessie.id)
     } catch (e) {
       console.error('Trainingsduur opslaan mislukt:', e)

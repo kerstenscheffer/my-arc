@@ -35,6 +35,27 @@ export default function HistorieBlad({ db, clientId, isMobile }) {
   const [cardio, setCardio] = useState([])
   const [open, setOpen] = useState(null) // { type: 'training', blok } | { type: 'cardio', log }
   const [limiet, setLimiet] = useState(40)
+  // Rooster + plan om oude sessies zonder echte naam ('Quick Log - …') alsnog
+  // een naam te geven op basis van de weekdag.
+  const [naamPerWeekdag, setNaamPerWeekdag] = useState({})
+  useEffect(() => {
+    if (!clientId || !db?.supabase) return
+    let weg = false
+    ;(async () => {
+      const { data: klant } = await db.supabase.from('clients').select('workout_schedule, assigned_schema_id').eq('id', clientId).maybeSingle().then(r => r, () => ({ data: null }))
+      if (!klant?.assigned_schema_id) return
+      const { data: plan } = await db.supabase.from('workout_schemas').select('week_structure').eq('id', klant.assigned_schema_id).maybeSingle().then(r => r, () => ({ data: null }))
+      if (weg) return
+      const uit = {}
+      Object.entries(klant.workout_schedule || {}).forEach(([dag, sleutel]) => {
+        const d = plan?.week_structure?.[sleutel]
+        const naam = (d?.name || d?.focus || '').trim()
+        if (naam) uit[dag.toLowerCase()] = naam
+      })
+      setNaamPerWeekdag(uit)
+    })()
+    return () => { weg = true }
+  }, [clientId, db])
 
   useEffect(() => {
     if (!clientId || !db?.supabase) return
@@ -71,7 +92,9 @@ export default function HistorieBlad({ db, clientId, isMobile }) {
       const start = minVan(s.created_at)
       let eind = laatste ? minVan(laatste) + 5 : start + (Number(s.duration_minutes) || 60)
       eind = Math.min(eind, start + 120, 24 * 60); if (eind <= start) eind = Math.min(start + 45, 24 * 60)
-      const naam = s.day_display_name || s.day_name || 'Training'
+      const ruw = s.day_display_name || ''
+      const weekdag = new Date(String(s.workout_date).slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+      const naam = (!ruw || /^quick log/i.test(ruw)) ? (naamPerWeekdag[weekdag] || 'Training') : ruw
       voeg(String(s.workout_date).slice(0, 10), {
         type: 'training', id: s.id, naam, tijd: s.created_at,
         sub: [`${oef.length} oef`, `${sets} sets`, s.duration_minutes ? `${s.duration_minutes} min` : null, beste ? `beste ${nl(beste)} kg` : null].filter(Boolean).join(' · '),
@@ -92,7 +115,7 @@ export default function HistorieBlad({ db, clientId, isMobile }) {
     return Object.keys(perDag).sort((a, b) => b.localeCompare(a)).map(datum => ({
       datum, items: perDag[datum].sort((a, b) => new Date(b.tijd) - new Date(a.tijd)),
     }))
-  }, [sessies, cardio, soort, zoek])
+  }, [sessies, cardio, soort, zoek, naamPerWeekdag])
 
   const totaal = { trainingen: (sessies || []).length, cardio: cardio.length, sets: (sessies || []).reduce((t, s) => t + (s.workout_progress || []).reduce((u, p) => u + (Array.isArray(p.sets) ? p.sets.length : 0), 0), 0) }
   const zichtbaar = dagen.slice(0, limiet)

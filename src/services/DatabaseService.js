@@ -754,13 +754,37 @@ async _ruimLegeDubbeleSessiesOp(sessies) {
   if (wisFout) console.warn('Lege dubbele sessies opruimen mislukt:', wisFout)
 }
 
+// Naam van de trainingsdag volgens het rooster: clients.workout_schedule
+// (weekdag → dag-sleutel) en de naam van die dag in het actieve plan. Zo heet
+// een sessie 'Legs' en niet 'Quick Log - 7-10-2026'.
+async naamVanTrainingsdag(clientId, datum) {
+  try {
+    const { data: klant } = await this.supabase.from('clients')
+      .select('workout_schedule, assigned_schema_id').eq('id', clientId).maybeSingle()
+    const rooster = klant?.workout_schedule || {}
+    const weekdag = new Date(`${datum}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+    const sleutel = rooster[weekdag] || rooster[weekdag.toLowerCase()] || null
+    if (!sleutel || !klant?.assigned_schema_id) return null
+    const { data: plan } = await this.supabase.from('workout_schemas')
+      .select('week_structure').eq('id', klant.assigned_schema_id).maybeSingle()
+    const dag = plan?.week_structure?.[sleutel]
+    return (dag?.name || dag?.focus || '').trim() || null
+  } catch { return null }
+}
+
 async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null) {
   try {
     // 1. Create or get today's workout session
     const today = new Date().toISOString().split('T')[0]
+    const naam = await this.naamVanTrainingsdag(clientId, today)
     const session = await this.getOrCreateWorkoutSession(clientId, today, {
-      day_display_name: `Quick Log - ${new Date().toLocaleDateString()}`,
+      day_display_name: naam || 'Training',
     })
+    // Bestond de sessie al met de oude generieke naam? Dan alsnog de echte.
+    if (naam && /^quick log/i.test(session?.day_display_name || '')) {
+      await this.supabase.from('workout_sessions').update({ day_display_name: naam }).eq('id', session.id)
+        .then(r => r, () => null)
+    }
     
     // 2. Check if progress entry already exists for this exercise TODAY
     // Zelfde valkuil als bij de sessie: er staan in deze tabel al combinaties
