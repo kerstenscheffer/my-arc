@@ -133,33 +133,33 @@ function planPerDag(mealPlan) {
 // en zo is teruggaan naar nul ook meteen duidelijk.
 function Stapper({ label, waarde, eenheid, stap, onChange, toelichting }) {
   const knop = {
-    width: 24, height: 24, flexShrink: 0,
+    width: 32, height: 32, flexShrink: 0, borderRadius: 8,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'rgba(255,255,255,0.06)',
-    borderTop: '1px solid rgba(255,255,255,0.12)',
-    borderBottom: '1px solid rgba(255,255,255,0.12)',
-    borderLeft: '1px solid rgba(255,255,255,0.12)',
-    borderRight: '1px solid rgba(255,255,255,0.12)',
+    borderTop: '1px solid rgba(255,255,255,0.15)',
+    borderBottom: '1px solid rgba(255,255,255,0.15)',
+    borderLeft: '1px solid rgba(255,255,255,0.15)',
+    borderRight: '1px solid rgba(255,255,255,0.15)',
     color: '#fff', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900,
     cursor: 'pointer', lineHeight: 1,
   }
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>
           {label}
         </span>
         <button onClick={() => onChange(waarde - stap)} style={knop}>−</button>
         <span style={{
           minWidth: 52, textAlign: 'center',
-          fontSize: '0.72rem', fontWeight: 900,
-          color: waarde === 0 ? 'rgba(255,255,255,0.35)' : '#FFD700',
+          fontSize: '0.8rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
+          color: waarde === 0 ? 'rgba(255,255,255,0.35)' : '#fff',
         }}>
           {waarde > 0 ? `+${waarde}` : waarde}
         </span>
         <button onClick={() => onChange(waarde + stap)} style={knop}>+</button>
       </div>
-      <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>
+      <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
         {eenheid}{toelichting ? ` · ${toelichting}` : ''}
       </div>
     </div>
@@ -188,6 +188,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   const [simTdee, setSimTdee] = useState(0)          // kcal per dag erbij of eraf
   const [simTrainingen, setSimTrainingen] = useState(0) // sessies per week erbij
   const [simStappen, setSimStappen] = useState(null)    // andere band, of null
+  const [simCardio, setSimCardio] = useState(0)         // minuten cardio per week erbij
 
   // Pas ophalen als je het paneel opent. De agenda laadt al genoeg bij het
   // openen van de pagina; dit hoeft daar niet bij.
@@ -224,7 +225,36 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
 
   const perDag = planPerDag(mealPlan)
   const planWeek = perDag ? perDag.totaal : null
-  const verbranding = tdee?.tdee ? tdee.tdee * 7 : null
+
+  // ── Wat-als: afwijkingen op de verbranding ──
+  // Alles hieronder rekent met de effectieve TDEE, zodat het hele venster
+  // meebeweegt: Verbrandt, Mag eten, het overschot en het tempo. Geen apart
+  // uitkomstvak; 'Terug naar nu' zet alles op nul.
+  const gewicht = Number(tdee?.current_weight) || null
+  const kcalPerTraining = gewicht
+    ? Math.round(MET_KRACHTTRAINING * 3.5 * gewicht / 200 * TRAINING_MINUTEN)
+    : null
+  // Cardio op zone 2 (MET 6): kcal per minuut uit het lichaamsgewicht.
+  const kcalPerCardioMin = gewicht ? Math.round(6 * 3.5 * gewicht / 200 * 10) / 10 : null
+  const kcalPer1000Stappen = gewicht ? Math.round(KCAL_PER_1000_STAPPEN_PER_KG * gewicht) : null
+
+  const huidigeBand = tdee?.daily_steps || null
+  const stapVerschilPerDag = (() => {
+    if (!simStappen || !huidigeBand || !kcalPer1000Stappen) return 0
+    const verschil = (STAP_MIDDEN[simStappen] ?? 0) - (STAP_MIDDEN[huidigeBand] ?? 0)
+    return Math.round((verschil / 1000) * kcalPer1000Stappen)
+  })()
+  const extraPerDag = Math.round(
+    simTdee
+    + stapVerschilPerDag
+    + ((kcalPerTraining || 0) * simTrainingen) / 7
+    + ((kcalPerCardioMin || 0) * simCardio) / 7
+  )
+  const simActief = simAan && extraPerDag !== 0
+  const tdeeNu = tdee?.tdee ? Number(tdee.tdee) : null
+  const tdeeEff = tdeeNu != null ? tdeeNu + (simActief ? extraPerDag : 0) : null
+
+  const verbranding = tdeeEff != null ? tdeeEff * 7 : null
   const tekort = (planWeek != null && verbranding != null) ? verbranding - planWeek : null
   const kilos = tekort != null ? tekort / KCAL_PER_KILO : null
 
@@ -252,30 +282,6 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   })()
   const doelLabel = richting === 'afvallen' ? 'Cut' : richting === 'aankomen' ? 'Build' : richting === 'stabiel' ? 'Onderhoud' : null
   const kgTekst = (n) => `${n < 0 ? '−' : n > 0 ? '+' : ''}${Math.abs(n).toFixed(2)} kg`
-
-  // ── Wat-als doorrekenen ──
-  const gewicht = Number(tdee?.current_weight) || null
-  const kcalPerTraining = gewicht
-    ? Math.round(MET_KRACHTTRAINING * 3.5 * gewicht / 200 * TRAINING_MINUTEN)
-    : null
-  const kcalPer1000Stappen = gewicht ? Math.round(KCAL_PER_1000_STAPPEN_PER_KG * gewicht) : null
-
-  const huidigeBand = tdee?.daily_steps || null
-  const stapVerschilPerDag = (() => {
-    if (!simStappen || !huidigeBand || !kcalPer1000Stappen) return 0
-    const verschil = (STAP_MIDDEN[simStappen] ?? 0) - (STAP_MIDDEN[huidigeBand] ?? 0)
-    return Math.round((verschil / 1000) * kcalPer1000Stappen)
-  })()
-
-  const simVerbranding = verbranding == null ? null : (
-    verbranding
-    + simTdee * 7
-    + stapVerschilPerDag * 7
-    + (kcalPerTraining || 0) * simTrainingen
-  )
-  const simTekort = (simVerbranding != null && planWeek != null) ? simVerbranding - planWeek : null
-  const simKilos = simTekort != null ? simTekort / KCAL_PER_KILO : null
-  const simActief = simAan && (simTdee !== 0 || simTrainingen !== 0 || !!simStappen)
 
   const rand = 'rgba(255,255,255,0.1)'
   const regel = (label, waarde, toelichting, kleur = '#fff') => (
@@ -392,7 +398,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
               {tdee !== undefined && (
                 <div style={{ display: 'flex', gap: 6, padding: '0.5rem 0 0.2rem' }}>
                   {[
-                    { label: 'Verbrandt', sub: 'TDEE per dag', waarde: tdee?.tdee ? getal(tdee.tdee) : '?', kleur: '#fff' },
+                    { label: 'Verbrandt', sub: simActief ? `wat als · nu ${getal(tdeeNu)}` : 'TDEE per dag', waarde: tdeeEff != null ? getal(tdeeEff) : '?', kleur: simActief ? '#22c55e' : '#fff' },
                     { label: 'Plan geeft', sub: 'per dag', waarde: getal(planWeek / 7), kleur: '#fff' },
                     {
                       label: 'Mag eten', sub: 'voor streeftempo',
@@ -551,7 +557,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   // Staafjes en de TDEE-lijn delen dezelfde schaal, anders
                   // zegt "erboven of eronder" niets. De schaal loopt daarom
                   // tot de hoogste van beide.
-                  const dagTdee = tdee?.tdee || null
+                  const dagTdee = tdeeEff || null
                   const hoogste = Math.max(...perDag.dagen.map(x => x.kcal), dagTdee || 0, dagDoelKcal || 0, 1)
                   // Ruim hoog: het verschil tussen "vult het blok" en
                   // "blijft eronder" is de hele boodschap, en op 44px zag je
@@ -665,119 +671,98 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                 })()}
 
               {/* ── Wat als ──────────────────────────────────────────────
-                  Aan de knoppen zitten zonder iets te wijzigen: wat gebeurt
-                  er met het tekort als de TDEE anders is, als er een training
-                  bij komt, of als hij meer gaat lopen. Verandert niets in de
-                  database — het is een rekenmachine, geen instelling. */}
+                  Verandert niets in de database. Draai je aan een knop, dan
+                  rekent het hele venster met de nieuwe verbranding. */}
               {verbranding != null && (
                 <div style={{ marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                   <button onClick={() => setSimAan(o => !o)} style={{
-                    display: 'flex', alignItems: 'center', gap: 5, width: '100%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%',
                     background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                    color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
-                    fontSize: '0.62rem', fontWeight: 800,
+                    color: '#fff', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800,
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   }}>
-                    {simAan ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                    Wat als…
+                    <span>Wat als…</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 700, color: simActief ? '#22c55e' : 'rgba(255,255,255,0.45)' }}>
+                      {simActief ? `${extraPerDag > 0 ? '+' : '−'}${getal(Math.abs(extraPerDag))} kcal per dag` : 'TDEE, training, stappen, cardio'}
+                      <ChevronDown size={13} style={{ transform: simAan ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                    </span>
                   </button>
 
                   {simAan && (
-                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <Stapper
                         label="TDEE"
                         waarde={simTdee}
-                        eenheid="kcal/dag"
+                        eenheid="kcal per dag"
                         stap={50}
                         onChange={setSimTdee}
-                        toelichting={`nu ${getal(tdee.tdee)}`}
+                        toelichting={`nu ${getal(tdeeNu)}`}
                       />
                       <Stapper
                         label="Trainingen"
                         waarde={simTrainingen}
                         eenheid="per week"
                         stap={1}
-                        onChange={setSimTrainingen}
+                        onChange={(v) => setSimTrainingen(Math.max(-7, v))}
                         toelichting={kcalPerTraining ? `± ${kcalPerTraining} kcal per sessie` : 'gewicht onbekend'}
+                      />
+                      <Stapper
+                        label="Cardio"
+                        waarde={simCardio}
+                        eenheid="minuten per week"
+                        stap={15}
+                        onChange={(v) => setSimCardio(Math.max(0, v))}
+                        toelichting={kcalPerCardioMin ? `± ${kcalPerCardioMin} kcal per minuut, zone 2` : 'gewicht onbekend'}
                       />
 
                       <div>
-                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginBottom: 3 }}>
-                          Stappen
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>Stappen</span>
+                          <select
+                            value={simStappen || ''}
+                            onChange={e => setSimStappen(e.target.value || null)}
+                            style={{
+                              minHeight: 32, padding: '0 0.5rem',
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
+                              color: '#fff', fontSize: '0.74rem', fontWeight: 800,
+                              fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+                            }}
+                          >
+                            <option value="" style={{ background: '#1a1a1a' }}>
+                              {huidigeBand ? `nu ${STAP_LABEL[huidigeBand]}` : 'niet bekend'}
+                            </option>
+                            {Object.keys(STAP_MIDDEN).map(b => (
+                              <option key={b} value={b} style={{ background: '#1a1a1a' }}>{STAP_LABEL[b]}</option>
+                            ))}
+                          </select>
                         </div>
-                        <select
-                          value={simStappen || ''}
-                          onChange={e => setSimStappen(e.target.value || null)}
-                          style={{
-                            width: '100%', padding: '0.35rem 0.4rem',
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.12)', borderRadius: 0,
-                            color: '#fff', fontSize: '0.7rem', fontWeight: 800,
-                            fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
-                          }}
-                        >
-                          <option value="" style={{ background: '#1a1a1a' }}>
-                            {huidigeBand ? `nu: ${STAP_LABEL[huidigeBand]}` : 'niet ingevuld in de intake'}
-                          </option>
-                          {Object.keys(STAP_MIDDEN).map(b => (
-                            <option key={b} value={b} style={{ background: '#1a1a1a' }}>{STAP_LABEL[b]}</option>
-                          ))}
-                        </select>
-                        {stapVerschilPerDag !== 0 && (
-                          <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                            {stapVerschilPerDag > 0 ? '+' : '−'}{Math.abs(stapVerschilPerDag)} kcal per dag
-                          </div>
-                        )}
-                        {!huidigeBand && (
-                          <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#f59e0b', marginTop: 2 }}>
-                            Zonder antwoord uit de intake valt er niets te vergelijken.
-                          </div>
-                        )}
+                        <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                          {!huidigeBand
+                            ? 'Geen stappen uit de intake; dan valt er niets te vergelijken.'
+                            : stapVerschilPerDag !== 0
+                              ? `${stapVerschilPerDag > 0 ? '+' : '−'}${Math.abs(stapVerschilPerDag)} kcal per dag`
+                              : kcalPer1000Stappen ? `± ${kcalPer1000Stappen} kcal per 1.000 stappen` : 'gewicht onbekend'}
+                        </div>
                       </div>
 
-                      {/* Uitkomst */}
-                      <div style={{
-                        marginTop: 2, padding: '0.5rem 0.6rem',
-                        background: simActief ? 'rgba(255,215,0,0.06)' : 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${simActief ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)'}`,
-                      }}>
-                        {!simActief ? (
-                          <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
-                            Draai aan een knop om het effect te zien.
-                          </div>
-                        ) : (
-                          <>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
-                              <span>Verbranding</span>
-                              <span>{getal(verbranding)} → <span style={{ color: '#fff' }}>{getal(simVerbranding)}</span></span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 3, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
-                              <span>{simTekort >= 0 ? 'Tekort' : 'Overschot'}</span>
-                              <span>{getal(Math.abs(tekort))} → <span style={{ color: '#fff' }}>{getal(Math.abs(simTekort))}</span></span>
-                            </div>
-                            <div style={{ marginTop: 5, fontSize: '1.05rem', fontWeight: 900, color: simTekort >= 0 ? '#10b981' : '#f59e0b' }}>
-                              {simTekort >= 0 ? '−' : '+'}{Math.abs(simKilos).toFixed(2)} kg
-                              <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
-                                {' '}per week · was {kilos >= 0 ? '−' : '+'}{Math.abs(kilos).toFixed(2)}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => { setSimTdee(0); setSimTrainingen(0); setSimStappen(null) }}
-                              style={{
-                                marginTop: 6, background: 'none', border: 'none', padding: 0,
-                                color: 'rgba(255,255,255,0.4)', fontFamily: 'inherit',
-                                fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer',
-                              }}
-                            >
-                              Terug naar nu
-                            </button>
-                          </>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: '0.64rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', lineHeight: 1.35 }}>
+                          Schattingen; wijzigt niets. De cijfers hierboven rekenen ermee.
+                        </span>
+                        {simActief && (
+                          <button
+                            onClick={() => { setSimTdee(0); setSimTrainingen(0); setSimCardio(0); setSimStappen(null) }}
+                            style={{
+                              flexShrink: 0, minHeight: 32, padding: '0 0.7rem', borderRadius: 8,
+                              background: 'transparent', border: '1px solid rgba(255,255,255,0.25)',
+                              color: '#fff', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer',
+                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            }}
+                          >
+                            Terug naar nu
+                          </button>
                         )}
-                      </div>
-
-                      <div style={{ fontSize: '0.55rem', fontWeight: 600, color: 'rgba(255,255,255,0.25)', lineHeight: 1.35 }}>
-                        Schattingen, en ze wijzigen niets. Lopen gerekend op
-                        {kcalPer1000Stappen ? ` ${kcalPer1000Stappen} kcal per 1.000 stappen` : ' gewicht onbekend'},
-                        training op een uur krachttraining.
                       </div>
                     </div>
                   )}
