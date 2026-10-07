@@ -32,10 +32,11 @@ export default function WeekGrid({
   }
 
   const gap = isMobile ? '0.3rem' : '0.5rem'
-  const PIJL_B = isMobile ? 22 : 26
+  // Weekpijlen in het Ma- en Zo-vak van de strook zelf, zodat de kaarten
+  // eronder de volle breedte houden.
   const pijl = {
-    flexShrink: 0, width: PIJL_B, height: isMobile ? 22 : 26, padding: 0, borderRadius: 7,
-    background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer',
+    flexShrink: 0, width: isMobile ? 16 : 18, height: isMobile ? 22 : 26, padding: 0,
+    background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
@@ -43,37 +44,35 @@ export default function WeekGrid({
     {/* Eén dagenstrook boven het rooster, in dezelfde kolommen als de
         kaarten: dag en datum, vandaag als witte pil. De kaarten zelf hebben
         geen label meer, dus de tegels krijgen de hoogte. */}
-    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 2 : 4, minWidth: 0, width: '100%', marginBottom: isMobile ? 4 : 6 }}>
-      {/* Weekpijlen op de dagenstrook: links van Ma, rechts van Zo. De
-          kaarten eronder springen evenveel in zodat de kolommen gelijk lopen. */}
-      <button onClick={onPrevWeek} aria-label="Vorige week" style={pijl}><ChevronLeft size={isMobile ? 16 : 18} strokeWidth={3} /></button>
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: kolommen, gap, minWidth: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap, minWidth: 0, width: '100%', marginBottom: isMobile ? 4 : 6 }}>
       {weekDays.map((day, index) => {
         const vandaag = kanOpenen && index === todayIndex
         const d = dayDates ? dayDates[index] : null
+        const eerste = index === 0, laatste = index === 6
         return (
           <div key={day} style={{
-            minWidth: 0, textAlign: 'center', minHeight: isMobile ? 22 : 26, borderRadius: 7,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+            minWidth: 0, minHeight: isMobile ? 22 : 26, borderRadius: 7,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: vandaag ? '#fff' : 'transparent',
             color: vandaag ? '#000' : (leeg[index] ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.7)'),
             fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase',
             whiteSpace: 'nowrap', overflow: 'hidden',
           }}>
-            {weekDaysDutch[index]}{d && !leeg[index] ? <span style={{ fontWeight: 800, opacity: vandaag ? 0.75 : 0.6, letterSpacing: 0 }}>{d.getDate()}</span> : null}
+            {eerste && <button onClick={onPrevWeek} aria-label="Vorige week" style={{ ...pijl, color: vandaag ? '#000' : '#fff' }}><ChevronLeft size={isMobile ? 14 : 16} strokeWidth={3} /></button>}
+            <span style={{ flex: eerste || laatste ? 1 : 'none', minWidth: 0, textAlign: 'center', display: 'inline-flex', justifyContent: 'center', gap: 3 }}>
+              {weekDaysDutch[index]}{d && !leeg[index] ? <span style={{ fontWeight: 800, opacity: vandaag ? 0.75 : 0.6, letterSpacing: 0 }}>{d.getDate()}</span> : null}
+            </span>
+            {laatste && <button onClick={onNextWeek} aria-label="Volgende week" style={{ ...pijl, color: vandaag ? '#000' : '#fff' }}><ChevronRight size={isMobile ? 14 : 16} strokeWidth={3} /></button>}
           </div>
         )
       })}
-      </div>
-      <button onClick={onNextWeek} aria-label="Volgende week" style={pijl}><ChevronRight size={isMobile ? 16 : 18} strokeWidth={3} /></button>
     </div>
     <div style={{
       display: 'grid',
       gridTemplateColumns: kolommen,
       gap,
       marginBottom: isMobile ? '0.5rem' : '0.625rem',
-      minWidth: 0, boxSizing: 'border-box', width: '100%',
-      padding: `0 ${PIJL_B + (isMobile ? 2 : 4)}px`,
+      minWidth: 0, width: '100%',
     }}>
       {weekDays.map((day, index) => {
         const assignedWorkout = tempSchedule[day]
