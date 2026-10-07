@@ -19,6 +19,7 @@ import { balkVak, balkVakActief } from './werkbalkStijl'
 import useZwevendVenster from '../../components/useZwevendVenster'
 import DagRingen from '../ai-meal-generator/tabs/plan-analyzer/DagRingen'
 import CardioService from '../workout/services/CardioService'
+import { ClientAgendaService, getMondayOf } from './ClientAgendaService'
 import { useModalHost } from '../../coach/ModalHost'
 import { maakConfig } from '../weight-tracker/utils/coachingBand'
 
@@ -188,13 +189,35 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut
 
 const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 
-export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio, realiteit = null, onRealiteitNodig = null }) {
+export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio, realiteit = null }) {
   const [open, setOpen] = useState(false)
   // Plan = wat het weekplan geeft. Realiteit = wat er deze week gelogd is:
   // maaltijden, trainingen en cardio uit de logs. Zelfde rekenwerk, andere bron.
   const [stand, setStand] = useState('plan')
   const isRealiteit = stand === 'realiteit'
-  useEffect(() => { if (open && isRealiteit && !realiteit) onRealiteitNodig?.() }, [open, isRealiteit, realiteit, onRealiteitNodig])
+  // Eigen week voor de realiteit, los van de agenda. Standaard de vorige
+  // week: die is af. De lopende week laat halverwege altijd 'te weinig' zien.
+  const [realiteitWeek, setRealiteitWeek] = useState(() => { const d = getMondayOf(new Date()); d.setDate(d.getDate() - 7); return d })
+  const [realiteitData, setRealiteitData] = useState(null)
+  const [realiteitLaden, setRealiteitLaden] = useState(false)
+  useEffect(() => {
+    if (!open || !isRealiteit || !db?.supabase || !clientId) return
+    let weg = false
+    setRealiteitLaden(true)
+    new ClientAgendaService(db.supabase).loadRealiteit(clientId, realiteitWeek)
+      .then(res => { if (!weg) setRealiteitData(res) })
+      .catch(e => { console.warn('realiteit laden mislukt:', e?.message); if (!weg) setRealiteitData(null) })
+      .finally(() => { if (!weg) setRealiteitLaden(false) })
+    return () => { weg = true }
+  }, [open, isRealiteit, db, clientId, realiteitWeek])
+  const dezeMaandag = getMondayOf(new Date())
+  const weekLoopt = realiteitWeek.getTime() >= dezeMaandag.getTime()
+  const weekLabel = (() => {
+    const eind = new Date(realiteitWeek); eind.setDate(eind.getDate() + 6)
+    const f = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+    return `${f(realiteitWeek)} – ${f(eind)}`
+  })()
+  const schuifWeek = (n) => setRealiteitWeek(prev => { const d = new Date(prev); d.setDate(d.getDate() + 7 * n); return d })
   // Alle secties dicht; je opent wat je nodig hebt.
   const [secties, setSecties] = useState({})
   const zetSectie = (k) => setSecties(prev => ({ ...prev, [k]: !prev[k] }))
@@ -341,9 +364,10 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
   // gemiddelde maal zeven, anders lijkt een week met vier gelogde dagen een
   // enorm tekort.
   const realiteitPerDag = (() => {
-    if (!realiteit?.blocksByDay) return null
+    const bron = realiteitData || realiteit
+    if (!bron?.blocksByDay) return null
     const dagen = DAGEN.map(dag => {
-      const blokken = realiteit.blocksByDay[dag] || []
+      const blokken = bron.blocksByDay[dag] || []
       const maaltijden = blokken.filter(b => b.type === 'meal')
       const som = (k) => maaltijden.reduce((t, b) => t + (Number(b.meta?.[k]) || 0), 0)
       return {
@@ -360,7 +384,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
       totaal: gem('kcal') * 7,
       eiwitGem: gem('eiwit'), koolhGem: gem('koolh'), vetGem: gem('vet'),
       trainingen: dagen.filter(d => d.training).length,
-      cardio: Object.values(realiteit.blocksByDay).flat().filter(b => b.type === 'cardio'),
+      cardio: Object.values(bron.blocksByDay).flat().filter(b => b.type === 'cardio'),
     }
   })()
   const perDag = isRealiteit ? realiteitPerDag : planPerDag(mealPlan)
@@ -609,11 +633,24 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                   }}>{label}</button>
                 ))}
               </div>
-              <span style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {isRealiteit
-                  ? (realiteitPerDag ? `${realiteitPerDag.gelogdeDagen} van 7 dagen voeding gelogd · ${realiteitPerDag.trainingen} trainingen` : 'laden…')
-                  : 'wat het weekplan geeft'}
-              </span>
+              {isRealiteit ? (
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button onClick={() => schuifWeek(-1)} title="Vorige week" aria-label="Vorige week" style={{ ...kopKnop, width: 26, height: 26 }}><ChevronDown size={12} style={{ transform: 'rotate(90deg)' }} /></button>
+                  <span style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: '0.7rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {weekLabel}{weekLoopt ? ' · loopt nog' : ''}
+                  </span>
+                  <button onClick={() => schuifWeek(1)} disabled={weekLoopt} title="Volgende week" aria-label="Volgende week" style={{ ...kopKnop, width: 26, height: 26, opacity: weekLoopt ? 0.3 : 1 }}><ChevronDown size={12} style={{ transform: 'rotate(-90deg)' }} /></button>
+                </div>
+              ) : (
+                <span style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  wat het weekplan geeft
+                </span>
+              )}
+            </div>
+          )}
+          {!ingeklapt && isRealiteit && (
+            <div style={{ flexShrink: 0, padding: '0.3rem 0.8rem', fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {realiteitLaden ? 'laden…' : realiteitPerDag ? `${realiteitPerDag.gelogdeDagen} van 7 dagen voeding gelogd · ${realiteitPerDag.trainingen} trainingen · ${realiteitPerDag.cardio.length} cardio` : 'geen logs in deze week'}
             </div>
           )}
 
@@ -641,7 +678,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.25rem 0.8rem 0.8rem' }}>
           {planWeek == null ? (
             <div style={{ padding: '0.6rem 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
-              {isRealiteit ? 'Realiteit laden…' : 'Geen actief weekplan voor deze klant.'}
+              {isRealiteit ? (realiteitLaden ? 'Realiteit laden…' : 'Geen logs in deze week.') : 'Geen actief weekplan voor deze klant.'}
             </div>
           ) : (
             <>

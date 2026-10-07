@@ -1285,11 +1285,8 @@ export default function ClientAgendaView({
   const [realiteit, setRealiteit] = useState(null)
   const [realiteitLaden, setRealiteitLaden] = useState(false)
   const [realiteitBlok, setRealiteitBlok] = useState(null)
-  // Het weekbudget-venster kan ook om de realiteit vragen zonder dat de
-  // agenda zelf omschakelt.
-  const [realiteitGewenst, setRealiteitGewenst] = useState(false)
   useEffect(() => {
-    if ((weergave !== 'realiteit' && !realiteitGewenst) || !service || !client?.id) return
+    if (weergave !== 'realiteit' || !service || !client?.id) return
     let weg = false
     setRealiteitLaden(true)
     service.loadRealiteit(client.id, weekAnchor)
@@ -1297,7 +1294,7 @@ export default function ClientAgendaView({
       .catch(e => { console.error('realiteit laden mislukt:', e); if (!weg) setRealiteit(null) })
       .finally(() => { if (!weg) setRealiteitLaden(false) })
     return () => { weg = true }
-  }, [weergave, realiteitGewenst, service, client?.id, weekAnchor, refreshKey])
+  }, [weergave, service, client?.id, weekAnchor, refreshKey])
   const isRealiteit = weergave === 'realiteit'
 
   const reload = async () => {
@@ -2308,7 +2305,6 @@ export default function ClientAgendaView({
           // de coach de dagen tikt waarop het moet gebeuren.
           onPlanCardio={({ label, duur }) => setTeplaatsen({ id: 'cardio', label, duur, kleur: '#06b6d4' })}
           realiteit={realiteit}
-          onRealiteitNodig={() => setRealiteitGewenst(true)}
         />
         </div>
       )}
