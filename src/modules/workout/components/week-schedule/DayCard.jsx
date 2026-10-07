@@ -12,8 +12,9 @@
 //   · Default   → grijs-glass card
 //   · Rust      → dashed border + "RUST" label (geen pijlen)
 
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, HeartPulse } from 'lucide-react'
 import WorkoutIndicator from './WorkoutIndicator'
+import { cardioFoto } from '../../utils/workoutFoto'
 import CustomWorkoutIndicator from './CustomWorkoutIndicator'
 
 export default function DayCard({
@@ -25,10 +26,23 @@ export default function DayCard({
   dayDate, kanPlannen = true, kanOpenen = true, gedimd = false,
   // 'rood' of 'oranje' als dezelfde training te dicht op deze dag staat.
   rust = null,
+  // Cardio op deze dag uit de agenda: [{ soort, tijd, duur, gedaan }]. Op een
+  // trainingsdag een chip onder de training; op een rustdag de inhoud van
+  // de kaart. cardioRij: er is deze week ergens cardio, dus elke kaart houdt
+  // onderin dezelfde ruimte vrij zodat de rij gelijk blijft.
+  cardio = [],
+  cardioRij = false,
 }) {
   const isCustom = workoutKey?.startsWith('custom_')
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
   const hasContent = !!workoutData || isActivity
+  const heeftCardio = Array.isArray(cardio) && cardio.length > 0
+  const cardioKlaar = heeftCardio && cardio.every(c => c.gedaan)
+  const logCardio = (c) => {
+    // De cardio-sectie luistert hiernaar en opent het logblad voorgevuld.
+    window.dispatchEvent(new CustomEvent('myarc:cardio-log', { detail: { soort: c.soort, minuten: c.duur } }))
+    if (navigator.vibrate) navigator.vibrate(15)
+  }
 
   const handleClick = () => { if (onClick) onClick() }
 
@@ -103,7 +117,7 @@ export default function DayCard({
     paddingBottom: bottomPadding,
     paddingLeft: 0,
     paddingRight: 0,
-    height: isMobile ? 108 : 124,
+    height: (isMobile ? 108 : 124) + (cardioRij ? (isMobile ? 22 : 24) : 0),
     borderRadius: isMobile ? 12 : 14,
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'flex-start',
@@ -149,6 +163,31 @@ export default function DayCard({
       {weekDaysDutch[dayIndex]}{dateNum ? ` ${dateNum}` : ''}
     </div>
   )
+
+  // ── Cardio-chip onder de training: sport en tijd, groen als gelogd.
+  const cardioChip = heeftCardio ? (
+    <button
+      onClick={(e) => { e.stopPropagation(); if (kanOpenen) logCardio(cardio[0]) }}
+      title={cardio.map(c => `${c.soort} ${c.tijd}`).join(' · ')}
+      style={{
+        position: 'absolute', left: 4, right: 4,
+        bottom: showArrows ? (isMobile ? 26 : 30) : (isMobile ? 5 : 6),
+        height: isMobile ? 18 : 20, borderRadius: 6, padding: '0 5px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        background: cardioKlaar ? 'rgba(16,185,129,0.18)' : 'rgba(255,255,255,0.1)',
+        border: `1px solid ${cardioKlaar ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.18)'}`,
+        color: cardioKlaar ? '#10b981' : '#fff', fontFamily: 'inherit', cursor: kanOpenen ? 'pointer' : 'default',
+        fontSize: isMobile ? '0.56rem' : '0.6rem', fontWeight: 900, letterSpacing: '0.02em',
+        whiteSpace: 'nowrap', overflow: 'hidden',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {cardioKlaar ? <Check size={10} strokeWidth={3.2} /> : <HeartPulse size={10} strokeWidth={2.8} />}
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {cardio[0].soort}{cardio.length > 1 ? ` +${cardio.length - 1}` : ''}{isMobile ? '' : ` · ${cardio[0].tijd}`}
+      </span>
+    </button>
+  ) : null
 
   // ── Chevron-rij (alleen wanneer er content is en niet voltooid)
   const arrowRow = showArrows ? (
@@ -230,7 +269,44 @@ export default function DayCard({
             </div>
           )}
 
+          {cardioChip}
           {arrowRow}
+        </div>
+      ) : heeftCardio ? (
+        // Rustdag mét cardio: dan is de cardio de inhoud van de kaart. Foto
+        // van de sport als banner, label CARDIO, sport en tijd eronder.
+        <div
+          onClick={() => { if (kanOpenen) logCardio(cardio[0]) }}
+          style={{
+            ...sharedCardStyle,
+            paddingBottom: isMobile ? 8 : 10,
+            background: cardioKlaar ? 'rgba(16,185,129, 0.10)' : tone.bg,
+            border: `1px solid ${cardioKlaar ? 'rgba(16,185,129, 0.45)' : tone.border}`,
+            cursor: kanOpenen ? 'pointer' : 'default',
+            opacity: gedimd ? 0.7 : 1,
+          }}
+        >
+          {isToday ? todayPill : dayLabel}
+          <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${cardioFoto(cardio[0].soort)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: cardioKlaar ? 0.45 : 0.85 }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.85) 100%)' }} />
+            <div style={{ position: 'absolute', left: 4, right: 4, bottom: 4, textAlign: 'center' }}>
+              <div style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', fontWeight: 900, color: cardioKlaar ? '#10b981' : 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.1em', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+                {cardioKlaar ? 'Gedaan' : 'Cardio'}
+              </div>
+              <div style={{ fontSize: isMobile ? '0.66rem' : '0.74rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.15, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {cardio[0].soort}
+              </div>
+              <div style={{ fontSize: isMobile ? '0.56rem' : '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 6px rgba(0,0,0,0.9)', fontVariantNumeric: 'tabular-nums' }}>
+                {cardio[0].tijd}{cardio[0].duur ? ` · ${cardio[0].duur} min` : ''}{cardio.length > 1 ? ` +${cardio.length - 1}` : ''}
+              </div>
+            </div>
+          </div>
+          {cardioKlaar && (
+            <div style={{ position: 'absolute', bottom: isMobile ? 4 : 5, right: isMobile ? 4 : 5 }}>
+              <Check size={isMobile ? 12 : 14} color="#10b981" strokeWidth={3} />
+            </div>
+          )}
         </div>
       ) : (
         // Rust-dag — dashed border + "RUST" label, geen pijlen

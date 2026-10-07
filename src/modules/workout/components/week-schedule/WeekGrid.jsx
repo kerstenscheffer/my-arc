@@ -11,7 +11,9 @@ export default function WeekGrid({
   getWorkoutData, onDayClick, onSwapClick, onShift, isMobile,
   dayDates, kanPlannen = true, kanOpenen = true, gedimd = false,
   rustPerDag = {},
+  cardioPerDag = {},
 }) {
+  const cardioRij = Object.keys(cardioPerDag).length > 0
   const weekDaysDutch = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
   // Een komende week mag je wél indelen (pijltjes) maar niet openen: de
@@ -61,6 +63,8 @@ export default function WeekGrid({
             kanOpenen={kanOpenen}
             gedimd={gedimd}
             rust={rustPerDag[index] || null}
+            cardio={cardioPerDag[index] || []}
+            cardioRij={cardioRij}
           />
         )
       })}

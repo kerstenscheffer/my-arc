@@ -6,6 +6,7 @@ import WeekGrid from './week-schedule/WeekGrid'
 import WorkoutServiceNew from '../services/WorkoutServiceNew'
 import { rustWaarschuwingen, waarschuwingTekst, ROOD } from '../utils/rustWaarschuwing'
 import ActionButtons from './week-schedule/ActionButtons'
+import CardioService, { normaliseerSoort } from '../services/CardioService'
 
 // Bereken de maandag van de huidige week (lokale tijd).
 function getThisMonday() {
@@ -53,6 +54,36 @@ export default function WeekSchedule({
 
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const weekDaysDutch = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+
+  // Cardio in dezelfde dagkaart als de training: de blokken 'Cardio · Sport'
+  // uit de agenda (per weekdag, dus voor elke week gelijk) en de logs van de
+  // getoonde week om te zien wat al gedaan is.
+  const [cardioBlokken, setCardioBlokken] = useState([])
+  const [cardioLogs, setCardioLogs] = useState([])
+  const [cardioVersie, setCardioVersie] = useState(0)
+  useEffect(() => {
+    const bump = () => setCardioVersie(v => v + 1)
+    window.addEventListener('myarc:cardio-changed', bump)
+    return () => window.removeEventListener('myarc:cardio-changed', bump)
+  }, [])
+  useEffect(() => {
+    if (!clientId || !db?.supabase) return
+    let weg = false
+    const maandag = (() => { const d = getThisMonday(); d.setDate(d.getDate() + weekOffset * 7); return d })()
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    Promise.all([
+      db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time')
+        .eq('client_id', clientId).eq('type', 'custom').ilike('label', 'Cardio ·%')
+        .then(r => r, () => ({ data: [] })),
+      CardioService.getLogs(clientId, iso(maandag), db),
+    ]).then(([b, logs]) => {
+      if (weg) return
+      setCardioBlokken(b?.data || [])
+      const eind = new Date(maandag); eind.setDate(eind.getDate() + 6)
+      setCardioLogs((logs || []).filter(l => String(l.logged_date).slice(0, 10) <= iso(eind)))
+    })
+    return () => { weg = true }
+  }, [clientId, db, weekOffset, cardioVersie])
   const hasValidSchema = schema && schema.week_structure && typeof schema.week_structure === 'object'
 
   useEffect(() => { loadSavedSchedule() }, [clientId, weekSleutel])
@@ -326,6 +357,26 @@ export default function WeekSchedule({
             {/* WeekGrid */}
             <div style={{ padding: isMobile ? '0 0.75rem' : '0 1rem' }}>
               <WeekGrid
+                cardioPerDag={(() => {
+                  const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                  const uit = {}
+                  sleutels.forEach((k, i) => {
+                    const datum = dayDates?.[i] ? iso(dayDates[i]) : null
+                    const lijst = cardioBlokken.filter(b => b.day === k)
+                      .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)))
+                      .map(b => {
+                        const soort = String(b.label).replace(/^Cardio\s*·\s*/, '')
+                        const [h, m] = String(b.start_time || '').split(':').map(Number)
+                        const [eh, em] = String(b.end_time || '').split(':').map(Number)
+                        const duur = Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null
+                        const gedaan = !!datum && cardioLogs.some(l => String(l.logged_date).slice(0, 10) === datum && normaliseerSoort(l.cardio_type) === normaliseerSoort(soort))
+                        return { soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan }
+                      })
+                    if (lijst.length) uit[i] = lijst
+                  })
+                  return uit
+                })()}
                 tempSchedule={tempSchedule} weekDays={weekDays} todayIndex={todayIndex}
                 completedWorkouts={completedWorkouts} selectedWorkout={selectedWorkout}
                 selectedForSwap={selectedForSwap} swapMode={swapMode} localSwapMode={localSwapMode}

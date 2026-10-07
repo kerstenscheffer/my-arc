@@ -55,6 +55,19 @@ export default function CardioLogSection({ client, db, isMobile }) {
 
   // Loggen vanaf een plan-regel: de velden staan al goed, je hoeft alleen te
   // bevestigen of bij te stellen.
+  // Vanuit de dagkaart in de weekplanning: logblad open, voorgevuld.
+  useEffect(() => {
+    const open = (e) => {
+      resetForm()
+      setType(e.detail?.soort || '')
+      setDuration(e.detail?.minuten ? String(e.detail.minuten) : '')
+      setShowModal(true)
+    }
+    window.addEventListener('myarc:cardio-log', open)
+    return () => window.removeEventListener('myarc:cardio-log', open)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const openVoorPlan = (item) => {
     setType(item.cardio_type || '')
     setDuration(item.duration_minutes ? String(item.duration_minutes) : '')
@@ -78,6 +91,7 @@ export default function CardioLogSection({ client, db, isMobile }) {
         notes,
       }, db)
       resetForm(); setShowModal(false); await laadAlles()
+      window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
     } catch (err) { setError(err.message) }
     setSaving(false)
   }
@@ -95,81 +109,14 @@ export default function CardioLogSection({ client, db, isMobile }) {
     } catch { return d }
   }
 
-  // Geplande cardio uit de agenda van de klant: blokken 'Cardio · Sport' per
-  // weekdag, zoals de coach ze in het weekbudget heeft ingepland.
-  const [gepland, setGepland] = useState([])
-  useEffect(() => {
-    if (!client?.id || !db?.supabase) return
-    let weg = false
-    db.supabase.from('client_agenda_blocks')
-      .select('id, day, label, start_time, end_time')
-      .eq('client_id', client.id).eq('type', 'custom').ilike('label', 'Cardio ·%')
-      .then(({ data }) => { if (!weg) setGepland(data || []) }, () => { if (!weg) setGepland([]) })
-    return () => { weg = true }
-  }, [client?.id, db, logs.length])
-
   const doel = (item) => [
     item.duration_minutes ? `${item.duration_minutes} min` : null,
     item.distance_km ? `${item.distance_km} km` : null,
     item.steps ? `${item.steps.toLocaleString('nl-NL')} stappen` : null,
   ].filter(Boolean).join(' · ')
 
-  // Kop: de titel en daaronder de geplande cardio van deze week als zeven
-  // dagvakken. Geen foto meer; wat er deze week staat is nuttiger dan sfeer.
-  const WEEKDAGEN = [
-    ['monday', 'Ma'], ['tuesday', 'Di'], ['wednesday', 'Wo'], ['thursday', 'Do'],
-    ['friday', 'Vr'], ['saturday', 'Za'], ['sunday', 'Zo'],
-  ]
-  const vandaagKey = WEEKDAGEN[(new Date().getDay() + 6) % 7][0]
-  const weekStart = weekStartISO()
-  const datumVanDag = (key) => {
-    const i = WEEKDAGEN.findIndex(([k]) => k === key)
-    const d = new Date(weekStart + 'T12:00:00'); d.setDate(d.getDate() + i)
-    return d.toISOString().slice(0, 10)
-  }
-  const gedaanOp = (key) => logs.some(l => String(l.logged_date).slice(0, 10) === datumVanDag(key))
-  const weekStrook = (
-    <div style={{ marginBottom: m ? '0.9rem' : '1.1rem' }}>
-      <div style={{ fontSize: m ? '0.62rem' : '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
-        Gepland deze week
-      </div>
-      <div style={{ display: 'flex', gap: m ? 4 : 6 }}>
-        {WEEKDAGEN.map(([key, label]) => {
-          const blokken = gepland.filter(b => b.day === key).sort((x, y) => String(x.start_time).localeCompare(String(y.start_time)))
-          const isVandaag = key === vandaagKey
-          const klaar = blokken.length > 0 && gedaanOp(key)
-          return (
-            <div key={key} style={{
-              flex: 1, minWidth: 0, minHeight: m ? 58 : 66, borderRadius: 10, padding: m ? '0.35rem 0.3rem' : '0.4rem 0.4rem',
-              background: blokken.length > 0 ? (klaar ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.07)') : 'rgba(255,255,255,0.025)',
-              border: `1px solid ${isVandaag ? 'rgba(255,255,255,0.6)' : klaar ? 'rgba(16,185,129,0.45)' : 'rgba(255,255,255,0.08)'}`,
-              display: 'flex', flexDirection: 'column', gap: 2,
-            }}>
-              <div style={{ fontSize: '0.62rem', fontWeight: 900, color: isVandaag ? '#fff' : 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-              {blokken.length === 0 ? (
-                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)' }}>–</div>
-              ) : blokken.map(b => (
-                <div key={b.id} style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: m ? '0.66rem' : '0.72rem', fontWeight: 900, color: klaar ? '#10b981' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {String(b.label).replace(/^Cardio\s*·\s*/, '')}
-                  </div>
-                  <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
-                    {String(b.start_time || '').slice(0, 5)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        })}
-      </div>
-      {gepland.length === 0 && (
-        <div style={{ fontSize: m ? '0.7rem' : '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
-          Nog niets ingepland. Je coach zet cardio in je agenda; tot die tijd log je hieronder wat je doet.
-        </div>
-      )}
-    </div>
-  )
-
+  // Kop: alleen de titel. Welke dag welke cardio staat, zit in de dagkaarten
+  // van de weekplanning erboven.
   const kop = (
     <div style={{ padding: m ? '0 1rem' : '0 1.5rem', marginTop: m ? '3.25rem' : '4rem' }}>
       <div style={{ fontSize: m ? '1.7rem' : '2.4rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: m ? '0.6rem' : '0.8rem' }}>
@@ -267,9 +214,8 @@ export default function CardioLogSection({ client, db, isMobile }) {
             </div>
           )}
 
-          {/* Na de kaarten: wat er deze week op welke dag gepland staat, en
-              de stappen van de telefoon. */}
-          {weekStrook}
+          {/* Na de kaarten de stappen van de telefoon. Welke dag welke cardio
+              staat, zie je in de weekplanning erboven, in de dagkaart zelf. */}
           <StappenStrook client={client} db={db} isMobile={m} />
 
           {/* ── Wat je deze week gelogd hebt ── */}
