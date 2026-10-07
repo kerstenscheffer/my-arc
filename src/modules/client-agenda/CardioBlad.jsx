@@ -1,0 +1,127 @@
+// src/modules/client-agenda/CardioBlad.jsx
+//
+// Cardio toevoegen of aanpassen, als blad dat van onderen openschuift. Zelfde
+// vorm als het oefening-logscherm: één ding per stap, grote cijfers, één
+// witte knop. Sport als tikbare vakken, keer per week en minuten per keer met
+// grote min/plus-knoppen, en live wat het kost in kcal bij dit gewicht.
+
+import { useEffect, useState } from 'react'
+import { Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Trash2, Check } from 'lucide-react'
+import BladModal from '../workout/components/todays-workout/components/BladModal'
+
+const ICOON = { Wandelen: Footprints, Fietsen: Bike, Zwemmen: Waves, Hardlopen: Timer, Roeien: Wind, Crosstrainer: Activity, Stairmaster: TrendingUp, HIIT: Zap }
+const nl = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n || 0))
+
+function Teller({ label, waarde, eenheid, stap, min = 0, onChange }) {
+  const knop = {
+    width: 52, height: 52, flexShrink: 0, borderRadius: 14,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+    color: '#fff', fontFamily: 'inherit', fontSize: '1.3rem', fontWeight: 900, lineHeight: 1,
+    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button onClick={() => onChange(Math.max(min, waarde - stap))} aria-label={`${label} minder`} style={knop}>−</button>
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+          <div style={{ fontSize: '1.9rem', fontWeight: 900, color: '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em' }}>{waarde}</div>
+          <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{eenheid}</div>
+        </div>
+        <button onClick={() => onChange(waarde + stap)} aria-label={`${label} meer`} style={knop}>+</button>
+      </div>
+    </div>
+  )
+}
+
+export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuut, onOpslaan, onVerwijder, onClose }) {
+  const [soort, setSoort] = useState('Wandelen')
+  const [keer, setKeer] = useState(3)
+  const [minuten, setMinuten] = useState(30)
+  useEffect(() => {
+    if (!open) return
+    setSoort(regel?.soort || 'Wandelen')
+    setKeer(Number(regel?.keer) || 3)
+    setMinuten(Number(regel?.minuten) || 30)
+  }, [open, regel])
+
+  const gekozen = soorten.find(x => x.id === soort) || soorten[0]
+  const perMin = kcalPerMinuut(gekozen.met, gewicht)
+  const perKeer = Math.round(perMin * minuten)
+  const perWeek = perKeer * keer
+
+  return (
+    <BladModal open={open} titel={regel?.id || regel ? 'Cardio aanpassen' : 'Cardio toevoegen'} onClose={onClose} zIndex={10650}>
+      {/* Sport als vakken, twee per rij. */}
+      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Sport</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 18 }}>
+        {soorten.map(x => {
+          const Icoon = ICOON[x.id] || Activity
+          const aan = x.id === soort
+          return (
+            <button key={x.id} onClick={() => { setSoort(x.id); if (navigator.vibrate) navigator.vibrate(10) }} style={{
+              display: 'flex', alignItems: 'center', gap: 8, minHeight: 48, padding: '0 0.8rem', borderRadius: 12, textAlign: 'left',
+              background: aan ? '#fff' : 'rgba(255,255,255,0.04)', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+              color: aan ? '#0a0a0a' : '#fff', fontFamily: 'inherit', cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <Icoon size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+              <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.84rem', fontWeight: 900, letterSpacing: '-0.015em' }}>{x.id}</span>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.label.replace(`${x.id} `, '').replace(/[()]/g, '') || `${x.met} MET`}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, marginBottom: 18 }}>
+        <Teller label="Keer per week" waarde={keer} eenheid="keer" stap={1} min={1} onChange={setKeer} />
+        <Teller label="Minuten" waarde={minuten} eenheid="per keer" stap={5} min={5} onChange={setMinuten} />
+      </div>
+
+      {/* Wat het kost: per keer en per week, bij dit gewicht. */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {[
+          { label: 'per keer', waarde: `${nl(perKeer)} kcal` },
+          { label: 'per week', waarde: `${nl(perWeek)} kcal` },
+          { label: 'per dag', waarde: `${nl(perWeek / 7)} kcal` },
+        ].map(x => (
+          <div key={x.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0.55rem 0.25rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12 }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{x.waarde}</div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 3 }}>{x.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
+        ± {perMin} kcal per minuut bij {Math.round(gewicht)} kg, rustige intensiteit (MET {gekozen.met}).
+      </div>
+
+      <button
+        onClick={() => onOpslaan({ ...(regel || {}), soort, keer, minuten })}
+        style={{
+          width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a',
+          fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.01em', fontFamily: 'inherit', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <Check size={16} strokeWidth={3} /> {regel ? 'Aanpassen' : 'Toevoegen aan wat als'}
+      </button>
+      {regel && onVerwijder && (
+        <button
+          onClick={() => onVerwijder(regel)}
+          style={{
+            width: '100%', minHeight: 44, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: 'transparent', border: 'none', color: '#ef4444',
+            fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Trash2 size={14} /> Verwijderen
+        </button>
+      )}
+    </BladModal>
+  )
+}

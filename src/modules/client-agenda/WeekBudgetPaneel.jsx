@@ -19,6 +19,7 @@ import { balkVak, balkVakActief } from './werkbalkStijl'
 import useZwevendVenster from '../../components/useZwevendVenster'
 import DagRingen from '../ai-meal-generator/tabs/plan-analyzer/DagRingen'
 import CardioService from '../workout/services/CardioService'
+import CardioBlad from './CardioBlad'
 import { ClientAgendaService, getMondayOf } from './ClientAgendaService'
 import { useModalHost } from '../../coach/ModalHost'
 import { maakConfig } from '../weight-tracker/utils/coachingBand'
@@ -154,7 +155,7 @@ function planPerDag(mealPlan) {
 // en zo is teruggaan naar nul ook meteen duidelijk.
 function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut = false }) {
   const knop = {
-    width: 32, height: 32, flexShrink: 0, borderRadius: 8,
+    width: 36, height: 36, flexShrink: 0, borderRadius: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'rgba(255,255,255,0.06)',
     borderTop: '1px solid rgba(255,255,255,0.15)',
@@ -167,7 +168,7 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
           {label}
         </span>
         <button onClick={() => onChange(waarde - stap)} style={knop}>−</button>
@@ -180,7 +181,7 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut
         </span>
         <button onClick={() => onChange(waarde + stap)} style={knop}>+</button>
       </div>
-      <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
         {eenheid}{toelichting ? ` · ${toelichting}` : ''}
       </div>
     </div>
@@ -245,6 +246,8 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
   const [cardioBasis, setCardioBasis] = useState(undefined)   // undefined = nog laden
   const [cardioVerwijderd, setCardioVerwijderd] = useState([])
   const [cardioBezig, setCardioBezig] = useState(false)
+  // Het cardio-blad: null = dicht, { regel: null } = nieuw, { regel, index } = bewerken.
+  const [cardioBlad, setCardioBlad] = useState(null)
   // Schema's om mee door te rekenen en eventueel actief te zetten: eigen
   // plannen van de klant plus de standaardplannen van de coach.
   const [plannen, setPlannen] = useState([])
@@ -1029,7 +1032,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                   samenvatting={simActief ? `verbranding ${extraPerDag > 0 ? '+' : '−'}${getal(Math.abs(extraPerDag))} kcal per dag` : 'TDEE, training, stappen, cardio'}
                   kleur={simActief ? '#22c55e' : null}
                 >
-                    <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 14 }}>
                       <Stapper
                         label="TDEE"
                         waarde={simTdee}
@@ -1052,7 +1055,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                       {plannen.length > 0 && (
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>Schema</span>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Schema</span>
                             <select value={simPlan} onChange={e => setSimPlan(e.target.value)} style={{ ...selectStijl, flex: '0 1 60%' }}>
                               <option value="" style={{ background: '#1a1a1a' }}>huidig · {trainingNu} dagen</option>
                               {plannen.some(p => p.eigen) && (
@@ -1091,47 +1094,48 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                         </div>
                       )}
 
-                      {/* Cardio: per regel een sport, keer per week en minuten.
-                          kcal uit de MET van de sport en het gewicht. */}
+                      {/* Cardio: rustige regels, aantikken om aan te passen;
+                          toevoegen en bewerken gaan via het blad. */}
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>Cardio</span>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Cardio</span>
                           <button
-                            onClick={() => setSimCardio(r => [...r, { soort: 'Wandelen', keer: 3, minuten: 30 }])}
+                            onClick={() => setCardioBlad({ regel: null })}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32, padding: '0 0.6rem', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                           >
                             <Plus size={12} strokeWidth={3} /> Cardio
                           </button>
                         </div>
+                        {simCardio.length === 0 && (
+                          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', padding: '0.2rem 0 0.4rem' }}>
+                            Nog geen cardio. Tik op + Cardio om door te rekenen wat zwemmen, fietsen of wandelen doet.
+                          </div>
+                        )}
                         {simCardio.map((r, i) => {
                           const soort = CARDIO_SOORTEN.find(x => x.id === r.soort) || CARDIO_SOORTEN[0]
-                          const perMin = kcalPerMinuut(soort.met, gewicht)
-                          const perKeer = Math.round(perMin * (Number(r.minuten) || 0))
-                          const perWeek = perKeer * (Number(r.keer) || 0)
-                          const zet = (veld, v) => setSimCardio(rows => rows.map((x, j) => j === i ? { ...x, [veld]: v } : x))
+                          const perWeek = Math.round(kcalPerMinuut(soort.met, gewicht) * (Number(r.minuten) || 0) * (Number(r.keer) || 0))
                           return (
-                            <div key={i} style={{ padding: '0.45rem 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <select value={r.soort} onChange={e => zet('soort', e.target.value)} style={selectStijl}>
-                                  {CARDIO_SOORTEN.map(x => <option key={x.id} value={x.id} style={{ background: '#1a1a1a' }}>{x.label}</option>)}
-                                </select>
-                                <button onClick={() => { if (r.id) setCardioVerwijderd(v => [...v, r.id]); setSimCardio(rows => rows.filter((_, j) => j !== i)) }} aria-label="Regel weghalen" style={{ ...kopKnop, width: 32, height: 32 }}>
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                              <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <Stapper absoluut label="Keer" waarde={Number(r.keer) || 0} eenheid="per week" stap={1} onChange={(v) => zet('keer', Math.max(0, v))} />
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <Stapper absoluut label="Minuten" waarde={Number(r.minuten) || 0} eenheid="per keer" stap={5} onChange={(v) => zet('minuten', Math.max(0, v))} />
-                                </div>
-                              </div>
-                              <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
-                                {r.id ? <span style={{ color: '#22c55e' }}>in plan · </span> : <span style={{ color: '#fff' }}>nieuw · </span>}
-                                ± {perMin} kcal per minuut bij {Math.round(gewicht)} kg · {perKeer} per keer · <span style={{ color: '#fff' }}>{getal(perWeek)} kcal per week</span>
-                              </div>
-                            </div>
+                            <button
+                              key={r.id || `nieuw-${i}`}
+                              onClick={() => setCardioBlad({ regel: r, index: i })}
+                              style={{
+                                width: '100%', display: 'flex', alignItems: 'center', gap: 10, minHeight: 44,
+                                padding: '0.35rem 0', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)',
+                                textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
+                                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                              }}
+                            >
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{r.soort}</span>
+                                <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: r.id ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
+                                  {r.id ? 'in plan' : 'nieuw'} · {r.keer}× {r.minuten} min
+                                </span>
+                              </span>
+                              <span style={{ flexShrink: 0, fontSize: '0.84rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                                {getal(perWeek)}<span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}> kcal/wk</span>
+                              </span>
+                              <ChevronDown size={14} color="rgba(255,255,255,0.4)" style={{ transform: 'rotate(-90deg)', flexShrink: 0 }} />
+                            </button>
                           )
                         })}
                         {(cardioGewijzigd || cardioBezig) && (
@@ -1152,7 +1156,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
 
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>Stappen</span>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Stappen</span>
                           <select
                             value={simStappen || ''}
                             onChange={e => setSimStappen(e.target.value || null)}
@@ -1208,6 +1212,27 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
           </div>
           )}
 
+          <CardioBlad
+            open={!!cardioBlad}
+            regel={cardioBlad?.regel || null}
+            soorten={CARDIO_SOORTEN}
+            gewicht={gewicht}
+            kcalPerMinuut={kcalPerMinuut}
+            onClose={() => setCardioBlad(null)}
+            onOpslaan={(nieuw) => {
+              setSimCardio(rows => cardioBlad?.regel != null && cardioBlad.index != null
+                ? rows.map((x, j) => j === cardioBlad.index ? { ...x, ...nieuw } : x)
+                : [...rows, nieuw])
+              setCardioBlad(null)
+              if (navigator.vibrate) navigator.vibrate([20, 40, 20])
+            }}
+            onVerwijder={(r) => {
+              if (r.id) setCardioVerwijderd(v => [...v, r.id])
+              setSimCardio(rows => rows.filter((_, j) => j !== cardioBlad.index))
+              setCardioBlad(null)
+            }}
+          />
+
           {/* Hoekje rechtsonder om het venster groter te maken. */}
           {formaatHandvat && !ingeklapt && (
             <div
@@ -1254,7 +1279,7 @@ function Sectie({ titel, samenvatting, kleur, open, onToggle, children }) {
         </span>
         <ChevronDown size={14} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
       </button>
-      {open && <div style={{ paddingBottom: '0.6rem' }}>{children}</div>}
+      {open && <div style={{ padding: '0.1rem 0 0.7rem' }}>{children}</div>}
     </div>
   )
 }
