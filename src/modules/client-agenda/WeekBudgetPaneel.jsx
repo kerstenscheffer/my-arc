@@ -200,6 +200,15 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
       .maybeSingle()
       .then(({ data }) => { if (leeft) setTdee(data || null) },
             (e) => { console.warn('tdee laden mislukt:', e); if (leeft) setTdee(null) })
+    return () => { leeft = false }
+  }, [open, tdee, db, clientId])
+
+  // Apart effect: zat dit bij de TDEE in één effect, dan startte dat effect
+  // opnieuw zodra de TDEE binnen was en gooide de cleanup het nog lopende
+  // fase-antwoord weg. Gevolg: 'geen fase' terwijl er wel een was.
+  useEffect(() => {
+    if (!open || fase !== undefined || !db?.supabase || !clientId) return
+    let leeft = true
     // Nieuwste fase is de actieve, net als in het fase-paneel.
     db.supabase
       .from('client_phases')
@@ -210,7 +219,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
       .then(({ data }) => { if (leeft) setFase(data?.[0] || null) },
             (e) => { console.warn('fase laden mislukt:', e); if (leeft) setFase(null) })
     return () => { leeft = false }
-  }, [open, tdee, db, clientId])
+  }, [open, fase, db, clientId])
 
   const perDag = planPerDag(mealPlan)
   const planWeek = perDag ? perDag.totaal : null
