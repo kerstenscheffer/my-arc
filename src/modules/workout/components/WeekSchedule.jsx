@@ -1,6 +1,6 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
-import { AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { AlertCircle, RefreshCw, Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import WeekGrid from './week-schedule/WeekGrid'
 import WorkoutServiceNew from '../services/WorkoutServiceNew'
@@ -439,8 +439,6 @@ export default function WeekSchedule({
       {/* Weeknavigatie — vorige/volgende week */}
       {(() => {
         const monday = getoondeMaandag
-        const sunday = new Date(monday)
-        sunday.setDate(sunday.getDate() + 6)
         const fmt = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
         const isCurrentWeek = isHuidigeWeek
         const dayDates = Array.from({ length: 7 }, (_, i) => {
@@ -463,6 +461,8 @@ export default function WeekSchedule({
                   if (error) { console.error('cardio verschuiven mislukt:', error); return }
                   setCardioVersie(v => v + 1)
                 }}
+                onPrevWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
+                onNextWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
                 trainingTijdPerDag={(() => {
                   const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
                   const uit = {}
@@ -503,48 +503,6 @@ export default function WeekSchedule({
                 ))}
               </div>
             )}
-            <div style={{
-              padding: isMobile ? '0.15rem 0.75rem 0.25rem' : '0.25rem 1rem 0.375rem',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <button
-                onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
-                aria-label="Vorige week"
-                style={{
-                  background: 'transparent', border: '1.5px solid rgba(255,255,255,0.28)',
-                  borderRadius: 9, padding: isMobile ? '5px 10px' : '6px 12px',
-                  color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <ChevronLeft size={isMobile ? 15 : 17} strokeWidth={3} />
-              </button>
-              <div style={{
-                flex: 1, textAlign: 'center',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                fontWeight: 900,
-                color: isCurrentWeek ? '#fff' : 'rgba(255,255,255,0.5)',
-                letterSpacing: '-0.01em',
-              }}>
-                {isCurrentWeek ? 'Deze week'
-                  : weekOffset === 1 ? 'Volgende week'
-                  : weekOffset === -1 ? 'Vorige week'
-                  : `${fmt(monday)} – ${fmt(sunday)}`}
-              </div>
-              <button
-                onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
-                aria-label="Volgende week"
-                style={{
-                  background: 'transparent', border: '1.5px solid rgba(255,255,255,0.28)',
-                  borderRadius: 9, padding: isMobile ? '5px 10px' : '6px 12px',
-                  color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <ChevronRight size={isMobile ? 15 : 17} strokeWidth={3} />
-              </button>
-            </div>
-
             {/* Zeg erbij dat je vooruit plant: de wijziging geldt voor die week
                 en gaat pas in als die week begint. */}
             {isToekomst && (

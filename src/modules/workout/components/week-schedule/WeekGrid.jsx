@@ -4,6 +4,7 @@
 // chevron-knoppen binnenin elke card (zie DayCard). De cards reageren alleen
 // nog op tap-to-open.
 import DayCard from './DayCard'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function WeekGrid({
   tempSchedule, weekDays, todayIndex, completedWorkouts,
@@ -14,6 +15,7 @@ export default function WeekGrid({
   cardioPerDag = {},
   onCardioShift = null,
   trainingTijdPerDag = {},
+  onPrevWeek = null, onNextWeek = null,
 }) {
   // Lege rustdagen smal, dagen met training of cardio breed: dan is er ruimte
   // voor de naam van de sport in plaats van zeven even smalle vakjes.
