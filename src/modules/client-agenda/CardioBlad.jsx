@@ -35,21 +35,44 @@ function Teller({ label, waarde, eenheid, stap, min = 0, onChange }) {
   )
 }
 
-export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuut, onOpslaan, onVerwijder, onClose, huidig = [], onBewerk = null }) {
+const DAGEN = [
+  { id: 'monday', label: 'Ma' }, { id: 'tuesday', label: 'Di' }, { id: 'wednesday', label: 'Wo' },
+  { id: 'thursday', label: 'Do' }, { id: 'friday', label: 'Vr' }, { id: 'saturday', label: 'Za' }, { id: 'sunday', label: 'Zo' },
+]
+
+export default function CardioBlad({
+  open, regel, soorten, gewicht, kcalPerMinuut, onOpslaan, onVerwijder, onClose, huidig = [], onBewerk = null,
+  // Weektempo nu en met dit cardio erbij: { nu, straks } als tekst. Zo zie je
+  // bij het invullen wat het doet.
+  tempoVoor = null,
+  // Dagen + tijd gekozen: meteen in het plan en op die dagen in de agenda.
+  onInplannen = null,
+}) {
   const [soort, setSoort] = useState('Wandelen')
   const [keer, setKeer] = useState(3)
   const [minuten, setMinuten] = useState(30)
+  const [dagen, setDagen] = useState([])
+  const [tijd, setTijd] = useState('18:00')
+  const [bezig, setBezig] = useState(false)
   useEffect(() => {
     if (!open) return
     setSoort(regel?.soort || 'Wandelen')
     setKeer(Number(regel?.keer) || 3)
     setMinuten(Number(regel?.minuten) || 30)
+    setDagen([]); setTijd('18:00'); setBezig(false)
   }, [open, regel])
 
   const gekozen = soorten.find(x => x.id === soort) || soorten[0]
   const perMin = kcalPerMinuut(gekozen.met, gewicht)
   const perKeer = Math.round(perMin * minuten)
-  const perWeek = perKeer * keer
+  // Met dagen gekozen telt het aantal dagen; anders de teller.
+  const effKeer = dagen.length > 0 ? dagen.length : keer
+  const perWeek = perKeer * effKeer
+  // Bij bewerken van een bestaande regel is het verschil t.o.v. wat er al stond.
+  const basisWeek = regel ? Math.round(kcalPerMinuut((soorten.find(x => x.id === regel.soort) || gekozen).met, gewicht) * (Number(regel.minuten) || 0) * (Number(regel.keer) || 0)) : 0
+  const tempo = tempoVoor ? tempoVoor(perWeek - basisWeek) : null
+  const wisselDag = (id) => setDagen(d => d.includes(id) ? d.filter(x => x !== id) : [...d, id])
+  const tijdMin = (() => { const m = String(tijd).match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : 18 * 60 })()
 
   return (
     <BladModal open={open} titel={regel ? 'Cardio aanpassen' : 'Cardio toevoegen'} onClose={onClose} zIndex={10650}>
@@ -110,9 +133,39 @@ export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuu
       </div>
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 18 }}>
-        <Teller label="Keer per week" waarde={keer} eenheid="keer" stap={1} min={1} onChange={setKeer} />
+        <Teller label="Keer per week" waarde={effKeer} eenheid={dagen.length > 0 ? 'dagen gekozen' : 'keer'} stap={1} min={1} onChange={(v) => { setDagen([]); setKeer(v) }} />
         <Teller label="Minuten" waarde={minuten} eenheid="per keer" stap={5} min={5} onChange={setMinuten} />
       </div>
+
+      {/* Dagen en tijd: kies je dagen, dan gaat het meteen de agenda in. */}
+      {onInplannen && !regel && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Dagen en tijd</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {DAGEN.map(d => {
+              const aan = dagen.includes(d.id)
+              return (
+                <button key={d.id} onClick={() => wisselDag(d.id)} style={{
+                  flex: 1, minHeight: 40, borderRadius: 10,
+                  background: aan ? '#fff' : 'rgba(255,255,255,0.04)', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                  color: aan ? '#0a0a0a' : '#fff', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>{d.label}</button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>Tijd</span>
+            <input type="time" value={tijd} onChange={e => setTijd(e.target.value)} style={{
+              minHeight: 40, padding: '0 0.6rem', background: 'transparent', border: 'none',
+              color: '#fff', fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark',
+            }} />
+          </div>
+          <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+            {dagen.length > 0 ? `${dagen.length} dag${dagen.length === 1 ? '' : 'en'} · komt om ${tijd} in de agenda en in het cardioplan van de klant` : 'Geen dagen gekozen: dan blijft het een wat-als.'}
+          </div>
+        </div>
+      )}
 
       {/* Wat het kost: per keer en per week, bij dit gewicht. */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
@@ -127,12 +180,30 @@ export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuu
           </div>
         ))}
       </div>
+      {tempo && (
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '0.6rem 0', borderTop: '1px solid rgba(255,255,255,0.08)', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>Weektempo</span>
+          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+            <span style={{ color: 'rgba(255,255,255,0.45)' }}>{tempo.nu}</span> → <span style={{ color: tempo.beter ? '#22c55e' : '#fff' }}>{tempo.straks}</span>
+            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}> per week</span>
+          </span>
+        </div>
+      )}
       <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
         ± {perMin} kcal per minuut bij {Math.round(gewicht)} kg, rustige intensiteit (MET {gekozen.met}).
       </div>
 
       <button
-        onClick={() => onOpslaan({ ...(regel || {}), soort, keer, minuten })}
+        disabled={bezig}
+        onClick={async () => {
+          const nieuw = { ...(regel || {}), soort, keer: effKeer, minuten }
+          if (!regel && dagen.length > 0 && onInplannen) {
+            setBezig(true)
+            try { await onInplannen(nieuw, dagen, tijdMin) } finally { setBezig(false) }
+            return
+          }
+          onOpslaan(nieuw)
+        }}
         style={{
           width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a',
@@ -140,7 +211,7 @@ export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuu
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <Check size={16} strokeWidth={3} /> {regel ? 'Aanpassen' : 'Toevoegen aan wat als'}
+        <Check size={16} strokeWidth={3} /> {bezig ? 'Bezig…' : regel ? 'Aanpassen' : dagen.length > 0 ? 'Inplannen en opslaan' : 'Toevoegen aan wat als'}
       </button>
       {regel && onVerwijder && (
         <button

@@ -2304,6 +2304,15 @@ export default function ClientAgendaView({
           // Cardio opgeslagen in het weekbudget: meteen in plaatsmodus, zodat
           // de coach de dagen tikt waarop het moet gebeuren.
           onPlanCardio={({ label, duur }) => setTeplaatsen({ id: 'cardio', label, duur, kleur: '#06b6d4' })}
+          onPlanCardioDagen={async ({ label, duur, dagen, tijdMin }) => {
+            for (const day of dagen) {
+              await service.upsertBlock({
+                id: null, clientId: client.id, day, type: 'custom', label, sublabel: null,
+                startMin: tijdMin, endMin: Math.min(24 * 60, tijdMin + duur), color: '#06b6d4',
+              })
+            }
+            await reload()
+          }}
           realiteit={realiteit}
         />
         </div>

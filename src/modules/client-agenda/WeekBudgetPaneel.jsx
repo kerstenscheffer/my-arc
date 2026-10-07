@@ -187,7 +187,7 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut
 
 const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 
-export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio, realiteit = null }) {
+export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio, onPlanCardioDagen = null, realiteit = null }) {
   const [open, setOpen] = useState(false)
   // Plan = wat het weekplan geeft. Realiteit = wat er deze week gelogd is:
   // maaltijden, trainingen en cardio uit de logs. Zelfde rekenwerk, andere bron.
@@ -1211,6 +1211,29 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
             kcalPerMinuut={kcalPerMinuut}
             huidig={simCardio}
             onBewerk={(i) => setCardioBlad({ regel: simCardio[i], index: i })}
+            // Meer verbranding = groter tekort = kilo's eraf; dus min.
+            tempoVoor={planKg == null ? null : (kcalWeekExtra) => {
+              const straks = planKg - kcalWeekExtra / KCAL_PER_KILO
+              const beter = richting === 'afvallen' ? straks < planKg : richting === 'aankomen' ? straks > planKg : Math.abs(straks) < Math.abs(planKg)
+              return { nu: kgTekst(planKg), straks: kgTekst(straks), beter }
+            }}
+            onInplannen={onPlanCardioDagen ? async (nieuw, dagen, tijdMin) => {
+              // Direct in het cardioplan (regel krijgt een id) en op de dagen in de agenda.
+              const soort = CARDIO_SOORTEN.find(x => x.id === nieuw.soort) || CARDIO_SOORTEN[0]
+              const rij = await CardioService.savePlanItem({
+                client_id: clientId, cardio_type: soort.id,
+                times_per_week: Math.max(1, Number(nieuw.keer) || 1),
+                duration_minutes: Math.max(5, Number(nieuw.minuten) || 30),
+                intensity: 'rustig', sort_order: simCardio.length,
+                notes: `± ${Math.round(kcalPerMinuut(soort.met, gewicht) * (Number(nieuw.minuten) || 0))} kcal per keer`,
+              }, db)
+              const metId = { ...nieuw, id: rij?.id || undefined }
+              setSimCardio(rows => [...rows, metId])
+              if (rij?.id) setCardioBasis(b => [...(b || []), metId])
+              await onPlanCardioDagen({ label: `Cardio · ${soort.id}`, duur: Math.max(5, Number(nieuw.minuten) || 30), dagen, tijdMin })
+              setCardioBlad(null)
+              if (navigator.vibrate) navigator.vibrate([20, 40, 20])
+            } : null}
             onClose={() => setCardioBlad(null)}
             onOpslaan={(nieuw) => {
               setSimCardio(rows => cardioBlad?.regel != null && cardioBlad.index != null
