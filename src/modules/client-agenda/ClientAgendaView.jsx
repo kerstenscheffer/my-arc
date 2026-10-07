@@ -2263,6 +2263,9 @@ export default function ClientAgendaView({
           clientId={client?.id}
           mealPlan={data?.mealPlan}
           isMobile={isMobile}
+          // Cardio opgeslagen in het weekbudget: meteen in plaatsmodus, zodat
+          // de coach de dagen tikt waarop het moet gebeuren.
+          onPlanCardio={({ label, duur }) => setTeplaatsen({ id: 'cardio', label, duur, kleur: '#06b6d4' })}
         />
         </div>
       )}

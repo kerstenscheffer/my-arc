@@ -14,10 +14,11 @@
 
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronRight, Flame, GripVertical, Minus, Maximize2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Flame, GripVertical, Minus, Maximize2, X, Plus, Trash2 } from 'lucide-react'
 import { balkVak, balkVakActief } from './werkbalkStijl'
 import useZwevendVenster from '../../components/useZwevendVenster'
 import DagRingen from '../ai-meal-generator/tabs/plan-analyzer/DagRingen'
+import CardioService from '../workout/services/CardioService'
 import { useModalHost } from '../../coach/ModalHost'
 import { maakConfig } from '../weight-tracker/utils/coachingBand'
 
@@ -74,6 +75,25 @@ const KCAL_PER_1000_STAPPEN_PER_KG = 0.385
 // toont het getal per sessie, zodat je zelf kunt wegen of het klopt.
 const MET_KRACHTTRAINING = 4
 const TRAINING_MINUTEN = 60
+
+// Cardio per sport, als MET (hoeveel keer het rustverbruik). Bron: Ainsworth
+// e.a., Compendium of Physical Activities (2011 update). kcal per minuut =
+// MET × 3,5 × kg / 200 — dus voor 90 kg kost zwemmen (6,0 MET) ~9,5 kcal
+// per minuut. Rustige, volhoudbare intensiteit; een klant die hard gaat
+// verbrandt meer, maar te hoog schatten laat het tekort groter lijken dan
+// het is, en dat is de gevaarlijke kant om fout te zitten.
+const CARDIO_SOORTEN = [
+  { id: 'Wandelen',     label: 'Wandelen (stevig, 5,5 km/u)',   met: 4.3 },
+  { id: 'Fietsen',      label: 'Fietsen (matig, 16–19 km/u)',   met: 6.8 },
+  { id: 'Zwemmen',      label: 'Zwemmen (rustige baantjes)',    met: 6.0 },
+  { id: 'Hardlopen',    label: 'Hardlopen (rustig, 8 km/u)',    met: 8.3 },
+  { id: 'Roeien',       label: 'Roeien (matig)',                met: 7.0 },
+  { id: 'Crosstrainer', label: 'Crosstrainer',                  met: 5.0 },
+  { id: 'Stairmaster',  label: 'Stairmaster',                   met: 9.0 },
+  { id: 'HIIT',         label: 'HIIT',                          met: 8.0 },
+]
+const kcalPerMinuut = (met, kg) => Math.round(met * 3.5 * kg / 200 * 10) / 10
+const GEWICHT_AANNAME = 80
 
 // Middelpunt van elke stappenband, om het verschil tussen twee banden te
 // kunnen uitrekenen. 10.000+ krijgt 11.000: de band is open, maar doen alsof
@@ -168,7 +188,7 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting }) {
 
 const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 
-export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
+export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio }) {
   const [open, setOpen] = useState(false)
   // Alle secties dicht; je opent wat je nodig hebt.
   const [secties, setSecties] = useState({})
@@ -189,7 +209,14 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   const [simTdee, setSimTdee] = useState(0)          // kcal per dag erbij of eraf
   const [simTrainingen, setSimTrainingen] = useState(0) // sessies per week erbij
   const [simStappen, setSimStappen] = useState(null)    // andere band, of null
-  const [simCardio, setSimCardio] = useState(0)         // minuten cardio per week erbij
+  // Cardio als regels: sport, keer per week, minuten per keer. Zo past het
+  // één-op-één op client_cardio_plan bij Opslaan.
+  const [simCardio, setSimCardio] = useState([])        // [{ soort, keer, minuten }]
+  const [cardioOpgeslagen, setCardioOpgeslagen] = useState(false)
+  const [cardioBezig, setCardioBezig] = useState(false)
+  // Laatste bekende gewicht als de klantkaart er geen heeft: nodig voor
+  // training en cardio (kcal hangt aan kg). undefined = nog laden.
+  const [gewichtLog, setGewichtLog] = useState(undefined)
 
   // Pas ophalen als je het paneel opent. De agenda laadt al genoeg bij het
   // openen van de pagina; dit hoeft daar niet bij.
@@ -205,6 +232,26 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
             (e) => { console.warn('tdee laden mislukt:', e); if (leeft) setTdee(null) })
     return () => { leeft = false }
   }, [open, tdee, db, clientId])
+
+  useEffect(() => {
+    if (!open || gewichtLog !== undefined || !db?.supabase || !clientId) return
+    let leeft = true
+    ;(async () => {
+      try {
+        // De dagelijkse wegingen uit de app staan in weight_challenge_logs;
+        // de andere twee tabellen zijn oudere invoerpaden. Eerste treffer wint.
+        let w = null
+        for (const tabel of ['weight_challenge_logs', 'weight_tracking', 'weight_logs']) {
+          const { data } = await db.supabase.from(tabel).select('weight, date').eq('client_id', clientId).order('date', { ascending: false }).limit(1)
+            .then(r => r, () => ({ data: null }))
+          w = Number(data?.[0]?.weight) || null
+          if (w) break
+        }
+        if (leeft) setGewichtLog(w)
+      } catch (e) { console.warn('gewicht laden mislukt:', e?.message); if (leeft) setGewichtLog(null) }
+    })()
+    return () => { leeft = false }
+  }, [open, gewichtLog, db, clientId])
 
   // Apart effect: zat dit bij de TDEE in één effect, dan startte dat effect
   // opnieuw zodra de TDEE binnen was en gooide de cleanup het nog lopende
@@ -231,13 +278,19 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   // Alles hieronder rekent met de effectieve TDEE, zodat het hele venster
   // meebeweegt: Verbrandt, Mag eten, het overschot en het tempo. Geen apart
   // uitkomstvak; 'Terug naar nu' zet alles op nul.
-  const gewicht = Number(tdee?.current_weight) || null
-  const kcalPerTraining = gewicht
-    ? Math.round(MET_KRACHTTRAINING * 3.5 * gewicht / 200 * TRAINING_MINUTEN)
-    : null
-  // Cardio op zone 2 (MET 6): kcal per minuut uit het lichaamsgewicht.
-  const kcalPerCardioMin = gewicht ? Math.round(6 * 3.5 * gewicht / 200 * 10) / 10 : null
-  const kcalPer1000Stappen = gewicht ? Math.round(KCAL_PER_1000_STAPPEN_PER_KG * gewicht) : null
+  // Gewicht: klantkaart, anders laatste weging, anders startgewicht van de
+  // fase, anders een aanname van 80 kg (en dat staat er dan bij).
+  const gewichtBron = Number(tdee?.current_weight) ? 'klantkaart'
+    : Number(gewichtLog) ? 'laatste weging'
+    : Number(fase?.start_gewicht) ? 'start van de fase'
+    : 'aanname'
+  const gewicht = Number(tdee?.current_weight) || Number(gewichtLog) || Number(fase?.start_gewicht) || GEWICHT_AANNAME
+  const kcalPerTraining = Math.round(MET_KRACHTTRAINING * 3.5 * gewicht / 200 * TRAINING_MINUTEN)
+  const kcalPer1000Stappen = Math.round(KCAL_PER_1000_STAPPEN_PER_KG * gewicht)
+  const cardioKcalWeek = simCardio.reduce((t, r) => {
+    const soort = CARDIO_SOORTEN.find(x => x.id === r.soort) || CARDIO_SOORTEN[0]
+    return t + kcalPerMinuut(soort.met, gewicht) * (Number(r.minuten) || 0) * (Number(r.keer) || 0)
+  }, 0)
 
   const huidigeBand = tdee?.daily_steps || null
   const stapVerschilPerDag = (() => {
@@ -248,14 +301,39 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   const extraPerDag = Math.round(
     simTdee
     + stapVerschilPerDag
-    + ((kcalPerTraining || 0) * simTrainingen) / 7
-    + ((kcalPerCardioMin || 0) * simCardio) / 7
+    + (kcalPerTraining * simTrainingen) / 7
+    + cardioKcalWeek / 7
   )
   // Actief zodra er iets is ingesteld, ook als het blok dichtgeklapt is:
   // je klapt het dicht om de tabel en de balken erboven te bekijken, en dan
   // moet het effect juist blijven staan.
   const simActief = extraPerDag !== 0
-  const simTerug = () => { setSimTdee(0); setSimTrainingen(0); setSimCardio(0); setSimStappen(null) }
+  const simTerug = () => { setSimTdee(0); setSimTrainingen(0); setSimCardio([]); setSimStappen(null); setCardioOpgeslagen(false) }
+
+  // Cardio-regels naar het cardioplan van de klant (workout-pagina, kop
+  // Cardio), en daarna de agenda in plaatsmodus zodat je de dagen tikt.
+  const cardioOpslaan = async () => {
+    if (!clientId || simCardio.length === 0 || cardioBezig) return
+    setCardioBezig(true)
+    try {
+      for (const [i, r] of simCardio.entries()) {
+        const soort = CARDIO_SOORTEN.find(x => x.id === r.soort) || CARDIO_SOORTEN[0]
+        await CardioService.savePlanItem({
+          client_id: clientId, cardio_type: soort.id,
+          times_per_week: Math.max(1, Number(r.keer) || 1),
+          duration_minutes: Math.max(5, Number(r.minuten) || 30),
+          intensity: 'rustig', sort_order: i,
+          notes: `± ${Math.round(kcalPerMinuut(soort.met, gewicht) * (Number(r.minuten) || 0))} kcal per keer`,
+        }, db)
+      }
+      setCardioOpgeslagen(true)
+      const eerste = simCardio[0]
+      onPlanCardio?.({ label: `Cardio · ${eerste.soort}`, duur: Math.max(5, Number(eerste.minuten) || 30) })
+    } catch (e) {
+      console.error('cardio opslaan mislukt:', e)
+      alert('Cardio opslaan mislukt: ' + (e?.message || 'onbekende fout'))
+    } finally { setCardioBezig(false) }
+  }
   const tdeeNu = tdee?.tdee ? Number(tdee.tdee) : null
   const tdeeEff = tdeeNu != null ? tdeeNu + (simActief ? extraPerDag : 0) : null
 
@@ -749,16 +827,68 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                         eenheid="per week"
                         stap={1}
                         onChange={(v) => setSimTrainingen(Math.max(-7, v))}
-                        toelichting={kcalPerTraining ? `± ${kcalPerTraining} kcal per sessie` : 'gewicht onbekend'}
+                        toelichting={`± ${kcalPerTraining} kcal per uur krachttraining`}
                       />
-                      <Stapper
-                        label="Cardio"
-                        waarde={simCardio}
-                        eenheid="minuten per week"
-                        stap={15}
-                        onChange={(v) => setSimCardio(Math.max(0, v))}
-                        toelichting={kcalPerCardioMin ? `± ${kcalPerCardioMin} kcal per minuut, zone 2` : 'gewicht onbekend'}
-                      />
+
+                      {/* Cardio: per regel een sport, keer per week en minuten.
+                          kcal uit de MET van de sport en het gewicht. */}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>Cardio</span>
+                          <button
+                            onClick={() => { setSimCardio(r => [...r, { soort: 'Wandelen', keer: 3, minuten: 30 }]); setCardioOpgeslagen(false) }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32, padding: '0 0.6rem', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            <Plus size={12} strokeWidth={3} /> Cardio
+                          </button>
+                        </div>
+                        {simCardio.map((r, i) => {
+                          const soort = CARDIO_SOORTEN.find(x => x.id === r.soort) || CARDIO_SOORTEN[0]
+                          const perMin = kcalPerMinuut(soort.met, gewicht)
+                          const perKeer = Math.round(perMin * (Number(r.minuten) || 0))
+                          const perWeek = perKeer * (Number(r.keer) || 0)
+                          const zet = (veld, v) => { setSimCardio(rows => rows.map((x, j) => j === i ? { ...x, [veld]: v } : x)); setCardioOpgeslagen(false) }
+                          return (
+                            <div key={i} style={{ padding: '0.45rem 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <select value={r.soort} onChange={e => zet('soort', e.target.value)} style={selectStijl}>
+                                  {CARDIO_SOORTEN.map(x => <option key={x.id} value={x.id} style={{ background: '#1a1a1a' }}>{x.label}</option>)}
+                                </select>
+                                <button onClick={() => setSimCardio(rows => rows.filter((_, j) => j !== i))} aria-label="Regel weghalen" style={{ ...kopKnop, width: 32, height: 32 }}>
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+                                <div style={{ flex: 1 }}>
+                                  <Stapper label="Keer per week" waarde={Number(r.keer) || 0} eenheid="keer" stap={1} onChange={(v) => zet('keer', Math.max(0, v))} />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <Stapper label="Minuten" waarde={Number(r.minuten) || 0} eenheid="per keer" stap={5} onChange={(v) => zet('minuten', Math.max(0, v))} />
+                                </div>
+                              </div>
+                              <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
+                                ± {perMin} kcal per minuut bij {Math.round(gewicht)} kg · {perKeer} per keer · <span style={{ color: '#fff' }}>{getal(perWeek)} kcal per week</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {simCardio.length > 0 && (
+                          <button
+                            onClick={cardioOpslaan}
+                            disabled={cardioBezig || cardioOpgeslagen}
+                            style={{
+                              width: '100%', minHeight: 40, marginTop: 6, borderRadius: 10,
+                              background: cardioOpgeslagen ? 'transparent' : '#fff',
+                              border: cardioOpgeslagen ? '1px solid rgba(34,197,94,0.5)' : 'none',
+                              color: cardioOpgeslagen ? '#22c55e' : '#0a0a0a',
+                              fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: cardioOpgeslagen ? 'default' : 'pointer',
+                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            }}
+                          >
+                            {cardioBezig ? 'Opslaan…' : cardioOpgeslagen ? 'In het cardioplan van de klant · tik dagen in de agenda' : 'Opslaan in cardioplan en inplannen'}
+                          </button>
+                        )}
+                      </div>
 
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -787,13 +917,13 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                             ? 'Geen stappen uit de intake; dan valt er niets te vergelijken.'
                             : stapVerschilPerDag !== 0
                               ? `${stapVerschilPerDag > 0 ? '+' : '−'}${Math.abs(stapVerschilPerDag)} kcal per dag`
-                              : kcalPer1000Stappen ? `± ${kcalPer1000Stappen} kcal per 1.000 stappen` : 'gewicht onbekend'}
+                              : `± ${kcalPer1000Stappen} kcal per 1.000 stappen`}
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ fontSize: '0.64rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', lineHeight: 1.35 }}>
-                          Schattingen; wijzigt niets. De cijfers hierboven rekenen ermee.
+                        <span style={{ fontSize: '0.64rem', fontWeight: 600, color: gewichtBron === 'aanname' ? '#f59e0b' : 'rgba(255,255,255,0.35)', lineHeight: 1.35 }}>
+                          Gerekend met {Math.round(gewicht)} kg ({gewichtBron}). Schattingen; wijzigt niets behalve bij Opslaan.
                         </span>
                         {simActief && (
                           <button
@@ -867,6 +997,12 @@ function Sectie({ titel, samenvatting, kleur, open, onToggle, children }) {
       {open && <div style={{ paddingBottom: '0.6rem' }}>{children}</div>}
     </div>
   )
+}
+
+const selectStijl = {
+  flex: 1, minWidth: 0, minHeight: 32, padding: '0 0.5rem',
+  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
+  color: '#fff', fontSize: '0.74rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
 }
 
 const kopKnop = {
