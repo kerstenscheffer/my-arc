@@ -262,9 +262,8 @@ export default function WeekSchedule({
     await loadCustomWorkoutsForSchedule(next)
   }
 
-  // Kruisje op een tegel: alleen deze week weg. Training: zelfde weg als
-  // 'eenmalig' toevoegen, maar dan zonder die dag. Cardio: een eenmalig blok
-  // gaat weg, een vast blok slaat deze week over (skip_weeks).
+  // Prullenbak op een trainingstegel: alleen deze week weg, zelfde weg als
+  // 'eenmalig' toevoegen maar dan zonder die dag.
   const verwijderTraining = async (day) => {
     const next = { ...tempSchedule }
     delete next[day]
@@ -279,13 +278,25 @@ export default function WeekSchedule({
     if (!eigenVolgende) await WorkoutServiceNew.saveWeekPlanning(clientId, volgendeWeekSleutel, tempSchedule, db)
     await handleAutoSave(next)
   }
+  // Cardio gaat voorgoed weg: het blok uit de agenda, en de planregel van
+  // die sport telt een keer minder (of gaat uit als er niets overblijft).
   const verwijderCardio = async (c) => {
     if (!c?.id || !db?.supabase) return
-    const q = c.eenmalig
-      ? db.supabase.from('client_agenda_blocks').delete().eq('id', c.id)
-      : db.supabase.from('client_agenda_blocks').update({ skip_weeks: [...(c.skipWeeks || []), weekSleutel], updated_at: new Date().toISOString() }).eq('id', c.id)
-    const { error } = await q
+    const { error } = await db.supabase.from('client_agenda_blocks').delete().eq('id', c.id)
     if (error) { console.error('cardio weghalen mislukt:', error); alert('⚠️ Weghalen mislukt.'); return }
+    if (!c.eenmalig) {
+      const label = `Cardio · ${c.soort}`
+      const plan = await CardioService.getPlan(clientId, db)
+      const regel = plan.find(p => normaliseerSoort(p.cardio_type) === normaliseerSoort(c.soort))
+      if (regel) {
+        const { data: over } = await db.supabase.from('client_agenda_blocks').select('id')
+          .eq('client_id', clientId).eq('type', 'custom').eq('label', label).is('week_start', null)
+          .then(r => r, () => ({ data: null }))
+        const keer = (over || []).length
+        if (keer === 0) await CardioService.deactivatePlanItem(regel.id, db)
+        else await CardioService.savePlanItem({ ...regel, times_per_week: keer }, db)
+      }
+    }
     setCardioVersie(v => v + 1)
     window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
   }

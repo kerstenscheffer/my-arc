@@ -11,7 +11,7 @@
 //   · Rust-waarschuwing → rode/oranje rand als dezelfde training te dicht
 //     op deze dag staat
 
-import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, Trash2 } from 'lucide-react'
 import { cardioFoto } from '../../utils/workoutFoto'
 import { getWorkoutImage } from './workoutImage'
 
@@ -43,15 +43,17 @@ function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRecht
           </div>
         )}
       </div>
-      {/* Kruisje rechtsboven: deze training alleen deze week weghalen. */}
+      {/* Prullenbak rechtsboven, kaal wit: training alleen deze week weg,
+          cardio voorgoed. */}
       {onVerwijder && !klaar && (
-        <button onClick={(e) => { e.stopPropagation(); onVerwijder(); if (navigator.vibrate) navigator.vibrate(25) }} aria-label="Deze week weghalen" style={{
-          position: 'absolute', top: 3, right: 3, width: isMobile ? 20 : 22, height: isMobile ? 20 : 22, padding: 0, borderRadius: '50%',
-          background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.35)', color: '#fff',
+        <button onClick={(e) => { e.stopPropagation(); onVerwijder(); if (navigator.vibrate) navigator.vibrate(25) }} aria-label="Weghalen" style={{
+          position: 'absolute', top: 2, right: 2, width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, padding: 0,
+          background: 'transparent', border: 'none', color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.9))',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
-          <X size={isMobile ? 11 : 12} strokeWidth={3} />
+          <Trash2 size={isMobile ? 13 : 14} strokeWidth={2.8} />
         </button>
       )}
       {/* Pijltjes aan de foto vast: links en rechts in de onderrand. */}
