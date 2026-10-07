@@ -1251,22 +1251,6 @@ export default function ClientAgendaView({
   // modus: buiten die modus opent een tik het bewerkvenster en werkt slepen,
   // en dat botst met aantikken om te selecteren.
   const [selectieModus, setSelectieModus] = useState(false)
-  // Plan of realiteit. Realiteit = wat er echt gelogd is deze week; niets
-  // daarvan is te verslepen of te bewerken.
-  const [weergave, setWeergave] = useState('plan')
-  const [realiteit, setRealiteit] = useState(null)
-  const [realiteitLaden, setRealiteitLaden] = useState(false)
-  useEffect(() => {
-    if (weergave !== 'realiteit' || !service || !client?.id) return
-    let weg = false
-    setRealiteitLaden(true)
-    service.loadRealiteit(client.id, weekAnchor)
-      .then(res => { if (!weg) setRealiteit(res) })
-      .catch(e => { console.error('realiteit laden mislukt:', e); if (!weg) setRealiteit(null) })
-      .finally(() => { if (!weg) setRealiteitLaden(false) })
-    return () => { weg = true }
-  }, [weergave, service, client?.id, weekAnchor, refreshKey])
-  const isRealiteit = weergave === 'realiteit'
   const [geselecteerd, setGeselecteerd] = useState(() => new Set())
   const [bulkBezig, setBulkBezig] = useState(false)
   // Iets inplannen: eerst een soort aanklikken, dan een plek in de agenda.
@@ -1292,6 +1276,23 @@ export default function ClientAgendaView({
     reden,
     bron: instantieRef.current,
   })
+
+  // Plan of realiteit. Realiteit = wat er echt gelogd is deze week; niets
+  // daarvan is te verslepen of te bewerken.
+  const [weergave, setWeergave] = useState('plan')
+  const [realiteit, setRealiteit] = useState(null)
+  const [realiteitLaden, setRealiteitLaden] = useState(false)
+  useEffect(() => {
+    if (weergave !== 'realiteit' || !service || !client?.id) return
+    let weg = false
+    setRealiteitLaden(true)
+    service.loadRealiteit(client.id, weekAnchor)
+      .then(res => { if (!weg) setRealiteit(res) })
+      .catch(e => { console.error('realiteit laden mislukt:', e); if (!weg) setRealiteit(null) })
+      .finally(() => { if (!weg) setRealiteitLaden(false) })
+    return () => { weg = true }
+  }, [weergave, service, client?.id, weekAnchor, refreshKey])
+  const isRealiteit = weergave === 'realiteit'
 
   const reload = async () => {
     if (!service || !client?.id) return
