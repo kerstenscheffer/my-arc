@@ -772,10 +772,11 @@ async naamVanTrainingsdag(clientId, datum) {
   } catch { return null }
 }
 
-async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null) {
+async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null, datum = null) {
   try {
-    // 1. Create or get today's workout session
-    const today = new Date().toISOString().split('T')[0]
+    // 1. Create or get the day's workout session (vandaag, of een andere dag
+    //    als het logscherm voor een afgeronde training is geopend)
+    const today = datum || new Date().toISOString().split('T')[0]
     const naam = await this.naamVanTrainingsdag(clientId, today)
     const session = await this.getOrCreateWorkoutSession(clientId, today, {
       day_display_name: naam || 'Training',

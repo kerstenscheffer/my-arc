@@ -6,7 +6,7 @@
 // voedings- en trainingspaneel in het inzicht, zodat het één verhaal blijft.
 
 import { useEffect, useState } from 'react'
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, Info } from 'lucide-react'
 import BladModal from '../workout/components/todays-workout/components/BladModal'
 import MealCard from '../meal-plan/components/day-schedule/MealCard'
 import { foodImageFallback } from '../meal-plan/foodImageFallback'
@@ -90,7 +90,7 @@ function MaaltijdInhoud({ blok, db, isMobile }) {
   )
 }
 
-function TrainingInhoud({ blok, db, isMobile }) {
+function TrainingInhoud({ blok, db, isMobile, onOefening = null }) {
   const meta = blok.meta || {}
   const [oefeningen, setOefeningen] = useState(null)
   useEffect(() => {
@@ -145,9 +145,20 @@ function TrainingInhoud({ blok, db, isMobile }) {
               )}
             </div>
             {beste > 0 && (
-              <div style={{ flexShrink: 0, alignSelf: 'center', padding: '0 0.8rem', fontSize: '0.9rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ flexShrink: 0, alignSelf: 'center', padding: onOefening ? '0 0.3rem 0 0.8rem' : '0 0.8rem', fontSize: '0.9rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
                 {beste}<span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>kg</span>
               </div>
+            )}
+            {/* Door naar het logscherm van deze oefening op deze dag: sets,
+                video, vorige keer. */}
+            {onOefening && (
+              <button onClick={() => onOefening(ex)} aria-label={`${ex.exercise_name} openen`} style={{
+                flexShrink: 0, alignSelf: 'center', width: 36, height: 36, marginRight: 6, padding: 0,
+                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <Info size={17} strokeWidth={2.4} />
+              </button>
             )}
           </div>
         )
@@ -156,13 +167,13 @@ function TrainingInhoud({ blok, db, isMobile }) {
   )
 }
 
-export default function RealiteitBlad({ blok, db, isMobile, onClose }) {
+export default function RealiteitBlad({ blok, db, isMobile, onClose, onOefening = null }) {
   const open = !!blok
   const titel = blok ? (blok.type === 'meal' ? blok.sublabel : blok.type === 'training' ? (blok.sublabel || 'Training') : blok.sublabel || blok.label) : ''
   return (
     <BladModal open={open} titel={titel} onClose={onClose} zIndex={10600}>
       {blok?.type === 'meal' && <MaaltijdInhoud blok={blok} db={db} isMobile={isMobile} />}
-      {blok?.type === 'training' && <TrainingInhoud blok={blok} db={db} isMobile={isMobile} />}
+      {blok?.type === 'training' && <TrainingInhoud blok={blok} db={db} isMobile={isMobile} onOefening={onOefening} />}
       {blok && blok.type !== 'meal' && blok.type !== 'training' && (
         <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', paddingBottom: '0.5rem' }}>
           {blok.label} · {tijd(blok.start)}

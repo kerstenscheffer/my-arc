@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, Dumbbell, HeartPulse, ChevronDown, Clock } from 'lucide-react'
 import RealiteitBlad from '../../client-agenda/RealiteitBlad'
 import CardioGedaanBlad from './CardioGedaanBlad'
+import ExerciseLogModal from './todays-workout/components/ExerciseLogModal'
 import CardioService from '../services/CardioService'
 import { cardioFoto } from '../utils/workoutFoto'
 import { getWorkoutImage } from './week-schedule/workoutImage'
@@ -27,13 +28,14 @@ const dagKop = (datum) => {
 }
 const minVan = (ts) => { const d = new Date(ts); return d.getHours() * 60 + d.getMinutes() }
 
-export default function HistorieBlad({ db, clientId, isMobile }) {
+export default function HistorieBlad({ db, clientId, isMobile, client = null }) {
   const [soort, setSoort] = useState('alles') // alles | kracht | cardio
   const [periode, setPeriode] = useState(90)
   const [zoek, setZoek] = useState('')
   const [sessies, setSessies] = useState(null)
   const [cardio, setCardio] = useState([])
   const [open, setOpen] = useState(null) // { type: 'training', blok } | { type: 'cardio', log }
+  const [oefeningLog, setOefeningLog] = useState(null) // { exercise, datum }
   const [limiet, setLimiet] = useState(40)
   // Rooster + plan om oude sessies zonder echte naam ('Quick Log - …') alsnog
   // een naam te geven op basis van de weekdag.
@@ -202,7 +204,12 @@ export default function HistorieBlad({ db, clientId, isMobile }) {
         <button onClick={() => setLimiet(l => l + 40)} style={{ ...pil(false), width: '100%', justifyContent: 'center', minHeight: 44, borderRadius: 14 }}>Meer laden</button>
       )}
 
-      <RealiteitBlad blok={open?.type === 'training' ? open.blok : null} db={db} isMobile={isMobile} onClose={() => setOpen(null)} />
+      <RealiteitBlad blok={open?.type === 'training' && !oefeningLog ? open.blok : null} db={db} isMobile={isMobile} onClose={() => setOpen(null)}
+        onOefening={(ex) => { const sets = Array.isArray(ex?.sets) ? ex.sets : []; setOefeningLog({ exercise: { name: ex.exercise_name, sets: sets.length || 3, reps: sets[0]?.reps || 10 }, datum: open?.blok?.meta?.datum || null }) }} />
+      {oefeningLog && (
+        <ExerciseLogModal db={db} client={client || { id: clientId }} exercise={oefeningLog.exercise} datum={oefeningLog.datum} isMobile={isMobile}
+          onClose={() => setOefeningLog(null)} />
+      )}
       {open?.type === 'cardio' && (
         <CardioGedaanBlad log={open.log} soort={open.log?.cardio_type} db={db} isMobile={isMobile}
           onClose={() => setOpen(null)}

@@ -235,6 +235,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
           onSwitchPlan={() => setShowPlanSwitch(true)}
           weekOffset={weekOffset}
           onWeekOffsetChange={setWeekOffset}
+          client={client}
           tussenBlok={<div style={{ padding: isMobile ? '0.75rem 1rem 0' : '1rem 1.25rem 0' }}><StappenStrook client={client} db={db} isMobile={isMobile} /></div>}
         />
       </div></FadeOnScroll>}
@@ -279,7 +280,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         <KrachtBlad db={db} client={client} isMobile={isMobile} />
       </BladModal>
       <BladModal open={historyOpen} titel="Historie" onClose={() => setHistoryOpen(false)}>
-        <HistorieBlad db={db} clientId={client?.id} isMobile={isMobile} />
+        <HistorieBlad db={db} clientId={client?.id} client={client} isMobile={isMobile} />
       </BladModal>
 
       <style>{`

@@ -414,7 +414,12 @@ function youtubeThumb(url) {
 }
 
 // ========== MAIN MODAL ==========
-export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768 }) {
+// `datum` (YYYY-MM-DD): het logscherm voor een andere dag dan vandaag, bv.
+// een afgeronde training uit het weekrooster of de historie. Alles wat
+// 'vandaag' was, is dan die dag: de gelogde sets, 'vorige keer' (de keer
+// ervóór) en waar een nieuwe set naartoe gaat.
+export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768, datum = null }) {
+  const vandaag = datum || new Date().toISOString().split('T')[0]
   const [loggedSets, setLoggedSets] = useState([])
   // In welke eenheid je invoert, komt van de sportschool waar je nu staat.
   // Zelf ophalen in plaats van als prop: dit scherm wordt vanuit vier plekken
@@ -497,7 +502,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const loadPreviousPerformance = async () => {
     if (!client?.id || !db) return
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = vandaag
       const { data: sessions } = await db.supabase
         .from('workout_sessions').select('id, workout_date, gym_id')
         .eq('client_id', client.id).lt('workout_date', today)
@@ -544,7 +549,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const laadEerdereNotities = async () => {
     if (!client?.id || !db) return
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = vandaag
       const { data: sessions } = await db.supabase
         .from('workout_sessions').select('id, workout_date')
         .eq('client_id', client.id).lt('workout_date', today)
@@ -616,7 +621,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   const loadExistingLogs = async () => {
     if (!client?.id || !db) { setLoading(false); return }
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = vandaag
       const { data: sessions } = await db.supabase.from('workout_sessions').select('id').eq('client_id', client.id).eq('workout_date', today)
       if (sessions?.length > 0) {
         const { data: progress } = await db.supabase.from('workout_progress').select('*').in('session_id', sessions.map(s => s.id)).eq('exercise_name', exercise.name).order('created_at', { ascending: true })
@@ -720,7 +725,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
     setSaving(true)
     try {
       const setsData = sets.map(s => ({ weight: s.weight, reps: s.reps, partials: s.partials || 0, dropsets: s.dropsets || [] }))
-      const progress = await db.saveQuickWorkoutLog(client.id, exercise.name, setsData, notitie || null)
+      const progress = await db.saveQuickWorkoutLog(client.id, exercise.name, setsData, notitie || null, vandaag)
 
       console.log('💾 progress id:', progress?.id, '| attachment:', attachmentUsed, '| settings:', machineSettings)
 
@@ -778,7 +783,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
       await db.supabase.from('clients').update({ exercise_preferences: prefs }).eq('id', client.id)
 
       // Ook opslaan in workout_progress als die al bestaat vandaag
-      const today = new Date().toISOString().split('T')[0]
+      const today = vandaag
       const { data: sessions } = await db.supabase
         .from('workout_sessions').select('id').eq('client_id', client.id).eq('workout_date', today)
       if (sessions?.length) {

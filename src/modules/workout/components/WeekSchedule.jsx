@@ -12,6 +12,7 @@ import CardioService, { normaliseerSoort } from '../services/CardioService'
 import TrainingToevoegen from './TrainingToevoegen'
 import RealiteitBlad from '../../client-agenda/RealiteitBlad'
 import CardioGedaanBlad from './CardioGedaanBlad'
+import ExerciseLogModal from './todays-workout/components/ExerciseLogModal'
 
 // Bereken de maandag van de huidige week (lokale tijd).
 function getThisMonday() {
@@ -28,6 +29,8 @@ export default function WeekSchedule({
   completedWorkouts = [], todayIndex, onDayClick,
   clientId, db, workoutService, onScheduleUpdate, onSwitchPlan,
   weekOffset = 0, onWeekOffsetChange,
+  // Volledige klant voor het logscherm van een afgeronde oefening.
+  client = null,
   // Blok onder de weekstrip (de cardio-sectie). Als slot doorgegeven zodat
   // WeekSchedule zelf niets van cardio hoeft te weten en de volgorde op één
   // plek staat. Stond eerst tussen de dagen en de weekbalk in, maar dan raakt
@@ -83,6 +86,17 @@ export default function WeekSchedule({
   const [sessieBlad, setSessieBlad] = useState(null)
   // Geopende gedane cardio (tik op een groene cardiotegel): { log, soort, gepland }
   const [cardioBlad, setCardioBlad] = useState(null)
+  // Logscherm voor één oefening op een afgeronde dag: { exercise, datum }.
+  // Het sessieblad gaat zolang dicht (zelfde laag) en komt daarna terug.
+  const [oefeningLog, setOefeningLog] = useState(null)
+  const oefeningVan = (naam, ex) => {
+    for (const dag of Object.values(schema?.week_structure || {})) {
+      const hit = (dag?.exercises || []).find(e => String(e?.name || '').trim().toLowerCase() === String(naam).trim().toLowerCase())
+      if (hit) return hit
+    }
+    const sets = Array.isArray(ex?.sets) ? ex.sets : []
+    return { name: naam, sets: sets.length || 3, reps: sets[0]?.reps || 10 }
+  }
   const [sessieVersie, setSessieVersie] = useState(0)
   useEffect(() => {
     const bump = () => setSessieVersie(v => v + 1)
@@ -96,7 +110,7 @@ export default function WeekSchedule({
     const zondag = new Date(maandag); zondag.setDate(zondag.getDate() + 6)
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     ;(async () => {
-      const { data: sessies } = await db.supabase.from('workout_sessions').select('id, workout_date, day_name, duration_minutes, is_completed, created_at')
+      const { data: sessies } = await db.supabase.from('workout_sessions').select('id, workout_date, day_name, day_display_name, duration_minutes, is_completed, created_at')
         .eq('client_id', clientId).gte('workout_date', iso(maandag)).lte('workout_date', iso(zondag))
         .then(r => r, () => ({ data: [] }))
       const ids = (sessies || []).map(x => x.id)
@@ -127,7 +141,11 @@ export default function WeekSchedule({
           uit.push({
             workout_day: dagen[idx], workout_date: x.workout_date,
             blok: {
-              id: `gedaan-${x.id}`, day: dagen[idx].toLowerCase(), type: 'training', label: 'Training', sublabel: x.day_name || 'Training',
+              id: `gedaan-${x.id}`, day: dagen[idx].toLowerCase(), type: 'training', label: 'Training',
+              // Naam van de training: wat de sessie zelf zegt, anders de dag
+              // uit het rooster (oude sessies heten 'Wednesday' of 'Quick Log').
+              sublabel: (x.day_display_name && !/^quick log/i.test(x.day_display_name)) ? x.day_display_name
+                : (getWorkoutData(tempSchedule[dagen[idx]])?.name || getWorkoutData(tempSchedule[dagen[idx]])?.focus || 'Training'),
               start, end: eind, color: '#fff', source: 'realiteit', editable: false,
               meta: { echt: true, sessionId: x.id, exercise_count: telSets[x.id] || null, estimated_time: `${eind - start} min`, afgerond: !!x.is_completed, datum: x.workout_date },
             },
@@ -719,7 +737,12 @@ export default function WeekSchedule({
 
       {/* Afgeronde sessie: oefeningen met hun sets, zelfde blad als de
           Realiteit-agenda van de coach. */}
-      <RealiteitBlad blok={sessieBlad} db={db} isMobile={isMobile} onClose={() => setSessieBlad(null)} />
+      <RealiteitBlad blok={oefeningLog ? null : sessieBlad} db={db} isMobile={isMobile} onClose={() => setSessieBlad(null)}
+        onOefening={(ex) => setOefeningLog({ exercise: oefeningVan(ex.exercise_name, ex), datum: sessieBlad?.meta?.datum || null })} />
+      {oefeningLog && (
+        <ExerciseLogModal db={db} client={client || { id: clientId }} exercise={oefeningLog.exercise} datum={oefeningLog.datum} isMobile={isMobile}
+          onClose={() => { setOefeningLog(null); setSessieVersie(v => v + 1) }} />
+      )}
       {cardioBlad && (
         <CardioGedaanBlad log={cardioBlad.log} soort={cardioBlad.soort} gepland={cardioBlad.gepland} db={db} isMobile={isMobile}
           onClose={() => setCardioBlad(null)}
