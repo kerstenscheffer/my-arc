@@ -30,11 +30,22 @@ export default function WeekGrid({
   }
 
   const gap = isMobile ? '0.3rem' : '0.5rem'
+  const PIJL_B = isMobile ? 22 : 26
+  const pijl = {
+    flexShrink: 0, width: PIJL_B, height: isMobile ? 22 : 26, padding: 0, borderRadius: 7,
+    background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
   return (<>
     {/* Eén dagenstrook boven het rooster, in dezelfde kolommen als de
         kaarten: dag en datum, vandaag als witte pil. De kaarten zelf hebben
         geen label meer, dus de tegels krijgen de hoogte. */}
-    <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap, minWidth: 0, width: '100%', marginBottom: isMobile ? 4 : 6 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 2 : 4, minWidth: 0, width: '100%', marginBottom: isMobile ? 4 : 6 }}>
+      {/* Weekpijlen op de dagenstrook: links van Ma, rechts van Zo. De
+          kaarten eronder springen evenveel in zodat de kolommen gelijk lopen. */}
+      <button onClick={onPrevWeek} aria-label="Vorige week" style={pijl}><ChevronLeft size={isMobile ? 16 : 18} strokeWidth={3} /></button>
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: kolommen, gap, minWidth: 0 }}>
       {weekDays.map((day, index) => {
         const vandaag = kanOpenen && index === todayIndex
         const d = dayDates ? dayDates[index] : null
@@ -51,13 +62,16 @@ export default function WeekGrid({
           </div>
         )
       })}
+      </div>
+      <button onClick={onNextWeek} aria-label="Volgende week" style={pijl}><ChevronRight size={isMobile ? 16 : 18} strokeWidth={3} /></button>
     </div>
     <div style={{
       display: 'grid',
       gridTemplateColumns: kolommen,
       gap,
       marginBottom: isMobile ? '0.5rem' : '0.625rem',
-      minWidth: 0, width: '100%',
+      minWidth: 0, boxSizing: 'border-box', width: '100%',
+      padding: `0 ${PIJL_B + (isMobile ? 2 : 4)}px`,
     }}>
       {weekDays.map((day, index) => {
         const assignedWorkout = tempSchedule[day]
