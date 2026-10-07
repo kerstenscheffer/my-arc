@@ -170,7 +170,9 @@ const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 
 export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   const [open, setOpen] = useState(false)
-  const [toonRingen, setToonRingen] = useState(false)
+  // Alle secties dicht; je opent wat je nodig hebt.
+  const [secties, setSecties] = useState({})
+  const zetSectie = (k) => setSecties(prev => ({ ...prev, [k]: !prev[k] }))
   // Zwevend venster, net als de intake-modal: verslepen aan de kop, groter
   // maken aan de hoek, inklappen tot de balk. Zo zet je het naast de agenda
   // terwijl je maaltijden verschuift en ziet het tempo live meebewegen.
@@ -184,7 +186,6 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
 
   // Wat-als. Alle drie de knoppen zijn afwijkingen van de huidige situatie,
   // niet absolute waarden — zo blijft "terug naar nu" simpelweg alles op nul.
-  const [simAan, setSimAan] = useState(false)
   const [simTdee, setSimTdee] = useState(0)          // kcal per dag erbij of eraf
   const [simTrainingen, setSimTrainingen] = useState(0) // sessies per week erbij
   const [simStappen, setSimStappen] = useState(null)    // andere band, of null
@@ -386,6 +387,11 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
             </div>
           ) : (
             <>
+              <Sectie
+                titel="Doel"
+                open={!!secties.doel} onToggle={() => zetSectie('doel')}
+                samenvatting={config && doelLabel ? `${doelLabel} · ${richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)} per week` : 'geen fase'}
+              >
               {/* Doel en streeftempo. Dit is waar je op stuurt; de rest van
                   het paneel vergelijkt het plan hiermee. */}
               {fase !== undefined && tdee !== undefined && (
@@ -457,34 +463,6 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                 )
               })()}
 
-              {/* Wat het plan gemiddeld per dag geeft, als dezelfde vier
-                  ringen als in de analyzer, tegen de targets van de klant. */}
-              <button
-                onClick={() => setToonRingen(v => !v)}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                  padding: '0.5rem 0', marginTop: '0.2rem', background: 'none', border: 'none',
-                  borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>Plan geeft</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-                  macro's per dag · {getal(planWeek)} kcal per week
-                  <ChevronDown size={13} style={{ transform: toonRingen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                </span>
-              </button>
-              {toonRingen && (
-                <div style={{ margin: '0 -0.5rem' }}>
-                  <DagRingen
-                    totalen={{ calories: planWeek / 7, protein: perDag.eiwitGem, carbs: perDag.koolhGem, fat: perDag.vetGem }}
-                    targets={{ calories: tdee?.target_calories, protein: tdee?.target_protein, carbs: tdee?.target_carbs, fat: tdee?.target_fat }}
-                    isMobile
-                  />
-                </div>
-              )}
-
               {tdee === undefined && regel('Verbranding', '…', 'laden')}
 
               {tdee !== undefined && verbranding == null && regel(
@@ -492,11 +470,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                 'geen TDEE ingevuld bij deze klant', 'rgba(255,255,255,0.4)'
               )}
 
-              {verbranding != null && (
-                <>
-
-                  {/* Stappen uit de intake. Alleen tonen als ze er zijn — een
-                      regel "onbekend" helpt niemand. */}
+              {verbranding != null && (<>
                   {tdee?.daily_steps && (() => {
                     const stapN = STAP_NIVEAU[tdee.daily_steps]
                     const actieN = ACTIE_NIVEAU[tdee.activity_level]
@@ -532,6 +506,30 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   {/* Tekort (cut) of overschot (build): wat het doeltempo
                       vraagt, en wat het plan nu geeft met het tempo dat daar
                       bij hoort. Het woord volgt de richting van de fase. */}
+              </>)}
+              </Sectie>
+
+              <Sectie
+                titel="Plan geeft"
+                open={!!secties.plan} onToggle={() => zetSectie('plan')}
+                samenvatting={`${getal(planWeek / 7)} kcal per dag · ${perDag.eiwitGem} g eiwit`}
+              >
+                <div style={{ margin: '0 -0.5rem' }}>
+                  <DagRingen
+                    totalen={{ calories: planWeek / 7, protein: perDag.eiwitGem, carbs: perDag.koolhGem, fat: perDag.vetGem }}
+                    targets={{ calories: tdee?.target_calories, protein: tdee?.target_protein, carbs: tdee?.target_carbs, fat: tdee?.target_fat }}
+                    isMobile
+                  />
+                </div>
+              </Sectie>
+
+              {verbranding != null && (
+                <Sectie
+                  titel={tekort >= 0 ? 'Tekort' : 'Overschot'}
+                  open={!!secties.tekort} onToggle={() => zetSectie('tekort')}
+                  samenvatting={`${getal(Math.abs(tekort))} kcal per week · ${kgTekst(planKg)}`}
+                  kleur={opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : null}
+                >
                   {/* Tabel: links wat het is (doeltempo, dit plan), boven de
                       periode (dag, week, maand), in elk vak de kcal en de kilo's
                       die dat oplevert. Het woord volgt het getal: een plan dat
@@ -603,18 +601,14 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                     Schatting op 7700 kcal per kilo. Wat de weegschaal doet blijft leidend.
                   </div>
 
-                </>
+                </Sectie>
               )}
 
-                {/* Verdeling over de week. Het weektotaal zegt niets over
-                    hoe scheef de dagen liggen: 2000-2000-2000 leest heel
-                    anders dan 900-900-4200. Staafje op de hoogste dag
-                    geschaald; trainingsdagen in goud, zodat een uitschieter
-                    meteen te plaatsen is. */}
-                <div style={{ marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>
-                    Per dag
-                  </div>
+              <Sectie
+                titel="Per dag"
+                open={!!secties.perdag} onToggle={() => zetSectie('perdag')}
+                samenvatting={dagDoelKcal != null ? `doel ${getal(dagDoelKcal)} kcal per dag` : (tdeeEff ? `verbranding ${getal(tdeeEff)} per dag` : null)}
+              >
                   {(() => {
                   // Staafjes en de TDEE-lijn delen dezelfde schaal, anders
                   // zegt "erboven of eronder" niets. De schaal loopt daarom
@@ -731,26 +725,15 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                     </>
                   )
                 })()}
+              </Sectie>
 
-              {/* ── Wat als ──────────────────────────────────────────────
-                  Verandert niets in de database. Draai je aan een knop, dan
-                  rekent het hele venster met de nieuwe verbranding. */}
               {verbranding != null && (
-                <div style={{ marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <button onClick={() => setSimAan(o => !o)} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%',
-                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                    color: '#fff', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800,
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}>
-                    <span>Wat als…</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 700, color: simActief ? '#22c55e' : 'rgba(255,255,255,0.45)' }}>
-                      {simActief ? `${extraPerDag > 0 ? '+' : '−'}${getal(Math.abs(extraPerDag))} kcal per dag` : 'TDEE, training, stappen, cardio'}
-                      <ChevronDown size={13} style={{ transform: simAan ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                    </span>
-                  </button>
-
-                  {simAan && (
+                <Sectie
+                  titel="Wat als"
+                  open={!!secties.watals} onToggle={() => zetSectie('watals')}
+                  samenvatting={simActief ? `verbranding ${extraPerDag > 0 ? '+' : '−'}${getal(Math.abs(extraPerDag))} kcal per dag` : 'TDEE, training, stappen, cardio'}
+                  kleur={simActief ? '#22c55e' : null}
+                >
                     <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <Stapper
                         label="TDEE"
@@ -827,11 +810,9 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
 
-              </div>
+                </Sectie>
+              )}
             </>
           )}
           </div>
@@ -853,6 +834,37 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
         </div>,
         modalHost || document.body
       )}
+    </div>
+  )
+}
+
+// Eén sectie van het venster: kop met wit label (zwarte tekst) als
+// dropdown, rechts een korte samenvatting en het pijltje. Dicht = alleen de kop.
+function Sectie({ titel, samenvatting, kleur, open, onToggle, children }) {
+  return (
+    <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <button
+        onClick={onToggle}
+        aria-expanded={open}
+        style={{
+          width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10,
+          padding: '0.35rem 0', background: 'none', border: 'none',
+          fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <span style={{
+          flexShrink: 0, fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase',
+          color: '#000', background: '#fff', borderRadius: 6, padding: '3px 8px',
+        }}>
+          {titel}
+        </span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 700, color: kleur || 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'right' }}>
+          {samenvatting || ''}
+        </span>
+        <ChevronDown size={14} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+      {open && <div style={{ paddingBottom: '0.6rem' }}>{children}</div>}
     </div>
   )
 }
