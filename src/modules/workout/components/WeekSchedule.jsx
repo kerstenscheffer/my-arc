@@ -2,6 +2,8 @@
 import useIsMobile from '../../../hooks/useIsMobile'
 import { AlertCircle, RefreshCw, Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { Trash2 } from 'lucide-react'
 import WeekGrid from './week-schedule/WeekGrid'
 import WorkoutServiceNew from '../services/WorkoutServiceNew'
 import { rustWaarschuwingen, waarschuwingTekst, ROOD } from '../utils/rustWaarschuwing'
@@ -42,6 +44,11 @@ export default function WeekSchedule({
   // zondag botst niet met de dinsdag ervóór maar met de dinsdag erna, en die
   // staat in de week hierna.
   const [buurWeken, setBuurWeken] = useState({})
+  // Het vaste rooster (clients.workout_schedule), om te weten of een training
+  // 'permanent' in het plan staat of alleen in deze week.
+  const [vastRooster, setVastRooster] = useState({})
+  // Vraag na een tik op de prullenbak: { soort, titel, permanent, item }
+  const [verwijderVraag, setVerwijderVraag] = useState(null)
 
   // Maandag van de getoonde week — nodig om de planning van die week te
   // laden en te bewaren, dus hier en niet pas in de render.
@@ -163,6 +170,7 @@ export default function WeekSchedule({
       }
 
       const vast = await db.getClientWorkoutSchedule(clientId)
+      setVastRooster(vast || {})
       await laadBuurWeken(vast)
       // Een komende week begint bij de vaste indeling en wijkt daarvan af
       // zodra de klant hem verschuift.
@@ -194,6 +202,7 @@ export default function WeekSchedule({
         if (!gelukt) throw new Error('niet opgeslagen')
       } else {
         await db.updateClientWorkoutSchedule(clientId, newSchedule)
+        setVastRooster(newSchedule)
         if (onScheduleUpdate) onScheduleUpdate(newSchedule)
       }
       setHasChanges(false)
@@ -278,6 +287,48 @@ export default function WeekSchedule({
     if (!eigenVolgende) await WorkoutServiceNew.saveWeekPlanning(clientId, volgendeWeekSleutel, tempSchedule, db)
     await handleAutoSave(next)
   }
+  // Training voorgoed uit het plan: uit het vaste rooster, en uit de eigen
+  // planning van de getoonde week als die er is.
+  const verwijderTrainingVoorgoed = async (day) => {
+    const vast = { ...vastRooster }
+    delete vast[day]
+    await db.updateClientWorkoutSchedule(clientId, vast)
+    setVastRooster(vast)
+    const next = { ...tempSchedule }
+    delete next[day]
+    if (isToekomst) await WorkoutServiceNew.saveWeekPlanning(clientId, weekSleutel, next, db)
+    else if (onScheduleUpdate) onScheduleUpdate(vast)
+    setTempSchedule(next)
+    await laadBuurWeken(isToekomst ? undefined : vast)
+    if (navigator.vibrate) navigator.vibrate([30, 50, 30])
+  }
+  // Vast cardio één week overslaan (skip_weeks); het plan blijft staan.
+  const verwijderCardioDezeWeek = async (c) => {
+    const { error } = await db.supabase.from('client_agenda_blocks')
+      .update({ skip_weeks: [...(c.skipWeeks || []), weekSleutel], updated_at: new Date().toISOString() }).eq('id', c.id)
+    if (error) { console.error('cardio overslaan mislukt:', error); alert('⚠️ Weghalen mislukt.'); return }
+    setCardioVersie(v => v + 1)
+    window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
+  }
+  const vraagTraining = (day) => {
+    const key = tempSchedule[day]
+    const w = getWorkoutData(key)
+    setVerwijderVraag({ soort: 'training', titel: w?.name || w?.focus || 'Training', permanent: !!key && vastRooster[day] === key, item: day })
+  }
+  const vraagCardio = (c) => setVerwijderVraag({ soort: 'cardio', titel: c.soort, permanent: !c.eenmalig, item: c })
+  const voerUit = async (hoe) => {
+    const v = verwijderVraag
+    setVerwijderVraag(null)
+    if (!v) return
+    if (v.soort === 'training') {
+      if (hoe === 'voorgoed') await verwijderTrainingVoorgoed(v.item)
+      else await verwijderTraining(v.item)
+    } else {
+      if (hoe === 'voorgoed' || !v.permanent) await verwijderCardio(v.item)
+      else await verwijderCardioDezeWeek(v.item)
+    }
+  }
+
   // Cardio gaat voorgoed weg: het blok uit de agenda, en de planregel van
   // die sport telt een keer minder (of gaat uit als er niets overblijft).
   const verwijderCardio = async (c) => {
@@ -501,8 +552,8 @@ export default function WeekSchedule({
                   if (error) { console.error('cardio verschuiven mislukt:', error); return }
                   setCardioVersie(v => v + 1)
                 }}
-                onRemoveTraining={verwijderTraining}
-                onRemoveCardio={verwijderCardio}
+                onRemoveTraining={vraagTraining}
+                onRemoveCardio={vraagCardio}
                 onPrevWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
                 onNextWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
                 trainingTijdPerDag={(() => {
@@ -580,9 +631,44 @@ export default function WeekSchedule({
       {/* WeekList ("Schema" expanded card list) removed — duplicates the
           WeekGrid above; tile tap already opens the workout details. */}
 
+      {verwijderVraag && createPortal(
+        <div onClick={() => setVerwijderVraag(null)} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: isMobile ? '1.2rem 1rem 1.1rem' : '1.4rem 1.3rem 1.2rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', textAlign: 'center' }}>
+            <Trash2 size={22} color="#fff" strokeWidth={2.6} style={{ marginBottom: 8 }} />
+            <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: 4 }}>{verwijderVraag.titel} weghalen?</div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 16, lineHeight: 1.4 }}>
+              {verwijderVraag.permanent
+                ? (verwijderVraag.soort === 'training' ? 'Staat vast in je plan.' : 'Staat elke week in je plan.')
+                : 'Staat alleen deze week ingepland.'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {verwijderVraag.permanent ? (
+                <>
+                  <button onClick={() => voerUit('deze_week')} style={vraagKnop(true)}>Alleen deze week</button>
+                  <button onClick={() => voerUit('voorgoed')} style={vraagKnop(false)}>Voorgoed uit mijn plan</button>
+                </>
+              ) : (
+                <button onClick={() => voerUit('voorgoed')} style={vraagKnop(true)}>Ja, weghalen</button>
+              )}
+              <button onClick={() => setVerwijderVraag(null)} style={{ ...vraagKnop(false), border: 'none', color: 'rgba(255,255,255,0.5)' }}>Nee, laat staan</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
       `}</style>
     </div>
   )
 }
+
+// Knoppen in het vraag-venster: één witte, de rest kaal met rand.
+const vraagKnop = (primair) => ({
+  width: '100%', minHeight: 48, borderRadius: 14, fontFamily: 'inherit', cursor: 'pointer',
+  fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.01em',
+  background: primair ? '#fff' : 'transparent', color: primair ? '#0a0a0a' : '#fff',
+  border: `1px solid ${primair ? '#fff' : 'rgba(255,255,255,0.2)'}`,
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+})
