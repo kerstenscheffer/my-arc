@@ -371,12 +371,22 @@ export default function WeekSchedule({
                         const [eh, em] = String(b.end_time || '').split(':').map(Number)
                         const duur = Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null
                         const gedaan = !!datum && cardioLogs.some(l => String(l.logged_date).slice(0, 10) === datum && normaliseerSoort(l.cardio_type) === normaliseerSoort(soort))
-                        return { soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan }
+                        return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan }
                       })
                     if (lijst.length) uit[i] = lijst
                   })
                   return uit
                 })()}
+                onCardioShift={async (c, dir) => {
+                  // Cardio-blok een dag opzij in de agenda, los van de training.
+                  const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                  const i = sleutels.indexOf(c.day)
+                  const j = i + dir
+                  if (i < 0 || j < 0 || j > 6 || !db?.supabase) return
+                  const { error } = await db.supabase.from('client_agenda_blocks').update({ day: sleutels[j], updated_at: new Date().toISOString() }).eq('id', c.id)
+                  if (error) { console.error('cardio verschuiven mislukt:', error); return }
+                  setCardioVersie(v => v + 1)
+                }}
                 tempSchedule={tempSchedule} weekDays={weekDays} todayIndex={todayIndex}
                 completedWorkouts={completedWorkouts} selectedWorkout={selectedWorkout}
                 selectedForSwap={selectedForSwap} swapMode={swapMode} localSwapMode={localSwapMode}

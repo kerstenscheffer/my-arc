@@ -12,8 +12,8 @@ export default function WeekGrid({
   dayDates, kanPlannen = true, kanOpenen = true, gedimd = false,
   rustPerDag = {},
   cardioPerDag = {},
+  onCardioShift = null,
 }) {
-  const cardioRij = Object.keys(cardioPerDag).length > 0
   // Lege rustdagen smal, dagen met training of cardio breed: dan is er ruimte
   // voor de naam van de sport in plaats van zeven even smalle vakjes.
   const leeg = weekDays.map((day, i) => !tempSchedule[day] && !(cardioPerDag[i]?.length))
@@ -68,7 +68,8 @@ export default function WeekGrid({
             gedimd={gedimd}
             rust={rustPerDag[index] || null}
             cardio={cardioPerDag[index] || []}
-            cardioRij={cardioRij}
+            onCardioShiftLeft={onCardioShift ? (c) => onCardioShift(c, -1) : null}
+            onCardioShiftRight={onCardioShift ? (c) => onCardioShift(c, +1) : null}
             smal={leeg[index]}
           />
         )
