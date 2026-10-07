@@ -1,6 +1,6 @@
 // src/modules/workout/WorkoutPlan.jsx
 import useIsMobile from '../../hooks/useIsMobile'
-import ClientWorkoutChart from './components/ClientWorkoutChart'
+import KrachtBlad from './components/KrachtBlad'
 import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { Calendar, Clock, ChevronLeft, ChevronRight, ChevronDown, RefreshCw, TrendingUp, History } from 'lucide-react'
@@ -275,8 +275,8 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
 
       {/* Krachtoverzicht en geschiedenis in hetzelfde blad als de historie in
           het log-scherm, zodat die drie zich hetzelfde gedragen. */}
-      <BladModal open={krachtOpen} titel="Krachtoverzicht" onClose={() => setKrachtOpen(false)}>
-        <ClientWorkoutChart db={db} client={client} kaal />
+      <BladModal open={krachtOpen} titel="Kracht" onClose={() => setKrachtOpen(false)}>
+        <KrachtBlad db={db} client={client} isMobile={isMobile} />
       </BladModal>
       <BladModal open={historyOpen} titel="Historie" onClose={() => setHistoryOpen(false)}>
         <HistorieBlad db={db} clientId={client?.id} isMobile={isMobile} />
