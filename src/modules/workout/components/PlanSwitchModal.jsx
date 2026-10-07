@@ -5,6 +5,12 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Check, ChevronDown, Dumbbell, Calendar } from 'lucide-react'
+import { getWorkoutImage } from './week-schedule/workoutImage'
+
+// Foto per plan, zoals de workout-tegels: thuisplannen een huiskamerfoto,
+// de rest een vaste keuze uit de gympool op basis van de naam.
+const THUIS_FOTO = 'https://images.unsplash.com/photo-1758599878868-52cced2f8154?w=800&h=400&fit=crop&q=70'
+const planFoto = (p) => p?.image_url || (/thuis|home/i.test(p?.name || '') ? THUIS_FOTO : getWorkoutImage({ name: p?.name }).replace('w=400&h=300', 'w=800&h=400'))
 
 export default function PlanSwitchModal({ client, db, isMobile = false, onClose, onActivated }) {
   const [loading, setLoading] = useState(true)
@@ -64,22 +70,26 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
     const open = openId === p.id
     const days = dayList(p.week_structure)
     return (
-      <div style={{ borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: `1px solid ${actief ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.08)'}`, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.8rem 0.85rem' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.015em' }}>{p.name || 'Trainingsplan'}</span>
-              {actief && <span style={{ flexShrink: 0, fontSize: '0.6rem', fontWeight: 900, color: '#000', background: '#fff', padding: '2px 7px', borderRadius: 4, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Actief</span>}
+      <div style={{ borderRadius: 14, background: '#0f0f0f', border: `1px solid ${actief ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.08)'}`, overflow: 'hidden' }}>
+        {/* Fototegel zoals de workout-kaarten: naam en dagen onderin over de
+            foto, de knoppen rechts onderin. */}
+        <div style={{ position: 'relative', height: isMobile ? 112 : 128 }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${planFoto(p)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.9) 100%)' }} />
+          {actief && <span style={{ position: 'absolute', top: 10, left: 10, fontSize: '0.6rem', fontWeight: 900, color: '#000', background: '#fff', padding: '3px 8px', borderRadius: 5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Actief</span>}
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 0.75rem 0.7rem', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.1, textShadow: '0 1px 8px rgba(0,0,0,0.6)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{p.name || 'Trainingsplan'}</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Calendar size={11} /> {p.days_per_week || days.length} dagen per week{p.primary_goal ? ` · ${String(p.primary_goal).replace(/_/g, ' ')}` : ''}
+              </div>
             </div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Calendar size={11} /> {p.days_per_week || days.length} dagen per week{p.primary_goal ? ` · ${p.primary_goal}` : ''}
-            </div>
+            <button onClick={() => setOpenId(open ? null : p.id)} title="Bekijk plan" aria-label="Bekijk plan"
+              style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 10, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.35)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <ChevronDown size={16} strokeWidth={2.8} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+            {knop}
           </div>
-          <button onClick={() => setOpenId(open ? null : p.id)} title="Bekijk plan" aria-label="Bekijk plan"
-            style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 10, background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <ChevronDown size={16} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-          </button>
-          {knop}
         </div>
         {open && (
           <div style={{ padding: '0 0.85rem 0.85rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
