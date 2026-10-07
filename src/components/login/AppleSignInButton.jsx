@@ -35,8 +35,12 @@ const sha256Hex = async (str) => {
 export default function AppleSignInButton({ onError }) {
   const [loading, setLoading] = useState(false)
 
-  // Hide on web — feature only works inside the native iOS app
-  if (!Capacitor.isNativePlatform()) return null
+  // Alleen in de native iOS-app. Op web bestaat de plugin niet, en op
+  // Android ook niet ("Instructions (Android): Not supported" in de README):
+  // daar deed de knop niets, en een dode knop is voor Google Play reden
+  // voor afkeuring (Broken Functionality). Gezien in de Test Lab-run van
+  // 7 okt 2026, versionCode 4.
+  if (Capacitor.getPlatform() !== 'ios') return null
 
   const handleClick = async () => {
     if (loading) return
