@@ -21,8 +21,8 @@ export async function findClient(email) {
 
 /**
  * Zorg dat er een client is voor dit e-mailadres: bestaand record, of een
- * nieuw account (auth-gebruiker + client-rij + 'stel je wachtwoord in'-mail).
- * Geeft { client, created, mailVerstuurd }.
+ * nieuw account (auth-gebruiker met het startwachtwoord + client-rij).
+ * Geeft { client, created, wachtwoord }.
  */
 export async function ensureClient({ email, first_name, last_name, phone }) {
   return call('ensure-client', { email, first_name, last_name, phone })

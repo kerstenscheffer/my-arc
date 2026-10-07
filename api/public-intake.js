@@ -20,8 +20,9 @@ const VERSION = 'pi-2026-10-07-ensure-client';
 // De coach aan wie een nieuw account via de intake wordt gehangen. Eén coach
 // in dit systeem; via env te overschrijven als dat ooit verandert.
 const COACH_ID = (process.env.MYARC_COACH_ID || '5a0135ac-3188-499d-8682-ed6a179e5541').trim();
-// Waar de 'stel je wachtwoord in'-mail naartoe linkt.
-const RESET_URL = (process.env.MYARC_RESET_URL || 'https://www.myarcfitness.com/reset-password').trim();
+// Vast startwachtwoord voor accounts die via de intake ontstaan. Geen mail:
+// de coach geeft het door, net als bij handmatig aangemaakte accounts.
+const START_WACHTWOORD = (process.env.MYARC_START_WACHTWOORD || 'Welcome123!').trim();
 
 // Een auth-gebruiker opzoeken op e-mail via de admin-API (geen directe
 // query op auth.users). Kleine gebruikersgroep, dus een paar pagina's is zat.
@@ -214,9 +215,8 @@ export default async function handler(req, res) {
       // Auth-gebruiker: nieuw, of de bestaande als dit e-mailadres al een
       // login had (bijvoorbeeld een oud account zonder client-rij).
       let authUser = null;
-      const tijdelijk = `Welkom${Math.floor(Math.random() * 900000) + 100000}!`;
       const { data: gemaakt, error: maakFout } = await supabase.auth.admin.createUser({
-        email, password: tijdelijk, email_confirm: true,
+        email, password: START_WACHTWOORD, email_confirm: true,
         user_metadata: { first_name, last_name, role: 'client' },
       });
       if (maakFout) {
@@ -237,17 +237,10 @@ export default async function handler(req, res) {
         .select('*').single();
       if (insFout) throw insFout;
 
-      // 'Stel je wachtwoord in'-mail: de gewone herstel-mail van Supabase,
-      // naar de bestaande /reset-password-pagina. Mislukt dit, dan is het
-      // account er wél en kan de klant altijd 'wachtwoord vergeten' doen.
-      let mailVerstuurd = false;
-      try {
-        const { error: mailFout } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: RESET_URL });
-        mailVerstuurd = !mailFout;
-        if (mailFout) console.warn('wachtwoord-mail mislukt:', mailFout.message);
-      } catch (e) { console.warn('wachtwoord-mail mislukt:', e?.message); }
-
-      return res.status(200).json({ client, created: true, mailVerstuurd, version: VERSION });
+      // Bestond de login al (oud account), dan laten we dat wachtwoord met rust
+      // en weten we het hier niet; anders is het het startwachtwoord.
+      const wachtwoord = maakFout ? null : START_WACHTWOORD;
+      return res.status(200).json({ client, created: true, wachtwoord, version: VERSION });
     }
 
     if (action === 'get-client') {
