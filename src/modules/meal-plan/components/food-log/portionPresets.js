@@ -54,7 +54,7 @@ const PORTION_PRESETS = [
     { label: '1 blikje',     grams: 330 },
     { label: '1 fles',       grams: 500 },
   ]},
-  { match: /\b(bier|beer|pils|pilsner|witbier|tripel)\b/i, displayUnit: 'ml', presets: [
+  { match: /\b(bier|beer|pils|pilsner|witbier|tripel|radler)\b/i, displayUnit: 'ml', presets: [
     { label: '1 glas',   grams: 250 },
     { label: '1 pintje', grams: 300 },
     { label: '1 fles',   grams: 330 },

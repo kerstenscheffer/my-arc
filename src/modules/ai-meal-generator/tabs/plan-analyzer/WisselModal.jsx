@@ -18,6 +18,8 @@ import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 import { niveauVoorDoel } from '../../../meal-plan/DayTemplateService'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
 import BereikKeuze from './BereikKeuze'
+import { findPortionConfig } from '../../../meal-plan/components/food-log/portionPresets'
+import { portieInfo, portieLabel, stapPortie } from './portie'
 import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Info, SlidersHorizontal } from 'lucide-react'
 
 // Slots van het weekplan ('breakfast', 'snack2', 'pre_workout', …) naar de
@@ -170,8 +172,11 @@ export default function WisselModal({
     setPortieBezig(true)
     try {
       const macro = productMacros(portieVan, gram)
+      const eenheid = findPortionConfig(productNaam(portieVan))?.displayUnit === 'ml' ? 'ml' : 'g'
+      const info = portieInfo(portieVan)
+      const hoeveelheid = info ? portieLabel(gram, info) : `${Math.round(Number(gram))}${eenheid}`
       const rij = {
-        name: `${productNaam(portieVan)} ${Math.round(Number(gram))}g`,
+        name: `${productNaam(portieVan)} ${hoeveelheid}`,
         ...macro,
         ingredients_list: [{ ingredient_id: portieVan.id, amount: Number(gram) || 0, unit: 'gram' }],
         image_url: portieVan.image_url || null,
@@ -688,7 +693,7 @@ export default function WisselModal({
                       calories: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat,
                     }}
                     momentLabel={ing.barcode ? 'Product' : 'Basis'}
-                    tijdLabel={`per ${portie} g`}
+                    tijdLabel={`per ${portie} ${findPortionConfig(productNaam(ing))?.displayUnit === 'ml' ? 'ml' : 'g'}`}
                     isMobile={isMobile}
                     compact
                     onTik={() => { setPortieVan(ing); setGram(portie) }}
@@ -764,15 +769,49 @@ export default function WisselModal({
       >
         {portieVan && (() => {
           const m = productMacros(portieVan, gram)
+          // Vloeistoffen in milliliters (dichtheid ≈ 1, dus de rekensom blijft
+          // per 100 g). Natuurlijke porties: eerst de eenheid uit de database
+          // (eenheid + gram_per_eenheid), anders de lijst van de klant-app.
+          const cfg = findPortionConfig(productNaam(portieVan))
+          const eenheid = cfg?.displayUnit === 'ml' ? 'ml' : 'g'
+          const info = portieInfo(portieVan)
+          const porties = info
+            ? [1, 2, 3].map(n => ({ label: portieLabel(n * info.gram, info), grams: Math.round(n * info.gram) }))
+            : (cfg?.presets || [])
+          const stap = (dir) => setGram(g => info ? stapPortie(g, info, dir) : Math.max(0, Math.round((Number(g) || 0) + dir * 10)))
+          const stapGroot = (dir) => setGram(g => Math.max(0, Math.round((Number(g) || 0) + dir * 50)))
           return (
             <>
               <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 12 }}>
-                {Math.round(portieVan.calories_per_100g || 0)} kcal per 100 gram
+                {Math.round(portieVan.calories_per_100g || 0)} kcal per 100 {eenheid === 'ml' ? 'ml' : 'gram'}
+                {info ? ` · 1 ${info.eenheid} = ${Math.round(info.gram)} ${eenheid}` : ''}
               </div>
+              {porties.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  {porties.map(pz => {
+                    const actief = Math.round(Number(gram) || 0) === pz.grams
+                    return (
+                      <button
+                        key={pz.label}
+                        onClick={() => { setGram(pz.grams); if (navigator.vibrate) navigator.vibrate(15) }}
+                        style={{
+                          minHeight: 40, padding: '0 0.8rem', borderRadius: 999,
+                          background: actief ? '#fff' : 'transparent',
+                          border: `1px solid ${actief ? '#fff' : 'rgba(255,255,255,0.25)'}`,
+                          color: actief ? '#0a0a0a' : '#fff', fontSize: '0.78rem', fontWeight: 900,
+                          fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        }}
+                      >
+                        {pz.label}<span style={{ marginLeft: 5, opacity: 0.6, fontWeight: 700 }}>{pz.grams} {eenheid}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                {[-50, -10].map(d => (
-                  <button key={d} onClick={() => setGram(g => Math.max(0, Math.round((Number(g) || 0) + d)))} style={portieKnop}>{d}</button>
-                ))}
+                <button onClick={() => stapGroot(-1)} style={portieKnop}>-50</button>
+                <button onClick={() => stap(-1)} style={portieKnop}>{info ? `-1 ${info.eenheid}` : '-10'}</button>
                 <input
                   type="number" min="0" inputMode="numeric"
                   value={gram}
@@ -784,10 +823,9 @@ export default function WisselModal({
                     fontFamily: 'inherit', outline: 'none',
                   }}
                 />
-                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>g</span>
-                {[10, 50].map(d => (
-                  <button key={d} onClick={() => setGram(g => Math.max(0, Math.round((Number(g) || 0) + d)))} style={portieKnop}>+{d}</button>
-                ))}
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>{eenheid}</span>
+                <button onClick={() => stap(1)} style={portieKnop}>{info ? `+1 ${info.eenheid}` : '+10'}</button>
+                <button onClick={() => stapGroot(1)} style={portieKnop}>+50</button>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.1rem' }}>
                 {[
