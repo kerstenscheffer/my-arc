@@ -322,17 +322,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
         position: 'absolute', inset: 0, pointerEvents: 'none',
         background: 'linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0) 32%, rgba(10,10,10,0.78) 70%, #0a0a0a 100%)',
       }} />
-      <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: isMobile ? 10 : 14,
-        padding: isMobile ? '0 1rem' : '0 1.5rem',
-        fontSize: isMobile ? '1.7rem' : '2.4rem',
-        fontWeight: 900, color: '#fff',
-        letterSpacing: '-0.03em', lineHeight: 1.05,
-        textShadow: '0 2px 12px rgba(0,0,0,0.6)',
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-      }}>
-        Vandaags workout{todaysWorkout?.name || todaysWorkout?.focus ? <>: <span style={{ color: 'rgba(255,255,255,0.75)' }}>{todaysWorkout.name || todaysWorkout.focus}</span></> : null}
-      </div>
+      {/* De titel staat in de kaart eronder, die over de uitloop van de
+          foto heen schuift: zo staan titel, pijl en cijfers bij elkaar. */}
     </div>
   )
 
@@ -393,7 +384,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   return (
     <>
       {kop}
-      {kaart}
+      <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{kaart}</div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )

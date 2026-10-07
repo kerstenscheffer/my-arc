@@ -204,7 +204,7 @@ export default function TodaysWorkoutCard({
     <div
       onClick={onLogClick}
       style={{
-        padding: isMobile ? '0.6rem 1rem 0.75rem' : '0.75rem 1.5rem 1rem',
+        padding: zonderFoto ? (isMobile ? '0 1rem 0.75rem' : '0 1.5rem 1rem') : (isMobile ? '0.6rem 1rem 0.75rem' : '0.75rem 1.5rem 1rem'),
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
@@ -261,9 +261,10 @@ export default function TodaysWorkoutCard({
         </div>
       )}
 
-      {/* Info-rij onder de foto: label/naam/stats links, chevron rechts */}
+      {/* Zonder eigen foto: titel en pijl op één regel, de cijfers er
+          direct onder. Met foto: de oude info-rij met de pijl rechts. */}
       <div style={{
-        display: 'flex', alignItems: 'center',
+        display: 'flex', alignItems: zonderFoto ? 'flex-start' : 'center',
         gap: isMobile ? '0.6rem' : '0.85rem',
       }}>
         <div style={{
@@ -271,6 +272,16 @@ export default function TodaysWorkoutCard({
           display: 'flex', flexDirection: 'column',
           justifyContent: 'center',
         }}>
+          {zonderFoto && (
+            <div style={{
+              fontSize: isMobile ? '1.7rem' : '2.4rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 6,
+              textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              Vandaags workout{workout.name || workout.focus ? <>: <span style={{ color: 'rgba(255,255,255,0.75)' }}>{workout.name || workout.focus}</span></> : null}
+            </div>
+          )}
           {/* Label en naam staan in de kop boven de foto; hier alleen de
               voortgang als die er is, en de stats in dik wit. */}
           {(isCompleted || inProgress) && <div style={{
@@ -318,9 +329,9 @@ export default function TodaysWorkoutCard({
           </div>
         </div>
 
-        {/* Chevron — gouden cirkel-knop, duidelijker dan los icoontje. */}
+        {/* Pijl: op de titelregel, witte rand en witte dikke chevron. */}
         <div style={{
-          flexShrink: 0,
+          flexShrink: 0, marginTop: zonderFoto ? (isMobile ? 2 : 6) : 0,
           width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
           borderRadius: '50%',
           background: isCompleted ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)',
