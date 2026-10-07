@@ -11,7 +11,8 @@
 // gaf kcal een ander gewicht dan de rest terwijl je ze juist naast elkaar wil
 // wegen — een dag die op kcal klopt maar 60 gram eiwit mist is geen goede dag.
 
-import { Flame, Egg, Wheat, Droplet } from 'lucide-react'
+import { useState } from 'react'
+import { Flame, Egg, Wheat, Droplet, ChevronDown } from 'lucide-react'
 
 const RINGEN = [
   { sleutel: 'calories', doel: 'calories', label: 'Kcal',  kleur: '#fff',    eenheid: '',  Icoon: Flame },
@@ -32,12 +33,57 @@ const kleurVoor = (pct, eigen) => {
   return eigen
 }
 
-export default function DagRingen({ totalen, targets, isMobile }) {
+const OPEN_SLEUTEL = 'analyzer_ringen_open'
+
+export default function DagRingen({ totalen, targets, isMobile, inklapbaar = false }) {
   const m = isMobile
   const t = totalen || {}
   const d = targets || {}
+  // Dichtgeklapt: één regel met de vier getallen, zodat de agenda en de
+  // maaltijden de ruimte krijgen. De stand onthoudt zich per browser.
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem(OPEN_SLEUTEL) === '1' } catch { return false }
+  })
+  const wissel = () => setOpen(v => { try { localStorage.setItem(OPEN_SLEUTEL, v ? '0' : '1') } catch { /* privé-venster */ } return !v })
 
-  return (
+  const kort = RINGEN.map(({ sleutel, doel, label, kleur, eenheid }) => {
+    const waarde = Number(t[sleutel] ?? (sleutel === 'calories' ? t.kcal : 0)) || 0
+    const target = Number(d[doel]) || 0
+    const pct = target > 0 ? (waarde / target) * 100 : null
+    return { label, waarde, eenheid, kleur: kleurVoor(pct, '#fff') }
+  })
+
+  const kop = inklapbaar && (
+    <button
+      onClick={wissel}
+      aria-expanded={open}
+      style={{
+        width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10,
+        padding: m ? '0 0.75rem' : '0 1rem', background: 'none', border: 'none',
+        borderTop: '1px solid rgba(255,255,255,0.04)',
+        fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <span style={{ flexShrink: 0, fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#000', background: '#fff', borderRadius: 6, padding: '3px 8px' }}>
+        Macro's
+      </span>
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', gap: m ? 10 : 14, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        {kort.map(x => (
+          <span key={x.label} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: 900, color: x.kleur, fontVariantNumeric: 'tabular-nums' }}>{nl(x.waarde)}</span>
+            <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{x.eenheid || 'kcal'}{x.label !== 'Kcal' ? ` ${x.label.slice(0, 1)}` : ''}</span>
+          </span>
+        ))}
+      </span>
+      <ChevronDown size={15} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+    </button>
+  )
+
+  if (inklapbaar && !open) return kop
+
+  return (<>
+    {kop}
     <div style={{
       display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start',
       gap: m ? 4 : 8,
@@ -95,5 +141,5 @@ export default function DagRingen({ totalen, targets, isMobile }) {
         )
       })}
     </div>
-  )
+  </>)
 }

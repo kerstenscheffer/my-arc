@@ -1978,6 +1978,7 @@ export default function PlanAnalyzer({
               }}
               targets={targets || {}}
               isMobile={m}
+              inklapbaar
             />
           )}
         </div>
@@ -2061,6 +2062,7 @@ export default function PlanAnalyzer({
                 }}
                 targets={targets || {}}
                 isMobile={m}
+                inklapbaar
               />
               <VezelsMicros db={db} maaltijden={maaltijdenVanDag} isMobile={m} />
               {/* ── PRE-WORKOUT ────────────────────────────────────────────
