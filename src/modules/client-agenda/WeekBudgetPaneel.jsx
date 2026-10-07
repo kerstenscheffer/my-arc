@@ -211,9 +211,18 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
   const [simStappen, setSimStappen] = useState(null)    // andere band, of null
   // Cardio als regels: sport, keer per week, minuten per keer. Zo past het
   // één-op-één op client_cardio_plan bij Opslaan.
-  const [simCardio, setSimCardio] = useState([])        // [{ soort, keer, minuten }]
-  const [cardioOpgeslagen, setCardioOpgeslagen] = useState(false)
+  const [simCardio, setSimCardio] = useState([])        // [{ id?, soort, keer, minuten }]
+  // Wat er in het cardioplan van de klant staat bij laden: de basis waar de
+  // afwijking tegen wordt gerekend, en de maat voor 'is er iets gewijzigd'.
+  const [cardioBasis, setCardioBasis] = useState(undefined)   // undefined = nog laden
+  const [cardioVerwijderd, setCardioVerwijderd] = useState([])
   const [cardioBezig, setCardioBezig] = useState(false)
+  // Schema's om mee door te rekenen en eventueel actief te zetten: eigen
+  // plannen van de klant plus de standaardplannen van de coach.
+  const [plannen, setPlannen] = useState([])
+  const [simPlan, setSimPlan] = useState('')
+  const [planBezig, setPlanBezig] = useState(false)
+  const [trainingNuOverride, setTrainingNuOverride] = useState(null)
   // Laatste bekende gewicht als de klantkaart er geen heeft: nodig voor
   // training en cardio (kcal hangt aan kg). undefined = nog laden.
   const [gewichtLog, setGewichtLog] = useState(undefined)
@@ -225,7 +234,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
     let leeft = true
     db.supabase
       .from('clients')
-      .select('tdee, target_calories, target_protein, target_carbs, target_fat, primary_goal, first_name, daily_steps, activity_level, current_weight, body_fat_percentage, age')
+      .select('tdee, target_calories, target_protein, target_carbs, target_fat, primary_goal, first_name, last_name, daily_steps, activity_level, current_weight, body_fat_percentage, age, workout_schedule, assigned_schema_id')
       .eq('id', clientId)
       .maybeSingle()
       .then(({ data }) => { if (leeft) setTdee(data || null) },
@@ -252,6 +261,45 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
     })()
     return () => { leeft = false }
   }, [open, gewichtLog, db, clientId])
+
+  // Cardioplan van de klant en de schema's om mee te spelen.
+  useEffect(() => {
+    if (!open || cardioBasis !== undefined || !db?.supabase || !clientId) return
+    let leeft = true
+    ;(async () => {
+      try {
+        const rijen = await CardioService.getPlan(clientId, db)
+        const lijst = (rijen || []).map(r => ({
+          id: r.id,
+          soort: CARDIO_SOORTEN.some(x => x.id === r.cardio_type) ? r.cardio_type : (CARDIO_SOORTEN.find(x => x.id.toLowerCase() === String(r.cardio_type || '').toLowerCase())?.id || 'Wandelen'),
+          keer: Number(r.times_per_week) || 1,
+          minuten: Number(r.duration_minutes) || 30,
+        }))
+        if (!leeft) return
+        setSimCardio(lijst)
+        setCardioBasis(lijst)
+        setCardioVerwijderd([])
+      } catch (e) { console.warn('cardioplan laden mislukt:', e?.message); if (leeft) setCardioBasis([]) }
+      try {
+        const [eigen, std] = await Promise.all([
+          db.getClientWorkoutPlans ? db.getClientWorkoutPlans(clientId) : Promise.resolve({ plans: [] }),
+          db.supabase.from('workout_schemas')
+            .select('id, name, days_per_week, week_structure')
+            .eq('is_template', true).eq('is_public', true)
+            .or('is_archived.is.null,is_archived.eq.false')
+            .order('days_per_week', { ascending: true }).order('name', { ascending: true })
+            .then(r => r, () => ({ data: [] })),
+        ])
+        if (!leeft) return
+        const dagen = (p) => Number(p.days_per_week) || Object.keys(p.week_structure || {}).length || 0
+        setPlannen([
+          ...(eigen?.plans || []).map(p => ({ id: p.id, naam: p.name, dagen: dagen(p), eigen: true, actief: !!p.isActive })),
+          ...(std?.data || []).map(p => ({ id: p.id, naam: p.name, dagen: dagen(p), eigen: false, actief: false })),
+        ])
+      } catch (e) { console.warn('plannen laden mislukt:', e?.message) }
+    })()
+    return () => { leeft = false }
+  }, [open, cardioBasis, db, clientId])
 
   // Apart effect: zat dit bij de TDEE in één effect, dan startte dat effect
   // opnieuw zodra de TDEE binnen was en gooide de cleanup het nog lopende
@@ -287,10 +335,23 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
   const gewicht = Number(tdee?.current_weight) || Number(gewichtLog) || Number(fase?.start_gewicht) || GEWICHT_AANNAME
   const kcalPerTraining = Math.round(MET_KRACHTTRAINING * 3.5 * gewicht / 200 * TRAINING_MINUTEN)
   const kcalPer1000Stappen = Math.round(KCAL_PER_1000_STAPPEN_PER_KG * gewicht)
-  const cardioKcalWeek = simCardio.reduce((t, r) => {
+  const cardioWeek = (rijen) => (rijen || []).reduce((t, r) => {
     const soort = CARDIO_SOORTEN.find(x => x.id === r.soort) || CARDIO_SOORTEN[0]
     return t + kcalPerMinuut(soort.met, gewicht) * (Number(r.minuten) || 0) * (Number(r.keer) || 0)
   }, 0)
+  const cardioKcalWeek = cardioWeek(simCardio)
+  // Gepland cardio telt mee in de verbranding van nu: dat is wat de klant
+  // volgens zijn plan doet, bovenop de TDEE die uit het activiteitsniveau komt.
+  const cardioBasisKcalWeek = cardioWeek(cardioBasis || [])
+  const cardioGewijzigd = cardioBasis !== undefined && (
+    cardioVerwijderd.length > 0 ||
+    JSON.stringify(simCardio.map(r => [r.id || null, r.soort, Number(r.keer), Number(r.minuten)])) !==
+    JSON.stringify((cardioBasis || []).map(r => [r.id || null, r.soort, Number(r.keer), Number(r.minuten)]))
+  )
+  // Trainingen nu: de dagen in het weekrooster van de klant.
+  const trainingNu = trainingNuOverride ?? Object.values(tdee?.workout_schedule || {}).filter(Boolean).length
+  const gekozenPlan = plannen.find(p => p.id === simPlan) || null
+  const trainingDelta = simTrainingen + (gekozenPlan ? gekozenPlan.dagen - trainingNu : 0)
 
   const huidigeBand = tdee?.daily_steps || null
   const stapVerschilPerDag = (() => {
@@ -301,41 +362,89 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
   const extraPerDag = Math.round(
     simTdee
     + stapVerschilPerDag
-    + (kcalPerTraining * simTrainingen) / 7
-    + cardioKcalWeek / 7
+    + (kcalPerTraining * trainingDelta) / 7
+    + (cardioKcalWeek - cardioBasisKcalWeek) / 7
   )
   // Actief zodra er iets is ingesteld, ook als het blok dichtgeklapt is:
   // je klapt het dicht om de tabel en de balken erboven te bekijken, en dan
   // moet het effect juist blijven staan.
   const simActief = extraPerDag !== 0
-  const simTerug = () => { setSimTdee(0); setSimTrainingen(0); setSimCardio([]); setSimStappen(null); setCardioOpgeslagen(false) }
+  const simTerug = () => { setSimTdee(0); setSimTrainingen(0); setSimCardio(cardioBasis || []); setCardioVerwijderd([]); setSimStappen(null); setSimPlan('') }
 
   // Cardio-regels naar het cardioplan van de klant (workout-pagina, kop
-  // Cardio), en daarna de agenda in plaatsmodus zodat je de dagen tikt.
+  // Cardio): bestaande regels bijwerken, weggehaalde op inactief, nieuwe
+  // erbij. Daarna de agenda in plaatsmodus voor een nieuwe regel.
   const cardioOpslaan = async () => {
-    if (!clientId || simCardio.length === 0 || cardioBezig) return
+    if (!clientId || cardioBezig || !cardioGewijzigd) return
     setCardioBezig(true)
     try {
+      for (const id of cardioVerwijderd) await CardioService.deactivatePlanItem(id, db)
+      const nieuw = []
+      const bewaard = []
       for (const [i, r] of simCardio.entries()) {
         const soort = CARDIO_SOORTEN.find(x => x.id === r.soort) || CARDIO_SOORTEN[0]
-        await CardioService.savePlanItem({
+        const rij = await CardioService.savePlanItem({
+          id: r.id || undefined,
           client_id: clientId, cardio_type: soort.id,
           times_per_week: Math.max(1, Number(r.keer) || 1),
           duration_minutes: Math.max(5, Number(r.minuten) || 30),
           intensity: 'rustig', sort_order: i,
           notes: `± ${Math.round(kcalPerMinuut(soort.met, gewicht) * (Number(r.minuten) || 0))} kcal per keer`,
         }, db)
+        const metId = { ...r, id: rij?.id || r.id }
+        bewaard.push(metId)
+        if (!r.id) nieuw.push(metId)
       }
-      setCardioOpgeslagen(true)
-      const eerste = simCardio[0]
-      onPlanCardio?.({ label: `Cardio · ${eerste.soort}`, duur: Math.max(5, Number(eerste.minuten) || 30) })
+      setSimCardio(bewaard)
+      setCardioBasis(bewaard)
+      setCardioVerwijderd([])
+      if (nieuw.length > 0) onPlanCardio?.({ label: `Cardio · ${nieuw[0].soort}`, duur: Math.max(5, Number(nieuw[0].minuten) || 30) })
     } catch (e) {
       console.error('cardio opslaan mislukt:', e)
       alert('Cardio opslaan mislukt: ' + (e?.message || 'onbekende fout'))
     } finally { setCardioBezig(false) }
   }
+
+  // Gekozen schema actief zetten voor de klant. Eigen plan: gewoon wisselen.
+  // Standaardplan: eigen kopie onder de klant (zoals de toewijzing in de
+  // builder), dan actief; de trigger vult de weekindeling.
+  const planActiveren = async () => {
+    if (!gekozenPlan || !clientId || planBezig) return
+    setPlanBezig(true)
+    try {
+      if (gekozenPlan.eigen) {
+        const res = await db.setActiveWorkoutPlan(clientId, gekozenPlan.id)
+        if (!res?.success) throw new Error(res?.error || 'Activeren mislukt')
+      } else {
+        const { data: t, error: leesFout } = await db.supabase.from('workout_schemas').select('*').eq('id', gekozenPlan.id).single()
+        if (leesFout || !t) throw (leesFout || new Error('Sjabloon niet gevonden'))
+        const naam = [tdee?.first_name, tdee?.last_name].filter(Boolean).join(' ') || null
+        const kopie = {
+          user_id: t.user_id, name: t.name, description: t.description, primary_goal: t.primary_goal, specific_goal: t.specific_goal,
+          experience_level: t.experience_level, days_per_week: t.days_per_week, time_per_session: t.time_per_session,
+          equipment: t.equipment, split_type: t.split_type, split_name: t.split_name, week_structure: t.week_structure,
+          volume_analysis: t.volume_analysis, specific_goal_data: t.specific_goal_data,
+          is_ai_generated: false, is_public: false, is_template: false, is_client_edited: false,
+          original_schema_id: t.id, client_id: clientId, client_name: naam, is_archived: false,
+        }
+        const { data: nieuw, error: insFout } = await db.supabase.from('workout_schemas').insert(kopie).select('id').single()
+        if (insFout || !nieuw?.id) throw (insFout || new Error('Kopie maken mislukt'))
+        const { error: updFout } = await db.supabase.from('clients').update({ assigned_schema_id: nieuw.id, updated_at: new Date().toISOString() }).eq('id', clientId)
+        if (updFout) throw updFout
+      }
+      setTrainingNuOverride(gekozenPlan.dagen)
+      setSimPlan('')
+      setPlannen(prev => prev.map(p => ({ ...p, actief: p.id === gekozenPlan.id })))
+      if (navigator.vibrate) navigator.vibrate([20, 40, 20])
+    } catch (e) {
+      console.error('plan activeren mislukt:', e)
+      alert('Schema activeren mislukt: ' + (e?.message || 'onbekende fout'))
+    } finally { setPlanBezig(false) }
+  }
   const tdeeNu = tdee?.tdee ? Number(tdee.tdee) : null
-  const tdeeEff = tdeeNu != null ? tdeeNu + (simActief ? extraPerDag : 0) : null
+  // 'Nu' = TDEE plus het geplande cardio; daar komt het wat-als bovenop.
+  const tdeeBasis = tdeeNu != null ? tdeeNu + Math.round(cardioBasisKcalWeek / 7) : null
+  const tdeeEff = tdeeBasis != null ? tdeeBasis + (simActief ? extraPerDag : 0) : null
 
   const verbranding = tdeeEff != null ? tdeeEff * 7 : null
   const tekort = (planWeek != null && verbranding != null) ? verbranding - planWeek : null
@@ -506,7 +615,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
               {tdee !== undefined && (
                 <div style={{ display: 'flex', gap: 6, padding: '0.5rem 0 0.2rem' }}>
                   {[
-                    { label: 'Verbrandt', sub: simActief ? `wat als · nu ${getal(tdeeNu)}` : 'TDEE per dag', waarde: tdeeEff != null ? getal(tdeeEff) : '?', kleur: simActief ? '#22c55e' : '#fff' },
+                    { label: 'Verbrandt', sub: simActief ? `wat als · nu ${getal(tdeeBasis)}` : (cardioBasisKcalWeek > 0 ? 'TDEE + cardio per dag' : 'TDEE per dag'), waarde: tdeeEff != null ? getal(tdeeEff) : '?', kleur: simActief ? '#22c55e' : '#fff' },
                     { label: 'Plan geeft', sub: 'per dag', waarde: getal(planWeek / 7), kleur: '#fff' },
                     {
                       label: 'Mag eten', sub: 'voor streeftempo',
@@ -827,8 +936,52 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                         eenheid="per week"
                         stap={1}
                         onChange={(v) => setSimTrainingen(Math.max(-7, v))}
-                        toelichting={`± ${kcalPerTraining} kcal per uur krachttraining`}
+                        toelichting={`nu ${trainingNu} per week · ± ${kcalPerTraining} kcal per uur krachttraining`}
                       />
+                      {/* Ander schema: eigen plannen van de klant en de
+                          standaardplannen, op aantal dagen. Kiezen rekent
+                          door; de knop zet het ook echt actief. */}
+                      {plannen.length > 0 && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>Schema</span>
+                            <select value={simPlan} onChange={e => setSimPlan(e.target.value)} style={{ ...selectStijl, flex: '0 1 60%' }}>
+                              <option value="" style={{ background: '#1a1a1a' }}>huidig · {trainingNu} dagen</option>
+                              {plannen.some(p => p.eigen) && (
+                                <optgroup label="Eigen plannen" style={{ background: '#1a1a1a' }}>
+                                  {plannen.filter(p => p.eigen).map(p => (
+                                    <option key={p.id} value={p.id} style={{ background: '#1a1a1a' }}>{p.dagen}× · {p.naam}{p.actief ? ' (actief)' : ''}</option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {plannen.some(p => !p.eigen) && (
+                                <optgroup label="Standaardplannen" style={{ background: '#1a1a1a' }}>
+                                  {plannen.filter(p => !p.eigen).map(p => (
+                                    <option key={p.id} value={p.id} style={{ background: '#1a1a1a' }}>{p.dagen}× · {p.naam}</option>
+                                  ))}
+                                </optgroup>
+                              )}
+                            </select>
+                          </div>
+                          {gekozenPlan && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>
+                              <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+                                {gekozenPlan.dagen} dagen: {gekozenPlan.dagen - trainingNu >= 0 ? '+' : ''}{gekozenPlan.dagen - trainingNu} training per week
+                              </span>
+                              {!gekozenPlan.actief && (
+                                <button onClick={planActiveren} disabled={planBezig} style={{
+                                  flexShrink: 0, minHeight: 32, padding: '0 0.7rem', borderRadius: 8,
+                                  background: '#fff', border: 'none', color: '#0a0a0a',
+                                  fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, cursor: planBezig ? 'wait' : 'pointer',
+                                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                                }}>
+                                  {planBezig ? 'Bezig…' : 'Activeer voor klant'}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Cardio: per regel een sport, keer per week en minuten.
                           kcal uit de MET van de sport en het gewicht. */}
@@ -836,7 +989,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
                           <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>Cardio</span>
                           <button
-                            onClick={() => { setSimCardio(r => [...r, { soort: 'Wandelen', keer: 3, minuten: 30 }]); setCardioOpgeslagen(false) }}
+                            onClick={() => setSimCardio(r => [...r, { soort: 'Wandelen', keer: 3, minuten: 30 }])}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32, padding: '0 0.6rem', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                           >
                             <Plus size={12} strokeWidth={3} /> Cardio
@@ -847,14 +1000,14 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                           const perMin = kcalPerMinuut(soort.met, gewicht)
                           const perKeer = Math.round(perMin * (Number(r.minuten) || 0))
                           const perWeek = perKeer * (Number(r.keer) || 0)
-                          const zet = (veld, v) => { setSimCardio(rows => rows.map((x, j) => j === i ? { ...x, [veld]: v } : x)); setCardioOpgeslagen(false) }
+                          const zet = (veld, v) => setSimCardio(rows => rows.map((x, j) => j === i ? { ...x, [veld]: v } : x))
                           return (
                             <div key={i} style={{ padding: '0.45rem 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <select value={r.soort} onChange={e => zet('soort', e.target.value)} style={selectStijl}>
                                   {CARDIO_SOORTEN.map(x => <option key={x.id} value={x.id} style={{ background: '#1a1a1a' }}>{x.label}</option>)}
                                 </select>
-                                <button onClick={() => setSimCardio(rows => rows.filter((_, j) => j !== i))} aria-label="Regel weghalen" style={{ ...kopKnop, width: 32, height: 32 }}>
+                                <button onClick={() => { if (r.id) setCardioVerwijderd(v => [...v, r.id]); setSimCardio(rows => rows.filter((_, j) => j !== i)) }} aria-label="Regel weghalen" style={{ ...kopKnop, width: 32, height: 32 }}>
                                   <Trash2 size={13} />
                                 </button>
                               </div>
@@ -867,25 +1020,24 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                                 </div>
                               </div>
                               <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
+                                {r.id ? <span style={{ color: '#22c55e' }}>in plan · </span> : <span style={{ color: '#fff' }}>nieuw · </span>}
                                 ± {perMin} kcal per minuut bij {Math.round(gewicht)} kg · {perKeer} per keer · <span style={{ color: '#fff' }}>{getal(perWeek)} kcal per week</span>
                               </div>
                             </div>
                           )
                         })}
-                        {simCardio.length > 0 && (
+                        {(cardioGewijzigd || cardioBezig) && (
                           <button
                             onClick={cardioOpslaan}
-                            disabled={cardioBezig || cardioOpgeslagen}
+                            disabled={cardioBezig}
                             style={{
                               width: '100%', minHeight: 40, marginTop: 6, borderRadius: 10,
-                              background: cardioOpgeslagen ? 'transparent' : '#fff',
-                              border: cardioOpgeslagen ? '1px solid rgba(34,197,94,0.5)' : 'none',
-                              color: cardioOpgeslagen ? '#22c55e' : '#0a0a0a',
-                              fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: cardioOpgeslagen ? 'default' : 'pointer',
+                              background: '#fff', border: 'none', color: '#0a0a0a',
+                              fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: cardioBezig ? 'wait' : 'pointer',
                               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                             }}
                           >
-                            {cardioBezig ? 'Opslaan…' : cardioOpgeslagen ? 'In het cardioplan van de klant · tik dagen in de agenda' : 'Opslaan in cardioplan en inplannen'}
+                            {cardioBezig ? 'Opslaan…' : cardioVerwijderd.length > 0 && simCardio.every(r => r.id) ? 'Wijzigingen opslaan in cardioplan' : 'Opslaan in cardioplan en inplannen'}
                           </button>
                         )}
                       </div>
@@ -923,7 +1075,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <span style={{ fontSize: '0.64rem', fontWeight: 600, color: gewichtBron === 'aanname' ? '#f59e0b' : 'rgba(255,255,255,0.35)', lineHeight: 1.35 }}>
-                          Gerekend met {Math.round(gewicht)} kg ({gewichtBron}). Schattingen; wijzigt niets behalve bij Opslaan.
+                          Gerekend met {Math.round(gewicht)} kg ({gewichtBron}). Gepland cardio telt mee in de verbranding. Schattingen; wijzigt niets behalve bij Opslaan en Activeer.
                         </span>
                         {simActief && (
                           <button
