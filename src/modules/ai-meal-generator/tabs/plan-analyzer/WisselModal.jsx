@@ -11,7 +11,7 @@
 // (coach_meal_favorites) en "Eigen maaltijden" zijn die van de klant.
 // Er wordt niets geschaald: wat je kiest komt 1-op-1 in het slot.
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import MealCard from '../../../meal-plan/components/day-schedule/MealCard'
 import Keuze from '../../../meal-plan/components/Keuze'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
@@ -112,6 +112,83 @@ export default function WisselModal({
   const [infoIngredienten, setInfoIngredienten] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
+  // Producten en ingrediënten (ai_ingredients): een biertje of een appel is
+  // geen recept, maar wel iets dat je in het plan wilt zetten. Zoeken op
+  // naam of merk; kiezen vraagt eerst de portie en legt dan een maaltijd
+  // vast in ai_meals, zodat het slot gewoon een meal_id draagt.
+  const [producten, setProducten] = useState([])
+  const [productenLaden, setProductenLaden] = useState(false)
+  const productZoekRef = useRef(0)
+  const [portieVan, setPortieVan] = useState(null)   // product waarvan de portie open staat
+  const [gram, setGram] = useState(100)
+  const [portieBezig, setPortieBezig] = useState(false)
+
+  useEffect(() => {
+    const term = searchTerm.trim()
+    if (term.length < 2) { setProducten([]); setProductenLaden(false); return }
+    const eigen = ++productZoekRef.current
+    setProductenLaden(true)
+    const t = setTimeout(async () => {
+      try {
+        const veilig = term.replace(/[%,()]/g, ' ')
+        const { data } = await db.supabase
+          .from('ai_ingredients')
+          .select('id, name, name_en, brand, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, default_portion_gram, image_url, barcode, log_count')
+          .or(`name.ilike.%${veilig}%,name_en.ilike.%${veilig}%,brand.ilike.%${veilig}%`)
+          .order('log_count', { ascending: false, nullsFirst: false })
+          .limit(20)
+        if (eigen !== productZoekRef.current) return
+        const t2 = term.toLowerCase()
+        const rang = (n) => { const x = String(n || '').toLowerCase(); return x === t2 ? 0 : x.startsWith(t2) ? 1 : 2 }
+        setProducten((data || []).sort((a, b) => rang(a.name) - rang(b.name) || (b.log_count || 0) - (a.log_count || 0)))
+      } catch (e) {
+        console.warn('producten zoeken mislukt', e?.message)
+        if (eigen === productZoekRef.current) setProducten([])
+      } finally {
+        if (eigen === productZoekRef.current) setProductenLaden(false)
+      }
+    }, 250)
+    return () => clearTimeout(t)
+  }, [searchTerm, db])
+
+  const productMacros = (ing, g) => {
+    const f = (Number(g) || 0) / 100
+    return {
+      calories: Math.round((Number(ing?.calories_per_100g) || 0) * f),
+      protein: Math.round((Number(ing?.protein_per_100g) || 0) * f * 10) / 10,
+      carbs: Math.round((Number(ing?.carbs_per_100g) || 0) * f * 10) / 10,
+      fat: Math.round((Number(ing?.fat_per_100g) || 0) * f * 10) / 10,
+      fiber: Math.round((Number(ing?.fiber_per_100g) || 0) * f * 10) / 10,
+    }
+  }
+  const productNaam = (ing) => ing?.brand && !String(ing.name || '').includes(ing.brand) ? `${ing.name} (${ing.brand})` : (ing?.name || 'Product')
+
+  // Product met portie vastleggen als maaltijd en daarna de gewone weg:
+  // bevestig-blad, en bij een bestaand slot de vraag waar het geldt.
+  const kiesProduct = async () => {
+    if (!portieVan || portieBezig || !(Number(gram) > 0)) return
+    setPortieBezig(true)
+    try {
+      const macro = productMacros(portieVan, gram)
+      const rij = {
+        name: `${productNaam(portieVan)} ${Math.round(Number(gram))}g`,
+        ...macro,
+        ingredients_list: [{ ingredient_id: portieVan.id, amount: Number(gram) || 0, unit: 'gram' }],
+        image_url: portieVan.image_url || null,
+        // meal_type NIET zetten (check-constraint over textuur); moment in timing.
+        timing: [slotNaarMoment(slot || currentMeal?.slot)],
+      }
+      const { data, error } = await db.supabase.from('ai_meals').insert([rij]).select('*').single()
+      if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
+      setPortieVan(null)
+      setSelectedMeal({ ...data, meal_id: data.id })
+    } catch (e) {
+      console.error('product toevoegen mislukt:', e)
+      alert('Product toevoegen mislukt: ' + (e?.message || 'onbekende fout'))
+    } finally {
+      setPortieBezig(false)
+    }
+  }
 
   const slotKey = slotNaarMoment(slot || currentMeal?.slot)
   const huidigId = currentMeal?.meal_id || currentMeal?.id || null
@@ -577,8 +654,8 @@ export default function WisselModal({
               animation: 'wisselSpin 0.8s linear infinite',
             }} />
           </div>
-        ) : filteredMeals.length > 0 ? (
-          filteredMeals.map((meal, idx) => (
+        ) : (filteredMeals.length > 0 || producten.length > 0 || productenLaden) ? (<>
+          {filteredMeals.map((meal, idx) => (
             <SuggestieKaart
               key={meal.id || idx}
               meal={meal}
@@ -591,8 +668,37 @@ export default function WisselModal({
               onSter={meal._isCustom ? null : () => toggleFavorite(meal.id)}
               onInfo={() => openInfo(meal)}
             />
-          ))
-        ) : (
+          ))}
+
+          {/* Producten en ingrediënten, alleen bij een zoekterm. */}
+          {searchTerm.trim().length >= 2 && (producten.length > 0 || productenLaden) && (
+            <div style={{ marginTop: filteredMeals.length > 0 ? '0.6rem' : 0 }}>
+              <div style={{ padding: isMobile ? '0 0.9rem 0.45rem' : '0 1.25rem 0.5rem', fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
+                Producten en ingrediënten{productenLaden ? '…' : ''}
+              </div>
+              {producten.map(ing => {
+                const portie = ing.default_portion_gram || 100
+                const m = productMacros(ing, portie)
+                return (
+                  <MealCard
+                    key={ing.id}
+                    meal={{
+                      name: productNaam(ing),
+                      image_url: ing.image_url || foodImageFallback(ing.name, null, 200),
+                      calories: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat,
+                    }}
+                    momentLabel={ing.barcode ? 'Product' : 'Basis'}
+                    tijdLabel={`per ${portie} g`}
+                    isMobile={isMobile}
+                    compact
+                    onTik={() => { setPortieVan(ing); setGram(portie) }}
+                    acties={[{ icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />, label: 'Kies', onClick: () => { setPortieVan(ing); setGram(portie) } }]}
+                  />
+                )
+              })}
+            </div>
+          )}
+        </>) : (
           <div style={{ textAlign: 'center', padding: '3rem 1.25rem' }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: '0.35rem' }}>
               Geen resultaten
@@ -604,7 +710,9 @@ export default function WisselModal({
                   ? 'Er staan nog geen vaste swaps.'
                   : bron === 'mine'
                     ? 'De klant heeft hier nog geen eigen maaltijden die passen.'
-                    : 'Probeer een ander moment, een andere bron of een zoekterm.'}
+                    : searchTerm.trim().length >= 2
+                      ? 'Niets gevonden bij maaltijden, producten of ingrediënten.'
+                      : 'Probeer een ander moment, een andere bron of een zoekterm.'}
             </div>
             {(moment !== 'alles' || bron !== 'alles') && (
               <button
@@ -645,6 +753,73 @@ export default function WisselModal({
           {inhoud}
         </div>
       )}
+
+      {/* Portie van een product: eerst de hoeveelheid, dan pas vastleggen.
+          "330 ml Hertog Jan" is iets anders dan "Hertog Jan". */}
+      <BladModal
+        open={!!portieVan}
+        titel={portieVan ? productNaam(portieVan) : 'Product'}
+        onClose={() => { if (!portieBezig) setPortieVan(null) }}
+        zIndex={10600}
+      >
+        {portieVan && (() => {
+          const m = productMacros(portieVan, gram)
+          return (
+            <>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 12 }}>
+                {Math.round(portieVan.calories_per_100g || 0)} kcal per 100 gram
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                {[-50, -10].map(d => (
+                  <button key={d} onClick={() => setGram(g => Math.max(0, Math.round((Number(g) || 0) + d)))} style={portieKnop}>{d}</button>
+                ))}
+                <input
+                  type="number" min="0" inputMode="numeric"
+                  value={gram}
+                  onChange={e => setGram(e.target.value)}
+                  style={{
+                    flex: 1, minWidth: 0, minHeight: 44, textAlign: 'center',
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.25)',
+                    borderRadius: 10, color: '#fff', fontSize: '1.1rem', fontWeight: 900,
+                    fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>g</span>
+                {[10, 50].map(d => (
+                  <button key={d} onClick={() => setGram(g => Math.max(0, Math.round((Number(g) || 0) + d)))} style={portieKnop}>+{d}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.1rem' }}>
+                {[
+                  { label: 'kcal', waarde: m.calories },
+                  { label: 'eiwit', waarde: `${Math.round(m.protein)}g` },
+                  { label: 'koolh', waarde: `${Math.round(m.carbs)}g` },
+                  { label: 'vet', waarde: `${Math.round(m.fat)}g` },
+                ].map(x => (
+                  <div key={x.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0.5rem 0.25rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>{x.waarde}</div>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{x.label}</div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={kiesProduct}
+                disabled={portieBezig || !(Number(gram) > 0)}
+                style={{
+                  width: '100%', minHeight: 50,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  background: Number(gram) > 0 ? '#fff' : 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12,
+                  color: Number(gram) > 0 ? '#0a0a0a' : 'rgba(255,255,255,0.4)', fontSize: '0.95rem', fontWeight: 900,
+                  fontFamily: 'inherit', cursor: portieBezig ? 'wait' : 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Check size={16} strokeWidth={3} /> {portieBezig ? 'Bezig…' : 'Kies deze portie'}
+              </button>
+            </>
+          )
+        })()}
+      </BladModal>
 
       {/* Wat zit erin, voordat je kiest. */}
       <BladModal
@@ -809,6 +984,13 @@ export default function WisselModal({
       `}</style>
     </>
   )
+}
+
+const portieKnop = {
+  minWidth: 44, minHeight: 44, padding: '0 0.5rem', flexShrink: 0,
+  background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10,
+  color: '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
 // Eén suggestie: dezelfde kaart als in de dagplanning, met op de foto het
