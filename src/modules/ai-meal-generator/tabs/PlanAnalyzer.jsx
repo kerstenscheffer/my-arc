@@ -822,11 +822,18 @@ export default function PlanAnalyzer({
     setMakerState(null)
   }
   // "Dagen"-knop op een meal-card: open de dag-picker in het dock-vak.
-  const handleApplyToDays = (dayIndex, slot, meal) => { if (meal) setApplyDaysState({ dayIndex, slot, meal }) }
+  // Een pre-workout hoort in de plan-kolom (één maaltijd, volgt de
+  // trainingsdagen), niet als slot per dag: dan staat hij ook op rustdagen.
+  const handleApplyToDays = (dayIndex, slot, meal) => {
+    if (!meal) return
+    if (slot === PRE_WORKOUT_SLOT) { bewaarPreWorkout(meal); return }
+    setApplyDaysState({ dayIndex, slot, meal })
+  }
   // Pas de gekozen meal (met huidige aanpassingen) toe op de geselecteerde dagen.
   const handleApplyDaysConfirm = async (dayIndices) => {
     if (!applyDaysState || !weekData) return
     const { meal, slot } = applyDaysState
+    if (slot === PRE_WORKOUT_SLOT) { await bewaarPreWorkout(meal); setApplyDaysState(null); return }
     const updated = [...weekData]
     dayIndices.forEach(di => {
       updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: withSlotTiming(meal, slot, updated[di].meals[slot]) } }
@@ -864,6 +871,9 @@ export default function PlanAnalyzer({
       // op wat er op die dag stond en anders op de slot-tijd. Zonder dat slaat
       // de agenda hem over.
       Object.entries(bron.meals || {}).forEach(([slot, meal]) => {
+        // De pre-workout uit een bewaarde dag gaat niet per dag mee (dan
+        // staat hij ook op rustdagen); zie hieronder, naar de plan-kolom.
+        if (slot === PRE_WORKOUT_SLOT) return
         if (meal) nieuw[slot] = withSlotTiming(meal, slot, updated[di]?.meals?.[slot])
       })
       // is_training_day blijft van de doeldag: dat hoort bij het schema van de
@@ -876,6 +886,9 @@ export default function PlanAnalyzer({
       updated,
       `Dag "${naam || 'opgeslagen dag'}" op ${dayIndices.length} dag${dayIndices.length !== 1 ? 'en' : ''} gezet`,
     )
+    // Zat er een pre-workout in de bewaarde dag en heeft het plan er nog
+    // geen, dan in de kolom: één keer, en alleen op trainingsdagen zichtbaar.
+    if (bron.meals?.[PRE_WORKOUT_SLOT] && !preWorkoutMeal) await bewaarPreWorkout(bron.meals[PRE_WORKOUT_SLOT])
   }
   const handleDelete = async (dayIndex, slot) => {
     if (!weekData) return
