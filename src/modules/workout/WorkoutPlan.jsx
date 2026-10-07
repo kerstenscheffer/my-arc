@@ -13,7 +13,7 @@ import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 import WorkoutProgressToast from './components/WorkoutProgressToast'
 import StappenStrook from './components/StappenStrook'
 import CardioLogVanger from './components/CardioLogVanger'
-import WorkoutHistory from '../progress/WorkoutHistory'
+import HistorieBlad from './components/HistorieBlad'
 import BladModal from './components/todays-workout/components/BladModal'
 import FadeOnScroll from '../../components/FadeOnScroll'
 import PlanningWizard from './components/planning/PlanningWizard'
@@ -279,7 +279,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         <ClientWorkoutChart db={db} client={client} kaal />
       </BladModal>
       <BladModal open={historyOpen} titel="Historie" onClose={() => setHistoryOpen(false)}>
-        <WorkoutHistory db={db} clientId={client?.id} onBack={null} />
+        <HistorieBlad db={db} clientId={client?.id} isMobile={isMobile} />
       </BladModal>
 
       <style>{`
