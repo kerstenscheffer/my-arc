@@ -10,6 +10,7 @@ import { rustWaarschuwingen, waarschuwingTekst, ROOD } from '../utils/rustWaarsc
 import ActionButtons from './week-schedule/ActionButtons'
 import CardioService, { normaliseerSoort } from '../services/CardioService'
 import TrainingToevoegen from './TrainingToevoegen'
+import RealiteitBlad from '../../client-agenda/RealiteitBlad'
 
 // Bereken de maandag van de huidige week (lokale tijd).
 function getThisMonday() {
@@ -76,7 +77,9 @@ export default function WeekSchedule({
   // Gedane trainingen van de getoonde week: een sessie in workout_sessions
   // met minstens één gelogde set. De oude bron (localStorage) werd nooit
   // gevuld, waardoor 'Gedaan' nooit verscheen.
-  const [gedaneDagen, setGedaneDagen] = useState([]) // [{ workout_day }]
+  const [gedaneDagen, setGedaneDagen] = useState([]) // [{ workout_day, workout_date, sessie }]
+  // Geopende afgeronde sessie (tik op een 'Gedaan'-tegel): blok voor RealiteitBlad.
+  const [sessieBlad, setSessieBlad] = useState(null)
   const [sessieVersie, setSessieVersie] = useState(0)
   useEffect(() => {
     const bump = () => setSessieVersie(v => v + 1)
@@ -90,15 +93,20 @@ export default function WeekSchedule({
     const zondag = new Date(maandag); zondag.setDate(zondag.getDate() + 6)
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     ;(async () => {
-      const { data: sessies } = await db.supabase.from('workout_sessions').select('id, workout_date')
+      const { data: sessies } = await db.supabase.from('workout_sessions').select('id, workout_date, day_name, duration_minutes, is_completed, created_at')
         .eq('client_id', clientId).gte('workout_date', iso(maandag)).lte('workout_date', iso(zondag))
         .then(r => r, () => ({ data: [] }))
       const ids = (sessies || []).map(x => x.id)
       let metSets = new Set()
+      const telSets = {}, laatsteSet = {}
       if (ids.length) {
-        const { data: sets } = await db.supabase.from('workout_progress').select('session_id').in('session_id', ids)
+        const { data: sets } = await db.supabase.from('workout_progress').select('session_id, created_at').in('session_id', ids)
           .then(r => r, () => ({ data: [] }))
         metSets = new Set((sets || []).map(x => x.session_id))
+        ;(sets || []).forEach(x => {
+          telSets[x.session_id] = (telSets[x.session_id] || 0) + 1
+          laatsteSet[x.session_id] = Math.max(laatsteSet[x.session_id] || 0, new Date(x.created_at).getTime() || 0)
+        })
       }
       if (weg) return
       const dagen = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -106,7 +114,22 @@ export default function WeekSchedule({
       ;(sessies || []).filter(x => metSets.has(x.id)).forEach(x => {
         const d = new Date(String(x.workout_date).slice(0, 10) + 'T12:00:00')
         const idx = (d.getDay() + 6) % 7
-        if (!uit.some(u => u.workout_day === dagen[idx])) uit.push({ workout_day: dagen[idx], workout_date: x.workout_date })
+        if (!uit.some(u => u.workout_day === dagen[idx])) {
+          // Begin = aanmaak van de sessie, eind = laatste set + 5 min (max 2 uur),
+          // zelfde rekenwijze als de Realiteit-agenda van de coach.
+          const beginTs = new Date(x.created_at).getTime()
+          const b = new Date(beginTs); const start = b.getHours() * 60 + b.getMinutes()
+          let eind = laatsteSet[x.id] ? (() => { const e = new Date(laatsteSet[x.id]); return e.getHours() * 60 + e.getMinutes() + 5 })() : start + (Number(x.duration_minutes) || 60)
+          eind = Math.min(eind, start + 120, 24 * 60); if (eind <= start) eind = Math.min(start + 45, 24 * 60)
+          uit.push({
+            workout_day: dagen[idx], workout_date: x.workout_date,
+            blok: {
+              id: `gedaan-${x.id}`, day: dagen[idx].toLowerCase(), type: 'training', label: 'Training', sublabel: x.day_name || 'Training',
+              start, end: eind, color: '#fff', source: 'realiteit', editable: false,
+              meta: { echt: true, sessionId: x.id, exercise_count: telSets[x.id] || null, estimated_time: `${eind - start} min`, afgerond: !!x.is_completed, datum: x.workout_date },
+            },
+          })
+        }
       })
       setGedaneDagen(uit)
     })()
@@ -576,6 +599,7 @@ export default function WeekSchedule({
                   if (error) { console.error('cardio verschuiven mislukt:', error); return }
                   setCardioVersie(v => v + 1)
                 }}
+                onOpenGedaan={(day) => { const g = gedaneDagen.find(u => u.workout_day === day); if (g?.blok) setSessieBlad(g.blok) }}
                 onRemoveTraining={vraagTraining}
                 onRemoveCardio={vraagCardio}
                 onPrevWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
@@ -654,6 +678,10 @@ export default function WeekSchedule({
 
       {/* WeekList ("Schema" expanded card list) removed — duplicates the
           WeekGrid above; tile tap already opens the workout details. */}
+
+      {/* Afgeronde sessie: oefeningen met hun sets, zelfde blad als de
+          Realiteit-agenda van de coach. */}
+      <RealiteitBlad blok={sessieBlad} db={db} isMobile={isMobile} onClose={() => setSessieBlad(null)} />
 
       {verwijderVraag && createPortal(
         <div onClick={() => setVerwijderVraag(null)} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>

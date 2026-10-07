@@ -91,6 +91,7 @@ export default function DayCard({
   cardio = [],
   onCardioShiftLeft, onCardioShiftRight,
   onRemoveTraining = null, onRemoveCardio = null,
+  onOpenGedaan = null,
   smal = false,
   // Dag en datum staan in de strook boven het rooster; dan hier geen label.
   metLabel = true,
@@ -182,7 +183,7 @@ export default function DayCard({
               klaar={isCompleted}
               kanSchuiven={!isCompleted && kanPlannen}
               onLinks={onShiftLeft} onRechts={onShiftRight} kanLinks={canShiftLeft} kanRechts={canShiftRight}
-              onClick={kanOpenen || swapMode ? handleClick : undefined}
+              onClick={isCompleted && onOpenGedaan ? onOpenGedaan : (kanOpenen || swapMode ? handleClick : undefined)}
               isMobile={isMobile} icoon={Dumbbell}
               groei={alles ? 1.15 : 1}
               onVerwijder={kanPlannen && onRemoveTraining ? onRemoveTraining : null}

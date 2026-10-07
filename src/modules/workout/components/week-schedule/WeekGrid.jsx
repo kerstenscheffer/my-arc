@@ -17,6 +17,7 @@ export default function WeekGrid({
   trainingTijdPerDag = {},
   onPrevWeek = null, onNextWeek = null,
   onRemoveTraining = null, onRemoveCardio = null,
+  onOpenGedaan = null,
 }) {
   // Lege rustdagen smal, dagen met training of cardio breed: dan is er ruimte
   // voor de naam van de sport in plaats van zeven even smalle vakjes.
@@ -113,6 +114,7 @@ export default function WeekGrid({
             onCardioShiftRight={onCardioShift ? (c) => onCardioShift(c, +1) : null}
             onRemoveTraining={onRemoveTraining ? () => onRemoveTraining(day) : null}
             onRemoveCardio={onRemoveCardio}
+            onOpenGedaan={onOpenGedaan ? () => onOpenGedaan(day) : null}
             smal={leeg[index]}
             metLabel={false}
             trainingTijd={trainingTijdPerDag[index] || null}
