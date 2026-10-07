@@ -271,8 +271,9 @@ export default function TodaysWorkoutCard({
           display: 'flex', flexDirection: 'column',
           justifyContent: 'center',
         }}>
-          {/* Gouden uppercase label */}
-          <div style={{
+          {/* Label en naam staan in de kop boven de foto; hier alleen de
+              voortgang als die er is, en de stats in dik wit. */}
+          {(isCompleted || inProgress) && <div style={{
             fontSize: isMobile ? '0.55rem' : '0.6rem',
             fontWeight: 800,
             color: accent,
@@ -280,11 +281,10 @@ export default function TodaysWorkoutCard({
             letterSpacing: '0.1em',
             lineHeight: 1, marginBottom: 4, opacity: 0.85,
           }}>
-            {isCompleted ? 'Voltooid' : inProgress ? `${pct}% voltooid` : 'Training'}
-          </div>
+            {isCompleted ? 'Voltooid' : `${pct}% voltooid`}
+          </div>}
 
-          {/* Workout-naam */}
-          <h2 style={{
+          {!zonderFoto && <h2 style={{
             fontSize: isMobile ? '1.05rem' : '1.2rem',
             fontWeight: 900, color: '#fff',
             margin: 0, marginBottom: 5,
@@ -297,7 +297,7 @@ export default function TodaysWorkoutCard({
             WebkitBoxOrient: 'vertical',
           }}>
             {workout.name || workout.focus || 'Workout'}
-          </h2>
+          </h2>}
 
           {/* Meta-rij — compacte stats zoals MealCard macros */}
           <div style={{
@@ -313,7 +313,7 @@ export default function TodaysWorkoutCard({
               <Stat val={String(workout.geschatteTijd).replace(/[^0-9]/g, '') || workout.geschatteTijd} label="min" isMobile={isMobile} />
             )}
             {logsCount > 0 && (
-              <Stat val={logsCount} label="gelogd" isMobile={isMobile} color={accent} />
+              <Stat val={logsCount} label="gelogd" isMobile={isMobile} />
             )}
           </div>
         </div>
@@ -323,14 +323,10 @@ export default function TodaysWorkoutCard({
           flexShrink: 0,
           width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
           borderRadius: '50%',
-          background: isCompleted
-            ? 'rgba(16,185,129,0.15)'
-            : 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-          border: isCompleted ? '1.5px solid rgba(16,185,129,0.5)' : 'none',
-          boxShadow: isCompleted
-            ? '0 4px 12px rgba(16,185,129,0.25)'
-            : '0 6px 16px rgba(255,215,0,0.35), 0 2px 6px rgba(0,0,0,0.4)',
-          color: isCompleted ? '#10b981' : '#0a0a0a',
+          background: isCompleted ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)',
+          border: isCompleted ? '1.5px solid rgba(16,185,129,0.5)' : '1.5px solid rgba(255,255,255,0.85)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+          color: isCompleted ? '#10b981' : '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
           transition: 'transform 0.2s ease, box-shadow 0.2s ease',
@@ -346,14 +342,14 @@ function Stat({ val, label, isMobile, color }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
       <span style={{
-        fontSize: isMobile ? '0.78rem' : '0.85rem',
-        fontWeight: 800,
-        color: color || 'rgba(255,255,255,0.75)',
+        fontSize: isMobile ? '0.95rem' : '1.05rem',
+        fontWeight: 900, letterSpacing: '-0.02em',
+        color: color || '#fff',
       }}>{val}</span>
       <span style={{
-        fontSize: isMobile ? '0.55rem' : '0.6rem',
-        fontWeight: 700,
-        color: color ? `${color}` : 'rgba(255,255,255,0.32)',
+        fontSize: isMobile ? '0.6rem' : '0.65rem',
+        fontWeight: 800,
+        color: color ? `${color}` : 'rgba(255,255,255,0.85)',
         opacity: color ? 0.7 : 1,
         textTransform: 'uppercase', letterSpacing: '0.04em',
       }}>{label}</span>

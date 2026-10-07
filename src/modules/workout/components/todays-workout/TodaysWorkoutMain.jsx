@@ -329,8 +329,9 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
         fontWeight: 900, color: '#fff',
         letterSpacing: '-0.03em', lineHeight: 1.05,
         textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
-        Vandaags workout
+        Vandaags workout{todaysWorkout?.name || todaysWorkout?.focus ? <>: <span style={{ color: 'rgba(255,255,255,0.75)' }}>{todaysWorkout.name || todaysWorkout.focus}</span></> : null}
       </div>
     </div>
   )

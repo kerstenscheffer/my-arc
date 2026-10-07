@@ -398,46 +398,40 @@ export default function WeekSchedule({
         </div>
       )}
 
-      {/* Sectie-titel: actief trainingsplan + wissel-knop */}
+      {/* Titelrij: plannaam met het wissel-icoon er direct achter, rechts
+          de knop om een training toe te voegen. Geen label erboven. */}
       <div style={{
         padding: isMobile ? '0.5rem 1rem 0.875rem' : '0.5rem 1.25rem 1rem',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        {/* Klein grijs label, daaronder de plannaam in dik wit. Stond eerder
-            op één regel met de naam in goud; dat vocht met het goud op de
-            dag-cards en de weekbalk. */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
-            fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
-            color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase',
-            letterSpacing: '0.1em', lineHeight: 1, marginBottom: 5,
-          }}>
-            Jouw trainingsplan
-          </div>
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.45rem', fontWeight: 900, color: '#fff',
+            minWidth: 0, fontSize: isMobile ? '1.25rem' : '1.45rem', fontWeight: 900, color: '#fff',
             letterSpacing: '-0.025em', lineHeight: 1.1,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {schema?.name || 'Plan'}
           </div>
-        </div>
-        {onSwitchPlan && (
-          <button
-            onClick={onSwitchPlan}
-            aria-label="Wissel van plan"
-            style={{
-              flexShrink: 0, width: isMobile ? 40 : 46, height: isMobile ? 40 : 46,
-              borderRadius: '50%',
-              background: '#fff',
-              border: 'none',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
-              color: '#0a0a0a',
+          {onSwitchPlan && (
+            <button onClick={onSwitchPlan} aria-label="Wissel van plan" style={{
+              flexShrink: 0, width: 30, height: 30, borderRadius: '50%', padding: 0,
+              background: 'transparent', border: 'none', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <RefreshCw size={isMobile ? 18 : 21} strokeWidth={2.8} />
+            }}>
+              <RefreshCw size={isMobile ? 17 : 19} strokeWidth={2.8} />
+            </button>
+          )}
+        </div>
+        {kanPlannen && (
+          <button onClick={() => setToevoegenOpen(true)} style={{
+            flexShrink: 0, minHeight: isMobile ? 36 : 40, padding: isMobile ? '0 0.8rem' : '0 0.95rem',
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: '#fff', border: '1px solid #fff', borderRadius: 999, color: '#0a0a0a',
+            fontSize: isMobile ? '0.78rem' : '0.84rem', fontWeight: 900, letterSpacing: '-0.01em', fontFamily: 'inherit',
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <Plus size={16} strokeWidth={3} /> Training
           </button>
         )}
       </div>
@@ -564,19 +558,6 @@ export default function WeekSchedule({
               </div>
             )}
 
-            {/* Training toevoegen: gym of cardio, standaard of eenmalig. */}
-            {kanPlannen && (
-              <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.25rem' : '0.625rem 1rem 0.375rem' }}>
-                <button onClick={() => setToevoegenOpen(true)} style={{
-                  width: '100%', minHeight: isMobile ? 46 : 50, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a',
-                  fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, letterSpacing: '-0.01em', fontFamily: 'inherit',
-                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>
-                  <Plus size={18} strokeWidth={3} /> Training toevoegen
-                </button>
-              </div>
-            )}
             <TrainingToevoegen
               open={toevoegenOpen} onClose={() => setToevoegenOpen(false)} isMobile={isMobile}
               schema={schema} workoutService={workoutService} clientId={clientId}

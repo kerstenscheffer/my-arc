@@ -235,7 +235,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
           onSwitchPlan={() => setShowPlanSwitch(true)}
           weekOffset={weekOffset}
           onWeekOffsetChange={setWeekOffset}
-          tussenBlok={<StappenStrook client={client} db={db} isMobile={isMobile} />}
+          tussenBlok={<div style={{ padding: isMobile ? '0.75rem 1rem 0' : '1rem 1.25rem 0' }}><StappenStrook client={client} db={db} isMobile={isMobile} /></div>}
         />
       </div></FadeOnScroll>}
 
