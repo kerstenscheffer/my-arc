@@ -118,11 +118,6 @@ export default function KrachtBlad({ db, client, isMobile }) {
   const lijst = oefeningen.filter(o => (filter === 'alles' || o.oordeel === filter) && (!q || o.naam.toLowerCase().includes(q)))
   const fotoVan = useOefeningFotos(db, oefeningen.map(o => o.naam))
 
-  const pil = (aan) => ({
-    minHeight: 34, padding: '0 0.75rem', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 6,
-    background: aan ? '#fff' : 'transparent', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.2)'}`, color: aan ? '#0a0a0a' : '#fff',
-    fontSize: '0.74rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-  })
   const stip = (kleur) => <span style={{ width: 7, height: 7, borderRadius: '50%', background: kleur, flexShrink: 0 }} />
 
   return (
@@ -143,11 +138,16 @@ export default function KrachtBlad({ db, client, isMobile }) {
         </div>
       )}
 
-      {/* Filter op oordeel links, periode rechts */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        {[{ id: 'alles', label: 'Alles' }, { id: 'goed', label: labels.goed, k: KLEUR_VOOR.goed }, { id: 'traag', label: labels.traag, k: KLEUR_VOOR.traag }, { id: 'stil', label: labels.stil, k: KLEUR_VOOR.stil }].map(o => (
-          <button key={o.id} onClick={() => setFilter(o.id)} style={pil(filter === o.id)}>{o.k && stip(filter === o.id ? '#0a0a0a' : o.k)}{o.label}</button>
-        ))}
+      {/* Eén regel: oordeel-dropdown links, fase-dropdown rechts. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {filter !== 'alles' && stip(KLEUR_VOOR[filter])}
+          <select value={filter} onChange={e => setFilter(e.target.value)} style={{ appearance: 'none', WebkitAppearance: 'none', background: 'transparent', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', padding: '0 18px 0 0', cursor: 'pointer', outline: 'none' }}>
+            <option value="alles" style={{ background: '#0a0a0a' }}>Alle oefeningen</option>
+            {['goed', 'traag', 'stil'].map(k => <option key={k} value={k} style={{ background: '#0a0a0a' }}>{labels[k][0].toUpperCase() + labels[k].slice(1)}</option>)}
+          </select>
+          <ChevronDown size={14} color="#fff" strokeWidth={2.8} style={{ position: 'absolute', right: 0, pointerEvents: 'none' }} />
+        </div>
         <div style={{ marginLeft: 'auto', position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           <select value={faseId} onChange={e => setFaseId(e.target.value)} style={{ appearance: 'none', WebkitAppearance: 'none', background: 'transparent', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', padding: '0 18px 0 0', cursor: 'pointer', outline: 'none', maxWidth: 200, textOverflow: 'ellipsis' }}>
             {(fases || []).map(f => <option key={f.id} value={f.id} style={{ background: '#0a0a0a' }}>{faseNaam(f)}</option>)}
