@@ -157,11 +157,8 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut
   const knop = {
     width: 36, height: 36, flexShrink: 0, borderRadius: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(255,255,255,0.06)',
-    borderTop: '1px solid rgba(255,255,255,0.15)',
-    borderBottom: '1px solid rgba(255,255,255,0.15)',
-    borderLeft: '1px solid rgba(255,255,255,0.15)',
-    borderRight: '1px solid rgba(255,255,255,0.15)',
+    background: 'transparent',
+    borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
     color: '#fff', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900,
     cursor: 'pointer', lineHeight: 1,
   }
@@ -1101,7 +1098,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                           <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Cardio</span>
                           <button
                             onClick={() => setCardioBlad({ regel: null })}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32, padding: '0 0.6rem', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 36, padding: '0 0.25rem', background: 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                           >
                             <Plus size={12} strokeWidth={3} /> Cardio
                           </button>
@@ -1160,13 +1157,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                           <select
                             value={simStappen || ''}
                             onChange={e => setSimStappen(e.target.value || null)}
-                            style={{
-                              minHeight: 32, padding: '0 0.5rem',
-                              background: 'rgba(255,255,255,0.05)',
-                              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
-                              color: '#fff', fontSize: '0.74rem', fontWeight: 800,
-                              fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
-                            }}
+                            style={{ ...selectStijl, flex: '0 1 60%' }}
                           >
                             <option value="" style={{ background: '#1a1a1a' }}>
                               {huidigeBand ? `nu ${STAP_LABEL[huidigeBand]}` : 'niet bekend'}
@@ -1285,9 +1276,10 @@ function Sectie({ titel, samenvatting, kleur, open, onToggle, children }) {
 }
 
 const selectStijl = {
-  flex: 1, minWidth: 0, minHeight: 32, padding: '0 0.5rem',
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
-  color: '#fff', fontSize: '0.74rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+  flex: 1, minWidth: 0, minHeight: 36, padding: '0 0.25rem',
+  background: 'transparent', border: 'none', borderRadius: 0,
+  color: '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+  textAlign: 'right', direction: 'rtl',
 }
 
 const kopKnop = {
