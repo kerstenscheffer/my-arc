@@ -172,7 +172,7 @@ const kaartKnopStijl = {
   color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
 }
 
-function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus }) {
+function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus, klikDoor = false }) {
   const top = minToTop(block.start)
   const heightPct = Math.max(0.1, minToTop(block.end) - top)
   const isPlaceholder = block.meta?.placeholder
@@ -225,7 +225,10 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
     transition: isGhost ? 'none' : 'opacity 0.15s ease',
     userSelect: 'none',
     touchAction: sleepbaar ? 'none' : 'auto',
-    pointerEvents: isGhost ? 'none' : 'auto',
+    // In plaatsmodus ("tik een plek") moet een klik op een blok gewoon het
+    // rooster eronder raken: anders opent een klik op 'Kantoor' het blok in
+    // plaats van een maaltijd op die tijd te zetten.
+    pointerEvents: (isGhost || klikDoor) ? 'none' : 'auto',
     zIndex: isGhost ? 5 : isSelected ? 4 : isAchter ? 0 : 2,
     boxSizing: 'border-box',
   }
@@ -515,6 +518,7 @@ function DayColumn({
             isDragSource={sourceBlockId === b.id || (groepSleep && !!geselecteerd?.has(b.id))}
             isSelected={!!geselecteerd?.has(b.id)}
             selectieModus={selectieModus}
+            klikDoor={!!plaatsModus}
           />
         ))}
         {/* Bij een groepsverplaatsing staat hier de hele selectie in
