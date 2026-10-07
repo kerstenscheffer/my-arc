@@ -3,7 +3,7 @@ import useIsMobile from '../../../hooks/useIsMobile'
 import { AlertCircle, RefreshCw, Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Lock } from 'lucide-react'
 import WeekGrid from './week-schedule/WeekGrid'
 import WorkoutServiceNew from '../services/WorkoutServiceNew'
 import { rustWaarschuwingen, waarschuwingTekst, ROOD } from '../utils/rustWaarschuwing'
@@ -287,21 +287,6 @@ export default function WeekSchedule({
     if (!eigenVolgende) await WorkoutServiceNew.saveWeekPlanning(clientId, volgendeWeekSleutel, tempSchedule, db)
     await handleAutoSave(next)
   }
-  // Training voorgoed uit het plan: uit het vaste rooster, en uit de eigen
-  // planning van de getoonde week als die er is.
-  const verwijderTrainingVoorgoed = async (day) => {
-    const vast = { ...vastRooster }
-    delete vast[day]
-    await db.updateClientWorkoutSchedule(clientId, vast)
-    setVastRooster(vast)
-    const next = { ...tempSchedule }
-    delete next[day]
-    if (isToekomst) await WorkoutServiceNew.saveWeekPlanning(clientId, weekSleutel, next, db)
-    else if (onScheduleUpdate) onScheduleUpdate(vast)
-    setTempSchedule(next)
-    await laadBuurWeken(isToekomst ? undefined : vast)
-    if (navigator.vibrate) navigator.vibrate([30, 50, 30])
-  }
   // Vast cardio één week overslaan (skip_weeks); het plan blijft staan.
   const verwijderCardioDezeWeek = async (c) => {
     const { error } = await db.supabase.from('client_agenda_blocks')
@@ -321,8 +306,8 @@ export default function WeekSchedule({
     setVerwijderVraag(null)
     if (!v) return
     if (v.soort === 'training') {
-      if (hoe === 'voorgoed') await verwijderTrainingVoorgoed(v.item)
-      else await verwijderTraining(v.item)
+      // Voorgoed uit het plan is voor de coach; de klant kan alleen deze week.
+      await verwijderTraining(v.item)
     } else {
       if (hoe === 'voorgoed' || !v.permanent) await verwijderCardio(v.item)
       else await verwijderCardioDezeWeek(v.item)
@@ -645,7 +630,19 @@ export default function WeekSchedule({
               {verwijderVraag.permanent ? (
                 <>
                   <button onClick={() => voerUit('deze_week')} style={vraagKnop(true)}>Alleen deze week</button>
-                  <button onClick={() => voerUit('voorgoed')} style={vraagKnop(false)}>Voorgoed uit mijn plan</button>
+                  {verwijderVraag.soort === 'training' ? (
+                    // Het plan is van de coach: een trainingsdag haal je er niet
+                    // zelf uit. De knop staat er wel, maar op slot, met de reden.
+                    <div style={{ ...vraagKnop(false), minHeight: 0, padding: '0.7rem 0.9rem', cursor: 'default', opacity: 0.55, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
+                      <Lock size={16} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+                      <div>
+                        <div>Voorgoed uit mijn plan</div>
+                        <div style={{ fontSize: '0.66rem', fontWeight: 700, opacity: 0.75, marginTop: 2 }}>Kan je niet zomaar doen, neem contact op met je coach.</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => voerUit('voorgoed')} style={vraagKnop(false)}>Voorgoed uit mijn plan</button>
+                  )}
                 </>
               ) : (
                 <button onClick={() => voerUit('voorgoed')} style={vraagKnop(true)}>Ja, weghalen</button>
