@@ -17,6 +17,7 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronRight, Flame, GripVertical, Minus, Maximize2, X } from 'lucide-react'
 import { balkVak, balkVakActief } from './werkbalkStijl'
 import useZwevendVenster from '../../components/useZwevendVenster'
+import DagRingen from '../ai-meal-generator/tabs/plan-analyzer/DagRingen'
 import { useModalHost } from '../../coach/ModalHost'
 import { maakConfig } from '../weight-tracker/utils/coachingBand'
 
@@ -101,23 +102,29 @@ function planPerDag(mealPlan) {
 
   const preKcal = Number(mealPlan?.pre_workout_meal?.calories) || 0
 
-  const preEiwit = Number(mealPlan?.pre_workout_meal?.protein) || 0
+  const pre = mealPlan?.pre_workout_meal || {}
+  const preEiwit = Number(pre.protein) || 0
+  const preKoolh = Number(pre.carbs) || 0
+  const preVet = Number(pre.fat) || 0
 
   const dagen = DAGEN.map(dag => {
     const dagplan = week[dag]
     let kcal = Number(dagplan?.totals?.kcal) || 0
     let eiwit = Number(dagplan?.totals?.protein) || 0
+    let koolh = Number(dagplan?.totals?.carbs) || 0
+    let vet = Number(dagplan?.totals?.fat) || 0
     const training = !!dagplan?.is_training_day
     // Alleen optellen als de dag geen eigen pre-workout slot heeft; anders
     // zit die maaltijd al in het dagtotaal en zou hij dubbel tellen.
-    if (training && preKcal && !dagplan?.[PRE_WORKOUT_SLOT]) { kcal += preKcal; eiwit += preEiwit }
-    return { dag, label: DAG_KORT[dag], kcal: Math.round(kcal), eiwit: Math.round(eiwit), training }
+    if (training && preKcal && !dagplan?.[PRE_WORKOUT_SLOT]) { kcal += preKcal; eiwit += preEiwit; koolh += preKoolh; vet += preVet }
+    return { dag, label: DAG_KORT[dag], kcal: Math.round(kcal), eiwit: Math.round(eiwit), koolh: Math.round(koolh), vet: Math.round(vet), training }
   })
 
+  const gem = (k) => Math.round(dagen.reduce((t, d) => t + d[k], 0) / 7)
   return {
     dagen,
     totaal: dagen.reduce((t, d) => t + d.kcal, 0),
-    eiwitGem: Math.round(dagen.reduce((t, d) => t + d.eiwit, 0) / 7),
+    eiwitGem: gem('eiwit'), koolhGem: gem('koolh'), vetGem: gem('vet'),
   }
 }
 
@@ -407,13 +414,19 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                 </div>
               )}
 
-              {regel('Plan geeft', `${getal(planWeek)} kcal`, 'zeven dagen bij elkaar')}
-              {perDag?.eiwitGem > 0 && regel(
-                'Eiwit',
-                `${perDag.eiwitGem} g`,
-                tdee?.target_protein ? `gemiddeld per dag · target ${Math.round(tdee.target_protein)} g` : 'gemiddeld per dag',
-                tdee?.target_protein && perDag.eiwitGem < Math.round(tdee.target_protein) * 0.9 ? '#f59e0b' : '#fff'
-              )}
+              {/* Wat het plan gemiddeld per dag geeft, als dezelfde vier
+                  ringen als in de analyzer, tegen de targets van de klant. */}
+              <div style={{ paddingTop: '0.5rem' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>Plan geeft</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>gemiddeld per dag · {getal(planWeek)} kcal per week</div>
+              </div>
+              <div style={{ margin: '0 -0.5rem' }}>
+                <DagRingen
+                  totalen={{ calories: planWeek / 7, protein: perDag.eiwitGem, carbs: perDag.koolhGem, fat: perDag.vetGem }}
+                  targets={{ calories: tdee?.target_calories, protein: tdee?.target_protein, carbs: tdee?.target_carbs, fat: tdee?.target_fat }}
+                  isMobile
+                />
+              </div>
 
               {tdee === undefined && regel('Verbranding', '…', 'laden')}
 
@@ -424,7 +437,6 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
 
               {verbranding != null && (
                 <>
-                  {regel('Verbranding', `${getal(verbranding)} kcal`, 'TDEE maal zeven')}
 
                   {/* Stappen uit de intake. Alleen tonen als ze er zijn — een
                       regel "onbekend" helpt niemand. */}
@@ -460,49 +472,43 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                       </div>
                     )
                   })()}
-                  {regel(
-                    tekort >= 0 ? 'Tekort' : 'Overschot',
-                    `${getal(Math.abs(tekort))} kcal`,
-                    'over de hele week',
-                    tekort >= 0 ? '#10b981' : '#f59e0b'
+                  {/* Tekort (cut) of overschot (build): wat het doeltempo
+                      vraagt, en wat het plan nu geeft met het tempo dat daar
+                      bij hoort. Het woord volgt de richting van de fase. */}
+                  {(() => {
+                    const woord = richting === 'aankomen' ? 'Overschot' : 'Tekort'
+                    const t = richting === 'aankomen' ? -1 : 1   // zodat 'huidig' positief leest in de eigen richting
+                    const doelKcal = streefTekortWeek != null ? t * streefTekortWeek : null
+                    const huidigKcal = t * tekort
+                    return (
+                      <>
+                        {doelKcal != null && regel(
+                          `${woord} voor doeltempo`,
+                          `${getal(doelKcal)} kcal`,
+                          `per week · ${getal(doelKcal / 7)} per dag · ${richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)} per week`
+                        )}
+                        {regel(
+                          `Huidig ${woord.toLowerCase()} in plan`,
+                          `${huidigKcal < 0 ? '−' : ''}${getal(Math.abs(huidigKcal))} kcal`,
+                          `per week · ${getal(Math.abs(huidigKcal) / 7)} per dag = ${kgTekst(planKg)} per week`,
+                          opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : '#fff'
+                        )}
+                      </>
+                    )
+                  })()}
+                  {afwijkingWeek != null && (
+                    <div style={{ padding: '0.5rem 0 0', fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.4, color: opTempo ? '#22c55e' : '#fff' }}>
+                      {opTempo
+                        ? 'Op tempo. Dit plan zit binnen de band.'
+                        : Math.abs(afwijkingWeek) < 100
+                          ? 'Vrijwel op het doeltempo.'
+                          : afwijkingWeek > 0
+                            ? `${getal(afwijkingWeek)} kcal per week te veel voor het doeltempo · ${getal(afwijkingWeek / 7)} per dag eraf`
+                            : `${getal(-afwijkingWeek)} kcal per week te weinig voor het doeltempo · ${getal(-afwijkingWeek / 7)} per dag erbij`}
+                    </div>
                   )}
-                  <div style={{ paddingTop: '0.55rem' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
-                      Dit plan komt neer op
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
-                      <div style={{
-                        fontSize: '1.3rem', fontWeight: 900,
-                        color: opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : '#fff',
-                      }}>
-                        {kgTekst(planKg)}
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}> per week</span>
-                      </div>
-                      {streefKg != null && (
-                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
-                          streef {richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)}
-                        </div>
-                      )}
-                    </div>
-                    {/* De zin waar je mee stuurt: hoeveel kcal moet eraf of erbij
-                        om op het streeftempo te komen. */}
-                    {afwijkingWeek != null && (
-                      <div style={{
-                        marginTop: 6, fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.4,
-                        color: opTempo ? '#22c55e' : '#fff',
-                      }}>
-                        {opTempo
-                          ? 'Op tempo. Dit plan zit binnen de band.'
-                          : Math.abs(afwijkingWeek) < 100
-                            ? 'Vrijwel op het streeftempo.'
-                            : afwijkingWeek > 0
-                              ? `${getal(afwijkingWeek)} kcal per week te veel voor het streeftempo · ${getal(afwijkingWeek / 7)} per dag eraf`
-                              : `${getal(-afwijkingWeek)} kcal per week te weinig voor het streeftempo · ${getal(-afwijkingWeek / 7)} per dag erbij`}
-                      </div>
-                    )}
-                    <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
-                      Schatting op 7700 kcal per kilo. Wat de weegschaal doet blijft leidend.
-                    </div>
+                  <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
+                    Schatting op 7700 kcal per kilo. Wat de weegschaal doet blijft leidend.
                   </div>
 
                 </>
