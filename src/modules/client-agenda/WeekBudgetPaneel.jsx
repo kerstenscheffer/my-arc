@@ -410,18 +410,24 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   ))}
                 </div>
               )}
-              {dagDoelKcal != null && planWeek != null && (
-                <div style={{ padding: '0.45rem 0 0', fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.4, color: Math.abs(planWeek / 7 - dagDoelKcal) <= 50 ? '#22c55e' : '#fff' }}>
-                  {Math.abs(planWeek / 7 - dagDoelKcal) <= 50
-                    ? 'Het plan zit per dag op wat hij mag eten.'
-                    : planWeek / 7 > dagDoelKcal
-                      ? `Het plan geeft ${getal(planWeek / 7 - dagDoelKcal)} kcal per dag meer dan hij mag eten voor het streeftempo.`
-                      : `Het plan geeft ${getal(dagDoelKcal - planWeek / 7)} kcal per dag minder dan hij mag eten; er is ruimte.`}
-                  {tdee?.target_calories && Math.abs(tdee.target_calories - dagDoelKcal) > 100
-                    ? ` De target op de klant staat op ${getal(tdee.target_calories)}; dat wijkt af van wat het tempo vraagt.`
-                    : ''}
-                </div>
-              )}
+              {/* Eén korte regel onder de tegels: het verschil per dag, en
+                  alleen als het nodig is een tweede over de target. */}
+              {dagDoelKcal != null && planWeek != null && (() => {
+                const v = Math.round(planWeek / 7 - dagDoelKcal)
+                const targetWijkt = tdee?.target_calories && Math.abs(tdee.target_calories - dagDoelKcal) > 100
+                return (
+                  <div style={{ padding: '0.4rem 0 0', fontSize: '0.72rem', fontWeight: 800, lineHeight: 1.4 }}>
+                    <span style={{ color: Math.abs(v) <= 50 ? '#22c55e' : v > 0 ? '#f59e0b' : '#fff' }}>
+                      {Math.abs(v) <= 50 ? 'Plan zit op wat hij mag eten.' : v > 0 ? `${getal(v)} kcal per dag te veel.` : `${getal(-v)} kcal per dag ruimte.`}
+                    </span>
+                    {targetWijkt && (
+                      <span style={{ color: 'rgba(255,255,255,0.45)' }}>
+                        {' '}Target klant {getal(tdee.target_calories)}, tempo vraagt {getal(dagDoelKcal)}.
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Wat het plan gemiddeld per dag geeft, als dezelfde vier
                   ringen als in de analyzer, tegen de targets van de klant. */}
