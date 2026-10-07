@@ -188,8 +188,13 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut
 
 const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 
-export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio }) {
+export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio, realiteit = null, onRealiteitNodig = null }) {
   const [open, setOpen] = useState(false)
+  // Plan = wat het weekplan geeft. Realiteit = wat er deze week gelogd is:
+  // maaltijden, trainingen en cardio uit de logs. Zelfde rekenwerk, andere bron.
+  const [stand, setStand] = useState('plan')
+  const isRealiteit = stand === 'realiteit'
+  useEffect(() => { if (open && isRealiteit && !realiteit) onRealiteitNodig?.() }, [open, isRealiteit, realiteit, onRealiteitNodig])
   // Alle secties dicht; je opent wat je nodig hebt.
   const [secties, setSecties] = useState({})
   const zetSectie = (k) => setSecties(prev => ({ ...prev, [k]: !prev[k] }))
@@ -331,7 +336,34 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
     return () => { leeft = false }
   }, [open, fase, db, clientId])
 
-  const perDag = planPerDag(mealPlan)
+  // Realiteit per dag in dezelfde vorm als het plan. Dagen zonder gelogde
+  // maaltijd tellen niet mee in het gemiddelde; het weektotaal is dat
+  // gemiddelde maal zeven, anders lijkt een week met vier gelogde dagen een
+  // enorm tekort.
+  const realiteitPerDag = (() => {
+    if (!realiteit?.blocksByDay) return null
+    const dagen = DAGEN.map(dag => {
+      const blokken = realiteit.blocksByDay[dag] || []
+      const maaltijden = blokken.filter(b => b.type === 'meal')
+      const som = (k) => maaltijden.reduce((t, b) => t + (Number(b.meta?.[k]) || 0), 0)
+      return {
+        dag, label: DAG_KORT[dag],
+        kcal: Math.round(som('kcal')), eiwit: Math.round(som('protein')), koolh: Math.round(som('carbs')), vet: Math.round(som('fat')),
+        training: blokken.some(b => b.type === 'training'),
+        gelogd: maaltijden.length > 0, aantal: maaltijden.length,
+      }
+    })
+    const gelogd = dagen.filter(d => d.gelogd)
+    const gem = (k) => gelogd.length ? Math.round(gelogd.reduce((t, d) => t + d[k], 0) / gelogd.length) : 0
+    return {
+      dagen, gelogdeDagen: gelogd.length,
+      totaal: gem('kcal') * 7,
+      eiwitGem: gem('eiwit'), koolhGem: gem('koolh'), vetGem: gem('vet'),
+      trainingen: dagen.filter(d => d.training).length,
+      cardio: Object.values(realiteit.blocksByDay).flat().filter(b => b.type === 'cardio'),
+    }
+  })()
+  const perDag = isRealiteit ? realiteitPerDag : planPerDag(mealPlan)
   const planWeek = perDag ? perDag.totaal : null
 
   // ── Wat-als: afwijkingen op de verbranding ──
@@ -354,14 +386,21 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
   const cardioKcalWeek = cardioWeek(simCardio)
   // Gepland cardio telt mee in de verbranding van nu: dat is wat de klant
   // volgens zijn plan doet, bovenop de TDEE die uit het activiteitsniveau komt.
-  const cardioBasisKcalWeek = cardioWeek(cardioBasis || [])
+  // In realiteit: de gelogde cardio van deze week.
+  const gelogdCardioKcalWeek = (realiteitPerDag?.cardio || []).reduce((t, b) => {
+    const soort = CARDIO_SOORTEN.find(x => x.id.toLowerCase() === String(b.meta?.soort || '').toLowerCase())
+    return t + kcalPerMinuut(soort?.met || 6, gewicht) * (Number(b.meta?.duur) || 0)
+  }, 0)
+  const cardioBasisKcalWeek = isRealiteit ? gelogdCardioKcalWeek : cardioWeek(cardioBasis || [])
   const cardioGewijzigd = cardioBasis !== undefined && (
     cardioVerwijderd.length > 0 ||
     JSON.stringify(simCardio.map(r => [r.id || null, r.soort, Number(r.keer), Number(r.minuten)])) !==
     JSON.stringify((cardioBasis || []).map(r => [r.id || null, r.soort, Number(r.keer), Number(r.minuten)]))
   )
   // Trainingen nu: de dagen in het weekrooster van de klant.
-  const trainingNu = trainingNuOverride ?? Object.values(tdee?.workout_schedule || {}).filter(Boolean).length
+  const trainingNu = isRealiteit
+    ? (realiteitPerDag?.trainingen || 0)
+    : (trainingNuOverride ?? Object.values(tdee?.workout_schedule || {}).filter(Boolean).length)
   const gekozenPlan = plannen.find(p => p.id === simPlan) || null
   const trainingDelta = simTrainingen + (gekozenPlan ? gekozenPlan.dagen - trainingNu : 0)
 
@@ -558,6 +597,26 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
             </button>
           </div>
 
+          {/* Plan of realiteit: andere bron voor alles hieronder. */}
+          {!ingeklapt && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, padding: '0.4rem 0.8rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
+                {[['plan', 'Plan'], ['realiteit', 'Realiteit']].map(([k, label]) => (
+                  <button key={k} onClick={() => setStand(k)} style={{
+                    minHeight: 30, padding: '0 0.7rem', background: stand === k ? '#fff' : 'transparent', border: 'none',
+                    color: stand === k ? '#0a0a0a' : 'rgba(255,255,255,0.7)', fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>{label}</button>
+                ))}
+              </div>
+              <span style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {isRealiteit
+                  ? (realiteitPerDag ? `${realiteitPerDag.gelogdeDagen} van 7 dagen voeding gelogd · ${realiteitPerDag.trainingen} trainingen` : 'laden…')
+                  : 'wat het weekplan geeft'}
+              </span>
+            </div>
+          )}
+
           {/* Zolang 'Wat als' iets doet: een regel bovenin, waar je ook kijkt. */}
           {!ingeklapt && simActief && (
             <div style={{
@@ -582,7 +641,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.25rem 0.8rem 0.8rem' }}>
           {planWeek == null ? (
             <div style={{ padding: '0.6rem 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
-              Geen actief weekplan voor deze klant.
+              {isRealiteit ? 'Realiteit laden…' : 'Geen actief weekplan voor deze klant.'}
             </div>
           ) : (
             <>
@@ -628,7 +687,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                 <div style={{ display: 'flex', gap: 6, padding: '0.5rem 0 0.2rem' }}>
                   {[
                     { label: 'Verbrandt', sub: simActief ? `wat als · nu ${getal(tdeeBasis)}` : (cardioBasisKcalWeek > 0 ? 'TDEE + cardio per dag' : 'TDEE per dag'), waarde: tdeeEff != null ? getal(tdeeEff) : '?', kleur: simActief ? '#22c55e' : '#fff' },
-                    { label: 'Plan geeft', sub: 'per dag', waarde: getal(planWeek / 7), kleur: '#fff' },
+                    { label: isRealiteit ? 'Gelogd' : 'Plan geeft', sub: isRealiteit ? 'gem. per gelogde dag' : 'per dag', waarde: getal(planWeek / 7), kleur: '#fff' },
                     {
                       label: 'Mag eten', sub: 'voor streeftempo',
                       waarde: dagDoelKcal != null ? getal(dagDoelKcal) : '?',
@@ -709,7 +768,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
               </Sectie>
 
               <Sectie
-                titel="Plan geeft"
+                titel={isRealiteit ? 'Gelogd' : 'Plan geeft'}
                 open={!!secties.plan} onToggle={() => zetSectie('plan')}
                 samenvatting={`${getal(planWeek / 7)} kcal per dag · ${perDag.eiwitGem} g eiwit`}
               >
@@ -740,7 +799,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                         ? { label: `${streefTekortWeek >= 0 ? 'Tekort' : 'Overschot'} voor doeltempo`, week: streefTekortWeek, kleur: '#fff' }
                         : { label: 'Doeltempo', leeg: 'geen fase ingesteld' },
                       {
-                        label: `${tekort >= 0 ? 'Tekort' : 'Overschot'} in dit plan`,
+                        label: `${tekort >= 0 ? 'Tekort' : 'Overschot'} ${isRealiteit ? 'in de realiteit' : 'in dit plan'}`,
                         week: tekort,
                         kleur: opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : '#fff',
                       },
@@ -854,7 +913,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                               <div style={{
                                 position: 'absolute', left: 0, right: 0, bottom: 0,
                                 height: hoogte,
-                                background: d.training ? 'rgba(255,255,255,0.85)' : (boven ? '#f59e0b' : 'rgba(255,255,255,0.5)'),
+                                background: (isRealiteit && d.gelogd === false) ? 'rgba(255,255,255,0.12)' : d.training ? 'rgba(255,255,255,0.85)' : (boven ? '#f59e0b' : 'rgba(255,255,255,0.5)'),
                               }} />
                               {/* Doellijn: zoveel mag de dag geven om op het
                                   streeftempo te zitten. */}
