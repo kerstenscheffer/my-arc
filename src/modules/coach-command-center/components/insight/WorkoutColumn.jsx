@@ -10,8 +10,7 @@ import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
 import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
 import { workoutFoto } from '../../../../client/components/workoutFoto'
-import { getFallbackImage, youtubeThumb } from '../../../workout/utils/oefeningFoto'
-import { useEffect } from 'react'
+import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 const WEEKDAG_NL = { monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', thursday: 'donderdag', friday: 'vrijdag', saturday: 'zaterdag', sunday: 'zondag' }
@@ -50,35 +49,6 @@ const SetDisplay = ({ s }) => (
     {s.dropsets?.length > 0 ? s.dropsets.map((ds, di) => <span key={di} style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>D{ds.weight}×{ds.reps}</span>) : null}
   </span>
 )
-
-// Foto per oefening, dezelfde keten als de oefeningkaart van de klant:
-// thumbnail van de coach, YouTube-thumb, foto uit de oefeningentabel, en
-// anders de stockfoto op naam. Eén query voor alle oefeningen van een sessie.
-function useOefeningFotos(db, namen) {
-  const sleutel = namen.join('|')
-  const [fotos, setFotos] = useState({})
-  useEffect(() => {
-    if (!db?.supabase || namen.length === 0) return
-    let weg = false
-    ;(async () => {
-      try {
-        const { data } = await db.supabase
-          .from('exercises')
-          .select('name, thumbnail_url, video_url, image_url')
-          .in('name', namen)
-        if (weg) return
-        const uit = {}
-        ;(data || []).forEach(ex => {
-          uit[ex.name] = ex.thumbnail_url || youtubeThumb(ex.video_url) || ex.image_url || null
-        })
-        setFotos(uit)
-      } catch (e) { console.warn('oefeningfoto\'s laden mislukt', e?.message) }
-    })()
-    return () => { weg = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, sleutel])
-  return (naam) => fotos[naam] || getFallbackImage({ name: naam })
-}
 
 // Kaartstijl van de workout-pagina van de klant.
 const KAART = {

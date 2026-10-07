@@ -202,7 +202,7 @@ export class ClientAgendaService {
         .select('id, date, weight, time_of_day, created_at')
         .eq('client_id', clientId).gte('date', weekStart).lte('date', weekEnd)),
       veilig(this.supabase.from('consumed_meals')
-        .select('id, meal_name, meal_type, calories, protein, consumed_at, source, image_url, amount, per_unit')
+        .select('id, meal_name, meal_type, calories, protein, carbs, fat, consumed_at, source, image_url, amount, per_unit, ingredients, notes')
         .eq('client_id', clientId).gte('consumed_at', vanaf.toISOString()).lte('consumed_at', tot.toISOString())),
       veilig(this.supabase.from('client_checkins')
         .select('id, checkin_date, created_at, status')
@@ -255,7 +255,7 @@ export class ClientAgendaService {
         id: `echt-training-${s.id}`, day: dag, type: 'training',
         label: 'Training', sublabel: s.day_name || 'Training',
         start, end: eind, color: TRAINING_COLOR, source: 'realiteit', editable: false,
-        meta: { echt: true, exercise_count: n || null, estimated_time: `${eind - start} min`, afgerond: !!s.is_completed },
+        meta: { echt: true, sessionId: s.id, exercise_count: n || null, estimated_time: `${eind - start} min`, afgerond: !!s.is_completed, datum: s.workout_date },
       })
     })
 
@@ -279,7 +279,12 @@ export class ClientAgendaService {
         id: `echt-maaltijd-${m.id}`, day: dag, type: 'meal',
         label: BRON[m.source] || 'gelogd', sublabel: m.meal_name || 'Maaltijd',
         start, end: start + 20, color: SLOT_COLOR, source: 'realiteit', editable: false,
-        meta: { echt: true, slot: m.meal_type || null, kcal: m.calories, protein: m.protein, image_url: m.image_url || null, bron: m.source || null },
+        meta: {
+          echt: true, slot: m.meal_type || null, kcal: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat,
+          image_url: m.image_url || null, bron: m.source || null, bronLabel: BRON[m.source] || 'gelogd',
+          ingredients: Array.isArray(m.ingredients) ? m.ingredients : [], notes: m.notes || null,
+          amount: m.amount != null ? Number(m.amount) : null, per_unit: m.per_unit || null, tijdstip: m.consumed_at,
+        },
       })
     })
 

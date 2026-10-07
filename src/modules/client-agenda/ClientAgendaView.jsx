@@ -9,6 +9,7 @@ import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus,
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 import { meldMaaltijdTijd, luisterMaaltijdTijd, luisterPlanGewijzigd, meldPlanGewijzigd } from '../meal-plan/utils/mealSync'
 import WeekBudgetPaneel from './WeekBudgetPaneel'
+import RealiteitBlad from './RealiteitBlad'
 import { resolveFoodImage, foodImageFallback } from '../meal-plan/foodImageFallback'
 import { workoutFoto } from '../../client/components/workoutFoto'
 import { balkVak, balkVakActief, balkIconKnop, balkScheiding } from './werkbalkStijl'
@@ -181,7 +182,8 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   const heightPct = Math.max(0.1, minToTop(block.end) - top)
   const isPlaceholder = block.meta?.placeholder
   const isPlaceholderTime = block.meta?.placeholder_time
-  const clickable = (block.editable || selectieModus) && onClick
+  // Realiteit-blokken zijn niet te bewerken, maar wel te openen (inzien).
+  const clickable = (block.editable || selectieModus || block.meta?.echt) && onClick
   const sleepbaar = draggable && (!selectieModus || isSelected)
   const isMaaltijd = block.type === 'meal'
   const isTraining = block.type === 'training'
@@ -1282,6 +1284,7 @@ export default function ClientAgendaView({
   const [weergave, setWeergave] = useState('plan')
   const [realiteit, setRealiteit] = useState(null)
   const [realiteitLaden, setRealiteitLaden] = useState(false)
+  const [realiteitBlok, setRealiteitBlok] = useState(null)
   useEffect(() => {
     if (weergave !== 'realiteit' || !service || !client?.id) return
     let weg = false
@@ -1380,6 +1383,7 @@ export default function ClientAgendaView({
       })
       return
     }
+    if (block.meta?.echt) { setRealiteitBlok(block); return }
     if (isClient && block.type === 'meal') return
     setEditingBlock(block)
   }
@@ -2358,6 +2362,7 @@ export default function ClientAgendaView({
         overflowY: 'auto', overflowX: 'hidden',
         background: COLORS.bg,
       }}>
+        <RealiteitBlad blok={realiteitBlok} db={db} isMobile={isMobile} onClose={() => setRealiteitBlok(null)} />
         <TimeAxis isMobile={isMobile} />
         {visibleDays.map(day => {
           const dForHeader = weekDates[day]
