@@ -2304,7 +2304,10 @@ export default function ClientAgendaView({
           // Cardio opgeslagen in het weekbudget: meteen in plaatsmodus, zodat
           // de coach de dagen tikt waarop het moet gebeuren.
           onPlanCardio={({ label, duur }) => setTeplaatsen({ id: 'cardio', label, duur, kleur: '#06b6d4' })}
-          telBlokken={(label) => Object.values(data?.blocksByDay || {}).flat().filter(b => b.type === 'custom' && b.label === label).length}
+          blokkenVan={(label) => Object.values(data?.blocksByDay || {}).flat()
+            .filter(b => b.type === 'custom' && b.label === label)
+            .sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day))
+            .map(b => ({ day: b.day, start: b.start }))}
           onPlanCardioDagen={async ({ label, duur, dagen, tijdMin, vervangLabels = [], sync = null }) => {
             // Aangepast zonder dagen: de agenda bijtrekken. Meer blokken dan
             // keer per week → de laatste gaan weg (de eerste dagen blijven).

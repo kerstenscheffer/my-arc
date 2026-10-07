@@ -35,6 +35,16 @@ function Teller({ label, waarde, eenheid, stap, min = 0, onChange }) {
   )
 }
 
+// Standaardspreiding per aantal keer per week, zelfde gedachte als de
+// weekindeling van trainingen: rust ertussen.
+const SPREIDING = {
+  1: ['wednesday'], 2: ['monday', 'thursday'], 3: ['monday', 'wednesday', 'friday'],
+  4: ['monday', 'tuesday', 'thursday', 'friday'], 5: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+  6: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+  7: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+}
+const spreid = (n) => SPREIDING[Math.max(1, Math.min(7, Number(n) || 1))]
+
 const DAGEN = [
   { id: 'monday', label: 'Ma' }, { id: 'tuesday', label: 'Di' }, { id: 'wednesday', label: 'Wo' },
   { id: 'thursday', label: 'Do' }, { id: 'friday', label: 'Vr' }, { id: 'saturday', label: 'Za' }, { id: 'sunday', label: 'Zo' },
@@ -47,31 +57,34 @@ export default function CardioBlad({
   tempoVoor = null,
   // Dagen + tijd gekozen: meteen in het plan en op die dagen in de agenda.
   onInplannen = null,
-  // Bestaande regel aangepast zonder dagen: plan bijwerken en de agenda
-  // bijtrekken (minder keer = blokken weg, andere duur = blokken aangepast).
-  onAanpassen = null,
-  // Hoeveel blokken van deze sport er nu in de agenda staan.
-  blokkenInAgenda = null,
+  // Waar deze sport nu in de agenda staat: [{ day, start }] — voorkeuze bij
+  // bewerken, zodat de dagen en de tijd kloppen met wat er staat.
+  bestaandeBlokken = [],
 }) {
   const [soort, setSoort] = useState('Wandelen')
-  const [keer, setKeer] = useState(3)
   const [minuten, setMinuten] = useState(30)
-  const [dagen, setDagen] = useState([])
+  // De dagen zíjn het aantal keer: − en + schuiven de spreiding, een dag
+  // aantikken past het aantal aan. Zo lopen die twee nooit uit elkaar.
+  const [dagen, setDagen] = useState(spreid(3))
   const [tijd, setTijd] = useState('18:00')
   const [bezig, setBezig] = useState(false)
   useEffect(() => {
     if (!open) return
     setSoort(regel?.soort || 'Wandelen')
-    setKeer(Number(regel?.keer) || 3)
     setMinuten(Number(regel?.minuten) || 30)
-    setDagen([]); setTijd('18:00'); setBezig(false)
+    const keer = Number(regel?.keer) || 3
+    const bestaand = (bestaandeBlokken || []).map(b => b.day).filter(Boolean)
+    setDagen(bestaand.length > 0 ? [...new Set(bestaand)] : spreid(keer))
+    const eerste = (bestaandeBlokken || [])[0]
+    setTijd(eerste && Number.isFinite(eerste.start) ? `${String(Math.floor(eerste.start / 60)).padStart(2, '0')}:${String(eerste.start % 60).padStart(2, '0')}` : '18:00')
+    setBezig(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, regel])
 
   const gekozen = soorten.find(x => x.id === soort) || soorten[0]
   const perMin = kcalPerMinuut(gekozen.met, gewicht)
   const perKeer = Math.round(perMin * minuten)
-  // Met dagen gekozen telt het aantal dagen; anders de teller.
-  const effKeer = dagen.length > 0 ? dagen.length : keer
+  const effKeer = dagen.length
   const perWeek = perKeer * effKeer
   // Bij bewerken van een bestaande regel is het verschil t.o.v. wat er al stond.
   const basisWeek = regel ? Math.round(kcalPerMinuut((soorten.find(x => x.id === regel.soort) || gekozen).met, gewicht) * (Number(regel.minuten) || 0) * (Number(regel.keer) || 0)) : 0
@@ -138,11 +151,12 @@ export default function CardioBlad({
       </div>
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 18 }}>
-        <Teller label="Keer per week" waarde={effKeer} eenheid={dagen.length > 0 ? 'dagen gekozen' : 'keer'} stap={1} min={1} onChange={(v) => { setDagen([]); setKeer(v) }} />
+        <Teller label="Keer per week" waarde={effKeer} eenheid="keer" stap={1} min={1} onChange={(v) => setDagen(spreid(v))} />
         <Teller label="Minuten" waarde={minuten} eenheid="per keer" stap={5} min={5} onChange={setMinuten} />
       </div>
 
-      {/* Dagen en tijd: kies je dagen, dan gaat het meteen de agenda in. */}
+      {/* Dagen en tijd: staan al aangevinkt volgens het aantal keer; tik om te
+          wisselen. Dit gaat bij Toevoegen of Aanpassen meteen de agenda in. */}
       {onInplannen && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Dagen en tijd</div>
@@ -166,18 +180,10 @@ export default function CardioBlad({
               color: '#fff', fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark',
             }} />
           </div>
-          <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-            {dagen.length > 0
-              ? `${dagen.length} dag${dagen.length === 1 ? '' : 'en'} · ${regel ? 'vervangt de cardio-blokken van deze sport in de agenda' : 'komt'} om ${tijd} in de agenda en in het cardioplan van de klant`
-              : regel?.id
-                ? (blokkenInAgenda == null
-                  ? 'Geen dagen gekozen: de regel wordt aangepast en de agenda trekt mee.'
-                  : effKeer < blokkenInAgenda
-                    ? `Geen dagen gekozen: van de ${blokkenInAgenda} blokken in de agenda blijven de eerste ${effKeer} staan.`
-                    : effKeer > blokkenInAgenda
-                      ? `Er staan ${blokkenInAgenda} blokken in de agenda; kies ${effKeer - blokkenInAgenda} dag${effKeer - blokkenInAgenda === 1 ? '' : 'en'} erbij voor de rest.`
-                      : 'Geen dagen gekozen: de regel wordt aangepast, de blokken in de agenda krijgen de nieuwe duur.')
-                : regel ? 'Geen dagen gekozen: alleen de regel in het wat-als wordt aangepast.' : 'Geen dagen gekozen: dan blijft het een wat-als.'}
+          <div style={{ fontSize: '0.66rem', fontWeight: 700, color: dagen.length === 0 ? '#f59e0b' : 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+            {dagen.length === 0
+              ? 'Kies minstens één dag.'
+              : `${dagen.length}× per week om ${tijd} · ${regel?.id ? 'vervangt de blokken van deze sport in de agenda en werkt het cardioplan bij' : 'komt in de agenda en in het cardioplan van de klant'}`}
           </div>
         </div>
       )}
@@ -209,17 +215,13 @@ export default function CardioBlad({
       </div>
 
       <button
-        disabled={bezig}
+        disabled={bezig || dagen.length === 0}
         onClick={async () => {
           const nieuw = { ...(regel || {}), soort, keer: effKeer, minuten }
-          if (dagen.length > 0 && onInplannen) {
+          if (dagen.length === 0) return
+          if (onInplannen) {
             setBezig(true)
             try { await onInplannen(nieuw, dagen, tijdMin) } finally { setBezig(false) }
-            return
-          }
-          if (regel?.id && onAanpassen) {
-            setBezig(true)
-            try { await onAanpassen(nieuw) } finally { setBezig(false) }
             return
           }
           onOpslaan(nieuw)
@@ -231,7 +233,7 @@ export default function CardioBlad({
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <Check size={16} strokeWidth={3} /> {bezig ? 'Bezig…' : dagen.length > 0 ? (regel ? 'Aanpassen en inplannen' : 'Inplannen en opslaan') : regel?.id ? 'Aanpassen in plan en agenda' : regel ? 'Aanpassen' : 'Toevoegen aan wat als'}
+        <Check size={16} strokeWidth={3} /> {bezig ? 'Bezig…' : regel ? 'Aanpassen' : 'Toevoegen'}
       </button>
       {regel && onVerwijder && (
         <button

@@ -187,7 +187,7 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut
 
 const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 
-export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio, onPlanCardioDagen = null, telBlokken = null, realiteit = null }) {
+export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onPlanCardio, onPlanCardioDagen = null, blokkenVan = null, realiteit = null }) {
   const [open, setOpen] = useState(false)
   // Plan = wat het weekplan geeft. Realiteit = wat er deze week gelogd is:
   // maaltijden, trainingen en cardio uit de logs. Zelfde rekenwerk, andere bron.
@@ -1253,27 +1253,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
               setCardioBlad(null)
               if (navigator.vibrate) navigator.vibrate([20, 40, 20])
             }}
-            blokkenInAgenda={cardioBlad?.regel?.id && realiteit !== undefined ? (telBlokken?.(`Cardio · ${cardioBlad.regel.soort}`) ?? null) : null}
-            onAanpassen={onPlanCardioDagen ? async (nieuw) => {
-              const soort = CARDIO_SOORTEN.find(x => x.id === nieuw.soort) || CARDIO_SOORTEN[0]
-              const oudeSoort = cardioBlad?.regel?.soort || null
-              const rij = await CardioService.savePlanItem({
-                id: nieuw.id, client_id: clientId, cardio_type: soort.id,
-                times_per_week: Math.max(1, Number(nieuw.keer) || 1),
-                duration_minutes: Math.max(5, Number(nieuw.minuten) || 30),
-                intensity: 'rustig', sort_order: cardioBlad?.index ?? 0,
-                notes: `± ${Math.round(kcalPerMinuut(soort.met, gewicht) * (Number(nieuw.minuten) || 0))} kcal per keer`,
-              }, db)
-              const metId = { ...nieuw, id: rij?.id || nieuw.id }
-              setSimCardio(rows => rows.map((x, j) => j === cardioBlad.index ? metId : x))
-              setCardioBasis(b => (b || []).map(x => x.id === metId.id ? metId : x))
-              // Agenda bijtrekken: aantal blokken naar keer per week, duur en label mee.
-              await onPlanCardioDagen({
-                sync: { label: `Cardio · ${soort.id}`, oudLabel: oudeSoort && oudeSoort !== soort.id ? `Cardio · ${oudeSoort}` : null, keer: Math.max(1, Number(nieuw.keer) || 1), duur: Math.max(5, Number(nieuw.minuten) || 30) },
-              })
-              setCardioBlad(null)
-              if (navigator.vibrate) navigator.vibrate([20, 40, 20])
-            } : null}
+            bestaandeBlokken={cardioBlad?.regel?.soort ? (blokkenVan?.(`Cardio · ${cardioBlad.regel.soort}`) || []) : []}
             onVerwijder={async (r) => {
               // Een regel uit het plan gaat meteen weg, inclusief de blokken
               // van die sport in de agenda. Een nieuwe (nog niet opgeslagen)
