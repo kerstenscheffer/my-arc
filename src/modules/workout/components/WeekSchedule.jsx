@@ -11,6 +11,7 @@ import ActionButtons from './week-schedule/ActionButtons'
 import CardioService, { normaliseerSoort } from '../services/CardioService'
 import TrainingToevoegen from './TrainingToevoegen'
 import RealiteitBlad from '../../client-agenda/RealiteitBlad'
+import CardioGedaanBlad from './CardioGedaanBlad'
 
 // Bereken de maandag van de huidige week (lokale tijd).
 function getThisMonday() {
@@ -80,6 +81,8 @@ export default function WeekSchedule({
   const [gedaneDagen, setGedaneDagen] = useState([]) // [{ workout_day, workout_date, sessie }]
   // Geopende afgeronde sessie (tik op een 'Gedaan'-tegel): blok voor RealiteitBlad.
   const [sessieBlad, setSessieBlad] = useState(null)
+  // Geopende gedane cardio (tik op een groene cardiotegel): { log, soort, gepland }
+  const [cardioBlad, setCardioBlad] = useState(null)
   const [sessieVersie, setSessieVersie] = useState(0)
   useEffect(() => {
     const bump = () => setSessieVersie(v => v + 1)
@@ -498,11 +501,12 @@ export default function WeekSchedule({
           const dagVanLog = (l) => { const d = new Date(String(l.logged_date).slice(0, 10) + 'T12:00:00'); return sleutels[(d.getDay() + 6) % 7] }
           // Gedaan: een log op deze dag, of (oudere logs, vóór de datumkoppeling)
           // een log van deze sport in dezelfde week op een dag zonder eigen blok.
-          const gedaan = !!datum && cardioLogs.some(l => zelfdeSoort(l) && (
+          const log = !datum ? null : cardioLogs.find(l => zelfdeSoort(l) && (
             String(l.logged_date).slice(0, 10) === datum ||
             !cardioBlokken.some(b2 => b2.day === dagVanLog(l) && normaliseerSoort(String(b2.label).replace(/^Cardio\s*·\s*/, '')) === normaliseerSoort(soort))
-          ))
-          return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, eenmalig: !!b.week_start, skipWeeks: b.skip_weeks || [] }
+          )) || null
+          const gedaan = !!log
+          return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, log, eenmalig: !!b.week_start, skipWeeks: b.skip_weeks || [] }
         })
       if (lijst.length) uit[i] = lijst
     })
@@ -607,6 +611,7 @@ export default function WeekSchedule({
                   setCardioVersie(v => v + 1)
                 }}
                 onOpenGedaan={(day) => { const g = gedaneDagen.find(u => u.workout_day === day); if (g?.blok) setSessieBlad(g.blok) }}
+                onOpenCardioGedaan={(c) => c?.log && setCardioBlad({ log: c.log, soort: c.soort, gepland: c.duur })}
                 onRemoveTraining={vraagTraining}
                 onRemoveCardio={vraagCardio}
                 onPrevWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
@@ -689,6 +694,11 @@ export default function WeekSchedule({
       {/* Afgeronde sessie: oefeningen met hun sets, zelfde blad als de
           Realiteit-agenda van de coach. */}
       <RealiteitBlad blok={sessieBlad} db={db} isMobile={isMobile} onClose={() => setSessieBlad(null)} />
+      {cardioBlad && (
+        <CardioGedaanBlad log={cardioBlad.log} soort={cardioBlad.soort} gepland={cardioBlad.gepland} db={db} isMobile={isMobile}
+          onClose={() => setCardioBlad(null)}
+          onVerwijderd={() => { setCardioVersie(v => v + 1); window.dispatchEvent(new CustomEvent('myarc:cardio-changed')) }} />
+      )}
 
       {verwijderVraag && createPortal(
         <div onClick={() => setVerwijderVraag(null)} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>

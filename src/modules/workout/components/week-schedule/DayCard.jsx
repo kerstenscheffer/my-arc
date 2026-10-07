@@ -91,7 +91,7 @@ export default function DayCard({
   cardio = [],
   onCardioShiftLeft, onCardioShiftRight,
   onRemoveTraining = null, onRemoveCardio = null,
-  onOpenGedaan = null,
+  onOpenGedaan = null, onOpenCardioGedaan = null,
   smal = false,
   // Dag en datum staan in de strook boven het rooster; dan hier geen label.
   metLabel = true,
@@ -201,7 +201,7 @@ export default function DayCard({
               kanSchuiven={!cardioKlaar && kanPlannen && !!onCardioShiftLeft}
               onLinks={() => onCardioShiftLeft?.(cardio[0])} onRechts={() => onCardioShiftRight?.(cardio[0])}
               kanLinks={dayIndex > 0} kanRechts={dayIndex < 6}
-              onClick={kanOpenen ? () => logCardio(cardio[0]) : undefined}
+              onClick={cardioKlaar && onOpenCardioGedaan ? () => onOpenCardioGedaan(cardio[0]) : (kanOpenen ? () => logCardio(cardio[0]) : undefined)}
               isMobile={isMobile} icoon={HeartPulse}
               onVerwijder={kanPlannen && onRemoveCardio ? () => onRemoveCardio(cardio[0]) : null}
             />
