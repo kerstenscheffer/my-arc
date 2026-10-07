@@ -48,9 +48,9 @@ function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRecht
       {onVerwijder && !klaar && (
         <button onClick={(e) => { e.stopPropagation(); onVerwijder(); if (navigator.vibrate) navigator.vibrate(25) }} aria-label="Weghalen" style={{
           position: 'absolute', top: 2, right: 2, width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, padding: 0,
-          background: 'transparent', border: 'none', color: '#fff',
+          background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.9))',
+          filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.7))',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
           <Trash2 size={isMobile ? 13 : 14} strokeWidth={2.8} />
