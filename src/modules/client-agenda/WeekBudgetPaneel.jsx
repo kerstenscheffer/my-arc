@@ -151,7 +151,7 @@ function planPerDag(mealPlan) {
 // Plus/min-knopje met de afwijking ertussen. Toont bewust "+150" en niet de
 // nieuwe absolute waarde: je denkt in "wat als er honderdvijftig bij komt",
 // en zo is teruggaan naar nul ook meteen duidelijk.
-function Stapper({ label, waarde, eenheid, stap, onChange, toelichting }) {
+function Stapper({ label, waarde, eenheid, stap, onChange, toelichting, absoluut = false }) {
   const knop = {
     width: 32, height: 32, flexShrink: 0, borderRadius: 8,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -171,11 +171,11 @@ function Stapper({ label, waarde, eenheid, stap, onChange, toelichting }) {
         </span>
         <button onClick={() => onChange(waarde - stap)} style={knop}>−</button>
         <span style={{
-          minWidth: 52, textAlign: 'center',
+          minWidth: 34, textAlign: 'center',
           fontSize: '0.8rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
-          color: waarde === 0 ? 'rgba(255,255,255,0.35)' : '#fff',
+          color: (!absoluut && waarde === 0) ? 'rgba(255,255,255,0.35)' : '#fff',
         }}>
-          {waarde > 0 ? `+${waarde}` : waarde}
+          {absoluut ? waarde : waarde > 0 ? `+${waarde}` : waarde}
         </span>
         <button onClick={() => onChange(waarde + stap)} style={knop}>+</button>
       </div>
@@ -280,6 +280,17 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
         setCardioBasis(lijst)
         setCardioVerwijderd([])
       } catch (e) { console.warn('cardioplan laden mislukt:', e?.message); if (leeft) setCardioBasis([]) }
+    })()
+    return () => { leeft = false }
+  }, [open, cardioBasis, db, clientId])
+
+  // Eigen effect: zat dit achter de cardio-lading, dan herstartte het effect
+  // zodra het cardioplan binnen was en kwamen de plannen nooit aan.
+  const [plannenGeladen, setPlannenGeladen] = useState(false)
+  useEffect(() => {
+    if (!open || plannenGeladen || !db?.supabase || !clientId) return
+    let leeft = true
+    ;(async () => {
       try {
         const [eigen, std] = await Promise.all([
           db.getClientWorkoutPlans ? db.getClientWorkoutPlans(clientId) : Promise.resolve({ plans: [] }),
@@ -296,10 +307,11 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
           ...(eigen?.plans || []).map(p => ({ id: p.id, naam: p.name, dagen: dagen(p), eigen: true, actief: !!p.isActive })),
           ...(std?.data || []).map(p => ({ id: p.id, naam: p.name, dagen: dagen(p), eigen: false, actief: false })),
         ])
-      } catch (e) { console.warn('plannen laden mislukt:', e?.message) }
+        setPlannenGeladen(true)
+      } catch (e) { console.warn('plannen laden mislukt:', e?.message); if (leeft) setPlannenGeladen(true) }
     })()
     return () => { leeft = false }
-  }, [open, cardioBasis, db, clientId])
+  }, [open, plannenGeladen, db, clientId])
 
   // Apart effect: zat dit bij de TDEE in één effect, dan startte dat effect
   // opnieuw zodra de TDEE binnen was en gooide de cleanup het nog lopende
@@ -1011,12 +1023,12 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
                                   <Trash2 size={13} />
                                 </button>
                               </div>
-                              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                                <div style={{ flex: 1 }}>
-                                  <Stapper label="Keer per week" waarde={Number(r.keer) || 0} eenheid="keer" stap={1} onChange={(v) => zet('keer', Math.max(0, v))} />
+                              <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <Stapper absoluut label="Keer" waarde={Number(r.keer) || 0} eenheid="per week" stap={1} onChange={(v) => zet('keer', Math.max(0, v))} />
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                  <Stapper label="Minuten" waarde={Number(r.minuten) || 0} eenheid="per keer" stap={5} onChange={(v) => zet('minuten', Math.max(0, v))} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <Stapper absoluut label="Minuten" waarde={Number(r.minuten) || 0} eenheid="per keer" stap={5} onChange={(v) => zet('minuten', Math.max(0, v))} />
                                 </div>
                               </div>
                               <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
