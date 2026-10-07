@@ -1134,7 +1134,8 @@ export class ClientAgendaService {
       .eq('client_id', clientId)
       .or(`week_start.is.null,week_start.eq.${maandag}`)
     if (error) { console.warn('loadCustomBlocks', error); return [] }
-    return data || []
+    // Vaste blokken die de klant deze week heeft weggehaald (skip_weeks).
+    return (data || []).filter(b => !(b.skip_weeks || []).includes(maandag))
   }
 
   // ── CRUD voor client_agenda_blocks ──

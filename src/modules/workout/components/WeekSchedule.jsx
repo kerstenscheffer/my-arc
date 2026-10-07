@@ -77,7 +77,7 @@ export default function WeekSchedule({
     const maandag = (() => { const d = getThisMonday(); d.setDate(d.getDate() + weekOffset * 7); return d })()
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     Promise.all([
-      db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time, week_start')
+      db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time, week_start, skip_weeks')
         .eq('client_id', clientId).eq('type', 'custom').ilike('label', 'Cardio ·%')
         // Vaste blokken (week_start leeg) elke week; eenmalige alleen in hun week.
         .or(`week_start.is.null,week_start.eq.${iso(maandag)}`)
@@ -89,7 +89,8 @@ export default function WeekSchedule({
         .then(r => r, () => ({ data: null })),
     ]).then(([b, logs, t, c]) => {
       if (weg) return
-      setCardioBlokken(b?.data || [])
+      // Vaste blokken die deze week zijn weggehaald (skip_weeks) niet tonen.
+      setCardioBlokken((b?.data || []).filter(x => !(x.skip_weeks || []).includes(iso(maandag))))
       setTrainingBlokken(t?.data || [])
       setVasteTrainingstijd(c?.data?.training_time ? String(c.data.training_time).slice(0, 5) : null)
       const eind = new Date(maandag); eind.setDate(eind.getDate() + 6)
@@ -261,6 +262,34 @@ export default function WeekSchedule({
     await loadCustomWorkoutsForSchedule(next)
   }
 
+  // Kruisje op een tegel: alleen deze week weg. Training: zelfde weg als
+  // 'eenmalig' toevoegen, maar dan zonder die dag. Cardio: een eenmalig blok
+  // gaat weg, een vast blok slaat deze week over (skip_weeks).
+  const verwijderTraining = async (day) => {
+    const next = { ...tempSchedule }
+    delete next[day]
+    if (isToekomst) {
+      const ok = await WorkoutServiceNew.saveWeekPlanning(clientId, weekSleutel, next, db)
+      if (!ok) { alert('⚠️ Weghalen mislukt.'); return }
+      setTempSchedule(next)
+      await laadBuurWeken()
+      return
+    }
+    const eigenVolgende = await WorkoutServiceNew.getWeekPlanning(clientId, volgendeWeekSleutel, db)
+    if (!eigenVolgende) await WorkoutServiceNew.saveWeekPlanning(clientId, volgendeWeekSleutel, tempSchedule, db)
+    await handleAutoSave(next)
+  }
+  const verwijderCardio = async (c) => {
+    if (!c?.id || !db?.supabase) return
+    const q = c.eenmalig
+      ? db.supabase.from('client_agenda_blocks').delete().eq('id', c.id)
+      : db.supabase.from('client_agenda_blocks').update({ skip_weeks: [...(c.skipWeeks || []), weekSleutel], updated_at: new Date().toISOString() }).eq('id', c.id)
+    const { error } = await q
+    if (error) { console.error('cardio weghalen mislukt:', error); alert('⚠️ Weghalen mislukt.'); return }
+    setCardioVersie(v => v + 1)
+    window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
+  }
+
   // Cardio: blokken in de agenda op de gekozen dagen. Standaard = vast blok
   // (elke week) én een regel in het cardioplan; eenmalig = blok met
   // week_start, alleen zichtbaar in deze week.
@@ -357,7 +386,7 @@ export default function WeekSchedule({
           const [eh, em] = String(b.end_time || '').split(':').map(Number)
           const duur = Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null
           const gedaan = !!datum && cardioLogs.some(l => String(l.logged_date).slice(0, 10) === datum && normaliseerSoort(l.cardio_type) === normaliseerSoort(soort))
-          return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, eenmalig: !!b.week_start }
+          return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, eenmalig: !!b.week_start, skipWeeks: b.skip_weeks || [] }
         })
       if (lijst.length) uit[i] = lijst
     })
@@ -461,6 +490,8 @@ export default function WeekSchedule({
                   if (error) { console.error('cardio verschuiven mislukt:', error); return }
                   setCardioVersie(v => v + 1)
                 }}
+                onRemoveTraining={verwijderTraining}
+                onRemoveCardio={verwijderCardio}
                 onPrevWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
                 onNextWeek={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
                 trainingTijdPerDag={(() => {

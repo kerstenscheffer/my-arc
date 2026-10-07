@@ -11,12 +11,12 @@
 //   · Rust-waarschuwing → rode/oranje rand als dezelfde training te dicht
 //     op deze dag staat
 
-import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, X } from 'lucide-react'
 import { cardioFoto } from '../../utils/workoutFoto'
 import { getWorkoutImage } from './workoutImage'
 
 // Eén tegel: foto, verloop, eyebrow + titel linksonder, pijltjes onderin.
-function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1 }) {
+function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRechts, kanLinks, kanRechts, onClick, isMobile, icoon, groei = 1, onVerwijder = null }) {
   // Als variabele met hoofdletter, anders telt de lint-regel de JSX-aanroep niet.
   const Icoon = icoon
   return (
@@ -43,6 +43,17 @@ function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRecht
           </div>
         )}
       </div>
+      {/* Kruisje rechtsboven: deze training alleen deze week weghalen. */}
+      {onVerwijder && !klaar && (
+        <button onClick={(e) => { e.stopPropagation(); onVerwijder(); if (navigator.vibrate) navigator.vibrate(25) }} aria-label="Deze week weghalen" style={{
+          position: 'absolute', top: 3, right: 3, width: isMobile ? 20 : 22, height: isMobile ? 20 : 22, padding: 0, borderRadius: '50%',
+          background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.35)', color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          <X size={isMobile ? 11 : 12} strokeWidth={3} />
+        </button>
+      )}
       {/* Pijltjes aan de foto vast: links en rechts in de onderrand. */}
       {kanSchuiven && (
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, display: 'flex', justifyContent: 'space-between', pointerEvents: 'none' }}>
@@ -77,6 +88,7 @@ export default function DayCard({
   // Cardio op deze dag: [{ id, soort, tijd, duur, gedaan }].
   cardio = [],
   onCardioShiftLeft, onCardioShiftRight,
+  onRemoveTraining = null, onRemoveCardio = null,
   smal = false,
   // Dag en datum staan in de strook boven het rooster; dan hier geen label.
   metLabel = true,
@@ -171,6 +183,7 @@ export default function DayCard({
               onClick={kanOpenen || swapMode ? handleClick : undefined}
               isMobile={isMobile} icoon={Dumbbell}
               groei={alles ? 1.15 : 1}
+              onVerwijder={kanPlannen && onRemoveTraining ? onRemoveTraining : null}
             />
           )}
           {heeftCardio && (
@@ -184,6 +197,7 @@ export default function DayCard({
               kanLinks={dayIndex > 0} kanRechts={dayIndex < 6}
               onClick={kanOpenen ? () => logCardio(cardio[0]) : undefined}
               isMobile={isMobile} icoon={HeartPulse}
+              onVerwijder={kanPlannen && onRemoveCardio ? () => onRemoveCardio(cardio[0]) : null}
             />
           )}
         </div>
