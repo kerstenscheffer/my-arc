@@ -508,24 +508,62 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   {/* Tekort (cut) of overschot (build): wat het doeltempo
                       vraagt, en wat het plan nu geeft met het tempo dat daar
                       bij hoort. Het woord volgt de richting van de fase. */}
-                  {/* Twee regels, elk met het woord dat bij het getal hoort:
-                      een plan dat meer geeft dan de verbranding heeft een
-                      overschot, ook in een cut. Eerst wat het doeltempo vraagt,
-                      dan wat het plan nu doet en welk tempo dat oplevert. */}
-                  {streefTekortWeek != null ? regel(
-                    `${streefTekortWeek >= 0 ? 'Tekort' : 'Overschot'} voor doeltempo`,
-                    `${getal(Math.abs(streefTekortWeek))} kcal`,
-                    `per week · ${getal(Math.abs(streefTekortWeek) / 7)} per dag · ${richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)} per week`
-                  ) : regel(
-                    'Doeltempo', 'geen fase',
-                    'stel in het fase-paneel een doel en weektempo in', 'rgba(255,255,255,0.4)'
-                  )}
-                  {regel(
-                    `Huidig ${tekort >= 0 ? 'tekort' : 'overschot'} in plan`,
-                    `${getal(Math.abs(tekort))} kcal`,
-                    `= ${kgTekst(planKg)} per week · ${getal(Math.abs(tekort) / 7)} per dag`,
-                    opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : '#fff'
-                  )}
+                  {/* Tabel: links wat het is (doeltempo, dit plan), boven de
+                      periode (dag, week, maand), in elk vak de kcal en de kilo's
+                      die dat oplevert. Het woord volgt het getal: een plan dat
+                      meer geeft dan de verbranding heeft een overschot, ook
+                      in een cut. */}
+                  {(() => {
+                    const rijen = [
+                      streefTekortWeek != null
+                        ? { label: `${streefTekortWeek >= 0 ? 'Tekort' : 'Overschot'} voor doeltempo`, week: streefTekortWeek, kleur: '#fff' }
+                        : { label: 'Doeltempo', leeg: 'geen fase ingesteld' },
+                      {
+                        label: `${tekort >= 0 ? 'Tekort' : 'Overschot'} in dit plan`,
+                        week: tekort,
+                        kleur: opTempo === true ? '#22c55e' : opTempo === false ? '#f59e0b' : '#fff',
+                      },
+                    ]
+                    const kolommen = [
+                      { label: 'Dag', factor: 1 / 7 },
+                      { label: 'Week', factor: 1 },
+                      { label: 'Maand', factor: 52 / 12 },
+                    ]
+                    const cel = { padding: '0.4rem 0.3rem', textAlign: 'right', whiteSpace: 'nowrap', verticalAlign: 'top' }
+                    return (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.4rem' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ ...cel, textAlign: 'left', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 0 }}></th>
+                            {kolommen.map(k => (
+                              <th key={k.label} style={{ ...cel, fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k.label}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rijen.map(r => (
+                            <tr key={r.label} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                              <td style={{ ...cel, textAlign: 'left', paddingLeft: 0, fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)', whiteSpace: 'normal' }}>
+                                {r.label}
+                              </td>
+                              {r.leeg ? (
+                                <td colSpan={3} style={{ ...cel, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{r.leeg}</td>
+                              ) : kolommen.map(k => {
+                                const kcal = r.week * k.factor
+                                const kg = -kcal / KCAL_PER_KILO   // tekort = kilo's eraf
+                                return (
+                                  <td key={k.label} style={cel}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 900, color: r.kleur, fontVariantNumeric: 'tabular-nums' }}>{getal(Math.abs(kcal))}</div>
+                                    <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>{kgTekst(kg)}</div>
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )
+                  })()}
                   {afwijkingWeek != null && (
                     <div style={{ padding: '0.5rem 0 0', fontSize: '0.78rem', fontWeight: 800, lineHeight: 1.4, color: opTempo ? '#22c55e' : '#fff' }}>
                       {opTempo
