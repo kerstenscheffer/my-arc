@@ -13,6 +13,7 @@ export default function WeekGrid({
   rustPerDag = {},
   cardioPerDag = {},
   onCardioShift = null,
+  trainingTijdPerDag = {},
 }) {
   // Lege rustdagen smal, dagen met training of cardio breed: dan is er ruimte
   // voor de naam van de sport in plaats van zeven even smalle vakjes.
@@ -28,11 +29,33 @@ export default function WeekGrid({
     onDayClick(day, assignedWorkout)
   }
 
-  return (
+  const gap = isMobile ? '0.2rem' : '0.375rem'
+  return (<>
+    {/* Eén dagenstrook boven het rooster, in dezelfde kolommen als de
+        kaarten: dag en datum, vandaag als witte pil. De kaarten zelf hebben
+        geen label meer, dus de tegels krijgen de hoogte. */}
+    <div style={{ display: 'grid', gridTemplateColumns: kolommen, gap, minWidth: 0, width: '100%', marginBottom: isMobile ? 4 : 6 }}>
+      {weekDays.map((day, index) => {
+        const vandaag = kanOpenen && index === todayIndex
+        const d = dayDates ? dayDates[index] : null
+        return (
+          <div key={day} style={{
+            minWidth: 0, textAlign: 'center', minHeight: isMobile ? 22 : 26, borderRadius: 7,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+            background: vandaag ? '#fff' : 'transparent',
+            color: vandaag ? '#000' : (leeg[index] ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.7)'),
+            fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase',
+            whiteSpace: 'nowrap', overflow: 'hidden',
+          }}>
+            {weekDaysDutch[index]}{d && !leeg[index] ? <span style={{ fontWeight: 800, opacity: vandaag ? 0.75 : 0.6, letterSpacing: 0 }}>{d.getDate()}</span> : null}
+          </div>
+        )
+      })}
+    </div>
     <div style={{
       display: 'grid',
       gridTemplateColumns: kolommen,
-      gap: isMobile ? '0.2rem' : '0.375rem',
+      gap,
       marginBottom: isMobile ? '0.5rem' : '0.625rem',
       minWidth: 0, width: '100%',
     }}>
@@ -71,9 +94,11 @@ export default function WeekGrid({
             onCardioShiftLeft={onCardioShift ? (c) => onCardioShift(c, -1) : null}
             onCardioShiftRight={onCardioShift ? (c) => onCardioShift(c, +1) : null}
             smal={leeg[index]}
+            metLabel={false}
+            trainingTijd={trainingTijdPerDag[index] || null}
           />
         )
       })}
     </div>
-  )
+  </>)
 }

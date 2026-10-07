@@ -60,6 +60,10 @@ export default function WeekSchedule({
   // getoonde week om te zien wat al gedaan is.
   const [cardioBlokken, setCardioBlokken] = useState([])
   const [cardioLogs, setCardioLogs] = useState([])
+  // Trainingstijd per weekdag: het trainingsblok in de agenda van die dag,
+  // anders de vaste trainingstijd van de klant.
+  const [trainingBlokken, setTrainingBlokken] = useState([])
+  const [vasteTrainingstijd, setVasteTrainingstijd] = useState(null)
   const [cardioVersie, setCardioVersie] = useState(0)
   useEffect(() => {
     const bump = () => setCardioVersie(v => v + 1)
@@ -76,9 +80,15 @@ export default function WeekSchedule({
         .eq('client_id', clientId).eq('type', 'custom').ilike('label', 'Cardio ·%')
         .then(r => r, () => ({ data: [] })),
       CardioService.getLogs(clientId, iso(maandag), db),
-    ]).then(([b, logs]) => {
+      db.supabase.from('client_agenda_blocks').select('day, start_time').eq('client_id', clientId).eq('type', 'training')
+        .then(r => r, () => ({ data: [] })),
+      db.supabase.from('clients').select('training_time').eq('id', clientId).maybeSingle()
+        .then(r => r, () => ({ data: null })),
+    ]).then(([b, logs, t, c]) => {
       if (weg) return
       setCardioBlokken(b?.data || [])
+      setTrainingBlokken(t?.data || [])
+      setVasteTrainingstijd(c?.data?.training_time ? String(c.data.training_time).slice(0, 5) : null)
       const eind = new Date(maandag); eind.setDate(eind.getDate() + 6)
       setCardioLogs((logs || []).filter(l => String(l.logged_date).slice(0, 10) <= iso(eind)))
     })
@@ -387,6 +397,16 @@ export default function WeekSchedule({
                   if (error) { console.error('cardio verschuiven mislukt:', error); return }
                   setCardioVersie(v => v + 1)
                 }}
+                trainingTijdPerDag={(() => {
+                  const sleutels = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                  const uit = {}
+                  sleutels.forEach((k, i) => {
+                    const blok = trainingBlokken.find(b => b.day === k)
+                    const tijd = blok?.start_time ? String(blok.start_time).slice(0, 5) : vasteTrainingstijd
+                    if (tijd) uit[i] = tijd
+                  })
+                  return uit
+                })()}
                 tempSchedule={tempSchedule} weekDays={weekDays} todayIndex={todayIndex}
                 completedWorkouts={completedWorkouts} selectedWorkout={selectedWorkout}
                 selectedForSwap={selectedForSwap} swapMode={swapMode} localSwapMode={localSwapMode}

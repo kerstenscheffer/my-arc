@@ -78,6 +78,9 @@ export default function DayCard({
   cardio = [],
   onCardioShiftLeft, onCardioShiftRight,
   smal = false,
+  // Dag en datum staan in de strook boven het rooster; dan hier geen label.
+  metLabel = true,
+  trainingTijd = null,
 }) {
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
   const heeftTraining = !!workoutData || isActivity
@@ -105,7 +108,7 @@ export default function DayCard({
   const kaart = {
     position: 'relative', width: '100%', minWidth: 0,
     height: hoogte, borderRadius: isMobile ? 12 : 14,
-    paddingTop: isToday ? (isMobile ? 22 : 24) : (isMobile ? 6 : 8),
+    paddingTop: !metLabel ? (isMobile ? 3 : 4) : isToday ? (isMobile ? 22 : 24) : (isMobile ? 6 : 8),
     paddingBottom: isMobile ? 4 : 5, paddingLeft: isMobile ? 3 : 4, paddingRight: isMobile ? 3 : 4,
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
     textAlign: 'center', overflow: 'hidden', boxSizing: 'border-box',
@@ -134,7 +137,7 @@ export default function DayCard({
           border: isToday ? `1px solid ${tone.border}` : '1px dashed rgba(255,255,255,0.12)',
           cursor: swapMode ? 'pointer' : 'default', opacity: gedimd ? 0.7 : 1,
         }}>
-          {isToday ? todayPill : dayLabel}
+          {metLabel && (isToday ? todayPill : dayLabel)}
           <div style={{ fontSize: smal ? '0.5rem' : (isMobile ? '0.6rem' : '0.65rem'), fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: smal ? '0.04em' : '0.1em', textTransform: 'uppercase', marginTop: 'auto', marginBottom: 'auto' }}>
             Rust
           </div>
@@ -147,12 +150,13 @@ export default function DayCard({
   return (
     <div style={{ position: 'relative', minWidth: 0 }}>
       <div style={{ ...kaart, background: tone.bg, border: `1px solid ${tone.border}`, opacity: gedimd ? 0.7 : 1 }}>
-        {isToday ? todayPill : dayLabel}
+        {metLabel && (isToday ? todayPill : dayLabel)}
         <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
           {heeftTraining && (
             <Tegel
               foto={getWorkoutImage(workoutData || { name: workoutKey })}
               eyebrow="Training" titel={titelTraining || 'Training'}
+              sub={trainingTijd || null}
               klaar={isCompleted}
               kanSchuiven={!isCompleted && kanPlannen}
               onLinks={onShiftLeft} onRechts={onShiftRight} kanLinks={canShiftLeft} kanRechts={canShiftRight}
