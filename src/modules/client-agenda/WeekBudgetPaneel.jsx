@@ -1209,6 +1209,8 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
             soorten={CARDIO_SOORTEN}
             gewicht={gewicht}
             kcalPerMinuut={kcalPerMinuut}
+            huidig={simCardio}
+            onBewerk={(i) => setCardioBlad({ regel: simCardio[i], index: i })}
             onClose={() => setCardioBlad(null)}
             onOpslaan={(nieuw) => {
               setSimCardio(rows => cardioBlad?.regel != null && cardioBlad.index != null

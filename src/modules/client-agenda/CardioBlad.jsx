@@ -35,7 +35,7 @@ function Teller({ label, waarde, eenheid, stap, min = 0, onChange }) {
   )
 }
 
-export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuut, onOpslaan, onVerwijder, onClose }) {
+export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuut, onOpslaan, onVerwijder, onClose, huidig = [], onBewerk = null }) {
   const [soort, setSoort] = useState('Wandelen')
   const [keer, setKeer] = useState(3)
   const [minuten, setMinuten] = useState(30)
@@ -52,7 +52,38 @@ export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuu
   const perWeek = perKeer * keer
 
   return (
-    <BladModal open={open} titel={regel?.id || regel ? 'Cardio aanpassen' : 'Cardio toevoegen'} onClose={onClose} zIndex={10650}>
+    <BladModal open={open} titel={regel ? 'Cardio aanpassen' : 'Cardio toevoegen'} onClose={onClose} zIndex={10650}>
+      {/* Wat er al staat: zo zie je bij het toevoegen wat je al hebt, en
+          tik je een regel aan om die aan te passen. */}
+      {!regel && huidig.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Huidig cardio</div>
+          {huidig.map((r, i) => {
+            const x = soorten.find(y => y.id === r.soort) || soorten[0]
+            const Icoon = ICOON[x.id] || Activity
+            const perWeek = Math.round(kcalPerMinuut(x.met, gewicht) * (Number(r.minuten) || 0) * (Number(r.keer) || 0))
+            return (
+              <button key={r.id || i} onClick={() => onBewerk?.(i)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10, minHeight: 44,
+                padding: '0.3rem 0', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)',
+                textAlign: 'left', fontFamily: 'inherit', cursor: onBewerk ? 'pointer' : 'default',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <Icoon size={16} color="#fff" strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{r.soort}</span>
+                  <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: r.id ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>{r.id ? 'in plan' : 'nieuw'} · {r.keer}× {r.minuten} min</span>
+                </span>
+                <span style={{ flexShrink: 0, fontSize: '0.84rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                  {nl(perWeek)}<span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}> kcal/wk</span>
+                </span>
+              </button>
+            )
+          })}
+          <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 14 }}>Nieuw</div>
+        </div>
+      )}
+
       {/* Sport als vakken, twee per rij. */}
       <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Sport</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 18 }}>
@@ -69,7 +100,9 @@ export default function CardioBlad({ open, regel, soorten, gewicht, kcalPerMinuu
               <Icoon size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
               <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '0.84rem', fontWeight: 900, letterSpacing: '-0.015em' }}>{x.id}</span>
-                <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.label.replace(`${x.id} `, '').replace(/[()]/g, '') || `${x.met} MET`}</span>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {(() => { const t = x.label.replace(`${x.id} `, '').replace(/[()]/g, '').trim(); return t && t !== x.id ? t : `${x.met} MET` })()}
+                </span>
               </span>
             </button>
           )
