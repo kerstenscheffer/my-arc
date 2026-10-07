@@ -12,9 +12,13 @@ import ExerciseProgressChart from './todays-workout/components/ExerciseProgressC
 import { metBandFases, KLEUR_VOOR, oordeelTekst, geschatRM, REFERENTIE_REPS } from './todays-workout/krachtBand'
 import useOefeningFotos from '../utils/useOefeningFotos'
 
-const PERIODES = [{ id: 90, label: '90 dagen' }, { id: 180, label: '6 maanden' }, { id: 365, label: '1 jaar' }, { id: 0, label: 'Alles' }]
+const DOEL_LABEL = { cut: 'Cut', build: 'Build', recomp: 'Recomp', onderhoud: 'Onderhoud' }
+// De tellers heten anders per fase: in een cut is 'staat stil' juist goed.
+const TELLER_LABELS = {
+  cut: { goed: 'behouden', traag: 'zakt licht', stil: 'zakt hard' },
+  anders: { goed: 'op tempo', traag: 'traag', stil: 'stil' },
+}
 const nl1 = (n) => new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 1 }).format(n || 0)
-const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const kort = (d) => new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 
 // Zelfde keuze als de grafiek in het logscherm: de set met de hoogste
@@ -27,7 +31,27 @@ const besteSet = (sets) => (sets || []).reduce((beste, set) => {
 }, null)
 
 export default function KrachtBlad({ db, client, isMobile }) {
-  const [periode, setPeriode] = useState(180)
+  // Fases van de klant; de keuze bepaalt het bereik én de norm (cut = kracht
+  // vasthouden is goed, build = omhoog). Standaard de lopende fase.
+  const [fases, setFases] = useState(null)
+  const [faseId, setFaseId] = useState('alles')
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    let weg = false
+    db.supabase.from('client_phases').select('id, doel, started_on, ended_on').eq('client_id', client.id).order('started_on', { ascending: true })
+      .then(r => r, () => ({ data: [] }))
+      .then(({ data }) => {
+        if (weg) return
+        const lijst = data || []
+        setFases(lijst)
+        const lopend = lijst.find(f => !f.ended_on) || lijst[lijst.length - 1]
+        if (lopend) setFaseId(lopend.id)
+      })
+    return () => { weg = true }
+  }, [client?.id, db])
+  const fase = (fases || []).find(f => f.id === faseId) || null
+  const vanaf = fase ? String(fase.started_on).slice(0, 10) : null
+  const tot = fase?.ended_on ? String(fase.ended_on).slice(0, 10) : null
   const [filter, setFilter] = useState('alles') // alles | goed | traag | stil
   const [zoek, setZoek] = useState('')
   const [open, setOpen] = useState(null)
@@ -35,17 +59,14 @@ export default function KrachtBlad({ db, client, isMobile }) {
   const [ruw, setRuw] = useState(null) // { perOefening: {naam: [punten]}, fases }
 
   useEffect(() => {
-    if (!client?.id || !db?.supabase) return
+    if (!client?.id || !db?.supabase || fases === null) return
     let weg = false
     setRuw(null)
-    const vanaf = periode ? (() => { const d = new Date(); d.setDate(d.getDate() - periode); return iso(d) })() : '2000-01-01'
     ;(async () => {
-      const [{ data: sessies }, { data: fases }] = await Promise.all([
-        db.supabase.from('workout_sessions').select('id, workout_date').eq('client_id', client.id).gte('workout_date', vanaf).order('workout_date', { ascending: true })
-          .then(r => r, () => ({ data: [] })),
-        db.supabase.from('client_phases').select('doel, started_on').eq('client_id', client.id).order('started_on', { ascending: true })
-          .then(r => r, () => ({ data: [] })),
-      ])
+      let q = db.supabase.from('workout_sessions').select('id, workout_date').eq('client_id', client.id)
+      if (vanaf) q = q.gte('workout_date', vanaf)
+      if (tot) q = q.lte('workout_date', tot)
+      const { data: sessies } = await q.order('workout_date', { ascending: true }).then(r => r, () => ({ data: [] }))
       const perSessie = new Map((sessies || []).map(s => [s.id, s.workout_date]))
       let rijen = []
       const ids = (sessies || []).map(s => s.id)
@@ -65,10 +86,10 @@ export default function KrachtBlad({ db, client, isMobile }) {
         if (!bestaand) lijst.push(punt); else if (punt.gewicht > bestaand.gewicht) Object.assign(bestaand, punt)
       })
       Object.values(perOefening).forEach(l => l.sort((a, b) => String(a.datum).localeCompare(String(b.datum))))
-      setRuw({ perOefening, fases: fases || [] })
+      setRuw({ perOefening, fases })
     })()
     return () => { weg = true }
-  }, [client?.id, db, periode])
+  }, [client?.id, db, fases, vanaf, tot])
 
   // Per oefening: laatste stand, oordeel, verschil, PR.
   const oefeningen = useMemo(() => {
@@ -89,6 +110,8 @@ export default function KrachtBlad({ db, client, isMobile }) {
     }).sort((a, b) => String(b.laatste?.datum || '').localeCompare(String(a.laatste?.datum || '')))
   }, [ruw])
 
+  const labels = String(fase?.doel || '').toLowerCase() === 'cut' ? TELLER_LABELS.cut : TELLER_LABELS.anders
+  const faseNaam = (f) => `${DOEL_LABEL[String(f.doel || '').toLowerCase()] || f.doel || 'Fase'} · ${kort(f.started_on)}${f.ended_on ? ` – ${kort(f.ended_on)}` : ' – nu'}`
   const telling = { goed: 0, traag: 0, stil: 0, pr: 0 }
   oefeningen.forEach(o => { if (o.oordeel) telling[o.oordeel]++; if (o.isPR) telling.pr++ })
   const q = zoek.trim().toLowerCase()
@@ -106,7 +129,7 @@ export default function KrachtBlad({ db, client, isMobile }) {
     <div style={{ paddingBottom: '1rem' }}>
       {/* Telling: hoeveel oefeningen lopen op tempo, traag, stil, en PR's */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 12, alignItems: 'flex-end' }}>
-        {[{ w: telling.goed, l: 'op tempo', k: KLEUR_VOOR.goed }, { w: telling.traag, l: 'traag', k: KLEUR_VOOR.traag }, { w: telling.stil, l: 'stil', k: KLEUR_VOOR.stil }, { w: telling.pr, l: 'op PR', k: '#fff' }].map(x => (
+        {[{ w: telling.goed, l: labels.goed, k: KLEUR_VOOR.goed }, { w: telling.traag, l: labels.traag, k: KLEUR_VOOR.traag }, { w: telling.stil, l: labels.stil, k: KLEUR_VOOR.stil }, { w: telling.pr, l: 'op PR', k: '#fff' }].map(x => (
           <div key={x.l}>
             <div style={{ fontSize: isMobile ? '1.5rem' : '1.75rem', fontWeight: 900, color: x.k, lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{x.w}</div>
             <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 3 }}>{x.l}</div>
@@ -116,18 +139,19 @@ export default function KrachtBlad({ db, client, isMobile }) {
       </div>
       {uitleg && (
         <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginBottom: 12 }}>
-          Per oefening tellen we je beste set per training, omgerekend naar wat je op <strong style={{ color: '#fff' }}>{REFERENTIE_REPS} herhalingen</strong> zou halen. Zo telt 70 kg × 11 zwaarder dan 70 kg × 8. Het oordeel zet je laatste stand tegen de band van je fase: in een build hoort het omhoog, in een cut is vasthouden het doel.
+          Per oefening tellen we je beste set per training, omgerekend naar wat je op <strong style={{ color: '#fff' }}>{REFERENTIE_REPS} herhalingen</strong> zou halen. Zo telt 70 kg × 11 zwaarder dan 70 kg × 8. Het oordeel zet je laatste stand tegen de band van de gekozen fase: in een build hoort het omhoog, in een cut is vasthouden het doel en is 'behouden' dus groen.
         </div>
       )}
 
       {/* Filter op oordeel links, periode rechts */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        {[{ id: 'alles', label: 'Alles' }, { id: 'goed', label: 'Op tempo', k: KLEUR_VOOR.goed }, { id: 'traag', label: 'Traag', k: KLEUR_VOOR.traag }, { id: 'stil', label: 'Stil', k: KLEUR_VOOR.stil }].map(o => (
+        {[{ id: 'alles', label: 'Alles' }, { id: 'goed', label: labels.goed, k: KLEUR_VOOR.goed }, { id: 'traag', label: labels.traag, k: KLEUR_VOOR.traag }, { id: 'stil', label: labels.stil, k: KLEUR_VOOR.stil }].map(o => (
           <button key={o.id} onClick={() => setFilter(o.id)} style={pil(filter === o.id)}>{o.k && stip(filter === o.id ? '#0a0a0a' : o.k)}{o.label}</button>
         ))}
         <div style={{ marginLeft: 'auto', position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-          <select value={periode} onChange={e => setPeriode(Number(e.target.value))} style={{ appearance: 'none', WebkitAppearance: 'none', background: 'transparent', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', padding: '0 18px 0 0', cursor: 'pointer', outline: 'none' }}>
-            {PERIODES.map(p => <option key={p.id} value={p.id} style={{ background: '#0a0a0a' }}>{p.label}</option>)}
+          <select value={faseId} onChange={e => setFaseId(e.target.value)} style={{ appearance: 'none', WebkitAppearance: 'none', background: 'transparent', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', padding: '0 18px 0 0', cursor: 'pointer', outline: 'none', maxWidth: 200, textOverflow: 'ellipsis' }}>
+            {(fases || []).map(f => <option key={f.id} value={f.id} style={{ background: '#0a0a0a' }}>{faseNaam(f)}</option>)}
+            <option value="alles" style={{ background: '#0a0a0a' }}>Alle fases</option>
           </select>
           <ChevronDown size={14} color="#fff" strokeWidth={2.8} style={{ position: 'absolute', right: 0, pointerEvents: 'none' }} />
         </div>
@@ -141,7 +165,7 @@ export default function KrachtBlad({ db, client, isMobile }) {
       {ruw === null ? (
         <div style={{ padding: '2rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', fontWeight: 700 }}>Laden…</div>
       ) : lijst.length === 0 ? (
-        <div style={{ padding: '2rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', fontWeight: 700 }}>Geen oefeningen in deze periode.</div>
+        <div style={{ padding: '2rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', fontWeight: 700 }}>Geen oefeningen in deze fase.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {lijst.map(o => {
@@ -181,7 +205,7 @@ export default function KrachtBlad({ db, client, isMobile }) {
                 </button>
                 {isOpen && (
                   <div style={{ margin: '0 0 10px', marginLeft: isMobile ? -16 : -20, marginRight: isMobile ? -16 : -20 }}>
-                    <ExerciseProgressChart db={db} client={client} exerciseName={o.naam} isMobile={isMobile} />
+                    <ExerciseProgressChart db={db} client={client} exerciseName={o.naam} isMobile={isMobile} vanaf={vanaf} tot={tot} />
                   </div>
                 )}
               </div>
