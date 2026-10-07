@@ -172,47 +172,45 @@ export default function CardioLogSection({ client, db, isMobile }) {
                 const klaar = gedaan >= target
                 const pct = Math.min(100, Math.round((gedaan / target) * 100))
                 return (
+                  // Zelfde kaart als de training: de foto van de sport als
+                  // achtergrond, donker verloop, de naam eroverheen.
                   <div key={item.id} style={{
                     position: 'relative', overflow: 'hidden',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${klaar ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                    borderRadius: 10,
-                    padding: m ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
-                    display: 'flex', alignItems: 'center', gap: '0.7rem',
+                    minHeight: m ? 92 : 104, borderRadius: 14,
+                    border: `1px solid ${klaar ? 'rgba(16,185,129,0.45)' : 'rgba(255,255,255,0.08)'}`,
+                    display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
                   }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-                        <span style={{ fontSize: m ? '0.92rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
-                          {item.cardio_type}
-                        </span>
-                        <span style={{ fontSize: m ? '0.7rem' : '0.75rem', fontWeight: 800, color: klaar ? '#10b981' : 'rgba(255,255,255,0.5)' }}>
-                          {gedaan}/{target}
-                        </span>
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${cardioFoto(item.cardio_type)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: klaar ? 0.55 : 1 }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.85) 100%)' }} />
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: '0.7rem', padding: m ? '0.6rem 0.75rem' : '0.7rem 0.9rem' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+                          <span style={{ fontSize: m ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', textShadow: '0 2px 10px rgba(0,0,0,0.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.cardio_type}
+                          </span>
+                          <span style={{ fontSize: m ? '0.72rem' : '0.76rem', fontWeight: 900, color: klaar ? '#10b981' : 'rgba(255,255,255,0.75)', textShadow: '0 1px 6px rgba(0,0,0,0.9)', flexShrink: 0 }}>
+                            {gedaan}/{target}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 3, textShadow: '0 1px 6px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          Cardio{doel(item) ? ` · ${doel(item)}` : ''}{item.notes ? ` · ${item.notes}` : ''}
+                        </div>
                       </div>
-                      {doel(item) && (
-                        <div style={{ fontSize: m ? '0.66rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                          {doel(item)}
-                        </div>
-                      )}
-                      {item.notes && (
-                        <div style={{ fontSize: m ? '0.64rem' : '0.68rem', color: 'rgba(255,255,255,0.32)', marginTop: 2, fontStyle: 'italic' }}>
-                          {item.notes}
-                        </div>
-                      )}
+                      <button onClick={() => openVoorPlan(item)} aria-label={`${item.cardio_type} loggen`}
+                        style={{
+                          flexShrink: 0, minHeight: 38, padding: m ? '0 0.7rem' : '0 0.8rem',
+                          borderRadius: 10, border: klaar ? '1px solid rgba(16,185,129,0.5)' : '1px solid #fff',
+                          background: klaar ? 'rgba(0,0,0,0.5)' : '#fff', color: klaar ? '#10b981' : '#0a0a0a',
+                          fontSize: m ? '0.74rem' : '0.78rem', fontWeight: 900, fontFamily: 'inherit',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                          boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        }}>
+                        {klaar ? <><Check size={13} strokeWidth={3} /> Klaar</> : <><Plus size={13} strokeWidth={3} /> Log</>}
+                      </button>
                     </div>
-                    <button onClick={() => openVoorPlan(item)} aria-label={`${item.cardio_type} loggen`}
-                      style={{
-                        flexShrink: 0, padding: m ? '0.4rem 0.7rem' : '0.45rem 0.8rem',
-                        borderRadius: 8, border: klaar ? '1px solid rgba(16,185,129,0.45)' : '1.5px solid rgba(255,255,255,0.3)',
-                        background: 'transparent', color: klaar ? '#10b981' : '#fff',
-                        fontSize: m ? '0.7rem' : '0.75rem', fontWeight: 900, fontFamily: 'inherit',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}>
-                      {klaar ? <><Check size={13} strokeWidth={3} /> Klaar</> : <><Plus size={13} strokeWidth={3} /> Log</>}
-                    </button>
                     {/* Voortgangsstreep onderaan de kaart */}
-                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: 'rgba(255,255,255,0.06)' }}>
+                    <div style={{ position: 'relative', height: 3, background: 'rgba(0,0,0,0.45)' }}>
                       <div style={{ width: `${pct}%`, height: '100%', background: klaar ? '#10b981' : '#fff', transition: 'width 0.3s ease' }} />
                     </div>
                   </div>

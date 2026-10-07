@@ -15,7 +15,32 @@ const FOTOS = {
 
 // Kop van de cardio-sectie. Zelfde bron als de trainingsfoto's zodat de twee
 // koppen op de pagina bij elkaar horen.
-export function cardioFoto() {
+// Foto per cardio-soort, op naam gekozen (Unsplash). Zonder naam de
+// algemene cardio-foto, zoals de kop van de cardio-sectie die gebruikt.
+const U = (id) => `https://images.unsplash.com/${id}?w=900&h=500&fit=crop&q=80&crop=entropy`
+const CARDIO_FOTOS = {
+  hardlopen:    U('photo-1486739985386-d4fae04ca6f7'),
+  fietsen:      U('photo-1534787238916-9ba6764efd4f'),
+  zwemmen:      U('photo-1530549387789-4c1017266635'),
+  wandelen:     U('photo-1663524963924-4d84fd7204b5'),
+  roeien:       U('photo-1467818488384-3a21f2b79959'),
+  crosstrainer: U('photo-1649068618811-9f3547ef98fc'),
+  stairmaster:  U('photo-1651804279587-3c3d11496439'),
+  hiit:         U('photo-1599058917212-d750089bc07e'),
+  padel:        U('photo-1657704358775-ed705c7388d2'),
+}
+export function cardioFoto(soort) {
+  const n = String(soort || '').toLowerCase()
+  if (!n) return FOTOS.cardio
+  if (/hardl|run|jog/.test(n)) return CARDIO_FOTOS.hardlopen
+  if (/fiets|cycl|bike|spinning/.test(n)) return CARDIO_FOTOS.fietsen
+  if (/zwem|swim/.test(n)) return CARDIO_FOTOS.zwemmen
+  if (/wandel|walk|hike|lopen/.test(n)) return CARDIO_FOTOS.wandelen
+  if (/roei|row/.test(n)) return CARDIO_FOTOS.roeien
+  if (/cross|ellip/.test(n)) return CARDIO_FOTOS.crosstrainer
+  if (/stair|trap/.test(n)) return CARDIO_FOTOS.stairmaster
+  if (/hiit|interval|circuit/.test(n)) return CARDIO_FOTOS.hiit
+  if (/padel|tennis|squash/.test(n)) return CARDIO_FOTOS.padel
   return FOTOS.cardio
 }
 
