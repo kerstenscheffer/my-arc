@@ -96,6 +96,7 @@ const CardioService = {
       intensity: log.intensity || null,
       calories: Number.isFinite(Number(log.calories)) && Number(log.calories) > 0 ? Math.round(Number(log.calories)) : null,
       calories_source: log.calories_source || null,
+      ...(log.logged_date ? { logged_date: log.logged_date } : {}),
     }]).select().single()
     if (error) { console.error('❌ addLog cardio:', error); throw error }
     return data

@@ -494,7 +494,14 @@ export default function WeekSchedule({
           const [h, m] = String(b.start_time || '').split(':').map(Number)
           const [eh, em] = String(b.end_time || '').split(':').map(Number)
           const duur = Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null
-          const gedaan = !!datum && cardioLogs.some(l => String(l.logged_date).slice(0, 10) === datum && normaliseerSoort(l.cardio_type) === normaliseerSoort(soort))
+          const zelfdeSoort = (l) => normaliseerSoort(l.cardio_type) === normaliseerSoort(soort)
+          const dagVanLog = (l) => { const d = new Date(String(l.logged_date).slice(0, 10) + 'T12:00:00'); return sleutels[(d.getDay() + 6) % 7] }
+          // Gedaan: een log op deze dag, of (oudere logs, vóór de datumkoppeling)
+          // een log van deze sport in dezelfde week op een dag zonder eigen blok.
+          const gedaan = !!datum && cardioLogs.some(l => zelfdeSoort(l) && (
+            String(l.logged_date).slice(0, 10) === datum ||
+            !cardioBlokken.some(b2 => b2.day === dagVanLog(l) && normaliseerSoort(String(b2.label).replace(/^Cardio\s*·\s*/, '')) === normaliseerSoort(soort))
+          ))
           return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, eenmalig: !!b.week_start, skipWeeks: b.skip_weeks || [] }
         })
       if (lijst.length) uit[i] = lijst

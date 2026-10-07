@@ -103,7 +103,10 @@ export default function DayCard({
   const cardioKlaar = heeftCardio && cardio.every(c => c.gedaan)
   const handleClick = () => { if (onClick) onClick() }
   const logCardio = (c) => {
-    window.dispatchEvent(new CustomEvent('myarc:cardio-log', { detail: { soort: c.soort, minuten: c.duur } }))
+    // De log hoort bij de dag van de tegel, ook als je hem op een andere dag
+    // invult; anders springt de tegel niet op Gedaan.
+    const datum = dayDate ? `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}` : null
+    window.dispatchEvent(new CustomEvent('myarc:cardio-log', { detail: { soort: c.soort, minuten: c.duur, datum } }))
     if (navigator.vibrate) navigator.vibrate(15)
   }
 

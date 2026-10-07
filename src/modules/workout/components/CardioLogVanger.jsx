@@ -13,7 +13,7 @@ export default function CardioLogVanger({ client, db, isMobile }) {
   const [blad, setBlad] = useState(null) // { soort, minuten }
   const [gewicht, setGewicht] = useState(null)
   useEffect(() => {
-    const open = (e) => setBlad({ soort: e.detail?.soort || 'Cardio', minuten: e.detail?.minuten || null })
+    const open = (e) => setBlad({ soort: e.detail?.soort || 'Cardio', minuten: e.detail?.minuten || null, datum: e.detail?.datum || null })
     window.addEventListener('myarc:cardio-log', open)
     return () => window.removeEventListener('myarc:cardio-log', open)
   }, [])
@@ -35,7 +35,7 @@ export default function CardioLogVanger({ client, db, isMobile }) {
 
   const log = async (rij) => {
     try {
-      await CardioService.addLog({ client_id: client.id, ...rij }, db)
+      await CardioService.addLog({ client_id: client.id, logged_date: blad?.datum || null, ...rij }, db)
       setBlad(null)
       if (navigator.vibrate) navigator.vibrate([20, 40, 20])
       window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
