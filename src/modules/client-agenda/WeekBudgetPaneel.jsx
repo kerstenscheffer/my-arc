@@ -13,8 +13,11 @@
 // verwerkt via activity_level.
 
 import React, { useState, useEffect } from 'react'
-import { ChevronDown, ChevronRight, Flame } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ChevronDown, ChevronRight, Flame, GripVertical, Minus, Maximize2, X } from 'lucide-react'
 import { balkVak, balkVakActief } from './werkbalkStijl'
+import useZwevendVenster from '../../components/useZwevendVenster'
+import { useModalHost } from '../../coach/ModalHost'
 import { maakConfig } from '../weight-tracker/utils/coachingBand'
 
 // Vuistregel: ongeveer 7700 kcal per kilo vetweefsel. Een model, geen wet —
@@ -160,6 +163,13 @@ const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 
 export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   const [open, setOpen] = useState(false)
+  // Zwevend venster, net als de intake-modal: verslepen aan de kop, groter
+  // maken aan de hoek, inklappen tot de balk. Zo zet je het naast de agenda
+  // terwijl je maaltijden verschuift en ziet het tempo live meebewegen.
+  const modalHost = useModalHost()
+  const {
+    ingeklapt, setIngeklapt, herstel, vensterStijl, sleepHandvat, formaatHandvat,
+  } = useZwevendVenster({ isMobile, standaard: { w: 360, h: 700 } })
   const [tdee, setTdee] = useState(undefined)   // undefined = nog laden
   // Actieve fase (client_phases): doel en streeftempo. null = geen fase.
   const [fase, setFase] = useState(undefined)
@@ -283,15 +293,46 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </button>
 
-      {open && (
+      {open && createPortal(
         <div style={{
-          position: 'absolute', top: '100%', right: 0, zIndex: 60,
-          width: isMobile ? 'min(92vw, 320px)' : 320,
-          marginTop: 4, padding: '0.5rem 0.7rem 0.7rem',
-          border: `1px solid ${rand}`,
-          background: '#0f0f0f',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+          ...vensterStijl,
+          background: '#0a0a0a',
+          borderRadius: isMobile ? 0 : 14,
+          border: isMobile ? 'none' : `1px solid ${rand}`,
+          boxShadow: isMobile ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
         }}>
+          {/* Kop; op desktop tevens het handvat om te verslepen. */}
+          <div
+            {...sleepHandvat}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+              padding: isMobile ? 'calc(0.6rem + env(safe-area-inset-top, 0px)) 0.8rem 0.6rem' : '0.55rem 0.75rem',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              ...(sleepHandvat.style || {}),
+            }}
+          >
+            {!isMobile && <GripVertical size={13} color="rgba(255,255,255,0.25)" style={{ flexShrink: 0 }} />}
+            <Flame size={14} color="#fff" style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Weekbudget{tdee?.first_name ? ` · ${tdee.first_name}` : ''}
+            </div>
+            {!isMobile && (
+              <button onClick={() => setIngeklapt(v => !v)} title={ingeklapt ? 'Uitklappen' : 'Inklappen'} aria-label={ingeklapt ? 'Uitklappen' : 'Inklappen'} style={kopKnop}>
+                <Minus size={13} />
+              </button>
+            )}
+            {!isMobile && (
+              <button onClick={herstel} title="Terug naar het midden" aria-label="Terug naar het midden" style={kopKnop}>
+                <Maximize2 size={13} />
+              </button>
+            )}
+            <button onClick={() => setOpen(false)} title="Sluiten" aria-label="Sluiten" style={kopKnop}>
+              <X size={13} />
+            </button>
+          </div>
+
+          {!ingeklapt && (
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.25rem 0.8rem 0.8rem' }}>
           {planWeek == null ? (
             <div style={{ padding: '0.6rem 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
               Geen actief weekplan voor deze klant.
@@ -687,8 +728,33 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
               </div>
             </>
           )}
-        </div>
+          </div>
+          )}
+
+          {/* Hoekje rechtsonder om het venster groter te maken. */}
+          {formaatHandvat && !ingeklapt && (
+            <div
+              {...formaatHandvat}
+              style={{
+                position: 'absolute', bottom: 0, right: 0,
+                width: 16, height: 16, cursor: 'se-resize',
+                display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: 3,
+              }}
+            >
+              <div style={{ width: 8, height: 8, borderRight: '2px solid rgba(255,255,255,0.2)', borderBottom: '2px solid rgba(255,255,255,0.2)' }} />
+            </div>
+          )}
+        </div>,
+        modalHost || document.body
       )}
     </div>
   )
+}
+
+const kopKnop = {
+  width: 30, height: 30, flexShrink: 0, padding: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+  color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontFamily: 'inherit',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
