@@ -1314,12 +1314,20 @@ export default function ClientAgendaView({
     })
   }, instantieRef.current), [])
 
+  // Een herlaad via refreshKey (maaltijd erbij of gewisseld in de analyzer)
+  // gaat stil: de view blijft staan en de data wisselt eronder. Met de
+  // laadtekst ertussen werd de hele agenda even weggehaald, en daarmee ook
+  // het weekbudget-venster dat je juist open had om het effect te zien.
+  const eerderGeladen = useRef(null)
   useEffect(() => {
     if (!service || !client?.id) return
     let cancelled = false
-    setLoading(true); setError(null)
+    const sleutel = `${client.id}|${toIsoDate(weekAnchor)}|${forcedMealPlanId || ''}`
+    const stil = eerderGeladen.current === sleutel
+    if (!stil) setLoading(true)
+    setError(null)
     service.loadWeek(client.id, weekAnchor, forcedMealPlanId)
-      .then(res => { if (!cancelled) { setData(res); setLoading(false) } })
+      .then(res => { if (!cancelled) { setData(res); setLoading(false); eerderGeladen.current = sleutel } })
       .catch(e => { if (!cancelled) { console.error(e); setError(e); setLoading(false) } })
     return () => { cancelled = true }
   }, [service, client?.id, weekAnchor, refreshKey, forcedMealPlanId])
