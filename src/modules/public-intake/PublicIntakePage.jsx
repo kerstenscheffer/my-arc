@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import IntakePhase1 from './components/IntakePhase1'
 import IntakePhase3 from './components/IntakePhase3'
 import DatabaseService from '../../services/DatabaseService'
-import { findClient, updateClient, saveBaseline} from '../../lib/publicIntakeApi'
+import { findClient, updateClient, saveBaseline, ensureClient } from '../../lib/publicIntakeApi'
 
 const supabase = DatabaseService.supabase
 
@@ -41,6 +41,14 @@ const ERROR_TYPES = {
       'Dit kan gebeuren als je de browser hebt gesloten en opnieuw bent begonnen.',
     ],
     action: 'Ga terug naar stap 1 en vul je gegevens opnieuw in.'
+  },
+  ACCOUNT_FAILED: {
+    title: 'Account aanmaken lukte niet',
+    lines: [
+      'We konden geen account voor dit e-mailadres aanmaken.',
+      'Je antwoorden zijn wel bewaard; je kunt het zo opnieuw proberen.',
+    ],
+    action: 'Probeer het over een minuut opnieuw. Lukt het dan nog niet? Stuur je coach een berichtje.'
   },
   CLIENT_NOT_FOUND: {
     title: 'Account niet gevonden',
@@ -248,6 +256,9 @@ export default function PublicIntakePage() {
   const [workoutData, setWorkoutData] = useState({})
   const [saving, setSaving]     = useState(false)
   const [errorType, setErrorType] = useState(null)
+  // Gezet als deze intake zojuist een account heeft aangemaakt: dan vertellen
+  // we dat de klant een mail krijgt om zijn wachtwoord in te stellen.
+  const [accountInfo, setAccountInfo] = useState(null)
   const [intakeId, setIntakeId]   = useState(null)
 
   useEffect(() => {
@@ -374,7 +385,18 @@ export default function PublicIntakePage() {
       try {
         existingClient = await findClient(data.email)
       } catch (lookupError) { console.error('❌ Lookup error:', lookupError); setErrorType('SAVE_FAILED'); setSaving(false); return }
-      if (!existingClient) { console.warn('⚠️ Email niet gevonden:', data.email); setErrorType('EMAIL_NOT_FOUND'); setSaving(false); return }
+      // Nog geen account? Dan maken we het hier aan. Zo loopt iemand die
+      // sneller betaalt dan de coach een account aanmaakt niet meer vast.
+      let nieuwAccount = false
+      if (!existingClient) {
+        try {
+          const r = await ensureClient({ email: data.email, first_name: data.first_name, last_name: data.last_name, phone: data.phone })
+          existingClient = r?.client || null
+          nieuwAccount = !!r?.created
+          if (nieuwAccount) setAccountInfo({ email: data.email, mail: !!r?.mailVerstuurd })
+        } catch (e) { console.error('❌ Account aanmaken mislukt:', e) }
+      }
+      if (!existingClient) { console.warn('⚠️ Geen account en aanmaken lukte niet:', data.email); setErrorType('ACCOUNT_FAILED'); setSaving(false); return }
 
       const clientId = existingClient.id
       console.log('✅ Client gevonden, id:', clientId, '— nu opslaan...')
@@ -478,7 +500,9 @@ export default function PublicIntakePage() {
           p_type: 'intake_completed',
           p_priority: 'high',
           p_title: `${data.first_name || existingClient.first_name || 'Een client'} heeft de intake ingevuld`,
-          p_message: 'De onboarding-intake is volledig ingevuld en klaar om te bekijken.',
+          p_message: nieuwAccount
+            ? 'Account automatisch aangemaakt via de intake. De onboarding-intake is ingevuld en klaar om te bekijken.'
+            : 'De onboarding-intake is volledig ingevuld en klaar om te bekijken.',
           p_action_type: 'review_intake',
           p_action_data: { client_id: clientId },
         })
@@ -710,6 +734,16 @@ export default function PublicIntakePage() {
       {/* ── Phase 2: Tussenstap voeding ── */}
       {phase === 2 && (
         <div style={{ maxWidth: '520px', margin: '0 auto', padding: isMobile ? '2rem 1rem 3rem' : '3rem 1.25rem 4rem' }}>
+          {accountInfo && (
+            <div style={{ marginBottom: '1.25rem', padding: '0.9rem 1rem', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)' }}>
+              <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', marginBottom: 4 }}>Je account staat klaar</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>
+                {accountInfo.mail
+                  ? <>We hebben een mail gestuurd naar <strong style={{ color: '#fff' }}>{accountInfo.email}</strong> om je wachtwoord in te stellen. Daarna log je in op de app met dit e-mailadres.</>
+                  : <>Je kunt straks inloggen met <strong style={{ color: '#fff' }}>{accountInfo.email}</strong>. Kies op het inlogscherm "wachtwoord vergeten" om je wachtwoord in te stellen.</>}
+              </div>
+            </div>
+          )}
           <MotivationReminder personalData={personalData} isMobile={isMobile} />
 
           <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>

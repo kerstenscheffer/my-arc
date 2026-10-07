@@ -15,7 +15,26 @@ import { createClient } from '@supabase/supabase-js';
 
 // Versie-marker — curl `/api/public-intake?diag=1` geeft dit terug. Zo zie je
 // meteen of een deploy de nieuwe code écht live heeft (i.p.v. gokken).
-const VERSION = 'pi-2026-07-07-diag2-urlvalidate';
+const VERSION = 'pi-2026-10-07-ensure-client';
+
+// De coach aan wie een nieuw account via de intake wordt gehangen. Eén coach
+// in dit systeem; via env te overschrijven als dat ooit verandert.
+const COACH_ID = (process.env.MYARC_COACH_ID || '5a0135ac-3188-499d-8682-ed6a179e5541').trim();
+// Waar de 'stel je wachtwoord in'-mail naartoe linkt.
+const RESET_URL = (process.env.MYARC_RESET_URL || 'https://www.myarcfitness.com/reset-password').trim();
+
+// Een auth-gebruiker opzoeken op e-mail via de admin-API (geen directe
+// query op auth.users). Kleine gebruikersgroep, dus een paar pagina's is zat.
+async function vindAuthUser(supabase, email) {
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const hit = (data?.users || []).find(u => String(u.email || '').toLowerCase() === email);
+    if (hit) return hit;
+    if (!data?.users || data.users.length < 1000) break;
+  }
+  return null;
+}
 
 const HARDCODED_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsYXljcHdwbmhqbXVsZnNueW5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMTEzNDUsImV4cCI6MjA3MDU4NzM0NX0.19WRJrOO4Yll95w9j8qa8ZgoXFiwPK39farBuNSyd6c';
@@ -165,6 +184,70 @@ export default async function handler(req, res) {
 
       if (error) throw error;
       return res.status(200).json({ client: data?.[0] || null });
+    }
+
+    // Account aanmaken als het nog niet bestaat. Zo kan de klant na de
+    // intake-call direct de link krijgen, ook als hij sneller betaalt dan
+    // de coach een account aanmaakt. Bestaat er al een client met dit
+    // e-mailadres, dan krijg je die gewoon terug.
+    if (action === 'ensure-client') {
+      const email = (req.body.email || '').toLowerCase().trim();
+      if (!email || !email.includes('@')) return res.status(400).json({ error: 'email required' });
+      const first_name = String(req.body.first_name || '').trim();
+      const last_name = String(req.body.last_name || '').trim();
+      const phone = String(req.body.phone || '').trim() || null;
+
+      const { data: bestaand, error: zoekFout } = await supabase
+        .from('clients').select('*').eq('email', email)
+        .order('created_at', { ascending: false }).limit(1);
+      if (zoekFout) throw zoekFout;
+      if (bestaand?.[0]) return res.status(200).json({ client: bestaand[0], created: false });
+
+      // Hiervoor is de service-key nodig (admin-API). Met alleen de anon-key
+      // kunnen we geen gebruiker aanmaken: dan netjes zeggen in plaats van
+      // half werk leveren.
+      const keyNaam = pickKey().name;
+      if (!/SERVICE/.test(keyNaam)) {
+        return res.status(503).json({ error: 'account aanmaken niet mogelijk: geen service-key op de server', version: VERSION });
+      }
+
+      // Auth-gebruiker: nieuw, of de bestaande als dit e-mailadres al een
+      // login had (bijvoorbeeld een oud account zonder client-rij).
+      let authUser = null;
+      const tijdelijk = `Welkom${Math.floor(Math.random() * 900000) + 100000}!`;
+      const { data: gemaakt, error: maakFout } = await supabase.auth.admin.createUser({
+        email, password: tijdelijk, email_confirm: true,
+        user_metadata: { first_name, last_name, role: 'client' },
+      });
+      if (maakFout) {
+        if (/already|exists|registered/i.test(maakFout.message || '')) authUser = await vindAuthUser(supabase, email);
+        if (!authUser) throw maakFout;
+      } else {
+        authUser = gemaakt?.user || null;
+      }
+
+      const { data: client, error: insFout } = await supabase
+        .from('clients')
+        .insert([{
+          email, first_name, last_name, phone,
+          auth_user_id: authUser?.id || null,
+          trainer_id: COACH_ID, coach_id: COACH_ID,
+          created_at: new Date().toISOString(),
+        }])
+        .select('*').single();
+      if (insFout) throw insFout;
+
+      // 'Stel je wachtwoord in'-mail: de gewone herstel-mail van Supabase,
+      // naar de bestaande /reset-password-pagina. Mislukt dit, dan is het
+      // account er wél en kan de klant altijd 'wachtwoord vergeten' doen.
+      let mailVerstuurd = false;
+      try {
+        const { error: mailFout } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: RESET_URL });
+        mailVerstuurd = !mailFout;
+        if (mailFout) console.warn('wachtwoord-mail mislukt:', mailFout.message);
+      } catch (e) { console.warn('wachtwoord-mail mislukt:', e?.message); }
+
+      return res.status(200).json({ client, created: true, mailVerstuurd, version: VERSION });
     }
 
     if (action === 'get-client') {
