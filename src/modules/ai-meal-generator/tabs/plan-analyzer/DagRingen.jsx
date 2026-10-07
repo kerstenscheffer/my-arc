@@ -46,7 +46,7 @@ export default function DagRingen({ totalen, targets, isMobile, inklapbaar = fal
   })
   const wissel = () => setOpen(v => { try { localStorage.setItem(OPEN_SLEUTEL, v ? '0' : '1') } catch { /* privé-venster */ } return !v })
 
-  const kort = RINGEN.map(({ sleutel, doel, label, kleur, eenheid }) => {
+  const kort = RINGEN.map(({ sleutel, doel, label, eenheid }) => {
     const waarde = Number(t[sleutel] ?? (sleutel === 'calories' ? t.kcal : 0)) || 0
     const target = Number(d[doel]) || 0
     const pct = target > 0 ? (waarde / target) * 100 : null
