@@ -27,7 +27,22 @@
 
         <!-- Health Connect: waarom we stappen lezen. Google Play weigert een
              app die gezondheidsdata leest zonder dit scherm. De activiteit
-             zelf komt uit capacitor-health. -->
+             zelf komt uit capacitor-health.
+
+             Twee declaraties, allebei verplicht. Android 13 opent de activity
+             zelf (ACTION_SHOW_PERMISSIONS_RATIONALE); Android 14+ gaat via de
+             alias eronder. Ontbreekt de <activity>, dan verwijst de alias naar
+             niets en weigert Android het hele pakket al bij installeren
+             ("Bad activity-alias"). Dat was de reden van de Play-afwijzing van
+             6 okt 2026: "Je app wordt niet geïnstalleerd voor gebruikers". -->
+        <activity
+            android:name="com.fit_up.health.capacitor.PermissionsRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
         <activity-alias
             android:name="ViewPermissionUsageActivity"
             android:exported="true"

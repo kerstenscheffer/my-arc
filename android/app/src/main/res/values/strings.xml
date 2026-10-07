@@ -4,4 +4,8 @@
     <string name="title_activity_main">MY ARC</string>
     <string name="package_name">com.myarcfitness.app</string>
     <string name="custom_url_scheme">com.myarcfitness.app</string>
+    <!-- Gebruikt door PermissionsRationaleActivity (capacitor-health): het scherm
+         dat Health Connect toont als iemand op "privacybeleid" tikt. Zonder deze
+         string crasht dat scherm met resource-id 0. -->
+    <string name="privacy_policy_url">https://www.myarcfitness.com/privacy</string>
 </resources>
