@@ -2304,8 +2304,14 @@ export default function ClientAgendaView({
           // Cardio opgeslagen in het weekbudget: meteen in plaatsmodus, zodat
           // de coach de dagen tikt waarop het moet gebeuren.
           onPlanCardio={({ label, duur }) => setTeplaatsen({ id: 'cardio', label, duur, kleur: '#06b6d4' })}
-          onPlanCardioDagen={async ({ label, duur, dagen, tijdMin }) => {
-            for (const day of dagen) {
+          onPlanCardioDagen={async ({ label, duur, dagen, tijdMin, vervangLabels = [] }) => {
+            // Bij aanpassen of verwijderen eerst de oude blokken van die sport weg.
+            if (vervangLabels.length > 0) {
+              await db.supabase.from('client_agenda_blocks').delete()
+                .eq('client_id', client.id).eq('type', 'custom').in('label', vervangLabels)
+                .then(r => r, (e) => console.warn('oude cardio-blokken weghalen mislukt:', e?.message))
+            }
+            for (const day of (dagen || [])) {
               await service.upsertBlock({
                 id: null, clientId: client.id, day, type: 'custom', label, sublabel: null,
                 startMin: tijdMin, endMin: Math.min(24 * 60, tijdMin + duur), color: '#06b6d4',

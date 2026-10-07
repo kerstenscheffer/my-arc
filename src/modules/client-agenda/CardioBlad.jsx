@@ -138,7 +138,7 @@ export default function CardioBlad({
       </div>
 
       {/* Dagen en tijd: kies je dagen, dan gaat het meteen de agenda in. */}
-      {onInplannen && !regel && (
+      {onInplannen && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Dagen en tijd</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
@@ -162,7 +162,9 @@ export default function CardioBlad({
             }} />
           </div>
           <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-            {dagen.length > 0 ? `${dagen.length} dag${dagen.length === 1 ? '' : 'en'} · komt om ${tijd} in de agenda en in het cardioplan van de klant` : 'Geen dagen gekozen: dan blijft het een wat-als.'}
+            {dagen.length > 0
+              ? `${dagen.length} dag${dagen.length === 1 ? '' : 'en'} · ${regel ? 'vervangt de cardio-blokken van deze sport in de agenda' : 'komt'} om ${tijd} in de agenda en in het cardioplan van de klant`
+              : regel ? 'Geen dagen gekozen: alleen de regel wordt aangepast, de agenda blijft.' : 'Geen dagen gekozen: dan blijft het een wat-als.'}
           </div>
         </div>
       )}
@@ -197,7 +199,7 @@ export default function CardioBlad({
         disabled={bezig}
         onClick={async () => {
           const nieuw = { ...(regel || {}), soort, keer: effKeer, minuten }
-          if (!regel && dagen.length > 0 && onInplannen) {
+          if (dagen.length > 0 && onInplannen) {
             setBezig(true)
             try { await onInplannen(nieuw, dagen, tijdMin) } finally { setBezig(false) }
             return
@@ -211,7 +213,7 @@ export default function CardioBlad({
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <Check size={16} strokeWidth={3} /> {bezig ? 'Bezig…' : regel ? 'Aanpassen' : dagen.length > 0 ? 'Inplannen en opslaan' : 'Toevoegen aan wat als'}
+        <Check size={16} strokeWidth={3} /> {bezig ? 'Bezig…' : dagen.length > 0 ? (regel ? 'Aanpassen en inplannen' : 'Inplannen en opslaan') : regel ? 'Aanpassen' : 'Toevoegen aan wat als'}
       </button>
       {regel && onVerwijder && (
         <button

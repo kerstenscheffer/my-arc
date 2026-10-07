@@ -1218,19 +1218,30 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
               return { nu: kgTekst(planKg), straks: kgTekst(straks), beter }
             }}
             onInplannen={onPlanCardioDagen ? async (nieuw, dagen, tijdMin) => {
-              // Direct in het cardioplan (regel krijgt een id) en op de dagen in de agenda.
+              // Direct in het cardioplan (nieuw of bijgewerkt) en op de dagen
+              // in de agenda; bij een bestaande regel vervangen de blokken van
+              // die sport de oude.
               const soort = CARDIO_SOORTEN.find(x => x.id === nieuw.soort) || CARDIO_SOORTEN[0]
+              const oudeSoort = cardioBlad?.regel?.soort || null
               const rij = await CardioService.savePlanItem({
+                id: nieuw.id || undefined,
                 client_id: clientId, cardio_type: soort.id,
                 times_per_week: Math.max(1, Number(nieuw.keer) || 1),
                 duration_minutes: Math.max(5, Number(nieuw.minuten) || 30),
-                intensity: 'rustig', sort_order: simCardio.length,
+                intensity: 'rustig', sort_order: cardioBlad?.index ?? simCardio.length,
                 notes: `± ${Math.round(kcalPerMinuut(soort.met, gewicht) * (Number(nieuw.minuten) || 0))} kcal per keer`,
               }, db)
-              const metId = { ...nieuw, id: rij?.id || undefined }
-              setSimCardio(rows => [...rows, metId])
-              if (rij?.id) setCardioBasis(b => [...(b || []), metId])
-              await onPlanCardioDagen({ label: `Cardio · ${soort.id}`, duur: Math.max(5, Number(nieuw.minuten) || 30), dagen, tijdMin })
+              const metId = { ...nieuw, id: rij?.id || nieuw.id || undefined }
+              const bestaand = cardioBlad?.regel != null && cardioBlad.index != null
+              setSimCardio(rows => bestaand ? rows.map((x, j) => j === cardioBlad.index ? metId : x) : [...rows, metId])
+              if (metId.id) setCardioBasis(b => {
+                const lijst = b || []
+                return lijst.some(x => x.id === metId.id) ? lijst.map(x => x.id === metId.id ? metId : x) : [...lijst, metId]
+              })
+              await onPlanCardioDagen({
+                label: `Cardio · ${soort.id}`, duur: Math.max(5, Number(nieuw.minuten) || 30), dagen, tijdMin,
+                vervangLabels: bestaand ? [`Cardio · ${soort.id}`, ...(oudeSoort && oudeSoort !== soort.id ? [`Cardio · ${oudeSoort}`] : [])] : [],
+              })
               setCardioBlad(null)
               if (navigator.vibrate) navigator.vibrate([20, 40, 20])
             } : null}
@@ -1242,8 +1253,15 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
               setCardioBlad(null)
               if (navigator.vibrate) navigator.vibrate([20, 40, 20])
             }}
-            onVerwijder={(r) => {
-              if (r.id) setCardioVerwijderd(v => [...v, r.id])
+            onVerwijder={async (r) => {
+              // Een regel uit het plan gaat meteen weg, inclusief de blokken
+              // van die sport in de agenda. Een nieuwe (nog niet opgeslagen)
+              // regel verdwijnt alleen uit het wat-als.
+              if (r.id) {
+                await CardioService.deactivatePlanItem(r.id, db)
+                setCardioBasis(b => (b || []).filter(x => x.id !== r.id))
+                if (onPlanCardioDagen) await onPlanCardioDagen({ dagen: [], vervangLabels: [`Cardio · ${r.soort}`] })
+              }
               setSimCardio(rows => rows.filter((_, j) => j !== cardioBlad.index))
               setCardioBlad(null)
             }}
