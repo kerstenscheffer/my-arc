@@ -3,6 +3,7 @@
 // Conversational flow, één vraag per stap
 
 import React, { useState } from 'react'
+import { ensureClient } from '../../../../lib/publicIntakeApi'
 import { Q, Hint, NextBtn, BackBtn, BigOption, TextField, NumberField, OptionGrid } from './FlowStep'
 
 
@@ -27,7 +28,7 @@ async function verkleinFoto(file) {
   return canvas.toDataURL('image/jpeg', 0.85)
 }
 
-export default function BasicsFlow({ data, onChange, onNext, onBack, isMobile }) {
+export default function BasicsFlow({ data, onChange, onNext, onBack, isMobile, onAccount = null }) {
   const [step, setStep] = useState('voornaam')
   const [history, setHistory] = useState([])
   const [emailChecking, setEmailChecking] = useState(false)
@@ -56,18 +57,26 @@ export default function BasicsFlow({ data, onChange, onNext, onBack, isMobile })
     onNext()
   }
 
-  // Een nog onbekend adres is geen fout meer: aan het eind van deze stap
-  // wordt er dan een account voor aangemaakt (zie PublicIntakePage). Hier
-  // alleen nog controleren of het een geldig adres is, zodat de mail voor
-  // het wachtwoord straks aankomt.
-  const handleEmailNext = () => {
-    const email = String(data.email || '').trim()
+  // Zodra het e-mailadres bekend is, bestaat de klant: bestaand record, of
+  // een nieuw account (login met startwachtwoord + klantrij). Zo wordt alles
+  // wat hierna wordt ingevuld meteen bij de klant bewaard, en niet pas aan
+  // het eind van dit deel. Lukt het aanmaken even niet, dan gaan we toch
+  // door: aan het eind van stap 1 wordt het nog een keer geprobeerd.
+  const handleEmailNext = async () => {
+    const email = String(data.email || '').trim().toLowerCase()
     setEmailError(null)
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       setEmailError({ title: 'Dit lijkt geen geldig e-mailadres', lines: [`Je vulde in: "${data.email}"`, 'Let op: geen spaties, en een punt in het domein (bijv. gmail.com).'], action: 'Controleer het adres en probeer opnieuw.' })
       return
     }
     if (email !== data.email) update('email', email)
+    setEmailChecking(true)
+    try {
+      const r = await ensureClient({ email, first_name: data.first_name, last_name: data.last_name, phone: data.phone })
+      if (r?.client) onAccount?.(r)
+    } catch (e) {
+      console.warn('Account aanmaken bij e-mailstap mislukt (wordt later opnieuw geprobeerd):', e?.message)
+    }
     setEmailChecking(false)
     go('telefoon')
   }
@@ -187,7 +196,7 @@ export default function BasicsFlow({ data, onChange, onNext, onBack, isMobile })
 
           <NextBtn
             onClick={handleEmailNext}
-            label={emailChecking ? 'Even checken...' : 'VOLGENDE →'}
+            label={emailChecking ? 'Account klaarzetten…' : 'VOLGENDE →'}
             disabled={!data.email?.includes('@') || emailChecking}
             isMobile={isMobile}
           />

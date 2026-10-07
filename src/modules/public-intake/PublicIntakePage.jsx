@@ -718,7 +718,8 @@ export default function PublicIntakePage() {
       {/* ── Phase 1: Persoonlijke gegevens ── */}
       {phase === 1 && (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <IntakePhase1 data={personalData} onChange={setPersonalData} onComplete={handlePhase1Complete} isMobile={isMobile} />
+          <IntakePhase1 data={personalData} onChange={setPersonalData} onComplete={handlePhase1Complete} isMobile={isMobile}
+            onAccount={(r) => { if (r?.created) setAccountInfo({ email: r.client?.email || personalData.email, wachtwoord: r?.wachtwoord || null }) }} />
           {saving && (
             <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />

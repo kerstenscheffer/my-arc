@@ -17,7 +17,7 @@ import { calculateTDEE, calculateTargetCalories, calculateMacros } from '../serv
 
 const SECTIONS = ['Basis', 'Lichaam', 'Doel', 'Nulmeting', 'Levensstijl', 'Gezondheid', 'Coaching']
 
-export default function IntakePhase1({ data, onChange, onComplete, isMobile }) {
+export default function IntakePhase1({ data, onChange, onComplete, isMobile, onAccount = null }) {
   const [sectionIndex, setSectionIndex] = useState(0)
 
   const goNext = () => setSectionIndex(i => i + 1)
@@ -101,7 +101,7 @@ export default function IntakePhase1({ data, onChange, onComplete, isMobile }) {
   return (
     <div>
       <div style={{ padding: isMobile ? '1rem' : '1.25rem' }}>
-        {sectionIndex === 0 && <BasicsFlow    {...sectionProps} onNext={goNext} />}
+        {sectionIndex === 0 && <BasicsFlow    {...sectionProps} onNext={goNext} onAccount={onAccount} />}
         {sectionIndex === 1 && <BodyFlow      {...sectionProps} onNext={goNext} />}
         {sectionIndex === 2 && <GoalFlow      {...sectionProps} onNext={goNext} />}
         {sectionIndex === 3 && <BaselineFlow  {...sectionProps} onNext={goNext} />}
