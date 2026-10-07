@@ -152,6 +152,39 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       )}
 
 
+      {/* Bovenbalk zoals op de maaltijdpagina: twee knoppen zonder kader aan
+          weerszijden, boven de foto. Kracht en Historie stonden als twee
+          blokken onder de workout van vandaag; hier kosten ze geen ruimte en
+          zie je sneller de weekplanning en cardio. */}
+      {!workoutOpen && (() => {
+        const lijn = 'rgba(255,255,255,0.12)'
+        const knop = (kant) => ({
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: isMobile ? '0 0.9rem' : '0 1.2rem',
+          background: 'transparent', border: 'none',
+          [kant === 'links' ? 'borderRight' : 'borderLeft']: `1px solid ${lijn}`,
+          color: '#fff', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 900,
+          letterSpacing: '-0.015em', fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        })
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'stretch',
+            height: isMobile ? 40 : 48,
+            paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
+            boxSizing: 'content-box', background: '#0a0a0a', borderBottom: `1px solid ${lijn}`,
+          }}>
+            <button onClick={() => setKrachtOpen(true)} title="Krachtoverzicht" style={knop('links')}>
+              <TrendingUp size={16} strokeWidth={2.8} /> Kracht
+            </button>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => setHistoryOpen(true)} title="Historie" style={knop('rechts')}>
+              <History size={16} strokeWidth={2.8} /> Historie
+            </button>
+          </div>
+        )
+      })()}
+
       <div id="todays-workout-anchor">
         <TodaysWorkoutMain
           client={client}
@@ -175,22 +208,6 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       {!workoutOpen && (
         <div style={{ marginTop: isMobile ? '1.75rem' : '2.25rem' }}>
           <BelangrijkeVideo client={client} pagina="workout" isMobile={isMobile} />
-        </div>
-      )}
-
-      {/* Twee knoppen tussen de workout van vandaag en de weekplanning: het
-          krachtoverzicht en de geschiedenis. Stonden eerder als inline blokken
-          verderop de pagina — een grafiek en een lijst die je zelden nodig
-          hebt maar wel elke keer voorbij moest scrollen. */}
-      {!workoutOpen && (
-        <div style={{
-          display: 'flex', gap: isMobile ? 8 : 10,
-          padding: isMobile ? '2.25rem 1rem 0' : '2.75rem 1.5rem 0',
-        }}>
-          <OverzichtKnop icon={<TrendingUp size={isMobile ? 17 : 19} strokeWidth={2.6} />}
-            label="Kracht" onClick={() => setKrachtOpen(true)} isMobile={isMobile} />
-          <OverzichtKnop icon={<History size={isMobile ? 17 : 19} strokeWidth={2.6} />}
-            label="Historie" onClick={() => setHistoryOpen(true)} isMobile={isMobile} />
         </div>
       )}
 

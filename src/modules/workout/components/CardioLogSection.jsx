@@ -128,11 +128,8 @@ export default function CardioLogSection({ client, db, isMobile }) {
     return d.toISOString().slice(0, 10)
   }
   const gedaanOp = (key) => logs.some(l => String(l.logged_date).slice(0, 10) === datumVanDag(key))
-  const kop = (
-    <div style={{ padding: m ? '0 1rem' : '0 1.5rem', marginTop: m ? '3.25rem' : '4rem' }}>
-      <div style={{ fontSize: m ? '1.7rem' : '2.4rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: m ? '0.6rem' : '0.8rem' }}>
-        Cardio
-      </div>
+  const weekStrook = (
+    <div style={{ marginBottom: m ? '0.9rem' : '1.1rem' }}>
       <div style={{ fontSize: m ? '0.62rem' : '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
         Gepland deze week
       </div>
@@ -173,12 +170,16 @@ export default function CardioLogSection({ client, db, isMobile }) {
     </div>
   )
 
+  const kop = (
+    <div style={{ padding: m ? '0 1rem' : '0 1.5rem', marginTop: m ? '3.25rem' : '4rem' }}>
+      <div style={{ fontSize: m ? '1.7rem' : '2.4rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: m ? '0.6rem' : '0.8rem' }}>
+        Cardio
+      </div>
+    </div>
+  )
+
   const section = (
     <div style={{ padding: m ? '0 0.75rem' : '0 1rem', marginBottom: m ? '0.9rem' : '1.1rem' }}>
-      {/* Wat de telefoon zelf bijhoudt, bovenaan. Wandelen is cardio; wie hier
-          kijkt hoeft zijn stappen niet ergens anders op te zoeken. */}
-      <StappenStrook client={client} db={db} isMobile={m} />
-
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Footprints size={m ? 14 : 16} color="rgba(255,255,255,0.45)" />
@@ -265,6 +266,11 @@ export default function CardioLogSection({ client, db, isMobile }) {
               })}
             </div>
           )}
+
+          {/* Na de kaarten: wat er deze week op welke dag gepland staat, en
+              de stappen van de telefoon. */}
+          {weekStrook}
+          <StappenStrook client={client} db={db} isMobile={m} />
 
           {/* ── Wat je deze week gelogd hebt ── */}
           <div style={{
