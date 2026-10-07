@@ -13,6 +13,7 @@ import { Plus, X, Footprints, Trash2, Check } from 'lucide-react'
 import CardioService, { weekStartISO, normaliseerSoort } from '../services/CardioService'
 import { cardioFoto } from '../utils/workoutFoto'
 import StappenStrook from './StappenStrook'
+import CardioLogBlad from './CardioLogBlad'
 
 // Veelgebruikte cardio-types als snelkeuze; vrij typen kan ook.
 const CARDIO_PRESETS = ['Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT']
@@ -55,28 +56,25 @@ export default function CardioLogSection({ client, db, isMobile }) {
 
   // Loggen vanaf een plan-regel: de velden staan al goed, je hoeft alleen te
   // bevestigen of bij te stellen.
-  // Vanuit de dagkaart in de weekplanning: logblad open, voorgevuld.
+  // Vanuit de dagkaart in de weekplanning of de planregel: het stapsgewijze
+  // logscherm voor deze sport, voorgevuld met de geplande minuten.
+  const [blad, setBlad] = useState(null) // { soort, minuten }
   useEffect(() => {
-    const open = (e) => {
-      resetForm()
-      setType(e.detail?.soort || '')
-      setDuration(e.detail?.minuten ? String(e.detail.minuten) : '')
-      setShowModal(true)
-    }
+    const open = (e) => setBlad({ soort: e.detail?.soort || 'Cardio', minuten: e.detail?.minuten || null })
     window.addEventListener('myarc:cardio-log', open)
     return () => window.removeEventListener('myarc:cardio-log', open)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const openVoorPlan = (item) => {
-    setType(item.cardio_type || '')
-    setDuration(item.duration_minutes ? String(item.duration_minutes) : '')
-    setDistance(item.distance_km ? String(item.distance_km) : '')
-    setSteps(item.steps ? String(item.steps) : '')
-    setNotes('')
-    setError(null)
-    setShowModal(true)
+  const logVanuitBlad = async (log) => {
+    try {
+      await CardioService.addLog({ client_id: client.id, ...log }, db)
+      setBlad(null)
+      if (navigator.vibrate) navigator.vibrate([20, 40, 20])
+      await laadAlles()
+      window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
+    } catch (err) { alert('Loggen mislukt: ' + (err?.message || 'onbekende fout')) }
   }
+
+  const openVoorPlan = (item) => setBlad({ soort: item.cardio_type || 'Cardio', minuten: item.duration_minutes || null })
 
   const handleSave = async () => {
     if (!type.trim()) { setError('Kies of typ een soort cardio'); return }
@@ -123,6 +121,14 @@ export default function CardioLogSection({ client, db, isMobile }) {
         Cardio
       </div>
     </div>
+  )
+
+  const cardioBlad = (
+    <CardioLogBlad
+      open={!!blad} soort={blad?.soort} minutenGepland={blad?.minuten}
+      gewicht={Number(client?.current_weight) || 80}
+      onLog={logVanuitBlad} onClose={() => setBlad(null)} isMobile={m}
+    />
   )
 
   const section = (
@@ -318,5 +324,5 @@ export default function CardioLogSection({ client, db, isMobile }) {
     document.body
   ) : null
 
-  return <>{kop}{section}{modal}</>
+  return <>{kop}{section}{modal}{cardioBlad}</>
 }

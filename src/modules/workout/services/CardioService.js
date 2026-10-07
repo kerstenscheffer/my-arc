@@ -93,6 +93,9 @@ const CardioService = {
       distance_km: log.distance_km ? parseFloat(log.distance_km) : null,
       steps: log.steps ? parseInt(log.steps, 10) : null,
       notes: log.notes?.trim() || null,
+      intensity: log.intensity || null,
+      calories: Number.isFinite(Number(log.calories)) && Number(log.calories) > 0 ? Math.round(Number(log.calories)) : null,
+      calories_source: log.calories_source || null,
     }]).select().single()
     if (error) { console.error('❌ addLog cardio:', error); throw error }
     return data
