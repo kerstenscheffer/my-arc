@@ -170,6 +170,7 @@ const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
 
 export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   const [open, setOpen] = useState(false)
+  const [toonRingen, setToonRingen] = useState(false)
   // Zwevend venster, net als de intake-modal: verslepen aan de kop, groter
   // maken aan de hoek, inklappen tot de balk. Zo zet je het naast de agenda
   // terwijl je maaltijden verschuift en ziet het tempo live meebewegen.
@@ -360,25 +361,22 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
               {fase !== undefined && tdee !== undefined && (
                 <div style={{ padding: '0.5rem 0 0.6rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   {config && doelLabel ? (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>Doel</div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>{doelLabel}</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff' }}>
+                        {doelLabel}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginTop: 6 }}>
-                        <div>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>Streeftempo</div>
-                          {richting !== 'stabiel' && (config.traagKg || config.snelKg) ? (
-                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
-                              tussen {config.traagKg.toFixed(2)} en {config.snelKg.toFixed(2)} kg per week
-                            </div>
-                          ) : null}
-                        </div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>
-                          {richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)} <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>per week</span>
-                        </div>
+                      <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff' }}>
+                          {richting === 'stabiel' ? '0 kg' : kgTekst(streefKg)}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}> per week</span>
+                        {richting !== 'stabiel' && (config.traagKg || config.snelKg) ? (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                            {' '}· {config.traagKg.toFixed(2)}–{config.snelKg.toFixed(2)}
+                          </span>
+                        ) : null}
                       </div>
-                    </>
+                    </div>
                   ) : (
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
                       Geen fase ingesteld. Zet in het fase-paneel een doel en weektempo, dan vergelijkt dit paneel het plan daarmee.
@@ -392,7 +390,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   verbrandt, wat het plan geeft, en wat hij mag eten om op
                   het streeftempo te zitten (als de TDEE klopt). */}
               {tdee !== undefined && (
-                <div style={{ display: 'flex', gap: 6, padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', gap: 6, padding: '0.5rem 0 0.2rem' }}>
                   {[
                     { label: 'Verbrandt', sub: 'TDEE per dag', waarde: tdee?.tdee ? getal(tdee.tdee) : '?', kleur: '#fff' },
                     { label: 'Plan geeft', sub: 'per dag', waarde: getal(planWeek / 7), kleur: '#fff' },
@@ -402,7 +400,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                       kleur: dagDoelKcal != null ? (opTempo ? '#22c55e' : '#fff') : 'rgba(255,255,255,0.4)',
                     },
                   ].map(x => (
-                    <div key={x.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0.5rem 0.25rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 }}>
+                    <div key={x.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0.15rem 0' }}>
                       <div style={{ fontSize: '1.05rem', fontWeight: 900, color: x.kleur, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{x.waarde}</div>
                       <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', marginTop: 3, whiteSpace: 'nowrap' }}>{x.label}</div>
                       <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>{x.sub}</div>
@@ -431,17 +429,31 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
 
               {/* Wat het plan gemiddeld per dag geeft, als dezelfde vier
                   ringen als in de analyzer, tegen de targets van de klant. */}
-              <div style={{ paddingTop: '0.5rem' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>Plan geeft</div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>gemiddeld per dag · {getal(planWeek)} kcal per week</div>
-              </div>
-              <div style={{ margin: '0 -0.5rem' }}>
-                <DagRingen
-                  totalen={{ calories: planWeek / 7, protein: perDag.eiwitGem, carbs: perDag.koolhGem, fat: perDag.vetGem }}
-                  targets={{ calories: tdee?.target_calories, protein: tdee?.target_protein, carbs: tdee?.target_carbs, fat: tdee?.target_fat }}
-                  isMobile
-                />
-              </div>
+              <button
+                onClick={() => setToonRingen(v => !v)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                  padding: '0.5rem 0', marginTop: '0.2rem', background: 'none', border: 'none',
+                  borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>Plan geeft</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+                  macro's per dag · {getal(planWeek)} kcal per week
+                  <ChevronDown size={13} style={{ transform: toonRingen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </span>
+              </button>
+              {toonRingen && (
+                <div style={{ margin: '0 -0.5rem' }}>
+                  <DagRingen
+                    totalen={{ calories: planWeek / 7, protein: perDag.eiwitGem, carbs: perDag.koolhGem, fat: perDag.vetGem }}
+                    targets={{ calories: tdee?.target_calories, protein: tdee?.target_protein, carbs: tdee?.target_carbs, fat: tdee?.target_fat }}
+                    isMobile
+                  />
+                </div>
+              )}
 
               {tdee === undefined && regel('Verbranding', '…', 'laden')}
 
