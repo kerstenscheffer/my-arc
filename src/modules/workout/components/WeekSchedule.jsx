@@ -285,6 +285,14 @@ export default function WeekSchedule({
 
   // Verschuif workout van `day` één positie in `direction` (-1 = vorige dag,
   // +1 = volgende dag). Bezet → swap; leeg → move.
+  // Na een verschuiving met de pijltjes: zes seconden 'Ongedaan maken'. Een
+  // tik op een pijltje is klein en snel; zo is een misser meteen terug te draaien.
+  const [ongedaan, setOngedaan] = useState(null) // { vorige, dag }
+  useEffect(() => {
+    if (!ongedaan) return
+    const t = setTimeout(() => setOngedaan(null), 6000)
+    return () => clearTimeout(t)
+  }, [ongedaan])
   const handleShift = (day, direction) => {
     const sourceIdx = weekDays.indexOf(day)
     const targetIdx = sourceIdx + direction
@@ -301,6 +309,8 @@ export default function WeekSchedule({
       next[targetDay] = sourceWorkout
       delete next[day]
     }
+    const w = getWorkoutData(sourceWorkout)
+    setOngedaan({ vorige: tempSchedule, naam: w?.name || w?.focus || 'Training', naar: weekDaysDutch[targetIdx] })
     handleAutoSave(next)
   }
 
@@ -639,6 +649,18 @@ export default function WeekSchedule({
                 rustPerDag={rustPerDag}
               />
             </div>
+
+            {ongedaan && (
+              <div style={{ padding: isMobile ? '0.4rem 0.75rem 0' : '0.5rem 1rem 0', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.74rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {ongedaan.naam} naar {ongedaan.naar} verschoven
+                </div>
+                <button onClick={() => { const v = ongedaan.vorige; setOngedaan(null); handleAutoSave(v) }} style={{
+                  flexShrink: 0, minHeight: 32, padding: '0 0.75rem', borderRadius: 999, background: '#fff', border: '1px solid #fff', color: '#0a0a0a',
+                  fontSize: '0.74rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>Ongedaan maken</button>
+              </div>
+            )}
 
             {rustMeldingen.length > 0 && (
               <div style={{
