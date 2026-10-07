@@ -5,12 +5,14 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Check, ChevronDown, Dumbbell, Calendar } from 'lucide-react'
-import { getWorkoutImage } from './week-schedule/workoutImage'
 
-// Foto per plan, zoals de workout-tegels: thuisplannen een huiskamerfoto,
-// de rest een vaste keuze uit de gympool op basis van de naam.
-const THUIS_FOTO = 'https://images.unsplash.com/photo-1758599878868-52cced2f8154?w=800&h=400&fit=crop&q=70'
-const planFoto = (p) => p?.image_url || (/thuis|home/i.test(p?.name || '') ? THUIS_FOTO : getWorkoutImage({ name: p?.name }).replace('w=400&h=300', 'w=800&h=400'))
+// Foto per plan: donkere sportfoto's, thuisplannen een thuis-trainingsfoto en
+// gymplannen een vaste keuze uit een kleine donkere pool op basis van de naam.
+const FOTO = (id) => `https://images.unsplash.com/${id}?w=800&h=400&fit=crop&q=70`
+const THUIS_FOTO = FOTO('photo-1649789248266-ef1c7f744f6f')
+const GYM_FOTOS = [FOTO('photo-1623947061710-70c895a9f5bb'), FOTO('photo-1600347054806-ada26c5186b4'), FOTO('photo-1601745398552-debacfca634c')]
+const hash = (str) => { let h = 0; for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0 } return Math.abs(h) }
+const planFoto = (p) => p?.image_url || (/thuis|home/i.test(p?.name || '') ? THUIS_FOTO : GYM_FOTOS[hash(String(p?.name || 'plan').toLowerCase()) % GYM_FOTOS.length])
 
 export default function PlanSwitchModal({ client, db, isMobile = false, onClose, onActivated }) {
   const [loading, setLoading] = useState(true)
@@ -75,7 +77,7 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
             foto, de knoppen rechts onderin. */}
         <div style={{ position: 'relative', height: isMobile ? 112 : 128 }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${planFoto(p)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.9) 100%)' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.94) 100%)' }} />
           {actief && <span style={{ position: 'absolute', top: 10, left: 10, fontSize: '0.6rem', fontWeight: 900, color: '#000', background: '#fff', padding: '3px 8px', borderRadius: 5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Actief</span>}
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 0.75rem 0.7rem', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
