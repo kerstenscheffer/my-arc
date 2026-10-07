@@ -4,9 +4,7 @@
 
 import React, { useState } from 'react'
 import { Q, Hint, NextBtn, BackBtn, BigOption, TextField, NumberField, OptionGrid } from './FlowStep'
-import DatabaseService from '../../../../services/DatabaseService'
 
-const supabase = DatabaseService.supabase
 
 const STEPS = ['voornaam', 'achternaam', 'email', 'telefoon', 'geslacht', 'geboortejaar', 'geboortedatum', 'foto']
 
@@ -58,41 +56,20 @@ export default function BasicsFlow({ data, onChange, onNext, onBack, isMobile })
     onNext()
   }
 
-  const handleEmailNext = async () => {
-    if (!data.email?.includes('@')) return
-    setEmailChecking(true)
+  // Een nog onbekend adres is geen fout meer: aan het eind van deze stap
+  // wordt er dan een account voor aangemaakt (zie PublicIntakePage). Hier
+  // alleen nog controleren of het een geldig adres is, zodat de mail voor
+  // het wachtwoord straks aankomt.
+  const handleEmailNext = () => {
+    const email = String(data.email || '').trim()
     setEmailError(null)
-    console.log('🔍 EMAIL CHECK gestart voor:', data.email)
-    try {
-      const email = data.email.toLowerCase().trim()
-      const { data: found, error } = await supabase
-        .from('clients').select('id').eq('email', email).limit(1)
-      if (error) {
-        console.error('❌ EMAIL CHECK — verbindingsfout:', error)
-        setEmailError({ title: 'Verbindingsfout', lines: ['Er kon geen verbinding worden gemaakt.'], action: 'Controleer je internet en probeer opnieuw.' })
-        setEmailChecking(false); return
-      }
-      if (!found || found.length === 0) {
-        console.warn('⚠️ EMAIL CHECK — niet gevonden in DB:', email)
-        setEmailError({
-          title: 'E-mailadres niet gevonden',
-          lines: [
-            'Gebruik het adres waarmee je coach je heeft aangemeld.',
-            'Let op: geen hoofdletters, geen spaties voor of na het adres.',
-            `Je vulde in: "${data.email}"`
-          ],
-          action: 'Weet je het niet meer? Neem contact op met je coach.'
-        })
-        setEmailChecking(false); return
-      }
-      console.log('✅ EMAIL CHECK — gevonden! client_id:', found[0].id, '| email:', email)
-      setEmailChecking(false)
-      go('telefoon')
-    } catch(e) {
-      console.error('❌ EMAIL CHECK — exception:', e)
-      setEmailError({ title: 'Er ging iets mis', lines: ['Probeer het opnieuw.'], action: 'Blijft het fout gaan? Neem contact op met je coach.' })
-      setEmailChecking(false)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      setEmailError({ title: 'Dit lijkt geen geldig e-mailadres', lines: [`Je vulde in: "${data.email}"`, 'Let op: geen spaties, en een punt in het domein (bijv. gmail.com).'], action: 'Controleer het adres en probeer opnieuw.' })
+      return
     }
+    if (email !== data.email) update('email', email)
+    setEmailChecking(false)
+    go('telefoon')
   }
 
   // Geboortejaar opties — 12 t/m 80 jaar geleden
@@ -162,7 +139,7 @@ export default function BasicsFlow({ data, onChange, onNext, onBack, isMobile })
         return <>
           <BackBtn onBack={goBack} />
           <Q isMobile={isMobile}>Wat is je e-mailadres?</Q>
-          <Hint isMobile={isMobile}>Gebruik het adres dat je coach heeft meegestuurd.</Hint>
+          <Hint isMobile={isMobile}>Hiermee log je straks in op de app. Nog geen account? Dan maken we die voor je aan.</Hint>
           <input
             type="email"
             value={data.email || ''}
