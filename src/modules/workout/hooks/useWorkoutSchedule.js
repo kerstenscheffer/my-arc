@@ -17,33 +17,26 @@ export default function useWorkoutSchedule(schema, clientId, db) {
     }
   }, [schema, clientId])
   
+  // De indeling komt uit clients.workout_schedule, nergens anders vandaan.
+  //
+  // Hier stond een 'slimme' standaardverdeling (ma/wo/vr/zo/di) voor als er
+  // niets te laden viel, en de laadroute las localStorage dat nooit gevuld
+  // werd. Gevolg: elke keer dat het plan opnieuw binnenkwam, kreeg de pagina
+  // die verzonnen verdeling in beeld — Legs op vrijdag, Push op zaterdag — en
+  // schreef de eerstvolgende tik op een pijltje hem naar de database. Lukt het
+  // laden niet, dan blijft nu gewoon staan wat er stond.
   const initializeSchedule = async () => {
     setIsLoading(true)
-    
-    // Try to load saved schedule first
-    if (clientId) {
-      const savedSchedule = await workoutService.getWeekSchedule(clientId)
-      if (savedSchedule) {
-        setWeekSchedule(savedSchedule)
-        setIsLoading(false)
-        return
+    try {
+      if (clientId && db?.getClientWorkoutSchedule) {
+        const saved = await db.getClientWorkoutSchedule(clientId)
+        if (saved && typeof saved === 'object' && Object.keys(saved).length > 0) setWeekSchedule(saved)
       }
+    } catch (e) {
+      console.warn('Weekindeling laden mislukt, huidige stand blijft staan:', e?.message)
+    } finally {
+      setIsLoading(false)
     }
-    
-    // Otherwise use default schedule
-    const workoutDays = Object.keys(schema.week_structure)
-    const defaultSchedule = {}
-    
-    // Smart default assignment
-    if (workoutDays[0]) defaultSchedule['Monday'] = workoutDays[0]
-    if (workoutDays[1]) defaultSchedule['Wednesday'] = workoutDays[1]
-    if (workoutDays[2]) defaultSchedule['Friday'] = workoutDays[2]
-    if (workoutDays[3]) defaultSchedule['Sunday'] = workoutDays[3]
-    if (workoutDays[4]) defaultSchedule['Tuesday'] = workoutDays[4]
-    if (workoutDays[5]) defaultSchedule['Thursday'] = workoutDays[5]
-    
-    setWeekSchedule(defaultSchedule)
-    setIsLoading(false)
   }
   
   // Save schedule to database

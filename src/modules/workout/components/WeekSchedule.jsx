@@ -178,10 +178,14 @@ export default function WeekSchedule({
     // Alleen de huidige week volgt de planning van de pagina; een vooruit
     // geplande week heeft zijn eigen indeling en mag daar niet door
     // overschreven worden.
-    if (!loading && weekSchedule && isHuidigeWeek) {
+    // Alleen een gevulde indeling overnemen, en niet terwijl er net een
+    // wijziging onderweg is: anders zet een oude stand van de pagina de
+    // zojuist verschoven dag terug.
+    if (!loading && !saving && isHuidigeWeek && weekSchedule && Object.keys(weekSchedule).length > 0) {
       setTempSchedule(weekSchedule)
       loadCustomWorkoutsForSchedule(weekSchedule)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekSchedule, loading, isHuidigeWeek])
 
   const loadCustomWorkoutsForSchedule = async (schedule) => {
