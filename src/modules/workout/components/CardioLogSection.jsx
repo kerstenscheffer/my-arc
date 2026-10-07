@@ -59,6 +59,24 @@ export default function CardioLogSection({ client, db, isMobile }) {
   // Vanuit de dagkaart in de weekplanning of de planregel: het stapsgewijze
   // logscherm voor deze sport, voorgevuld met de geplande minuten.
   const [blad, setBlad] = useState(null) // { soort, minuten }
+  // Laatste weging voor de kcal-schatting; de app weegt dagelijks in
+  // weight_challenge_logs, de andere twee zijn oudere invoerpaden.
+  const [gewicht, setGewicht] = useState(null)
+  useEffect(() => {
+    if (!blad || gewicht || !client?.id) return
+    let leeft = true
+    ;(async () => {
+      let w = Number(client?.current_weight) || null
+      for (const tabel of w ? [] : ['weight_challenge_logs', 'weight_tracking', 'weight_logs']) {
+        const { data } = await db.supabase.from(tabel).select('weight, date').eq('client_id', client.id).order('date', { ascending: false }).limit(1)
+          .then(r => r, () => ({ data: null }))
+        w = Number(data?.[0]?.weight) || null
+        if (w) break
+      }
+      if (leeft) setGewicht(w || 80)
+    })()
+    return () => { leeft = false }
+  }, [blad, gewicht, client?.id, client?.current_weight, db])
   useEffect(() => {
     const open = (e) => setBlad({ soort: e.detail?.soort || 'Cardio', minuten: e.detail?.minuten || null })
     window.addEventListener('myarc:cardio-log', open)
@@ -126,7 +144,7 @@ export default function CardioLogSection({ client, db, isMobile }) {
   const cardioBlad = (
     <CardioLogBlad
       open={!!blad} soort={blad?.soort} minutenGepland={blad?.minuten}
-      gewicht={Number(client?.current_weight) || 80}
+      gewicht={gewicht || Number(client?.current_weight) || 80}
       onLog={logVanuitBlad} onClose={() => setBlad(null)} isMobile={m}
     />
   )

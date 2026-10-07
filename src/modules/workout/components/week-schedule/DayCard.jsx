@@ -24,7 +24,7 @@ function Tegel({ foto, eyebrow, titel, sub, klaar, kanSchuiven, onLinks, onRecht
       onClick={onClick}
       style={{
         position: 'relative', flex: groei, minHeight: isMobile ? 58 : 66, width: '100%',
-        borderRadius: 8, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
+        borderRadius: 10, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
         border: `1px solid ${klaar ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.08)'}`,
       }}
     >
@@ -133,8 +133,9 @@ export default function DayCard({
       <div style={{ position: 'relative', minWidth: 0 }}>
         <div onClick={swapMode ? handleClick : undefined} style={{
           ...kaart, paddingLeft: 0, paddingRight: 0,
-          background: isToday ? 'rgba(255,255,255, 0.05)' : 'transparent',
-          border: isToday ? `1px solid ${tone.border}` : '1px dashed rgba(255,255,255,0.12)',
+          ...(!metLabel ? { paddingTop: 0, paddingBottom: 0, borderRadius: 8 } : {}),
+          background: isToday && metLabel ? 'rgba(255,255,255, 0.05)' : 'transparent',
+          border: isToday && metLabel ? `1px solid ${tone.border}` : '1px dashed rgba(255,255,255,0.12)',
           cursor: swapMode ? 'pointer' : 'default', opacity: gedimd ? 0.7 : 1,
         }}>
           {metLabel && (isToday ? todayPill : dayLabel)}
@@ -149,7 +150,14 @@ export default function DayCard({
   const titelTraining = (workoutData?.name || workoutData?.focus || (isActivity ? workoutKey : '')).trim()
   return (
     <div style={{ position: 'relative', minWidth: 0 }}>
-      <div style={{ ...kaart, background: tone.bg, border: `1px solid ${tone.border}`, opacity: gedimd ? 0.7 : 1 }}>
+      <div style={{
+        ...kaart, opacity: gedimd ? 0.7 : 1,
+        // Met de dagenstrook erboven staan de tegels op zichzelf: geen vlak,
+        // geen rand, geen binnenruimte. De kolomafstand scheidt de dagen.
+        ...(metLabel
+          ? { background: tone.bg, border: `1px solid ${tone.border}` }
+          : { background: 'transparent', border: 'none', padding: 0, borderRadius: 0, overflow: 'visible' }),
+      }}>
         {metLabel && (isToday ? todayPill : dayLabel)}
         <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
           {heeftTraining && (

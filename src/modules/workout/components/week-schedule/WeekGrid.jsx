@@ -29,7 +29,7 @@ export default function WeekGrid({
     onDayClick(day, assignedWorkout)
   }
 
-  const gap = isMobile ? '0.2rem' : '0.375rem'
+  const gap = isMobile ? '0.3rem' : '0.5rem'
   return (<>
     {/* Eén dagenstrook boven het rooster, in dezelfde kolommen als de
         kaarten: dag en datum, vandaag als witte pil. De kaarten zelf hebben
