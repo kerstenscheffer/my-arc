@@ -411,7 +411,10 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile, onP
   // Gepland cardio telt mee in de verbranding van nu: dat is wat de klant
   // volgens zijn plan doet, bovenop de TDEE die uit het activiteitsniveau komt.
   // In realiteit: de gelogde cardio van deze week.
+  // Heeft de klant kcal gelogd (horloge of de schatting met zwaarte uit het
+  // logblad), dan telt dat getal; anders schatten we hier op MET × minuten.
   const gelogdCardioKcalWeek = (realiteitPerDag?.cardio || []).reduce((t, b) => {
+    if (Number(b.meta?.kcal) > 0) return t + Number(b.meta.kcal)
     const soort = CARDIO_SOORTEN.find(x => x.id.toLowerCase() === String(b.meta?.soort || '').toLowerCase())
     return t + kcalPerMinuut(soort?.met || 6, gewicht) * (Number(b.meta?.duur) || 0)
   }, 0)

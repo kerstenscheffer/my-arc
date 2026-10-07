@@ -208,7 +208,7 @@ export class ClientAgendaService {
         .select('id, checkin_date, created_at, status')
         .eq('client_id', clientId).gte('created_at', vanaf.toISOString()).lte('created_at', tot.toISOString())),
       veilig(this.supabase.from('cardio_logs')
-        .select('id, cardio_type, duration_minutes, distance_km, steps, logged_date, created_at')
+        .select('id, cardio_type, duration_minutes, distance_km, steps, logged_date, created_at, intensity, calories, calories_source')
         .eq('client_id', clientId).gte('logged_date', weekStart).lte('logged_date', weekEnd)),
     ])
 
@@ -304,12 +304,13 @@ export class ClientAgendaService {
       const dag = c.logged_date ? DAYS[(new Date(c.logged_date + 'T12:00:00').getDay() + 6) % 7] : dagVan(c.created_at)
       const start = c.created_at ? minVan(c.created_at) : 18 * 60
       const duur = Number(c.duration_minutes) || 30
-      const delen = [c.cardio_type, duur ? `${duur} min` : null, c.distance_km ? `${String(c.distance_km).replace('.', ',')} km` : null, c.steps ? `${c.steps} stappen` : null].filter(Boolean)
+      const ZWAARTE = { rustig: 'rustig', gemiddeld: 'gemiddeld', pittig: 'pittig', vol_gas: 'vol gas' }
+      const delen = [c.cardio_type, duur ? `${duur} min` : null, ZWAARTE[c.intensity] || null, c.calories ? `${c.calories} kcal${c.calories_source === 'horloge' ? ' (horloge)' : ''}` : null, c.distance_km ? `${String(c.distance_km).replace('.', ',')} km` : null, c.steps ? `${c.steps} stappen` : null].filter(Boolean)
       push(dag, {
         id: `echt-cardio-${c.id}`, day: dag, type: 'cardio',
         label: 'Cardio', sublabel: delen.join(' · '),
         start, end: Math.min(start + duur, 24 * 60), color: '#06b6d4', source: 'realiteit', editable: false,
-        meta: { echt: true, soort: c.cardio_type, duur, km: c.distance_km || null },
+        meta: { echt: true, soort: c.cardio_type, duur, km: c.distance_km || null, zwaarte: c.intensity || null, kcal: c.calories || null, kcalBron: c.calories_source || null },
       })
     })
 
