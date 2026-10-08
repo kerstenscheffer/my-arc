@@ -120,11 +120,10 @@ function bouwPayload(antw, uitkomst, afwijsreden, utm) {
 const knopGoud = (m, uit = false) => ({
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
   minHeight: m ? 58 : 64, padding: m ? '0 1.4rem' : '0 2rem', width: '100%',
-  borderRadius: 14, border: 'none', background: GOUD_KNOP, color: '#fff',
+  borderRadius: 14, border: 'none', background: GOLD, color: '#000',
   fontSize: m ? '1.1rem' : '1.2rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase',
-  textShadow: '0 1px 3px rgba(0,0,0,0.3)', WebkitTextStroke: '0.5px #fff',
   cursor: uit ? 'default' : 'pointer', opacity: uit ? 0.45 : 1, fontFamily: 'inherit',
-  boxShadow: uit ? 'none' : '0 10px 30px rgba(212,175,55,0.35)',
+  boxShadow: 'none',
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })
 
@@ -270,7 +269,7 @@ export function PrequalFlow({ m = false, compact = false }) {
           {sub(einde.reden?.startsWith('Voor de challenge') ? einde.reden : 'Nu lijkt het nog niet het juiste moment voor de challenge.')}
           {sub('Hier is mijn gratis content om alvast te starten. En volg me op Instagram voor dagelijkse tips.')}
           <a href={GRATIS_CONTENT} style={{ ...knopGoud(m), marginTop: '1.6rem', textDecoration: 'none' }}><Gift size={22} strokeWidth={2.6} /> Gratis starten</a>
-          <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopGoud(m), marginTop: '0.7rem', background: 'rgba(255,255,255,0.08)', color: '#fff', textDecoration: 'none', boxShadow: 'none', WebkitTextStroke: '0', textShadow: 'none', border: '1px solid rgba(255,255,255,0.2)' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
+          <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopGoud(m), marginTop: '0.7rem', background: 'rgba(255,255,255,0.08)', color: '#fff', textDecoration: 'none', boxShadow: 'none', border: '1px solid rgba(255,255,255,0.2)' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
         </div>
       )
     }

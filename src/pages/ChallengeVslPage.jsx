@@ -222,11 +222,10 @@ function Cta({ m, sub, style }) {
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           minHeight: m ? 68 : 76, padding: m ? '0 1.8rem' : '0 2.6rem',
           width: m ? '100%' : 'auto', minWidth: m ? 0 : 380,
-          borderRadius: 14, background: GOUD_KNOP, color: '#fff',
+          borderRadius: 14, background: GOLD, color: '#000',
           fontSize: m ? '1.3rem' : '1.45rem', fontWeight: 900, letterSpacing: '0.04em',
-          textShadow: '0 1px 3px rgba(0,0,0,0.3)', WebkitTextStroke: '0.7px #fff',
           textTransform: 'uppercase', textDecoration: 'none', boxSizing: 'border-box',
-          boxShadow: '0 10px 30px rgba(212,175,55,0.35), 0 4px 12px rgba(0,0,0,0.25)',
+          boxShadow: 'none',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
@@ -942,10 +941,9 @@ export default function ChallengeVslPage() {
           transition: 'opacity 0.25s ease',
           display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
           padding: m ? '0.85rem 1.6rem' : '0.95rem 2rem', borderRadius: 999,
-          background: GOUD_KNOP, color: '#fff', textDecoration: 'none',
+          background: GOLD, color: '#000', textDecoration: 'none',
           fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 900, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.03em',
-          textShadow: '0 1px 3px rgba(0,0,0,0.3)', WebkitTextStroke: '0.55px #fff',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 24px rgba(255,215,0,0.25)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
