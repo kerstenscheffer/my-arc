@@ -452,6 +452,27 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           {/* Op een telefoon passen drie van deze cijfers niet naast elkaar:
               de twee tempo's horen bij elkaar en staan op één regel, het doel
               zakt eronder. Op een breed scherm staan ze met z'n drieën. */}
+          {/* Doel per week bovenaan, als één regel: dit is de maat waar de
+              tegels eronder tegen gekleurd worden. */}
+          {bereik && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: isMobile ? '0.6rem 0.5rem 0.2rem' : '0.7rem 0.75rem 0.25rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 900, color: '#fff' }}>Doel per week</span>
+              <span style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                {bereik}<span style={{ fontSize: '0.55em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg</span>
+              </span>
+              <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+                {bandConfig.handmatig ? 'zelf ingesteld' : 'afgeleid van het weekdoel'}
+              </span>
+              {onBewerkDoel && (
+                <button onClick={onBewerkDoel} aria-label="Doel per week aanpassen" title="Aanpassen" style={{
+                  flexShrink: 0, width: 22, height: 22, padding: 0, borderRadius: 999, alignSelf: 'center',
+                  border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.45)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}><Pencil size={13} strokeWidth={2.8} /></button>
+              )}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap' }}>
             {/* De weken als strook: deze week vooraan, daarachter terug in de
                 tijd. Slepen met de muis of vegen op een telefoon. */}
@@ -481,34 +502,9 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               onder={startDateLabel ? `vanaf ${startDateLabel}` : 'geen start'}
               isMobile={isMobile}
               basis="0 0 auto"
-              laatste={!bereik || isMobile}
+              laatste
               vast
             />
-            {bereik && <GrootBlok
-              titel="Doel per week"
-              waarde={bereik}
-              eenheid="kg"
-              kleur="#fff"
-              onder={bandConfig.handmatig ? 'zelf ingesteld' : 'afgeleid van het weekdoel'}
-              isMobile={isMobile}
-              basis={isMobile ? '1 1 100%' : '0 0 auto'}
-              laatste
-              actie={onBewerkDoel ? (
-                <button
-                  onClick={onBewerkDoel}
-                  aria-label="Doel per week aanpassen"
-                  title="Aanpassen"
-                  style={{
-                    flexShrink: 0, width: 18, height: 18, padding: 0, borderRadius: 999,
-                    border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.45)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  <Pencil size={13} strokeWidth={2.8} />
-                </button>
-              ) : null}
-            />}
           </div>
 
           {uitlegOpen && (
