@@ -698,12 +698,12 @@ export default function ChallengeVslPage() {
 
         {/* De transformaties van Kersten en Nitish, zoals op de andere pagina's. */}
         <div style={{
-          display: 'grid', gridTemplateColumns: m ? '1fr' : 'repeat(2, 1fr)',
-          gap: m ? '0.8rem' : '1.2rem', marginTop: m ? '1.6rem' : '2.4rem',
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: m ? '0.6rem' : '1.2rem', marginTop: m ? '1.6rem' : '2.4rem',
         }}>
           {TRANSFORMATIES.map(t => (
             <div key={t.src} style={{
-              padding: m ? '0.6rem' : '0.8rem', borderRadius: 14,
+              padding: m ? '0.4rem' : '0.8rem', borderRadius: 14,
               border: `1px solid ${THEMAS.goud.rand}`, background: THEMAS.goud.kaart,
             }}>
               <div style={{ borderRadius: 10, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
@@ -711,7 +711,7 @@ export default function ChallengeVslPage() {
                   onError={(e) => { e.currentTarget.style.opacity = 0 }}
                   style={{ maxWidth: '100%', width: 'auto', height: 'auto', display: 'block' }} />
               </div>
-              <p style={{ margin: '0.6rem 0 0.2rem', fontSize: m ? '0.8rem' : '0.86rem', fontWeight: 800, color: THEMAS.goud.dim, textAlign: 'center' }}>
+              <p style={{ margin: '0.5rem 0 0.2rem', fontSize: m ? '0.7rem' : '0.86rem', fontWeight: 800, color: THEMAS.goud.dim, textAlign: 'center', lineHeight: 1.3 }}>
                 {t.caption}
               </p>
             </div>
