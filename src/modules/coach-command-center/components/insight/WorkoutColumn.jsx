@@ -11,6 +11,10 @@ import StappenInsight from './StappenInsight'
 import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
 import { workoutFoto } from '../../../../client/components/workoutFoto'
 import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
+// Hetzelfde krachtblad als de klant op zijn workout-pagina opent: per
+// oefening de stand op 8 reps tegen de band van de fase, met grafiek.
+import KrachtBlad from '../../../workout/components/KrachtBlad'
+import BladModal from '../../../workout/components/todays-workout/components/BladModal'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 const WEEKDAG_NL = { monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', thursday: 'donderdag', friday: 'vrijdag', saturday: 'zaterdag', sunday: 'zondag' }
@@ -64,6 +68,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
   const [swappedExercises, setSwappedExercises] = useState([])
+  const [krachtOpen, setKrachtOpen] = useState(false)
   const workouts = workoutData?.workouts || []
 
   // Wissels van de klant in dít plan. Eerder telde dit alle overrides van
@@ -239,8 +244,8 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {workoutData?.totalWorkouts > 0 && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>{workoutData.completedWorkouts}/{workoutData.totalWorkouts}</span>}
             <button
-              onClick={() => setView('overview')}
-              title="Krachtoverzicht"
+              onClick={() => setKrachtOpen(true)}
+              title="Kracht: per oefening de stand tegen de band van de fase, zoals de klant het ziet"
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.2rem',
                 padding: '0.25rem 0.4rem',
@@ -252,10 +257,14 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                 WebkitTapHighlightColor: 'transparent', minHeight: '24px'
               }}
             >
-              <BarChart3 size={12} /> Overzicht
+              <BarChart3 size={12} /> Kracht
             </button>
           </div>
         </div>
+        {/* Modal boven het inzichtpaneel; zIndex hoger dan dat paneel. */}
+        <BladModal open={krachtOpen} titel="Kracht" onClose={() => setKrachtOpen(false)} zIndex={12000}>
+          <KrachtBlad db={db} client={client} isMobile={isMobile} />
+        </BladModal>
         {/* ── BEKIJK PLAN KNOP — identiek aan MealsColumn ── */}
         {onNavigateWorkout && (
           <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
