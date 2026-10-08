@@ -2,7 +2,7 @@
 // v4.0 — flush stat bar, borderBottom dividers, compact chart + plan line
 // Props: { stats, client, fridayData, history, isMobile, coachingPlan }
 
-import React, { useState, useMemo, useRef } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity, Info, Pencil } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
@@ -472,12 +472,6 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               )} />
             </div>
 
-            {/* Echte scheiding tussen de schuivende weken en het vaste blok:
-                een bredere, lichtere lijn met wat zwart ernaast, anders
-                leest Sinds start als nog een tegel in de slider. */}
-            <div aria-hidden style={{ flex: '0 0 auto', width: isMobile ? 12 : 16, display: 'flex', justifyContent: 'center', background: '#000' }}>
-              <div style={{ width: 2, background: 'rgba(255,255,255,0.22)' }} />
-            </div>
             <GrootBlok
               titel={fase ? 'Sinds fase' : 'Sinds start'}
               waarde={totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—'}
@@ -487,6 +481,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               isMobile={isMobile}
               basis="0 0 auto"
               laatste={!bereik || isMobile}
+              vast
             />
             {bereik && <GrootBlok
               titel="Doel per week"
@@ -784,12 +779,15 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
 // alleen in tekst en kleur, en dan gaat er bij een wijziging altijd eentje
 // achterlopen.
 function GrootBlok(props) {
-  const { titel, waarde, eenheid, kleur, onder, isMobile, basis, actie, laatste } = props
+  const { titel, waarde, eenheid, kleur, onder, isMobile, basis, actie, laatste, vast } = props
   return (
     <div style={{
       flex: basis, minWidth: 0,
       padding: isMobile ? '0.7rem 0.5rem' : '0.8rem 0.75rem',
       borderRight: laatste ? 'none' : '1px solid rgba(255,255,255,0.08)',
+      // `vast`: het blok dat naast de slider staat en niet meeschuift. Eigen
+      // vlak, zodat je ziet dat het geen tegel van de slider is.
+      ...(vast ? { background: 'rgba(255,255,255,0.045)', borderLeft: '1px solid rgba(255,255,255,0.12)' } : {}),
       borderTop: basis === '1 1 100%' ? '1px solid rgba(255,255,255,0.08)' : 'none',
       display: 'flex', flexDirection: 'column', gap: 4,
     }}>
@@ -832,6 +830,25 @@ function WekenStrook(props) {
   const { weken, isMobile, uitleg } = props
   const baan = useRef(null)
   const sleep = useRef(null)
+  // Waar de slider staat: { deel: 0..1 van de baan die zichtbaar is,
+  // pos: 0..1 hoe ver er gescrold is }. Voor het spoor onderin en de
+  // vervaging aan de randen.
+  const [stand, setStand] = useState({ deel: 1, pos: 0 })
+  const meet = () => {
+    const el = baan.current
+    if (!el) return
+    const deel = el.scrollWidth > 0 ? Math.min(1, el.clientWidth / el.scrollWidth) : 1
+    const rest = el.scrollWidth - el.clientWidth
+    setStand({ deel, pos: rest > 0 ? el.scrollLeft / rest : 0 })
+  }
+  useEffect(() => {
+    meet()
+    const el = baan.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(meet)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [weken.length])
 
   if (!weken.length) return null
 
@@ -867,10 +884,13 @@ function WekenStrook(props) {
     }
   }
 
+  const schuift = stand.deel < 0.999
   return (
+    <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
     <div
       ref={baan}
       className="weken-strook"
+      onScroll={meet}
       onPointerDown={begin}
       onPointerMove={beweeg}
       onPointerUp={stop}
@@ -923,6 +943,23 @@ function WekenStrook(props) {
           </div>
         </div>
       ))}
+    </div>
+    {/* Vervaging aan de kant waar nog tegels staan: je ziet ze onder de rand
+        doorlopen. Links pas zodra je gescrold hebt. */}
+    {schuift && stand.pos < 0.98 && (
+      <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 6, right: 0, width: 44, pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />
+    )}
+    {schuift && stand.pos > 0.02 && (
+      <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 6, left: 0, width: 28, pointerEvents: 'none', background: 'linear-gradient(270deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />
+    )}
+    {/* Het spoor: dun lijntje met een blokje dat meeschuift. Dit is wat van
+        een rij tegels een slider maakt. */}
+    {schuift && (
+      <div aria-hidden style={{ height: 6, margin: isMobile ? '0 0.5rem 4px' : '0 0.75rem 6px', position: 'relative' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 2, height: 2, borderRadius: 2, background: 'rgba(255,255,255,0.1)' }} />
+        <div style={{ position: 'absolute', top: 1, height: 4, borderRadius: 2, background: '#fff', width: `${Math.max(14, stand.deel * 100)}%`, left: `${stand.pos * (100 - Math.max(14, stand.deel * 100))}%`, transition: 'left 0.05s linear' }} />
+      </div>
+    )}
     </div>
   )
 }
