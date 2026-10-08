@@ -10,7 +10,6 @@ import WeekSchedule from './components/WeekSchedule'
 import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
 import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
 import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
-import WorkoutProgressToast from './components/WorkoutProgressToast'
 import StappenStrook from './components/StappenStrook'
 import CardioLogVanger from './components/CardioLogVanger'
 import HistorieBlad from './components/HistorieBlad'
@@ -120,7 +119,6 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
 
   // Het compliment verwijst naar de grafiek; die zit nu in een blad in plaats
   // van ergens onderaan de pagina, dus openen we dat blad.
-  const handleToastViewChart = () => setKrachtOpen(true)
 
   const handleWizardComplete = (newSchedule) => { setWeekSchedule(newSchedule); setShowWizard(false) }
   const handleWorkoutCompleted = () => { setChallengeRefreshKey(prev => prev + 1) }
@@ -240,12 +238,8 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         />
       </div></FadeOnScroll>}
 
-      {/* TodaysLogToast removed — same heaviest-lift info already lives in
-          TodaysWorkoutCard. WorkoutProgressToast stays for the 30-day
-          PR/stagnation insights that aren't visible elsewhere. */}
-      {/* Het compliment schuift zichzelf rechtsboven in beeld; het hoeft dus
-          geen plek meer in de paginastroom. */}
-      {!workoutOpen && <WorkoutProgressToast client={client} db={db} onViewChart={handleToastViewChart} />}
+      {/* De complimenten-melding (WorkoutProgressToast, "Sterke moves") is
+          weg: voegde niets toe en stond in de weg (8 okt 2026). */}
       {/* Tik op een cardiotegel in het weekrooster → logblad. */}
       <CardioLogVanger client={client} db={db} isMobile={isMobile} />
       {!workoutOpen && (
