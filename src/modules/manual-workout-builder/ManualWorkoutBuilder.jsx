@@ -24,6 +24,7 @@ import KlantWeekrooster from './components/KlantWeekrooster'
 // plannen + standaardplannen), zodat de coach en de klant hetzelfde zien.
 import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
+import KlantCardioOverzicht from './components/KlantCardioOverzicht'
 import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
@@ -908,6 +909,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </div>
           )}
         </div>
+        {/* Cardio is ook een workout: altijd zichtbaar als de klant het heeft,
+            ook (juist) zonder krachtplan. */}
+        {effectiveClient && (
+          <KlantCardioOverzicht client={effectiveClient} db={db} isMobile={isMobile} refreshKey={agendaKey} onOpen={() => setShowCardio(true)} />
+        )}
         {showWeekAgenda && effectiveClient && (
           <div style={{ margin: isMobile ? '0.5rem' : '0.75rem 1rem 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -954,8 +960,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             isMobile={isMobile} db={db} client={effectiveClient}
           />
         ) : (
-          <div style={{ padding: '3rem 1rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginBottom: '0.5rem' }}>Nog geen dagen</div>
+          <div style={{ padding: '2rem 1rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginBottom: '0.5rem' }}>Nog geen trainingsdagen</div>
             <button onClick={() => setShowDayPicker(true)} style={{
               display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.6rem 1rem',
               borderRadius: 8, border: 'none', background: '#fff', color: '#0a0a0a',
