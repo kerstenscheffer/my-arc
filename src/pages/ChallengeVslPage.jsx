@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
-const GOLD = '#ffba09'
+const GOLD = '#FFD700'
 const TP_GREEN = '#00B67A'
 const BG = '#000000'
 
