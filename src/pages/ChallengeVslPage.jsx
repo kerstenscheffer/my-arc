@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 import { PrequalFlow } from './ChallengePrequalPage'
+import { meet, pixel, volgTijdOpPagina } from './challengeTracking'
 
 const GOLD = '#FFD700'
 const TP_GREEN = '#00B67A'
@@ -317,6 +318,13 @@ function Video({ m }) {
   const iframeRef = useRef(null)
   const spelerRef = useRef(null)
   const verbergTimer = useRef(null)
+  // Mijlpalen van de échte voortgang (niet de getoonde balk), één keer per sessie.
+  const mijlpalen = useRef(new Set())
+  useEffect(() => {
+    [[0.25, 'video_25'], [0.5, 'video_50'], [0.75, 'video_75'], [0.98, 'video_100']].forEach(([grens, naam]) => {
+      if (voortgang >= grens && !mijlpalen.current.has(naam)) { mijlpalen.current.add(naam); meet(naam) }
+    })
+  }, [voortgang])
 
   const toonBediening = () => {
     setBedieningZichtbaar(true)
@@ -388,7 +396,7 @@ function Video({ m }) {
     return (
       <div style={kader}>
         <button
-          onClick={() => setGestart(true)}
+          onClick={() => { setGestart(true); meet('video_start'); pixel('ViewContent', { content_name: '6 weken challenge video' }) }}
           aria-label="Video afspelen"
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -593,7 +601,7 @@ export default function ChallengeVslPage() {
   const [m, setM] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [openVraag, setOpenVraag] = useState(0)
   const [kalenderOpen, setKalenderOpen] = useState(false)
-  const openKalender = () => setKalenderOpen(true)
+  const openKalender = () => { setKalenderOpen(true); meet('knop') }
   // De zwevende knop komt pas als de knop bovenaan uit beeld is.
   const [zwevend, setZwevend] = useState(false)
   const heroCtaRef = useRef(null)
@@ -604,6 +612,12 @@ export default function ChallengeVslPage() {
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // Meting: bezoek bij binnenkomst, tijd op de pagina tot het verlaten.
+  useEffect(() => {
+    meet('bezoek')
+    return volgTijdOpPagina()
   }, [])
 
   useEffect(() => {

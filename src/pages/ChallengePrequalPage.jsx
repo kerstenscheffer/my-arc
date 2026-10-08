@@ -19,6 +19,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, ArrowRight, Check, Instagram, Gift } from 'lucide-react'
 import db from '../services/DatabaseService'
+import { meet, pixel, herkomst, volgTijdOpPagina } from './challengeTracking'
 
 const GOLD = '#FFD700'
 const GOUD_KNOP = 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
@@ -166,7 +167,7 @@ export function PrequalFlow({ m = false, compact = false }) {
   const [einde, setEinde] = useState(null)       // { uitkomst, reden, leadId }
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState('')
-  const utm = useRef(utmUitUrl())
+  const utm = useRef({ ...utmUitUrl(), ...herkomst() })
   const bovenRef = useRef(null)
 
   useEffect(() => { bovenRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }) }, [stap])
@@ -191,6 +192,8 @@ export function PrequalFlow({ m = false, compact = false }) {
       if (error) throw error
       setEinde({ uitkomst, reden, leadId: data })
       setStap('klaar')
+      meet('form_klaar', { meta: { uitkomst, reden: reden || null }, lead_id: data })
+      if (uitkomst === 'A') pixel('Lead', { content_name: '6 weken challenge prequal' })
     } catch (e) {
       console.error('prequal opslaan mislukt:', e)
       setFout('Opslaan lukte niet. Probeer het nog een keer.')
@@ -206,6 +209,7 @@ export function PrequalFlow({ m = false, compact = false }) {
       return verstuur(uitkomst, vraag.afwijsTekst || `${vraag.vraag} → ${antw[vraag.id]}`)
     }
     if (stap === VRAGEN.length - 1) return verstuur('A', null)
+    meet('form_stap', { meta: { stap: stap + 1, vraag: vraag.id } })
     setStap(stap + 1)
   }
   const terug = () => setStap(stap <= 0 ? -1 : stap - 1)
@@ -231,7 +235,7 @@ export function PrequalFlow({ m = false, compact = false }) {
         <div style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.15em', color: GOLD, textTransform: 'uppercase', marginBottom: '0.8rem' }}>Gratis 6 Weken Challenge</div>
         {kop('Past de 6 Weken Challenge bij jou?')}
         {sub('Beantwoord 10 korte vragen (2 minuten). Past het, dan plan je direct je kennismaking met mij in.')}
-        <button onClick={() => setStap(0)} style={{ ...knopGoud(m), marginTop: '1.6rem' }}>
+        <button onClick={() => { setStap(0); meet('form_start') }} style={{ ...knopGoud(m), marginTop: '1.6rem' }}>
           Start de vragen <ArrowRight size={22} strokeWidth={2.6} />
         </button>
       </div>
@@ -373,6 +377,7 @@ export default function ChallengePrequalPage() {
     check(); window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+  useEffect(() => { meet('bezoek'); return volgTijdOpPagina() }, [])
   return (
     <div style={{ minHeight: '100vh', background: '#000', color: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'center', padding: `calc(env(safe-area-inset-top, 0px) + ${m ? '0.7rem' : '0.9rem'}) 1rem ${m ? '0.7rem' : '0.9rem'}`, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>

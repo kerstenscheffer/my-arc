@@ -23,6 +23,7 @@ import CoachCheckinDashboard from '../modules/client-checkin/CoachCheckinDashboa
 import CoachOutputDashboard from '../modules/output-planning/CoachOutputDashboard'
 import ProductivityHub from '../modules/productivity/ProductivityHub'
 import { FunnelDashboard } from '../modules/qualification-funnel'
+import ChallengeAdsDashboard from '../modules/challenge-ads/ChallengeAdsDashboard'
 import SpotsManager from '../modules/spots/SpotsManager'
 import AppVersiesPaneel from '../modules/app-update/AppVersiesPaneel'
 import NotificationHub from '../modules/notifications/NotificationHub'
@@ -60,7 +61,7 @@ import {
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText, Columns2,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
   Bell, Bug, Lightbulb, Smartphone, AlertCircle, Image as ImageIcon, FlaskConical,
-  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck
+  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck, Megaphone
 } from 'lucide-react'
 
 // ============================================
@@ -98,7 +99,9 @@ const MORE_CATEGORIES = [
   {
     label: 'Gameplan',
     items: [
-      { id: 'productivity', label: 'Productivity', icon: Target }
+      { id: 'productivity', label: 'Productivity', icon: Target },
+      // Wat de Meta-advertenties voor de challenge opleveren, per hook.
+      { id: 'ads', label: 'Ads', icon: Megaphone }
     ]
   },
   {
@@ -544,6 +547,8 @@ export default function CoachHub() {
         return <SalesSection db={db} />
       case 'funnel':
         return <FunnelDashboard isMobile={isMobile} />
+      case 'ads':
+        return <ChallengeAdsDashboard db={db} isMobile={isMobile} />
       case 'client-view':
         return <ClientViewTab db={db} isMobile={isMobile} />
 
