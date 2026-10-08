@@ -43,6 +43,7 @@ import SixteenWeekPage from './pages/SixteenWeekPage'
 // (hero, methode/voorwaarden/waarom, garanties, reviewslider). De oude
 // sales-call-6week-pagina staat er nog maar wordt niet meer gerenderd.
 import SixWeekChallengePage from './pages/SixWeekChallengePage'
+import ChallengeVslPage from './pages/ChallengeVslPage'
 import SixWeekChallengeCheckout from './pages/SixWeekChallengeCheckout'
 import BackInShapePage from './sales-call/BackInShapePage'
 import VSLLandingPage from './sales-call-vsl/VSLLandingPage'
@@ -217,6 +218,12 @@ function App() {
   // drie eigen slotschermen (systeem, voorwaarden, garantie).
   if (currentPath === '/6weekchallenge') {
     return <SixWeekChallengePage />
+  }
+
+  // VSL voor de 6 Weken Challenge: video bovenaan, verhaal eronder, elke knop
+  // naar de kennismaking in Calendly. Geen betaling op deze pagina.
+  if (currentPath === '/challenge') {
+    return <ChallengeVslPage />
   }
 
   // Sales-pagina-kopie met gratis strategiegesprek-CTA i.p.v. prijzen
