@@ -198,16 +198,17 @@ export default function TrainingToevoegen({
               return (
                 <div style={{ position: 'relative', minWidth: 0 }}>
                   <button onClick={() => kies(item.key)} style={{
-                    width: '100%', height: isMobile ? 118 : 132, padding: 0, borderRadius: 14, overflow: 'hidden', textAlign: 'left',
+                    width: '100%', height: isMobile ? 138 : 150, padding: 0, borderRadius: 14, overflow: 'hidden', textAlign: 'left',
                     border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`, background: '#111',
                     cursor: 'pointer', fontFamily: 'inherit', color: '#fff', position: 'relative',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   }}>
                     <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${getWorkoutImage(item.w || { name: item.naam })})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.15) 0%, rgba(10,10,10,0.2) 40%, rgba(10,10,10,0.88) 100%)' }} />
+                    {/* Donkerder dan de dagtegel: hier moet de tekst leesbaar zijn, de foto is bijzaak. */}
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.45) 0%, rgba(10,10,10,0.55) 35%, rgba(10,10,10,0.95) 100%)' }} />
                     <div style={{ position: 'absolute', left: 10, right: 10, bottom: 9 }}>
-                      <div style={{ fontSize: '0.56rem', fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.plan}</div>
-                      <div style={{ fontSize: isMobile ? '0.95rem' : '1.02rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>{item.naam}</div>
+                      <div style={{ fontSize: '0.56rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>{item.plan}</div>
+                      <div style={{ fontSize: isMobile ? '0.95rem' : '1.02rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>{item.naam}</div>
                       {n != null && <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{n} oefeningen</div>}
                     </div>
                   </button>
