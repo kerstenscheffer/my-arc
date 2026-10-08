@@ -17,6 +17,7 @@ import {
 import DeleteClientModal from './DeleteClientModal'
 import ClientInsightModal from './ClientInsightModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
+import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo } from '../../weight-tracker/utils/coachingBand'
 
 // Platte actieknop: geen vlak, geen rand — alleen icoon + woord. Drie
 // omkaderde knoppen naast elkaar maakten de kaart onrustig.
@@ -168,43 +169,27 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     return '#333'
   }
 
-  // Kalenderweek-gemiddelden — appels met appels i.p.v. rollende 7-daagse
-  // vensters. weekOffset 0 = deze week (Ma→Zo), -1 = vorige week, enz.
-  const mondayOf = (date) => {
-    const d = new Date(date)
-    const day = d.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    d.setDate(d.getDate() + diff)
-    d.setHours(0, 0, 0, 0)
-    return d
-  }
-  const getCalendarWeekAvg = (weekOffset = 0) => {
-    const monday = mondayOf(new Date())
-    monday.setDate(monday.getDate() + weekOffset * 7)
-    const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 6)
-    sunday.setHours(23, 59, 59, 999)
-    const entries = history.filter(e => {
-      const d = new Date(e.date)
-      return d >= monday && d <= sunday
-    })
-    if (entries.length === 0) return { avg: null, count: 0, monday, sunday }
-    const avg = parseFloat(
-      (entries.reduce((t, e) => t + parseFloat(e.weight), 0) / entries.length).toFixed(1)
-    )
-    return { avg, count: entries.length, monday, sunday }
-  }
-  const fmtWeekRange = (mon, sun) => {
-    const fmt = d => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-    return `${fmt(mon)} – ${fmt(sun)}`
-  }
-  const thisWeek = getCalendarWeekAvg(0)
-  const lastWeek = getCalendarWeekAvg(-1)
-  const curAvg  = thisWeek.avg
-  const prevAvg = lastWeek.avg
-  const weekDiff = (curAvg !== null && prevAvg !== null)
-    ? parseFloat((curAvg - prevAvg).toFixed(1))
+  // Zaterdag op zaterdag, dezelfde som als de tempo-strook op de klantpagina
+  // en in het inzichtpaneel (WeightStatsGrid). "Deze week" is het venster
+  // sinds de laatste zaterdag (zondag t/m vandaag) tegenover de 7 dagen tot
+  // en met die zaterdag; "Laatste zaterdag" is het vaste weekpunt. Stond hier
+  // als kalenderweek ma-zo; dat was een andere maat dan de rest (8 okt 2026).
+  const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0)
+  const zaIso = laatsteZaterdag(vandaag)
+  const dagenSindsZa = Math.round((vandaag.getTime() - new Date(`${zaIso}T00:00:00`).getTime()) / 86400000)
+  const isoVandaag = `${vandaag.getFullYear()}-${String(vandaag.getMonth() + 1).padStart(2, '0')}-${String(vandaag.getDate()).padStart(2, '0')}`
+  const lopendNu = dagenSindsZa > 0 ? vensterGemiddelde(history, isoVandaag, dagenSindsZa) : { gemiddelde: null, metingen: 0 }
+  const lopendVorig = vensterGemiddelde(history, zaIso)
+  const weekDiff = (lopendNu.gemiddelde != null && lopendVorig.gemiddelde != null)
+    ? Math.round((lopendNu.gemiddelde - lopendVorig.gemiddelde) * 100) / 100
     : null
+  const weekGenoeg = lopendNu.metingen >= 3 && lopendVorig.metingen >= 3
+  const za = zaterdagTempo(history, vandaag)
+  const zaGenoeg = za.nu.metingen >= 3 && za.vorige.metingen >= 3
+  const fmtDag = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  // Onder de drie wegingen in een van beide vensters geen kleur: dan is het
+  // verschil vooral dagruis.
+  const tempoKleur = (v, genoeg) => (v != null && genoeg) ? weightGoalColor(v, doelBron) : 'rgba(255,255,255,0.4)'
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 
@@ -282,9 +267,14 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // lijst is een tempo zonder band alleen maar een getal.
   const kaartStats = [
     {
-      label: 'Verschil', kort: 'Verschil',
+      label: 'Deze week', kort: 'Deze week',
       val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—',
-      color: weekDiff !== null ? weightGoalColor(weekDiff, doelBron) : 'rgba(255,255,255,0.4)',
+      color: tempoKleur(weekDiff, weekGenoeg),
+    },
+    {
+      label: 'Laatste zaterdag', kort: 'Zaterdag',
+      val: za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—',
+      color: tempoKleur(za.verschil, zaGenoeg),
     },
     {
       label: fase ? 'Sinds start fase' : 'Sinds start',
@@ -659,9 +649,9 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
                 }}
               >
                 {[
-                  { label: 'Deze week (Ma-Zo)',   sub: thisWeek.count > 0 ? `${thisWeek.count} meting${thisWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}` : `geen metingen · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}`, val: curAvg ?? '—', color: '#fff' },
-                  { label: 'Vorige week (Ma-Zo)', sub: lastWeek.count > 0 ? `${lastWeek.count} meting${lastWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}` : `geen metingen · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}`, val: prevAvg ?? '—', color: '#fff' },
-                  { label: 'vs Vorige week', sub: weekDiff !== null ? 'verschil tussen weekgemiddelden' : 'geen vergelijking', val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: weekDiff !== null ? weightGoalColor(weekDiff, doelBron) : 'rgba(255,255,255,0.4)' },
+                  { label: 'Deze week', sub: weekDiff !== null ? `gem. ${lopendNu.gemiddelde} vs ${lopendVorig.gemiddelde} kg · ${lopendVorig.metingen} en ${lopendNu.metingen} wegingen` : (lopendNu.metingen === 0 ? 'nog geen weging sinds zaterdag' : 'vorige week geen wegingen'), val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: tempoKleur(weekDiff, weekGenoeg) },
+                  { label: 'Laatste zaterdag', sub: za.verschil != null ? `za ${fmtDag(za.zaterdag)} · gem. ${za.nu.gemiddelde} vs ${za.vorige.gemiddelde} kg` : `za ${fmtDag(za.zaterdag)} · te weinig wegingen`, val: za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—', color: tempoKleur(za.verschil, zaGenoeg) },
+                  { label: 'Zaterdag ervoor', sub: `za ${fmtDag(za.vorigeZaterdag)}`, val: (() => { const v = zaterdagTempo(history, new Date(`${za.vorigeZaterdag}T00:00:00`)); return v.verschil != null ? `${v.verschil > 0 ? '+' : ''}${v.verschil}` : '—' })(), color: (() => { const v = zaterdagTempo(history, new Date(`${za.vorigeZaterdag}T00:00:00`)); return tempoKleur(v.verschil, v.nu.metingen >= 3 && v.vorige.metingen >= 3) })() },
                   { label: fase ? 'Sinds start fase' : 'Sinds start', sub: startDateLabel ? `${fase ? 'fase vanaf' : 'eerste meting ·'} ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)' },
                 ].map((s, i) => (
                   <div key={i} style={{ padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
