@@ -174,17 +174,18 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // sinds de laatste zaterdag (zondag t/m vandaag) tegenover de 7 dagen tot
   // en met die zaterdag; "Laatste zaterdag" is het vaste weekpunt. Stond hier
   // als kalenderweek ma-zo; dat was een andere maat dan de rest (8 okt 2026).
-  const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0)
-  const zaIso = laatsteZaterdag(vandaag)
-  const dagenSindsZa = Math.round((vandaag.getTime() - new Date(`${zaIso}T00:00:00`).getTime()) / 86400000)
-  const isoVandaag = `${vandaag.getFullYear()}-${String(vandaag.getMonth() + 1).padStart(2, '0')}-${String(vandaag.getDate()).padStart(2, '0')}`
+  // `vandaag` (JJJJ-MM-DD) bestaat hierboven al voor het afvinken.
+  const nuDag = new Date(`${vandaag}T00:00:00`)
+  const zaIso = laatsteZaterdag(nuDag)
+  const dagenSindsZa = Math.round((nuDag.getTime() - new Date(`${zaIso}T00:00:00`).getTime()) / 86400000)
+  const isoVandaag = vandaag
   const lopendNu = dagenSindsZa > 0 ? vensterGemiddelde(history, isoVandaag, dagenSindsZa) : { gemiddelde: null, metingen: 0 }
   const lopendVorig = vensterGemiddelde(history, zaIso)
   const weekDiff = (lopendNu.gemiddelde != null && lopendVorig.gemiddelde != null)
     ? Math.round((lopendNu.gemiddelde - lopendVorig.gemiddelde) * 100) / 100
     : null
   const weekGenoeg = lopendNu.metingen >= 3 && lopendVorig.metingen >= 3
-  const za = zaterdagTempo(history, vandaag)
+  const za = zaterdagTempo(history, nuDag)
   const zaGenoeg = za.nu.metingen >= 3 && za.vorige.metingen >= 3
   const fmtDag = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   // Onder de drie wegingen in een van beide vensters geen kleur: dan is het
