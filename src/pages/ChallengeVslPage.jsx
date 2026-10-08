@@ -310,8 +310,23 @@ function Video({ m }) {
   const [speelt, setSpeelt] = useState(false)
   const [gedempt, setGedempt] = useState(false)
   const [voortgang, setVoortgang] = useState(0)
+  // De bediening verdwijnt na een paar seconden zodra de video speelt, en
+  // komt terug bij een tik of muisbeweging. Bij pauze blijft hij staan.
+  const [bedieningZichtbaar, setBedieningZichtbaar] = useState(true)
   const iframeRef = useRef(null)
   const spelerRef = useRef(null)
+  const verbergTimer = useRef(null)
+
+  const toonBediening = () => {
+    setBedieningZichtbaar(true)
+    clearTimeout(verbergTimer.current)
+    verbergTimer.current = setTimeout(() => setBedieningZichtbaar(false), 2500)
+  }
+  useEffect(() => {
+    if (speelt) toonBediening()
+    else { clearTimeout(verbergTimer.current); setBedieningZichtbaar(true) }
+    return () => clearTimeout(verbergTimer.current)
+  }, [speelt])
 
   const directeEmbed = `https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
   const appUrl = appSafeEmbedUrl(directeEmbed)
@@ -423,8 +438,10 @@ function Video({ m }) {
       {/* Tikken op het beeld pauzeert of hervat; de laag vangt de klik af
           zodat de YouTube-knoppen eronder niet reageren. */}
       <div
-        onClick={wisselSpelen}
-        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: bediening, cursor: 'pointer' }}
+        onClick={() => { wisselSpelen(); toonBediening() }}
+        onMouseMove={toonBediening}
+        onTouchStart={toonBediening}
+        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: bedieningZichtbaar ? bediening : 0, cursor: bedieningZichtbaar ? 'pointer' : 'none' }}
       />
       {!speelt && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -432,12 +449,18 @@ function Video({ m }) {
         </div>
       )}
       {/* Eigen bediening onderin: play/pauze, geluid, voortgang. */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, height: bediening,
-        display: 'flex', alignItems: 'center', gap: m ? 10 : 14,
-        padding: m ? '0 0.75rem' : '0 1rem',
-        background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)',
-      }}>
+      <div
+        onMouseMove={toonBediening}
+        style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0, height: bediening,
+          display: 'flex', alignItems: 'center', gap: m ? 10 : 14,
+          padding: m ? '0 0.75rem' : '0 1rem',
+          background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)',
+          opacity: bedieningZichtbaar ? 1 : 0,
+          transform: bedieningZichtbaar ? 'none' : 'translateY(8px)',
+          pointerEvents: bedieningZichtbaar ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease, transform 0.3s ease',
+        }}>
         <button onClick={wisselSpelen} aria-label={speelt ? 'Pauzeren' : 'Afspelen'} style={knopIcoon}>
           {speelt ? <Pause size={20} fill="#fff" color="#fff" /> : <Play size={20} fill="#fff" color="#fff" />}
         </button>
