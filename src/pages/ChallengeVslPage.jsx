@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import {
   Star, ChevronDown, ChevronRight, Utensils, Dumbbell, MessageCircle,
-  Check, CalendarCheck, Play,
+  Check, CalendarCheck, Play, Pause, Volume2, VolumeX,
 } from 'lucide-react'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
@@ -265,29 +265,103 @@ function TrustpilotBadge({ style }) {
   )
 }
 
-// De video: eerst een stilstaand beeld met een afspeelknop, pas bij een tik
-// de echte speler. Zo laadt de pagina snel en begint er niets vanzelf.
+// ── De speler ───────────────────────────────────────────────────────────────
+//
+// Eerst een stilstaand beeld met een afspeelknop; pas bij een tik de echte
+// speler. De YouTube-bediening staat uit (controls=0) en daar ligt onze eigen
+// laag overheen: play/pauze, geluid en een voortgangsbalk.
+//
+// Die balk loopt niet gelijk met de tijd. In het begin gaat hij snel en
+// daarna vlakt hij af: wie wil weten "hoe lang duurt dit" ziet de balk
+// opschieten en kijkt verder; tegen de tijd dat hij merkt dat de video
+// langer is, zit hij er al in. Daarom is de balk ook niet versleepbaar.
+//
+// In de native app loopt de iframe via yt.html (zie youtubeHelpers); daar
+// werkt de IFrame API niet, dus daar blijft de gewone YouTube-speler staan.
+const TOON_VOORTGANG = (x) => Math.pow(Math.max(0, Math.min(1, x)), 0.6)
+
+function laadYouTubeApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT)
+  if (!window.__ytApiBelofte) {
+    window.__ytApiBelofte = new Promise((resolve) => {
+      const vorige = window.onYouTubeIframeAPIReady
+      window.onYouTubeIframeAPIReady = () => { vorige?.(); resolve(window.YT) }
+      const el = document.createElement('script')
+      el.src = 'https://www.youtube.com/iframe_api'
+      document.head.appendChild(el)
+    })
+  }
+  return window.__ytApiBelofte
+}
+
 function Video({ m }) {
+  const [gestart, setGestart] = useState(false)
   const [speelt, setSpeelt] = useState(false)
-  const src = appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&rel=0&modestbranding=1`)
-  return (
-    <div style={{
-      position: 'relative', width: '100%', aspectRatio: '16 / 9',
-      borderRadius: m ? 14 : 18, overflow: 'hidden', background: '#111',
-      border: '1px solid rgba(255,255,255,0.1)',
-      boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
-    }}>
-      {speelt ? (
-        <iframe
-          src={src}
-          title="Hoe de 6 Weken Challenge werkt"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
-        />
-      ) : (
+  const [gedempt, setGedempt] = useState(false)
+  const [voortgang, setVoortgang] = useState(0)
+  const iframeRef = useRef(null)
+  const spelerRef = useRef(null)
+
+  const directeEmbed = `https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
+  const appUrl = appSafeEmbedUrl(directeEmbed)
+  // In de app gaat de URL door yt.html; dan geen eigen laag.
+  const eigenLaag = appUrl === directeEmbed
+
+  useEffect(() => {
+    if (!gestart || !eigenLaag) return
+    let weg = false
+    laadYouTubeApi().then((YT) => {
+      if (weg || !iframeRef.current) return
+      spelerRef.current = new YT.Player(iframeRef.current, {
+        events: {
+          onReady: (e) => { e.target.playVideo() },
+          onStateChange: (e) => {
+            setSpeelt(e.data === YT.PlayerState.PLAYING)
+            if (e.data === YT.PlayerState.ENDED) setVoortgang(1)
+          },
+        },
+      })
+    })
+    return () => { weg = true; try { spelerRef.current?.destroy?.() } catch { /* leeg */ } }
+  }, [gestart, eigenLaag])
+
+  useEffect(() => {
+    if (!speelt) return
+    const t = setInterval(() => {
+      const p = spelerRef.current
+      try {
+        const duur = p?.getDuration?.() || 0
+        const nu = p?.getCurrentTime?.() || 0
+        if (duur > 0) setVoortgang(nu / duur)
+      } catch { /* speler nog niet klaar */ }
+    }, 200)
+    return () => clearInterval(t)
+  }, [speelt])
+
+  const wisselSpelen = () => {
+    const p = spelerRef.current
+    if (!p?.getPlayerState) return
+    if (p.getPlayerState() === 1) p.pauseVideo(); else p.playVideo()
+  }
+  const wisselGeluid = (e) => {
+    e.stopPropagation()
+    const p = spelerRef.current
+    if (!p?.mute) return
+    if (gedempt) { p.unMute(); setGedempt(false) } else { p.mute(); setGedempt(true) }
+  }
+
+  const kader = {
+    position: 'relative', width: '100%', aspectRatio: '16 / 9',
+    borderRadius: m ? 14 : 18, overflow: 'hidden', background: '#111',
+    border: '1px solid rgba(255,255,255,0.1)',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+  }
+
+  if (!gestart) {
+    return (
+      <div style={kader}>
         <button
-          onClick={() => setSpeelt(true)}
+          onClick={() => setGestart(true)}
           aria-label="Video afspelen"
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -305,9 +379,75 @@ function Video({ m }) {
             style={{ position: 'relative', filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }}
           />
         </button>
+      </div>
+    )
+  }
+
+  if (!eigenLaag) {
+    return (
+      <div style={kader}>
+        <iframe
+          src={appUrl}
+          title="Hoe de 6 Weken Challenge werkt"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+        />
+      </div>
+    )
+  }
+
+  const bediening = m ? 44 : 52
+  return (
+    <div style={kader}>
+      <iframe
+        ref={iframeRef}
+        src={`${directeEmbed}&enablejsapi=1&controls=0&disablekb=1&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`}
+        title="Hoe de 6 Weken Challenge werkt"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+      />
+      {/* Tikken op het beeld pauzeert of hervat; de laag vangt de klik af
+          zodat de YouTube-knoppen eronder niet reageren. */}
+      <div
+        onClick={wisselSpelen}
+        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: bediening, cursor: 'pointer' }}
+      />
+      {!speelt && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <Play size={m ? 56 : 72} fill={GOLD} color={GOLD} strokeWidth={1} style={{ filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }} />
+        </div>
       )}
+      {/* Eigen bediening onderin: play/pauze, geluid, voortgang. */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: bediening,
+        display: 'flex', alignItems: 'center', gap: m ? 10 : 14,
+        padding: m ? '0 0.75rem' : '0 1rem',
+        background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)',
+      }}>
+        <button onClick={wisselSpelen} aria-label={speelt ? 'Pauzeren' : 'Afspelen'} style={knopIcoon}>
+          {speelt ? <Pause size={20} fill="#fff" color="#fff" /> : <Play size={20} fill="#fff" color="#fff" />}
+        </button>
+        <button onClick={wisselGeluid} aria-label={gedempt ? 'Geluid aan' : 'Geluid uit'} style={knopIcoon}>
+          {gedempt ? <VolumeX size={20} color="#fff" /> : <Volume2 size={20} color="#fff" />}
+        </button>
+        <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.25)', overflow: 'hidden' }}>
+          <div style={{
+            width: `${TOON_VOORTGANG(voortgang) * 100}%`, height: '100%',
+            background: GOUD_KNOP, borderRadius: 3,
+            transition: 'width 0.25s linear',
+          }} />
+        </div>
+      </div>
     </div>
   )
+}
+
+const knopIcoon = {
+  width: 36, height: 36, padding: 0, flexShrink: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'transparent', border: 'none', cursor: 'pointer',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
 function Vraag({ item, open, onToggle, m }) {
