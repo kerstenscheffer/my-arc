@@ -109,12 +109,18 @@ export default function TrainingToevoegen({
     key: maakPlanKey(p.id, dagKey), w, plan: p.name, naam: w?.name || w?.focus || dagKey,
     sub: [p.name, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
   })))
+  // Standaarddagen: per plan, en zonder dubbelen. Dezelfde dag staat vaak in
+  // meerdere sjablonen (Full body A in 2x gym én 3x gym); is de oefeningen-
+  // lijst identiek, dan tonen we hem één keer, bij het eerste plan.
+  const gezien = new Set()
+  const vingerafdruk = (naam, w) => `${String(naam).toLowerCase()}|${(w?.exercises || []).map(e => `${String(e?.name || '').toLowerCase()}:${e?.sets || ''}x${e?.reps || ''}`).join(',')}`
   const standaardDagen = standaardPlannen
     .filter(p => !anderePlannen.some(a => a.id === p.id))
     .flatMap(p => Object.entries(p.week_structure || {}).map(([dagKey, w]) => ({
       key: maakPlanKey(p.id, dagKey), w, plan: p.name, naam: w?.name || w?.focus || dagKey,
       sub: [p.name, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
     })))
+    .filter(d => { const v = vingerafdruk(d.naam, d.w); if (gezien.has(v)) return false; gezien.add(v); return true })
   const naamVan = (key) => {
     const w = getWorkoutData ? getWorkoutData(key) : null
     if (w?.name || w?.focus) return w.name || w.focus
@@ -239,14 +245,26 @@ export default function TrainingToevoegen({
                   }}
                 />
                 {groepen.length === 0 && <div style={{ padding: '1.5rem 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Niets gevonden voor "{zoek}"</div>}
-                {groepen.map((g, gi) => (
-                  <div key={g.titel}>
-                    <div style={{ fontSize: isMobile ? '1.35rem' : '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.1, margin: gi === 0 ? '6px 0 10px' : '20px 0 10px' }}>{g.titel}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 8 }}>
-                      {g.items.map(item => <Kaart key={item.key} item={item} />)}
+                {groepen.map((g, gi) => {
+                  // Standaardtrainingen per plan onder elkaar, met de plannaam
+                  // als tussenkop; anders is het één lange muur van kaarten.
+                  const perPlan = g.titel === 'Standaardtrainingen'
+                    ? [...new Set(g.items.map(i => i.plan))].map(plan => ({ plan, items: g.items.filter(i => i.plan === plan) }))
+                    : [{ plan: null, items: g.items }]
+                  return (
+                    <div key={g.titel}>
+                      <div style={{ fontSize: isMobile ? '1.35rem' : '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.1, margin: gi === 0 ? '6px 0 10px' : '20px 0 10px' }}>{g.titel}</div>
+                      {perPlan.map((pp, pi) => (
+                        <div key={pp.plan || 'alle'} style={{ marginTop: pi === 0 ? 0 : 12 }}>
+                          {pp.plan && <div style={{ fontSize: '0.78rem', fontWeight: 900, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px' }}>{pp.plan.replace(/^MY ARC\s*·\s*/i, '')}</div>}
+                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 8 }}>
+                            {pp.items.map(item => <Kaart key={item.key} item={item} />)}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
                 <button onClick={() => { tik(); setEigenOpen(true) }} style={{ ...tegel(false), marginTop: 10, borderStyle: 'dashed', justifyContent: 'center' }}>
                   <Plus size={16} strokeWidth={2.8} /><span style={{ fontSize: '0.9rem', fontWeight: 900 }}>Eigen training opstellen</span>
                 </button>
