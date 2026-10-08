@@ -573,9 +573,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // Zijpaneel-knop: plat, volle breedte, geen vakje eromheen.
   const zijKnop = (extra = {}) => ({
     display: 'flex', alignItems: 'center', gap: 7,
-    width: '100%', padding: '0.45rem 0',
+    width: '100%', padding: '0.3rem 0',
     background: 'none', border: 'none', fontFamily: 'inherit',
-    fontSize: '0.82rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)',
+    fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)',
     cursor: 'pointer', textAlign: 'left',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
     ...extra,
@@ -607,8 +607,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
         borderBottom: isMobile ? '1px solid rgba(255,255,255,0.08)' : 'none',
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        padding: isMobile ? '0.75rem' : '1rem',
-        display: 'flex', flexDirection: 'column', gap: '0.85rem',
+        padding: isMobile ? '0.6rem 0.75rem' : '0.75rem 0.85rem',
+        display: 'flex', flexDirection: 'column', gap: '0.5rem',
       }}>
 
         {/* Klant + schema */}
@@ -630,7 +630,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* ── Intake — de antwoorden van de klant, naast je werk ──────── */}
         {intake && (intake.regels.length > 0 || intake.blessures) && (
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem' }}>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.35rem' }}>
             <button onClick={() => setIntakeOpen(v => !v)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
               <ChevronDown size={14} style={{ transform: intakeOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
               Intake
@@ -678,10 +678,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* ── Dagen — dit is de navigatie ─────────────────────────────── */}
         <div>
-          <div style={{ fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>
+          <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
             {workoutPlan.days.length} {workoutPlan.days.length === 1 ? 'dag' : 'dagen'}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {workoutPlan.days.map((day, index) => {
               const aan = day.id === activeDay
               const aantal = (day.exercises || []).length
@@ -689,20 +689,20 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 <button key={day.id} onClick={() => setActiveDay(day.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8,
+                    width: '100%', padding: '0.3rem 0.5rem', borderRadius: 7,
                     background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
                     border: `1px solid ${aan ? 'rgba(255,255,255,0.2)' : 'transparent'}`,
                     color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   }}>
                   <span style={{
-                    flexShrink: 0, minWidth: 22, height: 22, borderRadius: 6,
+                    flexShrink: 0, minWidth: 20, height: 20, borderRadius: 5,
                     background: aan ? '#fff' : 'rgba(255,255,255,0.08)',
                     color: aan ? '#000' : 'rgba(255,255,255,0.6)',
                     fontSize: '0.72rem', fontWeight: 900,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>{index + 1}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: aan ? 900 : 700, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: aan ? 900 : 700, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {day.name || `Dag ${index + 1}`}
                   </span>
                   <span style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
@@ -711,14 +711,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 </button>
               )
             })}
-            <button onClick={() => setShowDayPicker(true)} style={zijKnop({ padding: '0.5rem 0.6rem', color: '#fff', fontWeight: 900 })}>
+            <button onClick={() => setShowDayPicker(true)} style={zijKnop({ padding: '0.3rem 0.5rem', color: '#fff', fontWeight: 900 })}>
               <Plus size={14} strokeWidth={2.8} /> Nieuwe dag
             </button>
           </div>
         </div>
 
         {/* ── Planinstellingen — dichtgeklapt; je stelt ze één keer in ─── */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem' }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.35rem' }}>
           <button onClick={() => setInstellingenOpen(v => !v)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
             <ChevronDown size={14} style={{ transform: instellingenOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
             Planinstellingen
@@ -747,7 +747,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         </div>
 
         {/* ── Acties — onder elkaar i.p.v. tien knoppen op een rij ─────── */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
           {/* Trainingsweek — de zeven dagen naast elkaar, per dag bladeren
               met pijltjes. Was een wizard van vier stappen; bij het plannen
               van een week wil je juist alles tegelijk zien, want je kijkt
@@ -787,7 +787,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             <Trash2 size={14} /> Leegmaken
           </button>
 
-          <div style={{ display: 'flex', gap: 6, marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: '0.25rem' }}>
             <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken"
               style={{ ...zijKnop({ width: 'auto', padding: '0.4rem 0.55rem' }), opacity: history.canUndo ? 1 : 0.3 }}>
               <Undo2 size={15} />
