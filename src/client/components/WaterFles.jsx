@@ -161,20 +161,7 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
         zIndex: 95, touchAction: 'none',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       }}>
-      {/* Inklappen: de fles wordt een randje aan de zijkant. */}
-      <button
-        onClick={() => klapIn(true)}
-        aria-label="Waterfles verbergen"
-        style={{
-          width: 26, height: 26, padding: 0, borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(10,10,10,0.9)', border: '1px solid rgba(255,255,255,0.14)',
-          color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <ChevronRight size={14} strokeWidth={3} />
-      </button>
+
       {/* Min-knop: alleen vlak na een tik, want meestal heb je hem niet nodig. */}
       <button
         onClick={() => { if (!sleep.current.verplaatst) verzet(-STAP_ML) }}
@@ -198,6 +185,26 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
       {/* De fles zelf: een echte flesvorm in SVG, die van onderen volloopt.
           Een afgerond blokje leek op een knop; hier zie je in één oogopslag
           waar het over gaat. */}
+      <div style={{ position: 'relative' }}>
+      {/* Inklappen: klein knopje tegen de dop van de fles, zodat je ziet dat
+          het bij de fles hoort en niet bij de lijst erboven. */}
+      <button
+        onClick={(e) => { e.stopPropagation(); klapIn(true) }}
+        onPointerDown={(e) => e.stopPropagation()}
+        aria-label="Waterfles verbergen"
+        title="Verbergen"
+        style={{
+          position: 'absolute', top: -4, right: -8, zIndex: 2,
+          width: 20, height: 20, padding: 0, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#fff', border: '1px solid rgba(0,0,0,0.3)',
+          color: '#0a0a0a', cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <ChevronRight size={12} strokeWidth={3.5} />
+      </button>
       <button
         onClick={() => { if (!sleep.current.verplaatst) verzet(STAP_ML) }}
         aria-label={`${ml} van ${doelMl} milliliter water. Tik voor 100 ml erbij. Sleep om te verplaatsen.`}
@@ -274,6 +281,7 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
           {liters}<span style={{ color: 'rgba(255,255,255,0.45)' }}>/{(doelMl / 1000).toFixed(1)}L</span>
         </span>
       </button>
+      </div>
     </div>
   )
 }
