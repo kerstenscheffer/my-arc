@@ -469,7 +469,7 @@ function KalenderBlad({ open, onClose, m }) {
   // embed_domain + embed_type zijn wat Calendly's eigen widget-script
   // meegeeft; zonder die twee blijft de pagina in een iframe op de
   // laadpuntjes hangen.
-  const url = `${CALENDLY}?embed_domain=${encodeURIComponent(window.location.hostname)}&embed_type=Inline&hide_gdpr_banner=1&background_color=0a0a0a&text_color=ffffff&primary_color=ffd700`
+  const url = `${CALENDLY}?embed_domain=${encodeURIComponent(window.location.hostname)}&embed_type=Inline&hide_gdpr_banner=1&hide_event_type_details=1&hide_landing_page_details=1&background_color=0a0a0a&text_color=ffffff&primary_color=ffd700`
   return (
     <div
       onClick={onClose}
