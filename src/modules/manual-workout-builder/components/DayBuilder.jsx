@@ -95,7 +95,7 @@ export default function DayBuilder({
         borderRadius: '16px',
         border: `1px solid ${isActive ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
         boxShadow: 'none',
-        padding: isMobile ? '1rem' : '1.25rem', cursor: 'pointer',
+        padding: isMobile ? '0.7rem' : '0.85rem', cursor: 'pointer',
         transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)',
         position: 'relative', overflow: 'hidden',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
@@ -109,7 +109,7 @@ export default function DayBuilder({
       )}
 
       {/* ═══ Header — compact, max 2 regels (leadsysteem-stijl) ═══ */}
-      <div style={{ marginBottom: collapsed ? 0 : '0.85rem' }}>
+      <div style={{ marginBottom: collapsed ? 0 : '0.5rem' }}>
 
         {/* Regel 1: dagnr + naam + spiergroep · acties */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
@@ -169,17 +169,17 @@ export default function DayBuilder({
             60 en was nergens te wijzigen, terwijl hij wel doorloopt naar de
             PDF en naar het trainingsblok in de agenda. */}
         {!collapsed && (
-          <div style={{ display: 'flex', marginTop: '0.7rem', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', marginTop: '0.5rem', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
             {[
               { v: day.exercises.length, l: 'Oefeningen' },
               { v: totalVolume, l: 'Sets' },
             ].map((s, i) => (
-              <div key={s.l} style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.5rem 0.4rem' : '0.55rem 0.6rem', borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+              <div key={s.l} style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.35rem 0.4rem' : '0.4rem 0.6rem', borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
                 <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: 900, color: '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.v}</div>
                 <div style={{ fontSize: '0.5rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>{s.l}</div>
               </div>
             ))}
-            <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.5rem 0.4rem' : '0.55rem 0.6rem', borderLeft: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.35rem 0.4rem' : '0.4rem 0.6rem', borderLeft: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
               <input
                 type="number"
                 min="5" max="240" step="5"
@@ -215,7 +215,7 @@ export default function DayBuilder({
         <>
           {/* Bulk edit panel */}
           {day.exercises.length > 0 && (
-            <div style={{ marginTop: '0.85rem', marginBottom: bulkOpen ? '0.75rem' : '0.25rem' }}>
+            <div style={{ marginTop: '0.5rem', marginBottom: bulkOpen ? '0.6rem' : 0 }}>
               <button
                 onClick={e => { e.stopPropagation(); setBulkOpen(v => !v) }}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.65rem', background: bulkOpen ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${bulkOpen ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 7, color: bulkOpen ? '#FFD700' : 'rgba(255,255,255,0.5)', fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}
@@ -255,7 +255,7 @@ export default function DayBuilder({
 
           {/* gap 10px: de sleep-hook rekent met diezelfde 10 om de andere
               kaarten precies één plek op te schuiven. */}
-          <div ref={sleep.lijstRef} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: '1rem', marginBottom: '1rem', maxHeight: isMobile ? '400px' : '440px', overflowY: sleep.bezig ? 'hidden' : 'auto', WebkitOverflowScrolling: 'touch', paddingRight: day.exercises.length > 5 ? '0.4rem' : 0 }}>
+          <div ref={sleep.lijstRef} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: '0.55rem', marginBottom: '0.55rem', maxHeight: isMobile ? '400px' : '520px', overflowY: sleep.bezig ? 'hidden' : 'auto', WebkitOverflowScrolling: 'touch', paddingRight: day.exercises.length > 5 ? '0.4rem' : 0 }}>
             {day.exercises.map((exercise, index) => (
               <div key={exercise.id} data-sleep-index={index} style={sleep.kaartStijl(index)}>
                 <BuilderExerciseCard
@@ -282,7 +282,7 @@ export default function DayBuilder({
           {/* Add Exercise + Add Cardio — rustige leadsysteem-knoppen */}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button onClick={(e) => { e.stopPropagation(); onAddExercise() }}
-              style={{ flex: 1, padding: '0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '42px' }}
+              style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '38px' }}
               onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}>
               <Plus size={16} color="#FFD700" />Oefening
