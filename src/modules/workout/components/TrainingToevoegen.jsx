@@ -35,12 +35,22 @@ export default function TrainingToevoegen({
   // De andere plannen van de klant: elke dag daaruit is ook te kiezen,
   // zonder van actief plan te wisselen (call Martijn, 8 okt 2026).
   const [anderePlannen, setAnderePlannen] = useState([])
+  // Ook de standaardplannen van de coach (is_template + is_public): iedereen
+  // mag elke soort trainingsdag kiezen, niet alleen wat in zijn eigen
+  // plannen staat (8 okt 2026).
+  const [standaardPlannen, setStandaardPlannen] = useState([])
   useEffect(() => {
     if (!open || !db?.getClientWorkoutPlans || !clientId) return
     let weg = false
     db.getClientWorkoutPlans(clientId)
       .then(({ plans }) => { if (!weg) setAnderePlannen((plans || []).filter(p => p.id !== schema?.id && p.week_structure)) })
       .catch(() => {})
+    db.supabase?.from('workout_schemas')
+      .select('id, name, days_per_week, week_structure')
+      .eq('is_template', true).eq('is_public', true)
+      .or('is_archived.is.null,is_archived.eq.false')
+      .order('days_per_week', { ascending: true }).order('name', { ascending: true })
+      .then(r => { if (!weg) setStandaardPlannen((r?.data || []).filter(p => p.id !== schema?.id && p.week_structure)) }, () => {})
     return () => { weg = true }
   }, [open, clientId, schema?.id, db])
   const [soortTraining, setSoortTraining] = useState(null) // 'gym' | 'cardio'
@@ -96,10 +106,16 @@ export default function TrainingToevoegen({
     key: maakPlanKey(p.id, dagKey), naam: w?.name || w?.focus || dagKey,
     sub: [p.name, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
   })))
+  const standaardDagen = standaardPlannen
+    .filter(p => !anderePlannen.some(a => a.id === p.id))
+    .flatMap(p => Object.entries(p.week_structure || {}).map(([dagKey, w]) => ({
+      key: maakPlanKey(p.id, dagKey), naam: w?.name || w?.focus || dagKey,
+      sub: [p.name, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
+    })))
   const naamVan = (key) => {
     const w = getWorkoutData ? getWorkoutData(key) : null
     if (w?.name || w?.focus) return w.name || w.focus
-    const ander = andereDagen.find(d => d.key === key)
+    const ander = andereDagen.find(d => d.key === key) || standaardDagen.find(d => d.key === key)
     return ander?.naam || key
   }
 
@@ -173,6 +189,16 @@ export default function TrainingToevoegen({
               ))}
               {andereDagen.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '8px 0 2px' }}>Uit je andere plannen</div>}
               {andereDagen.map(p => (
+                <button key={p.key} onClick={() => { tik(); setWorkoutKey(p.key); setStap('gym-dag') }} style={tegel(workoutKey === p.key)}>
+                  <Dumbbell size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.naam}</div>
+                    {p.sub && <div style={sub}>{p.sub}</div>}
+                  </div>
+                </button>
+              ))}
+              {standaardDagen.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '8px 0 2px' }}>Standaardtrainingen</div>}
+              {standaardDagen.map(p => (
                 <button key={p.key} onClick={() => { tik(); setWorkoutKey(p.key); setStap('gym-dag') }} style={tegel(workoutKey === p.key)}>
                   <Dumbbell size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>

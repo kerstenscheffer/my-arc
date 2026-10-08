@@ -305,6 +305,12 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
 
   const handleMakePermanent = async (newExercise) => {
     if (!schema?.id || !workoutDayKey || swapping) return
+    // Een standaardplan van de coach is gedeeld; een permanente wissel zou
+    // voor iedereen gelden. Dan wordt het een weekwissel voor deze klant.
+    if (schema?.is_template) {
+      alert('Dit is een standaardtraining van je coach. De wissel geldt voor deze week.')
+      return handleSwap(newExercise)
+    }
     setSwapping(true)
     try {
       const updatedExercise = {
