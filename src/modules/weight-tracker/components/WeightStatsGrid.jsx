@@ -9,7 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { weightGoalColor } from '../utils/weightGoalColor'
 import {
   maakConfig, trendReeks, tempoPerWeek, weekFractie, lijnenOpWeek, ernstVan, kleurVoorErnst,
-  tempoOordeel, zaterdagReeks, bereikTekst,
+  tempoOordeel, zaterdagReeks, bereikTekst, laatsteZaterdag, vensterGemiddelde,
 } from '../utils/coachingBand'
 
 const PERIODES = [
@@ -391,16 +391,21 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
       const oordeel = (verschil != null && genoeg) ? tempoOordeel(verschil, bandConfig) : null
       return oordeel == null ? 'rgba(255,255,255,0.45)' : oordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b'
     }
-    // Vooraan: de lopende kalenderweek. Het gemiddelde van deze week (maandag
-    // tot en met vandaag) tegenover het gemiddelde van vorige week (ma-zo).
-    // Dit is wat je door de week heen wilt zien; de zaterdag-reeks erachter
-    // is het vaste weekpunt (Kersten, 8 okt 2026).
-    const nu = getCalendarWeekAvg(0)
-    const vorig = getCalendarWeekAvg(-1)
+    // Vooraan: de lopende week, op dezelfde zaterdag-maat als de rest. Het
+    // venster sinds de laatste zaterdag (zondag tot en met vandaag) tegenover
+    // de zeven dagen tot en met die zaterdag. Zo kijk je door de week heen
+    // alvast naar het getal dat zaterdag vast komt te staan (Kersten, 8 okt
+    // 2026: "we doen altijd zaterdag tot zaterdag").
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0)
+    const za = laatsteZaterdag(vandaag)
+    const dagenSinds = Math.round((vandaag.getTime() - new Date(`${za}T00:00:00`).getTime()) / 86400000)
+    const isoVandaag = `${vandaag.getFullYear()}-${String(vandaag.getMonth() + 1).padStart(2, '0')}-${String(vandaag.getDate()).padStart(2, '0')}`
+    const nu = dagenSinds > 0 ? vensterGemiddelde(binnenFase, isoVandaag, dagenSinds) : { gemiddelde: null, metingen: 0 }
+    const vorig = vensterGemiddelde(binnenFase, za)
     const lopend = []
-    if (nu.count > 0 || vorig.count > 0) {
-      const verschil = (nu.avg != null && vorig.avg != null) ? Math.round((nu.avg - vorig.avg) * 100) / 100 : null
-      const genoeg = nu.count >= 3 && vorig.count >= 3
+    if (dagenSinds > 0 && (nu.metingen > 0 || vorig.metingen > 0)) {
+      const verschil = (nu.gemiddelde != null && vorig.gemiddelde != null) ? Math.round((nu.gemiddelde - vorig.gemiddelde) * 100) / 100 : null
+      const genoeg = nu.metingen >= 3 && vorig.metingen >= 3
       lopend.push({
         sleutel: 'lopend',
         waarde: verschil,
@@ -408,8 +413,8 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         kleur: kleurVoor(verschil, genoeg),
         kop: 'Deze week',
         onder: verschil == null
-          ? (nu.count === 0 ? 'nog geen weging deze week' : 'vorige week geen wegingen')
-          : genoeg ? `gem. ${nu.avg} vs ${vorig.avg} kg` : `${vorig.count} en ${nu.count} wegingen`,
+          ? (nu.metingen === 0 ? 'nog geen weging sinds zaterdag' : 'vorige week geen wegingen')
+          : genoeg ? `gem. ${nu.gemiddelde} vs ${vorig.gemiddelde} kg` : `${vorig.metingen} en ${nu.metingen} wegingen`,
       })
     }
     const zaterdagen = zaterdagReeks(binnenFase).map((z, i) => {
@@ -943,7 +948,7 @@ const UITLEG_FOTO = (id) => `https://images.unsplash.com/${id}?w=640&h=360&fit=c
 const UITLEG_THUMB = (id) => `https://images.unsplash.com/${id}?w=160&h=160&fit=crop&q=70`
 function UitlegModal({ isMobile, coach, onClose }) {
   const regels = [
-    { kop: 'Deze week', foto: 'photo-1522844990619-4951c40f7eda', tekst: 'Je gemiddelde van deze week (maandag tot nu) min het gemiddelde van vorige week. Loopt mee tot zondag.' },
+    { kop: 'Deze week', foto: 'photo-1522844990619-4951c40f7eda', tekst: 'Je gemiddelde sinds de laatste zaterdag (zondag tot nu) min het gemiddelde van de 7 dagen tot en met die zaterdag. Loopt mee tot het komende zaterdag vast staat.' },
     { kop: 'Laatste zaterdag', foto: 'photo-1626794174544-c3200f10e32b', tekst: 'Het vaste weekpunt. Gemiddelde van de 7 dagen tot en met zaterdag, min diezelfde 7 dagen een week eerder. Daarachter: de zaterdagen ervoor.' },
     { kop: 'Sinds start', foto: 'photo-1561570121-c8219daec12b', tekst: 'Je laatste weging tegenover je startgewicht. Het grote plaatje.' },
     { kop: 'Kleur', kleuren: [['#10b981', 'op koers'], ['#f59e0b', 'te langzaam of te snel'], ['rgba(255,255,255,0.45)', 'minder dan 3 wegingen, dus nog ruis']] },
