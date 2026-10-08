@@ -25,19 +25,30 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
   const [standaard, setStandaard] = useState([])
   const [openId, setOpenId] = useState(null)
   const [busyId, setBusyId] = useState(null)
+  // Coach-kant: alle templates van de coach (niet alleen de publieke), dus
+  // met een zoekveld. De klant ziet alleen de publieke standaardplannen.
+  const [zoek, setZoek] = useState('')
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       setLoading(true)
       try {
+        // Coach: eigen templates én publieke. De coach miste zo "5X | PPL-UL"
+        // (wel template, niet publiek) bij het toewijzen (8 okt 2026).
+        let tplQ = db.supabase.from('workout_schemas')
+          .select('id, name, description, primary_goal, days_per_week, week_structure, equipment, is_public')
+          .eq('is_template', true)
+          .or('is_archived.is.null,is_archived.eq.false')
+        if (viewerRole === 'coach') {
+          const uid = (await db.getCurrentUser())?.id
+          tplQ = uid ? tplQ.or(`is_public.eq.true,user_id.eq.${uid}`) : tplQ.eq('is_public', true)
+        } else {
+          tplQ = tplQ.eq('is_public', true)
+        }
         const [eigen, std] = await Promise.all([
           db.getClientWorkoutPlans(client.id),
-          db.supabase.from('workout_schemas')
-            .select('id, name, description, primary_goal, days_per_week, week_structure, equipment')
-            .eq('is_template', true).eq('is_public', true)
-            .or('is_archived.is.null,is_archived.eq.false')
-            .order('days_per_week', { ascending: true }).order('name', { ascending: true })
+          tplQ.order('days_per_week', { ascending: true }).order('name', { ascending: true })
             .then(r => r, () => ({ data: [] })),
         ])
         if (!alive) return
@@ -136,7 +147,10 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
   }
 
   // Standaardplannen gegroepeerd per aantal dagen; de klant kiest op tijd.
-  const perDagen = standaard.reduce((acc, p) => {
+  const zichtbaar = zoek.trim()
+    ? standaard.filter(p => String(p.name || '').toLowerCase().includes(zoek.trim().toLowerCase()))
+    : standaard
+  const perDagen = zichtbaar.reduce((acc, p) => {
     const k = p.days_per_week || dayList(p.week_structure).length || 0
     ;(acc[k] = acc[k] || []).push(p)
     return acc
@@ -178,12 +192,16 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
 
               {standaard.length > 0 && (
                 <div style={{ marginTop: '1.5rem' }}>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{viewerRole === 'coach' ? 'Standaardplannen' : 'Even een week minder tijd?'}</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{viewerRole === 'coach' ? `Templates (${standaard.length})` : 'Even een week minder tijd?'}</div>
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2, marginBottom: 10, lineHeight: 1.4 }}>
                     {viewerRole === 'coach'
                       ? `Kiezen zet een kopie bij ${client?.first_name || 'de klant'} en maakt die actief. De eigen plannen hierboven blijven staan.`
                       : 'Kies een lichter standaardplan. Je eigen plan blijft hierboven staan, dus je kunt altijd terug.'}
                   </div>
+                  {viewerRole === 'coach' && (
+                    <input value={zoek} onChange={e => setZoek(e.target.value)} placeholder="Zoek template…" style={{ width: '100%', boxSizing: 'border-box', marginBottom: 10, padding: '0.6rem 0.8rem', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 700, outline: 'none' }} />
+                  )}
+                  {zichtbaar.length === 0 && <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', padding: '0.4rem 0' }}>Geen template gevonden.</div>}
                   {Object.keys(perDagen).sort((a, b) => Number(a) - Number(b)).map(k => (
                     <div key={k} style={{ marginBottom: 12 }}>
                       <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px 2px' }}>
