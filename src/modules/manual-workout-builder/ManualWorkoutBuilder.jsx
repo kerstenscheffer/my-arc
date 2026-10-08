@@ -16,7 +16,10 @@ import WeekPlanner from '../workout/components/planning/WeekPlanner'
 import WorkoutService from '../../services/WorkoutService'
 import ClientPlanManagerModal from './components/ClientPlanManagerModal'
 import CardioPlanModal from './components/CardioPlanModal'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart } from 'lucide-react'
+// Dezelfde weekagenda als in de maaltijd-analyzer: trainingen, cardio en
+// de rest van de week van de klant, zodat je ziet waar je iets inplant.
+import ClientAgendaView from '../client-agenda/ClientAgendaView'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -38,6 +41,15 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [showClientAssigner, setShowClientAssigner] = useState(false)
   const [showAgenda, setShowAgenda] = useState(false)
+  // Weekagenda van de klant in het hoofdvlak (aan/uit) en een teller om hem
+  // te laten herladen na cardio-wijzigingen.
+  const [showWeekAgenda, setShowWeekAgenda] = useState(false)
+  const [agendaKey, setAgendaKey] = useState(0)
+  useEffect(() => {
+    const bump = () => setAgendaKey(k => k + 1)
+    window.addEventListener('myarc:cardio-changed', bump)
+    return () => window.removeEventListener('myarc:cardio-changed', bump)
+  }, [])
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
   const [showPlanManager, setShowPlanManager] = useState(false)
   const [showCardio, setShowCardio] = useState(false)
@@ -783,6 +795,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             style={zijKnop({ opacity: (!effectiveClient || !selectedSchemaId) ? 0.35 : 1, cursor: (!effectiveClient || !selectedSchemaId) ? 'not-allowed' : 'pointer' })}>
             <CalendarDays size={14} /> Trainingsweek
           </button>
+          {/* Weekagenda van de klant: wat er al staat (trainingen, cardio,
+              werk) voordat je iets inplant. */}
+          <button onClick={() => setShowWeekAgenda(v => !v)}
+            disabled={!effectiveClient}
+            title={!effectiveClient ? 'Kies eerst een klant' : 'De week van deze klant'}
+            style={zijKnop({ opacity: effectiveClient ? 1 : 0.35, cursor: effectiveClient ? 'pointer' : 'not-allowed', background: showWeekAgenda && effectiveClient ? 'rgba(255,255,255,0.1)' : undefined })}>
+            <Calendar size={14} /> Agenda
+          </button>
           {/* Cardio hangt aan de klant, niet aan het schema: wandelen of
               fietsen wil je juist op de dagen dat er geen training staat. */}
           <button onClick={() => setShowCardio(true)}
@@ -823,6 +843,22 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         padding: isMobile ? '0.75rem' : '1rem',
       }}>
+        {showWeekAgenda && effectiveClient && (
+          <div style={{ margin: isMobile ? '0.5rem' : '0.75rem 1rem 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
+                Week van {effectiveClient.first_name || 'de klant'}
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginLeft: 8 }}>trainingen, cardio en agenda</span>
+              </div>
+              <button onClick={() => setShowWeekAgenda(false)} aria-label="Agenda sluiten" style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={14} strokeWidth={2.6} />
+              </button>
+            </div>
+            <div style={{ height: isMobile ? 460 : 560, overflow: 'auto' }}>
+              <ClientAgendaView client={effectiveClient} db={db} isMobile={isMobile} viewerRole="coach" refreshKey={agendaKey} />
+            </div>
+          </div>
+        )}
         {actieveDag ? (
           <DayBuilder
             key={actieveDag.id} day={actieveDag} dayNumber={actieveIndex + 1} isActive
@@ -945,7 +981,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       )}
 
       {showCardio && effectiveClient && (
-        <CardioPlanModal client={effectiveClient} db={db} isMobile={isMobile} onClose={() => setShowCardio(false)} />
+        <CardioPlanModal client={effectiveClient} db={db} isMobile={isMobile} onClose={() => { setShowCardio(false); setAgendaKey(k => k + 1) }} />
       )}
 
       {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={effectiveClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
