@@ -21,7 +21,7 @@ import useWorkoutSchedule from './hooks/useWorkoutSchedule'
 import useWorkoutProgress from './hooks/useWorkoutProgress'
 import WorkoutService from '../../services/WorkoutService'
 
-export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
+export default function WorkoutPlan({ client, schema, db, onFocusChange, onClientUpdate }) {
   const { t } = useLanguage()
   const isMobile = useIsMobile()
   const chartWidgetRef = useRef(null)
@@ -146,7 +146,14 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         <PlanSwitchModal
           client={client} db={db} isMobile={isMobile}
           onClose={() => setShowPlanSwitch(false)}
-          onActivated={() => { setShowPlanSwitch(false); window.location.reload() }}
+          // Geen harde refresh meer: het dashboard laadt klant en schema
+          // opnieuw, en de pagina volgt de nieuwe props (useWorkoutSchedule
+          // en TodaysWorkoutMain herladen op schema-wissel).
+          onActivated={async () => {
+            setShowPlanSwitch(false)
+            if (onClientUpdate) { try { await onClientUpdate() } catch { window.location.reload() } }
+            else window.location.reload()
+          }}
         />
       )}
 

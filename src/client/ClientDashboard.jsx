@@ -390,7 +390,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
               <ClientHome client={client} db={db} setCurrentView={setCurrentView} />
             )}
             {currentView === 'workout' && (
-              <ClientWorkoutPlan client={client} schema={schema} db={db} onFocusChange={setFocusMode} />
+              <ClientWorkoutPlan client={client} schema={schema} db={db} onFocusChange={setFocusMode} onClientUpdate={loadClientData} />
             )}
             {currentView === 'meal' && (
               <MealPlanMain client={client} db={db} onNavigate={setCurrentView} />
