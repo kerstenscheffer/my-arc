@@ -10,6 +10,7 @@ import WorkoutServiceNew from '../../services/WorkoutServiceNew'
 import { workoutFoto } from '../../utils/workoutFoto'
 import { isWorkoutFullyLogged, workoutCompletionPct } from '../../utils/exerciseCompletion'
 import { ontleedPlanKey } from '../../utils/planKey'
+import CardioVandaag, { useCardioVanDag } from './CardioVandaag'
 
 // onOpenPlanner is vervallen: op een dag zonder training staat geen knop meer,
 // je koppelt hem in de weekstrip eronder.
@@ -161,6 +162,16 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   const currentDate = new Date()
   const todayIndex = (currentDate.getDay() + 6) % 7
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  // Cardio van de gekozen dag (uit het weekrooster), naast of in plaats van
+  // de training bovenaan.
+  const geselecteerdeDatum = (() => {
+    const key = (selectedDay && selectedDay !== 'today') ? String(selectedDay).toLowerCase() : null
+    const idx = key ? weekDays.findIndex(d => d.toLowerCase() === key) : todayIndex
+    const d = new Date(currentDate); d.setHours(12, 0, 0, 0)
+    d.setDate(d.getDate() + ((idx < 0 ? todayIndex : idx) - todayIndex))
+    return d
+  })()
+  const cardioLijst = useCardioVanDag(client, db, geselecteerdeDatum)
 
   useEffect(() => {
     if (schema && client?.id) {
@@ -300,6 +311,10 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   // wegloopt in het zwart met de titel eroverheen. Zonder foto viel de pagina
   // terug op een geel kaartje met een knop, wat er als een foutmelding uitzag.
   // De knop is weg: plannen doe je in de weekstrip die er direct onder staat.
+  if (!todaysWorkout && cardioLijst.length > 0) return (
+    <CardioVandaag lijst={cardioLijst} isMobile={isMobile} volledig />
+  )
+
   if (!todaysWorkout) return (
     <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
       <div style={{
@@ -414,6 +429,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     <>
       {kop}
       <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{kaart}</div>
+      {/* Staat er die dag ook cardio, dan direct onder de training. */}
+      <CardioVandaag lijst={cardioLijst} isMobile={isMobile} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
