@@ -275,8 +275,8 @@ export function PrequalFlow({ m = false, compact = false }) {
         <div ref={bovenRef} />
         {kop('Dank je voor het invullen.')}
         {sub('De challenge past op dit moment niet bij je situatie.')}
-        {sub('Wil je toch aan de slag? Hier is mijn gratis content.')}
-        <a href={GRATIS_CONTENT} style={{ ...knopGoud(m), marginTop: '1.6rem', textDecoration: 'none' }}><Gift size={22} strokeWidth={2.6} /> Gratis content</a>
+        {sub('Volg me op Instagram voor dagelijkse tips.')}
+        <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopGoud(m), marginTop: '1.6rem', textDecoration: 'none' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
       </div>
     )
   }
