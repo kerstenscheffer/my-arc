@@ -664,32 +664,6 @@ export default function WeekSchedule({
         )}
       </div>
 
-      {/* Stappen van de week, als regel onder de plannaam; de cijfers per dag
-          staan onder de tegels. De knop opent de lange lijn (30 & 90 dagen). */}
-      {stappenPerDag && (
-        <div style={{
-          padding: isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.75rem',
-          display: 'flex', alignItems: 'center', gap: 8,
-          fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
-        }}>
-          <Footprints size={isMobile ? 15 : 16} strokeWidth={2.4} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.55)' }} />
-          <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            <span style={{ color: '#fff', fontWeight: 900 }}>{stappenTotaal.toLocaleString('nl-NL')}</span> stappen
-            {stappenDagenGehaald > 0 && <span style={{ color: '#10b981' }}> · {stappenDagenGehaald}× doel</span>}
-            <span> · doel {stappenDoel.toLocaleString('nl-NL')} per dag</span>
-          </span>
-          <button onClick={() => setStappenInzicht(true)} aria-label="Stappen over 30 en 90 dagen" style={{
-            marginLeft: 'auto', flexShrink: 0, width: 30, height: 30, borderRadius: 10,
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}>
-            <BarChart3 size={14} strokeWidth={2.4} />
-          </button>
-        </div>
-      )}
-      <StappenInzichtModal isOpen={stappenInzicht} onClose={() => setStappenInzicht(false)} client={client} db={db} isMobile={isMobile} gewichtKg={Number(client?.current_weight) || null} doel={stappenDoel} />
-
       {/* Weeknavigatie — vorige/volgende week */}
       {(() => {
         const monday = getoondeMaandag
@@ -796,6 +770,31 @@ export default function WeekSchedule({
             />
 
             {tussenBlok}
+            {/* Stappen van de week, direct onder het rooster; de cijfers per dag
+                staan in de tegels. De knop opent de lange lijn (30 & 90 dagen). */}
+            {stappenPerDag && (
+              <div style={{
+                padding: isMobile ? '0.1rem 1rem 0.5rem' : '0.2rem 1.25rem 0.6rem',
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
+              }}>
+                <Footprints size={isMobile ? 15 : 16} strokeWidth={2.4} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.55)' }} />
+                <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ color: '#fff', fontWeight: 900 }}>{stappenTotaal.toLocaleString('nl-NL')}</span> stappen
+                  {stappenDagenGehaald > 0 && <span style={{ color: '#10b981' }}> · {stappenDagenGehaald}× doel</span>}
+                  <span> · doel {stappenDoel.toLocaleString('nl-NL')} per dag</span>
+                </span>
+                <button onClick={() => setStappenInzicht(true)} aria-label="Stappen over 30 en 90 dagen" style={{
+                  marginLeft: 'auto', flexShrink: 0, width: 30, height: 30, borderRadius: 10,
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  <BarChart3 size={14} strokeWidth={2.4} />
+                </button>
+              </div>
+            )}
+            <StappenInzichtModal isOpen={stappenInzicht} onClose={() => setStappenInzicht(false)} client={client} db={db} isMobile={isMobile} gewichtKg={Number(client?.current_weight) || null} doel={stappenDoel} />
           </>
         )
       })()}
