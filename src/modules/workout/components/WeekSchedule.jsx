@@ -504,32 +504,8 @@ export default function WeekSchedule({
   // (elke week) én een regel in het cardioplan; eenmalig = blok met
   // week_start, alleen zichtbaar in deze week.
   const bewaarCardio = async ({ soort, duur, tijd, dagen, bereik }) => {
-    const label = `Cardio · ${soort}`
-    const [h, m] = String(tijd || '18:00').split(':').map(Number)
-    const startMin = (h || 0) * 60 + (m || 0)
-    const eindMin = Math.min(24 * 60, startMin + duur)
-    const tijdStr = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}:00`
-    const rijen = dagen.map(d => ({
-      client_id: clientId, day: d.toLowerCase(), type: 'custom', label, sublabel: null,
-      start_time: tijdStr(startMin), end_time: tijdStr(eindMin), color: '#06b6d4',
-      week_start: bereik === 'eenmalig' ? weekSleutel : null, updated_at: new Date().toISOString(),
-    }))
-    const { error } = await db.supabase.from('client_agenda_blocks').insert(rijen)
-    if (error) throw error
-    if (bereik === 'standaard') {
-      const plan = await CardioService.getPlan(clientId, db)
-      const bestaand = plan.find(p => normaliseerSoort(p.cardio_type) === normaliseerSoort(soort))
-      const { data: vaste } = await db.supabase.from('client_agenda_blocks').select('id')
-        .eq('client_id', clientId).eq('type', 'custom').eq('label', label).is('week_start', null)
-        .then(r => r, () => ({ data: null }))
-      await CardioService.savePlanItem({
-        id: bestaand?.id || null, client_id: clientId, cardio_type: soort,
-        times_per_week: (vaste || []).length || dagen.length, duration_minutes: duur,
-        intensity: bestaand?.intensity || null, notes: bestaand?.notes || null, sort_order: bestaand?.sort_order || 0,
-      }, db)
-    }
+    await CardioService.planBlokken({ clientId, soort, duur, tijd, dagen, bereik, weekSleutel }, db)
     setCardioVersie(v => v + 1)
-    window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
   }
 
   const handleSwapClick = (day, workoutKey) => {

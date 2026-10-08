@@ -10,12 +10,10 @@ import { createPortal } from 'react-dom'
 import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info } from 'lucide-react'
 import CustomWorkoutModal from './planning/CustomWorkoutModal'
 import { maakPlanKey } from '../utils/planKey'
+import { CARDIO_SOORTEN } from '../cardioSoorten'
 import { getWorkoutImage } from './week-schedule/workoutImage'
 
-const SPORTEN = [
-  { id: 'Wandelen', icoon: Footprints }, { id: 'Fietsen', icoon: Bike }, { id: 'Zwemmen', icoon: Waves }, { id: 'Hardlopen', icoon: Timer },
-  { id: 'Roeien', icoon: Wind }, { id: 'Crosstrainer', icoon: Activity }, { id: 'Stairmaster', icoon: TrendingUp }, { id: 'HIIT', icoon: Zap },
-]
+const SPORTEN = CARDIO_SOORTEN
 const DAGEN = [
   { id: 'Monday', kort: 'Ma' }, { id: 'Tuesday', kort: 'Di' }, { id: 'Wednesday', kort: 'Wo' }, { id: 'Thursday', kort: 'Do' },
   { id: 'Friday', kort: 'Vr' }, { id: 'Saturday', kort: 'Za' }, { id: 'Sunday', kort: 'Zo' },

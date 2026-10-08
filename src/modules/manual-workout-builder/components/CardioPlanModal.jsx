@@ -1,115 +1,100 @@
 // src/modules/manual-workout-builder/components/CardioPlanModal.jsx
 //
-// Cardio per klant, los van het krachtschema. Zat eerder als item ín een
-// trainingsdag; dan bestaat cardio alleen op dagen dat er ook getraind wordt,
-// terwijl je juist vaak wandelen of fietsen op de rustdagen wil. Deze regels
-// horen bij de klant, niet bij het schema, en worden hier meteen opgeslagen.
+// Cardio inplannen voor een klant vanuit de Workout Builder, los van het
+// krachtschema. Schrijft precies wat de klant zelf via "Training toevoegen"
+// schrijft (CardioService.planBlokken): een blok per dag in zijn agenda met
+// sport, tijd en duur, dat hij in zijn weekrooster ziet en logt op duur,
+// intensiteit en afstand. Hyrox en CrossFit zitten in dezelfde lijst: een
+// training als blok, zonder losse oefeningen (8 okt 2026).
+//
+// Eerder bewaarde dit venster alleen "x keer per week" in client_cardio_plan;
+// dat plan wordt nu afgeleid van de vaste blokken.
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Trash2, Heart } from 'lucide-react'
+import { X, Plus, Trash2, Heart, Check, CalendarDays, Repeat } from 'lucide-react'
 import CardioService from '../../workout/services/CardioService'
+import { CARDIO_SOORTEN, DAGEN_WEEK } from '../../workout/cardioSoorten'
+import { cardioFoto } from '../../workout/utils/workoutFoto'
 
-const SOORTEN = ['Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT', 'Stairmaster']
-
-const leegItem = (clientId, volgorde) => ({
-  client_id: clientId, cardio_type: '', times_per_week: 3,
-  duration_minutes: '', distance_km: '', steps: '', intensity: '', notes: '',
-  sort_order: volgorde,
-})
+const DAG_KORT = Object.fromEntries(DAGEN_WEEK.map(d => [d.id.toLowerCase(), d.kort]))
+const DAG_VOLGORDE = DAGEN_WEEK.map(d => d.id.toLowerCase())
 
 export default function CardioPlanModal({ client, db, isMobile, onClose }) {
   const m = isMobile
-  const [items, setItems] = useState([])
+  const [blokken, setBlokken] = useState([])
   const [laden, setLaden] = useState(true)
   const [bezig, setBezig] = useState(false)
-  const [nieuw, setNieuw] = useState(null)
-
-  useEffect(() => { laad() }, [client?.id])
+  const [nieuwOpen, setNieuwOpen] = useState(false)
+  const [soort, setSoort] = useState(null)
+  const [dagen, setDagen] = useState([])
+  const [tijd, setTijd] = useState('18:00')
+  const [duur, setDuur] = useState(30)
+  const [bereik, setBereik] = useState('standaard')
+  const [notitie, setNotitie] = useState('')
+  const dezeWeek = CardioService.maandagIso()
 
   const laad = async () => {
     setLaden(true)
-    const plan = await CardioService.getPlan(client?.id, db)
-    setItems(plan)
+    const lijst = await CardioService.getBlokken(client?.id, db, dezeWeek)
+    setBlokken(lijst.sort((a, b) => DAG_VOLGORDE.indexOf(a.day) - DAG_VOLGORDE.indexOf(b.day) || String(a.tijd).localeCompare(String(b.tijd))))
     setLaden(false)
   }
+  useEffect(() => { laad() }, [client?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const bewaar = async (item) => {
-    if (!item.cardio_type?.trim()) return
+  const bewaar = async () => {
+    if (!soort || dagen.length === 0 || bezig) return
     setBezig(true)
-    const bewaard = await CardioService.savePlanItem({ ...item, client_id: client.id }, db)
-    setBezig(false)
-    if (!bewaard) { alert('Opslaan mislukt.'); return }
-    setNieuw(null)
-    await laad()
+    try {
+      await CardioService.planBlokken({ clientId: client.id, soort, duur: Number(duur) || 30, tijd, dagen, bereik, weekSleutel: dezeWeek, notitie: notitie.trim() || null }, db)
+      setNieuwOpen(false); setSoort(null); setDagen([]); setNotitie('')
+      await laad()
+    } catch (e) { alert('Opslaan mislukt: ' + (e?.message || 'onbekende fout')) }
+    finally { setBezig(false) }
   }
 
-  const weg = async (id) => {
-    setItems(prev => prev.filter(i => i.id !== id))
-    const gelukt = await CardioService.deactivatePlanItem(id, db)
-    if (!gelukt) await laad()
+  const weg = async (blok) => {
+    setBlokken(prev => prev.filter(b => b.id !== blok.id))
+    const ok = await CardioService.verwijderBlok(client.id, blok, db)
+    if (!ok) await laad()
   }
 
-  const isWandelen = (soort) => String(soort || '').trim().toLowerCase() === 'wandelen'
+  // Vaste blokken per sport bij elkaar: één regel met de dagen als chips.
+  const vast = blokken.filter(b => !b.week_start)
+  const eenmalig = blokken.filter(b => !!b.week_start)
+  const perSoort = [...new Set(vast.map(b => b.soort))].map(s => ({ soort: s, blokken: vast.filter(b => b.soort === s) }))
 
-  const regel = (item, opslaan, annuleer) => (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)',
-      borderRadius: 10, padding: m ? '0.7rem' : '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem',
-    }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-        {SOORTEN.map(s => {
-          const aan = item.cardio_type === s
-          return (
-            <button key={s} onClick={() => opslaan({ ...item, cardio_type: s })}
-              style={{
-                padding: '0.3rem 0.6rem', borderRadius: 7,
-                background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.65)',
-                fontSize: '0.72rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-              }}>{s}</button>
-          )
-        })}
+  const chip = (aan, extra = {}) => ({
+    padding: '0.4rem 0.7rem', borderRadius: 9, border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
+    background: aan ? '#fff' : 'rgba(255,255,255,0.04)', color: aan ? '#0a0a0a' : '#fff',
+    fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', gap: 6, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', ...extra,
+  })
+
+  const Regel = ({ titel, sub, foto, dagenChips, onWeg, eenmaligWeek }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)' }}>
+      <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 9, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titel}</div>
+        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{sub}</div>
+        {dagenChips && <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>{dagenChips}</div>}
+        {eenmaligWeek && <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#06b6d4', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Alleen week van {eenmaligWeek}</div>}
       </div>
-      <input value={item.cardio_type} onChange={e => opslaan({ ...item, cardio_type: e.target.value })}
-        placeholder="Soort cardio" style={veld} />
-
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <Getal label="× per week" waarde={item.times_per_week}
-          zet={v => opslaan({ ...item, times_per_week: v })} plaats="3" />
-        <Getal label="Duur (min)" waarde={item.duration_minutes}
-          zet={v => opslaan({ ...item, duration_minutes: v })} plaats="30" />
-        <Getal label="Afstand (km)" waarde={item.distance_km}
-          zet={v => opslaan({ ...item, distance_km: v })} plaats="5" />
-        {isWandelen(item.cardio_type) && (
-          <Getal label="Stappen" waarde={item.steps}
-            zet={v => opslaan({ ...item, steps: v })} plaats="10000" />
-        )}
-      </div>
-
-      <input value={item.notes || ''} onChange={e => opslaan({ ...item, notes: e.target.value })}
-        placeholder="Notitie voor de klant (optioneel)" style={veld} />
-
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-        {annuleer && (
-          <button onClick={annuleer} style={{ ...knop, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}>
-            Annuleren
-          </button>
-        )}
-        <button onClick={() => bewaar(item)} disabled={bezig || !item.cardio_type?.trim()}
-          style={{ ...knop, opacity: (bezig || !item.cardio_type?.trim()) ? 0.4 : 1 }}>
-          {bezig ? 'Opslaan…' : 'Opslaan'}
+      {onWeg && (
+        <button onClick={onWeg} aria-label="Verwijder" style={{ width: 36, height: 36, flexShrink: 0, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: 9, color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Trash2 size={14} />
         </button>
-      </div>
+      )}
     </div>
   )
+
+  const fmtWeek = (iso) => { try { return new Date(iso + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) } catch { return iso } }
 
   return createPortal(
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 10000, display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center' }}>
       <div style={{
-        background: '#0a0a0a', width: '100%', maxWidth: 560, maxHeight: '88vh',
+        background: '#0a0a0a', width: '100%', maxWidth: 600, maxHeight: '90vh',
         borderRadius: m ? '16px 16px 0 0' : 14, border: '1px solid rgba(255,255,255,0.1)',
         display: 'flex', flexDirection: 'column',
       }}>
@@ -117,13 +102,13 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <Heart size={16} color="#f87171" />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Cardio</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Cardio inplannen</div>
               <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {`${client?.first_name || ''} ${client?.last_name || ''}`.trim() || 'Klant'}
+                {`${client?.first_name || ''} ${client?.last_name || ''}`.trim() || 'Klant'} · komt in zijn weekrooster
               </div>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Sluit" style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <button onClick={onClose} aria-label="Sluit" style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={15} strokeWidth={2.5} />
           </button>
         </div>
@@ -133,32 +118,82 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
             <div style={{ padding: '1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem' }}>Laden…</div>
           ) : (
             <>
-              {items.length === 0 && !nieuw && (
+              {blokken.length === 0 && !nieuwOpen && (
                 <div style={{ padding: '1.25rem', textAlign: 'center', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: 10, color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', fontWeight: 700 }}>
-                  Nog geen cardio ingesteld. Dit staat los van het schema en verschijnt bij de klant op de workout-pagina.
+                  Nog geen cardio ingepland. Wat je hier zet, staat bij de klant op de dag in zijn weekrooster, met een logknop.
                 </div>
               )}
 
-              {items.map(item => (
-                <div key={item.id} style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <BestaandeRegel item={item} render={regel} />
-                  </div>
-                  <button onClick={() => weg(item.id)} aria-label="Verwijder"
-                    style={{ width: 38, flexShrink: 0, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: 9, color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+              {perSoort.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Elke week</div>}
+              {perSoort.map(g => (
+                <Regel key={g.soort} titel={g.soort} foto={cardioFoto(g.soort)}
+                  sub={`${g.blokken.length}× per week · ${g.blokken[0]?.duur || '–'} min`}
+                  dagenChips={g.blokken.map(b => (
+                    <span key={b.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', fontSize: '0.66rem', fontWeight: 900, color: '#fff' }}>
+                      {DAG_KORT[b.day] || b.day} {b.tijd}
+                      <button onClick={() => weg(b)} aria-label={`${DAG_KORT[b.day]} weghalen`} style={{ padding: 0, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex' }}><X size={11} strokeWidth={3} /></button>
+                    </span>
+                  ))}
+                />
               ))}
 
-              {nieuw
-                ? regel(nieuw, setNieuw, () => setNieuw(null))
-                : (
-                  <button onClick={() => setNieuw(leegItem(client.id, items.length))}
-                    style={{ ...knop, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.6rem' }}>
-                    <Plus size={15} strokeWidth={2.8} /> Cardio toevoegen
-                  </button>
-                )}
+              {eenmalig.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6 }}>Eenmalig</div>}
+              {eenmalig.map(b => (
+                <Regel key={b.id} titel={b.soort} foto={cardioFoto(b.soort)}
+                  sub={`${DAG_KORT[b.day] || b.day} · ${b.tijd}${b.duur ? ` · ${b.duur} min` : ''}`}
+                  eenmaligWeek={fmtWeek(b.week_start)} onWeg={() => weg(b)} />
+              ))}
+
+              {nieuwOpen ? (
+                <div style={{ marginTop: 6, padding: '0.85rem', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div>
+                    <div style={labelStijl}>Sport</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {CARDIO_SOORTEN.map(s => {
+                        const Icoon = s.icoon
+                        return <button key={s.id} onClick={() => setSoort(s.id)} style={chip(soort === s.id)}><Icoon size={14} strokeWidth={2.4} />{s.id}</button>
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={labelStijl}>Dagen</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
+                      {DAGEN_WEEK.map(d => {
+                        const aan = dagen.includes(d.id)
+                        return <button key={d.id} onClick={() => setDagen(l => aan ? l.filter(x => x !== d.id) : [...l, d.id])} style={chip(aan, { justifyContent: 'center', padding: '0.5rem 0' })}>{d.kort}</button>
+                      })}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 120px' }}>
+                      <div style={labelStijl}>Tijd</div>
+                      <input type="time" value={tijd} onChange={e => setTijd(e.target.value)} style={veld} />
+                    </div>
+                    <div style={{ flex: '1 1 120px' }}>
+                      <div style={labelStijl}>Duur (min)</div>
+                      <input type="number" inputMode="numeric" min={5} step={5} value={duur} onChange={e => setDuur(e.target.value)} style={veld} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={labelStijl}>Waar geldt dit</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <button onClick={() => setBereik('standaard')} style={chip(bereik === 'standaard', { justifyContent: 'center', padding: '0.6rem' })}><Repeat size={14} strokeWidth={2.4} /> Elke week</button>
+                      <button onClick={() => setBereik('eenmalig')} style={chip(bereik === 'eenmalig', { justifyContent: 'center', padding: '0.6rem' })}><CalendarDays size={14} strokeWidth={2.4} /> Alleen deze week</button>
+                    </div>
+                  </div>
+                  <input value={notitie} onChange={e => setNotitie(e.target.value)} placeholder="Notitie voor de klant (optioneel, bv. zone 2)" style={veld} />
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <button onClick={() => setNieuwOpen(false)} style={{ ...knop, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}>Annuleren</button>
+                    <button onClick={bewaar} disabled={bezig || !soort || dagen.length === 0} style={{ ...knop, opacity: (bezig || !soort || dagen.length === 0) ? 0.4 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Check size={14} strokeWidth={3} /> {bezig ? 'Opslaan…' : `Inplannen${dagen.length ? ` (${dagen.length}×)` : ''}`}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setNieuwOpen(true)} style={{ ...knop, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.65rem', marginTop: 6 }}>
+                  <Plus size={15} strokeWidth={2.8} /> Cardio inplannen
+                </button>
+              )}
             </>
           )}
         </div>
@@ -168,30 +203,14 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
   )
 }
 
-// Een bestaande regel houdt zijn eigen concept-staat bij, zodat typen in het
-// ene item de andere niet opnieuw laat renderen.
-function BestaandeRegel({ item, render }) {
-  const [concept, setConcept] = useState(item)
-  useEffect(() => { setConcept(item) }, [item.id, item.updated_at])
-  return render(concept, setConcept, null)
-}
-
-function Getal({ label, waarde, zet, plaats }) {
-  return (
-    <div style={{ flex: '1 1 110px', minWidth: 100 }}>
-      <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>{label}</div>
-      <input type="number" inputMode="numeric" value={waarde ?? ''} placeholder={plaats}
-        onChange={e => zet(e.target.value)} style={veld} />
-    </div>
-  )
-}
+const labelStijl = { fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }
 
 const veld = {
   width: '100%', boxSizing: 'border-box',
   padding: '0.5rem 0.65rem',
   background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
   borderRadius: 8, color: '#fff', fontSize: '0.82rem', fontWeight: 700,
-  fontFamily: 'inherit', outline: 'none',
+  fontFamily: 'inherit', outline: 'none', colorScheme: 'dark',
 }
 
 const knop = {

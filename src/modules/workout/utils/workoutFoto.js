@@ -28,6 +28,8 @@ const CARDIO_FOTOS = {
   stairmaster:  U('photo-1651804279587-3c3d11496439'),
   hiit:         U('photo-1599058917212-d750089bc07e'),
   padel:        U('photo-1657704358775-ed705c7388d2'),
+  hyrox:        U('photo-1517963879433-6ad2b056d712'),
+  crossfit:     U('photo-1517836357463-d25dfeac3438'),
 }
 export function cardioFoto(soort) {
   const n = String(soort || '').toLowerCase()
@@ -41,6 +43,8 @@ export function cardioFoto(soort) {
   if (/stair|trap/.test(n)) return CARDIO_FOTOS.stairmaster
   if (/hiit|interval|circuit/.test(n)) return CARDIO_FOTOS.hiit
   if (/padel|tennis|squash/.test(n)) return CARDIO_FOTOS.padel
+  if (/hyrox/.test(n)) return CARDIO_FOTOS.hyrox
+  if (/crossfit|wod/.test(n)) return CARDIO_FOTOS.crossfit
   return FOTOS.cardio
 }
 

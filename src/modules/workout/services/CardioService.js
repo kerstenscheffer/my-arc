@@ -116,6 +116,83 @@ const CardioService = {
     const soort = normaliseerSoort(plan?.cardio_type)
     return (logs || []).filter(l => normaliseerSoort(l.cardio_type) === soort).length
   },
+
+  // ── Cardio inplannen als agendablokken ────────────────────────────────
+  // Zelfde opslag voor klant (Training toevoegen) en coach (Workout Builder):
+  // client_agenda_blocks, type 'custom', label 'Cardio · <soort>'.
+  //   standaard -> week_start null (elke week) + regel in client_cardio_plan
+  //   eenmalig  -> week_start = maandag van die week
+  maandagIso(d = new Date()) {
+    const m = new Date(d); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); m.setHours(12, 0, 0, 0)
+    return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`
+  },
+
+  async planBlokken({ clientId, soort, duur, tijd, dagen, bereik, weekSleutel, notitie }, db) {
+    if (!db?.supabase || !clientId || !soort || !Array.isArray(dagen) || dagen.length === 0) throw new Error('onvolledig')
+    const label = `Cardio · ${soort}`
+    const [h, m] = String(tijd || '18:00').split(':').map(Number)
+    const startMin = (h || 0) * 60 + (m || 0)
+    const eindMin = Math.min(24 * 60, startMin + (Number(duur) || 30))
+    const tijdStr = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}:00`
+    const week = weekSleutel || this.maandagIso()
+    const rijen = dagen.map(d => ({
+      client_id: clientId, day: String(d).toLowerCase(), type: 'custom', label, sublabel: null,
+      start_time: tijdStr(startMin), end_time: tijdStr(eindMin), color: '#06b6d4',
+      week_start: bereik === 'eenmalig' ? week : null, updated_at: new Date().toISOString(),
+    }))
+    const { error } = await db.supabase.from('client_agenda_blocks').insert(rijen)
+    if (error) throw error
+    if (bereik === 'standaard') {
+      const plan = await this.getPlan(clientId, db)
+      const bestaand = plan.find(p => normaliseerSoort(p.cardio_type) === normaliseerSoort(soort))
+      const { data: vaste } = await db.supabase.from('client_agenda_blocks').select('id')
+        .eq('client_id', clientId).eq('type', 'custom').eq('label', label).is('week_start', null)
+        .then(r => r, () => ({ data: null }))
+      await this.savePlanItem({
+        id: bestaand?.id || null, client_id: clientId, cardio_type: soort,
+        times_per_week: (vaste || []).length || dagen.length, duration_minutes: duur,
+        intensity: bestaand?.intensity || null, notes: notitie ?? bestaand?.notes ?? null, sort_order: bestaand?.sort_order || 0,
+      }, db)
+    }
+    try { window.dispatchEvent(new CustomEvent('myarc:cardio-changed')) } catch { /* geen window */ }
+    return rijen.length
+  },
+
+  // Alle cardioblokken van een klant: vaste (elke week) en eenmalige vanaf
+  // de opgegeven maandag.
+  async getBlokken(clientId, db, vanafMaandagIso = null) {
+    if (!db?.supabase || !clientId) return []
+    let q = db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time, week_start, skip_weeks')
+      .eq('client_id', clientId).eq('type', 'custom').ilike('label', 'Cardio ·%')
+    if (vanafMaandagIso) q = q.or(`week_start.is.null,week_start.gte.${vanafMaandagIso}`)
+    const { data, error } = await q
+    if (error) { console.error('❌ getBlokken cardio:', error); return [] }
+    return (data || []).map(b => ({
+      ...b, soort: String(b.label).replace(/^Cardio\s*·\s*/, ''), tijd: String(b.start_time || '').slice(0, 5),
+      duur: (() => { const [h, m] = String(b.start_time || '').split(':').map(Number); const [eh, em] = String(b.end_time || '').split(':').map(Number); return Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null })(),
+    }))
+  },
+
+  // Blok weg; bij een vast blok telt het cardioplan opnieuw.
+  async verwijderBlok(clientId, blok, db) {
+    if (!db?.supabase || !blok?.id) return false
+    const { error } = await db.supabase.from('client_agenda_blocks').delete().eq('id', blok.id)
+    if (error) { console.error('❌ verwijderBlok cardio:', error); return false }
+    if (!blok.week_start) {
+      const label = blok.label || `Cardio · ${blok.soort}`
+      const { data: vaste } = await db.supabase.from('client_agenda_blocks').select('id')
+        .eq('client_id', clientId).eq('type', 'custom').eq('label', label).is('week_start', null)
+        .then(r => r, () => ({ data: [] }))
+      const plan = await this.getPlan(clientId, db)
+      const item = plan.find(p => normaliseerSoort(p.cardio_type) === normaliseerSoort(blok.soort))
+      if (item) {
+        if ((vaste || []).length === 0) await this.deactivatePlanItem(item.id, db)
+        else await this.savePlanItem({ ...item, times_per_week: vaste.length }, db)
+      }
+    }
+    try { window.dispatchEvent(new CustomEvent('myarc:cardio-changed')) } catch { /* geen window */ }
+    return true
+  },
 }
 
 export default CardioService

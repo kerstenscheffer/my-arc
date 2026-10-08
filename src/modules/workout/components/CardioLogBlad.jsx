@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom'
 import { X, Check, ChevronLeft, Watch } from 'lucide-react'
 
 // Zelfde MET-tabel als het weekbudget van de coach (Compendium 2011).
-const MET = { wandelen: 4.3, fietsen: 6.8, zwemmen: 6.0, hardlopen: 8.3, roeien: 7.0, crosstrainer: 5.0, stairmaster: 9.0, hiit: 8.0, padel: 6.0 }
+const MET = { wandelen: 4.3, fietsen: 6.8, zwemmen: 6.0, hardlopen: 8.3, roeien: 7.0, crosstrainer: 5.0, stairmaster: 9.0, hiit: 8.0, padel: 6.0, hyrox: 9.0, crossfit: 8.0 }
 const metVan = (soort) => {
   const n = String(soort || '').toLowerCase()
   const k = Object.keys(MET).find(k => n.includes(k)) || (n.includes('run') ? 'hardlopen' : n.includes('cycl') || n.includes('bike') ? 'fietsen' : null)
