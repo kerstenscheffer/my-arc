@@ -385,21 +385,47 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   // Alle weken achter elkaar, van deze week terug. Twee weken naast elkaar
   // liet al zien of het een losse matige week was; met de hele rij zie je het
   // verloop — waar het inzakte, en of het daarvoor wél liep.
-  const weken = useMemo(() => zaterdagReeks(binnenFase).map((z, i) => {
-    const genoeg = z.nu.metingen >= 3 && z.vorige.metingen >= 3
-    const oordeel = (z.verschil != null && genoeg) ? tempoOordeel(z.verschil, bandConfig) : null
-    return {
-      sleutel: z.zaterdag,
-      waarde: z.verschil,
-      genoeg,
-      kleur: oordeel == null ? 'rgba(255,255,255,0.45)'
-        : oordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b',
-      kop: i === 0 ? 'Tempo deze week' : i === 1 ? 'Tempo vorige week' : `${i} weken terug`,
-      onder: genoeg
-        ? `za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
-        : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
+  const weken = useMemo(() => {
+    const kleurVoor = (verschil, genoeg) => {
+      const oordeel = (verschil != null && genoeg) ? tempoOordeel(verschil, bandConfig) : null
+      return oordeel == null ? 'rgba(255,255,255,0.45)' : oordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b'
     }
-  }), [binnenFase, bandConfig])
+    // Vooraan: de lopende kalenderweek. Het gemiddelde van deze week (maandag
+    // tot en met vandaag) tegenover het gemiddelde van vorige week (ma-zo).
+    // Dit is wat je door de week heen wilt zien; de zaterdag-reeks erachter
+    // is het vaste weekpunt (Kersten, 8 okt 2026).
+    const nu = getCalendarWeekAvg(0)
+    const vorig = getCalendarWeekAvg(-1)
+    const lopend = []
+    if (nu.count > 0 || vorig.count > 0) {
+      const verschil = (nu.avg != null && vorig.avg != null) ? Math.round((nu.avg - vorig.avg) * 100) / 100 : null
+      const genoeg = nu.count >= 3 && vorig.count >= 3
+      lopend.push({
+        sleutel: 'lopend',
+        waarde: verschil,
+        genoeg,
+        kleur: kleurVoor(verschil, genoeg),
+        kop: 'Deze week',
+        onder: verschil == null
+          ? (nu.count === 0 ? 'nog geen weging deze week' : 'vorige week geen wegingen')
+          : genoeg ? `gem. ${nu.avg} vs ${vorig.avg} kg` : `${vorig.count} en ${nu.count} wegingen`,
+      })
+    }
+    const zaterdagen = zaterdagReeks(binnenFase).map((z, i) => {
+      const genoeg = z.nu.metingen >= 3 && z.vorige.metingen >= 3
+      return {
+        sleutel: z.zaterdag,
+        waarde: z.verschil,
+        genoeg,
+        kleur: kleurVoor(z.verschil, genoeg),
+        kop: i === 0 ? 'Laatste zaterdag' : i === 1 ? 'Zaterdag ervoor' : `${i} zaterdagen terug`,
+        onder: genoeg
+          ? `za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
+          : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
+      }
+    })
+    return [...lopend, ...zaterdagen]
+  }, [binnenFase, bandConfig, sortedHistory]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Weeknummer voor het label bij het gemiddelde ("Gemiddeld w38").
   const weekNummer = (() => {
@@ -417,10 +443,10 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
       {/* ═══ HET WEEKTEMPO — het getal waar je op zaterdag naar kijkt, en het
             bereik waarbinnen het hoort te vallen. Deze twee staan groot omdat
             je hierop bijstuurt; de rest van de regel is context. ═══ */}
-      {/* Alleen in het coach-paneel (volleBreedte). Op de klantpagina draait
-          deze balk mee en daar heeft de klant niet om een doelbereik gevraagd;
-          dat is een apart besluit. */}
-      {bereik && volleBreedte && (
+      {/* Coach én klant zien dezelfde strook: de klant hoort door de week
+          heen te zien of zijn gemiddelde beweegt (8 okt 2026). Het doelblok
+          staat er alleen bij als er een bereik is afgesproken. */}
+      {weken.length > 0 && (
         <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           {/* Op een telefoon passen drie van deze cijfers niet naast elkaar:
               de twee tempo's horen bij elkaar en staan op één regel, het doel
@@ -446,7 +472,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               )} />
             </div>
 
-            <GrootBlok
+            {bereik && <GrootBlok
               titel="Doel per week"
               waarde={bereik}
               eenheid="kg"
@@ -470,7 +496,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
                   <Pencil size={13} strokeWidth={2.8} />
                 </button>
               ) : null}
-            />
+            />}
           </div>
 
           {uitlegOpen && (
@@ -479,15 +505,15 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 700,
               color: 'rgba(255,255,255,0.7)', lineHeight: 1.55,
             }}>
-              <strong style={{ color: '#fff', fontWeight: 900 }}>Tempo deze week</strong> is het gemiddelde
-              gewicht over de zeven dagen tot en met zaterdag, min datzelfde venster van vorige week.
-              <strong style={{ color: '#fff', fontWeight: 900 }}> Tempo vorige week</strong> is diezelfde som,
-              een week eerder. Staan die twee allebei rond nul, dan sta je stil en is er iets te doen —
-              één matige week kan toeval zijn, twee niet.
+              <strong style={{ color: '#fff', fontWeight: 900 }}>Deze week</strong> is je gemiddelde gewicht
+              van deze week (maandag tot nu) min het gemiddelde van vorige week. Dat loopt mee tot en met zondag.
+              <strong style={{ color: '#fff', fontWeight: 900 }}> Laatste zaterdag</strong> is het vaste weekpunt:
+              het gemiddelde van de zeven dagen tot en met zaterdag, min datzelfde venster een week eerder.
+              Daarachter staan de zaterdagen ervoor. Staan ze allemaal rond nul, dan sta je stil en is er iets
+              te doen. Eén matige week kan toeval zijn, twee niet.
               <br /><br />
               <strong style={{ color: '#fff', fontWeight: 900 }}>Doel per week</strong> is het bereik waarbinnen
-              het tempo hoort te vallen. Erbinnen is groen, erboven of eronder oranje. Met het potlood
-              stel je het in.
+              het tempo hoort te vallen. Erbinnen is groen, erboven of eronder oranje.{volleBreedte ? ' Met het potlood stel je het in.' : ''}
               <br /><br />
               Onder de drie wegingen in een van beide weken krijgt een getal geen kleur: dan is het
               verschil vooral dagruis.
