@@ -66,21 +66,34 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   const [swappedExercises, setSwappedExercises] = useState([])
   const workouts = workoutData?.workouts || []
 
+  // Wissels van de klant in dít plan. Eerder telde dit alle overrides van
+  // de klant ooit, over alle plannen en weken heen, en stond het als los
+  // tekstblok boven de sessies: niet te herleiden tot een training. Nu
+  // hangt elke wissel aan plan + dag + week, zodat de kaart van die
+  // training een stip krijgt en de oefening erin "was: X" (8 okt 2026).
   useEffect(() => {
-    if (!client?.id || !db?.supabase) return
-    db.supabase
+    if (!client?.id || !db?.supabase) { setSwappedExercises([]); return }
+    const schemaId = workoutData?.schema?.id
+    let q = db.supabase
       .from('client_exercise_overrides')
-      .select('day_key, exercise_data, created_at')
+      .select('schema_id, week_start, day_key, exercise_index, exercise_data, created_at')
       .eq('client_id', client.id)
       .order('created_at', { ascending: false })
-      .limit(50)
-      .then(({ data }) => {
-        if (!data) return
-        // Alleen echte swaps: heeft _originalName en een andere naam
-        const swaps = data.filter(r => r.exercise_data?._originalName && r.exercise_data.name !== r.exercise_data._originalName)
-        setSwappedExercises(swaps)
-      })
-  }, [client?.id])
+      .limit(100)
+    if (schemaId) q = q.eq('schema_id', schemaId)
+    q.then(({ data }) => {
+      const swaps = (data || []).filter(r => r.exercise_data?._originalName && r.exercise_data.name !== r.exercise_data._originalName)
+      setSwappedExercises(swaps)
+    }, () => setSwappedExercises([]))
+  }, [client?.id, workoutData?.schema?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Maandag van een datum, als JJJJ-MM-DD: de week waar een override bij hoort.
+  const maandagVan = (datum) => {
+    const d = new Date(`${String(datum).slice(0, 10)}T12:00:00`)
+    if (Number.isNaN(d.getTime())) return null
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
 
   // Per-session count of exercise-level notes (from workout_progress.notes).
   // Lets us show a "💬 3" indicator on session rows without drilling in.
@@ -110,9 +123,57 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
       .filter(([, d]) => d && typeof d === 'object')
       .map(([key, d]) => ({
         key, naam: String(d.name || d.focus || '').trim(),
+        lijst: Array.isArray(d.exercises) ? d.exercises : [],
         oefeningen: new Set((Array.isArray(d.exercises) ? d.exercises : []).map(e => String(e?.name || '').trim().toLowerCase()).filter(Boolean)),
       }))
   }, [workoutData?.schema])
+  // De dag van het plan die bij een sessie hoort (zelfde drie aanwijzingen
+  // als naamVoorSessie hieronder; die geeft alleen de naam terug).
+  const dagVoorSessie = (w) => {
+    if (schemaDagen.length === 0) return null
+    const gelogd = new Set([
+      ...Object.entries(exerciseProgress).filter(([, entries]) => entries.some(e => e.sessionId === w.id)).map(([n]) => n),
+      ...(Array.isArray(w.exercises_completed) ? w.exercises_completed.map(e => e?.name) : []),
+    ].map(n => String(n || '').trim().toLowerCase()).filter(Boolean))
+    let beste = null, besteScore = 0
+    schemaDagen.forEach(d => {
+      let gedeeld = 0
+      gelogd.forEach(n => { if (d.oefeningen.has(n)) gedeeld++ })
+      if (gedeeld > besteScore) { besteScore = gedeeld; beste = d }
+    })
+    if (beste && (besteScore >= 2 || besteScore / Math.max(1, gelogd.size) >= 0.5)) return beste
+    const schedule = workoutData?.schedule
+    if (schedule && w.day_name) {
+      const sleutel = Object.keys(schedule).find(k => k.toLowerCase() === String(w.day_name).toLowerCase())
+      const dag = sleutel ? schemaDagen.find(d => d.key === schedule[sleutel]) : null
+      if (dag) return dag
+    }
+    if ((w.workout_naam || '').trim()) {
+      const opNaam = schemaDagen.find(d => d.naam.toLowerCase() === w.workout_naam.trim().toLowerCase())
+      if (opNaam) return opNaam
+    }
+    return beste
+  }
+  // Wissels die bij deze sessie horen: de weekoverrides van die dag in de
+  // week van de sessie, plus permanente wissels in het plan van vóór de
+  // sessie. Geeft { nieuweNaam(lowercase) -> origineleNaam }.
+  const wisselsVoorSessie = (w) => {
+    const dag = dagVoorSessie(w)
+    if (!dag) return {}
+    const uit = {}
+    const week = maandagVan(w.workout_date)
+    swappedExercises.forEach(r => {
+      if (r.day_key !== dag.key) return
+      if (week && r.week_start && String(r.week_start).slice(0, 10) !== week) return
+      uit[String(r.exercise_data.name || '').trim().toLowerCase()] = r.exercise_data._originalName
+    })
+    dag.lijst.forEach(e => {
+      if (!e?._originalName || e._originalName === e.name) return
+      if (e._swappedAt && w.workout_date && String(e._swappedAt).slice(0, 10) > String(w.workout_date).slice(0, 10)) return
+      uit[String(e.name || '').trim().toLowerCase()] = e._originalName
+    })
+    return uit
+  }
   const naamVoorSessie = (w) => {
     if ((w.workout_naam || '').trim()) return w.workout_naam.trim()
     if (schemaDagen.length === 0) return null
@@ -227,30 +288,6 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <StappenInsight db={db} client={client} isMobile={isMobile} />
           {/* Cardio die de client zelf logt (cardio_logs) — read-only voor coach */}
           <CardioInsightBlock db={db} client={client} isMobile={isMobile} />
-          {/* Wissel-indicator: laat zien als klant oefeningen heeft gewisseld */}
-          {swappedExercises.length > 0 && (
-            <div style={{
-              margin: '0.5rem 0.9rem 0.3rem',
-              padding: '0.4rem 0.65rem',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 8,
-              display: 'flex', alignItems: 'center', gap: '0.45rem',
-            }}>
-              <ArrowLeftRight size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.2} />
-              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>
-                {swappedExercises.length} oefening{swappedExercises.length !== 1 ? 'en' : ''} gewisseld
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {swappedExercises.slice(0, 3).map((s, i) => (
-                  <span key={i} style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', marginLeft: i === 0 ? 0 : '0.3rem' }}>
-                    {i > 0 ? '· ' : ''}{s.exercise_data._originalName} → {s.exercise_data.name}
-                  </span>
-                ))}
-                {swappedExercises.length > 3 && <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)' }}> +{swappedExercises.length - 3}</span>}
-              </div>
-            </div>
-          )}
           {workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
           {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => {
             const parsed = parseSessionNote(w.notes)
@@ -265,10 +302,12 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
             const trainingNaam = naamVoorSessie(w)
             const naam = trainingNaam || weekdag || 'Training'
             const hoogte = isMobile ? 74 : 82
+            const wissels = wisselsVoorSessie(w)
+            const aantalWissels = Object.keys(wissels).length
             return (
               <button
                 key={`${w.workout_date}-${idx}`}
-                onClick={() => { setSelectedSession({ ...w, workout_naam: trainingNaam || w.workout_naam || null }); setView('exercises') }}
+                onClick={() => { setSelectedSession({ ...w, workout_naam: trainingNaam || w.workout_naam || null, _wissels: wissels }); setView('exercises') }}
                 style={{
                   ...KAART, display: 'block', width: 'calc(100% - 1.8rem)', height: hoogte,
                   padding: 0, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
@@ -286,6 +325,17 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                   position: 'absolute', inset: 0,
                   background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 55%, rgba(0,0,0,0.85) 100%)',
                 }} />
+                {/* Oranje stip rechtsboven: in deze training is een oefening
+                    gewisseld. Welke, staat in het detail bij de oefening. */}
+                {aantalWissels > 0 && (
+                  <span title={`${aantalWissels} oefening${aantalWissels === 1 ? '' : 'en'} gewisseld`} style={{
+                    position: 'absolute', top: 7, right: 7, zIndex: 2,
+                    minWidth: 14, height: 14, padding: '0 4px', borderRadius: 999,
+                    background: '#f59e0b', border: '2px solid rgba(0,0,0,0.6)', boxSizing: 'content-box',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.58rem', fontWeight: 900, color: '#000', lineHeight: 1,
+                  }}>{aantalWissels > 1 ? aantalWissels : ''}</span>
+                )}
                 <div style={{
                   position: 'relative', height: '100%',
                   display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
@@ -450,6 +500,12 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
                     </span>
                   )}
                 </div>
+                {selectedSession._wissels?.[String(ex.name || '').trim().toLowerCase()] && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2, fontSize: '0.7rem', fontWeight: 800, color: '#f59e0b' }}>
+                    <ArrowLeftRight size={11} strokeWidth={2.6} />
+                    Gewisseld · was {selectedSession._wissels[String(ex.name || '').trim().toLowerCase()]}
+                  </div>
+                )}
                 {ex.sets?.length > 0 ? (
                   <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', marginTop: 3, flexWrap: 'wrap' }}>
                     {ex.sets.map((st, si) => <SetDisplay key={si} s={st} />)}

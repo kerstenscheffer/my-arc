@@ -326,6 +326,10 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
         thumbnail_url: newExercise.thumbnail_url || null,
         fallback_video_url: newExercise.fallback_video_url || null,
         image_url: newExercise.image_url || null,
+        // Het origineel blijft bekend: de coach ziet in het inzicht bij de
+        // oefening "was: X", ook na een permanente wissel.
+        _originalName: exercise._originalName || exercise.name,
+        _swappedAt: new Date().toISOString(),
       }
       // Schrijf permanent naar schema
       await db.updateExerciseInSchema(schema.id, workoutDayKey, exerciseIndex, updatedExercise)
