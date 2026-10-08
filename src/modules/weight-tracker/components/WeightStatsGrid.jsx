@@ -3,6 +3,7 @@
 // Props: { stats, client, fridayData, history, isMobile, coachingPlan }
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity, Info, Pencil } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
@@ -511,24 +512,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           </div>
 
           {uitlegOpen && (
-            <div style={{
-              padding: isMobile ? '0 0.5rem 0.8rem' : '0 0.75rem 0.9rem',
-              fontSize: isMobile ? '0.76rem' : '0.8rem', fontWeight: 700,
-              color: 'rgba(255,255,255,0.7)', lineHeight: 1.55,
-            }}>
-              <strong style={{ color: '#fff', fontWeight: 900 }}>Deze week</strong> is je gemiddelde gewicht
-              van deze week (maandag tot nu) min het gemiddelde van vorige week. Dat loopt mee tot en met zondag.
-              <strong style={{ color: '#fff', fontWeight: 900 }}> Laatste zaterdag</strong> is het vaste weekpunt:
-              het gemiddelde van de zeven dagen tot en met zaterdag, min datzelfde venster een week eerder.
-              Daarachter staan de zaterdagen ervoor. Staan ze allemaal rond nul, dan sta je stil en is er iets
-              te doen. Eén matige week kan toeval zijn, twee niet.
-              <br /><br />
-              <strong style={{ color: '#fff', fontWeight: 900 }}>Doel per week</strong> is het bereik waarbinnen
-              het tempo hoort te vallen. Erbinnen is groen, erboven of eronder oranje.{volleBreedte ? ' Met het potlood stel je het in.' : ''}
-              <br /><br />
-              Onder de drie wegingen in een van beide weken krijgt een getal geen kleur: dan is het
-              verschil vooral dagruis.
-            </div>
+            <UitlegModal isMobile={isMobile} coach={volleBreedte} onClose={() => setUitlegOpen(false)} />
           )}
         </div>
       )}
@@ -961,5 +945,38 @@ function WekenStrook(props) {
       </div>
     )}
     </div>
+  )
+}
+
+// Uitleg bij de tempo-strook, als venster. Kort en in stukken: wat elk
+// getal is, wat de kleur zegt, en wat je ermee doet.
+function UitlegModal({ isMobile, coach, onClose }) {
+  const blok = (kop, tekst) => (
+    <div key={kop} style={{ padding: '0.7rem 0.85rem', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{kop}</div>
+      <div style={{ fontSize: isMobile ? '0.84rem' : '0.88rem', fontWeight: 700, color: '#fff', lineHeight: 1.5 }}>{tekst}</div>
+    </div>
+  )
+  const kleur = (c, t) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginRight: 10 }}><span style={{ width: 9, height: 9, borderRadius: 999, background: c, display: 'inline-block' }} />{t}</span>
+  return createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, maxHeight: '88vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: isMobile ? '18px 18px 0 0' : 18, padding: isMobile ? '1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px))' : '1.1rem', fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Zo lees je je tempo</div>
+          <button onClick={onClose} aria-label="Sluiten" style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={16} strokeWidth={2.8} /></button>
+        </div>
+        <div style={{ fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 12 }}>
+          Eén weging zegt niets: twee kilo verschil tussen twee ochtenden is normaal. Daarom kijken we naar weekgemiddelden.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {blok('Deze week', 'Je gemiddelde van deze week (maandag tot nu) min het gemiddelde van vorige week. Loopt mee tot zondag.')}
+          {blok('Laatste zaterdag', 'Het vaste weekpunt. Gemiddelde van de 7 dagen tot en met zaterdag, min diezelfde 7 dagen een week eerder. Daarachter: de zaterdagen ervoor.')}
+          {blok('Sinds start', 'Je laatste weging tegenover je startgewicht. Het grote plaatje.')}
+          {blok('Kleur', <span>{kleur('#10b981', 'op koers')}{kleur('#f59e0b', 'te langzaam of te snel')}{kleur('rgba(255,255,255,0.45)', 'minder dan 3 wegingen, dus nog ruis')}</span>)}
+          {blok('Wat je ermee doet', 'Eén matige week kan toeval zijn. Twee achter elkaar niet: dan is er iets te veranderen aan eten, stappen of slaap.' + (coach ? ' Het bereik stel je in met het potlood bij Doel per week.' : ''))}
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
