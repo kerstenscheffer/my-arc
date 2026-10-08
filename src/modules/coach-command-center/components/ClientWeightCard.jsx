@@ -17,7 +17,7 @@ import {
 import DeleteClientModal from './DeleteClientModal'
 import ClientInsightModal from './ClientInsightModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
-import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks } from '../../weight-tracker/utils/coachingBand'
+import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks, maakConfig, tempoKleurVanDoel } from '../../weight-tracker/utils/coachingBand'
 
 // Platte actieknop: geen vlak, geen rand — alleen icoon + woord. Drie
 // omkaderde knoppen naast elkaar maakten de kaart onrustig.
@@ -190,7 +190,11 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   const fmtDag = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   // Onder de drie wegingen in een van beide vensters geen kleur: dan is het
   // verschil vooral dagruis.
-  const tempoKleur = (v, genoeg) => (v != null && genoeg) ? weightGoalColor(v, doelBron) : 'rgba(255,255,255,0.4)'
+  // Zelfde kleurregel als de tempo-strook op de klantpagina: groen binnen
+  // de band om het doeltempo, daarbuiten via oranje naar rood. De band komt
+  // uit de fase (of start-/doelgewicht zonder fase), net als daar.
+  const bandConfigKaart = maakConfig(client, client?.fase || null)
+  const tempoKleur = (v, genoeg) => (v != null && genoeg) ? tempoKleurVanDoel(v, bandConfigKaart, 'rgba(255,255,255,0.4)') : 'rgba(255,255,255,0.4)'
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 

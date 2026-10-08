@@ -9,7 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { weightGoalColor } from '../utils/weightGoalColor'
 import {
   maakConfig, trendReeks, tempoPerWeek, weekFractie, lijnenOpWeek, ernstVan, kleurVoorErnst,
-  tempoOordeel, zaterdagReeks, bereikTekst, laatsteZaterdag, vensterGemiddelde,
+  tempoOordeel, zaterdagReeks, bereikTekst, laatsteZaterdag, vensterGemiddelde, tempoKleurVanDoel,
 } from '../utils/coachingBand'
 
 const PERIODES = [
@@ -387,10 +387,9 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   // liet al zien of het een losse matige week was; met de hele rij zie je het
   // verloop — waar het inzakte, en of het daarvoor wél liep.
   const weken = useMemo(() => {
-    const kleurVoor = (verschil, genoeg) => {
-      const oordeel = (verschil != null && genoeg) ? tempoOordeel(verschil, bandConfig) : null
-      return oordeel == null ? 'rgba(255,255,255,0.45)' : oordeel === 'OP_KOERS' ? '#10b981' : '#f59e0b'
-    }
+    // Groen binnen de band, daarbuiten via oranje naar rood naarmate het
+    // tempo verder van het doel ligt. Grijs onder de drie wegingen.
+    const kleurVoor = (verschil, genoeg) => (verschil != null && genoeg) ? tempoKleurVanDoel(verschil, bandConfig) : 'rgba(255,255,255,0.45)'
     // Vooraan: de lopende week, op dezelfde zaterdag-maat als de rest. Het
     // venster sinds de laatste zaterdag (zondag tot en met vandaag) tegenover
     // de zeven dagen tot en met die zaterdag. Zo kijk je door de week heen
@@ -951,8 +950,8 @@ function UitlegModal({ isMobile, coach, onClose }) {
     { kop: 'Deze week', foto: 'photo-1522844990619-4951c40f7eda', tekst: 'Je gemiddelde sinds de laatste zaterdag (zondag tot nu) min het gemiddelde van de 7 dagen tot en met die zaterdag. Loopt mee tot het komende zaterdag vast staat.' },
     { kop: 'Laatste zaterdag', foto: 'photo-1626794174544-c3200f10e32b', tekst: 'Het vaste weekpunt. Gemiddelde van de 7 dagen tot en met zaterdag, min diezelfde 7 dagen een week eerder. Daarachter: de zaterdagen ervoor.' },
     { kop: 'Sinds start', foto: 'photo-1561570121-c8219daec12b', tekst: 'Je laatste weging tegenover je startgewicht. Het grote plaatje.' },
-    { kop: 'Kleur', kleuren: [['#10b981', 'op koers'], ['#f59e0b', 'te langzaam of te snel'], ['rgba(255,255,255,0.45)', 'minder dan 3 wegingen, dus nog ruis']] },
-    { kop: 'Wat je ermee doet', foto: 'photo-1543352632-5a4b24e4d2a6', tekst: 'Eén matige week kan toeval zijn. Twee achter elkaar niet: dan is er iets te veranderen aan eten, stappen of slaap.' + (coach ? ' Het bereik stel je in met het potlood bij Doel per week.' : '') },
+    { kop: 'Kleur', kleuren: [['#10b981', 'op je doeltempo'], ['#f59e0b', 'ernaast: te langzaam of te snel'], ['#ef4444', 'ver ernaast, of de verkeerde kant op'], ['rgba(255,255,255,0.45)', 'minder dan 3 wegingen, dus nog ruis']] },
+    { kop: 'Wat je ermee doet', foto: 'photo-1543352632-5a4b24e4d2a6', tekst: 'De kleur loopt door: hoe dichter bij je doeltempo, hoe groener. Eén matige week kan toeval zijn. Twee achter elkaar niet: dan is er iets te veranderen aan eten, stappen of slaap.' + (coach ? ' Het bereik stel je in met het potlood bij Doel per week.' : '') },
   ]
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}>

@@ -370,6 +370,30 @@ export function tempoOordeel(verschil, config) {
   return 'OP_KOERS'
 }
 
+// Kleur op afstand tot het doeltempo, voor de weektegels overal in de app
+// (klantpagina, inzichtpaneel, klantkaart in Command). Binnen de band is
+// groen. Erbuiten loopt de kleur via oranje naar rood: hoe verder van de
+// band, hoe roder. De schaal is de breedte van de band zelf (minstens
+// 0,3 kg): één bandbreedte naast de band is vol rood. De verkeerde kant op
+// (aankomen in een cut) ligt vanzelf ver van de band en wordt dus snel rood.
+// (Kersten, 8 okt 2026: "hoe dichter bij het doeltempo hoe groener".)
+const KLEUR_GROEN = [16, 185, 129]
+const KLEUR_ORANJE = [245, 158, 11]
+const KLEUR_ROOD = [239, 68, 68]
+const meng = (a, b, t) => a.map((x, i) => Math.round(x + (b[i] - x) * t))
+export function tempoKleurVanDoel(verschil, config, neutraal = 'rgba(255,255,255,0.45)') {
+  if (verschil == null || !config || config.richting === 'stabiel') return neutraal
+  const teken = config.richting === 'aankomen' ? 1 : -1
+  const gemeten = verschil * teken
+  const afstand = gemeten < config.traagKg ? config.traagKg - gemeten
+    : gemeten > config.snelKg ? gemeten - config.snelKg : 0
+  if (afstand <= 0) return `rgb(${KLEUR_GROEN.join(',')})`
+  const schaal = Math.max(0.3, config.snelKg - config.traagKg)
+  const t = Math.min(1, afstand / schaal)
+  const rgb = t < 0.5 ? meng(KLEUR_GROEN, KLEUR_ORANJE, t / 0.5) : meng(KLEUR_ORANJE, KLEUR_ROOD, (t - 0.5) / 0.5)
+  return `rgb(${rgb.join(',')})`
+}
+
 // `segmenten` (uit planSegmenten) maakt de planlijn stuksgewijs: na een
 // bijsturing wordt het verleden niet alsnog met het nieuwe tempo beoordeeld.
 export function weekBeoordelingen(reeks, startGewicht, startDatum, config, segmenten = null) {
