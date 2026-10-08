@@ -132,7 +132,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const herlaadKlant = async () => {
     if (!effectiveClient?.id) return
     try {
-      const vers = await db.getClient(effectiveClient.id)
+      // Niet via db.getClient: die geeft de gecachte klant terug, met het
+      // oude assigned_schema_id, waardoor het rooster "Nog geen plan" bleef
+      // tonen na wisselen (8 okt 2026). Cache leegmaken en vers ophalen.
+      db.clearCache?.('client')
+      const { data: vers } = await db.supabase.from('clients').select('*').eq('id', effectiveClient.id).single()
+        .then(r => r, () => ({ data: null }))
       if (vers) setLocalClient(vers)
       await loadClientSchemas(vers || effectiveClient)
     } catch (e) { console.error('klant herladen mislukt:', e) }

@@ -24,7 +24,9 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
     let weg = false
     ;(async () => {
       try {
-        const s = client.assigned_schema_id ? await db.getClientSchema(client.id) : null
+        // Altijd vers uit de database; het client-object kan een oud
+        // assigned_schema_id hebben (cache in DatabaseService).
+        const s = await db.getClientSchema(client.id)
         if (!weg) setSchema(s || LEEG_SCHEMA)
       } catch { if (!weg) setSchema(LEEG_SCHEMA) }
     })()
