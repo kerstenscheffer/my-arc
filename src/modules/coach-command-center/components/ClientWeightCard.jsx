@@ -479,7 +479,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       {/* ── ROW 1 — naam · doel  |  gewicht · datum, alles op één regel ── */}
       <div style={{
         display: 'flex', alignItems: 'center',
-        padding: isMobile ? '0.45rem 0.7rem 0.3rem' : '0.5rem 0.8rem 0.35rem',
+        padding: isMobile ? '0.35rem 0.7rem 0.1rem' : '0.4rem 0.8rem 0.1rem',
         gap: isMobile ? '0.4rem' : '0.5rem',
       }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem', overflow: 'hidden' }}>
@@ -529,7 +529,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       <div style={{
         display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap',
         rowGap: '0.35rem',
-        padding: isMobile ? '0 0.7rem 0.4rem' : '0 0.8rem 0.45rem',
+        padding: isMobile ? '0 0.7rem 0.35rem' : '0 0.8rem 0.35rem',
         gap: isMobile ? '0.6rem' : '0.8rem',
       }}>
         {/* De drie cijfers en de knoppen op één regel. Ze stonden als blok
@@ -546,12 +546,12 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             </span>
           )
           return (
-            <div style={{ display: 'flex', alignItems: 'flex-end', flex: isMobile ? '1 1 100%' : '1 1 0', minWidth: 0, gap: isMobile ? '0.55rem' : '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: isMobile ? '1 1 100%' : '1 1 0', minWidth: 0, gap: isMobile ? '0.55rem' : '0.75rem', lineHeight: 1 }}>
               {/* De slider: de weken schuiven, rechts loopt de rand weg in
                   een vervaging, zoals op de klantpagina. Tik = uitklappen. */}
               <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
                 <div onClick={() => setStatsExpanded(v => !v)} title="Toon alle weekcijfers" className="kaart-weken"
-                  style={{ display: 'flex', alignItems: 'flex-end', gap: isMobile ? '0.55rem' : '0.75rem', overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none', msOverflowStyle: 'none', paddingRight: 28, cursor: 'pointer', touchAction: 'pan-x', WebkitTapHighlightColor: 'transparent' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.55rem' : '0.75rem', overflowX: 'auto', overflowY: 'hidden', lineHeight: 1, scrollbarWidth: 'none', msOverflowStyle: 'none', paddingRight: 28, cursor: 'pointer', touchAction: 'pan-x', WebkitTapHighlightColor: 'transparent' }}>
                   <style>{'.kaart-weken::-webkit-scrollbar{display:none}'}</style>
                   {kaartWeken.map(st => <Cijfer key={st.sleutel} st={st} />)}
                 </div>
