@@ -220,16 +220,20 @@ function Cta({ m, sub, style }) {
         style={{
           border: 'none', cursor: 'pointer', fontFamily: 'inherit',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          minHeight: m ? 68 : 76, padding: m ? '0 1.8rem' : '0 2.6rem',
+          minHeight: m ? 68 : 76, padding: m ? '0 1rem' : '0 2.6rem',
           width: m ? '100%' : 'auto', minWidth: m ? 0 : 380,
           borderRadius: 14, background: GOLD, color: '#000',
-          fontSize: m ? '1.3rem' : '1.45rem', fontWeight: 900, letterSpacing: '0.04em',
+          // Eén regel op de telefoon: kleiner lettertype en nooit afbreken.
+          // Dikker dan 900 bestaat niet in het lettertype; een dunne zwarte
+          // contour maakt de letters zwaarder.
+          fontSize: m ? '1.12rem' : '1.45rem', fontWeight: 900, letterSpacing: '0.03em',
+          whiteSpace: 'nowrap', WebkitTextStroke: m ? '0.5px #000' : '0.7px #000',
           textTransform: 'uppercase', textDecoration: 'none', boxSizing: 'border-box',
           boxShadow: 'none',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <CalendarCheck size={24} strokeWidth={2.6} /> {CTA_TEKST}
+        <CalendarCheck size={m ? 22 : 26} strokeWidth={3} style={{ flexShrink: 0 }} /> {CTA_TEKST}
       </button>
       {sub && (
         <div style={{ fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.4 }}>
