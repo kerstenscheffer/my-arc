@@ -26,7 +26,7 @@ const VIDEO_ID = '41Hfc2YVBAA'
 // bedrag.
 const BORG_BEDRAG = ''
 
-const CTA_TEKST = 'Plan je kennismaking'
+const CTA_TEKST = 'Ik wil in shape komen'
 
 const RESULTATEN = [
   { kg: '4,5', weken: 4 },
