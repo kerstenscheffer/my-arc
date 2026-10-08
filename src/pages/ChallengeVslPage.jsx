@@ -42,9 +42,6 @@ const GOUD_KNOP = 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
 
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const VIDEO_ID = '41Hfc2YVBAA'
-// Vul in zodra het bedrag vaststaat, bv. '€150'. Leeg = de zin noemt geen
-// bedrag.
-const BORG_BEDRAG = '€297'
 
 const CTA_TEKST = 'Start mijn challenge'
 
@@ -110,36 +107,8 @@ const GESCHIKT = [
   'Bereid bent te trainen, afspraken na te komen en je voortgang bij te houden.',
 ]
 
-const BORG_EISEN = [
-  'Minimaal twee workouts per week.',
-  '75% van je voedingsplan volgen.',
-  'Drie calls met mij gedurende het traject.',
-  'Drie keer per week je gewicht in de app bijhouden.',
-]
 
 const VRAGEN = [
-  {
-    vraag: 'Hoe werkt de borg?',
-    antwoord: [
-      `Je legt aan het begin een borg${BORG_BEDRAG ? ` van ${BORG_BEDRAG}` : ''} in. Na zes weken krijg je die terug als je aan de afgesproken deelnamevoorwaarden hebt voldaan.`,
-      'De voorwaarden gaan over de acties die je uitvoert. In de video noem ik onder andere:',
-      { lijst: BORG_EISEN },
-      'Vóór je begint, krijg je duidelijkheid over de volledige voorwaarden en hoe we beoordelen of je eraan hebt voldaan. Wanneer je niet aan de voorwaarden voldoet, kun je de borg verliezen.',
-    ],
-  },
-  {
-    vraag: 'Hoeveel is de borg?',
-    antwoord: [
-      `De borg is ${BORG_BEDRAG}. Die krijg je na zes weken terug als je aan de deelnamevoorwaarden hebt voldaan.`,
-    ],
-  },
-  {
-    vraag: 'Waarom werk je met een borg?',
-    antwoord: [
-      'Ik wil samenwerken met mannen die serieus aan hun doel willen werken. De borg is bedoeld als stok achter de deur om de afspraken ook uit te voeren.',
-      'Mijn doel is dat je de begeleiding ervaart, vooruitgang boekt en je borg terugkrijgt doordat je de afgesproken acties hebt uitgevoerd.',
-    ],
-  },
   {
     vraag: 'Moet ik na zes weken doorgaan?',
     antwoord: [
