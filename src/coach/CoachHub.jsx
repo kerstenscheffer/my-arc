@@ -175,6 +175,12 @@ const setHashTab = (id) => {
 // ============================================
 export default function CoachHub() {
   const [activeTab, setActiveTab] = useState(getHashTab)
+  // Android-terugknop: vanaf elk tabblad terug naar Command.
+  useEffect(() => {
+    const terug = (ev) => { if (activeTab !== 'command') { ev.preventDefault(); setHashTab('command') } }
+    window.addEventListener('myarc:back', terug)
+    return () => window.removeEventListener('myarc:back', terug)
+  }, [activeTab])
   // ── Split screen ──────────────────────────────────────────────────────
   // Twee tabbladen naast elkaar, bijvoorbeeld het voedingsplan links en de
   // workout builder rechts. null = uit. Alleen op desktop: op een telefoon

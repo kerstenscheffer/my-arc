@@ -259,6 +259,14 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
         name: newExercise.name,
         equipment: newExercise.equipment || exercise.equipment,
         primairSpieren: exercise.primairSpieren,
+        // Media van de oude oefening gaan niet mee: met ...exercise bleef
+        // video_url van de oude staan en speelde de nieuwe oefening het oude
+        // filmpje (call Martijn, 8 okt 2026). Leeg laten = het log-scherm en
+        // de kaart zoeken op de nieuwe naam in exercises.
+        video_url: newExercise.video_url || null,
+        thumbnail_url: newExercise.thumbnail_url || null,
+        fallback_video_url: newExercise.fallback_video_url || null,
+        image_url: newExercise.image_url || null,
         _isWeeklyOverride: true,
         _originalName: exercise.name
       }
@@ -303,7 +311,15 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
         ...exercise,
         name: newExercise.name,
         equipment: newExercise.equipment || exercise.equipment,
-        primairSpieren: exercise.primairSpieren
+        primairSpieren: exercise.primairSpieren,
+        // Media van de oude oefening gaan niet mee: met ...exercise bleef
+        // video_url van de oude staan en speelde de nieuwe oefening het oude
+        // filmpje (call Martijn, 8 okt 2026). Leeg laten = het log-scherm en
+        // de kaart zoeken op de nieuwe naam in exercises.
+        video_url: newExercise.video_url || null,
+        thumbnail_url: newExercise.thumbnail_url || null,
+        fallback_video_url: newExercise.fallback_video_url || null,
+        image_url: newExercise.image_url || null,
       }
       // Schrijf permanent naar schema
       await db.updateExerciseInSchema(schema.id, workoutDayKey, exerciseIndex, updatedExercise)

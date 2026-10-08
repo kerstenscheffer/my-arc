@@ -12,11 +12,18 @@
 // staat in liters.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Minus } from 'lucide-react'
+import { Minus, ChevronRight, Droplets } from 'lucide-react'
 import { useOnderMarge } from './videoBalkHoogte'
 
 const STAP_ML = 100
 const STANDAARD_DOEL_L = 3
+// De fles is te verslepen (omhoog/omlaag) en in te klappen tot een randje,
+// want op de maaltijdpagina stond hij vast vóór de grammen van gerechten
+// (call Martijn, 8 okt 2026). Beide staan onthouden op het toestel.
+const SLEUTEL_HOOGTE = 'myarc_waterfles_hoogte'
+const SLEUTEL_INGEKLAPT = 'myarc_waterfles_ingeklapt'
+const lees = (k) => { try { return localStorage.getItem(k) } catch { return null } }
+const schrijf = (k, v) => { try { localStorage.setItem(k, String(v)) } catch { /* leeg */ } }
 
 const vandaag = () => new Date().toISOString().split('T')[0]
 
@@ -30,6 +37,29 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
   const [toonMin, setToonMin] = useState(false)
   const bewaarTimer = useRef(null)
   const minTimer = useRef(null)
+  // Verslepen: extra hoogte boven de standaardplek, in px.
+  const [hoogte, setHoogte] = useState(() => Math.max(0, Number(lees(SLEUTEL_HOOGTE)) || 0))
+  const [ingeklapt, setIngeklapt] = useState(() => lees(SLEUTEL_INGEKLAPT) === '1')
+  const sleep = useRef({ actief: false, startY: 0, startHoogte: 0, verplaatst: false })
+
+  const sleepStart = (e) => {
+    sleep.current = { actief: true, startY: e.clientY, startHoogte: hoogte, verplaatst: false }
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* leeg */ }
+  }
+  const sleepBeweeg = (e) => {
+    if (!sleep.current.actief) return
+    const dy = sleep.current.startY - e.clientY
+    if (!sleep.current.verplaatst && Math.abs(dy) < 8) return
+    sleep.current.verplaatst = true
+    const max = Math.max(0, window.innerHeight - 260)
+    setHoogte(Math.min(max, Math.max(0, sleep.current.startHoogte + dy)))
+  }
+  const sleepEind = () => {
+    if (!sleep.current.actief) return
+    sleep.current.actief = false
+    if (sleep.current.verplaatst) schrijf(SLEUTEL_HOOGTE, Math.round(hoogte))
+  }
+  const klapIn = (v) => { setIngeklapt(v); schrijf(SLEUTEL_INGEKLAPT, v ? '1' : '0') }
 
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
@@ -96,22 +126,58 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
 
   if (!geladen || !client?.id) return null
 
+  if (ingeklapt) {
+    return (
+      <button
+        onClick={() => klapIn(false)}
+        aria-label="Waterfles tonen"
+        style={{
+          position: 'fixed', right: 0,
+          bottom: `calc(${onder + hoogte + 20}px + env(safe-area-inset-bottom, 0px))`,
+          zIndex: 95, width: 30, height: 44, padding: 0,
+          borderRadius: '10px 0 0 10px', border: '1px solid rgba(255,255,255,0.14)', borderRight: 'none',
+          background: 'rgba(10,10,10,0.92)', color: 'rgba(96,165,250,0.95)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <Droplets size={16} strokeWidth={2.4} />
+      </button>
+    )
+  }
+
   const pct = doelMl > 0 ? Math.min(100, (ml / doelMl) * 100) : 0
   const gehaald = ml >= doelMl && doelMl > 0
   const liters = (ml / 1000).toFixed(ml % 1000 === 0 ? 1 : 1)
 
   return (
-    <div style={{
-      position: 'fixed',
-      right: isMobile ? 10 : 16,
-      bottom: `calc(${onder}px + env(safe-area-inset-bottom, 0px))`,
-      transition: 'bottom 0.34s cubic-bezier(0.22, 1, 0.36, 1)',
-      zIndex: 95,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-    }}>
+    <div
+      onPointerDown={sleepStart} onPointerMove={sleepBeweeg} onPointerUp={sleepEind} onPointerCancel={sleepEind}
+      style={{
+        position: 'fixed',
+        right: isMobile ? 10 : 16,
+        bottom: `calc(${onder + hoogte}px + env(safe-area-inset-bottom, 0px))`,
+        transition: sleep.current.actief ? 'none' : 'bottom 0.34s cubic-bezier(0.22, 1, 0.36, 1)',
+        zIndex: 95, touchAction: 'none',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+      }}>
+      {/* Inklappen: de fles wordt een randje aan de zijkant. */}
+      <button
+        onClick={() => klapIn(true)}
+        aria-label="Waterfles verbergen"
+        style={{
+          width: 26, height: 26, padding: 0, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(10,10,10,0.9)', border: '1px solid rgba(255,255,255,0.14)',
+          color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <ChevronRight size={14} strokeWidth={3} />
+      </button>
       {/* Min-knop: alleen vlak na een tik, want meestal heb je hem niet nodig. */}
       <button
-        onClick={() => verzet(-STAP_ML)}
+        onClick={() => { if (!sleep.current.verplaatst) verzet(-STAP_ML) }}
         aria-label="100 ml eraf"
         title="100 ml eraf"
         style={{
@@ -133,8 +199,8 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
           Een afgerond blokje leek op een knop; hier zie je in één oogopslag
           waar het over gaat. */}
       <button
-        onClick={() => verzet(STAP_ML)}
-        aria-label={`${ml} van ${doelMl} milliliter water. Tik voor 100 ml erbij.`}
+        onClick={() => { if (!sleep.current.verplaatst) verzet(STAP_ML) }}
+        aria-label={`${ml} van ${doelMl} milliliter water. Tik voor 100 ml erbij. Sleep om te verplaatsen.`}
         title={`${liters} van ${(doelMl / 1000).toFixed(1)} liter — tik voor +100 ml`}
         style={{
           position: 'relative', padding: 0, border: 'none', background: 'transparent',

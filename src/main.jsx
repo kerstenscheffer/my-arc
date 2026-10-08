@@ -5,6 +5,7 @@ import './index.css'
 import './styles/ai-generator.css'
 import './ui/tokens.css'   // design-contract tokens (goud), additief — laadt op elke pagina
 import App from './App.jsx'
+import { installeerTerugknop } from './terugknop'
 
 // ── Service-worker kill-switch ──────────────────────────────────────────────
 // De oude PWA-service-worker (public/service-worker.js) veroorzaakte spontane
@@ -21,6 +22,8 @@ if ('serviceWorker' in navigator) {
     caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(() => {})
   }
 }
+
+installeerTerugknop()
 
 // Mount application
 const container = document.getElementById('root');

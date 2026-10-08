@@ -71,6 +71,13 @@ const pageThemes = {
  */
 export default function ClientDashboard({ previewClientId = null, ingebed = false } = {}) {
   const [currentView, setCurrentView] = useState('home')
+  // Android-terugknop: vanaf elk tabblad terug naar Home; op Home laat
+  // terugknop.js de app naar de achtergrond gaan (niet dicht).
+  useEffect(() => {
+    const terug = (ev) => { if (currentView !== 'home') { ev.preventDefault(); setCurrentView('home') } }
+    window.addEventListener('myarc:back', terug)
+    return () => window.removeEventListener('myarc:back', terug)
+  }, [currentView])
   const [user, setUser] = useState(null)
   const [client, setClient] = useState(null)
   const [schema, setSchema] = useState(null)
