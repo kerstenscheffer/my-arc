@@ -50,6 +50,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showWeekAgenda, setShowWeekAgenda] = useState(false)
   const [showPlanSwitch, setShowPlanSwitch] = useState(false)
   const [showPlanToevoegen, setShowPlanToevoegen] = useState(false)
+  // Titel in de kopbalk aanpassen: null = niet aan het bewerken.
+  const [titelBewerk, setTitelBewerk] = useState(null)
   const [agendaWeergave, setAgendaWeergave] = useState('rooster') // 'rooster' | 'uren'
   const [agendaKey, setAgendaKey] = useState(0)
   useEffect(() => {
@@ -152,6 +154,20 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     history.reset({ name: '', description: '', primary_goal: 'muscle_gain', experience_level: 'intermediate', split_type: 'custom', days_per_week: 0, equipment: [], days: [] })
     setSelectedSchemaId(null)
     setActiveDay(null)
+  }
+
+  // Titel uit de kopbalk bewaren: in de builder, en meteen in de database
+  // als het een bestaand plan is, zodat je niet eerst op Opslaan hoeft.
+  const bewaarTitel = async () => {
+    const nieuw = (titelBewerk ?? '').trim()
+    setTitelBewerk(null)
+    if (!nieuw || nieuw === (workoutPlan.name || '')) return
+    setWorkoutPlan(prev => ({ ...prev, name: nieuw }))
+    if (!selectedSchemaId) return
+    const { error } = await db.supabase.from('workout_schemas').update({ name: nieuw, updated_at: new Date().toISOString() }).eq('id', selectedSchemaId)
+    if (error) { console.error('titel opslaan mislukt:', error); return }
+    setClientSchemas(prev => prev.map(x => x.id === selectedSchemaId ? { ...x, name: nieuw } : x))
+    setAgendaKey(k => k + 1)
   }
 
   const loadTrainingInfo = async (clientId) => {
@@ -837,9 +853,16 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </div>
           {effectiveClient && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, maxWidth: '100%' }}>
-              <div style={{ minWidth: 0, fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, color: huidigPlan ? '#fff' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {huidigPlan?.name || (selectedSchemaId ? workoutPlan.name : 'Nieuw plan') || 'Nog geen plan'}
-              </div>
+              {titelBewerk !== null ? (
+                <input autoFocus value={titelBewerk} onChange={e => setTitelBewerk(e.target.value)} onBlur={bewaarTitel}
+                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setTitelBewerk(null) }}
+                  placeholder={voorstelPlan(workoutPlan.days) || 'Naam van het plan'}
+                  style={{ minWidth: 0, width: isMobile ? 220 : 320, fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '0.1rem 0.5rem', outline: 'none', fontFamily: 'inherit', textAlign: 'center' }} />
+              ) : (
+                <button onClick={() => setTitelBewerk(workoutPlan.name || huidigPlan?.name || '')} title="Klik om de naam aan te passen" style={{ minWidth: 0, background: 'none', border: 'none', padding: '0.1rem 0.5rem', borderRadius: 8, fontFamily: 'inherit', cursor: 'text', fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, color: (workoutPlan.name || huidigPlan?.name) ? '#fff' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  {workoutPlan.name || huidigPlan?.name || (workoutPlan.days.length > 0 ? 'Naam van het plan…' : 'Nog geen plan')}
+                </button>
+              )}
               <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><RefreshCw size={15} strokeWidth={2.6} /></button>
               <button onClick={() => setShowPlanToevoegen(true)} title="Extra plan toevoegen" aria-label="Extra plan toevoegen" style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Plus size={16} strokeWidth={2.8} /></button>
               <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{ ...{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', cursor: huidigPlan ? 'pointer' : 'not-allowed', opacity: huidigPlan ? 1 : 0.4 }}><Trash2 size={15} strokeWidth={2.6} /></button>
