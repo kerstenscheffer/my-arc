@@ -10,7 +10,6 @@ import WeekSchedule from './components/WeekSchedule'
 import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
 import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
 import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
-import StappenStrook from './components/StappenStrook'
 import CardioLogVanger from './components/CardioLogVanger'
 import HistorieBlad from './components/HistorieBlad'
 import BladModal from './components/todays-workout/components/BladModal'
@@ -241,7 +240,6 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange, onClien
           weekOffset={weekOffset}
           onWeekOffsetChange={setWeekOffset}
           client={client}
-          tussenBlok={<div style={{ padding: isMobile ? '0.75rem 1rem 0' : '1rem 1.25rem 0' }}><StappenStrook client={client} db={db} isMobile={isMobile} /></div>}
         />
       </div></FadeOnScroll>}
 

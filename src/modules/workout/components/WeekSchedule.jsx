@@ -14,6 +14,10 @@ import { ontleedPlanKey } from '../utils/planKey'
 import RealiteitBlad from '../../client-agenda/RealiteitBlad'
 import CardioGedaanBlad from './CardioGedaanBlad'
 import ExerciseLogModal from './todays-workout/components/ExerciseLogModal'
+import StappenService, { STANDAARD_DOEL } from '../../steps/StappenService'
+import { STAPPEN_EVENT } from '../../steps/stappenSync'
+import StappenInzichtModal from '../../steps/StappenInzichtModal'
+import { Footprints, BarChart3 } from 'lucide-react'
 
 // Bereken de maandag van de huidige week (lokale tijd).
 function getThisMonday() {
@@ -46,6 +50,27 @@ export default function WeekSchedule({
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [customWorkouts, setCustomWorkouts] = useState({})
+  // Stappen van de getoonde week, in de weekstrip zelf (was een losse strook).
+  const [stappenWeek, setStappenWeek] = useState([])
+  const [stappenDoel, setStappenDoel] = useState(STANDAARD_DOEL)
+  const [stappenInzicht, setStappenInzicht] = useState(false)
+  useEffect(() => {
+    if (!clientId || !db?.supabase) return
+    let weg = false
+    const laad = async () => {
+      const anker = new Date(getoondeMaandag)
+      const [dagen, doel] = await Promise.all([StappenService.haalWeek(db, clientId, anker), StappenService.haalDoel(db, clientId)])
+      if (weg) return
+      setStappenWeek(dagen || []); setStappenDoel(doel || STANDAARD_DOEL)
+    }
+    laad()
+    window.addEventListener(STAPPEN_EVENT, laad)
+    return () => { weg = true; window.removeEventListener(STAPPEN_EVENT, laad) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, db, weekOffset])
+  const stappenPerDag = stappenWeek.length === 7 ? stappenWeek.map(d => ({ steps: d.steps, gehaald: (d.steps || 0) >= stappenDoel, toekomst: d.toekomst, isVandaag: d.isVandaag })) : null
+  const stappenTotaal = stappenWeek.filter(d => !d.toekomst).reduce((t, d) => t + (d.steps || 0), 0)
+  const stappenDagenGehaald = stappenWeek.filter(d => !d.toekomst && (d.steps || 0) >= stappenDoel).length
   // Andere plannen van de klant waar een dag van is ingepland (plan_<id>__<dag>).
   const [anderePlannen, setAnderePlannen] = useState({})
   // De indeling van de week ervoor en erna. Nodig voor de rust-waarschuwing:
@@ -639,6 +664,32 @@ export default function WeekSchedule({
         )}
       </div>
 
+      {/* Stappen van de week, als regel onder de plannaam; de cijfers per dag
+          staan onder de tegels. De knop opent de lange lijn (30 & 90 dagen). */}
+      {stappenPerDag && (
+        <div style={{
+          padding: isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.75rem',
+          display: 'flex', alignItems: 'center', gap: 8,
+          fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
+        }}>
+          <Footprints size={isMobile ? 15 : 16} strokeWidth={2.4} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.55)' }} />
+          <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ color: '#fff', fontWeight: 900 }}>{stappenTotaal.toLocaleString('nl-NL')}</span> stappen
+            {stappenDagenGehaald > 0 && <span style={{ color: '#10b981' }}> · {stappenDagenGehaald}× doel</span>}
+            <span> · doel {stappenDoel.toLocaleString('nl-NL')} per dag</span>
+          </span>
+          <button onClick={() => setStappenInzicht(true)} aria-label="Stappen over 30 en 90 dagen" style={{
+            marginLeft: 'auto', flexShrink: 0, width: 30, height: 30, borderRadius: 10,
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <BarChart3 size={14} strokeWidth={2.4} />
+          </button>
+        </div>
+      )}
+      <StappenInzichtModal isOpen={stappenInzicht} onClose={() => setStappenInzicht(false)} client={client} db={db} isMobile={isMobile} gewichtKg={Number(client?.current_weight) || null} doel={stappenDoel} />
+
       {/* Weeknavigatie — vorige/volgende week */}
       {(() => {
         const monday = getoondeMaandag
@@ -653,6 +704,7 @@ export default function WeekSchedule({
             {/* WeekGrid: tegen de schermrand aan, zodat de kaarten breed zijn. */}
             <div style={{ padding: isMobile ? '0 0.4rem' : '0 1rem' }}>
               <WeekGrid
+                stappenPerDag={stappenPerDag} stappenDoel={stappenDoel}
                 cardioPerDag={cardioPerDag}
                 onCardioShift={async (c, dir) => {
                   // Cardio-blok een dag opzij in de agenda, los van de training.
