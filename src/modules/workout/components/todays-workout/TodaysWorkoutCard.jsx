@@ -170,6 +170,20 @@ export default function TodaysWorkoutCard({
                 {workout.focus}
               </span>
             )}
+            {workout.uitPlan && (
+              // Dag uit een ander plan dan het actieve: laat zien waar hij
+              // vandaan komt, anders raak je kwijt welk plan er draait.
+              <span style={{
+                display: 'inline-block', verticalAlign: 'middle',
+                marginLeft: 8, padding: '3px 8px', borderRadius: 6,
+                background: 'rgba(255,255,255,0.16)', color: '#fff',
+                fontSize: '0.56rem', fontWeight: 900,
+                textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
+                textShadow: 'none', border: '1px solid rgba(255,255,255,0.25)',
+              }}>
+                uit {workout.uitPlan}
+              </span>
+            )}
           </h2>
           <div style={{
             display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap',

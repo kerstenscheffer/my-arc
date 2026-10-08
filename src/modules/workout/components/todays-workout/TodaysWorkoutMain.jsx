@@ -9,6 +9,7 @@ import LogModal from './LogModal'
 import WorkoutServiceNew from '../../services/WorkoutServiceNew'
 import { workoutFoto } from '../../utils/workoutFoto'
 import { isWorkoutFullyLogged, workoutCompletionPct } from '../../utils/exerciseCompletion'
+import { ontleedPlanKey } from '../../utils/planKey'
 
 // onOpenPlanner is vervallen: op een dag zonder training staat geen knop meer,
 // je koppelt hem in de weekstrip eronder.
@@ -199,9 +200,34 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       const dayKey = (selectedDay && selectedDay !== 'today') ? selectedDay : weekDays[todayIndex].toLowerCase()
       // Map naar het Schema-formaat (eerste hoofdletter), bv 'monday' → 'Monday'.
       const todayName = dayKey.charAt(0).toUpperCase() + dayKey.slice(1)
-      const workoutKey = savedSchedule?.[todayName] || null
+      let workoutKey = savedSchedule?.[todayName] || null
 
       console.log('🏋️ dag:', todayName, '| workoutKey:', workoutKey)
+
+      // Dag uit een ánder plan van de klant (plan_<schemaId>__<dag>). Dat
+      // plan wordt dan ook het schema waar het log-scherm tegenaan werkt,
+      // zodat overrides en wissels bij de juiste dag landen.
+      const pk = ontleedPlanKey(workoutKey)
+      if (pk && pk.schemaId === latestSchema.id) {
+        workoutKey = pk.dagKey
+      } else if (pk) {
+        const { data: ander } = await db.supabase
+          .from('workout_schemas').select('*').eq('id', pk.schemaId).maybeSingle()
+        if (ander?.week_structure?.[pk.dagKey]) {
+          const anderMetOverrides = await WorkoutServiceNew.getSchemaWithOverrides(client.id, ander, db)
+          setFreshSchema(ander)
+          const dayData = anderMetOverrides.week_structure[pk.dagKey]
+          setTodaysWorkout({
+            ...dayData,
+            workoutKey: pk.dagKey, dayKey: pk.dagKey, dayName: todayName,
+            isCustom: false, schemaId: ander.id, uitPlan: ander.name,
+          })
+        } else {
+          setTodaysWorkout(null)
+        }
+        setLoading(false)
+        return
+      }
 
       if (workoutKey && schemaWithOverrides.week_structure[workoutKey]) {
         const dayData = schemaWithOverrides.week_structure[workoutKey]

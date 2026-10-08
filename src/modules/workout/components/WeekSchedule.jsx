@@ -10,6 +10,7 @@ import { rustWaarschuwingen, waarschuwingTekst, ROOD } from '../utils/rustWaarsc
 import ActionButtons from './week-schedule/ActionButtons'
 import CardioService, { normaliseerSoort } from '../services/CardioService'
 import TrainingToevoegen from './TrainingToevoegen'
+import { ontleedPlanKey } from '../utils/planKey'
 import RealiteitBlad from '../../client-agenda/RealiteitBlad'
 import CardioGedaanBlad from './CardioGedaanBlad'
 import ExerciseLogModal from './todays-workout/components/ExerciseLogModal'
@@ -45,6 +46,8 @@ export default function WeekSchedule({
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [customWorkouts, setCustomWorkouts] = useState({})
+  // Andere plannen van de klant waar een dag van is ingepland (plan_<id>__<dag>).
+  const [anderePlannen, setAnderePlannen] = useState({})
   // De indeling van de week ervoor en erna. Nodig voor de rust-waarschuwing:
   // zondag botst niet met de dinsdag ervóór maar met de dinsdag erna, en die
   // staat in de week hierna.
@@ -206,7 +209,20 @@ export default function WeekSchedule({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekSchedule, loading, isHuidigeWeek])
 
+  const loadAnderePlannen = async (schedule) => {
+    if (!db?.supabase || !schedule) return
+    const ids = [...new Set(Object.values(schedule).map(ontleedPlanKey).filter(Boolean).map(k => k.schemaId).filter(id => id && id !== schema?.id))]
+    if (ids.length === 0) return
+    try {
+      const { data } = await db.supabase.from('workout_schemas').select('id, name, week_structure').in('id', ids)
+      const map = {}
+      ;(data || []).forEach(p => { map[p.id] = p })
+      setAnderePlannen(prev => ({ ...prev, ...map }))
+    } catch { /* leeg */ }
+  }
+
   const loadCustomWorkoutsForSchedule = async (schedule) => {
+    loadAnderePlannen(schedule)
     if (!workoutService || !schedule) return
     const ids = Object.values(schedule).filter(v => v?.startsWith('custom_')).map(v => v.replace('custom_', ''))
     if (ids.length === 0) return
@@ -499,6 +515,12 @@ export default function WeekSchedule({
     }
     if (activities[workoutKey]) return activities[workoutKey]
     if (schema?.week_structure?.[workoutKey]) return schema.week_structure[workoutKey]
+    const pk = ontleedPlanKey(workoutKey)
+    if (pk) {
+      const plan = pk.schemaId === schema?.id ? schema : anderePlannen[pk.schemaId]
+      const w = plan?.week_structure?.[pk.dagKey]
+      return w ? { ...w, uitPlan: plan?.name || null } : null
+    }
     return null
   }
 
@@ -715,7 +737,7 @@ export default function WeekSchedule({
 
             <TrainingToevoegen
               open={toevoegenOpen} onClose={() => setToevoegenOpen(false)} isMobile={isMobile}
-              schema={schema} workoutService={workoutService} clientId={clientId}
+              schema={schema} workoutService={workoutService} clientId={clientId} db={db}
               tempSchedule={tempSchedule} getWorkoutData={getWorkoutData} dayDates={dayDates}
               isHuidigeWeek={isHuidigeWeek} cardioPerDag={cardioPerDag}
               onBewaarGym={bewaarGym} onBewaarCardio={bewaarCardio}

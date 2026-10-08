@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays } from 'lucide-react'
 import CustomWorkoutModal from './planning/CustomWorkoutModal'
+import { maakPlanKey } from '../utils/planKey'
 
 const SPORTEN = [
   { id: 'Wandelen', icoon: Footprints }, { id: 'Fietsen', icoon: Bike }, { id: 'Zwemmen', icoon: Waves }, { id: 'Hardlopen', icoon: Timer },
@@ -26,11 +27,22 @@ const VORIGE = { 'gym-welke': 'soort', 'gym-dag': 'gym-welke', 'cardio-sport': '
 const fmt = (d) => d ? d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : ''
 
 export default function TrainingToevoegen({
-  open, onClose, isMobile, schema, workoutService, clientId,
+  open, onClose, isMobile, schema, workoutService, clientId, db,
   tempSchedule = {}, getWorkoutData, dayDates = [], isHuidigeWeek = true,
   cardioPerDag = {}, onBewaarGym, onBewaarCardio,
 }) {
   const [stap, setStap] = useState('soort')
+  // De andere plannen van de klant: elke dag daaruit is ook te kiezen,
+  // zonder van actief plan te wisselen (call Martijn, 8 okt 2026).
+  const [anderePlannen, setAnderePlannen] = useState([])
+  useEffect(() => {
+    if (!open || !db?.getClientWorkoutPlans || !clientId) return
+    let weg = false
+    db.getClientWorkoutPlans(clientId)
+      .then(({ plans }) => { if (!weg) setAnderePlannen((plans || []).filter(p => p.id !== schema?.id && p.week_structure)) })
+      .catch(() => {})
+    return () => { weg = true }
+  }, [open, clientId, schema?.id, db])
   const [soortTraining, setSoortTraining] = useState(null) // 'gym' | 'cardio'
   const [workoutKey, setWorkoutKey] = useState(null)
   const [dag, setDag] = useState(null)
@@ -80,7 +92,16 @@ export default function TrainingToevoegen({
   const planDagen = Object.entries(schema?.week_structure || {}).map(([key, w]) => ({
     key, naam: w?.name || w?.focus || key, sub: [w?.focus && w?.name ? w.focus : null, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
   }))
-  const naamVan = (key) => { const w = getWorkoutData ? getWorkoutData(key) : null; return w?.name || w?.focus || key }
+  const andereDagen = anderePlannen.flatMap(p => Object.entries(p.week_structure || {}).map(([dagKey, w]) => ({
+    key: maakPlanKey(p.id, dagKey), naam: w?.name || w?.focus || dagKey,
+    sub: [p.name, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
+  })))
+  const naamVan = (key) => {
+    const w = getWorkoutData ? getWorkoutData(key) : null
+    if (w?.name || w?.focus) return w.name || w.focus
+    const ander = andereDagen.find(d => d.key === key)
+    return ander?.naam || key
+  }
 
   const bewaar = async (bereik) => {
     if (bezig) return
@@ -142,6 +163,16 @@ export default function TrainingToevoegen({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {planDagen.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '2px 0' }}>Uit je plan</div>}
               {planDagen.map(p => (
+                <button key={p.key} onClick={() => { tik(); setWorkoutKey(p.key); setStap('gym-dag') }} style={tegel(workoutKey === p.key)}>
+                  <Dumbbell size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.naam}</div>
+                    {p.sub && <div style={sub}>{p.sub}</div>}
+                  </div>
+                </button>
+              ))}
+              {andereDagen.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '8px 0 2px' }}>Uit je andere plannen</div>}
+              {andereDagen.map(p => (
                 <button key={p.key} onClick={() => { tik(); setWorkoutKey(p.key); setStap('gym-dag') }} style={tegel(workoutKey === p.key)}>
                   <Dumbbell size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
