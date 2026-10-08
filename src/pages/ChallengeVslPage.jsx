@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import {
   Star, ChevronDown, ChevronRight, Utensils, Dumbbell, MessageCircle,
-  Check, CalendarCheck, Play, Pause, Volume2, VolumeX,
+  Check, CalendarCheck, Play, Pause, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
@@ -29,6 +29,9 @@ const THEMAS = {
   goud:  { bg: '#f6edd2', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.12)',       randZacht: 'rgba(0,0,0,0.1)',        kaart: 'rgba(255,255,255,0.65)', label: '#a86f00', icoon: '#000' },
 }
 const ThemaCtx = createContext(THEMAS.zwart)
+// Elke knop opent het kalenderblad; de functie komt via context zodat de
+// knoppen diep in de secties er niet aan hoeven te worden doorgegeven.
+const OpenKalenderCtx = createContext(() => {})
 const useThema = () => useContext(ThemaCtx)
 // De hero is net iets lichter dan de vaste balk erboven, zodat je de twee
 // vlakken van elkaar ziet.
@@ -201,12 +204,13 @@ function Tekst({ children, m, center, dim, style }) {
 
 // De knop: wit vlak, zwarte tekst, zoals op de challenge-pagina.
 function Cta({ m, sub, style }) {
+  const openKalender = useContext(OpenKalenderCtx)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, ...style }}>
-      <a
-        href={CALENDLY}
-        target="_blank" rel="noopener noreferrer"
+      <button
+        onClick={openKalender}
         style={{
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           minHeight: m ? 68 : 76, padding: m ? '0 1.8rem' : '0 2.6rem',
           width: m ? '100%' : 'auto', minWidth: m ? 0 : 380,
@@ -218,7 +222,7 @@ function Cta({ m, sub, style }) {
         }}
       >
         <CalendarCheck size={24} strokeWidth={2.6} /> {CTA_TEKST}
-      </a>
+      </button>
       {sub && (
         <div style={{ fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.4 }}>
           {sub}
@@ -278,7 +282,7 @@ function TrustpilotBadge({ style }) {
 //
 // In de native app loopt de iframe via yt.html (zie youtubeHelpers); daar
 // werkt de IFrame API niet, dus daar blijft de gewone YouTube-speler staan.
-const TOON_VOORTGANG = (x) => Math.pow(Math.max(0, Math.min(1, x)), 0.6)
+const TOON_VOORTGANG = (x) => Math.pow(Math.max(0, Math.min(1, x)), 0.45)
 
 function laadYouTubeApi() {
   if (window.YT?.Player) return Promise.resolve(window.YT)
@@ -450,6 +454,70 @@ const knopIcoon = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
+// Het kalenderblad: schuift van onderaf omhoog, Calendly erin. Donker
+// gekleurd via de URL-parameters zodat het bij de pagina past.
+function KalenderBlad({ open, onClose, m }) {
+  useEffect(() => {
+    if (!open) return
+    const vorige = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const toets = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', toets)
+    return () => { document.body.style.overflow = vorige; window.removeEventListener('keydown', toets) }
+  }, [open, onClose])
+  if (!open) return null
+  // embed_domain + embed_type zijn wat Calendly's eigen widget-script
+  // meegeeft; zonder die twee blijft de pagina in een iframe op de
+  // laadpuntjes hangen.
+  const url = `${CALENDLY}?embed_domain=${encodeURIComponent(window.location.hostname)}&embed_type=Inline&hide_gdpr_banner=1&background_color=0a0a0a&text_color=ffffff&primary_color=ffd700`
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', animation: 'bladWaas 0.2s ease' }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          height: m ? '92dvh' : 'min(92vh, 900px)',
+          maxWidth: m ? '100%' : 1000, margin: '0 auto',
+          background: '#0a0a0a', borderRadius: '20px 20px 0 0',
+          border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          animation: 'bladOmhoog 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: m ? '0.7rem 0.9rem 0.6rem' : '0.9rem 1.2rem 0.8rem',
+          borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
+        }}>
+          <div>
+            <div style={{ fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', textTransform: 'uppercase' }}>Plan je kennismaking</div>
+            <div style={{ fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Een half uur. We bespreken je doel en of de challenge bij je past.</div>
+          </div>
+          <button
+            onClick={onClose} aria-label="Sluiten"
+            style={{
+              width: 38, height: 38, flexShrink: 0, borderRadius: 10,
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+              color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <X size={18} strokeWidth={2.6} />
+          </button>
+        </div>
+        <iframe
+          src={url}
+          title="Kennismaking plannen"
+          style={{ flex: 1, width: '100%', border: 0, background: '#0a0a0a' }}
+        />
+      </div>
+    </div>
+  )
+}
+
 function Vraag({ item, open, onToggle, m }) {
   const t = useThema()
   return (
@@ -489,6 +557,8 @@ function Vraag({ item, open, onToggle, m }) {
 export default function ChallengeVslPage() {
   const [m, setM] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [openVraag, setOpenVraag] = useState(0)
+  const [kalenderOpen, setKalenderOpen] = useState(false)
+  const openKalender = () => setKalenderOpen(true)
   // De zwevende knop komt pas als de knop bovenaan uit beeld is.
   const [zwevend, setZwevend] = useState(false)
   const heroCtaRef = useRef(null)
@@ -535,6 +605,7 @@ export default function ChallengeVslPage() {
   const reviewsDubbel = [...REVIEWS, ...REVIEWS]
 
   return (
+    <OpenKalenderCtx.Provider value={openKalender}>
     <div style={{
       background: BG, color: '#fff', minHeight: '100vh',
       fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
@@ -811,9 +882,10 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* Zwevende knop zodra de knop bovenaan uit beeld is. */}
-      <a
-        href={CALENDLY} target="_blank" rel="noopener noreferrer"
+      <button
+        onClick={openKalender}
         style={{
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
           position: 'fixed', left: '50%',
           bottom: `calc(env(safe-area-inset-bottom, 0px) + ${m ? '1.1rem' : '1.5rem'})`,
           transform: 'translateX(-50%)', zIndex: 90,
@@ -828,13 +900,18 @@ export default function ChallengeVslPage() {
         }}
       >
         {CTA_TEKST} <ChevronRight size={16} strokeWidth={3} />
-      </a>
+      </button>
+
+      <KalenderBlad open={kalenderOpen} onClose={() => setKalenderOpen(false)} m={m} />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
         html { scroll-behavior: smooth; }
         body { background: #000; margin: 0; }
+        @keyframes bladWaas { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes bladOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
     </div>
+    </OpenKalenderCtx.Provider>
   )
 }
