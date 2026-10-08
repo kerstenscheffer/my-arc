@@ -26,7 +26,7 @@ const VIDEO_ID = '41Hfc2YVBAA'
 // bedrag.
 const BORG_BEDRAG = ''
 
-const CTA_TEKST = 'Ik wil in shape komen'
+const CTA_TEKST = 'Start mijn challenge'
 
 const RESULTATEN = [
   { kg: '4,5', weken: 4 },
@@ -190,16 +190,16 @@ function Cta({ m, sub, style, donker = false }) {
         target="_blank" rel="noopener noreferrer"
         style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          minHeight: m ? 54 : 60, padding: m ? '0 1.6rem' : '0 2.2rem',
-          width: m ? '100%' : 'auto', minWidth: m ? 0 : 320,
+          minHeight: m ? 68 : 76, padding: m ? '0 1.8rem' : '0 2.6rem',
+          width: m ? '100%' : 'auto', minWidth: m ? 0 : 380,
           borderRadius: 14, background: donker ? '#000' : '#fff', color: donker ? '#fff' : '#000',
-          fontSize: m ? '0.98rem' : '1.08rem', fontWeight: 900, letterSpacing: '0.02em',
+          fontSize: m ? '1.18rem' : '1.3rem', fontWeight: 900, letterSpacing: '0.02em',
           textTransform: 'uppercase', textDecoration: 'none', boxSizing: 'border-box',
           boxShadow: donker ? '0 8px 28px rgba(0,0,0,0.25)' : '0 4px 24px rgba(255,255,255,0.14)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <CalendarCheck size={20} strokeWidth={2.6} /> {CTA_TEKST}
+        <CalendarCheck size={24} strokeWidth={2.6} /> {CTA_TEKST}
       </a>
       {sub && (
         <div style={{ fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.4 }}>
@@ -213,7 +213,7 @@ function Cta({ m, sub, style, donker = false }) {
 function Sectie({ children, m, smal, lijn = true, style }) {
   return (
     <section style={{
-      padding: m ? '3rem 1.25rem' : '5rem 3rem',
+      padding: m ? '4rem 1.25rem' : '6.5rem 3rem',
       borderTop: lijn ? '1px solid rgba(255,255,255,0.08)' : 'none',
       ...style,
     }}>
@@ -403,7 +403,7 @@ export default function ChallengeVslPage() {
 
       {/* Zwart tot halverwege de video, daaronder wit: de overgang loopt dwars
           door het beeld en trekt je oog naar de video en de knop eronder. */}
-      <section style={{ background: BG, padding: `${m ? '4.6rem' : '6.5rem'} ${m ? '1.25rem' : '3rem'} 0` }}>
+      <section style={{ background: BG, padding: `${m ? '5.4rem' : '7.5rem'} ${m ? '1.25rem' : '3rem'} 0` }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
           <Kop m={m} center groot>Strakker en sterker met een aanpak die werkt naast je baan, gezin en sociale leven.</Kop>
           <Tekst m={m} center style={{ marginTop: m ? '1.3rem' : '1.7rem', fontSize: m ? '1.08rem' : '1.22rem', color: '#fff' }}>
@@ -416,18 +416,18 @@ export default function ChallengeVslPage() {
           helft. */}
       <div style={{
         background: `linear-gradient(180deg, ${BG} 0%, ${BG} 50%, #fff 50%, #fff 100%)`,
-        padding: `${m ? '1.7rem' : '2.4rem'} ${m ? '1.25rem' : '3rem'} 0`,
+        padding: `${m ? '2.2rem' : '3rem'} ${m ? '1.25rem' : '3rem'} 0`,
       }}>
         <div style={{ maxWidth: 880, margin: '0 auto' }}>
           <Video m={m} />
         </div>
       </div>
-      <section style={{ background: '#fff', color: '#000', padding: `${m ? '1.5rem' : '2.2rem'} ${m ? '1.25rem' : '3rem'} ${m ? '2.5rem' : '3.5rem'}` }}>
+      <section style={{ background: '#fff', color: '#000', padding: `${m ? '2rem' : '2.8rem'} ${m ? '1.25rem' : '3rem'} ${m ? '3.2rem' : '4.5rem'}` }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div ref={heroCtaRef}>
             <Cta m={m} donker />
           </div>
-          <Tekst m={m} center style={{ marginTop: m ? '1.3rem' : '1.8rem', color: '#111', fontWeight: 700 }}>
+          <Tekst m={m} center style={{ marginTop: m ? '1.8rem' : '2.4rem', color: '#111', fontWeight: 700 }}>
             Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
           </Tekst>
         </div>
@@ -483,7 +483,7 @@ export default function ChallengeVslPage() {
         <Tekst m={m} center dim style={{ marginTop: m ? '1.2rem' : '1.6rem', fontSize: m ? '0.82rem' : '0.88rem' }}>
           Dit zijn individuele veranderingen in lichaamsgewicht, geen belofte voor jouw resultaat. Tijdens de kennismaking bespreken we je startpunt en wat voor jou een passende doelstelling is.
         </Tekst>
-        <Cta m={m} style={{ marginTop: m ? '1.6rem' : '2.2rem' }} />
+        <Cta m={m} style={{ marginTop: m ? '2.2rem' : '3rem' }} />
       </Sectie>
 
       {/* ══ 3. Herkenning ══ */}
@@ -537,7 +537,7 @@ export default function ChallengeVslPage() {
             </div>
           ))}
         </div>
-        <Cta m={m} style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
+        <Cta m={m} style={{ marginTop: m ? '2.4rem' : '3.2rem' }} />
       </Sectie>
 
       {/* ══ 5. De coach ══ */}
@@ -607,7 +607,7 @@ export default function ChallengeVslPage() {
         <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>
           Een gesprek van een half uur. We bespreken je doel, waar je nu vastloopt en of de challenge bij je past.
         </Tekst>
-        <Cta m={m} style={{ marginTop: m ? '1.4rem' : '1.8rem' }} />
+        <Cta m={m} style={{ marginTop: m ? '2rem' : '2.6rem' }} />
 
         <TrustpilotBadge style={{ margin: `${m ? '2rem' : '2.8rem'} 0 1rem` }} />
         <div
