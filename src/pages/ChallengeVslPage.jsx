@@ -9,7 +9,7 @@
 // kleine gouden labels, witte knoppen. Deze pagina scrolt gewoon door (geen
 // snap-scroll), want het is leestekst en geen presentatie.
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import {
   Star, ChevronDown, ChevronRight, Utensils, Dumbbell, MessageCircle,
   Check, CalendarCheck, Play,
@@ -19,6 +19,21 @@ import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
 const BG = '#000000'
+
+// Drie vlakken wisselen elkaar af, zoals op de acquisition.com-pagina: zwart,
+// wit en een lichte goudtint. Elke Sectie zet zijn thema; Kop, Tekst en Label
+// lezen het mee zodat de kleuren per vlak kloppen.
+const THEMAS = {
+  zwart: { bg: BG,        tekst: '#fff', tekst85: 'rgba(255,255,255,0.85)', dim: 'rgba(255,255,255,0.55)', rand: 'rgba(255,255,255,0.1)',  randZacht: 'rgba(255,255,255,0.08)', kaart: 'rgba(255,255,255,0.03)', label: GOLD,      icoon: '#fff' },
+  wit:   { bg: '#ffffff', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.12)',       randZacht: 'rgba(0,0,0,0.1)',        kaart: 'rgba(0,0,0,0.03)',       label: '#a86f00', icoon: '#000' },
+  goud:  { bg: '#f6edd2', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.12)',       randZacht: 'rgba(0,0,0,0.1)',        kaart: 'rgba(255,255,255,0.65)', label: '#a86f00', icoon: '#000' },
+}
+const ThemaCtx = createContext(THEMAS.zwart)
+const useThema = () => useContext(ThemaCtx)
+// De hero is net iets lichter dan de vaste balk erboven, zodat je de twee
+// vlakken van elkaar ziet.
+const HERO_BG = '#161616'
+const GOUD_KNOP = 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
 
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const VIDEO_ID = '41Hfc2YVBAA'
@@ -147,10 +162,11 @@ const VRAGEN = [
 // ── Bouwstenen ──────────────────────────────────────────────────────────────
 
 function Label({ children, m, center }) {
+  const t = useThema()
   return (
     <div style={{
       fontSize: m ? '0.62rem' : '0.7rem', fontWeight: 800,
-      letterSpacing: '0.15em', color: GOLD, textTransform: 'uppercase',
+      letterSpacing: '0.15em', color: t.label, textTransform: 'uppercase',
       marginBottom: m ? '0.7rem' : '0.9rem',
       textAlign: center ? 'center' : 'left',
     }}>{children}</div>
@@ -158,11 +174,12 @@ function Label({ children, m, center }) {
 }
 
 function Kop({ children, m, center, groot }) {
+  const t = useThema()
   return (
     <h2 style={{
       margin: 0,
       fontSize: groot ? (m ? '1.75rem' : '2.9rem') : (m ? '1.5rem' : '2.1rem'),
-      fontWeight: 900, lineHeight: 1.08, letterSpacing: '-0.02em', color: '#fff',
+      fontWeight: 900, lineHeight: 1.08, letterSpacing: '-0.02em', color: t.tekst,
       textTransform: 'uppercase',
       textAlign: center ? 'center' : 'left',
     }}>{children}</h2>
@@ -170,11 +187,12 @@ function Kop({ children, m, center, groot }) {
 }
 
 function Tekst({ children, m, center, dim, style }) {
+  const t = useThema()
   return (
     <p style={{
       margin: 0,
       fontSize: m ? '0.98rem' : '1.08rem', fontWeight: 600, lineHeight: 1.55,
-      color: dim ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.85)',
+      color: dim ? t.dim : t.tekst85,
       letterSpacing: '-0.01em', textAlign: center ? 'center' : 'left',
       ...style,
     }}>{children}</p>
@@ -182,7 +200,7 @@ function Tekst({ children, m, center, dim, style }) {
 }
 
 // De knop: wit vlak, zwarte tekst, zoals op de challenge-pagina.
-function Cta({ m, sub, style, donker = false }) {
+function Cta({ m, sub, style }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, ...style }}>
       <a
@@ -192,10 +210,10 @@ function Cta({ m, sub, style, donker = false }) {
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           minHeight: m ? 68 : 76, padding: m ? '0 1.8rem' : '0 2.6rem',
           width: m ? '100%' : 'auto', minWidth: m ? 0 : 380,
-          borderRadius: 14, background: donker ? '#000' : '#fff', color: donker ? '#fff' : '#000',
+          borderRadius: 14, background: GOUD_KNOP, color: '#000',
           fontSize: m ? '1.18rem' : '1.3rem', fontWeight: 900, letterSpacing: '0.02em',
           textTransform: 'uppercase', textDecoration: 'none', boxSizing: 'border-box',
-          boxShadow: donker ? '0 8px 28px rgba(0,0,0,0.25)' : '0 4px 24px rgba(255,255,255,0.14)',
+          boxShadow: '0 10px 30px rgba(212,175,55,0.35), 0 4px 12px rgba(0,0,0,0.25)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
@@ -210,17 +228,21 @@ function Cta({ m, sub, style, donker = false }) {
   )
 }
 
-function Sectie({ children, m, smal, lijn = true, style }) {
+function Sectie({ children, m, smal, lijn = true, thema = 'zwart', style }) {
+  const t = THEMAS[thema] || THEMAS.zwart
   return (
-    <section style={{
-      padding: m ? '4rem 1.25rem' : '6.5rem 3rem',
-      borderTop: lijn ? '1px solid rgba(255,255,255,0.08)' : 'none',
-      ...style,
-    }}>
-      <div style={{ maxWidth: smal ? 720 : 1000, margin: '0 auto', width: '100%' }}>
-        {children}
-      </div>
-    </section>
+    <ThemaCtx.Provider value={t}>
+      <section style={{
+        padding: m ? '4rem 1.25rem' : '6.5rem 3rem',
+        background: t.bg, color: t.tekst,
+        borderTop: lijn ? `1px solid ${t.randZacht}` : 'none',
+        ...style,
+      }}>
+        <div style={{ maxWidth: smal ? 720 : 1000, margin: '0 auto', width: '100%' }}>
+          {children}
+        </div>
+      </section>
+    </ThemaCtx.Provider>
   )
 }
 
@@ -279,8 +301,8 @@ function Video({ m }) {
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} />
           <div style={{
             position: 'relative', width: m ? 68 : 84, height: m ? 68 : 84, borderRadius: '50%',
-            background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+            background: GOUD_KNOP, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.5), 0 0 30px rgba(255,215,0,0.35)',
           }}>
             <Play size={m ? 28 : 34} fill="#000" color="#000" style={{ marginLeft: 4 }} />
           </div>
@@ -291,14 +313,15 @@ function Video({ m }) {
 }
 
 function Vraag({ item, open, onToggle, m }) {
+  const t = useThema()
   return (
-    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ borderBottom: `1px solid ${t.randZacht}` }}>
       <button
         onClick={onToggle}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           padding: m ? '1rem 0' : '1.2rem 0', background: 'transparent', border: 'none',
-          color: '#fff', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+          color: t.tekst, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
           fontSize: m ? '1.02rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
@@ -311,7 +334,7 @@ function Vraag({ item, open, onToggle, m }) {
           {item.antwoord.map((a, i) => a.lijst ? (
             <ul key={i} style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
               {a.lijst.map(r => (
-                <li key={r} style={{ fontSize: m ? '0.95rem' : '1.02rem', fontWeight: 700, color: '#fff', lineHeight: 1.5 }}>{r}</li>
+                <li key={r} style={{ fontSize: m ? '0.95rem' : '1.02rem', fontWeight: 700, color: t.tekst, lineHeight: 1.5 }}>{r}</li>
               ))}
             </ul>
           ) : (
@@ -403,7 +426,7 @@ export default function ChallengeVslPage() {
 
       {/* Zwart tot halverwege de video, daaronder wit: de overgang loopt dwars
           door het beeld en trekt je oog naar de video en de knop eronder. */}
-      <section style={{ background: BG, padding: `${m ? '5.4rem' : '7.5rem'} ${m ? '1.25rem' : '3rem'} 0` }}>
+      <section style={{ background: HERO_BG, padding: `${m ? '5.4rem' : '7.5rem'} ${m ? '1.25rem' : '3rem'} 0` }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
           <Kop m={m} center groot>Strakker en sterker met een aanpak die werkt naast je baan, gezin en sociale leven.</Kop>
           <Tekst m={m} center style={{ marginTop: m ? '1.3rem' : '1.7rem', fontSize: m ? '1.08rem' : '1.22rem', color: '#fff' }}>
@@ -415,7 +438,7 @@ export default function ChallengeVslPage() {
           het vlak is precies zo hoog als de video, dus de grens ligt op de
           helft. */}
       <div style={{
-        background: `linear-gradient(180deg, ${BG} 0%, ${BG} 50%, #fff 50%, #fff 100%)`,
+        background: `linear-gradient(180deg, ${HERO_BG} 0%, ${HERO_BG} 50%, #fff 50%, #fff 100%)`,
         padding: `${m ? '2.2rem' : '3rem'} ${m ? '1.25rem' : '3rem'} 0`,
       }}>
         <div style={{ maxWidth: 880, margin: '0 auto' }}>
@@ -425,7 +448,7 @@ export default function ChallengeVslPage() {
       <section style={{ background: '#fff', color: '#000', padding: `${m ? '2rem' : '2.8rem'} ${m ? '1.25rem' : '3rem'} ${m ? '3.2rem' : '4.5rem'}` }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div ref={heroCtaRef}>
-            <Cta m={m} donker />
+            <Cta m={m} />
           </div>
           <Tekst m={m} center style={{ marginTop: m ? '1.8rem' : '2.4rem', color: '#111', fontWeight: 700 }}>
             Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
@@ -434,7 +457,7 @@ export default function ChallengeVslPage() {
       </section>
 
       {/* ══ 2. Resultaten ══ */}
-      <Sectie m={m} lijn={false}>
+      <Sectie m={m} lijn={false} thema="goud">
         <Kop m={m} center>Deze mannen zetten de eerste stap al.</Kop>
         <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>In de video laat ik de voortgang van drie deelnemers zien:</Tekst>
 
@@ -445,11 +468,11 @@ export default function ChallengeVslPage() {
           {RESULTATEN.map(r => (
             <div key={r.kg} style={{
               padding: m ? '1rem 1.1rem' : '1.4rem 1.2rem', borderRadius: 14,
-              border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${THEMAS.goud.rand}`, background: THEMAS.goud.kaart,
               display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.5rem',
             }}>
-              <span style={{ fontSize: m ? '2rem' : '2.6rem', fontWeight: 900, letterSpacing: '-0.04em', color: '#fff', lineHeight: 1 }}>{r.kg}</span>
-              <span style={{ fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>kilo lichter in {r.weken} weken</span>
+              <span style={{ fontSize: m ? '2rem' : '2.6rem', fontWeight: 900, letterSpacing: '-0.04em', color: THEMAS.goud.tekst, lineHeight: 1 }}>{r.kg}</span>
+              <span style={{ fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 800, color: THEMAS.goud.dim }}>kilo lichter in {r.weken} weken</span>
             </div>
           ))}
         </div>
@@ -466,14 +489,14 @@ export default function ChallengeVslPage() {
           {TRANSFORMATIES.map(t => (
             <div key={t.src} style={{
               padding: m ? '0.6rem' : '0.8rem', borderRadius: 14,
-              border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)',
+              border: `1px solid ${THEMAS.goud.rand}`, background: THEMAS.goud.kaart,
             }}>
               <div style={{ borderRadius: 10, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
                 <img src={t.src} alt={t.caption} draggable={false}
                   onError={(e) => { e.currentTarget.style.opacity = 0 }}
                   style={{ maxWidth: '100%', width: 'auto', height: 'auto', display: 'block' }} />
               </div>
-              <p style={{ margin: '0.6rem 0 0.2rem', fontSize: m ? '0.8rem' : '0.86rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
+              <p style={{ margin: '0.6rem 0 0.2rem', fontSize: m ? '0.8rem' : '0.86rem', fontWeight: 800, color: THEMAS.goud.dim, textAlign: 'center' }}>
                 {t.caption}
               </p>
             </div>
@@ -512,7 +535,7 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* ══ 4. De aanpak ══ */}
-      <Sectie m={m}>
+      <Sectie m={m} thema="wit">
         <Label m={m} center>De aanpak</Label>
         <Kop m={m} center>Je weet wat je gaat eten, hoe je gaat trainen en wie er met je meekijkt.</Kop>
         <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>Tijdens de 6 Weken Challenge werken we aan drie onderdelen.</Tekst>
@@ -523,14 +546,14 @@ export default function ChallengeVslPage() {
           {AANPAK.map((a, i) => (
             <div key={a.kop} style={{
               padding: m ? '1.2rem 1.1rem' : '1.6rem 1.4rem', borderRadius: 16,
-              border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${THEMAS.wit.rand}`, background: THEMAS.wit.kaart,
               display: 'flex', flexDirection: 'column', gap: '0.8rem',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-                <a.Icon size={m ? 28 : 32} strokeWidth={2.6} color="#fff" />
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.15em', color: GOLD }}>{i + 1} VAN 3</span>
+                <a.Icon size={m ? 28 : 32} strokeWidth={2.6} color={THEMAS.wit.icoon} />
+                <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.15em', color: THEMAS.wit.label }}>{i + 1} VAN 3</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: m ? '1.2rem' : '1.3rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: '#fff' }}>{a.kop}</h3>
+              <h3 style={{ margin: 0, fontSize: m ? '1.2rem' : '1.3rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: THEMAS.wit.tekst }}>{a.kop}</h3>
               {a.alineas.map((t, n) => (
                 <Tekst key={n} m={m} style={{ fontSize: m ? '0.92rem' : '0.98rem' }}>{t}</Tekst>
               ))}
@@ -568,7 +591,7 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* ══ 6. Geschiktheid ══ */}
-      <Sectie m={m} smal>
+      <Sectie m={m} smal thema="goud">
         <Label m={m}>Geschiktheid</Label>
         <Kop m={m}>Past de 6 Weken Challenge bij jou?</Kop>
         <Tekst m={m} dim style={{ marginTop: '0.9rem' }}>Deze challenge sluit aan als je:</Tekst>
@@ -577,11 +600,11 @@ export default function ChallengeVslPage() {
             <div key={t} style={{
               display: 'flex', gap: '0.8rem', alignItems: 'center',
               padding: m ? '0.8rem 0' : '1rem 0',
-              borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              borderTop: i === 0 ? `1px solid ${THEMAS.goud.randZacht}` : 'none',
+              borderBottom: `1px solid ${THEMAS.goud.randZacht}`,
             }}>
-              <Check size={m ? 22 : 26} strokeWidth={3} color="#fff" style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: m ? '1.02rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: '#fff' }}>{t}</span>
+              <Check size={m ? 22 : 26} strokeWidth={3} color={THEMAS.goud.icoon} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: m ? '1.02rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: THEMAS.goud.tekst }}>{t}</span>
             </div>
           ))}
         </div>
@@ -591,10 +614,10 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* ══ 7. Vragen ══ */}
-      <Sectie m={m} smal>
+      <Sectie m={m} smal thema="wit">
         <Label m={m}>Veelgestelde vragen</Label>
         <Kop m={m}>Dit wil je waarschijnlijk nog weten.</Kop>
-        <div style={{ marginTop: m ? '1.2rem' : '1.6rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ marginTop: m ? '1.2rem' : '1.6rem', borderTop: `1px solid ${THEMAS.wit.randZacht}` }}>
           {VRAGEN.map((v, i) => (
             <Vraag key={v.vraag} item={v} m={m} open={openVraag === i} onToggle={() => setOpenVraag(openVraag === i ? -1 : i)} />
           ))}
@@ -660,9 +683,9 @@ export default function ChallengeVslPage() {
           transition: 'opacity 0.25s ease',
           display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
           padding: m ? '0.85rem 1.6rem' : '0.95rem 2rem', borderRadius: 999,
-          background: '#fff', color: '#000', textDecoration: 'none',
-          fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 900, whiteSpace: 'nowrap',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 24px rgba(255,255,255,0.12)',
+          background: GOUD_KNOP, color: '#000', textDecoration: 'none',
+          fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 900, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 24px rgba(255,215,0,0.25)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
