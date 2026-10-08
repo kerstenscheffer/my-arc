@@ -454,7 +454,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap' }}>
             {/* De weken als strook: deze week vooraan, daarachter terug in de
                 tijd. Slepen met de muis of vegen op een telefoon. */}
-            <div style={{ flex: isMobile ? '1 1 100%' : '1 1 0', minWidth: 0, display: 'flex' }}>
+            <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex' }}>
               <WekenStrook weken={weken} isMobile={isMobile} uitleg={(
                 <button
                   onClick={() => setUitlegOpen(v => !v)}
@@ -472,6 +472,16 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               )} />
             </div>
 
+            <GrootBlok
+              titel={fase ? 'Sinds fase' : 'Sinds start'}
+              waarde={totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—'}
+              eenheid="kg"
+              kleur={totalChange !== null ? weightGoalColor(totalChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)'}
+              onder={startDateLabel ? `vanaf ${startDateLabel}` : 'geen start'}
+              isMobile={isMobile}
+              basis="0 0 auto"
+              laatste={!bereik || isMobile}
+            />
             {bereik && <GrootBlok
               titel="Doel per week"
               waarde={bereik}
@@ -547,7 +557,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         </button>
       )}
 
-      {(!volleBreedte || cijfersOpen) && (
+      {volleBreedte && cijfersOpen && (
       <>
       {/* ═══ WEEKCIJFERS — één regel als tabel: verticale lijntjes ertussen,
             geen vakken. Het doel-blok dat hier stond is eruit; het doel staat
