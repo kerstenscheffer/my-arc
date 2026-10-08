@@ -162,7 +162,8 @@ function Kop({ children, m, center, groot }) {
     <h2 style={{
       margin: 0,
       fontSize: groot ? (m ? '1.75rem' : '2.9rem') : (m ? '1.5rem' : '2.1rem'),
-      fontWeight: 900, lineHeight: 1.08, letterSpacing: '-0.03em', color: '#fff',
+      fontWeight: 900, lineHeight: 1.08, letterSpacing: '-0.02em', color: '#fff',
+      textTransform: 'uppercase',
       textAlign: center ? 'center' : 'left',
     }}>{children}</h2>
   )
@@ -381,19 +382,26 @@ export default function ChallengeVslPage() {
       {/* ══ 1. Bovenaan: label, korte kop, video, één alinea, knop ══
           Alles op het eerste scherm van een telefoon. De lange uitleg staat
           onder de video, niet erboven: de video is waar je voor komt. */}
-      <Sectie m={m} lijn={false} style={{ paddingTop: m ? '1.5rem' : '3rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: m ? '1.1rem' : '1.6rem' }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: m ? '0.45rem 0.9rem' : '0.5rem 1.1rem', borderRadius: 999,
-            border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.05)',
-            fontSize: m ? '0.64rem' : '0.74rem', fontWeight: 800, letterSpacing: m ? '0.08em' : '0.12em',
-            textTransform: 'uppercase', color: '#fff', textAlign: 'center', lineHeight: 1.3,
-          }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: GOLD, boxShadow: `0 0 8px ${GOLD}` }} />
-            6 Weken Challenge · Voor drukke mannen
-          </span>
-        </div>
+      {/* Vaste balk bovenaan met het label als witte pil, rood bolletje ervoor. */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+        background: BG, borderBottom: '1px solid rgba(255,255,255,0.08)',
+        display: 'flex', justifyContent: 'center', alignItems: 'center',
+        padding: `calc(env(safe-area-inset-top, 0px) + ${m ? '0.6rem' : '0.75rem'}) 1rem ${m ? '0.6rem' : '0.75rem'}`,
+      }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: m ? '0.45rem 0.85rem' : '0.5rem 1.1rem', borderRadius: 6,
+          background: '#fff', color: '#000',
+          fontSize: m ? '0.66rem' : '0.74rem', fontWeight: 900, letterSpacing: '0.08em',
+          textTransform: 'uppercase', whiteSpace: 'nowrap',
+        }}>
+          <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+          Gratis 6 Weken Challenge | Voor drukke mannen
+        </span>
+      </div>
+
+      <Sectie m={m} lijn={false} style={{ paddingTop: m ? '4.6rem' : '6.5rem' }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
           <Kop m={m} center groot>Fitter en sterker. Met een plan dat past naast je werk en gezin.</Kop>
           <Tekst m={m} center dim style={{ marginTop: m ? '0.8rem' : '1.1rem' }}>
