@@ -19,6 +19,9 @@ import CardioPlanModal from './components/CardioPlanModal'
 // Dezelfde weekagenda als in de maaltijd-analyzer: trainingen, cardio en
 // de rest van de week van de klant, zodat je ziet waar je iets inplant.
 import ClientAgendaView from '../client-agenda/ClientAgendaView'
+// Het weekrooster met dagtegels zoals de klant het ziet; de uren-agenda
+// blijft er als tweede weergave naast.
+import KlantWeekrooster from './components/KlantWeekrooster'
 import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
@@ -44,6 +47,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // Weekagenda van de klant in het hoofdvlak (aan/uit) en een teller om hem
   // te laten herladen na cardio-wijzigingen.
   const [showWeekAgenda, setShowWeekAgenda] = useState(false)
+  const [agendaWeergave, setAgendaWeergave] = useState('rooster') // 'rooster' | 'uren'
   const [agendaKey, setAgendaKey] = useState(0)
   useEffect(() => {
     const bump = () => setAgendaKey(k => k + 1)
@@ -846,17 +850,33 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         {showWeekAgenda && effectiveClient && (
           <div style={{ margin: isMobile ? '0.5rem' : '0.75rem 1rem 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
-                Week van {effectiveClient.first_name || 'de klant'}
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginLeft: 8 }}>trainingen, cardio en agenda</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>
+                  Week van {effectiveClient.first_name || 'de klant'}
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[{ id: 'rooster', label: 'Weekrooster' }, { id: 'uren', label: 'Agenda' }].map(w => (
+                    <button key={w.id} onClick={() => setAgendaWeergave(w.id)} style={{
+                      padding: '0.3rem 0.65rem', borderRadius: 8, fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
+                      background: agendaWeergave === w.id ? '#fff' : 'rgba(255,255,255,0.06)', color: agendaWeergave === w.id ? '#000' : 'rgba(255,255,255,0.7)',
+                      border: `1px solid ${agendaWeergave === w.id ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                    }}>{w.label}</button>
+                  ))}
+                </div>
               </div>
               <button onClick={() => setShowWeekAgenda(false)} aria-label="Agenda sluiten" style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={14} strokeWidth={2.6} />
               </button>
             </div>
-            <div style={{ height: isMobile ? 460 : 560, overflow: 'auto' }}>
-              <ClientAgendaView client={effectiveClient} db={db} isMobile={isMobile} viewerRole="coach" refreshKey={agendaKey} />
-            </div>
+            {agendaWeergave === 'rooster' ? (
+              <div key={`rooster-${agendaKey}`} style={{ padding: isMobile ? '0.25rem 0 0.5rem' : '0.5rem 0 0.75rem' }}>
+                <KlantWeekrooster client={effectiveClient} db={db} isMobile={isMobile} refreshKey={agendaKey} onSwitchPlan={() => setShowPlanManager(true)} />
+              </div>
+            ) : (
+              <div style={{ height: isMobile ? 460 : 560, overflow: 'auto' }}>
+                <ClientAgendaView client={effectiveClient} db={db} isMobile={isMobile} viewerRole="coach" refreshKey={agendaKey} />
+              </div>
+            )}
           </div>
         )}
         {actieveDag ? (
