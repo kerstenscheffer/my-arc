@@ -8,13 +8,11 @@ import DayBuilder from './components/DayBuilder'
 import ExerciseSelector from './components/ExerciseSelector'
 import TemplateManager from './components/TemplateManager'
 import DayTemplatePickerModal from './components/DayTemplatePickerModal'
-import ClientAssigner from './components/ClientAssigner'
 // Dezelfde wizard die de klant op zijn workout-pagina gebruikt om te kiezen
 // welke training op welke dag valt. Hergebruikt i.p.v. nagebouwd: twee
 // versies van hetzelfde scherm lopen gegarandeerd uit elkaar.
 import WeekPlanner from '../workout/components/planning/WeekPlanner'
 import WorkoutService from '../../services/WorkoutService'
-import ClientPlanManagerModal from './components/ClientPlanManagerModal'
 import CardioPlanModal from './components/CardioPlanModal'
 // Dezelfde weekagenda als in de maaltijd-analyzer: trainingen, cardio en
 // de rest van de week van de klant, zodat je ziet waar je iets inplant.
@@ -45,7 +43,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [intakeOpen, setIntakeOpen] = useState(true)
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
-  const [showClientAssigner, setShowClientAssigner] = useState(false)
   const [showAgenda, setShowAgenda] = useState(false)
   // Weekagenda van de klant in het hoofdvlak (aan/uit) en een teller om hem
   // te laten herladen na cardio-wijzigingen.
@@ -59,7 +56,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     return () => window.removeEventListener('myarc:cardio-changed', bump)
   }, [])
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
-  const [showPlanManager, setShowPlanManager] = useState(false)
   const [showCardio, setShowCardio] = useState(false)
   const [saving, setSaving] = useState(false)
   const [templates, setTemplates] = useState([])
@@ -106,7 +102,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     loadTrainingInfo(selectedClient.id)
   }, [selectedClient?.id])
 
-  const loadClientSchemas = async (client, openAssigner = true) => {
+  const loadClientSchemas = async (client) => {
     if (!client) return
     try {
       const schemas = await db.getClientSchemas(client.id)
@@ -121,7 +117,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         if (schema) loadSchemaIntoBuilder(schema)
       } catch {}
     }
-    if (openAssigner) setShowClientAssigner(true)
   }
 
   // Het plan dat nu in de builder staat: wat de coach ziet en de klant draait.
@@ -134,7 +129,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     try {
       const vers = await db.getClient(effectiveClient.id)
       if (vers) setLocalClient(vers)
-      await loadClientSchemas(vers || effectiveClient, false)
+      await loadClientSchemas(vers || effectiveClient)
     } catch (e) { console.error('klant herladen mislukt:', e) }
     setAgendaKey(k => k + 1)
   }
@@ -181,7 +176,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setLocalClient(client)
     setShowClientPicker(false)
     setClientSearch('')
-    await loadClientSchemas(client, false)
+    await loadClientSchemas(client)
     await loadTrainingInfo(client.id)
   }
 
@@ -443,7 +438,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       if (kFout) throw kFout
 
       setSelectedSchemaId(data.id)
-      await loadClientSchemas(klant, false)
+      await loadClientSchemas(klant)
       alert('✅ Plan aangemaakt en toegewezen!')
     } catch (e) { alert('❌ Fout bij opslaan: ' + e.message) }
     finally { setSaving(false) }
@@ -1048,13 +1043,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         <CardioPlanModal client={effectiveClient} db={db} isMobile={isMobile} onClose={() => { setShowCardio(false); setAgendaKey(k => k + 1) }} />
       )}
 
-      {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={effectiveClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
       {showPlanSwitch && effectiveClient && (
         <PlanSwitchModal client={effectiveClient} db={db} isMobile={isMobile}
           onClose={() => setShowPlanSwitch(false)}
           onActivated={async () => { setShowPlanSwitch(false); await herlaadKlant() }} />
       )}
-      {showPlanManager && <ClientPlanManagerModal clients={clients} templates={templates} db={db} isMobile={isMobile} onClose={() => setShowPlanManager(false)} onEditInBuilder={(schema) => { loadSchemaIntoBuilder(schema); setShowPlanManager(false) }} />}
 
       <ExerciseLibraryModal
         isOpen={showExerciseLibrary}
