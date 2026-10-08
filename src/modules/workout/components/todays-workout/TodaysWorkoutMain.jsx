@@ -10,7 +10,8 @@ import WorkoutServiceNew from '../../services/WorkoutServiceNew'
 import { workoutFoto } from '../../utils/workoutFoto'
 import { isWorkoutFullyLogged, workoutCompletionPct } from '../../utils/exerciseCompletion'
 import { ontleedPlanKey } from '../../utils/planKey'
-import CardioVandaag, { useCardioVanDag } from './CardioVandaag'
+import CardioVandaag from './CardioVandaag'
+import { useCardioVanDag } from './useCardioVanDag'
 
 // onOpenPlanner is vervallen: op een dag zonder training staat geen knop meer,
 // je koppelt hem in de weekstrip eronder.
