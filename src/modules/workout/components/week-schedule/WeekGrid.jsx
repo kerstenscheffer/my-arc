@@ -24,7 +24,11 @@ export default function WeekGrid({
 }) {
   // Lege rustdagen smal, dagen met training of cardio breed: dan is er ruimte
   // voor de naam van de sport in plaats van zeven even smalle vakjes.
-  const leeg = weekDays.map((day, i) => !tempSchedule[day] && !(cardioPerDag[i]?.length))
+  const isActivityKey = (k) => ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(k)
+  // Een dag met een gedane sessie is geen lege dag, ook als er nu niets
+  // (meer) gepland staat.
+  const leeg = weekDays.map((day, i) => !tempSchedule[day] && !(cardioPerDag[i]?.length)
+    && !(Array.isArray(completedWorkouts) && completedWorkouts.some(w => w.workout_day === day)))
   const kolommen = leeg.map(l => (l ? 'minmax(0, 0.8fr)' : 'minmax(0, 1.6fr)')).join(' ')
   const weekDaysDutch = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
@@ -100,6 +104,9 @@ export default function WeekGrid({
         const sessieOef = Array.isArray(sessie?.oefeningen) ? sessie.oefeningen.map(norm).filter(Boolean) : []
         let pastBijPlanning
         if (!sessie) pastBijPlanning = false
+        // Niets gepland die dag maar wél getraind: dan is het altijd een
+        // eigen groene tegel (anders bleef de dag 'Rust' heten).
+        else if (!workoutData && !isActivityKey(assignedWorkout)) pastBijPlanning = false
         else if (sessieOef.length && geplandOef.size) {
           const gelijk = sessieOef.filter(n => geplandOef.has(n)).length
           pastBijPlanning = gelijk / Math.min(sessieOef.length, geplandOef.size) >= 0.5
