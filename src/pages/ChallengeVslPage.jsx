@@ -418,7 +418,7 @@ export default function ChallengeVslPage() {
           textTransform: 'uppercase', whiteSpace: 'nowrap',
         }}>
           <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
-          Gratis 6 Weken Challenge | Voor drukke mannen
+          Gratis 6 Weken Challenge | Online coaching
         </span>
       </div>
 
