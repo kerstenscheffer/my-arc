@@ -3,8 +3,8 @@
 // Training drill-down: Sessions → Exercises → Progress
 // Props: { workoutData, exerciseProgress, isMobile, onNavigateWorkout, client, onClose }
 // ============================================
-import React, { useState, useMemo } from 'react'
-import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer } from 'lucide-react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight } from 'lucide-react'
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
@@ -63,7 +63,24 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   const [view, setView] = useState('sessions')
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
+  const [swappedExercises, setSwappedExercises] = useState([])
   const workouts = workoutData?.workouts || []
+
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    db.supabase
+      .from('client_exercise_overrides')
+      .select('day_key, exercise_data, created_at')
+      .eq('client_id', client.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (!data) return
+        // Alleen echte swaps: heeft _originalName en een andere naam
+        const swaps = data.filter(r => r.exercise_data?._originalName && r.exercise_data.name !== r.exercise_data._originalName)
+        setSwappedExercises(swaps)
+      })
+  }, [client?.id])
 
   // Per-session count of exercise-level notes (from workout_progress.notes).
   // Lets us show a "💬 3" indicator on session rows without drilling in.
@@ -210,6 +227,30 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <StappenInsight db={db} client={client} isMobile={isMobile} />
           {/* Cardio die de client zelf logt (cardio_logs) — read-only voor coach */}
           <CardioInsightBlock db={db} client={client} isMobile={isMobile} />
+          {/* Wissel-indicator: laat zien als klant oefeningen heeft gewisseld */}
+          {swappedExercises.length > 0 && (
+            <div style={{
+              margin: '0.5rem 0.9rem 0.3rem',
+              padding: '0.4rem 0.65rem',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: '0.45rem',
+            }}>
+              <ArrowLeftRight size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.2} />
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>
+                {swappedExercises.length} oefening{swappedExercises.length !== 1 ? 'en' : ''} gewisseld
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {swappedExercises.slice(0, 3).map((s, i) => (
+                  <span key={i} style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', marginLeft: i === 0 ? 0 : '0.3rem' }}>
+                    {i > 0 ? '· ' : ''}{s.exercise_data._originalName} → {s.exercise_data.name}
+                  </span>
+                ))}
+                {swappedExercises.length > 3 && <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)' }}> +{swappedExercises.length - 3}</span>}
+              </div>
+            </div>
+          )}
           {workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
           {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => {
             const parsed = parseSessionNote(w.notes)
