@@ -14,7 +14,10 @@ const GYM_FOTOS = [FOTO('photo-1623947061710-70c895a9f5bb'), FOTO('photo-1600347
 const hash = (str) => { let h = 0; for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0 } return Math.abs(h) }
 const planFoto = (p) => p?.image_url || (/thuis|home/i.test(p?.name || '') ? THUIS_FOTO : GYM_FOTOS[hash(String(p?.name || 'plan').toLowerCase()) % GYM_FOTOS.length])
 
-export default function PlanSwitchModal({ client, db, isMobile = false, onClose, onActivated }) {
+// viewerRole 'coach': de coach kiest voor een klant. De RPC kies_standaard_plan
+// zoekt de klant op auth.uid() en zou dan de verkeerde (of geen) klant pakken,
+// dus de coach-kant kopieert via assignTemplateToClient met de klant-id.
+export default function PlanSwitchModal({ client, db, isMobile = false, onClose, onActivated, viewerRole = 'client' }) {
   const [loading, setLoading] = useState(true)
   const [plans, setPlans] = useState([])
   // Standaardplannen van de coach (is_template + is_public): voor een week
@@ -60,8 +63,13 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
     if (busyId) return
     setBusyId(plan.id)
     try {
-      const { error } = await db.supabase.rpc('kies_standaard_plan', { p_schema_id: plan.id })
-      if (error) throw error
+      if (viewerRole === 'coach') {
+        const r = await db.assignTemplateToClient(plan.id, client.id, true)
+        if (!r?.success) throw new Error(r?.error || 'Kopiëren mislukt')
+      } else {
+        const { error } = await db.supabase.rpc('kies_standaard_plan', { p_schema_id: plan.id })
+        if (error) throw error
+      }
       if (navigator.vibrate) navigator.vibrate([20, 40, 20])
       onActivated && onActivated(plan)
     } catch (e) { console.error(e); alert('Kon dit plan niet kiezen: ' + (e?.message || 'probeer het nog eens')); setBusyId(null) }
@@ -170,9 +178,11 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
 
               {standaard.length > 0 && (
                 <div style={{ marginTop: '1.5rem' }}>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Even een week minder tijd?</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{viewerRole === 'coach' ? 'Standaardplannen' : 'Even een week minder tijd?'}</div>
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2, marginBottom: 10, lineHeight: 1.4 }}>
-                    Kies een lichter standaardplan. Je eigen plan blijft hierboven staan, dus je kunt altijd terug.
+                    {viewerRole === 'coach'
+                      ? `Kiezen zet een kopie bij ${client?.first_name || 'de klant'} en maakt die actief. De eigen plannen hierboven blijven staan.`
+                      : 'Kies een lichter standaardplan. Je eigen plan blijft hierboven staan, dus je kunt altijd terug.'}
                   </div>
                   {Object.keys(perDagen).sort((a, b) => Number(a) - Number(b)).map(k => (
                     <div key={k} style={{ marginBottom: 12 }}>

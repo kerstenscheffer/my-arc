@@ -23,6 +23,7 @@ import KlantWeekrooster from './components/KlantWeekrooster'
 // Hetzelfde wisselvenster als op de workout-pagina van de klant (eigen
 // plannen + standaardplannen), zodat de coach en de klant hetzelfde zien.
 import PlanSwitchModal from '../workout/components/PlanSwitchModal'
+import PlanToevoegenModal from './components/PlanToevoegenModal'
 import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
@@ -48,6 +49,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // te laten herladen na cardio-wijzigingen.
   const [showWeekAgenda, setShowWeekAgenda] = useState(false)
   const [showPlanSwitch, setShowPlanSwitch] = useState(false)
+  const [showPlanToevoegen, setShowPlanToevoegen] = useState(false)
   const [agendaWeergave, setAgendaWeergave] = useState('rooster') // 'rooster' | 'uren'
   const [agendaKey, setAgendaKey] = useState(0)
   useEffect(() => {
@@ -142,6 +144,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setSelectedSchemaId(null)
     setWorkoutPlan({ name: '', description: '', primary_goal: 'muscle_gain', experience_level: 'intermediate', split_type: '', days_per_week: 3, equipment: [], days: [] })
     await herlaadKlant()
+  }
+
+  // Nieuw plan voor deze klant bouwen: builder leeg, klant blijft staan.
+  // Opslaan bewaart het dan als extra plan (zie handleSavePlan).
+  const nieuwPlanVoorKlant = () => {
+    history.reset({ name: '', description: '', primary_goal: 'muscle_gain', experience_level: 'intermediate', split_type: 'custom', days_per_week: 0, equipment: [], days: [] })
+    setSelectedSchemaId(null)
+    setActiveDay(null)
   }
 
   const loadTrainingInfo = async (clientId) => {
@@ -413,7 +423,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     const klant = effectiveClient
     if (!klant?.id) { alert('Kies eerst een klant'); return }
     const naam = `${klant.first_name || 'de klant'}`
-    if (!confirm(`${naam} heeft nog geen plan. Dit plan als zijn eerste instellen?`)) return
+    // Heeft de klant al plannen, dan is dit een extra plan: het huidige
+    // blijft actief, wisselen doe je met de wisselknop in de kopbalk.
+    const extra = clientSchemas.length > 0
+    if (!confirm(extra
+      ? `Als extra plan voor ${naam} opslaan? Het huidige plan blijft actief.`
+      : `${naam} heeft nog geen plan. Dit plan als zijn eerste instellen?`)) return
 
     setSaving(true)
     try {
@@ -432,14 +447,17 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
       // Zijn eerste plan is meteen het actieve; anders staat het klaar maar
       // ziet de klant nog niets.
-      const { error: kFout } = await db.supabase.from('clients')
-        .update({ assigned_schema_id: data.id, schema_assigned_at: new Date().toISOString() })
-        .eq('id', klant.id)
-      if (kFout) throw kFout
+      if (!extra) {
+        const { error: kFout } = await db.supabase.from('clients')
+          .update({ assigned_schema_id: data.id, schema_assigned_at: new Date().toISOString() })
+          .eq('id', klant.id)
+        if (kFout) throw kFout
+      }
 
-      setSelectedSchemaId(data.id)
-      await loadClientSchemas(klant)
-      alert('✅ Plan aangemaakt en toegewezen!')
+      await herlaadKlant()
+      const nieuw = (await db.getClientSchemas(klant.id).then(r => r, () => [])) || []
+      if (nieuw.find(x => x.id === data.id)) { setClientSchemas(nieuw); loadSchemaIntoBuilder(nieuw.find(x => x.id === data.id)) }
+      alert(extra ? '✅ Extra plan opgeslagen (niet actief).' : '✅ Plan aangemaakt en toegewezen!')
     } catch (e) { alert('❌ Fout bij opslaan: ' + e.message) }
     finally { setSaving(false) }
   }
@@ -594,34 +612,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       }}>
 
         {/* Klant + schema */}
-        {/* Links blijft leeg: daar zweeft de Terug-knop van CoachHub. De naam
-            van de klant staat centraal boven het plan, niet meer hier. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minHeight: 40 }}>
-          <div style={{ flex: 1 }} />
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowClientPicker(!showClientPicker)} style={zijKnop({ width: 'auto', padding: 0, fontSize: '0.78rem', color: '#fff' })}>
-              <Users size={13} /> {effectiveClient ? 'Andere klant' : 'Klant laden'}
-            </button>
-            {showClientPicker && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden', minWidth: 240, maxHeight: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Search size={12} color="rgba(255,255,255,0.4)" />
-                  <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Zoek klant…" style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '0.8rem', flex: 1, fontFamily: 'inherit' }} />
-                  {clientSearch && <button onClick={() => setClientSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.4)' }}><X size={12} /></button>}
-                </div>
-                <div style={{ overflowY: 'auto', flex: 1 }}>
-                  {filteredClients.length === 0 && <div style={{ padding: '0.6rem 0.85rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.78rem' }}>Geen klanten gevonden</div>}
-                  {filteredClients.map((c, i) => (
-                    <button key={c.id} onClick={() => handleSelectLocalClient(c)}
-                      style={{ width: '100%', padding: '0.55rem 0.85rem', background: 'transparent', border: 'none', borderBottom: i < filteredClients.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', color: '#fff', fontSize: '0.8rem', fontWeight: effectiveClient?.id === c.id ? 900 : 600, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', touchAction: 'manipulation' }}>
-                      {c.first_name} {c.last_name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Linksboven blijft leeg: daar zweeft de Terug-knop van CoachHub. */}
+        <div style={{ minHeight: 34 }} />
 
         {clientSchemas.length > 1 && (
           <select value={selectedSchemaId || ''} onChange={(e) => {
@@ -865,27 +857,44 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         padding: isMobile ? '0.75rem' : '1rem',
       }}>
-        {/* ── Kop: wie en welk plan, centraal. Wissel + verwijder erachter. ── */}
-        {effectiveClient && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: isMobile ? '0.25rem 0 0.9rem' : '0.4rem 0 1.1rem' }}>
-            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-              {clientName}
-            </div>
+        {/* ── Kopbalk, centraal: klant (tik = andere klant), plan, wissel,
+            verwijder, plus (extra plan). Alles wat over "wie en welk plan"
+            gaat staat hier; de zijbalk is voor het bouwen zelf. ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: isMobile ? '0.25rem 0 0.9rem' : '0.4rem 0 1.1rem' }}>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowClientPicker(v => !v)} style={{ background: 'none', border: 'none', padding: '2px 6px', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.12em', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Users size={12} /> {clientName || 'Kies een klant'} <ChevronDown size={12} strokeWidth={2.8} />
+            </button>
+            {showClientPicker && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', zIndex: 200, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden', width: 280, maxHeight: 360, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                <div style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Search size={12} color="rgba(255,255,255,0.4)" />
+                  <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Zoek klant…" style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 700, flex: 1, fontFamily: 'inherit' }} />
+                  {clientSearch && <button onClick={() => setClientSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.4)' }}><X size={12} /></button>}
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {filteredClients.length === 0 && <div style={{ padding: '0.6rem 0.85rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.78rem' }}>Geen klanten gevonden</div>}
+                  {filteredClients.map((c, i) => (
+                    <button key={c.id} onClick={() => handleSelectLocalClient(c)}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', borderBottom: i < filteredClients.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', color: '#fff', fontSize: '0.85rem', fontWeight: effectiveClient?.id === c.id ? 900 : 600, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', touchAction: 'manipulation' }}>
+                      {c.first_name} {c.last_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          {effectiveClient && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, maxWidth: '100%' }}>
               <div style={{ minWidth: 0, fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, color: huidigPlan ? '#fff' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {huidigPlan?.name || 'Nog geen plan'}
+                {huidigPlan?.name || (selectedSchemaId ? workoutPlan.name : 'Nieuw plan') || 'Nog geen plan'}
               </div>
-              <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={{
-                width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation',
-              }}><RefreshCw size={14} strokeWidth={2.6} /></button>
-              <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{
-                width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-                color: '#ef4444', cursor: huidigPlan ? 'pointer' : 'not-allowed', opacity: huidigPlan ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation',
-              }}><Trash2 size={14} strokeWidth={2.6} /></button>
+              <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><RefreshCw size={15} strokeWidth={2.6} /></button>
+              <button onClick={() => setShowPlanToevoegen(true)} title="Extra plan toevoegen" aria-label="Extra plan toevoegen" style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Plus size={16} strokeWidth={2.8} /></button>
+              <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{ ...{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', cursor: huidigPlan ? 'pointer' : 'not-allowed', opacity: huidigPlan ? 1 : 0.4 }}><Trash2 size={15} strokeWidth={2.6} /></button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         {showWeekAgenda && effectiveClient && (
           <div style={{ margin: isMobile ? '0.5rem' : '0.75rem 1rem 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -1043,8 +1052,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         <CardioPlanModal client={effectiveClient} db={db} isMobile={isMobile} onClose={() => { setShowCardio(false); setAgendaKey(k => k + 1) }} />
       )}
 
+      {showPlanToevoegen && effectiveClient && (
+        <PlanToevoegenModal client={effectiveClient} templates={templates} db={db} isMobile={isMobile}
+          onClose={() => setShowPlanToevoegen(false)}
+          onNieuw={nieuwPlanVoorKlant}
+          onToegevoegd={() => herlaadKlant()} />
+      )}
       {showPlanSwitch && effectiveClient && (
-        <PlanSwitchModal client={effectiveClient} db={db} isMobile={isMobile}
+        <PlanSwitchModal client={effectiveClient} db={db} isMobile={isMobile} viewerRole="coach"
           onClose={() => setShowPlanSwitch(false)}
           onActivated={async () => { setShowPlanSwitch(false); await herlaadKlant() }} />
       )}
