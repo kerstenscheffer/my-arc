@@ -13,7 +13,7 @@
 // pas na een week gebruik iets zinnigs over kunt zeggen.
 
 import { useEffect, useRef, useState } from 'react'
-import { Play, ChevronDown, FileText, Library, Video } from 'lucide-react'
+import { Play, ChevronDown, FileText, Library } from 'lucide-react'
 import clientVideoService from '../../modules/videos/ClientVideoService'
 import videoService from '../../modules/videos/VideoService'
 import fileService from '../../modules/videos/FileService'
@@ -121,18 +121,30 @@ export default function VideoTeaser({
     }
   }, [items.length, speler, vast, dicht, handmatig])
 
-  // Het knopje staat er zodra de balk niet open is — ook als hij vanzelf is
-  // ingezakt. Anders had je na twintig seconden geen enkele manier meer om de
-  // video terug te halen.
-  const knopZichtbaar = items.length > 0 && !open && !speler
+  // Het losse knopje rechtsboven de balk is weg (8 okt 2026): de knop zit
+  // nu ín de onderbalk van het dashboard. Die stuurt 'myarc:video-teaser'
+  // (open/dicht/toggle) en leest hier de stand terug via
+  // 'myarc:video-teaser-state', zodat hij weet of er iets te tonen is.
+  useEffect(() => {
+    const stuur = (e) => {
+      const actie = e.detail?.actie || 'toggle'
+      const wilOpen = actie === 'open' ? true : actie === 'dicht' ? false : !open
+      if (wilOpen) { setDicht(false); setHandmatig(true); setOpen(true) }
+      else { setHandmatig(false); setDicht(true); setOpen(false) }
+    }
+    window.addEventListener('myarc:video-teaser', stuur)
+    return () => window.removeEventListener('myarc:video-teaser', stuur)
+  }, [open])
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('myarc:video-teaser-state', { detail: { aantal: items.length, open } }))
+  }, [items.length, open])
+  useEffect(() => () => {
+    window.dispatchEvent(new CustomEvent('myarc:video-teaser-state', { detail: { aantal: 0, open: false } }))
+  }, [])
 
   // Doorgeven wat we onderin innemen, zodat de zwevende knoppen meeschuiven.
   useEffect(() => {
-    zetVideoBalkHoogte(
-      items.length === 0 ? VIDEO_BALK.weg
-        : open ? VIDEO_BALK.open
-        : VIDEO_BALK.knop
-    )
+    zetVideoBalkHoogte(items.length > 0 && open ? VIDEO_BALK.open : VIDEO_BALK.weg)
     return () => zetVideoBalkHoogte(VIDEO_BALK.weg)
   }, [items.length, open])
 
@@ -280,38 +292,6 @@ export default function VideoTeaser({
           <ChevronDown size={18} strokeWidth={3} />
         </button>
       </div>
-
-      {/* Is de balk weg — weggeklikt of vanzelf ingezakt — dan blijft dit
-          knopje staan, rechts boven de onderbalk. Het komt
-          omhoog zodra de balk eronder verdwijnt en zakt er weer in als je hem
-          terughaalt — vandaar de vertraging op de ene en niet op de andere. */}
-      <button
-        onClick={() => { setDicht(false); setHandmatig(true); setOpen(true) }}
-        title="Video van je coach"
-        aria-label="Video van je coach"
-        style={{
-          position: 'fixed',
-          bottom: onderMarge + 6,
-          right: isMobile ? 14 : 'calc(50% - min(340px, 50vw - 16px) + 14px)',
-          zIndex: 100,
-          width: 40, height: 40, padding: 0, borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(10,10,10,0.92)',
-          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          color: '#fff', cursor: 'pointer',
-          boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
-          transform: knopZichtbaar ? 'translateY(0) scale(1)' : 'translateY(14px) scale(0.6)',
-          opacity: knopZichtbaar ? 1 : 0,
-          pointerEvents: knopZichtbaar ? 'auto' : 'none',
-          transition: knopZichtbaar
-            ? 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.16s, opacity 0.22s ease 0.16s'
-            : 'transform 0.22s ease, opacity 0.16s ease',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <Video size={18} strokeWidth={2.6} />
-      </button>
 
       {speler && (
         <VideoPlayerModal

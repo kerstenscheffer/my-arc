@@ -42,8 +42,7 @@ import {
   LogOut,
   Bell,
   HelpCircle,
-  MoreHorizontal
-} from 'lucide-react'
+  MoreHorizontal, Video } from 'lucide-react'
 
 // Initialize database
 const db = DatabaseService
@@ -71,6 +70,14 @@ const pageThemes = {
  */
 export default function ClientDashboard({ previewClientId = null, ingebed = false } = {}) {
   const [currentView, setCurrentView] = useState('home')
+  // Stand van de video-teaser (de balk met de coachvideo): de knop in de
+  // onderbalk opent hem, en toont de bibliotheek als er niets klaarstaat.
+  const [videoTeaser, setVideoTeaser] = useState({ aantal: 0, open: false })
+  useEffect(() => {
+    const stand = (e) => setVideoTeaser({ aantal: e.detail?.aantal || 0, open: !!e.detail?.open })
+    window.addEventListener('myarc:video-teaser-state', stand)
+    return () => window.removeEventListener('myarc:video-teaser-state', stand)
+  }, [])
   // Android-terugknop: vanaf elk tabblad terug naar Home; op Home laat
   // terugknop.js de app naar de achtergrond gaan (niet dicht).
   useEffect(() => {
@@ -522,6 +529,41 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
               </button>
             )
           })}
+
+          {/* Video — opent de video-balk van de coach omhoog; staat er niets
+              klaar, dan de bibliotheek. Stond eerder als los rond knopje
+              rechtsboven de balk. */}
+          <button
+            onClick={() => {
+              if (videoTeaser.aantal > 0) window.dispatchEvent(new CustomEvent('myarc:video-teaser', { detail: { actie: 'toggle' } }))
+              else setWidgetOpen('video')
+            }}
+            aria-expanded={videoTeaser.open}
+            style={{
+              flex: 1,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              padding: isMobile ? '0.25rem 0.05rem' : '0.3rem 0.15rem',
+              background: videoTeaser.open ? 'rgba(255,255,255,0.1)' : 'transparent',
+              border: 'none', borderRadius: 12,
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              minHeight: 38, minWidth: 36,
+              transition: 'background 0.15s ease',
+            }}
+          >
+            <Video
+              size={isMobile ? 21 : 23}
+              color={videoTeaser.open ? '#fff' : 'rgba(255, 255, 255, 0.4)'}
+              strokeWidth={videoTeaser.open ? 2.8 : 2}
+            />
+            <span style={{
+              fontSize: isMobile ? '0.5rem' : '0.55rem',
+              fontWeight: videoTeaser.open ? 900 : 700,
+              color: videoTeaser.open ? '#fff' : 'rgba(255, 255, 255, 0.35)',
+              letterSpacing: '-0.01em', lineHeight: 1,
+            }}>
+              Video
+            </span>
+          </button>
 
           {/* Meer — klapt boven de balk open. */}
           <button
