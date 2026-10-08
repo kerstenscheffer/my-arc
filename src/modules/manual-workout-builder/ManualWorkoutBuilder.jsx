@@ -599,14 +599,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       }}>
 
         {/* Klant + schema */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
-            {clientName || 'Workout Builder'}
-          </span>
+        {/* Links blijft leeg: daar zweeft de Terug-knop van CoachHub. De naam
+            van de klant staat centraal boven het plan, niet meer hier. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minHeight: 40 }}>
           <div style={{ flex: 1 }} />
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowClientPicker(!showClientPicker)} style={zijKnop({ width: 'auto', padding: 0, fontSize: '0.78rem', color: '#fff' })}>
-              <Users size={13} /> {effectiveClient ? 'Wissel' : 'Klant laden'}
+              <Users size={13} /> {effectiveClient ? 'Andere klant' : 'Klant laden'}
             </button>
             {showClientPicker && (
               <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden', minWidth: 240, maxHeight: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' }}>
@@ -760,26 +759,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           )}
         </div>
 
-        {/* ── Huidig plan van de klant: naam, wisselen, verwijderen ────── */}
-        {effectiveClient && (
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem' }}>
-            <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Huidig plan</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ flex: 1, minWidth: 0, fontSize: '0.95rem', fontWeight: 900, color: huidigPlan ? '#fff' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {huidigPlan?.name || 'Nog geen plan'}
-              </div>
-              <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={{
-                width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}><RefreshCw size={14} strokeWidth={2.6} /></button>
-              <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{
-                width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-                color: '#ef4444', cursor: huidigPlan ? 'pointer' : 'not-allowed', opacity: huidigPlan ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}><Trash2 size={14} strokeWidth={2.6} /></button>
-            </div>
-          </div>
-        )}
-
         {/* ── Acties — onder elkaar i.p.v. tien knoppen op een rij ─────── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
           {/* Opslaan bovenaan: het is de actie die je het vaakst doet, en
@@ -891,6 +870,27 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         padding: isMobile ? '0.75rem' : '1rem',
       }}>
+        {/* ── Kop: wie en welk plan, centraal. Wissel + verwijder erachter. ── */}
+        {effectiveClient && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: isMobile ? '0.25rem 0 0.9rem' : '0.4rem 0 1.1rem' }}>
+            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+              {clientName}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, maxWidth: '100%' }}>
+              <div style={{ minWidth: 0, fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, color: huidigPlan ? '#fff' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {huidigPlan?.name || 'Nog geen plan'}
+              </div>
+              <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={{
+                width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation',
+              }}><RefreshCw size={14} strokeWidth={2.6} /></button>
+              <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{
+                width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                color: '#ef4444', cursor: huidigPlan ? 'pointer' : 'not-allowed', opacity: huidigPlan ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation',
+              }}><Trash2 size={14} strokeWidth={2.6} /></button>
+            </div>
+          </div>
+        )}
         {showWeekAgenda && effectiveClient && (
           <div style={{ margin: isMobile ? '0.5rem' : '0.75rem 1rem 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
