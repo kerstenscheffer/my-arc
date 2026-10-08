@@ -941,31 +941,60 @@ function WekenStrook(props) {
 }
 
 // Uitleg bij de tempo-strook, als venster. Kort en in stukken: wat elk
-// getal is, wat de kleur zegt, en wat je ermee doet.
+// getal is, wat de kleur zegt, en wat je ermee doet. Geen vakjes: een
+// foto-kop en daaronder regels met een kleine foto, zoals de rest van de app.
+const UITLEG_FOTO = (id) => `https://images.unsplash.com/${id}?w=640&h=360&fit=crop&q=70`
+const UITLEG_THUMB = (id) => `https://images.unsplash.com/${id}?w=160&h=160&fit=crop&q=70`
 function UitlegModal({ isMobile, coach, onClose }) {
-  const blok = (kop, tekst) => (
-    <div key={kop} style={{ padding: '0.7rem 0.85rem', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{kop}</div>
-      <div style={{ fontSize: isMobile ? '0.84rem' : '0.88rem', fontWeight: 700, color: '#fff', lineHeight: 1.5 }}>{tekst}</div>
-    </div>
-  )
-  const kleur = (c, t) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginRight: 10 }}><span style={{ width: 9, height: 9, borderRadius: 999, background: c, display: 'inline-block' }} />{t}</span>
+  const regels = [
+    { kop: 'Deze week', foto: 'photo-1522844990619-4951c40f7eda', tekst: 'Je gemiddelde van deze week (maandag tot nu) min het gemiddelde van vorige week. Loopt mee tot zondag.' },
+    { kop: 'Laatste zaterdag', foto: 'photo-1626794174544-c3200f10e32b', tekst: 'Het vaste weekpunt. Gemiddelde van de 7 dagen tot en met zaterdag, min diezelfde 7 dagen een week eerder. Daarachter: de zaterdagen ervoor.' },
+    { kop: 'Sinds start', foto: 'photo-1561570121-c8219daec12b', tekst: 'Je laatste weging tegenover je startgewicht. Het grote plaatje.' },
+    { kop: 'Kleur', kleuren: [['#10b981', 'op koers'], ['#f59e0b', 'te langzaam of te snel'], ['rgba(255,255,255,0.45)', 'minder dan 3 wegingen, dus nog ruis']] },
+    { kop: 'Wat je ermee doet', foto: 'photo-1543352632-5a4b24e4d2a6', tekst: 'Eén matige week kan toeval zijn. Twee achter elkaar niet: dan is er iets te veranderen aan eten, stappen of slaap.' + (coach ? ' Het bereik stel je in met het potlood bij Doel per week.' : '') },
+  ]
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, maxHeight: '88vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: isMobile ? '18px 18px 0 0' : 18, padding: isMobile ? '1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px))' : '1.1rem', fontFamily: "'DM Sans', sans-serif" }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Zo lees je je tempo</div>
-          <button onClick={onClose} aria-label="Sluiten" style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={16} strokeWidth={2.8} /></button>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, maxHeight: '88vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: isMobile ? '18px 18px 0 0' : 18, overflow: 'hidden', fontFamily: "'DM Sans', sans-serif" }}>
+        {/* Foto-kop met de titel erin, sluitknop rechtsboven. */}
+        <div style={{ position: 'relative', height: isMobile ? 150 : 170 }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${UITLEG_FOTO('photo-1627903632132-ead7be18a56d')})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0.1) 40%, rgba(10,10,10,0.9) 85%, #0a0a0a 100%)' }} />
+          <button onClick={onClose} aria-label="Sluiten" style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, borderRadius: 9, background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={16} strokeWidth={2.8} /></button>
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 1.1rem 0.6rem' }}>
+            <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.05, textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}>Zo lees je je tempo</div>
+            <div style={{ fontSize: isMobile ? '0.8rem' : '0.84rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45, marginTop: 4, textShadow: '0 1px 8px rgba(0,0,0,0.7)' }}>
+              Eén weging zegt niets: twee kilo verschil tussen twee ochtenden is normaal. Daarom kijken we naar weekgemiddelden.
+            </div>
+          </div>
         </div>
-        <div style={{ fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 12 }}>
-          Eén weging zegt niets: twee kilo verschil tussen twee ochtenden is normaal. Daarom kijken we naar weekgemiddelden.
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {blok('Deze week', 'Je gemiddelde van deze week (maandag tot nu) min het gemiddelde van vorige week. Loopt mee tot zondag.')}
-          {blok('Laatste zaterdag', 'Het vaste weekpunt. Gemiddelde van de 7 dagen tot en met zaterdag, min diezelfde 7 dagen een week eerder. Daarachter: de zaterdagen ervoor.')}
-          {blok('Sinds start', 'Je laatste weging tegenover je startgewicht. Het grote plaatje.')}
-          {blok('Kleur', <span>{kleur('#10b981', 'op koers')}{kleur('#f59e0b', 'te langzaam of te snel')}{kleur('rgba(255,255,255,0.45)', 'minder dan 3 wegingen, dus nog ruis')}</span>)}
-          {blok('Wat je ermee doet', 'Eén matige week kan toeval zijn. Twee achter elkaar niet: dan is er iets te veranderen aan eten, stappen of slaap.' + (coach ? ' Het bereik stel je in met het potlood bij Doel per week.' : ''))}
+
+        <div style={{ padding: isMobile ? '0.4rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px))' : '0.4rem 1.1rem 1.1rem' }}>
+          {regels.map((r, i) => (
+            <div key={r.kop} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '0.75rem 0', borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+              {r.foto ? (
+                <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 10, backgroundImage: `url(${UITLEG_THUMB(r.foto)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+              ) : (
+                <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 10, background: 'rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '1fr 1fr', placeItems: 'center', padding: 8, boxSizing: 'border-box' }}>
+                  {r.kleuren.map(([c]) => <span key={c} style={{ width: 11, height: 11, borderRadius: 999, background: c }} />)}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', marginBottom: 2 }}>{r.kop}</div>
+                {r.tekst ? (
+                  <div style={{ fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>{r.tekst}</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
+                    {r.kleuren.map(([c, t]) => (
+                      <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 999, background: c, flexShrink: 0 }} />{t}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>,
