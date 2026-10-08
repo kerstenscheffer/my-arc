@@ -193,8 +193,8 @@ function Cta({ m, sub, style }) {
           minHeight: m ? 54 : 60, padding: m ? '0 1.6rem' : '0 2.2rem',
           width: m ? '100%' : 'auto', minWidth: m ? 0 : 320,
           borderRadius: 14, background: '#fff', color: '#000',
-          fontSize: m ? '0.98rem' : '1.08rem', fontWeight: 900, letterSpacing: '-0.01em',
-          textDecoration: 'none', boxSizing: 'border-box',
+          fontSize: m ? '0.98rem' : '1.08rem', fontWeight: 900, letterSpacing: '0.02em',
+          textTransform: 'uppercase', textDecoration: 'none', boxSizing: 'border-box',
           boxShadow: '0 4px 24px rgba(255,255,255,0.14)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
@@ -411,12 +411,12 @@ export default function ChallengeVslPage() {
         <div style={{ maxWidth: 880, margin: `${m ? '1.7rem' : '2.4rem'} auto 0` }}>
           <Video m={m} />
         </div>
-        <Tekst m={m} center style={{ maxWidth: 720, margin: `${m ? '1.1rem' : '1.6rem'} auto 0` }}>
+        <div ref={heroCtaRef}>
+          <Cta m={m} style={{ marginTop: m ? '1.3rem' : '1.8rem' }} />
+        </div>
+        <Tekst m={m} center style={{ maxWidth: 720, margin: `${m ? '1.3rem' : '1.8rem'} auto 0` }}>
           Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
         </Tekst>
-        <div ref={heroCtaRef}>
-          <Cta m={m} style={{ marginTop: m ? '1.1rem' : '1.6rem' }} />
-        </div>
       </Sectie>
 
       {/* ══ 2. Resultaten ══ */}
