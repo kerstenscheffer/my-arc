@@ -182,7 +182,7 @@ function Tekst({ children, m, center, dim, style }) {
 }
 
 // De knop: wit vlak, zwarte tekst, zoals op de challenge-pagina.
-function Cta({ m, sub, style }) {
+function Cta({ m, sub, style, donker = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, ...style }}>
       <a
@@ -192,10 +192,10 @@ function Cta({ m, sub, style }) {
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           minHeight: m ? 54 : 60, padding: m ? '0 1.6rem' : '0 2.2rem',
           width: m ? '100%' : 'auto', minWidth: m ? 0 : 320,
-          borderRadius: 14, background: '#fff', color: '#000',
+          borderRadius: 14, background: donker ? '#000' : '#fff', color: donker ? '#fff' : '#000',
           fontSize: m ? '0.98rem' : '1.08rem', fontWeight: 900, letterSpacing: '0.02em',
           textTransform: 'uppercase', textDecoration: 'none', boxSizing: 'border-box',
-          boxShadow: '0 4px 24px rgba(255,255,255,0.14)',
+          boxShadow: donker ? '0 8px 28px rgba(0,0,0,0.25)' : '0 4px 24px rgba(255,255,255,0.14)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
@@ -401,26 +401,40 @@ export default function ChallengeVslPage() {
         </span>
       </div>
 
-      <Sectie m={m} lijn={false} style={{ paddingTop: m ? '4.6rem' : '6.5rem' }}>
+      {/* Zwart tot halverwege de video, daaronder wit: de overgang loopt dwars
+          door het beeld en trekt je oog naar de video en de knop eronder. */}
+      <section style={{ background: BG, padding: `${m ? '4.6rem' : '6.5rem'} ${m ? '1.25rem' : '3rem'} 0` }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
           <Kop m={m} center groot>Strakker en sterker met een aanpak die werkt naast je baan, gezin en sociale leven.</Kop>
           <Tekst m={m} center style={{ marginTop: m ? '1.3rem' : '1.7rem', fontSize: m ? '1.08rem' : '1.22rem', color: '#fff' }}>
             Bekijk de video en ontdek hoe de challenge werkt, wat je krijgt en welke inzet we van je verwachten.
           </Tekst>
         </div>
-        <div style={{ maxWidth: 880, margin: `${m ? '1.7rem' : '2.4rem'} auto 0` }}>
+      </section>
+      {/* De video zelf staat op een vlak dat boven zwart en onder wit is;
+          het vlak is precies zo hoog als de video, dus de grens ligt op de
+          helft. */}
+      <div style={{
+        background: `linear-gradient(180deg, ${BG} 0%, ${BG} 50%, #fff 50%, #fff 100%)`,
+        padding: `${m ? '1.7rem' : '2.4rem'} ${m ? '1.25rem' : '3rem'} 0`,
+      }}>
+        <div style={{ maxWidth: 880, margin: '0 auto' }}>
           <Video m={m} />
         </div>
-        <div ref={heroCtaRef}>
-          <Cta m={m} style={{ marginTop: m ? '1.3rem' : '1.8rem' }} />
+      </div>
+      <section style={{ background: '#fff', color: '#000', padding: `${m ? '1.5rem' : '2.2rem'} ${m ? '1.25rem' : '3rem'} ${m ? '2.5rem' : '3.5rem'}` }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <div ref={heroCtaRef}>
+            <Cta m={m} donker />
+          </div>
+          <Tekst m={m} center style={{ marginTop: m ? '1.3rem' : '1.8rem', color: '#111', fontWeight: 700 }}>
+            Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
+          </Tekst>
         </div>
-        <Tekst m={m} center style={{ maxWidth: 720, margin: `${m ? '1.3rem' : '1.8rem'} auto 0` }}>
-          Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
-        </Tekst>
-      </Sectie>
+      </section>
 
       {/* ══ 2. Resultaten ══ */}
-      <Sectie m={m}>
+      <Sectie m={m} lijn={false}>
         <Kop m={m} center>Deze mannen zetten de eerste stap al.</Kop>
         <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>In de video laat ik de voortgang van drie deelnemers zien:</Tekst>
 
