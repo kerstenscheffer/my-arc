@@ -161,7 +161,7 @@ function Kop({ children, m, center, groot }) {
   return (
     <h2 style={{
       margin: 0,
-      fontSize: groot ? (m ? '1.9rem' : '2.9rem') : (m ? '1.5rem' : '2.1rem'),
+      fontSize: groot ? (m ? '1.75rem' : '2.9rem') : (m ? '1.5rem' : '2.1rem'),
       fontWeight: 900, lineHeight: 1.08, letterSpacing: '-0.03em', color: '#fff',
       textAlign: center ? 'center' : 'left',
     }}>{children}</h2>
@@ -378,29 +378,39 @@ export default function ChallengeVslPage() {
       fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     }}>
 
-      {/* ══ 1. Bovenaan: kop, video, knop ══ */}
-      <Sectie m={m} lijn={false} style={{ paddingTop: m ? '2.5rem' : '4rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: m ? '1.6rem' : '2.2rem' }}>
-          <img src="/ma-logo-header.png" alt="MA Coaching" style={{ height: m ? 40 : 52, width: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+      {/* ══ 1. Bovenaan: label, korte kop, video, één alinea, knop ══
+          Alles op het eerste scherm van een telefoon. De lange uitleg staat
+          onder de video, niet erboven: de video is waar je voor komt. */}
+      <Sectie m={m} lijn={false} style={{ paddingTop: m ? '1.5rem' : '3rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: m ? '1.1rem' : '1.6rem' }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: m ? '0.45rem 0.9rem' : '0.5rem 1.1rem', borderRadius: 999,
+            border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.05)',
+            fontSize: m ? '0.64rem' : '0.74rem', fontWeight: 800, letterSpacing: m ? '0.08em' : '0.12em',
+            textTransform: 'uppercase', color: '#fff', textAlign: 'center', lineHeight: 1.3,
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: GOLD, boxShadow: `0 0 8px ${GOLD}` }} />
+            6 Weken Challenge · Voor drukke mannen
+          </span>
         </div>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
-          <Label m={m} center>Voor drukke mannen die willen afvallen, sterker worden en hun aanpak willen volhouden</Label>
-          <Kop m={m} center groot>Werk aan een fitter, sterker lichaam. Met een plan dat past naast je werk, gezin en sociale leven.</Kop>
-          <Tekst m={m} center style={{ marginTop: m ? '1.1rem' : '1.5rem' }}>
-            Ontdek hoe je tijdens de 6 Weken Challenge met persoonlijke voeding, gerichte trainingen en coaching aan jouw doel werkt. Met ruimte voor een biertje en lekker eten en zonder iedere dag in de sportschool te staan.
-          </Tekst>
-          <Tekst m={m} center dim style={{ marginTop: m ? '0.9rem' : '1.1rem', fontSize: m ? '0.88rem' : '0.95rem' }}>
+          <Kop m={m} center groot>Fitter en sterker. Met een plan dat past naast je werk en gezin.</Kop>
+          <Tekst m={m} center dim style={{ marginTop: m ? '0.8rem' : '1.1rem' }}>
             Bekijk de video en ontdek hoe de challenge werkt, wat je krijgt en welke inzet we van je verwachten.
           </Tekst>
         </div>
-        <div style={{ maxWidth: 880, margin: `${m ? '1.6rem' : '2.4rem'} auto 0` }}>
+        <div style={{ maxWidth: 880, margin: `${m ? '1.1rem' : '1.8rem'} auto 0` }}>
           <Video m={m} />
         </div>
+        <Tekst m={m} center style={{ maxWidth: 720, margin: `${m ? '1.1rem' : '1.6rem'} auto 0` }}>
+          Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
+        </Tekst>
         <div ref={heroCtaRef}>
-          <Cta m={m} style={{ marginTop: m ? '1.6rem' : '2.2rem' }}
+          <Cta m={m} style={{ marginTop: m ? '1.1rem' : '1.6rem' }}
             sub="We bespreken je doel, waar je nu vastloopt en of de challenge bij je past." />
         </div>
-        <TrustpilotBadge style={{ marginTop: m ? '1.4rem' : '1.8rem' }} />
+        <TrustpilotBadge style={{ marginTop: m ? '1rem' : '1.4rem' }} />
       </Sectie>
 
       {/* ══ 2. Resultaten ══ */}
