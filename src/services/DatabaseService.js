@@ -140,12 +140,28 @@ async getCurrentUser() {
       }
     }
     
+    // Geen sessie uit getSession: dat gebeurt ook even tijdens een
+    // token-verversing (tabblad terug in beeld, Terug-knop na een tijd in
+    // de builder). Dan haalde Command de klanten op met "geen trainer" en
+    // bleef de lijst leeg (8 okt 2026). Eerst verversen, dan de server
+    // vragen, en anders de gebruiker van eerder in deze sessie.
+    try {
+      const { data: { session: ververst } } = await this.supabase.auth.refreshSession()
+      if (ververst?.user) { this.currentUser = ververst.user; return ververst.user }
+    } catch { /* geen refresh-token */ }
+    try {
+      const { data: { user } } = await this.supabase.auth.getUser()
+      if (user) { this.currentUser = user; return user }
+    } catch { /* offline of verlopen */ }
+    if (this.currentUser) {
+      console.warn('⚠️ Geen sessie op dit moment; gebruiker van eerder in deze sessie gebruikt')
+      return this.currentUser
+    }
     console.log('❌ No session found')
     return null
   } catch (error) {
     console.error('❌ getCurrentUser error:', error)
-    
-    // Don't crash the app - return null
+    if (this.currentUser) return this.currentUser
     return null
   }
 }

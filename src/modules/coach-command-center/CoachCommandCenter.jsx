@@ -101,7 +101,14 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
       // ── Stap 1: klanten op (snelste query) → lijst tonen ──
       // Demo-persoon (voor voorbeeldplannen in de Analyzer) niet in het
       // coaching-overzicht tonen — het is geen echte klant.
-      const clients = (await db.getAllClients()).filter(c => c.email !== 'demo@myarcfitness.internal')
+      let clients = (await db.getAllClients()).filter(c => c.email !== 'demo@myarcfitness.internal')
+      // Leeg terwijl er net nog klanten stonden: bijna altijd een sessie die
+      // even niet te lezen was. Eén keer opnieuw na een korte pauze.
+      if (clients.length === 0 && clientsWithData.length > 0) {
+        await new Promise(r => setTimeout(r, 800))
+        clients = (await db.getAllClients()).filter(c => c.email !== 'demo@myarcfitness.internal')
+        if (clients.length === 0) { console.warn('⚠️ Klantenlijst leeg na nieuwe poging; oude lijst blijft staan'); setLoading(false); return }
+      }
       const clientIds = clients.map(c => c.id)
 
       const emptyClientShape = (client) => ({
