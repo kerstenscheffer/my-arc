@@ -143,15 +143,34 @@ export default function WeekSchedule({
         .then(r => r, () => ({ data: [] }))
       const ids = (sessies || []).map(x => x.id)
       let metSets = new Set()
-      const telSets = {}, laatsteSet = {}
+      const telSets = {}, laatsteSet = {}, oefPerSessie = {}
       if (ids.length) {
-        const { data: sets } = await db.supabase.from('workout_progress').select('session_id, created_at').in('session_id', ids)
+        const { data: sets } = await db.supabase.from('workout_progress').select('session_id, created_at, exercise_name').in('session_id', ids)
           .then(r => r, () => ({ data: [] }))
         metSets = new Set((sets || []).map(x => x.session_id))
         ;(sets || []).forEach(x => {
           telSets[x.session_id] = (telSets[x.session_id] || 0) + 1
           laatsteSet[x.session_id] = Math.max(laatsteSet[x.session_id] || 0, new Date(x.created_at).getTime() || 0)
+          if (x.exercise_name) (oefPerSessie[x.session_id] = oefPerSessie[x.session_id] || new Set()).add(String(x.exercise_name).trim().toLowerCase())
         })
+      }
+      // Alle plannen van de klant (ook het vorige, na een wissel): een sessie
+      // zonder eigen naam ("Quick Log") krijgt de naam van de dag waarvan de
+      // oefeningen het best overeenkomen, bv. 'Push'.
+      const { plans: allePlannen } = db.getClientWorkoutPlans ? await db.getClientWorkoutPlans(clientId).then(r => r, () => ({ plans: [] })) : { plans: [] }
+      const naamUitOefeningen = (oef) => {
+        if (!oef || oef.size === 0) return null
+        let beste = null, besteScore = 0
+        ;[...(allePlannen || []), ...(schema ? [schema] : [])].forEach(pl => {
+          Object.values(pl?.week_structure || {}).forEach(dag => {
+            const namen = new Set((dag?.exercises || []).map(e => String(e?.name || '').trim().toLowerCase()).filter(Boolean))
+            if (!namen.size) return
+            let gelijk = 0; oef.forEach(n => { if (namen.has(n)) gelijk++ })
+            const score = gelijk / Math.min(namen.size, oef.size)
+            if (score > besteScore) { besteScore = score; beste = dag?.name || dag?.focus || null }
+          })
+        })
+        return besteScore >= 0.5 ? beste : null
       }
       if (weg) return
       const dagen = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -171,8 +190,9 @@ export default function WeekSchedule({
             // Wat er toen écht gedaan is. Wordt in het rooster vergeleken met
             // wat er nu op die dag staat: na een planwissel blijft de gedane
             // training zichtbaar en krijgt de nieuwe dag niet onterecht 'Gedaan'.
-            naam: (x.day_display_name && !/^quick log/i.test(x.day_display_name)) ? x.day_display_name : null,
+            naam: (x.day_display_name && !/^quick log/i.test(x.day_display_name)) ? x.day_display_name : naamUitOefeningen(oefPerSessie[x.id]),
             dagSleutel: x.day_name || null,
+            oefeningen: oefPerSessie[x.id] ? [...oefPerSessie[x.id]] : [],
             blok: {
               id: `gedaan-${x.id}`, day: dagen[idx].toLowerCase(), type: 'training', label: 'Training',
               // Naam van de training: wat de sessie zelf zegt, anders de dag

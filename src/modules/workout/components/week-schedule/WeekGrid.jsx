@@ -93,13 +93,20 @@ export default function WeekGrid({
         const norm = (v) => String(v || '').trim().toLowerCase()
         const sessieNaam = sessie?.naam || sessie?.workout_name || sessie?.day_display_name || sessie?.blok?.sublabel || null
         const geplandNaam = workoutData?.name || workoutData?.focus || null
-        const pastBijPlanning = !!sessie && (
-          !sessieNaam || !geplandNaam
-          || norm(sessieNaam) === norm(geplandNaam)
-          || (sessie?.dagSleutel && norm(sessie.dagSleutel) === norm(assignedWorkout))
-        )
+        // Eerst op oefeningen (het hardste bewijs), dan op naam. Sessies uit
+        // Quick Log heten 'Monday', dus de dagsleutel zegt niets over de
+        // training en telt niet mee.
+        const geplandOef = new Set((workoutData?.exercises || []).map(e => norm(e?.name)).filter(Boolean))
+        const sessieOef = Array.isArray(sessie?.oefeningen) ? sessie.oefeningen.map(norm).filter(Boolean) : []
+        let pastBijPlanning
+        if (!sessie) pastBijPlanning = false
+        else if (sessieOef.length && geplandOef.size) {
+          const gelijk = sessieOef.filter(n => geplandOef.has(n)).length
+          pastBijPlanning = gelijk / Math.min(sessieOef.length, geplandOef.size) >= 0.5
+        } else if (sessieNaam && geplandNaam) pastBijPlanning = norm(sessieNaam) === norm(geplandNaam)
+        else pastBijPlanning = true
         const isCompleted = !!sessie && pastBijPlanning
-        const gedaanAnders = sessie && !pastBijPlanning ? { naam: sessieNaam } : null
+        const gedaanAnders = sessie && !pastBijPlanning ? { naam: sessieNaam || 'Training' } : null
         const isSelected = selectedWorkout === assignedWorkout
           || (selectedForSwap && selectedForSwap.day === day)
 
