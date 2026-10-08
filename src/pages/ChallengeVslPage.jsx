@@ -299,13 +299,11 @@ function Video({ m }) {
           }}
         >
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} />
-          <div style={{
-            position: 'relative', width: m ? 68 : 84, height: m ? 68 : 84, borderRadius: '50%',
-            background: GOUD_KNOP, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.5), 0 0 30px rgba(255,215,0,0.35)',
-          }}>
-            <Play size={m ? 28 : 34} fill="#000" color="#000" style={{ marginLeft: 4 }} />
-          </div>
+          {/* Los gouden driehoekje, geen cirkel eromheen. */}
+          <Play
+            size={m ? 64 : 84} fill={GOLD} color={GOLD} strokeWidth={1}
+            style={{ position: 'relative', filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }}
+          />
         </button>
       )}
     </div>
@@ -428,7 +426,7 @@ export default function ChallengeVslPage() {
           door het beeld en trekt je oog naar de video en de knop eronder. */}
       <section style={{ background: HERO_BG, padding: `${m ? '5.4rem' : '7.5rem'} ${m ? '1.25rem' : '3rem'} 0` }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
-          <Kop m={m} center groot>Strakker en sterker met een aanpak die werkt naast je baan, gezin en sociale leven.</Kop>
+          <Kop m={m} center groot>Wil jij strakker en sterker worden naast je baan, gezin en sociale leven?</Kop>
           <Tekst m={m} center style={{ marginTop: m ? '1.3rem' : '1.7rem', fontSize: m ? '1.08rem' : '1.22rem', color: '#fff' }}>
             Bekijk de video en ontdek hoe de challenge werkt, wat je krijgt en welke inzet we van je verwachten.
           </Tekst>
