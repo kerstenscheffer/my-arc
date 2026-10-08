@@ -472,6 +472,12 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               )} />
             </div>
 
+            {/* Echte scheiding tussen de schuivende weken en het vaste blok:
+                een bredere, lichtere lijn met wat zwart ernaast, anders
+                leest Sinds start als nog een tegel in de slider. */}
+            <div aria-hidden style={{ flex: '0 0 auto', width: isMobile ? 12 : 16, display: 'flex', justifyContent: 'center', background: '#000' }}>
+              <div style={{ width: 2, background: 'rgba(255,255,255,0.22)' }} />
+            </div>
             <GrootBlok
               titel={fase ? 'Sinds fase' : 'Sinds start'}
               waarde={totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—'}
