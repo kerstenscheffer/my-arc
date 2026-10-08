@@ -34,6 +34,7 @@ export default function TrainingToevoegen({
 }) {
   const [stap, setStap] = useState('soort')
   const [info, setInfo] = useState(null) // kaart waarvan de oefeningen open staan
+  const [zoek, setZoek] = useState('')
   // De andere plannen van de klant: elke dag daaruit is ook te kiezen,
   // zonder van actief plan te wisselen (call Martijn, 8 okt 2026).
   const [anderePlannen, setAnderePlannen] = useState([])
@@ -149,8 +150,8 @@ export default function TrainingToevoegen({
         />
       )}
       {!eigenOpen && (
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-        <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: isMobile ? '1.1rem 1rem 1.2rem' : '1.3rem 1.3rem 1.4rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? 0 : '1rem' }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: isMobile ? '100%' : 520, height: isMobile ? '100dvh' : 'auto', maxHeight: isMobile ? 'none' : '90vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', boxSizing: 'border-box', background: '#0a0a0a', border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)', borderRadius: isMobile ? 0 : 20, paddingTop: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 0.9rem)' : undefined, padding: isMobile ? '1.1rem 1rem 1.2rem' : '1.3rem 1.3rem 1.4rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             {VORIGE[stap] || stap === 'bereik' ? (
               <button onClick={() => setStap(stap === 'bereik' ? (soortTraining === 'gym' ? 'gym-dag' : 'cardio-dagen') : VORIGE[stap])} aria-label="Vorige stap" style={knop}><ChevronLeft size={18} strokeWidth={2.8} /></button>
@@ -185,7 +186,11 @@ export default function TrainingToevoegen({
               { titel: 'Uit je andere plannen', items: andereDagen },
               { titel: 'Standaardtrainingen', items: standaardDagen },
               { titel: 'Eigen trainingen', items: eigen.map(w => ({ key: `custom_${w.id}`, w, plan: 'Eigen', naam: w.name, sub: [w.type, w.duration ? `${w.duration} min` : null].filter(Boolean).join(' · ') })) },
-            ].filter(g => g.items.length > 0)
+            ].map(g => {
+              const q = zoek.trim().toLowerCase()
+              if (!q) return g
+              return { ...g, items: g.items.filter(i => `${i.naam} ${i.plan} ${(i.w?.exercises || []).map(e => e.name).join(' ')}`.toLowerCase().includes(q)) }
+            }).filter(g => g.items.length > 0)
             const kies = (key) => { tik(); setWorkoutKey(key); setStap('gym-dag') }
             const Kaart = ({ item }) => {
               const aan = workoutKey === item.key
@@ -222,9 +227,20 @@ export default function TrainingToevoegen({
             }
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Zoeken op naam van de training, het plan of een oefening. */}
+                <input
+                  value={zoek} onChange={e => setZoek(e.target.value)} placeholder="Zoek een training…"
+                  type="search" autoComplete="off"
+                  style={{
+                    width: '100%', boxSizing: 'border-box', padding: '0.85rem 1rem', marginBottom: 6,
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12,
+                    color: '#fff', fontSize: '1rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+                {groepen.length === 0 && <div style={{ padding: '1.5rem 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Niets gevonden voor "{zoek}"</div>}
                 {groepen.map((g, gi) => (
                   <div key={g.titel}>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: gi === 0 ? '2px 0 6px' : '12px 0 6px' }}>{g.titel}</div>
+                    <div style={{ fontSize: isMobile ? '1.35rem' : '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.1, margin: gi === 0 ? '6px 0 10px' : '20px 0 10px' }}>{g.titel}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 8 }}>
                       {g.items.map(item => <Kaart key={item.key} item={item} />)}
                     </div>
