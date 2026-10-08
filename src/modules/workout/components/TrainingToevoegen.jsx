@@ -7,9 +7,10 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays } from 'lucide-react'
+import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info } from 'lucide-react'
 import CustomWorkoutModal from './planning/CustomWorkoutModal'
 import { maakPlanKey } from '../utils/planKey'
+import { getWorkoutImage } from './week-schedule/workoutImage'
 
 const SPORTEN = [
   { id: 'Wandelen', icoon: Footprints }, { id: 'Fietsen', icoon: Bike }, { id: 'Zwemmen', icoon: Waves }, { id: 'Hardlopen', icoon: Timer },
@@ -32,6 +33,7 @@ export default function TrainingToevoegen({
   cardioPerDag = {}, onBewaarGym, onBewaarCardio,
 }) {
   const [stap, setStap] = useState('soort')
+  const [info, setInfo] = useState(null) // kaart waarvan de oefeningen open staan
   // De andere plannen van de klant: elke dag daaruit is ook te kiezen,
   // zonder van actief plan te wisselen (call Martijn, 8 okt 2026).
   const [anderePlannen, setAnderePlannen] = useState([])
@@ -100,16 +102,16 @@ export default function TrainingToevoegen({
 
   // Trainingen uit het plan van de coach, zoals ze in week_structure staan.
   const planDagen = Object.entries(schema?.week_structure || {}).map(([key, w]) => ({
-    key, naam: w?.name || w?.focus || key, sub: [w?.focus && w?.name ? w.focus : null, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
+    key, w, plan: schema?.name || 'Je plan', naam: w?.name || w?.focus || key, sub: [w?.focus && w?.name ? w.focus : null, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
   }))
   const andereDagen = anderePlannen.flatMap(p => Object.entries(p.week_structure || {}).map(([dagKey, w]) => ({
-    key: maakPlanKey(p.id, dagKey), naam: w?.name || w?.focus || dagKey,
+    key: maakPlanKey(p.id, dagKey), w, plan: p.name, naam: w?.name || w?.focus || dagKey,
     sub: [p.name, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
   })))
   const standaardDagen = standaardPlannen
     .filter(p => !anderePlannen.some(a => a.id === p.id))
     .flatMap(p => Object.entries(p.week_structure || {}).map(([dagKey, w]) => ({
-      key: maakPlanKey(p.id, dagKey), naam: w?.name || w?.focus || dagKey,
+      key: maakPlanKey(p.id, dagKey), w, plan: p.name, naam: w?.name || w?.focus || dagKey,
       sub: [p.name, Array.isArray(w?.exercises) ? `${w.exercises.length} oefeningen` : null].filter(Boolean).join(' · '),
     })))
   const naamVan = (key) => {
@@ -175,53 +177,100 @@ export default function TrainingToevoegen({
             </div>
           )}
 
-          {stap === 'gym-welke' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {planDagen.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '2px 0' }}>Uit je plan</div>}
-              {planDagen.map(p => (
-                <button key={p.key} onClick={() => { tik(); setWorkoutKey(p.key); setStap('gym-dag') }} style={tegel(workoutKey === p.key)}>
-                  <Dumbbell size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.naam}</div>
-                    {p.sub && <div style={sub}>{p.sub}</div>}
+          {stap === 'gym-welke' && (() => {
+            // Kaarten met foto, in groepen. Tik = kiezen; het i-knopje laat
+            // de oefeningen zien voordat je kiest.
+            const groepen = [
+              { titel: 'Uit je plan', items: planDagen },
+              { titel: 'Uit je andere plannen', items: andereDagen },
+              { titel: 'Standaardtrainingen', items: standaardDagen },
+              { titel: 'Eigen trainingen', items: eigen.map(w => ({ key: `custom_${w.id}`, w, plan: 'Eigen', naam: w.name, sub: [w.type, w.duration ? `${w.duration} min` : null].filter(Boolean).join(' · ') })) },
+            ].filter(g => g.items.length > 0)
+            const kies = (key) => { tik(); setWorkoutKey(key); setStap('gym-dag') }
+            const Kaart = ({ item }) => {
+              const aan = workoutKey === item.key
+              const n = Array.isArray(item.w?.exercises) ? item.w.exercises.length : null
+              return (
+                <div style={{ position: 'relative', minWidth: 0 }}>
+                  <button onClick={() => kies(item.key)} style={{
+                    width: '100%', height: isMobile ? 118 : 132, padding: 0, borderRadius: 14, overflow: 'hidden', textAlign: 'left',
+                    border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`, background: '#111',
+                    cursor: 'pointer', fontFamily: 'inherit', color: '#fff', position: 'relative',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${getWorkoutImage(item.w || { name: item.naam })})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.15) 0%, rgba(10,10,10,0.2) 40%, rgba(10,10,10,0.88) 100%)' }} />
+                    <div style={{ position: 'absolute', left: 10, right: 10, bottom: 9 }}>
+                      <div style={{ fontSize: '0.56rem', fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.plan}</div>
+                      <div style={{ fontSize: isMobile ? '0.95rem' : '1.02rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>{item.naam}</div>
+                      {n != null && <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{n} oefeningen</div>}
+                    </div>
+                  </button>
+                  {Array.isArray(item.w?.exercises) && item.w.exercises.length > 0 && (
+                    <button onClick={(e) => { e.stopPropagation(); tik(); setInfo(item) }} aria-label="Oefeningen bekijken" style={{
+                      position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: '50%', padding: 0,
+                      background: 'rgba(10,10,10,0.7)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <Info size={14} strokeWidth={2.6} />
+                    </button>
+                  )}
+                </div>
+              )
+            }
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {groepen.map((g, gi) => (
+                  <div key={g.titel}>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: gi === 0 ? '2px 0 6px' : '12px 0 6px' }}>{g.titel}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 8 }}>
+                      {g.items.map(item => <Kaart key={item.key} item={item} />)}
+                    </div>
                   </div>
+                ))}
+                <button onClick={() => { tik(); setEigenOpen(true) }} style={{ ...tegel(false), marginTop: 10, borderStyle: 'dashed', justifyContent: 'center' }}>
+                  <Plus size={16} strokeWidth={2.8} /><span style={{ fontSize: '0.9rem', fontWeight: 900 }}>Eigen training opstellen</span>
                 </button>
-              ))}
-              {andereDagen.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '8px 0 2px' }}>Uit je andere plannen</div>}
-              {andereDagen.map(p => (
-                <button key={p.key} onClick={() => { tik(); setWorkoutKey(p.key); setStap('gym-dag') }} style={tegel(workoutKey === p.key)}>
-                  <Dumbbell size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.naam}</div>
-                    {p.sub && <div style={sub}>{p.sub}</div>}
+
+                {/* Oefeningen van een training, vóór je kiest. */}
+                {info && (
+                  <div onClick={() => setInfo(null)} style={{ position: 'fixed', inset: 0, zIndex: 5, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: '80vh', background: '#0a0a0a', borderRadius: '18px 18px 0 0', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                      <div style={{ position: 'relative', height: 120, flexShrink: 0 }}>
+                        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${getWorkoutImage(info.w || { name: info.naam })})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.9) 100%)' }} />
+                        <button onClick={() => setInfo(null)} aria-label="Sluit" style={{ ...knop, position: 'absolute', top: 10, right: 10 }}><X size={18} strokeWidth={2.6} /></button>
+                        <div style={{ position: 'absolute', left: 14, right: 14, bottom: 10 }}>
+                          <div style={{ fontSize: '0.56rem', fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>{info.plan}</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff', lineHeight: 1.1 }}>{info.naam}</div>
+                        </div>
+                      </div>
+                      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.5rem 0.9rem' }}>
+                        {(info.w?.exercises || []).map((ex, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                            <span style={{ width: 22, fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>
+                                {[ex.sets ? `${ex.sets} sets` : null, ex.reps ? `${ex.reps} reps` : null, ex.rest || ex.rust ? `rust ${ex.rest || ex.rust}` : null].filter(Boolean).join(' · ')}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ padding: '0.7rem 0.9rem calc(0.9rem + env(safe-area-inset-bottom, 0px))', flexShrink: 0 }}>
+                        <button onClick={() => { const k = info.key; setInfo(null); kies(k) }} style={primair()}>
+                          <Check size={18} strokeWidth={3} /> Kies deze training
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </button>
-              ))}
-              {standaardDagen.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '8px 0 2px' }}>Standaardtrainingen</div>}
-              {standaardDagen.map(p => (
-                <button key={p.key} onClick={() => { tik(); setWorkoutKey(p.key); setStap('gym-dag') }} style={tegel(workoutKey === p.key)}>
-                  <Dumbbell size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.naam}</div>
-                    {p.sub && <div style={sub}>{p.sub}</div>}
-                  </div>
-                </button>
-              ))}
-              {eigen.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '8px 0 2px' }}>Eigen trainingen</div>}
-              {eigen.map(w => (
-                <button key={w.id} onClick={() => { tik(); setWorkoutKey(`custom_${w.id}`); setStap('gym-dag') }} style={tegel(workoutKey === `custom_${w.id}`)}>
-                  <Activity size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.name}</div>
-                    <div style={sub}>{[w.type, w.duration ? `${w.duration} min` : null].filter(Boolean).join(' · ')}</div>
-                  </div>
-                </button>
-              ))}
-              <button onClick={() => { tik(); setEigenOpen(true) }} style={{ ...tegel(false), marginTop: 8, borderStyle: 'dashed', justifyContent: 'center' }}>
-                <Plus size={16} strokeWidth={2.8} /><span style={{ fontSize: '0.9rem', fontWeight: 900 }}>Eigen training opstellen</span>
-              </button>
-            </div>
-          )}
+                )}
+              </div>
+            )
+          })()}
 
           {(stap === 'gym-dag' || stap === 'cardio-dagen') && (
             <>
