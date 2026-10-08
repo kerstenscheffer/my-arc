@@ -376,7 +376,9 @@ function Video({ m }) {
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
             padding: 0, border: 'none', cursor: 'pointer',
-            backgroundImage: `url(https://i.ytimg.com/vi/${VIDEO_ID}/maxresdefault.jpg)`,
+            // Eigen beeld in plaats van de YouTube-thumbnail: die loopt
+            // uren achter op een nieuwe upload en daar hebben we geen grip op.
+            backgroundImage: 'url(/challenge-thumbnail.jpg)',
             backgroundSize: 'cover', backgroundPosition: 'center',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
