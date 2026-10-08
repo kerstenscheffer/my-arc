@@ -782,7 +782,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           <button onClick={() => setShowWeekAgenda(v => !v)}
             disabled={!effectiveClient}
             title={!effectiveClient ? 'Kies eerst een klant' : 'De week van deze klant'}
-            style={zijKnop({ opacity: effectiveClient ? 1 : 0.35, cursor: effectiveClient ? 'pointer' : 'not-allowed', background: showWeekAgenda && effectiveClient ? 'rgba(255,255,255,0.1)' : undefined })}>
+            style={zijKnop({ opacity: effectiveClient ? 1 : 0.35, cursor: effectiveClient ? 'pointer' : 'not-allowed', background: showWeekAgenda && effectiveClient ? 'rgba(255,255,255,0.1)' : 'none' })}>
             <Calendar size={14} /> Agenda
           </button>
           {/* Cardio hangt aan de klant, niet aan het schema: wandelen of
