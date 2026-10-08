@@ -748,55 +748,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* ── Acties — onder elkaar i.p.v. tien knoppen op een rij ─────── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {/* Opslaan bovenaan: het is de actie die je het vaakst doet, en
-              onderaan de kolom viel 'ie buiten beeld. */}
-          {/* Twee losse knoppen, geen schakelaar op basis van "zit ik in een
-              klant". Eén knop die van betekenis verandert betekende dat je een
-              sjabloon alleen kon maken als er géén klant openstond — en dat je
-              nooit zeker wist wat er ging gebeuren als je erop drukte. */}
-          <button onClick={saveToClientSchema}
-            disabled={saving || (!selectedSchemaId && !effectiveClient?.id) || workoutPlan.days.length === 0}
-            title={(!selectedSchemaId && !effectiveClient?.id) ? 'Kies eerst een klant' : undefined}
-            style={{
-              marginBottom: '0.35rem', width: '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '0.6rem', borderRadius: 8, border: 'none',
-              background: '#fff', color: '#0a0a0a',
-              fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: saving ? 'wait' : ((!selectedSchemaId && !effectiveClient?.id) ? 'not-allowed' : 'pointer'),
-              opacity: ((!selectedSchemaId && !effectiveClient?.id) || workoutPlan.days.length === 0) ? 0.45 : 1,
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-            <Save size={15} strokeWidth={2.6} />
-            {saving ? 'Opslaan…' : (selectedSchemaId ? 'Opslaan in klantplan' : effectiveClient?.id ? `Eerste plan voor ${effectiveClient.first_name || 'klant'}` : 'Opslaan in klantplan')}
-          </button>
-          <button onClick={() => setTemplateNaam(workoutPlan.name || '')}
-            disabled={saving || workoutPlan.days.length === 0}
-            style={{
-              marginBottom: '0.5rem', width: '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '0.6rem', borderRadius: 8,
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.25)',
-              color: '#fff',
-              fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: saving ? 'wait' : 'pointer',
-              opacity: workoutPlan.days.length === 0 ? 0.45 : 1,
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-            <Save size={15} strokeWidth={2.6} />
-            Opslaan als template
-          </button>
-          {!selectedSchemaId && (
-            <div style={{
-              marginTop: -4, marginBottom: '0.5rem',
-              fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)',
-              lineHeight: 1.4,
-            }}>
-              {effectiveClient?.id
-                ? `${effectiveClient.first_name || 'Deze klant'} heeft nog geen plan. Opslaan maakt het aan en zet het meteen actief.`
-                : 'Geen klant gekozen — je wijzigingen gaan nergens heen tot je ze als template opslaat.'}
-            </div>
-          )}
           {/* Trainingsweek — de zeven dagen naast elkaar, per dag bladeren
               met pijltjes. Was een wizard van vier stappen; bij het plannen
               van een week wil je juist alles tegelijk zien, want je kijkt
@@ -892,6 +843,45 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><RefreshCw size={15} strokeWidth={2.6} /></button>
               <button onClick={() => setShowPlanToevoegen(true)} title="Extra plan toevoegen" aria-label="Extra plan toevoegen" style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Plus size={16} strokeWidth={2.8} /></button>
               <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{ ...{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', cursor: huidigPlan ? 'pointer' : 'not-allowed', opacity: huidigPlan ? 1 : 0.4 }}><Trash2 size={15} strokeWidth={2.6} /></button>
+            </div>
+          )}
+
+          {/* Opslaan hoort bij "welk plan": twee losse knoppen, geen schakelaar
+              die van betekenis verandert. Hier onder de titel, niet meer in
+              de zijbalk tussen de bouwknoppen. */}
+          {(() => {
+            const geenDoel = !selectedSchemaId && !effectiveClient?.id
+            const leeg = workoutPlan.days.length === 0
+            const knop = (vol) => ({
+              minHeight: 38, padding: '0 0.95rem', borderRadius: 9,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              background: vol ? '#fff' : 'transparent', color: vol ? '#0a0a0a' : '#fff',
+              border: vol ? 'none' : '1px solid rgba(255,255,255,0.25)',
+              fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', whiteSpace: 'nowrap',
+              cursor: saving ? 'wait' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            })
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <button onClick={saveToClientSchema} disabled={saving || geenDoel || leeg}
+                  title={geenDoel ? 'Kies eerst een klant' : undefined}
+                  style={{ ...knop(true), opacity: (geenDoel || leeg) ? 0.45 : 1, cursor: geenDoel ? 'not-allowed' : undefined }}>
+                  <Save size={14} strokeWidth={2.6} />
+                  {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan in klantplan' : effectiveClient?.id ? (clientSchemas.length > 0 ? 'Opslaan als extra plan' : `Eerste plan voor ${effectiveClient.first_name || 'klant'}`) : 'Opslaan in klantplan'}
+                </button>
+                <button onClick={() => setTemplateNaam(workoutPlan.name || '')} disabled={saving || leeg}
+                  style={{ ...knop(false), opacity: leeg ? 0.45 : 1 }}>
+                  <Save size={14} strokeWidth={2.6} /> Opslaan als template
+                </button>
+              </div>
+            )
+          })()}
+          {!selectedSchemaId && (
+            <div style={{ marginTop: 6, fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4, maxWidth: 420 }}>
+              {effectiveClient?.id
+                ? (clientSchemas.length > 0
+                  ? `Nieuw plan voor ${effectiveClient.first_name || 'deze klant'}. Opslaan zet het naast het huidige plan; actief maken doe je met de wisselknop.`
+                  : `${effectiveClient.first_name || 'Deze klant'} heeft nog geen plan. Opslaan maakt het aan en zet het meteen actief.`)
+                : 'Geen klant gekozen. Je wijzigingen gaan nergens heen tot je ze als template opslaat.'}
             </div>
           )}
         </div>
