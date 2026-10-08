@@ -498,9 +498,19 @@ function KalenderBlad({ open, onClose, m }) {
           padding: m ? '0.7rem 0.9rem 0.6rem' : '0.9rem 1.2rem 0.8rem',
           borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
         }}>
-          <div>
-            <div style={{ fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', textTransform: 'uppercase' }}>Plan je kennismaking</div>
-            <div style={{ fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Een half uur. We bespreken je doel en of de challenge bij je past.</div>
+          {/* Zelfde kopje als Calendly zelf toont (foto, naam, titel), maar
+              dan van ons: het Calendly-blok is uitgezet omdat het ook de
+              duur en de beschrijving meenam. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 16, minWidth: 0 }}>
+            <img
+              src="/kersten-rond.jpg" alt="Kersten Scheffer"
+              style={{ width: m ? 52 : 64, height: m ? 52 : 64, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(255,255,255,0.15)' }}
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Kersten Scheffer</div>
+              <div style={{ fontSize: m ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, marginTop: 2 }}>Start 6-week-challenge | Kersten</div>
+            </div>
           </div>
           <button
             onClick={onClose} aria-label="Sluiten"
