@@ -15,6 +15,7 @@ import {
   Check, CalendarCheck, Play, Pause, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
+import { PrequalFlow } from './ChallengePrequalPage'
 
 const GOLD = '#FFD700'
 const TP_GREEN = '#00B67A'
@@ -486,8 +487,9 @@ const knopIcoon = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
-// Het kalenderblad: schuift van onderaf omhoog, Calendly erin. Donker
-// gekleurd via de URL-parameters zodat het bij de pagina past.
+// Het blad: schuift van onderaf omhoog. Eerst de tien vragen
+// (prekwalificatie), en past het, dan Calendly als laatste stap van
+// datzelfde formulier.
 function KalenderBlad({ open, onClose, m }) {
   useEffect(() => {
     if (!open) return
@@ -498,10 +500,6 @@ function KalenderBlad({ open, onClose, m }) {
     return () => { document.body.style.overflow = vorige; window.removeEventListener('keydown', toets) }
   }, [open, onClose])
   if (!open) return null
-  // embed_domain + embed_type zijn wat Calendly's eigen widget-script
-  // meegeeft; zonder die twee blijft de pagina in een iframe op de
-  // laadpuntjes hangen.
-  const url = `${CALENDLY}?embed_domain=${encodeURIComponent(window.location.hostname)}&embed_type=Inline&hide_gdpr_banner=1&hide_event_type_details=1&hide_landing_page_details=1&background_color=0a0a0a&text_color=ffffff&primary_color=ffd700`
   return (
     <div
       onClick={onClose}
@@ -524,9 +522,6 @@ function KalenderBlad({ open, onClose, m }) {
           padding: m ? '0.7rem 0.9rem 0.6rem' : '0.9rem 1.2rem 0.8rem',
           borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
         }}>
-          {/* Zelfde kopje als Calendly zelf toont (foto, naam, titel), maar
-              dan van ons: het Calendly-blok is uitgezet omdat het ook de
-              duur en de beschrijving meenam. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 16, minWidth: 0 }}>
             <img
               src="/kersten-rond.jpg" alt="Kersten Scheffer"
@@ -550,11 +545,9 @@ function KalenderBlad({ open, onClose, m }) {
             <X size={18} strokeWidth={2.6} />
           </button>
         </div>
-        <iframe
-          src={url}
-          title="Kennismaking plannen"
-          style={{ flex: 1, width: '100%', border: 0, background: '#0a0a0a' }}
-        />
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <PrequalFlow m={m} compact />
+        </div>
       </div>
     </div>
   )

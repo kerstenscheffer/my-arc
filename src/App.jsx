@@ -44,6 +44,7 @@ import SixteenWeekPage from './pages/SixteenWeekPage'
 // sales-call-6week-pagina staat er nog maar wordt niet meer gerenderd.
 import SixWeekChallengePage from './pages/SixWeekChallengePage'
 import ChallengeVslPage from './pages/ChallengeVslPage'
+import ChallengePrequalPage from './pages/ChallengePrequalPage'
 import SixWeekChallengeCheckout from './pages/SixWeekChallengeCheckout'
 import BackInShapePage from './sales-call/BackInShapePage'
 import VSLLandingPage from './sales-call-vsl/VSLLandingPage'
@@ -224,6 +225,11 @@ function App() {
   // naar de kennismaking in Calendly. Geen betaling op deze pagina.
   if (currentPath === '/challenge') {
     return <ChallengeVslPage />
+  }
+  // Prekwalificatie vóór de kennismaking: tien vragen, lead op het bord,
+  // daarna Calendly. Zit ook in het blad van /challenge.
+  if (currentPath === '/challenge/start') {
+    return <ChallengePrequalPage />
   }
 
   // Sales-pagina-kopie met gratis strategiegesprek-CTA i.p.v. prijzen

@@ -65,6 +65,23 @@ console.log('📋 Using webhook payload data (no API call needed)');
       
       const scheduledDate = scheduledEvent.start_time;
       const eventId = scheduledEvent.uri.split('/').pop();
+// Lead uit de prekwalificatie (/challenge/start): die stuurt
+// utm_content=lead_<id> mee naar Calendly. Dan is dit geen client-call
+// maar een sales call; de database-functie zet de lead in "Sales Call"
+// met datum en tijd, en we zijn klaar.
+const leadMatch = payload.tracking?.utm_content?.match(/lead_([a-f0-9-]{36})/);
+if (leadMatch) {
+  const { data: gelukt, error: leadFout } = await supabase.rpc('book_lead_call', {
+    p_lead_id: leadMatch[1],
+    p_start: scheduledDate,
+    p_event_id: eventId,
+    p_event_url: scheduledEvent.uri || null,
+  });
+  if (leadFout) console.error('❌ book_lead_call mislukt:', leadFout);
+  else console.log('✅ Sales call gekoppeld aan lead', leadMatch[1], gelukt);
+  return res.status(200).json({ success: true, lead_id: leadMatch[1], booked: !!gelukt });
+}
+
 // Extract call_id uit UTM parameters
 let targetCallId = null;
 if (payload.tracking?.utm_content) {
