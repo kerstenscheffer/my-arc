@@ -22,7 +22,10 @@ import ClientAgendaView from '../client-agenda/ClientAgendaView'
 // Het weekrooster met dagtegels zoals de klant het ziet; de uren-agenda
 // blijft er als tweede weergave naast.
 import KlantWeekrooster from './components/KlantWeekrooster'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar } from 'lucide-react'
+// Hetzelfde wisselvenster als op de workout-pagina van de klant (eigen
+// plannen + standaardplannen), zodat de coach en de klant hetzelfde zien.
+import PlanSwitchModal from '../workout/components/PlanSwitchModal'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -47,6 +50,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // Weekagenda van de klant in het hoofdvlak (aan/uit) en een teller om hem
   // te laten herladen na cardio-wijzigingen.
   const [showWeekAgenda, setShowWeekAgenda] = useState(false)
+  const [showPlanSwitch, setShowPlanSwitch] = useState(false)
   const [agendaWeergave, setAgendaWeergave] = useState('rooster') // 'rooster' | 'uren'
   const [agendaKey, setAgendaKey] = useState(0)
   useEffect(() => {
@@ -107,7 +111,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     try {
       const schemas = await db.getClientSchemas(client.id)
       setClientSchemas(schemas || [])
-      if (schemas?.length > 0) loadSchemaIntoBuilder(schemas[0])
+      // Het actieve plan van de klant voorop; anders het nieuwste.
+      const actief = (schemas || []).find(x => x.id === client.assigned_schema_id) || schemas?.[0]
+      if (actief) loadSchemaIntoBuilder(actief)
     } catch (e) {
       console.error('❌ getClientSchemas failed, falling back:', e)
       try {
@@ -116,6 +122,31 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       } catch {}
     }
     if (openAssigner) setShowClientAssigner(true)
+  }
+
+  // Het plan dat nu in de builder staat: wat de coach ziet en de klant draait.
+  const huidigPlan = clientSchemas.find(x => x.id === selectedSchemaId) || null
+
+  // Na wisselen of verwijderen: klant opnieuw ophalen (assigned_schema_id is
+  // veranderd) en de plannen opnieuw laden, zonder het toewijsvenster.
+  const herlaadKlant = async () => {
+    if (!effectiveClient?.id) return
+    try {
+      const vers = await db.getClient(effectiveClient.id)
+      if (vers) setLocalClient(vers)
+      await loadClientSchemas(vers || effectiveClient, false)
+    } catch (e) { console.error('klant herladen mislukt:', e) }
+    setAgendaKey(k => k + 1)
+  }
+
+  const verwijderHuidigPlan = async () => {
+    if (!huidigPlan || !effectiveClient?.id) return
+    if (!window.confirm(`"${huidigPlan.name || 'Dit plan'}" verwijderen voor ${effectiveClient.first_name || 'deze klant'}? Sjablonen blijven staan.`)) return
+    const r = await db.removeClientPlan(effectiveClient.id, huidigPlan.id)
+    if (!r?.success) { alert('Verwijderen mislukt.'); return }
+    setSelectedSchemaId(null)
+    setWorkoutPlan({ name: '', description: '', primary_goal: 'muscle_gain', experience_level: 'intermediate', split_type: '', days_per_week: 3, equipment: [], days: [] })
+    await herlaadKlant()
   }
 
   const loadTrainingInfo = async (clientId) => {
@@ -729,6 +760,26 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           )}
         </div>
 
+        {/* ── Huidig plan van de klant: naam, wisselen, verwijderen ────── */}
+        {effectiveClient && (
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem' }}>
+            <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Huidig plan</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: '0.95rem', fontWeight: 900, color: huidigPlan ? '#fff' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {huidigPlan?.name || 'Nog geen plan'}
+              </div>
+              <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={{
+                width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}><RefreshCw size={14} strokeWidth={2.6} /></button>
+              <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{
+                width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                color: '#ef4444', cursor: huidigPlan ? 'pointer' : 'not-allowed', opacity: huidigPlan ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}><Trash2 size={14} strokeWidth={2.6} /></button>
+            </div>
+          </div>
+        )}
+
         {/* ── Acties — onder elkaar i.p.v. tien knoppen op een rij ─────── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
           {/* Opslaan bovenaan: het is de actie die je het vaakst doet, en
@@ -780,13 +831,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 : 'Geen klant gekozen — je wijzigingen gaan nergens heen tot je ze als template opslaat.'}
             </div>
           )}
-          <button onClick={() => setShowPlanManager(true)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
-            <Users size={14} /> Plannen toewijzen
-          </button>
-          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0}
-            style={zijKnop({ opacity: workoutPlan.days.length === 0 ? 0.35 : 1, cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer' })}>
-            <Users size={14} /> Huidig plan toewijzen
-          </button>
           {/* Trainingsweek — de zeven dagen naast elkaar, per dag bladeren
               met pijltjes. Was een wizard van vier stappen; bij het plannen
               van een week wil je juist alles tegelijk zien, want je kijkt
@@ -870,7 +914,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </div>
             {agendaWeergave === 'rooster' ? (
               <div key={`rooster-${agendaKey}`} style={{ padding: isMobile ? '0.25rem 0 0.5rem' : '0.5rem 0 0.75rem' }}>
-                <KlantWeekrooster client={effectiveClient} db={db} isMobile={isMobile} refreshKey={agendaKey} onSwitchPlan={() => setShowPlanManager(true)} />
+                <KlantWeekrooster client={effectiveClient} db={db} isMobile={isMobile} refreshKey={agendaKey} onSwitchPlan={() => setShowPlanSwitch(true)} />
               </div>
             ) : (
               <div style={{ height: isMobile ? 460 : 560, overflow: 'auto' }}>
@@ -1005,6 +1049,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       )}
 
       {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={effectiveClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
+      {showPlanSwitch && effectiveClient && (
+        <PlanSwitchModal client={effectiveClient} db={db} isMobile={isMobile}
+          onClose={() => setShowPlanSwitch(false)}
+          onActivated={async () => { setShowPlanSwitch(false); await herlaadKlant() }} />
+      )}
       {showPlanManager && <ClientPlanManagerModal clients={clients} templates={templates} db={db} isMobile={isMobile} onClose={() => setShowPlanManager(false)} onEditInBuilder={(schema) => { loadSchemaIntoBuilder(schema); setShowPlanManager(false) }} />}
 
       <ExerciseLibraryModal
