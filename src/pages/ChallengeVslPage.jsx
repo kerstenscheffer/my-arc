@@ -42,7 +42,7 @@ const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten
 const VIDEO_ID = '41Hfc2YVBAA'
 // Vul in zodra het bedrag vaststaat, bv. '€150'. Leeg = de zin noemt geen
 // bedrag.
-const BORG_BEDRAG = ''
+const BORG_BEDRAG = '€297'
 
 const CTA_TEKST = 'Start mijn challenge'
 
@@ -54,7 +54,7 @@ const RESULTATEN = [
 
 const TRANSFORMATIES = [
   { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
-  { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
+  { src: '/transformatie-nitish.jpg', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
 const REVIEWS = [
@@ -123,6 +123,12 @@ const VRAGEN = [
       'De voorwaarden gaan over de acties die je uitvoert. In de video noem ik onder andere:',
       { lijst: BORG_EISEN },
       'Vóór je begint, krijg je duidelijkheid over de volledige voorwaarden en hoe we beoordelen of je eraan hebt voldaan. Wanneer je niet aan de voorwaarden voldoet, kun je de borg verliezen.',
+    ],
+  },
+  {
+    vraag: 'Hoeveel is de borg?',
+    antwoord: [
+      `De borg is ${BORG_BEDRAG}. Die krijg je na zes weken terug als je aan de deelnamevoorwaarden hebt voldaan.`,
     ],
   },
   {
