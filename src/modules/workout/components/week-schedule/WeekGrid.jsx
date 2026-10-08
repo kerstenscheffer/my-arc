@@ -85,8 +85,21 @@ export default function WeekGrid({
         const isToday = kanOpenen && index === todayIndex
         // Gedaan = er is in de getoonde week op die dag een sessie met
         // gelogde sets; ook in een voorbije week zichtbaar.
-        const isCompleted = Array.isArray(completedWorkouts)
-          && completedWorkouts.some(w => w.workout_day === day)
+        // Gedaan = een sessie op die dag die bij de geplande training hoort.
+        // Hoort hij ergens anders bij (planwissel, andere dag gedaan), dan
+        // blijft die sessie als eigen groene tegel staan en is de geplande
+        // training gewoon nog te doen.
+        const sessie = Array.isArray(completedWorkouts) ? completedWorkouts.find(w => w.workout_day === day) : null
+        const norm = (v) => String(v || '').trim().toLowerCase()
+        const sessieNaam = sessie?.naam || sessie?.workout_name || sessie?.day_display_name || sessie?.blok?.sublabel || null
+        const geplandNaam = workoutData?.name || workoutData?.focus || null
+        const pastBijPlanning = !!sessie && (
+          !sessieNaam || !geplandNaam
+          || norm(sessieNaam) === norm(geplandNaam)
+          || (sessie?.dagSleutel && norm(sessie.dagSleutel) === norm(assignedWorkout))
+        )
+        const isCompleted = !!sessie && pastBijPlanning
+        const gedaanAnders = sessie && !pastBijPlanning ? { naam: sessieNaam } : null
         const isSelected = selectedWorkout === assignedWorkout
           || (selectedForSwap && selectedForSwap.day === day)
 
@@ -118,6 +131,7 @@ export default function WeekGrid({
             onRemoveTraining={onRemoveTraining ? () => onRemoveTraining(day) : null}
             onRemoveCardio={onRemoveCardio}
             onOpenGedaan={onOpenGedaan ? () => onOpenGedaan(day) : null}
+            gedaanAnders={gedaanAnders}
             onOpenCardioGedaan={onOpenCardioGedaan}
             smal={leeg[index]}
             metLabel={false}

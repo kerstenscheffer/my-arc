@@ -168,6 +168,11 @@ export default function WeekSchedule({
           eind = Math.min(eind, start + 120, 24 * 60); if (eind <= start) eind = Math.min(start + 45, 24 * 60)
           uit.push({
             workout_day: dagen[idx], workout_date: x.workout_date,
+            // Wat er toen écht gedaan is. Wordt in het rooster vergeleken met
+            // wat er nu op die dag staat: na een planwissel blijft de gedane
+            // training zichtbaar en krijgt de nieuwe dag niet onterecht 'Gedaan'.
+            naam: (x.day_display_name && !/^quick log/i.test(x.day_display_name)) ? x.day_display_name : null,
+            dagSleutel: x.day_name || null,
             blok: {
               id: `gedaan-${x.id}`, day: dagen[idx].toLowerCase(), type: 'training', label: 'Training',
               // Naam van de training: wat de sessie zelf zegt, anders de dag

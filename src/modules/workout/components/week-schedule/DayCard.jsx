@@ -99,9 +99,12 @@ export default function DayCard({
   // Stappen van deze dag ({ steps, gehaald, toekomst }) in de kop van de
   // tegel, zodat training en stappen één kaart zijn (8 okt 2026).
   stappen = null, stappenDoel = 8000,
+  // Een gedane sessie die niet bij de geplande training hoort (bv. na een
+  // planwissel): { naam }. Komt als eigen groene tegel boven de planning.
+  gedaanAnders = null,
 }) {
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
-  const heeftTraining = !!workoutData || isActivity
+  const heeftTraining = !!workoutData || isActivity || !!gedaanAnders
   const heeftCardio = Array.isArray(cardio) && cardio.length > 0
   const cardioKlaar = heeftCardio && cardio.every(c => c.gedaan)
   const handleClick = () => { if (onClick) onClick() }
@@ -202,7 +205,16 @@ export default function DayCard({
         {metLabel && (isToday ? todayPill : dayLabel)}
         {stappenKop}
         <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {heeftTraining && (
+          {gedaanAnders && (
+            <Tegel
+              foto={getWorkoutImage({ name: gedaanAnders.naam || 'Training' })}
+              eyebrow="Gedaan" titel={gedaanAnders.naam || 'Training'}
+              klaar kanSchuiven={false}
+              onClick={onOpenGedaan || undefined}
+              isMobile={isMobile} icoon={Dumbbell}
+            />
+          )}
+          {(workoutData || isActivity) && (
             <Tegel
               foto={getWorkoutImage(workoutData || { name: workoutKey })}
               eyebrow="Training" titel={titelTraining || 'Training'}
