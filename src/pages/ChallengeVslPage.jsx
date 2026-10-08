@@ -403,12 +403,12 @@ export default function ChallengeVslPage() {
 
       <Sectie m={m} lijn={false} style={{ paddingTop: m ? '4.6rem' : '6.5rem' }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
-          <Kop m={m} center groot>Fitter en sterker. Met een plan dat past naast je werk en gezin.</Kop>
-          <Tekst m={m} center dim style={{ marginTop: m ? '0.8rem' : '1.1rem' }}>
+          <Kop m={m} center groot>Strakker en sterker met een aanpak die werkt naast je baan, gezin en sociale leven.</Kop>
+          <Tekst m={m} center style={{ marginTop: m ? '1.3rem' : '1.7rem', fontSize: m ? '1.08rem' : '1.22rem', color: '#fff' }}>
             Bekijk de video en ontdek hoe de challenge werkt, wat je krijgt en welke inzet we van je verwachten.
           </Tekst>
         </div>
-        <div style={{ maxWidth: 880, margin: `${m ? '1.1rem' : '1.8rem'} auto 0` }}>
+        <div style={{ maxWidth: 880, margin: `${m ? '1.7rem' : '2.4rem'} auto 0` }}>
           <Video m={m} />
         </div>
         <Tekst m={m} center style={{ maxWidth: 720, margin: `${m ? '1.1rem' : '1.6rem'} auto 0` }}>
