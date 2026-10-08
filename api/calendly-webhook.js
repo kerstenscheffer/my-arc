@@ -81,6 +81,22 @@ if (leadMatch) {
   else console.log('✅ Sales call gekoppeld aan lead', leadMatch[1], gelukt);
   return res.status(200).json({ success: true, lead_id: leadMatch[1], booked: !!gelukt });
 }
+// Geen utm_content (bv. iemand boekt later via de losse Calendly-link):
+// koppel op e-mail aan de jongste prequal-lead zonder call. Levert dat niets
+// op, dan is het gewoon een client-call en gaan we hieronder verder.
+if (payload.email && scheduledEvent.name?.toLowerCase().includes('6-week')) {
+  const { data: leadId, error: mailFout } = await supabase.rpc('book_lead_call_by_email', {
+    p_email: payload.email,
+    p_start: scheduledDate,
+    p_event_id: eventId,
+    p_event_url: scheduledEvent.uri || null,
+  });
+  if (mailFout) console.error('❌ book_lead_call_by_email mislukt:', mailFout);
+  else if (leadId) {
+    console.log('✅ Sales call op e-mail gekoppeld aan lead', leadId);
+    return res.status(200).json({ success: true, lead_id: leadId, booked: true });
+  }
+}
 
 // Extract call_id uit UTM parameters
 let targetCallId = null;
