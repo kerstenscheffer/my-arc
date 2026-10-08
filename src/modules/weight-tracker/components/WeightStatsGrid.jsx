@@ -931,18 +931,10 @@ function WekenStrook(props) {
     {/* Vervaging aan de kant waar nog tegels staan: je ziet ze onder de rand
         doorlopen. Links pas zodra je gescrold hebt. */}
     {schuift && stand.pos < 0.98 && (
-      <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 6, right: 0, width: 44, pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />
+      <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 44, pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />
     )}
     {schuift && stand.pos > 0.02 && (
-      <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 6, left: 0, width: 28, pointerEvents: 'none', background: 'linear-gradient(270deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />
-    )}
-    {/* Het spoor: dun lijntje met een blokje dat meeschuift. Dit is wat van
-        een rij tegels een slider maakt. */}
-    {schuift && (
-      <div aria-hidden style={{ height: 6, margin: isMobile ? '0 0.5rem 4px' : '0 0.75rem 6px', position: 'relative' }}>
-        <div style={{ position: 'absolute', left: 0, right: 0, top: 2, height: 2, borderRadius: 2, background: 'rgba(255,255,255,0.1)' }} />
-        <div style={{ position: 'absolute', top: 1, height: 4, borderRadius: 2, background: '#fff', width: `${Math.max(14, stand.deel * 100)}%`, left: `${stand.pos * (100 - Math.max(14, stand.deel * 100))}%`, transition: 'left 0.05s linear' }} />
-      </div>
+      <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 28, pointerEvents: 'none', background: 'linear-gradient(270deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.92) 100%)' }} />
     )}
     </div>
   )
