@@ -163,6 +163,14 @@ export function maakConfig(client, fase = null, overrides = {}) {
     const verschil = doel - start
     if (Math.abs(verschil) < start * 0.01) richting = 'stabiel'
     else if (verschil > 0) richting = 'aankomen'
+  } else {
+    // Geen doelgewicht: het hoofddoel van de klant zegt de richting. Zonder
+    // dit stond een bulk zonder doelgewicht stilletjes op 'afvallen'.
+    const pg = String(client?.primary_goal || '').toLowerCase()
+    const wk = Number(client?.weekly_weight_goal)
+    if (/bulk|muscle|gain|build|aankomen/.test(pg)) richting = 'aankomen'
+    else if (/cut|fat|loss|afvallen|lean/.test(pg)) richting = 'afvallen'
+    else if (/recomp|maint|onderhoud/.test(pg)) richting = Number.isFinite(wk) && wk !== 0 ? (wk > 0 ? 'aankomen' : 'afvallen') : 'stabiel'
   }
   const basis = richting === 'aankomen'
     ? { streeftempo_pct: 0.35, traagste_pct: 0.1, snelste_pct: 0.5 }

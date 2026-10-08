@@ -369,11 +369,10 @@ export default function ProgressMain({ db, client }) {
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
       {!photosOpen && (
         <div style={{ marginTop: isMobile ? '1rem' : '1.25rem' }}>
-          {/* Geen `fase` hier, met opzet: dan rekent de balk 'sinds start' vanaf
-              de eerste weging ooit en staan er vier cellen (gemiddelde, tempo,
-              vorige week, sinds start). Dat is de balk die de klant kent. De
-              fase-cijfers — tempo deze week, boven/onder plan — horen bij het
-              sturen, en dat doet de coach. */}
+          {/* Mét de lopende fase, dezelfde als de grafiek eronder en als het
+              coachpaneel. Zonder fase viel de band terug op start-/doelgewicht
+              en stond er bij een build een cut-doel (ks10k, 8 okt 2026:
+              -0,21 / -0,85 terwijl de fase +0,1 / +0,5 zegt). */}
           <WeightStatsGrid
             stats={weightStats}
             client={client}
@@ -381,6 +380,7 @@ export default function ProgressMain({ db, client }) {
             history={weightHistory}
             isMobile={isMobile}
             toonGrafiek={false}
+            fase={fases[0] || null}
           />
           {/* De coaching-band: dezelfde grafiek die de coach ziet. Het losse
               verloop dat hier stond (witte lijn, doel-streep) toonde alleen de
