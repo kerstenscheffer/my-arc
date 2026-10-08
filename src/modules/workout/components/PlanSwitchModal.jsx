@@ -36,10 +36,12 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
       try {
         // Coach: eigen templates én publieke. De coach miste zo "5X | PPL-UL"
         // (wel template, niet publiek) bij het toewijzen (8 okt 2026).
+        // Eén .or() per query: twee .or()'s achter elkaar (archief én
+        // publiek/eigen) kwamen als twee or-parameters bij PostgREST en
+        // leverden niets op aan de coach-kant. Archief filteren we hier.
         let tplQ = db.supabase.from('workout_schemas')
-          .select('id, name, description, primary_goal, days_per_week, week_structure, equipment, is_public')
+          .select('id, name, description, primary_goal, days_per_week, week_structure, equipment, is_public, is_archived')
           .eq('is_template', true)
-          .or('is_archived.is.null,is_archived.eq.false')
         if (viewerRole === 'coach') {
           const uid = (await db.getCurrentUser())?.id
           tplQ = uid ? tplQ.or(`is_public.eq.true,user_id.eq.${uid}`) : tplQ.eq('is_public', true)
@@ -49,11 +51,12 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
         const [eigen, std] = await Promise.all([
           db.getClientWorkoutPlans(client.id),
           tplQ.order('days_per_week', { ascending: true }).order('name', { ascending: true })
-            .then(r => r, () => ({ data: [] })),
+            .then(r => r, (e) => { console.error('templates laden:', e); return { data: [] } }),
         ])
         if (!alive) return
+        if (std?.error) console.error('templates laden:', std.error)
         setPlans(eigen?.plans || [])
-        setStandaard(std?.data || [])
+        setStandaard((std?.data || []).filter(p => !p.is_archived))
       } catch (e) { console.error('Plannen laden mislukt:', e); if (alive) { setPlans([]); setStandaard([]) } }
       finally { if (alive) setLoading(false) }
     })()
