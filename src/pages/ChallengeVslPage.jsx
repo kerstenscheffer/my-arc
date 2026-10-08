@@ -504,7 +504,7 @@ function KalenderBlad({ open, onClose, m }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 16, minWidth: 0 }}>
             <img
               src="/kersten-rond.jpg" alt="Kersten Scheffer"
-              style={{ width: m ? 52 : 64, height: m ? 52 : 64, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(255,255,255,0.15)' }}
+              style={{ width: m ? 52 : 64, height: m ? 52 : 64, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center 15%', flexShrink: 0, border: '1px solid rgba(255,255,255,0.15)' }}
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
             <div style={{ minWidth: 0 }}>
