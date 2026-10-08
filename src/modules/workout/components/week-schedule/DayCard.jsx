@@ -11,7 +11,7 @@
 //   · Rust-waarschuwing → rode/oranje rand als dezelfde training te dicht
 //     op deze dag staat
 
-import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, Trash2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, HeartPulse, Dumbbell, Trash2, Footprints } from 'lucide-react'
 import { cardioFoto } from '../../utils/workoutFoto'
 import { getWorkoutImage } from './workoutImage'
 
@@ -96,6 +96,9 @@ export default function DayCard({
   // Dag en datum staan in de strook boven het rooster; dan hier geen label.
   metLabel = true,
   trainingTijd = null,
+  // Stappen van deze dag ({ steps, gehaald, toekomst }) in de kop van de
+  // tegel, zodat training en stappen één kaart zijn (8 okt 2026).
+  stappen = null, stappenDoel = 8000,
 }) {
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
   const heeftTraining = !!workoutData || isActivity
@@ -123,6 +126,25 @@ export default function DayCard({
 
   const hoogte = isMobile ? 176 : 204
   const dateNum = dayDate ? dayDate.getDate() : null
+
+  const stappenKop = (() => {
+    if (!stappen) return null
+    const n = Number(stappen.steps) || 0
+    const tekst = n === 0 ? (stappen.toekomst ? '' : '0') : n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : String(n)
+    const deel = Math.min(1, n / Math.max(1, stappenDoel))
+    const kleur = stappen.gehaald ? '#10b981' : n > 0 ? '#fff' : 'rgba(255,255,255,0.3)'
+    return (
+      <div title={`${n.toLocaleString('nl-NL')} stappen`} style={{ width: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3, padding: smal ? '0 1px' : '0 2px', boxSizing: 'border-box', marginBottom: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: smal ? (isMobile ? '0.64rem' : '0.72rem') : (isMobile ? '0.78rem' : '0.88rem'), fontWeight: 900, color: kleur, lineHeight: 1, letterSpacing: '-0.02em', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+          {!smal && <Footprints size={isMobile ? 10 : 11} strokeWidth={2.6} style={{ opacity: 0.8 }} />}
+          <span>{tekst || '·'}</span>
+        </div>
+        <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+          <div style={{ width: `${Math.round(deel * 100)}%`, height: '100%', background: stappen.gehaald ? '#10b981' : 'rgba(255,255,255,0.7)', transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
+        </div>
+      </div>
+    )
+  })()
   const kaart = {
     position: 'relative', width: '100%', minWidth: 0,
     height: hoogte, borderRadius: isMobile ? 12 : 14,
@@ -157,6 +179,7 @@ export default function DayCard({
           cursor: swapMode ? 'pointer' : 'default', opacity: gedimd ? 0.7 : 1,
         }}>
           {metLabel && (isToday ? todayPill : dayLabel)}
+          {stappenKop}
           <div style={{ fontSize: smal ? '0.5rem' : (isMobile ? '0.6rem' : '0.65rem'), fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: smal ? '0.04em' : '0.1em', textTransform: 'uppercase', marginTop: 'auto', marginBottom: 'auto' }}>
             Rust
           </div>
@@ -177,6 +200,7 @@ export default function DayCard({
           : { background: 'transparent', border: 'none', padding: 0, borderRadius: 0, overflow: 'visible' }),
       }}>
         {metLabel && (isToday ? todayPill : dayLabel)}
+        {stappenKop}
         <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
           {heeftTraining && (
             <Tegel

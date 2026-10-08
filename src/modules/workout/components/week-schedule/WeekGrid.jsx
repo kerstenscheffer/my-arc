@@ -122,38 +122,11 @@ export default function WeekGrid({
             smal={leeg[index]}
             metLabel={false}
             trainingTijd={trainingTijdPerDag[index] || null}
+            stappen={Array.isArray(stappenPerDag) ? stappenPerDag[index] : null}
+            stappenDoel={stappenDoel}
           />
         )
       })}
     </div>
-    {/* Stappen van elke dag, recht onder de tegel: getal groot, balkje tot
-        het doel. Groen als het doel is gehaald. Zo lees je per dag in één
-        blik of training én stappen kloppen, en een rustdag is niet leeg. */}
-    {Array.isArray(stappenPerDag) && stappenPerDag.length === 7 && (
-      <div style={{
-        display: 'grid', gridTemplateColumns: kolommen, gap,
-        marginTop: isMobile ? -2 : 0, marginBottom: isMobile ? '0.6rem' : '0.75rem',
-        minWidth: 0, width: '100%',
-      }}>
-        {stappenPerDag.map((d, index) => {
-          const n = Number(d?.steps) || 0
-          const tekst = n === 0 ? (d?.toekomst ? '' : '0') : n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : String(n)
-          const deel = Math.min(1, n / Math.max(1, stappenDoel))
-          const kleur = d?.gehaald ? '#10b981' : n > 0 ? '#fff' : 'rgba(255,255,255,0.3)'
-          return (
-            <div key={index} title={`${n.toLocaleString('nl-NL')} stappen`} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-              <div style={{
-                fontSize: leeg[index] ? (isMobile ? '0.66rem' : '0.74rem') : (isMobile ? '0.8rem' : '0.9rem'),
-                fontWeight: 900, color: kleur, letterSpacing: '-0.02em', lineHeight: 1, whiteSpace: 'nowrap',
-                fontVariantNumeric: 'tabular-nums',
-              }}>{tekst || '·'}</div>
-              <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.round(deel * 100)}%`, height: '100%', background: d?.gehaald ? '#10b981' : 'rgba(255,255,255,0.7)', transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )}
   </>)
 }
