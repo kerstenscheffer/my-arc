@@ -415,15 +415,12 @@ export default function ChallengeVslPage() {
           Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
         </Tekst>
         <div ref={heroCtaRef}>
-          <Cta m={m} style={{ marginTop: m ? '1.1rem' : '1.6rem' }}
-            sub="We bespreken je doel, waar je nu vastloopt en of de challenge bij je past." />
+          <Cta m={m} style={{ marginTop: m ? '1.1rem' : '1.6rem' }} />
         </div>
-        <TrustpilotBadge style={{ marginTop: m ? '1rem' : '1.4rem' }} />
       </Sectie>
 
       {/* ══ 2. Resultaten ══ */}
       <Sectie m={m}>
-        <Label m={m} center>Resultaten</Label>
         <Kop m={m} center>Deze mannen zetten de eerste stap al.</Kop>
         <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>In de video laat ik de voortgang van drie deelnemers zien:</Tekst>
 
