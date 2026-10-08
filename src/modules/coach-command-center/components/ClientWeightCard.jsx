@@ -542,26 +542,27 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             onClick={() => setStatsExpanded(v => !v)}
             title="Toon alle weekcijfers"
             style={{
-              display: 'flex', alignItems: 'baseline', gap: isMobile ? '0.5rem' : '0.7rem',
+              display: 'flex', alignItems: 'flex-end', gap: isMobile ? '0.55rem' : '0.75rem',
               background: 'none', border: 'none', padding: 0, cursor: 'pointer',
               fontFamily: 'inherit', flexShrink: 1, minWidth: 0, overflow: 'hidden',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
+            {/* Label boven het getal, dicht op elkaar: drie cijfers naast
+                elkaar werden te breed met het label ernaast (8 okt 2026). */}
             {kaartStats.map(st => (
               <span key={st.label} style={{
-                display: 'inline-flex', alignItems: 'baseline', gap: '0.2rem', whiteSpace: 'nowrap',
+                display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, whiteSpace: 'nowrap',
               }}>
-                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>
+                <span style={{ fontSize: '0.54rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', lineHeight: 1, letterSpacing: '0.02em' }}>
                   {st.kort}
                 </span>
                 <span style={{
                   fontSize: '0.88rem', fontWeight: 900, color: st.color, lineHeight: 1,
                   fontVariantNumeric: 'tabular-nums',
                 }}>
-                  {st.val}
+                  {st.val}<span style={{ fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginLeft: 2 }}>kg</span>
                 </span>
-                <span style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>kg</span>
               </span>
             ))}
           </button>
