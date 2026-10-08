@@ -2,8 +2,7 @@
 import useIsMobile from '../../hooks/useIsMobile'
 import KrachtBlad from './components/KrachtBlad'
 import { useState, useEffect, useRef } from 'react'
-import { useLanguage } from '../../contexts/LanguageContext'
-import { Calendar, Clock, ChevronLeft, ChevronRight, ChevronDown, RefreshCw, TrendingUp, History } from 'lucide-react'
+import { Clock, ChevronLeft, ChevronRight, ChevronDown, RefreshCw, TrendingUp, History } from 'lucide-react'
 import PlanSwitchModal from './components/PlanSwitchModal'
 
 import WeekSchedule from './components/WeekSchedule'
@@ -20,8 +19,14 @@ import useWorkoutSchedule from './hooks/useWorkoutSchedule'
 import useWorkoutProgress from './hooks/useWorkoutProgress'
 import WorkoutService from '../../services/WorkoutService'
 
-export default function WorkoutPlan({ client, schema, db, onFocusChange, onClientUpdate }) {
-  const { t } = useLanguage()
+// Zonder toegewezen plan toonde de pagina een leeg kaartje ('workout.noplan')
+// en zag de klant zijn cardio en stappen niet, en kon hij ook geen training
+// kiezen. Nu is 'geen plan' gewoon een lege week: alles werkt, en via de
+// wisselknop of 'Training toevoegen' zet hij zelf iets neer (8 okt 2026).
+const LEEG_SCHEMA = { id: null, name: 'Nog geen plan', week_structure: {} }
+
+export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusChange, onClientUpdate }) {
+  const schema = schemaProp || LEEG_SCHEMA
   const isMobile = useIsMobile()
   const chartWidgetRef = useRef(null)
 
@@ -122,21 +127,6 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange, onClien
   const handleWizardComplete = (newSchedule) => { setWeekSchedule(newSchedule); setShowWizard(false) }
   const handleWorkoutCompleted = () => { setChallengeRefreshKey(prev => prev + 1) }
 
-  if (!schema) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%)', padding: '1rem' }}>
-        <div style={{ maxWidth: '600px', margin: '4rem auto', textAlign: 'center', padding: '2rem', background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(59,130,246,0.05) 100%)', backdropFilter: 'blur(20px)', borderRadius: '20px', border: '1px solid rgba(139,92,246,0.2)' }}>
-          <Calendar size={48} color="#8b5cf6" style={{ marginBottom: '1.5rem' }} />
-          <h3 style={{ fontSize: '1.5rem', background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '1rem', fontWeight: 'bold' }}>
-            {t('workout.noplan') || 'No Workout Plan Yet'}
-          </h3>
-          <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-            {t('workout.waitingForTrainer') || 'Your trainer will assign a workout plan soon!'}
-          </p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0a', paddingBottom: isMobile ? '5rem' : '2rem', position: 'relative' }}>

@@ -205,7 +205,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
 
       console.log('🏋️ Week structure keys:', Object.keys(latestSchema.week_structure))
 
-      const schemaWithOverrides = await WorkoutServiceNew.getSchemaWithOverrides(client.id, latestSchema, db)
+      // Zonder opgeslagen plan (lege week) zijn er geen overrides om te laden.
+      const schemaWithOverrides = latestSchema?.id ? await WorkoutServiceNew.getSchemaWithOverrides(client.id, latestSchema, db) : latestSchema
 
       const savedSchedule = await db.getClientWorkoutSchedule(client.id)
       // selectedDay is een dag-key zoals 'monday'..'sunday' (of 'today'/null = vandaag).
