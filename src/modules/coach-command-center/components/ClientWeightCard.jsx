@@ -17,7 +17,7 @@ import {
 import DeleteClientModal from './DeleteClientModal'
 import ClientInsightModal from './ClientInsightModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
-import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo } from '../../weight-tracker/utils/coachingBand'
+import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks } from '../../weight-tracker/utils/coachingBand'
 
 // Platte actieknop: geen vlak, geen rand — alleen icoon + woord. Drie
 // omkaderde knoppen naast elkaar maakten de kaart onrustig.
@@ -266,24 +266,23 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // Tempo nu en tempo fase stonden hier even, maar die horen bij de grafiek —
   // daar staat de band erbij die zegt of dat tempo goed is. Op een kaart in een
   // lijst is een tempo zonder band alleen maar een getal.
-  const kaartStats = [
-    {
-      label: 'Deze week', kort: 'Deze week',
-      val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—',
-      color: tempoKleur(weekDiff, weekGenoeg),
-    },
-    {
-      label: 'Laatste zaterdag', kort: 'Zaterdag',
-      val: za.verschil != null ? `${za.verschil > 0 ? '+' : ''}${za.verschil}` : '—',
-      color: tempoKleur(za.verschil, zaGenoeg),
-    },
-    {
-      label: fase ? 'Sinds start fase' : 'Sinds start',
-      kort: fase ? 'Sinds fase' : 'Sinds start',
-      val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
-      color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)',
-    },
+  // De weken als slider, zoals op de klantpagina: deze week vooraan, dan de
+  // zaterdagen terug in de tijd. Sinds start staat er vast naast.
+  const fmtV = (v) => v != null ? `${v > 0 ? '+' : ''}${v}` : '—'
+  const kaartWeken = [
+    { sleutel: 'lopend', kort: 'Deze week', val: fmtV(weekDiff), color: tempoKleur(weekDiff, weekGenoeg) },
+    ...zaterdagReeks(history).map((z, i) => ({
+      sleutel: z.zaterdag,
+      kort: i === 0 ? 'Zaterdag' : `za ${fmtDag(z.zaterdag)}`,
+      val: fmtV(z.verschil),
+      color: tempoKleur(z.verschil, z.nu.metingen >= 3 && z.vorige.metingen >= 3),
+    })),
   ]
+  const sindsStart = {
+    kort: fase ? 'Sinds fase' : 'Sinds start',
+    val: fmtV(totalChange),
+    color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)',
+  }
 
   // Aanwezigheid van de rij is het vinkje, dus afvinken is invoegen en
   // ongedaan maken is verwijderen.
@@ -537,36 +536,33 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             onder de kaart met een uitleg-regel eronder ('deze week',
             'gemiddeld'); dat maakte elke kaart twee regels hoger en dwong de
             kolommen breder dan nodig. Het label zegt het al. */}
-        {!isInactive && (
-          <button
-            onClick={() => setStatsExpanded(v => !v)}
-            title="Toon alle weekcijfers"
-            style={{
-              display: 'flex', alignItems: 'flex-end', gap: isMobile ? '0.55rem' : '0.75rem',
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              fontFamily: 'inherit', flexShrink: 1, minWidth: 0, overflow: 'hidden',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            {/* Label boven het getal, dicht op elkaar: drie cijfers naast
-                elkaar werden te breed met het label ernaast (8 okt 2026). */}
-            {kaartStats.map(st => (
-              <span key={st.label} style={{
-                display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, whiteSpace: 'nowrap',
-              }}>
-                <span style={{ fontSize: '0.54rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', lineHeight: 1, letterSpacing: '0.02em' }}>
-                  {st.kort}
-                </span>
-                <span style={{
-                  fontSize: '0.88rem', fontWeight: 900, color: st.color, lineHeight: 1,
-                  fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {st.val}<span style={{ fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginLeft: 2 }}>kg</span>
-                </span>
+        {!isInactive && (() => {
+          const Cijfer = ({ st }) => (
+            <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <span style={{ fontSize: '0.54rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', lineHeight: 1, letterSpacing: '0.02em' }}>{st.kort}</span>
+              <span style={{ fontSize: '0.88rem', fontWeight: 900, color: st.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                {st.val}<span style={{ fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginLeft: 2 }}>kg</span>
               </span>
-            ))}
-          </button>
-        )}
+            </span>
+          )
+          return (
+            <div style={{ display: 'flex', alignItems: 'flex-end', flex: isMobile ? '1 1 100%' : '1 1 0', minWidth: 0, gap: isMobile ? '0.55rem' : '0.75rem' }}>
+              {/* De slider: de weken schuiven, rechts loopt de rand weg in
+                  een vervaging, zoals op de klantpagina. Tik = uitklappen. */}
+              <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
+                <div onClick={() => setStatsExpanded(v => !v)} title="Toon alle weekcijfers" className="kaart-weken"
+                  style={{ display: 'flex', alignItems: 'flex-end', gap: isMobile ? '0.55rem' : '0.75rem', overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none', msOverflowStyle: 'none', paddingRight: 28, cursor: 'pointer', touchAction: 'pan-x', WebkitTapHighlightColor: 'transparent' }}>
+                  <style>{'.kaart-weken::-webkit-scrollbar{display:none}'}</style>
+                  {kaartWeken.map(st => <Cijfer key={st.sleutel} st={st} />)}
+                </div>
+                <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 28, pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(10,10,10,0) 0%, #0a0a0a 100%)' }} />
+              </div>
+              <div onClick={() => setStatsExpanded(v => !v)} style={{ flexShrink: 0, paddingLeft: isMobile ? '0.55rem' : '0.75rem', borderLeft: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer' }}>
+                <Cijfer st={sindsStart} />
+              </div>
+            </div>
+          )
+        })()}
 
         {/* De drie acties zijn één blok. Los van elkaar waren het drie
             flex-items, en dan brak op een smalle kaart alleen de ⋯ af naar
