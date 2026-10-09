@@ -1593,7 +1593,37 @@ export default function PlanAnalyzer({
   ]
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', height: '100%', minHeight: '400px', background: '#0a0a0a', position: 'relative' }}>
+    // Eén blok dat onder de kop van CoachHub kleeft: de plantitel over de
+    // volle breedte, daaronder zijbalk, zijvak en bouwer naast elkaar. Eerst
+    // kleefden die drie elk apart en zat de titel alleen boven de bouwer,
+    // waardoor de zijbalk hoger begon dan de rechterkant en de zwevende
+    // Terug-knop over de klantknop viel (Kersten, 9 okt 2026).
+    <div style={{ display: 'flex', flexDirection: 'column', position: 'sticky', top: kleefTop, height: paneelHoogte, minHeight: '400px', background: '#0a0a0a' }}>
+        {/* Titel van het geladen plan — bewerkbaar, slaat hard op dit plan op. */}
+        {(planMeta || selectedConceptId || resolvedClientId) && (
+          <div style={{ flexShrink: 0, opacity: wisselBezig ? 0.5 : 1, transition: 'opacity 0.2s ease', pointerEvents: wisselBezig ? 'none' : undefined }}>
+          <PlanTitleBar
+            name={planMeta?.name}
+            isActive={activated || planMeta?.isActive}
+            clientName={clientRecord?.first_name || ''}
+            templateName={planMeta?.templateName || null}
+            canEdit={!!actievePlanId}
+            onRename={handleRenamePlan}
+            weekSaveState={weekSaveState}
+            isMobile={m}
+            clients={clients} selectedClient={selectedClient || clientRecord} onSelectClient={onSelectClient}
+            heeftPlan={!!(planMeta || selectedConceptId)}
+            onSwitch={() => setShowPlanSwitcher(true)}
+            onNew={handleStartBlanco}
+            onDelete={verwijderHuidigPlan}
+            onClear={leegWeek}
+            onSaveTemplate={() => setShowPlanLibrary(true)}
+          />
+          </div>
+        )}
+
+
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', position: 'relative' }}>
 
       {/* ════════════ SIDEBAR ════════════
           Bredere kolom (72/92 ipv 56/80), iconen 18px (was 14), labels
@@ -1610,10 +1640,8 @@ export default function PlanAnalyzer({
         padding: m ? '10px 0' : '12px 14px', gap: 6, boxSizing: 'border-box',
         paddingBottom: navRuimte,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        // Meescrollen met de pagina, niet mee naar beneden verdwijnen —
-        // en beginnen onder de kop van CoachHub.
-        position: 'sticky', top: kleefTop,
-        maxHeight: paneelHoogte,
+        // Even hoog als de rij; de rij zelf kleeft onder de kop van CoachHub.
+        minHeight: 0,
       }}>
         {/* Klant + targets. Kwamen uit de tabbalk die over deze zijbalk heen
             lag. Bovenaan, want je kiest eerst een klant en dan pas de rest. */}
@@ -1758,10 +1786,9 @@ export default function PlanAnalyzer({
           // eronder onder de vouw viel. Nu is het precies zo hoog als het
           // scherm (min de zwevende navbalk) en scrollt alleen de inhoud;
           // de knoppenbalk onderin blijft daardoor altijd zichtbaar.
-          height: paneelHoogte,
           ...(m
-            ? { position: 'fixed', left: 72, right: 0, top: kleefTop, zIndex: 40 }
-            : { position: 'sticky', top: kleefTop, flexBasis: dockWidth, width: dockWidth }),
+            ? { position: 'fixed', left: 72, right: 0, top: kleefTop, zIndex: 40, height: paneelHoogte }
+            : { flexBasis: dockWidth, width: dockWidth, minHeight: 0 }),
         }}>
           {/* Kop van het zijvak. Rendert altijd, ook als het paneel eronder
               niets teruggeeft. Zonder deze regel is een vak dat niet laadt
@@ -1958,31 +1985,9 @@ export default function PlanAnalyzer({
           werkt alleen als de kolom een échte hoogte heeft. Zonder dat groeide
           hij door en verdween de plantitel onder de kop. */}
       <div style={{
-        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        position: 'sticky', top: kleefTop, height: paneelHoogte,
+        flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
         opacity: wisselBezig ? 0.5 : 1, transition: 'opacity 0.2s ease', pointerEvents: wisselBezig ? 'none' : undefined,
       }}>
-
-        {/* Titel van het geladen plan — bewerkbaar, slaat hard op dit plan op. */}
-        {(planMeta || selectedConceptId || resolvedClientId) && (
-          <PlanTitleBar
-            name={planMeta?.name}
-            isActive={activated || planMeta?.isActive}
-            clientName={clientRecord?.first_name || ''}
-            templateName={planMeta?.templateName || null}
-            canEdit={!!actievePlanId}
-            onRename={handleRenamePlan}
-            weekSaveState={weekSaveState}
-            isMobile={m}
-            clients={clients} selectedClient={selectedClient || clientRecord} onSelectClient={onSelectClient}
-            heeftPlan={!!(planMeta || selectedConceptId)}
-            onSwitch={() => setShowPlanSwitcher(true)}
-            onNew={handleStartBlanco}
-            onDelete={verwijderHuidigPlan}
-            onClear={leegWeek}
-            onSaveTemplate={() => setShowPlanLibrary(true)}
-          />
-        )}
 
         {/* Header — compact: pijl + dagnaam + pijl, daaronder de vier
             dag-ringen in de stijl van het inzicht-paneel. De oude plan-name
@@ -2281,6 +2286,7 @@ export default function PlanAnalyzer({
             })()}
           </div>
         )}
+      </div>
       </div>
 
       {/* ════════════ MODALS ════════════ */}
