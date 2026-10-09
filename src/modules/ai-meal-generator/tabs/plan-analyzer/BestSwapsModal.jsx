@@ -6,10 +6,12 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Search, Check, Plus, Loader2 } from 'lucide-react'
-
-const GOLD = '#FFD700'
-const FIELDS = 'id, name, internal_name, calories, protein, carbs, fat, image_url, timing'
+import { X, Search, Check, Plus, Loader2, ChevronDown } from 'lucide-react'
+import Keuze from '../../../meal-plan/components/Keuze'
+import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
+import { wisselNiveauVoorDoel } from '../../../meal-plan/DayTemplateService'
+import { colors, radius, space, shadow } from '../../../../ui/tokens'
+const FIELDS = 'id, name, internal_name, calories, protein, carbs, fat, image_url, timing, labels'
 
 // Aantal swap-opties dat je per slot mag kiezen. Eén getal voor alle slots —
 // stond eerder op 5 voor ontbijt en 3 voor de rest.
@@ -24,9 +26,40 @@ const SLOTS = [
   { key: 'pre_workout', label: 'Pre-Workout', timing: 'pre_workout', max: MAX_PER_SLOT },
 ]
 
-const mealLabel = (m) => m.internal_name || m.name || 'Maaltijd'
+const mealLabel = (m) => m.name || m.internal_name || 'Maaltijd'
+const fotoVan = (m, slot) => m?.image_url || foodImageFallback(mealLabel(m), slot, 200)
+
+// Wisselopties dragen hun groep als label ('groep:Op brood').
+const GROEP_VOLGORDE = ['Op brood', 'Bowl', 'Wrap', 'Warm', 'Licht en snel', 'Klassiek', 'Pasta en wok', 'Mexicaans', 'Zoet', 'Hartig']
+const groepVan = (m) => {
+  const l = (Array.isArray(m?.labels) ? m.labels : []).map(String).find(x => x.startsWith('groep:'))
+  return l ? l.slice(6) : null
+}
+
+// Drie tekstgroottes, meer niet (DESIGN-CONTRACT).
+const T_KLEIN = 11
+const T_BODY = 13
+const T_NAAM = 15
 
 const emptySlots = () => ({ breakfast: [], lunch: [], dinner: [], snack: [], avondsnack: [], pre_workout: [] })
+
+// Eén regel: foto, naam met macro's, en rechts een actie.
+function Rij({ m, rechts, onClick, gekozen, uit, slot }) {
+  return (
+    <div onClick={uit ? undefined : onClick} style={{
+      display: 'flex', alignItems: 'center', gap: space[3], minHeight: 52,
+      padding: `${space[1]}px 0`, cursor: onClick && !uit ? 'pointer' : 'default',
+      opacity: uit ? 0.35 : 1,
+    }}>
+      <img src={fotoVan(m, slot)} alt="" style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: colors.surface, outline: gekozen ? `2px solid ${colors.accent}` : 'none' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: T_NAAM, fontWeight: 800, color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mealLabel(m)}</div>
+        <div style={{ fontSize: T_BODY, fontWeight: 600, color: colors.textSecondary }}>{Math.round(m.calories || 0)} kcal · {Math.round(m.protein || 0)}g eiwit</div>
+      </div>
+      {rechts}
+    </div>
+  )
+}
 
 export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedded = false }) {
   const modalHost = useModalHost()
@@ -45,6 +78,11 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
   const [coachId, setCoachId] = useState(null)
+  // Automatische wisselopties: die krijgt de klant sowieso, op het niveau van
+  // zijn caloriedoel. Hier alleen ter inzage, standaard ingeklapt.
+  const [wisselNiveau, setWisselNiveau] = useState(null)
+  const [auto, setAuto] = useState([])
+  const [autoOpen, setAutoOpen] = useState(false)
 
   const slotCfg = SLOTS.find(s => s.key === activeSlot)
 
@@ -57,6 +95,29 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
     })()
     return () => { alive = false }
   }, [db])
+
+  useEffect(() => {
+    if (!clientId) { setWisselNiveau(null); return }
+    let alive = true
+    db.supabase.from('clients').select('target_calories').eq('id', clientId).maybeSingle()
+      .then(({ data }) => { if (alive) setWisselNiveau(wisselNiveauVoorDoel(data?.target_calories)) }, () => {})
+    return () => { alive = false }
+  }, [clientId, db])
+
+  useEffect(() => {
+    if (!wisselNiveau || mode !== 'client') { setAuto([]); return }
+    let alive = true
+    db.supabase.from('ai_meals').select(FIELDS)
+      .like('internal_name', `wissel${wisselNiveau}_${slotCfg.timing}_%`)
+      .then(({ data }) => {
+        if (!alive) return
+        setAuto([...(data || [])].sort((a, b) => {
+          const ga = GROEP_VOLGORDE.indexOf(groepVan(a)), gb = GROEP_VOLGORDE.indexOf(groepVan(b))
+          return ga !== gb ? ga - gb : mealLabel(a).localeCompare(mealLabel(b))
+        }))
+      }, () => { if (alive) setAuto([]) })
+    return () => { alive = false }
+  }, [wisselNiveau, mode, slotCfg.timing, db])
 
   // Beide niveaus laden. De standaard hebben we ook in klant-modus nodig, om te
   // kunnen tonen wat een leeg slot erft.
@@ -105,7 +166,13 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
     setLoading(true)
     ;(async () => {
       try {
-        let q = db.supabase.from('ai_meals').select(FIELDS).overlaps('timing', [slotCfg.timing]).limit(60)
+        // Wisselopties zitten er al automatisch in; die hoef je niet te kiezen.
+        let q = db.supabase.from('ai_meals').select(FIELDS).overlaps('timing', [slotCfg.timing])
+          // Lege internal_name moet blijven: NOT LIKE op NULL zou hem wegfilteren.
+          .or('internal_name.is.null,internal_name.not.like.wissel*')
+          .not('needs_review', 'is', true)
+          .order('name', { ascending: true })
+          .limit(60)
         const term = search.trim()
         if (term) q = q.or(`name.ilike.%${term}%,internal_name.ilike.%${term}%`)
         const { data } = await q
@@ -176,7 +243,7 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
           .upsert(rows, { onConflict: 'coach_id,meal_slot' })
         if (error) throw error
         setDefaults({ ...selected })
-        setSavedMsg('Standaard opgeslagen ✓')
+        setSavedMsg('Standaard opgeslagen')
       } else {
         const rows = SLOTS.map(s => ({
           coach_id: uid,
@@ -189,7 +256,7 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
           .from('client_swap_options')
           .upsert(rows, { onConflict: 'client_id,meal_slot' })
         if (error) throw error
-        setSavedMsg('Opgeslagen voor deze klant ✓')
+        setSavedMsg('Opgeslagen voor deze klant')
       }
     } catch (e) {
       console.error('Best swaps opslaan mislukt:', e)
@@ -201,177 +268,124 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
 
   const totalSelected = SLOTS.reduce((n, s) => n + effectiveCount(s.key), 0)
 
-  // Ingebed in het zijvak is dit geen venster maar gewoon de inhoud van een
-  // kolom. Het overlay-omhulsel (position: fixed + inset 0) hing af van een
-  // transform-ouder om binnen het paneel te blijven; klapte die keten om, dan
-  // stond het blok buiten beeld en zag je een leeg vak — zonder foutmelding,
-  // want er was niets mis. In deze modus dus geen fixed, geen donkere waas en
-  // geen maximale hoogte: de kolom bepaalt de maat.
   const omhulsel = embedded
-    ? { position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'stretch', padding: 0 }
-    : { position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : '1.5rem' }
+    ? { position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'stretch' }
+    : { position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : space[6] }
 
   const kaart = embedded
-    ? { width: '100%', height: '100%', background: '#0a0a0a', border: 'none', borderRadius: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
-    : { width: '100%', maxWidth: 720, maxHeight: isMobile ? '94vh' : '88vh', background: '#0a0a0a', border: '1px solid rgba(255,215,0,0.2)', borderRadius: isMobile ? '18px 18px 0 0' : 18, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+    ? { width: '100%', height: '100%', background: colors.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+    : { width: '100%', maxWidth: 640, maxHeight: isMobile ? '94vh' : '88vh', background: colors.bg, border: `1px solid ${colors.borderSubtle}`, borderRadius: isMobile ? `${radius.card}px ${radius.card}px 0 0` : radius.card, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+
+  const rand = isMobile ? space[4] : space[6]
+  const eyebrow = { fontSize: T_KLEIN, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: colors.textMuted }
+  const vlakKnop = { background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
+
+  const rondje = (aan) => (
+    <div style={{ flexShrink: 0, width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: aan ? colors.accent : 'transparent', border: aan ? 'none' : '1.5px solid rgba(255,255,255,0.35)' }}>
+      {aan ? <Check size={15} color={colors.onAccent} strokeWidth={3} /> : <Plus size={15} color={colors.textPrimary} strokeWidth={2.6} />}
+    </div>
+  )
+
+  const slotOpties = SLOTS.map(s => ({ id: s.key, label: `${s.label} · ${effectiveCount(s.key)}` }))
+  const modusOpties = [{ id: 'client', label: 'Deze klant' }, { id: 'default', label: 'Iedereen' }]
+  const eigen = selected[activeSlot]
+  const erft = inheritsDefault(activeSlot)
 
   const modal = (
     <div style={omhulsel}>
       <div style={kaart}>
 
-        {/* Header */}
-        <div style={{ padding: isMobile ? '1rem 1rem 0.75rem' : '1.25rem 1.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div>
-              <h2 style={{ fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', margin: 0 }}>Beste swaps</h2>
-              <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', margin: '0.2rem 0 0', fontWeight: 500 }}>
-                {mode === 'default'
-                  ? 'Geldt voor al je klanten, behalve waar je per klant afwijkt.'
-                  : 'Alleen voor deze klant — lege slots erven je standaard.'}
-              </p>
-            </div>
-            {/* In het zijvak zit er al een kruisje in de kop erboven. */}
-            {!embedded && (
-              <button onClick={onClose} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={18} />
-              </button>
-            )}
-          </div>
-
-          {/* Niveau: standaard voor iedereen, of afwijking voor deze klant. */}
-          {clientId && (
-            <div style={{ display: 'flex', gap: 4, marginTop: '0.85rem', padding: 3, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10 }}>
-              {[
-                { key: 'default', label: 'Standaard (iedereen)' },
-                { key: 'client',  label: 'Deze klant' },
-              ].map(t => {
-                const on = mode === t.key
-                return (
-                  <button key={t.key} onClick={() => { setMode(t.key); setSavedMsg('') }} style={{
-                    flex: 1, padding: '0.45rem 0.5rem', borderRadius: 8, cursor: 'pointer',
-                    background: on ? 'rgba(255,215,0,0.14)' : 'transparent',
-                    border: on ? `1px solid ${GOLD}66` : '1px solid transparent',
-                    color: on ? GOLD : 'rgba(255,255,255,0.55)', fontSize: '0.74rem', fontWeight: 800,
-                  }}>{t.label}</button>
-                )
-              })}
-            </div>
+        {/* Kop: twee keuzes op één regel. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: space[2], padding: `${space[3]}px ${rand}px`, borderBottom: `1px solid ${colors.borderSubtle}` }}>
+          {!embedded && <div style={{ fontSize: T_NAAM, fontWeight: 800, color: colors.textPrimary, marginRight: 'auto' }}>Beste swaps</div>}
+          <Keuze vast waarde={activeSlot} opties={slotOpties} zet={(v) => { setActiveSlot(v); setSearch(''); setAutoOpen(false) }} isMobile={isMobile} />
+          {clientId && <Keuze vast uitlijning="rechts" waarde={mode} opties={modusOpties} zet={(v) => { setMode(v); setSavedMsg('') }} isMobile={isMobile} />}
+          {!embedded && (
+            <button onClick={onClose} aria-label="Sluiten" style={{ ...vlakKnop, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textPrimary }}>
+              <X size={20} strokeWidth={2.6} />
+            </button>
           )}
-
-          {/* Slot-tabs */}
-          <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.85rem', overflowX: 'auto' }}>
-            {SLOTS.map(s => {
-              const active = activeSlot === s.key
-              const count = effectiveCount(s.key)
-              const erft = inheritsDefault(s.key)
-              return (
-                <button key={s.key} onClick={() => { setActiveSlot(s.key); setSearch('') }} style={{
-                  flexShrink: 0, padding: '0.45rem 0.8rem', borderRadius: 999,
-                  background: active ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.03)',
-                  border: active ? `1.5px solid ${GOLD}` : '1px solid rgba(255,255,255,0.1)',
-                  color: active ? GOLD : 'rgba(255,255,255,0.6)', fontSize: '0.78rem', fontWeight: 800,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                }}>{s.label} <span style={{ opacity: 0.7 }}>{count}/{s.max}</span>
-                  {/* Puntje = dit slot komt uit de standaard, niet van deze klant. */}
-                  {erft && <span title="Erft je standaard" style={{ marginLeft: 4, opacity: 0.75 }}>·std</span>}
-                </button>
-              )
-            })}
-          </div>
         </div>
 
-        {/* Geselecteerd voor dit slot */}
-        <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.85rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}>
-            <div style={{ flex: 1, fontSize: '0.62rem', fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Gekozen ({selected[activeSlot].length}/{slotCfg.max})
-            </div>
-            {/* Staat er een eigen keuze voor deze klant? Dan kun je 'm terugzetten. */}
-            {mode === 'client' && selected[activeSlot].length > 0 && (defaults[activeSlot]?.length || 0) > 0 && (
-              <button onClick={resetToDefault} style={{ flexShrink: 0, padding: '0.25rem 0.55rem', borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.65)', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer' }}>
-                Terug naar standaard
-              </button>
-            )}
-          </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: `${space[4]}px ${rand}px ${space[6]}px` }}>
 
-          {/* Erft dit slot? Toon wát het erft, en bied aan er vanaf te wijken. */}
-          {inheritsDefault(activeSlot) && (
-            <div style={{ padding: '0.6rem 0.7rem', borderRadius: 10, background: 'rgba(255,215,0,0.05)', border: `1px solid ${GOLD}33`, marginBottom: '0.6rem' }}>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)', fontWeight: 600, marginBottom: 6 }}>
-                Erft je standaard: {defaults[activeSlot].map(mealLabel).join(', ')}
-              </div>
-              <button onClick={overrideFromDefault} style={{ padding: '0.35rem 0.7rem', borderRadius: 8, background: GOLD, border: 'none', color: '#000', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}>
-                Afwijken voor deze klant
+          {/* Automatisch: wat de klant op zijn niveau al krijgt. */}
+          {mode === 'client' && auto.length > 0 && (
+            <div style={{ marginBottom: space[6] }}>
+              <button onClick={() => setAutoOpen(v => !v)} style={{ ...vlakKnop, width: '100%', display: 'flex', alignItems: 'center', gap: space[2], minHeight: 44 }}>
+                <span style={{ flex: 1, textAlign: 'left', fontSize: T_NAAM, fontWeight: 800, color: colors.textPrimary }}>
+                  {auto.length} wisselopties
+                  <span style={{ fontSize: T_BODY, fontWeight: 600, color: colors.textSecondary }}> · automatisch voor {wisselNiveau} kcal</span>
+                </span>
+                <ChevronDown size={18} color={colors.textPrimary} style={{ transform: autoOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </button>
-            </div>
-          )}
-
-          {selected[activeSlot].length === 0 ? (
-            !inheritsDefault(activeSlot) && (
-              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)', fontWeight: 500 }}>Nog niks gekozen — tik hieronder maaltijden aan.</div>
-            )
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              {selected[activeSlot].map(m => (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0.55rem', background: 'rgba(255,215,0,0.06)', border: `1px solid ${GOLD}33`, borderRadius: 10 }}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mealLabel(m)}</span>
-                  <span style={{ flexShrink: 0, fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{Math.round(m.calories || 0)} kcal · {Math.round(m.protein || 0)}e</span>
-                  <button onClick={() => toggle(m)} style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
+              {autoOpen && auto.map((m, i) => (
+                <div key={m.id}>
+                  {groepVan(m) && groepVan(m) !== groepVan(auto[i - 1]) && (
+                    <div style={{ ...eyebrow, marginTop: i === 0 ? space[2] : space[4], marginBottom: space[1] }}>{groepVan(m)}</div>
+                  )}
+                  <Rij m={m} slot={slotCfg.timing} />
                 </div>
               ))}
             </div>
           )}
-        </div>
 
-        {/* Zoek */}
-        <div style={{ padding: isMobile ? '0.75rem 1rem 0.5rem' : '0.85rem 1.5rem 0.5rem' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Zoek ${slotCfg.label.toLowerCase()}-maaltijden…`}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '0.6rem 0.6rem 0.6rem 2rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: '#fff', fontSize: '0.85rem', fontWeight: 600, outline: 'none', fontFamily: 'inherit' }} />
+          {/* Jouw keuze voor dit moment. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: space[2], marginBottom: space[2] }}>
+            <div style={{ ...eyebrow, flex: 1 }}>
+              {mode === 'client' ? 'Extra van jou' : 'Standaard voor iedereen'} · {eigen.length}/{slotCfg.max}
+            </div>
+            {mode === 'client' && eigen.length > 0 && (defaults[activeSlot]?.length || 0) > 0 && (
+              <button onClick={resetToDefault} style={{ ...vlakKnop, fontSize: T_BODY, fontWeight: 800, color: colors.textPrimary }}>Terug naar standaard</button>
+            )}
           </div>
-        </div>
 
-        {/* Kandidaten */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0.25rem 1rem 1rem' : '0.25rem 1.5rem 1rem', WebkitOverflowScrolling: 'touch' }}>
-          {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}><Loader2 size={22} color={GOLD} style={{ animation: 'spin 1s linear infinite' }} /></div>
-          ) : candidates.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.3)', fontSize: '0.82rem' }}>Geen maaltijden gevonden.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {candidates.map(m => {
-                const picked = isPicked(m.id)
-                const full = !picked && selected[activeSlot].length >= slotCfg.max
-                return (
-                  <button key={m.id} onClick={() => toggle(m)} disabled={full}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.55rem 0.65rem', textAlign: 'left',
-                      background: picked ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)',
-                      border: picked ? `1.5px solid ${GOLD}` : '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 10, cursor: full ? 'not-allowed' : 'pointer', opacity: full ? 0.4 : 1, width: '100%' }}>
-                    <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 8, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {m.image_url ? <img src={m.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', fontWeight: 800 }}>{mealLabel(m).charAt(0)}</span>}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mealLabel(m)}</div>
-                      <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>{Math.round(m.calories || 0)} kcal · {Math.round(m.protein || 0)}e {Math.round(m.carbs || 0)}k {Math.round(m.fat || 0)}v</div>
-                    </div>
-                    <div style={{ flexShrink: 0, width: 24, height: 24, borderRadius: '50%', background: picked ? GOLD : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {picked ? <Check size={14} color="#0a0a0a" strokeWidth={3} /> : <Plus size={14} color="rgba(255,255,255,0.5)" />}
-                    </div>
-                  </button>
-                )
-              })}
+          {erft && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: space[3], minHeight: 44, marginBottom: space[2] }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: T_BODY, fontWeight: 600, color: colors.textSecondary }}>
+                Volgt je standaard: {defaults[activeSlot].map(mealLabel).join(', ')}
+              </div>
+              <button onClick={overrideFromDefault} style={{ ...vlakKnop, flexShrink: 0, fontSize: T_BODY, fontWeight: 800, color: colors.textPrimary, textDecoration: 'underline', textUnderlineOffset: 3 }}>Aanpassen</button>
             </div>
           )}
+
+          {eigen.length === 0 && !erft && (
+            <div style={{ fontSize: T_BODY, fontWeight: 600, color: colors.textMuted, marginBottom: space[2] }}>
+              Nog niets gekozen. Tik hieronder een maaltijd aan.
+            </div>
+          )}
+          {eigen.map(m => (
+            <Rij key={m.id} m={m} slot={slotCfg.timing} gekozen rechts={
+              <button onClick={() => toggle(m)} aria-label="Weghalen" style={{ ...vlakKnop, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textPrimary }}>
+                <X size={18} strokeWidth={2.6} />
+              </button>
+            } />
+          ))}
+
+          {/* Zoeken en kiezen. */}
+          <div style={{ position: 'relative', margin: `${space[4]}px 0 ${space[2]}px` }}>
+            <Search size={16} style={{ position: 'absolute', left: space[3], top: '50%', transform: 'translateY(-50%)', color: colors.textSecondary }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Zoek ${slotCfg.label.toLowerCase()}`}
+              style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: `0 ${space[3]}px 0 ${space[8]}px`, background: colors.surface, border: `1px solid ${colors.borderSubtle}`, borderRadius: radius.btn, color: colors.textPrimary, fontSize: T_NAAM, fontWeight: 600, outline: 'none', fontFamily: 'inherit' }} />
+          </div>
+
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: space[6] }}><Loader2 size={22} color={colors.textPrimary} style={{ animation: 'spin 1s linear infinite' }} /></div>
+          ) : candidates.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: space[6], color: colors.textMuted, fontSize: T_BODY, fontWeight: 600 }}>Geen maaltijden gevonden.</div>
+          ) : candidates.map(m => {
+            const picked = isPicked(m.id)
+            const vol = !picked && eigen.length >= slotCfg.max
+            return <Rij key={m.id} m={m} slot={slotCfg.timing} gekozen={picked} uit={vol} onClick={() => toggle(m)} rechts={rondje(picked)} />
+          })}
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ flex: 1, fontSize: '0.72rem', fontWeight: 600, color: savedMsg.startsWith('Fout') ? '#ef4444' : 'rgba(255,255,255,0.5)' }}>
-            {savedMsg || `${totalSelected} maaltijden gekozen`}
+        {/* Voet: status en de ene primaire actie. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: space[3], padding: `${space[3]}px ${rand}px`, borderTop: `1px solid ${colors.borderSubtle}` }}>
+          <span style={{ flex: 1, fontSize: T_BODY, fontWeight: 700, color: savedMsg.startsWith('Fout') ? colors.danger : colors.textSecondary }}>
+            {savedMsg || `${totalSelected} gekozen`}
           </span>
-          <button onClick={handleSave} disabled={saving} style={{ padding: '0.65rem 1.4rem', borderRadius: 12, background: saving ? 'rgba(255,215,0,0.4)' : 'linear-gradient(135deg,#FFD700,#D4AF37)', border: 'none', color: '#0a0a0a', fontSize: '0.88rem', fontWeight: 900, cursor: saving ? 'default' : 'pointer' }}>
+          <button onClick={handleSave} disabled={saving} style={{ minHeight: 44, padding: `0 ${space[6]}px`, borderRadius: radius.btn, background: colors.accent, border: 'none', color: colors.onAccent, fontSize: T_NAAM, fontWeight: 800, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1, boxShadow: shadow.glow, fontFamily: 'inherit' }}>
             {saving ? 'Opslaan…' : 'Opslaan'}
           </button>
         </div>
