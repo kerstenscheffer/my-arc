@@ -59,6 +59,35 @@ class WorkoutServiceNew {
     }
   }
 
+  // Wat een komende week laat zien als hij geen eigen planning heeft: de
+  // laatst geplande week ervóór (die wordt bij het begin van die week de
+  // vaste indeling, zie promoveerWeekPlanning), anders de vaste indeling.
+  //
+  // Zonder dit liet een 'eenmalige' training in de huidige week zich twee
+  // weken later weer zien: eenmalig schrijft namelijk naar de vaste
+  // indeling en zet alleen voor de week erna een kopie van de oude klaar
+  // (ks10k, 9 okt 2026: CHEST en test stonden op 19 okt weer in de week).
+  async getPlanningVoorWeek(clientId, weekStart, vast, db) {
+    if (!clientId || !weekStart) return vast || null
+    try {
+      const eigen = await this.getWeekPlanning(clientId, weekStart, db)
+      if (eigen) return eigen
+      const { data, error } = await this._client(db)
+        .from('client_week_schedules')
+        .select('schedule')
+        .eq('client_id', clientId)
+        .lt('week_start', weekStart)
+        .order('week_start', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw error
+      return data?.schedule || vast || null
+    } catch (error) {
+      console.error('❌ getPlanningVoorWeek failed:', error)
+      return vast || null
+    }
+  }
+
   async saveWeekPlanning(clientId, weekStart, schedule, db) {
     if (!clientId || !weekStart) return false
     try {

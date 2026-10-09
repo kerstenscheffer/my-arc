@@ -299,8 +299,11 @@ export default function WeekSchedule({
       const d = new Date(getoondeMaandag)
       d.setDate(d.getDate() + stap * 7)
       const sleutel = WorkoutServiceNew.datumSleutel(d)
-      const eigenWeek = await WorkoutServiceNew.getWeekPlanning(clientId, sleutel, db)
-      buur[String(stap)] = eigenWeek || vast || null
+      // Een komende buurweek erft van de laatst geplande week ervoor; de
+      // week ervoor (verleden) is altijd de vaste indeling.
+      buur[String(stap)] = stap > 0
+        ? await WorkoutServiceNew.getPlanningVoorWeek(clientId, sleutel, vast, db)
+        : ((await WorkoutServiceNew.getWeekPlanning(clientId, sleutel, db)) || vast || null)
     }))
     setBuurWeken(buur)
   }
@@ -326,10 +329,10 @@ export default function WeekSchedule({
       const vast = await db.getClientWorkoutSchedule(clientId)
       setVastRooster(vast || {})
       await laadBuurWeken(vast)
-      // Een komende week begint bij de vaste indeling en wijkt daarvan af
-      // zodra de klant hem verschuift.
-      const eigen = isHuidigeWeek ? null : await WorkoutServiceNew.getWeekPlanning(clientId, weekSleutel, db)
-      const saved = eigen || vast
+      // Een komende week begint bij wat er het laatst gepland is (de week
+      // ervoor met eigen planning, anders de vaste indeling) en wijkt
+      // daarvan af zodra de klant hem verschuift.
+      const saved = isHuidigeWeek ? vast : await WorkoutServiceNew.getPlanningVoorWeek(clientId, weekSleutel, vast, db)
       if (saved && Object.keys(saved).length > 0) {
         setTempSchedule(saved)
         await loadCustomWorkoutsForSchedule(saved)
