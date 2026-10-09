@@ -1077,7 +1077,15 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
       {/* De foto vult de regel van lijn tot lijn: geen ronde hoeken, geen
           marge boven of onder. Regels zonder foto houden dezelfde breedte vrij,
           zodat de namen recht onder elkaar staan. */}
-      <div style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: 12, opacity: afgerond ? 0.45 : 1 }}>
+      <div style={{
+        flex: 1, minWidth: 0, alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: 12,
+        // Afgevinkt: rustig weg dimmen en een stukje inschuiven, zodat wat
+        // nog te doen is naar voren komt. De overgang zelf is het moment.
+        opacity: afgerond ? 0.4 : 1,
+        transform: afgerond ? 'translateX(8px)' : 'none',
+        filter: afgerond ? 'grayscale(0.6)' : 'none',
+        transition: 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s ease',
+      }}>
         {foto ? (
           <span style={{
             width: fotoMaat, alignSelf: 'stretch', flexShrink: 0,
