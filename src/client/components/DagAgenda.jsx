@@ -945,6 +945,12 @@ export default function DagAgenda({
           dagIso={dagIso}
           mealPlanId={data?.mealPlan?.id || null}
           isMobile={isMobile}
+          // Hetzelfde werkblok op de andere dagen van de week, voor 'Elke werkdag'.
+          zelfdeOpAndereDagen={bewerk?.type === 'work'
+            ? Object.entries(data?.blocksByDay || {}).flatMap(([d, lijst]) => d === bewerk.day ? [] : (lijst || [])
+              .filter(x => x.type === 'work' && (x.label || '') === (bewerk.label || ''))
+              .slice(0, 1))
+            : []}
           onSluit={() => setBewerk(null)}
           onKlaar={() => { setBewerk(null); setVersie(v => v + 1) }}
         />

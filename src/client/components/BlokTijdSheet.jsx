@@ -33,6 +33,8 @@ const TYPE_LABEL = { meal: 'Maaltijd', training: 'Training', sleep: 'Slaap', wor
 
 export default function BlokTijdSheet({
   blok, client, service, dagIso, mealPlanId, isMobile = false, onSluit, onKlaar,
+  // Hetzelfde blok op andere dagen (nu alleen werk): voor 'Elke werkdag'.
+  zelfdeOpAndereDagen = [],
 }) {
   const duurVan = (b) => {
     const d = b.end >= b.start ? b.end - b.start : (24 * 60 - b.start) + b.end
@@ -94,6 +96,13 @@ export default function BlokTijdSheet({
         clientId: client.id, dateIso: dagIso, recurringId,
         startMin: startOpslaan, endMin: eind,
       })
+      return
+    }
+    if (bereik === 'werkdagen') {
+      // Deze dag plus elke andere dag met hetzelfde werkblok.
+      for (const b of [blok, ...zelfdeOpAndereDagen]) {
+        await service.shiftBlock({ block: { ...b, clientId: client.id }, newStartMin: startOpslaan, newEndMin: eind, mealPlanId })
+      }
       return
     }
     await service.shiftBlock({
@@ -301,6 +310,10 @@ export default function BlokTijdSheet({
                     ? 'Past je supplementenplan aan: voortaan elke dag op deze tijd.'
                     : 'Past je plan aan, ook voor de weken hierna.',
                 },
+                ...(isWerk && zelfdeOpAndereDagen.length > 0 ? [{
+                  id: 'werkdagen', titel: 'Elke werkdag',
+                  uitleg: `Zet deze tijden op al je ${zelfdeOpAndereDagen.length + 1} werkdagen, ook de weken hierna.`,
+                }] : []),
               ].map(k => {
                 const aan = bereik === k.id
                 return (
