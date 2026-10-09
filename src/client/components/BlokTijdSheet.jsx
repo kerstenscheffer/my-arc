@@ -20,7 +20,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, CalendarOff, RotateCcw, ChevronLeft, ChevronRight, Check } from 'lucide-react'
+import { X, CalendarOff, RotateCcw, ChevronLeft, ChevronRight, Check, Moon, Sun } from 'lucide-react'
 import { recurringIdFor, DAY_LABELS_NL_LONG } from '../../modules/client-agenda/ClientAgendaService'
 import TijdWiel from './TijdWiel'
 import { STAP, tijdTekst as tijd } from './tijdHelpers'
@@ -38,6 +38,15 @@ export default function BlokTijdSheet({
     const d = b.end >= b.start ? b.end - b.start : (24 * 60 - b.start) + b.end
     return Math.max(STAP, d)
   }
+  // Slaap loopt over middernacht: daar kies je twee tijden (naar bed en
+  // opgestaan) in plaats van een begintijd met duur. De nacht bestaat uit
+  // twee helften in de agenda; fullStart/fullEnd geven de hele nacht.
+  const isSlaap = blok.type === 'sleep'
+  const nachtStart = blok.meta?.fullStart ?? blok.start
+  const nachtEind = blok.meta?.fullEnd ?? blok.end
+  const [bed, setBed] = useState(() => Math.round(nachtStart / STAP) * STAP)
+  const [op, setOp] = useState(() => Math.round(nachtEind / STAP) * STAP)
+  const [actief, setActief] = useState(blok.meta?.wrapHalf === 'late' ? 'bed' : 'op')
   const [stap, setStap] = useState('tijd')      // 'tijd' → 'bereik'
   const [start, setStart] = useState(() => Math.round(blok.start / STAP) * STAP)
   const [duur, setDuur] = useState(() => duurVan(blok))
@@ -50,11 +59,17 @@ export default function BlokTijdSheet({
     return () => window.removeEventListener('keydown', opToets)
   }, [onSluit])
 
-  const eind = (start + duur) % 1440
+  const eind = isSlaap ? op : (start + duur) % 1440
   const soort = blok.type === 'meal' ? (blok.label || 'Maaltijd') : (TYPE_LABEL[blok.type] || blok.label || 'Blok')
   const naam = blok.sublabel || (blok.type === 'meal' ? null : blok.label)
   const recurringId = recurringIdFor(blok)
-  const verzet = blok.start !== start || duurVan(blok) !== duur
+  const verzet = isSlaap
+    ? (bed !== nachtStart || op !== nachtEind)
+    : (blok.start !== start || duurVan(blok) !== duur)
+  // Bij slaap is 'start' de bedtijd.
+  const startOpslaan = isSlaap ? bed : start
+  const slaapUren = (() => { const m = op >= bed ? op - bed : (1440 - bed) + op; return Math.round((m / 60) * 10) / 10 })()
+  const bedLabel = bed >= 12 * 60 ? 'gisteravond' : 'vannacht'
   const isOverschreven = !!blok.meta?.isOverridden
   const dagNaam = DAY_LABELS_NL_LONG[blok.day]?.toLowerCase() || 'week'
 
@@ -74,13 +89,13 @@ export default function BlokTijdSheet({
     if (bereik === 'vandaag') {
       await service.upsertOverride({
         clientId: client.id, dateIso: dagIso, recurringId,
-        startMin: start, endMin: eind,
+        startMin: startOpslaan, endMin: eind,
       })
       return
     }
     await service.shiftBlock({
       block: { ...blok, clientId: client.id },
-      newStartMin: start, newEndMin: eind,
+      newStartMin: startOpslaan, newEndMin: eind,
       mealPlanId,
     })
   })
@@ -159,8 +174,43 @@ export default function BlokTijdSheet({
           ))}
         </div>
 
+        {/* ── Stap 1 bij slaap: naar bed en opgestaan ── */}
+        {opTijd && isSlaap && (
+          <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: '0.6rem' }}>
+              {[
+                { id: 'bed', label: 'Naar bed', sub: bedLabel, waarde: bed, I: Moon },
+                { id: 'op', label: 'Opgestaan', sub: 'vanochtend', waarde: op, I: Sun },
+              ].map(v => {
+                const aan = actief === v.id
+                const I = v.I
+                return (
+                  <button key={v.id} onClick={() => setActief(v.id)} style={{
+                    flex: 1, padding: '0.6rem 0.7rem', borderRadius: 12, textAlign: 'left',
+                    background: aan ? '#fff' : 'transparent', border: `1px solid ${aan ? '#fff' : LIJN}`,
+                    color: aan ? '#0a0a0a' : '#fff', fontFamily: 'inherit', cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.6 }}>
+                      <I size={11} strokeWidth={2.8} /> {v.label}
+                    </span>
+                    <span style={{ display: 'block', fontSize: '1.7rem', fontWeight: 900, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, marginTop: 2 }}>{tijd(v.waarde)}</span>
+                    <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 700, opacity: 0.55 }}>{v.sub}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginBottom: '0.6rem' }}>
+              {String(slaapUren).replace('.', ',')} uur slaap
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <TijdWiel key={actief} waarde={actief === 'bed' ? bed : op} onKies={actief === 'bed' ? setBed : setOp} />
+            </div>
+          </>
+        )}
+
         {/* ── Stap 1: hoe laat, en hoe lang ── */}
-        {opTijd && (
+        {opTijd && !isSlaap && (
           <>
             <div style={{ textAlign: 'center', marginBottom: '0.4rem' }}>
               <span style={{
@@ -220,9 +270,9 @@ export default function BlokTijdSheet({
                 fontSize: '1.05rem', fontWeight: 900, color: '#fff',
                 letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
               }}>
-                {tijd(start)}
+                {tijd(startOpslaan)}
                 <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>
-                  tot {tijd(eind)}
+                  tot {tijd(eind)}{isSlaap ? ` · ${String(slaapUren).replace('.', ',')} uur` : ''}
                 </span>
               </span>
               <span style={{ fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)' }}>
@@ -311,7 +361,7 @@ export default function BlokTijdSheet({
           {bezig ? 'Bezig…'
             : opTijd
               ? (verzet ? <>Verder <ChevronRight size={16} strokeWidth={3} /></> : 'Kies een andere tijd')
-              : (bereik ? `Verzetten naar ${tijd(start)}` : 'Kies er een')}
+              : (bereik ? (isSlaap ? `Opslaan: ${tijd(bed)} – ${tijd(op)}` : `Verzetten naar ${tijd(start)}`) : 'Kies er een')}
         </button>
 
         {/* Weg voor vandaag, of terug naar wat de coach had gezet. Hoort bij de

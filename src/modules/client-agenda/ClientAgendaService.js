@@ -928,10 +928,28 @@ export class ClientAgendaService {
         if (ov.skipped) return [] // dag overslaan
         const newStart = timeStrToMinutes(ov.override_start_time) ?? b.start
         const newEnd   = timeStrToMinutes(ov.override_end_time)   ?? b.end
+        const ovMeta = { ...b.meta, overrideId: ov.id, isOverridden: true }
+        // Slaap over middernacht: de override geldt voor de hele nacht
+        // (naar bed → opgestaan). Beide helften delen dezelfde recurring-id,
+        // dus elke helft pakt zijn eigen deel; zonder dit kregen beide
+        // helften dezelfde start en eind.
+        if (b.type === 'sleep') {
+          const wrap = newStart > newEnd
+          const full = { ...ovMeta, fullStart: newStart, fullEnd: newEnd }
+          if (b.meta?.wrapHalf === 'late') return wrap ? [{ ...b, start: newStart, end: 24 * 60, meta: { ...full, wrapHalf: 'late' } }] : []
+          if (b.meta?.wrapHalf === 'early') return wrap ? [{ ...b, start: 0, end: newEnd, meta: { ...full, wrapHalf: 'early' } }] : [{ ...b, start: newStart, end: newEnd, meta: { ...full, wrapHalf: undefined } }]
+          if (wrap) {
+            return [
+              { ...b, id: `${b.id}-late`, start: newStart, end: 24 * 60, meta: { ...full, wrapHalf: 'late' } },
+              { ...b, id: `${b.id}-early`, start: 0, end: newEnd, meta: { ...full, wrapHalf: 'early' } },
+            ]
+          }
+          return [{ ...b, start: newStart, end: newEnd, meta: full }]
+        }
         return [{
           ...b,
           start: newStart, end: newEnd,
-          meta: { ...b.meta, overrideId: ov.id, isOverridden: true },
+          meta: ovMeta,
         }]
       })
     })
