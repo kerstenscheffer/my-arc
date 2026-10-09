@@ -492,14 +492,22 @@ export default function DagAgenda({
     const was = vorigeGedaan.current || wasUitOpslag
     const vanElders = !vorigeGedaan.current && !!wasUitOpslag
     vorigeGedaan.current = nu
+    // Niet meer gedaan (teruggedraaid)? Dan meteen uit het inklappen halen,
+    // anders blijft de regel ingeklapt en onzichtbaar in de lijst staan.
+    setInklappen(prev => {
+      const weg = Object.keys(prev).filter(id => !nu.has(id))
+      if (!weg.length) return prev
+      const n = { ...prev }; weg.forEach(id => { delete n[id] }); return n
+    })
     if (!was) return
     const nieuw = [...nu].filter(id => !was.has(id))
     if (!nieuw.length) return
     setDeckPop(p => p + 1)
     if (!vanElders && Date.now() - (window.__arcLaatsteTik || 0) > 120000) return
     setInklappen(prev => { const n = { ...prev }; nieuw.forEach(id => { n[id] = true }); return n })
-    const t = setTimeout(() => setInklappen(prev => { const n = { ...prev }; nieuw.forEach(id => { delete n[id] }); return n }), 560)
-    return () => clearTimeout(t)
+    // Bewust geen opruimen van deze timer bij een volgende run: anders bleef
+    // een regel die je snel weer ontvinkte voor altijd ingeklapt staan.
+    setTimeout(() => setInklappen(prev => { const n = { ...prev }; nieuw.forEach(id => { delete n[id] }); return n }), 560)
   }, [gedaanIds, laden, slaapDagIso])
   // Andere dag: opnieuw beginnen, geen animaties van de vorige dag.
   useEffect(() => { vorigeGedaan.current = null; setDeckOpen(false); setInklappen({}) }, [dag, weekAnker])
