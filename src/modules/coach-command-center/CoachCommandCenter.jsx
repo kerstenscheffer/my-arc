@@ -2,6 +2,7 @@
 // CoachCommandCenter.jsx - v3.5
 // + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import Keuze from '../meal-plan/components/Keuze'
 import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, EyeOff } from 'lucide-react'
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
@@ -375,41 +376,23 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             Geen titel, geen gekleurde chips, geen bolletjes — de statusfilters
             zaten eerder als losse pillen op een tweede rij en dat kostte hoogte
             zonder iets toe te voegen. */}
-        <select
-          value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setUrgencyFilter('all') }}
-          style={selectStijl}
-        >
-          <option value="active" style={optieStijl}>Actief · {stats.active}</option>
-          <option value="inactive" style={optieStijl}>Inactief · {stats.inactive}</option>
-          <option value="all" style={optieStijl}>Alle · {stats.total}</option>
-        </select>
-
-        {statusFilter === 'active' && (
-          <select
-            value={urgencyFilter}
-            onChange={e => setUrgencyFilter(e.target.value)}
-            style={selectStijl}
-          >
-            <option value="all" style={optieStijl}>Alle urgenties · {stats.active}</option>
-            <option value="urgent" style={optieStijl}>Urgent · {stats.urgent}</option>
-            <option value="warning" style={optieStijl}>Aandacht · {stats.warning}</option>
-            <option value="ok" style={optieStijl}>Op schema · {stats.ok}</option>
-          </select>
-        )}
-
-        {/* Alleen tonen als er ook echt een challenge loopt: een dropdown met
-            één zinnige optie is ruis. */}
-        {challengeIds.size > 0 && (
-          <select
-            value={challengeFilter}
-            onChange={e => setChallengeFilter(e.target.value)}
-            style={selectStijl}
-          >
-            <option value="all" style={optieStijl}>Iedereen</option>
-            <option value="challenge" style={optieStijl}>Challenge · {challengeIds.size}</option>
-          </select>
-        )}
+        {/* Filters als keuzemenu's (losse tekst met pijltje, lijntje
+            ertussen), zelfde taal als de kopbalk van de Workout Builder en
+            het wisselvenster op de voedingspagina. Geen systeem-selects. */}
+        <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: isMobile ? '1 1 100%' : '0 1 auto', padding: '0 0.2rem', height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Keuze waarde={statusFilter} zet={(v) => { setStatusFilter(v); setUrgencyFilter('all') }} isMobile={isMobile}
+            opties={[{ id: 'active', label: `Actief · ${stats.active}` }, { id: 'inactive', label: `Inactief · ${stats.inactive}` }, { id: 'all', label: `Alle · ${stats.total}` }]} />
+          {statusFilter === 'active' && (<>
+            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+            <Keuze waarde={urgencyFilter} zet={setUrgencyFilter} isMobile={isMobile}
+              opties={[{ id: 'all', label: `Alle urgenties · ${stats.active}` }, { id: 'urgent', label: `Urgent · ${stats.urgent}` }, { id: 'warning', label: `Aandacht · ${stats.warning}` }, { id: 'ok', label: `Op schema · ${stats.ok}` }]} />
+          </>)}
+          {challengeIds.size > 0 && (<>
+            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+            <Keuze waarde={challengeFilter} zet={setChallengeFilter} isMobile={isMobile} uitlijning="rechts"
+              opties={[{ id: 'all', label: 'Iedereen' }, { id: 'challenge', label: `Challenge · ${challengeIds.size}` }]} />
+          </>)}
+        </div>
 
         {!isMobile && <div style={{ flex: 1, minWidth: 8 }} />}
         {/* Regelafbreking op telefoon: zoeken + knoppen op een eigen rij. */}
@@ -418,9 +401,9 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
         {/* Zoeken staat nu inline; dat scheelt een klik en een aparte rij. */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6, minWidth: 0,
-          flex: isMobile ? '1 1 0' : '0 1 260px',
-          padding: '0 0.6rem', height: 36, borderRadius: 10,
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+          flex: isMobile ? '1 1 0' : '0 1 240px',
+          padding: '0 0.75rem', height: 36, borderRadius: 999,
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
         }}>
           <Search size={14} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
           <input
@@ -526,7 +509,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
       {activeView === 'clients' && (
         <>
           {stats.fridayMissing > 0 && new Date().getDay() === 5 && (
-            <div style={{ padding: isMobile ? '0.4rem 1rem' : '0.5rem 2rem', background: 'rgba(255,215,0,0.06)', borderBottom: '1px solid rgba(255,215,0,0.15)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#FFD700' }}>
+            <div style={{ padding: isMobile ? '0.35rem 1rem' : '0.4rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: isMobile ? '0.7rem' : '0.74rem', fontWeight: 800, color: '#f59e0b' }}>
               <AlertTriangle size={14} /> Vrijdag! {stats.fridayMissing} client(s) nog niet gewogen
             </div>
           )}
