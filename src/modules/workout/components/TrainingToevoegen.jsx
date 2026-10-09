@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom'
 import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info, Pencil } from 'lucide-react'
 import CustomWorkoutModal from './planning/CustomWorkoutModal'
 import { locatieVan, spiergroepenVan, SPIERGROEPEN } from '../utils/trainingFilters'
+import Keuze from '../../meal-plan/components/Keuze'
 import { maakPlanKey } from '../utils/planKey'
 import { CARDIO_SOORTEN } from '../cardioSoorten'
 import { getWorkoutImage } from './week-schedule/workoutImage'
@@ -207,13 +208,6 @@ export default function TrainingToevoegen({
               if (q) items = items.filter(i => `${i.naam} ${i.plan} ${(i.w?.exercises || []).map(e => e.name).join(' ')}`.toLowerCase().includes(q))
               return { ...g, items }
             }).filter(g => g.items.length > 0)
-            const chip = (aan) => ({
-              padding: '0.4rem 0.75rem', borderRadius: 999, flexShrink: 0,
-              border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.16)'}`,
-              background: aan ? '#fff' : 'rgba(255,255,255,0.05)', color: aan ? '#0a0a0a' : '#fff',
-              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            })
             const filterActief = locatie !== 'alles' || spier
             const kies = (key) => { tik(); setWorkoutKey(key); setStap('gym-dag') }
             const Kaart = ({ item }) => {
@@ -273,17 +267,15 @@ export default function TrainingToevoegen({
                     color: '#fff', fontSize: '1rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none',
                   }}
                 />
-                {/* Filters: eerst waar (thuis/gym), dan welke spiergroep. Eén
-                    rij die opzij scrolt op een telefoon. */}
-                <div className="training-filters" style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, marginBottom: 8 }}>
-                  <style>{'.training-filters::-webkit-scrollbar{display:none}'}</style>
-                  {[{ id: 'alles', label: 'Alles' }, { id: 'thuis', label: 'Thuis' }, { id: 'gym', label: 'Gym' }].map(l => (
-                    <button key={l.id} onClick={() => setLocatie(l.id)} style={chip(locatie === l.id)}>{l.label}</button>
-                  ))}
-                  <span style={{ width: 1, background: 'rgba(255,255,255,0.14)', margin: '0 4px', flexShrink: 0 }} />
-                  {SPIERGROEPEN.map(g => (
-                    <button key={g.id} onClick={() => setSpier(spier === g.id ? null : g.id)} style={chip(spier === g.id)}>{g.label}</button>
-                  ))}
+                {/* Twee keuzes, zelfde vorm als het wisselvenster op de
+                    voedingspagina: losse tekst met een pijltje, lijntje
+                    ertussen. Geen chips; die maakten van de kop een formulier. */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 4 }}>
+                  <Keuze waarde={locatie} zet={setLocatie} isMobile={isMobile}
+                    opties={[{ id: 'alles', label: 'Thuis en gym' }, { id: 'thuis', label: 'Thuis' }, { id: 'gym', label: 'Gym' }]} />
+                  <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                  <Keuze waarde={spier || 'alle'} zet={(v) => setSpier(v === 'alle' ? null : v)} isMobile={isMobile} uitlijning="rechts"
+                    opties={[{ id: 'alle', label: 'Alle spiergroepen' }, ...SPIERGROEPEN]} />
                 </div>
                 {groepen.length === 0 && <div style={{ padding: '1.5rem 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{zoek ? `Niets gevonden voor "${zoek}"` : filterActief ? 'Geen training die hierbij past' : 'Geen trainingen'}</div>}
                 {groepen.map((g, gi) => {

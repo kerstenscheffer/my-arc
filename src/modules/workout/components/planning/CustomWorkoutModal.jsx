@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom'
 import { X, Search, Plus, Minus, ChevronUp, ChevronDown, Trash2, Check, ChevronLeft } from 'lucide-react'
 import ExerciseService from '../../../../services/ExerciseService'
 import useOefeningFotos from '../../utils/useOefeningFotos'
+import Keuze from '../../../meal-plan/components/Keuze'
 
 const SPIEREN = [
   { id: 'chest', label: 'Borst' }, { id: 'back', label: 'Rug' }, { id: 'shoulders', label: 'Schouders' },
@@ -46,6 +47,7 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
   const [laden, setLaden] = useState(false)
   const [zoek, setZoek] = useState('')
   const [spier, setSpier] = useState(null)
+  const [materiaal, setMateriaal] = useState(null)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState('')
 
@@ -67,9 +69,11 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
     const q = zoek.trim().toLowerCase()
     return bieb
       .filter(e => !spier || String(e.primair_spieren || '').toLowerCase() === spier)
+      .filter(e => !materiaal || String(e.equipment || '').toLowerCase() === materiaal)
       .filter(e => !q || String(e.name).toLowerCase().includes(q) || (e.tags || []).some(t => String(t).toLowerCase().includes(q)))
       .slice(0, 80)
-  }, [bieb, zoek, spier])
+  }, [bieb, zoek, spier, materiaal])
+  const materialen = useMemo(() => [...new Set(bieb.map(e => String(e.equipment || '').toLowerCase()).filter(Boolean))].sort(), [bieb])
   const fotoVan = useOefeningFotos(db, [...new Set([...lijst.map(e => e.name), ...oefeningen.map(e => e.name)])])
 
   const voegToe = (ex) => {
@@ -112,14 +116,6 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', ...extra,
   })
   const invoer = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, color: '#fff', fontFamily: 'inherit', fontWeight: 800, outline: 'none', boxSizing: 'border-box' }
-  const chip = (aan) => ({
-    padding: '0.4rem 0.75rem', borderRadius: 999, flexShrink: 0,
-    border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.16)'}`,
-    background: aan ? '#fff' : 'rgba(255,255,255,0.05)', color: aan ? '#0a0a0a' : '#fff',
-    fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-  })
-
   // Stapper voor sets: tikken op - en +, geen toetsenbord nodig.
   const Stapper = ({ waarde, onMin, onPlus }) => (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, padding: 2 }}>
@@ -210,10 +206,14 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
                 <Search size={16} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
                 <input value={zoek} onChange={e => setZoek(e.target.value)} placeholder="Zoek een oefening…" type="search" autoComplete="off" style={{ ...invoer, width: '100%', padding: '0.8rem 1rem 0.8rem 2.4rem', fontSize: '1rem' }} />
               </div>
-              <div className="eigen-spieren" style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingTop: 8 }}>
-                <style>{'.eigen-spieren::-webkit-scrollbar{display:none}'}</style>
-                <button onClick={() => setSpier(null)} style={chip(!spier)}>Alles</button>
-                {SPIEREN.map(s => <button key={s.id} onClick={() => setSpier(spier === s.id ? null : s.id)} style={chip(spier === s.id)}>{s.label}</button>)}
+              {/* Spiergroep en materiaal als keuzemenu's, zoals op de
+                  voedingspagina. */}
+              <div style={{ display: 'flex', alignItems: 'center', marginTop: 4, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 2 }}>
+                <Keuze waarde={spier || 'alle'} zet={(v) => setSpier(v === 'alle' ? null : v)} isMobile={isMobile}
+                  opties={[{ id: 'alle', label: 'Alle spiergroepen' }, ...SPIEREN]} />
+                <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                <Keuze waarde={materiaal || 'alle'} zet={(v) => setMateriaal(v === 'alle' ? null : v)} isMobile={isMobile} uitlijning="rechts"
+                  opties={[{ id: 'alle', label: 'Al het materiaal' }, ...materialen.map(m => ({ id: m, label: m.charAt(0).toUpperCase() + m.slice(1) }))]} />
               </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '0 1rem' : '0 1.2rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
