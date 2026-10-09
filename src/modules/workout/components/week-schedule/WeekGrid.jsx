@@ -18,6 +18,7 @@ export default function WeekGrid({
   onCardioShift = null,
   trainingTijdPerDag = {},
   onPrevWeek = null, onNextWeek = null,
+  onInfo = null,   // tik op een training in een week die je niet kunt openen: inkijken
   onRemoveTraining = null, onRemoveCardio = null,
   onOpenGedaan = null, onOpenCardioGedaan = null,
   // Stappen per dag (zeven items: { steps, gehaald, toekomst, isVandaag }) en
@@ -38,7 +39,7 @@ export default function WeekGrid({
   // workout van vandaag hoort bij vandaag.
   const handleCardClick = (day, assignedWorkout) => {
     if (localSwapMode) { if (kanPlannen) onSwapClick(day, assignedWorkout); return }
-    if (!kanOpenen) return
+    if (!kanOpenen) { if (onInfo && assignedWorkout) onInfo(day, assignedWorkout); return }
     onDayClick(day, assignedWorkout)
   }
 
@@ -167,6 +168,7 @@ export default function WeekGrid({
             dayDate={dayDates ? dayDates[index] : null}
             kanPlannen={kanPlannen}
             kanOpenen={kanOpenen}
+            kanBekijken={!kanOpenen && !!onInfo}
             gedimd={gedimd}
             rust={rustPerDag[index] || null}
             cardio={cardioPerDag[index] || []}

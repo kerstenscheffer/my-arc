@@ -85,7 +85,7 @@ export default function DayCard({
   isMobile, weekDaysDutch,
   onClick, swapMode,
   onShiftLeft, onShiftRight, canShiftLeft, canShiftRight,
-  dayDate, kanPlannen = true, kanOpenen = true, gedimd = false,
+  dayDate, kanPlannen = true, kanOpenen = true, kanBekijken = false, gedimd = false,
   rust = null,
   // Cardio op deze dag: [{ id, soort, tijd, duur, gedaan }].
   cardio = [],
@@ -223,7 +223,7 @@ export default function DayCard({
               klaar={isCompleted}
               kanSchuiven={!isCompleted && kanPlannen}
               onLinks={onShiftLeft} onRechts={onShiftRight} kanLinks={canShiftLeft} kanRechts={canShiftRight}
-              onClick={isCompleted && onOpenGedaan ? onOpenGedaan : (kanOpenen || swapMode ? handleClick : undefined)}
+              onClick={isCompleted && onOpenGedaan ? onOpenGedaan : (kanOpenen || kanBekijken || swapMode ? handleClick : undefined)}
               isMobile={isMobile} icoon={Dumbbell}
               groei={alles ? 1.15 : 1}
               onVerwijder={kanPlannen && onRemoveTraining ? onRemoveTraining : null}
@@ -235,7 +235,7 @@ export default function DayCard({
               eyebrow={`Training ${i + 2}`} titel={(x.data?.name || x.data?.focus || x.key || 'Training').trim()}
               klaar={x.klaar}
               kanSchuiven={false}
-              onClick={x.klaar && onOpenGedaan ? onOpenGedaan : (kanOpenen && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
+              onClick={x.klaar && onOpenGedaan ? onOpenGedaan : ((kanOpenen || kanBekijken) && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
               isMobile={isMobile} icoon={Dumbbell}
               onVerwijder={kanPlannen && onRemoveExtra ? () => onRemoveExtra(x.rosterKey) : null}
             />

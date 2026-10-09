@@ -14,6 +14,7 @@ import { ontleedPlanKey } from '../utils/planKey'
 import { voegTrainingToe, verwijderTrainingVanDag } from '../utils/extraTrainingen'
 import RealiteitBlad from '../../client-agenda/RealiteitBlad'
 import CardioGedaanBlad from './CardioGedaanBlad'
+import TrainingInfoBlad from './week-schedule/TrainingInfoBlad'
 import ExerciseLogModal from './todays-workout/components/ExerciseLogModal'
 import StappenService, { STANDAARD_DOEL } from '../../steps/StappenService'
 import { STAPPEN_EVENT } from '../../steps/stappenSync'
@@ -398,6 +399,8 @@ export default function WeekSchedule({
 
   // ── Training toevoegen (knop onder de week) ──
   const [toevoegenOpen, setToevoegenOpen] = useState(false)
+  // Inkijken van een training in een komende (of voorbije) week.
+  const [infoTraining, setInfoTraining] = useState(null)
   const volgendeWeekSleutel = (() => { const d = new Date(getoondeMaandag); d.setDate(d.getDate() + 7); return WorkoutServiceNew.datumSleutel(d) })()
 
   // Gym: 'standaard' = het vaste rooster (en de getoonde week als die een
@@ -757,10 +760,13 @@ export default function WeekSchedule({
                 dayDates={dayDates}
                 kanPlannen={kanPlannen}
                 kanOpenen={isCurrentWeek}
+                onInfo={(day, key) => { const d = getWorkoutData(key); if (d) setInfoTraining(d) }}
                 gedimd={weekOffset < 0}
                 rustPerDag={rustPerDag}
               />
             </div>
+
+            <TrainingInfoBlad open={!!infoTraining} training={infoTraining} db={db} isMobile={isMobile} onClose={() => setInfoTraining(null)} />
 
             {rustMeldingen.length > 0 && (
               <div style={{
