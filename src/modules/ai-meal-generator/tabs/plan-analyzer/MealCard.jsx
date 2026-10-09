@@ -5,7 +5,7 @@
 // / Delete, en de extra functies (timing edit, scaler, ingrediënten-
 // expand) blijven achter dezelfde card.
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X } from 'lucide-react'
