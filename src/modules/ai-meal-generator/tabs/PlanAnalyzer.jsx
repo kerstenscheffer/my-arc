@@ -300,12 +300,19 @@ export default function PlanAnalyzer({
   // bij Lisa nog in het plan van Tim (issue 9 okt 2026). Ook een vers
   // gegenereerd plan telt dan niet meer: dat hoorde bij de vorige klant.
   const vorigeClientRef = useRef(resolvedClientId)
+  // Na een klantwissel meteen het actieve plan van de nieuwe klant openen.
+  const naWisselActiefLaden = useRef(false)
   const [gegenereerdGenegeerd, setGegenereerdGenegeerd] = useState(false)
   useEffect(() => {
     const gewisseld = vorigeClientRef.current && resolvedClientId && vorigeClientRef.current !== resolvedClientId
     vorigeClientRef.current = resolvedClientId
     if (gewisseld) {
+      // Alles van de vorige klant uit beeld: zonder dit bleef weekData (het
+      // plan van Kersten) staan terwijl de kop al Tygo zei (9 okt 2026).
       setGegenereerdGenegeerd(true)
+      setWeekData(null); setPlanMeta(null); setActivated(false)
+      setHistory([]); setHistoryIndex(-1)
+      naWisselActiefLaden.current = true
       if (selectedConceptId) { setSelectedConceptId(null); return }   // volgende run laadt de plannen van déze klant
     }
     if (generatedPlan?.weekPlan && !gegenereerdGenegeerd && !gewisseld) loadFromGeneratedPlan(generatedPlan)
@@ -528,6 +535,11 @@ export default function PlanAnalyzer({
     setConceptPlans(concepten?.data || [])
     setActiefPlan(actief?.data?.[0] || null)
     setLoadingConcepts(false)
+    if (naWisselActiefLaden.current) {
+      naWisselActiefLaden.current = false
+      const eerste = actief?.data?.[0] || concepten?.data?.[0]
+      if (eerste?.id) setSelectedConceptId(eerste.id)
+    }
   }
 
   // Supplementen van de klant — alleen-lezen, uit het actieve
