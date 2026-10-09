@@ -11,6 +11,7 @@ import { useModalHost } from '../../../../coach/ModalHost'
 import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X } from 'lucide-react'
 import { portieInfo, stapPortie, portieLabel, portieUitleg } from './portie'
 import MealEditModal from './MealEditModal'
+import Keuze from '../../../meal-plan/components/Keuze'
 
 const GOLD = '#FFD700'
 const DIVIDER = 'rgba(255,255,255,0.06)'
@@ -652,10 +653,6 @@ function MomentVenster({ label, tijd, isMobile, pos, onClose, onSave }) {
   const top = (pos?.top || 8) + HOOG > vh - 8 ? Math.max(8, (pos?.boven || 0) - HOOG - 6) : (pos?.top || 8)
   const [l, setL] = useState(label || '')
   const [t, setT] = useState(tijd || '')
-  const chip = (aan) => ({
-    padding: '0.3rem 0.55rem', borderRadius: 999, fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer',
-    background: aan ? '#fff' : 'rgba(255,255,255,0.05)', color: aan ? '#0a0a0a' : '#fff', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
-  })
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'transparent' }}>
       <style>{'@keyframes momentIn { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }'}</style>
@@ -664,12 +661,14 @@ function MomentVenster({ label, tijd, isMobile, pos, onClose, onSave }) {
           <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Moment aanpassen</div>
           <button onClick={onClose} aria-label="Sluiten" style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
         </div>
-        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Soort</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-          {LABEL_OPTIONS.map(o => <button key={o} onClick={() => setL(o)} style={chip(l.toLowerCase() === o.toLowerCase())}>{o}</button>)}
+        {/* Soort als keuzemenu en tijd op één regel. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)' }}>
+            <Keuze waarde={l} zet={setL} isMobile={isMobile}
+              opties={[...(LABEL_OPTIONS.some(o => o.toLowerCase() === String(l).toLowerCase()) ? [] : [{ id: l, label: l || 'Kies soort' }]), ...LABEL_OPTIONS.map(o => ({ id: o, label: o }))]} />
+          </div>
+          <input type="time" value={t} onChange={e => setT(e.target.value)} style={{ width: 96, boxSizing: 'border-box', height: 34, padding: '0 0.5rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }} />
         </div>
-        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Tijd</div>
-        <input type="time" value={t} onChange={e => setT(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '0.4rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark', marginBottom: 10 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <button onClick={() => onSave(l, t, 'day')} style={{ minHeight: 34, borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer' }}>Alleen deze dag</button>
           <button onClick={() => onSave(l, t, 'slot')} style={{ minHeight: 34, borderRadius: 8, background: '#fff', border: 'none', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer' }}>Elke dag</button>
