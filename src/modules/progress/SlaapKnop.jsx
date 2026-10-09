@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Moon, X, Check, Trash2, Lightbulb, ChevronLeft, Scale } from 'lucide-react'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
+import HorizontaleSlider from '../../client/components/HorizontaleSlider'
 
 // Overgenomen uit het oude slaapblok op de pagina. Dat blok is weg; deze tips
 // waren het enige eraan dat niet in dit blad zat.
@@ -31,6 +32,9 @@ const TIPS = [
   'Kom zodra je wekker gaat meteen uit bed — snoozen verstoort je ritme.',
   'Ga binnen 30 minuten na het opstaan naar buiten voor daglicht.',
 ]
+
+// Gewichten voor de slider: 30,0 t/m 200,0 kg per 0,1.
+const GEWICHTEN = Array.from({ length: 1701 }, (_, i) => Math.round((300 + i)) / 10)
 
 const vandaagIso = () => {
   const d = new Date()
@@ -216,18 +220,11 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
 
   if (!client?.id || !open) return null
 
-  // Tijd ± minuten, rond de klok.
-  const schuif = (t, min) => {
-    const [h, m] = String(t || '00:00').split(':').map(Number)
-    let tot = ((h * 60 + m + min) % 1440 + 1440) % 1440
-    return `${String(Math.floor(tot / 60)).padStart(2, '0')}:${String(tot % 60).padStart(2, '0')}`
-  }
   const urenNu = Number.isFinite(urenWaarde) ? urenWaarde : 0
   const zetUren = (v) => { setUren(String(Math.max(0, Math.min(16, Math.round(v * 2) / 2)))); setUrenAangeraakt(true) }
   const nlUren = (n) => String(n).replace('.', ',')
   const kwaliteitKleur = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
 
-  const groot = { fontSize: '2.8rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }
   const rondKnop = {
     width: 56, height: 56, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
@@ -244,19 +241,20 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
   const vraag = (tekst) => (
     <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 16, letterSpacing: '-0.015em' }}>{tekst}</div>
   )
-  // Grote kloktijd met − en + per kwartier, en eronder het gewone tijdveld
-  // voor wie precies wil zijn.
-  const klok = (waarde, zet) => (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 12 }}>
-        <button onClick={() => zet(schuif(waarde, -15))} aria-label="Kwartier eerder" style={rondKnop}>−</button>
-        <div style={{ ...groot, minWidth: 128, textAlign: 'center' }}>{waarde}</div>
-        <button onClick={() => zet(schuif(waarde, 15))} aria-label="Kwartier later" style={rondKnop}>+</button>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-        <input type="time" value={waarde} onChange={e => e.target.value && zet(e.target.value)} style={{ ...veld, width: 130, textAlign: 'center', colorScheme: 'dark' }} />
-      </div>
-    </>
+  // Tijden als slider in stappen van 5 minuten, zoals de gewichtsslider.
+  // Bedtijd loopt van 12:00 via middernacht door (avond → nacht zonder
+  // sprong); opstaan gewoon van 00:00 tot 23:55.
+  const tijdLijst = (vanaf) => Array.from({ length: 288 }, (_, i) => {
+    const m = (vanaf + i * 5) % 1440
+    return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  })
+  const BEDTIJDEN = tijdLijst(12 * 60)
+  const OPSTAATIJDEN = tijdLijst(0)
+  const opVijf = (t) => { const [h, m] = String(t || '00:00').split(':').map(Number); const tot = Math.round((h * 60 + m) / 5) * 5 % 1440; return `${String(Math.floor(tot / 60)).padStart(2, '0')}:${String(tot % 60).padStart(2, '0')}` }
+  const klok = (waarde, zet, lijst) => (
+    <div style={{ marginBottom: 18 }}>
+      <HorizontaleSlider waarden={lijst} waarde={opVijf(waarde)} onChange={zet} itemBreedte={84} />
+    </div>
   )
   const planRegel = gepland ? (
     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: -8, marginBottom: 16 }}>
@@ -322,7 +320,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
           <>
             {vraag('Hoe laat ging je naar bed?')}
             {planRegel}
-            {klok(bed, setBed)}
+            {klok(bed, setBed, BEDTIJDEN)}
             <button onClick={() => setStap(2)} style={primair}>Volgende</button>
           </>
         )}
@@ -331,7 +329,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
           <>
             {vraag('Hoe laat stond je op?')}
             {planRegel}
-            {klok(opstaan, setOpstaan)}
+            {klok(opstaan, setOpstaan, OPSTAATIJDEN)}
             <button onClick={() => setStap(3)} style={primair}>Volgende</button>
           </>
         )}
@@ -344,16 +342,19 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: -8, marginBottom: 16 }}>
               {gewogen ? 'Deze ochtend al gewogen; pas aan als het anders was.' : 'Direct na het opstaan, na het plassen, vóór eten en drinken.'}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 18 }}>
-              <button onClick={() => setGewicht(g => Math.max(30, Math.round(((g || 80) - 0.1) * 10) / 10))} aria-label="100 gram minder" style={rondKnop}>−</button>
-              <div style={{ textAlign: 'center', minWidth: 120 }}>
-                <div style={groot}>{gewicht != null ? String(gewicht.toFixed(1)).replace('.', ',') : '…'}</div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Scale size={12} strokeWidth={2.6} /> kg</div>
-              </div>
-              <button onClick={() => setGewicht(g => Math.min(300, Math.round(((g || 80) + 0.1) * 10) / 10))} aria-label="100 gram meer" style={rondKnop}>+</button>
+            <div style={{ marginBottom: 6 }}>
+              {gewicht != null ? (
+                <HorizontaleSlider
+                  waarden={GEWICHTEN}
+                  waarde={Math.round(gewicht * 10) / 10}
+                  onChange={setGewicht}
+                  toon={(v) => v.toFixed(1).replace('.', ',')}
+                  itemBreedte={72}
+                />
+              ) : <div style={{ height: 86 }} />}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-              <input type="number" inputMode="decimal" step="0.1" value={gewicht ?? ''} onChange={e => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (Number.isFinite(v)) setGewicht(v) }} style={{ ...veld, width: 130, textAlign: 'center' }} />
+            <div style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <Scale size={12} strokeWidth={2.6} /> kg
             </div>
             {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10, textAlign: 'center' }}>{fout}</div>}
             <button onClick={() => bewaarGewicht(true)} disabled={gewichtBezig || gewicht == null} style={primair}>
@@ -368,13 +369,14 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         {stap === 4 && (
           <>
             {vraag('Hoeveel uur heb je echt geslapen?')}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 8 }}>
-              <button onClick={() => zetUren(urenNu - 0.5)} aria-label="Half uur minder" style={rondKnop}>−</button>
-              <div style={{ textAlign: 'center', minWidth: 110 }}>
-                <div style={groot}>{nlUren(urenNu)}</div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>uur</div>
-              </div>
-              <button onClick={() => zetUren(urenNu + 0.5)} aria-label="Half uur meer" style={rondKnop}>+</button>
+            <div style={{ marginBottom: 4 }}>
+              <HorizontaleSlider
+                waarden={Array.from({ length: 33 }, (_, i) => i / 2)}
+                waarde={Math.round(urenNu * 2) / 2}
+                onChange={zetUren}
+                toon={(v) => `${nlUren(v)}u`}
+                itemBreedte={72}
+              />
             </div>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 18, lineHeight: 1.4 }}>
               {berekend != null ? `Tussen ${bed} en ${opstaan} zit ${nlUren(berekend)} uur. Lag je wakker, haal het eraf.` : 'Pas aan als je wakker lag.'}
