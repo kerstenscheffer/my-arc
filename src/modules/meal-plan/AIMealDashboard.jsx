@@ -601,11 +601,13 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
             een titel op de foto maar een hele regel met pijlen en datum. */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.12) 18%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.88) 72%, #0a0a0a 100%)',
+          // Donkerder dan eerst, zodat de dagregel rustig op de foto ligt.
+          background: 'linear-gradient(180deg, rgba(10,10,10,0.7) 0%, rgba(10,10,10,0.45) 25%, rgba(10,10,10,0.7) 50%, rgba(10,10,10,0.92) 75%, #0a0a0a 100%)',
         }} />
 
         <div style={{
-          position: 'absolute', left: 0, right: 0, bottom: isMobile ? 6 : 10,
+          // Iets hoger in de foto dan eerst.
+          position: 'absolute', left: 0, right: 0, bottom: isMobile ? 22 : 30,
         }}>
           <MealDayNavHeader
             selectedDay={selectedDay}
