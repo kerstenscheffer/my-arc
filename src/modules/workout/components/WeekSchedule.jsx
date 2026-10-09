@@ -653,14 +653,15 @@ export default function WeekSchedule({
   }
 
   return (
-    <div style={{ padding: 0, marginBottom: '1rem' }}>
+    <div style={{ padding: 0, marginBottom: '1rem', position: 'relative' }}>
 
-      {/* "Planning" header + instruction strip removed — week-tiles speak for
-          themselves; opslaan-indicator floats top-right when saving. */}
+      {/* Opslaan-indicator zweeft rechtsboven, buiten de flow: als hij in de
+          flow stond, schoof het hele rooster omlaag en weer omhoog bij elke
+          verschuiving van een dag (9 okt 2026). */}
       {saving && (
         <div style={{
-          padding: isMobile ? '0 1rem 0.375rem' : '0 1.25rem 0.5rem',
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          position: 'absolute', top: -14, right: isMobile ? 16 : 20, zIndex: 3, pointerEvents: 'none',
+          display: 'flex', alignItems: 'center',
           gap: '0.3rem', fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600'
         }}>
           <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)', animation: 'pulse 1.5s ease-in-out infinite' }} />
@@ -771,9 +772,17 @@ export default function WeekSchedule({
               />
             </div>
 
+            {/* Ongedaan maken als zwevende pil onderin beeld, niet in de flow:
+                in de flow duwde hij alles onder het rooster zes seconden omlaag. */}
             {ongedaan && (
-              <div style={{ padding: isMobile ? '0.4rem 0.75rem 0' : '0.5rem 1rem 0', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.74rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{
+                position: 'fixed', left: '50%', transform: 'translateX(-50%)', zIndex: 96,
+                bottom: `calc(${isMobile ? 96 : 102}px + env(safe-area-inset-bottom, 0px))`,
+                maxWidth: 'min(92vw, 420px)', padding: '0.45rem 0.5rem 0.45rem 0.9rem', borderRadius: 999,
+                background: 'rgba(20,20,20,0.96)', border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 14px 36px rgba(0,0,0,0.55)',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.74rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {ongedaan.naam} naar {ongedaan.naar} verschoven
                 </div>
                 <button onClick={() => { const v = ongedaan.vorige; setOngedaan(null); handleAutoSave(v) }} style={{
