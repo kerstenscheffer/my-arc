@@ -29,6 +29,7 @@ import { verzetDag as verzetDagHelper } from './dagNavigatie'
 import MacroBoxes from './MacroBoxes'
 import BlokTijdSheet from './BlokTijdSheet'
 import DagindelingModal from './DagindelingModal'
+import { SlaapLogBlad } from '../../modules/progress/SlaapKnop'
 
 const LIJN = 'rgba(255,255,255,0.07)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.04)'
@@ -215,6 +216,46 @@ export default function DagAgenda({
 
   const datum = dateForDay(weekAnker, dag)
   const isVandaag = datum && toIsoDate(datum) === toIsoDate(nu)
+
+  // ── Slaap loggen vanuit het slaapblok ──
+  // Het slaapblok loopt over middernacht en staat in twee helften op de dag:
+  // het ochtenddeel is de nacht waaruit je vandaag wakker werd (log_date =
+  // deze dag), het avonddeel de nacht die vanavond begint (log_date = morgen).
+  // Zelfde tabel en hetzelfde blad als op de trackingpagina; de coach ziet
+  // het in coach-insight.
+  const [slaapLogs, setSlaapLogs] = useState({}) // { 'YYYY-MM-DD': { uren, kwaliteit } }
+  const [slaapBlad, setSlaapBlad] = useState(null) // { datum, bed, op }
+  const slaapDagIso = datum ? toIsoDate(datum) : null
+  const morgenIso = datum ? toIsoDate(new Date(datum.getFullYear(), datum.getMonth(), datum.getDate() + 1)) : null
+  useEffect(() => {
+    if (!client?.id || !db?.supabase || !slaapDagIso) return
+    let weg = false
+    db.supabase.from('sleep_logs').select('log_date, hours_slept, quality')
+      .eq('client_id', client.id).in('log_date', [slaapDagIso, morgenIso])
+      .then(({ data }) => {
+        if (weg) return
+        const uit = {}
+        ;(data || []).forEach(r => { uit[String(r.log_date).slice(0, 10)] = { uren: r.hours_slept, kwaliteit: r.quality } })
+        setSlaapLogs(uit)
+      }, () => { if (!weg) setSlaapLogs({}) })
+    return () => { weg = true }
+  }, [client?.id, db, slaapDagIso, morgenIso, versie])
+  const minNaarTijd = (m) => (Number.isFinite(m) ? `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` : null)
+  const slaapVan = (b) => {
+    if (b.type !== 'sleep' || !slaapDagIso) return null
+    const nacht = b.meta?.wrapHalf === 'late' ? morgenIso : slaapDagIso
+    return {
+      datum: nacht,
+      // Een nacht die nog niet voorbij is, kun je nog niet loggen.
+      kan: nacht <= toIsoDate(nu),
+      gelogd: slaapLogs[nacht] || null,
+      onLog: () => setSlaapBlad({
+        datum: nacht,
+        bed: minNaarTijd(b.meta?.fullStart ?? b.start) || '23:00',
+        op: minNaarTijd(b.meta?.fullEnd ?? b.end) || '07:00',
+      }),
+    }
+  }
   const nuMin = nu.getHours() * 60 + nu.getMinutes()
   const toonNuLijn = isVandaag && nuMin >= van && nuMin <= tot
 
@@ -472,6 +513,7 @@ export default function DagAgenda({
               onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
               onTijd={() => setBewerk(b)}
               bezig={toonNuLijn && nuMin >= b.start && nuMin < b.end}
+              slaap={slaapVan(b)}
             />
           ))}
         </div>
@@ -553,11 +595,22 @@ export default function DagAgenda({
               afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
               onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
               onTijd={() => setBewerk(b)}
+              slaap={slaapVan(b)}
             />
           ))}
         </div>
       </div>
       )}
+
+      <SlaapLogBlad
+        open={!!slaapBlad}
+        onClose={() => setSlaapBlad(null)}
+        client={client} db={db}
+        datum={slaapBlad?.datum}
+        voorBed={slaapBlad?.bed || '23:00'}
+        voorOpstaan={slaapBlad?.op || '07:00'}
+        onOpgeslagen={(r) => { if (r?.datum) setSlaapLogs(prev => ({ ...prev, [r.datum]: { uren: r.uren, kwaliteit: r.kwaliteit } })) }}
+      />
 
       {/* Tijd verzetten: dezelfde sheet vanuit de lijst en vanuit het rooster. */}
       {bewerk && dagIso && (
@@ -624,7 +677,7 @@ export default function DagAgenda({
 // tekstregels is maar hetzelfde spul op een tijdlijn. De rest (slaap, werk,
 // supplementen) blijft een rustige regel: dat hoef je alleen te zien, niet te
 // lezen.
-function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAfronden = null, onTijd = null }) {
+function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAfronden = null, onTijd = null, slaap = null }) {
   const top = pxVan(blok.start)
   // Ondergrens per soort. Een maaltijd duurt in het plan een kwartier; op
   // ware grootte is dat een streepje. Hij krijgt daarom de ruimte van een half
@@ -842,6 +895,7 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
       }}>
         {naam || soort}
       </span>
+      {slaap && <SlaapActie slaap={slaap} compact />}
       <TijdStempel blok={blok} onTijd={onTijd} />
     </Wrapper>
   )
@@ -874,7 +928,36 @@ function TijdStempel({ blok, onTijd, kleur }) {
 // Eén regel in de lijst: streep, naam, tijden rechts. Loopt het blok nu, dan
 // is de streep vol wit in plaats van doorzichtig — dat is het enige verschil
 // dat je nodig hebt om te zien waar je bent.
-function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezig }) {
+// Slaapblok: nog niet gelogd → witte knop 'Log' om het te stimuleren;
+// gelogd → uren en cijfer in groen. Tik op het getal om het bij te werken.
+const nl1 = (n) => String(Math.round(Number(n) * 10) / 10).replace('.', ',')
+function SlaapActie({ slaap, compact = false }) {
+  if (!slaap?.kan) return null
+  if (slaap.gelogd) {
+    return (
+      <button onClick={(e) => { e.stopPropagation(); slaap.onLog() }} title="Slaap bijwerken" style={{
+        flexShrink: 0, padding: 0, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+        fontSize: compact ? '0.62rem' : '0.72rem', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap',
+        fontVariantNumeric: 'tabular-nums', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}>
+        {slaap.gelogd.uren != null ? `${nl1(slaap.gelogd.uren)}u` : '✓'}{slaap.gelogd.kwaliteit != null ? ` · ${slaap.gelogd.kwaliteit}` : ''}
+      </button>
+    )
+  }
+  return (
+    <button onClick={(e) => { e.stopPropagation(); slaap.onLog() }} title="Slaap loggen" aria-label="Slaap loggen" style={{
+      flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
+      height: compact ? 18 : 24, padding: compact ? '0 6px' : '0 9px', borderRadius: 999,
+      background: '#fff', border: 'none', color: '#0a0a0a', cursor: 'pointer', fontFamily: 'inherit',
+      fontSize: compact ? '0.6rem' : '0.7rem', fontWeight: 900, whiteSpace: 'nowrap',
+      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    }}>
+      <Moon size={compact ? 10 : 12} strokeWidth={2.8} /> Log
+    </button>
+  )
+}
+
+function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezig, slaap = null }) {
   const isMaaltijd = blok.type === 'meal'
   const isTraining = blok.type === 'training'
   const Icoon = ICOON[blok.type] || Calendar
@@ -965,9 +1048,10 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
       </button>
 
       <div style={{
-        flexShrink: 0, width: 50,
+        flexShrink: 0, width: slaap?.kan ? 'auto' : 50, minWidth: 50,
         display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
       }}>
+        {slaap && <SlaapActie slaap={slaap} />}
         {onAfronden && (
           <button
             onClick={onAfronden}

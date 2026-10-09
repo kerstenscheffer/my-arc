@@ -67,10 +67,15 @@ const kopje = {
   textTransform: 'uppercase', letterSpacing: '0.11em', marginBottom: 6,
 }
 
-export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 96, onOpgeslagen }) {
-  const [open, setOpen] = useState(false)
-  const [bed, setBed] = useState('23:00')
-  const [opstaan, setOpstaan] = useState('07:00')
+// Het blad 'Je nacht', los te openen voor elke nacht. `datum` is de dag
+// waarop je wakker werd (log_date). Gebruikt door de zwevende knop op de
+// trackingpagina en door het slaapblok in de agenda op home. Eén tabel
+// (sleep_logs), dus de coach ziet het in coach-insight, waar je ook logt.
+export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed = '23:00', voorOpstaan = '07:00', onOpgeslagen, onStatus }) {
+  const logDatum = datum || vandaagIso()
+  const setOpen = (v) => { if (!v) onClose?.() }
+  const [bed, setBed] = useState(voorBed)
+  const [opstaan, setOpstaan] = useState(voorOpstaan)
   const [uren, setUren] = useState('')
   const [urenAangeraakt, setUrenAangeraakt] = useState(false)
   const [kwaliteit, setKwaliteit] = useState(null)
@@ -84,16 +89,19 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
   const [toonEerdere, setToonEerdere] = useState(false)
   const [toonTips, setToonTips] = useState(false)
 
-  // Al gelogd vannacht? Dan kleurt de knop groen en vult het blad zich met wat
-  // er staat, zodat je 'm bijwerkt in plaats van er een tweede naast te zetten.
+  // Al gelogd die nacht? Dan vult het blad zich met wat er staat, zodat je 'm
+  // bijwerkt in plaats van er een tweede naast te zetten. Bij het openen
+  // opnieuw, want de nacht kan intussen ergens anders gelogd zijn.
   useEffect(() => {
-    if (!client?.id || !db?.supabase) return
+    if (!open || !client?.id || !db?.supabase) return
     let weg = false
+    setBed(voorBed); setOpstaan(voorOpstaan); setUren(''); setUrenAangeraakt(false)
+    setKwaliteit(null); setStruggles(''); setAlGelogd(false); setFout(null)
     db.supabase
       .from('sleep_logs')
       .select('id, bedtime, wake_time, hours_slept, quality, struggles')
       .eq('client_id', client.id)
-      .eq('log_date', vandaagIso())
+      .eq('log_date', logDatum)
       .maybeSingle()
       .then(({ data }) => {
         if (weg || !data) return
@@ -105,7 +113,8 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
         if (data.struggles) setStruggles(data.struggles)
       })
     return () => { weg = true }
-  }, [db, client?.id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, db, client?.id, logDatum])
 
   // De lijst halen we pas op als je hem opent: meestal kom je hier om te
   // loggen, niet om terug te kijken.
@@ -127,7 +136,7 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
     setEerdere(e => e.filter(x => x.id !== id))
     const { error } = await db.supabase.from('sleep_logs').delete().eq('id', id)
     if (error) { setEerdere(vorige); return }
-    if (id && vandaagIso() === vorige.find(x => x.id === id)?.log_date) setAlGelogd(false)
+    if (id && logDatum === vorige.find(x => x.id === id)?.log_date) { setAlGelogd(false); onStatus?.(false) }
     onOpgeslagen?.()
   }
 
@@ -140,7 +149,7 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
     try {
       const rij = {
         client_id: client.id,
-        log_date: vandaagIso(),
+        log_date: logDatum,
         bedtime: bed || null,
         wake_time: opstaan || null,
         hours_slept: Number.isFinite(urenWaarde) ? urenWaarde : null,
@@ -159,8 +168,9 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
       if (error) throw error
 
       setAlGelogd(true)
+      onStatus?.(true)
       setOpen(false)
-      onOpgeslagen?.()
+      onOpgeslagen?.({ datum: logDatum, uren: rij.hours_slept, kwaliteit: rij.quality })
     } catch (e) {
       console.error('Slaap opslaan mislukt:', e)
       setFout(e.message || 'Opslaan mislukt')
@@ -169,34 +179,11 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
     }
   }
 
-  if (!client?.id) return null
+  if (!client?.id || !open) return null
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        title="Slaap loggen"
-        aria-label="Slaap loggen"
-        style={{
-          position: 'fixed',
-          left: isMobile ? 10 : 16,
-          bottom: `calc(${onderMarge}px + env(safe-area-inset-bottom, 0px))`,
-          zIndex: 95,
-          width: 48, height: 48, padding: 0, borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(10,10,10,0.92)',
-          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: `1px solid ${alGelogd ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.14)'}`,
-          color: alGelogd ? '#10b981' : '#fff',
-          cursor: 'pointer',
-          boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <Moon size={20} strokeWidth={2.4} />
-      </button>
-
-      {open && createPortal(
+      {createPortal(
         <div
           onClick={() => setOpen(false)}
           style={{
@@ -221,6 +208,11 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
               <Moon size={17} color="#fff" strokeWidth={2.4} />
               <span style={{ flex: 1, fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
                 Je nacht
+                {logDatum !== vandaagIso() && (
+                  <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+                    {' · wakker op '}{new Date(`${logDatum}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </span>
+                )}
               </span>
               <button onClick={() => setOpen(false)} aria-label="Sluiten" style={{
                 width: 30, height: 30, padding: 0, background: 'transparent', border: 'none',
@@ -384,6 +376,51 @@ export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 9
         </div>,
         document.body
       )}
+    </>
+  )
+}
+
+// Zwevende knop links op de trackingpagina. Groen als je vannacht al logde.
+export default function SlaapKnop({ client, db, isMobile = false, onderMarge = 96, onOpgeslagen }) {
+  const [open, setOpen] = useState(false)
+  const [alGelogd, setAlGelogd] = useState(false)
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    let weg = false
+    db.supabase.from('sleep_logs').select('id').eq('client_id', client.id).eq('log_date', vandaagIso()).maybeSingle()
+      .then(({ data }) => { if (!weg) setAlGelogd(!!data) }, () => {})
+    return () => { weg = true }
+  }, [db, client?.id])
+
+  if (!client?.id) return null
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        title="Slaap loggen"
+        aria-label="Slaap loggen"
+        style={{
+          position: 'fixed',
+          left: isMobile ? 10 : 16,
+          bottom: `calc(${onderMarge}px + env(safe-area-inset-bottom, 0px))`,
+          zIndex: 95,
+          width: 48, height: 48, padding: 0, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(10,10,10,0.92)',
+          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          border: `1px solid ${alGelogd ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.14)'}`,
+          color: alGelogd ? '#10b981' : '#fff',
+          cursor: 'pointer',
+          boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <Moon size={20} strokeWidth={2.4} />
+      </button>
+      <SlaapLogBlad
+        open={open} onClose={() => setOpen(false)} client={client} db={db}
+        onStatus={setAlGelogd} onOpgeslagen={onOpgeslagen}
+      />
     </>
   )
 }
