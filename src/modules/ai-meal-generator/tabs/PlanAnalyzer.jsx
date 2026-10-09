@@ -1573,14 +1573,14 @@ export default function PlanAnalyzer({
 
   // Toggle een sectie in het dock-paneel (klik zelfde knop = sluiten).
   const toggleDock = (id) => setDockedSection(d => d === id ? null : id)
+  // Tijden en Agenda weggehaald (9 okt 2026): tijden pas je aan op de kaart
+  // zelf (tik op de foto), en Week laat hetzelfde zien als Agenda.
   const sidebarNav = [
     // Client opent de intake van deze klant (zelfde venster als in CoachHub),
     // niet meer het zijvak met klantinfo (9 okt 2026).
     { id: 'client', icon: '👤',                    label: 'Client',  active: intakeOpen, onClick: () => setIntakeOpen(true) },
-    { id: 'timing', icon: <Clock size={18} />,     label: 'Tijden',  active: dockedSection === 'timing', onClick: () => toggleDock('timing') },
     { id: 'dagen',  icon: <CalendarDays size={18} />, label: 'Dagen', active: dockedSection === 'dagen', onClick: () => toggleDock('dagen') },
     { id: 'week',   icon: <Grid3X3 size={18} />,   label: 'Week',    active: viewMode === 'week',        onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
-    { id: 'agenda', icon: <Calendar size={18} />,  label: 'Agenda',  active: dockedSection === 'agenda', onClick: () => toggleDock('agenda') },
     { id: 'swaps',  icon: <Repeat size={18} />,    label: 'Swaps',   active: dockedSection === 'swaps',  onClick: () => toggleDock('swaps') },
     { id: 'library', icon: <List size={18} />, label: 'Plannen', active: dockedSection === 'library', onClick: () => toggleDock('library'), badge: allClientPlans.length > 0 ? allClientPlans.length : null },
     { id: 'supp',   icon: <Pill size={18} />,   label: 'Supp',    active: dockedSection === 'supp',    onClick: () => toggleDock('supp'), badge: supplementen.length > 0 ? supplementen.length : null },
