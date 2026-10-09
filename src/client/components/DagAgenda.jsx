@@ -586,8 +586,8 @@ export default function DagAgenda({
         onClose={() => setSlaapBlad(null)}
         client={client} db={db}
         datum={slaapBlad?.datum}
-        voorBed={slaapBlad?.bed || '23:00'}
-        voorOpstaan={slaapBlad?.op || '07:00'}
+        voorBed={slaapBlad?.bed || null}
+        voorOpstaan={slaapBlad?.op || null}
         onOpgeslagen={(r) => { if (r?.datum) setSlaapLogs(prev => ({ ...prev, [r.datum]: { uren: r.uren, kwaliteit: r.kwaliteit } })) }}
       />
 

@@ -16,7 +16,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Moon, X, Check, Trash2, Lightbulb, ChevronLeft } from 'lucide-react'
+import { Moon, X, Check, Trash2, Lightbulb, ChevronLeft, Scale } from 'lucide-react'
+import WeightTrackerService from '../weight-tracker/WeightTrackerService'
 
 // Overgenomen uit het oude slaapblok op de pagina. Dat blok is weg; deze tips
 // waren het enige eraan dat niet in dit blad zat.
@@ -67,11 +68,19 @@ const linkKnop = {
 // waarop je wakker werd (log_date). Gebruikt door de zwevende knop op de
 // trackingpagina en door het slaapblok in de agenda op home. Eén tabel
 // (sleep_logs), dus de coach ziet het in coach-insight, waar je ook logt.
-export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed = '23:00', voorOpstaan = '07:00', onOpgeslagen, onStatus }) {
+export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed = null, voorOpstaan = null, onOpgeslagen, onStatus }) {
   const logDatum = datum || vandaagIso()
   const setOpen = (v) => { if (!v) onClose?.() }
-  const [bed, setBed] = useState(voorBed)
-  const [opstaan, setOpstaan] = useState(voorOpstaan)
+  const [bed, setBed] = useState(voorBed || '23:00')
+  const [opstaan, setOpstaan] = useState(voorOpstaan || '07:00')
+  // De geplande nacht uit de intake (clients.work_schedule, type 'slaap'):
+  // de nacht die op logDatum eindigt, begon de avond ervoor.
+  const [gepland, setGepland] = useState(null) // { bed, op }
+  // Gewicht na het opstaan: laatste weging als startpunt, en of deze ochtend
+  // al gewogen is.
+  const [gewicht, setGewicht] = useState(null)
+  const [gewogen, setGewogen] = useState(false)
+  const [gewichtBezig, setGewichtBezig] = useState(false)
   const [uren, setUren] = useState('')
   const [urenAangeraakt, setUrenAangeraakt] = useState(false)
   const [kwaliteit, setKwaliteit] = useState(null)
@@ -93,7 +102,33 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
   useEffect(() => {
     if (!open || !client?.id || !db?.supabase) return
     let weg = false
-    setBed(voorBed); setOpstaan(voorOpstaan); setUren(''); setUrenAangeraakt(false)
+    setBed(voorBed || '23:00'); setOpstaan(voorOpstaan || '07:00'); setUren(''); setUrenAangeraakt(false)
+    setGepland(null); setGewicht(null); setGewogen(false)
+    // Intake-planning: toon hem, en gebruik hem als startwaarde als de
+    // aanroeper (bv. de maan-knop op tracking) zelf geen tijden meegaf.
+    db.supabase.from('clients').select('work_schedule').eq('id', client.id).maybeSingle()
+      .then(({ data }) => {
+        if (weg) return
+        const ws = data?.work_schedule || {}
+        const vorige = new Date(`${logDatum}T12:00:00`); vorige.setDate(vorige.getDate() - 1)
+        const sleutel = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'][vorige.getDay()]
+        const slaap = (Array.isArray(ws[sleutel]) ? ws[sleutel] : []).find(b => b?.type === 'slaap')
+        if (slaap?.start && slaap?.end) {
+          const g = { bed: String(slaap.start).slice(0, 5), op: String(slaap.end).slice(0, 5) }
+          setGepland(g)
+          if (!voorBed) setBed(g.bed)
+          if (!voorOpstaan) setOpstaan(g.op)
+        }
+      }, () => {})
+    // Laatste weging tot en met deze ochtend.
+    db.supabase.from('weight_challenge_logs').select('date, weight').eq('client_id', client.id)
+      .lte('date', logDatum).order('date', { ascending: false }).limit(1)
+      .then(({ data }) => {
+        if (weg) return
+        const r = data?.[0]
+        if (r?.weight) { setGewicht(Number(r.weight)); setGewogen(String(r.date).slice(0, 10) === logDatum) }
+        else setGewicht(80)
+      }, () => { if (!weg) setGewicht(80) })
     setKwaliteit(null); setStruggles(''); setAlGelogd(false); setFout(null); setStap(1); setToonEerdere(false); setToonTips(false)
     db.supabase
       .from('sleep_logs')
@@ -221,6 +256,24 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
       </div>
     </>
   )
+  const planRegel = gepland ? (
+    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: -8, marginBottom: 16 }}>
+      Volgens je intake: {gepland.bed} – {gepland.op}
+    </div>
+  ) : null
+  const bewaarGewicht = async (verder) => {
+    if (gewichtBezig) return
+    if (verder && gewicht) {
+      setGewichtBezig(true)
+      const r = await new WeightTrackerService(db).saveWeight(client.id, Math.round(gewicht * 10) / 10, logDatum)
+      setGewichtBezig(false)
+      if (!r?.success) { setFout('Gewicht opslaan mislukt'); return }
+      setGewogen(true)
+      window.dispatchEvent(new CustomEvent('myarc:gewicht-gelogd'))
+    }
+    setFout(null)
+    setStap(4)
+  }
   const datumTekst = logDatum !== vandaagIso()
     ? new Date(`${logDatum}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
     : null
@@ -249,7 +302,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
             : <div style={{ width: 40 }} />}
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Slaap loggen · stap {stap} van 4
+              Ochtend loggen · stap {stap} van 5
             </div>
             <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Moon size={15} strokeWidth={2.6} /> Je nacht{datumTekst && <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}> · {datumTekst}</span>}
@@ -261,6 +314,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         {stap === 1 && (
           <>
             {vraag('Hoe laat ging je naar bed?')}
+            {planRegel}
             {klok(bed, setBed)}
             <button onClick={() => setStap(2)} style={primair}>Volgende</button>
           </>
@@ -269,12 +323,42 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         {stap === 2 && (
           <>
             {vraag('Hoe laat stond je op?')}
+            {planRegel}
             {klok(opstaan, setOpstaan)}
             <button onClick={() => setStap(3)} style={primair}>Volgende</button>
           </>
         )}
 
+        {/* Na het opstaan: weeg je even. Zelfde opslag als de gewichtstracker,
+            dus het telt ook voor je challenge. */}
         {stap === 3 && (
+          <>
+            {vraag('Weeg je even?')}
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: -8, marginBottom: 16 }}>
+              {gewogen ? 'Deze ochtend al gewogen; pas aan als het anders was.' : 'Direct na het opstaan, na het plassen, vóór eten en drinken.'}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 18 }}>
+              <button onClick={() => setGewicht(g => Math.max(30, Math.round(((g || 80) - 0.1) * 10) / 10))} aria-label="100 gram minder" style={rondKnop}>−</button>
+              <div style={{ textAlign: 'center', minWidth: 120 }}>
+                <div style={groot}>{gewicht != null ? String(gewicht.toFixed(1)).replace('.', ',') : '…'}</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Scale size={12} strokeWidth={2.6} /> kg</div>
+              </div>
+              <button onClick={() => setGewicht(g => Math.min(300, Math.round(((g || 80) + 0.1) * 10) / 10))} aria-label="100 gram meer" style={rondKnop}>+</button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+              <input type="number" inputMode="decimal" step="0.1" value={gewicht ?? ''} onChange={e => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (Number.isFinite(v)) setGewicht(v) }} style={{ ...veld, width: 130, textAlign: 'center' }} />
+            </div>
+            {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10, textAlign: 'center' }}>{fout}</div>}
+            <button onClick={() => bewaarGewicht(true)} disabled={gewichtBezig || gewicht == null} style={primair}>
+              <Check size={16} strokeWidth={3} /> {gewichtBezig ? 'Opslaan…' : 'Gewicht opslaan'}
+            </button>
+            <button onClick={() => bewaarGewicht(false)} style={{ ...primair, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', minHeight: 40, marginTop: 4 }}>
+              Overslaan
+            </button>
+          </>
+        )}
+
+        {stap === 4 && (
           <>
             {vraag('Hoeveel uur heb je echt geslapen?')}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 8 }}>
@@ -288,11 +372,11 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 18, lineHeight: 1.4 }}>
               {berekend != null ? `Tussen ${bed} en ${opstaan} zit ${nlUren(berekend)} uur. Lag je wakker, haal het eraf.` : 'Pas aan als je wakker lag.'}
             </div>
-            <button onClick={() => setStap(4)} style={primair}>Volgende</button>
+            <button onClick={() => setStap(5)} style={primair}>Volgende</button>
           </>
         )}
 
-        {stap === 4 && (
+        {stap === 5 && (
           <>
             {vraag('Hoe voelde je nacht?')}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 6 }}>
