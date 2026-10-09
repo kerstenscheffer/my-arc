@@ -28,6 +28,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     if (onExpandedChange) onExpandedChange(next)
   }
   const [todaysWorkout, setTodaysWorkout] = useState(null)
+  const ooitGeladen = useRef(false)
   // Twee trainingen op één dag: alle sleutels van de dag, en welke open staat.
   const [dagSleutels, setDagSleutels] = useState([])
   const [gekozenKey, setGekozenKey] = useState(null)
@@ -288,6 +289,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       setTodaysWorkout(null)
     }
     setLoading(false)
+    ooitGeladen.current = true
   }
 
   const getLabel = (type) => ({ cardio: 'Cardio', cycling: 'Fietsen', running: 'Hardlopen', swimming: 'Zwemmen', hiking: 'Wandelen', yoga: 'Yoga', sports: 'Sport', custom: 'Custom' }[type] || type)
@@ -319,7 +321,18 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     </div>
   )
 
-  if (loading) return (
+  // Spinner alleen bij de allereerste keer laden. Bij een andere dag blijft
+  // de vorige kop staan (iets gedimd) en vervaagt de nieuwe erin; het blok
+  // sprong anders eerst naar een spinnerkaartje en dan hard naar de nieuwe
+  // training (9 okt 2026).
+  const dagFade = (inhoud) => (
+    <div key={`${selectedDay || 'today'}|${todaysWorkout?.customData?.id || todaysWorkout?.workoutKey || 'leeg'}`}
+      style={{ animation: 'dagFade 0.32s cubic-bezier(0.22, 1, 0.36, 1)', opacity: loading ? 0.55 : 1, transition: 'opacity 0.2s ease' }}>
+      <style>{'@keyframes dagFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } } @keyframes spin { to { transform: rotate(360deg); } }'}</style>
+      {inhoud}
+    </div>
+  )
+  if (loading && !ooitGeladen.current) return (
     <div style={{ padding: isMobile ? '1rem' : '1.5rem' }}>
       <div style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '2rem', textAlign: 'center' }}>
         <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }} />
@@ -331,11 +344,11 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   // wegloopt in het zwart met de titel eroverheen. Zonder foto viel de pagina
   // terug op een geel kaartje met een knop, wat er als een foutmelding uitzag.
   // De knop is weg: plannen doe je in de weekstrip die er direct onder staat.
-  if (!todaysWorkout && cardioLijst.length > 0) return (
+  if (!todaysWorkout && cardioLijst.length > 0) return dagFade(
     <CardioVandaag lijst={cardioLijst} isMobile={isMobile} volledig />
   )
 
-  if (!todaysWorkout) return (
+  if (!todaysWorkout) return dagFade(
     <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
       <div style={{
         position: 'absolute', inset: 0,
@@ -471,13 +484,12 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     )
   }
 
-  return (
+  return dagFade(
     <>
       {kop}
       <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{schakelaar}{kaart}</div>
       {/* Staat er die dag ook cardio, dan direct onder de training. */}
       <CardioVandaag lijst={cardioLijst} isMobile={isMobile} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }
