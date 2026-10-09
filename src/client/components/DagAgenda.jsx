@@ -467,7 +467,7 @@ export default function DagAgenda({
           blok, met de tijden rechts — zoals de dagweergave van een
           agenda-app. Beantwoordt "wat moet ik vandaag" zonder scrollen. */}
       {weergave === 'lijst' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: `1px solid ${LIJN_ZACHT}` }}>
           {laden && (
             <div style={{ padding: '1.2rem 0', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
               Dag laden…
@@ -932,10 +932,12 @@ function SlaapActie({ slaap, compact = false }) {
   )
 }
 
-// Eén regel in de lijst, zo rustig mogelijk: foto of icoon, de naam, één
-// tijd rechts en hooguit één actie. Geen streep, geen soortlabel eronder,
-// geen eindtijd (die staat in het rooster). Loopt het blok nu, dan staat er
-// een wit stipje voor de naam. Maaltijd en training: tik op de regel opent.
+// Eén regel in de lijst. Vaste structuur: de tijd helemaal links in een
+// vaste kolom, dan foto of icoon, de naam, en rechts hooguit één actie.
+// Elke regel even hoog, met een dunne lijn ertussen. Loopt het blok nu, dan
+// is de tijd vol wit en staat er een stipje voor; de rest is zachter.
+// Maaltijd en training: tik op de regel opent.
+const REGEL_HOOGTE = 54
 function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezig, slaap = null }) {
   const isMaaltijd = blok.type === 'meal'
   const isTraining = blok.type === 'training'
@@ -947,55 +949,55 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
     : isTraining ? workoutFoto(naam || soort)
     : null
   const opent = onOpen && (isMaaltijd || isTraining)
-  const fotoMaat = isMobile ? 34 : 38
+  const fotoMaat = 34
 
   return (
     <div
       onClick={opent ? () => onOpen(blok) : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: isMobile ? '0.5rem 0' : '0.55rem 0',
-        opacity: afgerond ? 0.45 : 1,
+        height: REGEL_HOOGTE, boxSizing: 'border-box',
+        borderBottom: `1px solid ${LIJN_ZACHT}`,
         cursor: opent ? 'pointer' : 'default',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >
-      {foto ? (
-        <span style={{
-          width: fotoMaat, height: fotoMaat, flexShrink: 0, borderRadius: 9,
-          background: `url(${foto}) center/cover`,
-        }} />
-      ) : (
-        <span style={{ width: fotoMaat, height: fotoMaat, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icoon size={15} color="rgba(255,255,255,0.45)" strokeWidth={2.4} />
-        </span>
-      )}
-
-      <div style={{
-        flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7,
-        fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 800, color: '#fff',
-        letterSpacing: '-0.015em',
-      }}>
-        {bezig && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />}
-        <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam || soort}</span>
-      </div>
-
-      {/* Eén tijd. Tikken verzet hem (zelfde wiel als eerst). Bij een
-          maaltijd staat het moment er zacht voor: 'ontbijt 08:10'. */}
+      {/* Tijd: vaste kolom helemaal links. Tikken verzet hem. */}
       <button
         onClick={(e) => { e.stopPropagation(); onTijd?.() }}
         disabled={!onTijd}
         title={onTijd ? 'Tijd aanpassen' : undefined}
         style={{
-          flexShrink: 0, padding: 0, background: 'transparent', border: 'none', fontFamily: 'inherit',
-          cursor: onTijd ? 'pointer' : 'default', whiteSpace: 'nowrap',
-          fontSize: '0.76rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums',
+          flexShrink: 0, width: 42, padding: 0, textAlign: 'left',
+          background: 'transparent', border: 'none', fontFamily: 'inherit',
+          cursor: onTijd ? 'pointer' : 'default',
+          fontSize: '0.8rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
+          color: bezig ? '#fff' : 'rgba(255,255,255,0.55)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {isMaaltijd && soort && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'lowercase' }}>{soort} </span>}
         {tijd(blok.start)}
       </button>
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, opacity: afgerond ? 0.45 : 1 }}>
+        {foto ? (
+          <span style={{
+            width: fotoMaat, height: fotoMaat, flexShrink: 0, borderRadius: 8,
+            background: `url(${foto}) center/cover`,
+          }} />
+        ) : (
+          <span style={{ width: fotoMaat, height: fotoMaat, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icoon size={15} color="rgba(255,255,255,0.45)" strokeWidth={2.4} />
+          </span>
+        )}
+        {bezig && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />}
+        <span style={{
+          minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.015em',
+        }}>
+          {naam || soort}
+        </span>
+      </div>
 
       {/* Hooguit één actie. */}
       <div style={{ flexShrink: 0, minWidth: 26, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
