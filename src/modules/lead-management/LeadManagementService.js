@@ -695,17 +695,17 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // Let op: `section.leads` is hier BEWUST onvolledig. Alles wat over álle leads
   // moet redeneren (client-side filteren/zoeken over het hele bord) hoort via
   // getSectionLeads() bij te laden of server-side te gebeuren.
-  async getKanbanBoardLight(coachId, perSection = 10) {
+  async getKanbanBoardLight(coachId, perSection = 10, { metVrouwen = true } = {}) {
     try {
       const { data, error } = await this.db.supabase
-        .rpc('get_kanban_board_light', { p_per_section: perSection })
+        .rpc('get_kanban_board_light', { p_per_section: perSection, p_met_vrouwen: metVrouwen })
       if (error) throw error
-      const sections = (data?.sections || []).map(s => ({
-        id: s.id, title: s.title, color: s.color, position: s.position,
+      const sections = (data?.sections || []).map(({ lead_count, ...s }) => ({
+        ...s,
         leads: s.leads || [],
-        leadCount: s.lead_count || 0,
+        leadCount: lead_count || 0,
         // Zolang dit false is heeft de sectie meer leads dan er geladen zijn.
-        leadsComplete: (s.leads || []).length >= (s.lead_count || 0),
+        leadsComplete: (s.leads || []).length >= (lead_count || 0),
       }))
       const un = data?.unassigned || { lead_count: 0, leads: [] }
       sections.push({
