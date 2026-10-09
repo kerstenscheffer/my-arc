@@ -27,6 +27,8 @@ import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
+// Zelfde macro-editor als in het coach-inzicht (Doelen & macro's).
+import DoelenMacrosPaneel from '../../coach-command-center/components/insight/DoelenMacrosPaneel'
 import { pasSupplementenToe } from './plan-analyzer/sjabloonExtras'
 import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
@@ -196,6 +198,16 @@ export default function PlanAnalyzer({
   // Keuzemenuutje van de zwevende 'maaltijd toevoegen'-knop.
   const [toevoegKeuze, setToevoegKeuze] = useState(false)
   const [intakeOpen, setIntakeOpen] = useState(false)
+  // Targets-knop: de macro-editor uit het coach-inzicht, met de lopende fase.
+  const [targetsOpen, setTargetsOpen] = useState(false)
+  const [targetsFase, setTargetsFase] = useState(null)
+  const openTargets = async () => {
+    setTargetsOpen(true)
+    const cId = resolvedClientId || selectedClient?.id
+    if (!cId) return
+    const { data } = await db.supabase.from('client_phases').select('*').eq('client_id', cId).is('ended_on', null).order('started_on', { ascending: false }).limit(1).then(r => r, () => ({ data: [] }))
+    setTargetsFase(data?.[0] || null)
+  }
   const [showPlanLibrary, setShowPlanLibrary] = useState(false)
   const [showTimingModal, setShowTimingModal] = useState(false)
   const [showWeekBalancer, setShowWeekBalancer] = useState(false)
@@ -1608,7 +1620,7 @@ export default function PlanAnalyzer({
         <ClientKiezer clients={clients} selectedClient={selectedClient}
           onSelectClient={onSelectClient} compact m={m} />
         {onOpenTargets && (
-          <button onClick={onOpenTargets} title="Client & targets instellen" style={{
+          <button onClick={openTargets} title="Macro-targets van deze klant" style={{
             width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
             display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
             background: 'rgba(255,255,255,0.025)',
@@ -2270,6 +2282,19 @@ export default function PlanAnalyzer({
       </div>
 
       {/* ════════════ MODALS ════════════ */}
+      {targetsOpen && (clientRecord || selectedClient) && (
+        <BladModal open titel="Doelen & macro's" onClose={() => setTargetsOpen(false)} zIndex={10040}>
+          <div style={{ padding: m ? '0.5rem 0.75rem 1rem' : '0.75rem 1rem 1.25rem' }}>
+            <DoelenMacrosPaneel
+              client={clientRecord || selectedClient} db={db} isMobile={m} fase={targetsFase}
+              onClientUpdate={(bijgewerkt) => {
+                if (bijgewerkt) setClientRecord(prev => ({ ...(prev || {}), ...bijgewerkt }))
+                else if (resolvedClientId) loadClientRecord(resolvedClientId)
+              }}
+            />
+          </div>
+        </BladModal>
+      )}
       {intakeOpen && (clientRecord || selectedClient) && (
         <IntakeSummaryModal db={db} client={clientRecord || selectedClient} isMobile={m} onClose={() => setIntakeOpen(false)} />
       )}
