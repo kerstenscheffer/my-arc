@@ -5,6 +5,7 @@
 // AIDaySchedule zodat er één duidelijke log-actie per pagina overblijft.
 
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { Plus } from 'lucide-react'
 import { useOnderMarge } from '../../../client/components/videoBalkHoogte'
 
@@ -16,7 +17,10 @@ export default function MealLogFAB({ onClick, isMobile: propMobile }) {
   // weer terug — vast op de hoogste stand stond hij raar hoog te zweven.
   const bottom = useOnderMarge(isMobile ? 96 : 102)
 
-  return (
+  // Via een portal: binnen de vaste maaltijdlaag (z-index 1) lag de knop onder
+  // de schaduw van de onderbalk. Nu er net boven (onderbalk 101), maar onder
+  // elk venster dat opengaat.
+  return createPortal(
     <button
       onClick={onClick}
       aria-label="Maaltijd loggen"
@@ -24,7 +28,7 @@ export default function MealLogFAB({ onClick, isMobile: propMobile }) {
         position: 'fixed',
         left: isMobile ? 18 : 28,
         bottom,
-        zIndex: 90,
+        zIndex: 102,
         width: size, height: size,
         borderRadius: '50%',
         background: '#fff',
@@ -56,5 +60,5 @@ export default function MealLogFAB({ onClick, isMobile: propMobile }) {
         Log
       </span>
     </button>
-  )
+  , document.body)
 }
