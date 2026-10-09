@@ -379,17 +379,17 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
         {/* Filters als keuzemenu's (losse tekst met pijltje, lijntje
             ertussen), zelfde taal als de kopbalk van de Workout Builder en
             het wisselvenster op de voedingspagina. Geen systeem-selects. */}
-        <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: isMobile ? '1 1 100%' : '0 1 auto', padding: '0 0.2rem', height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <Keuze waarde={statusFilter} zet={(v) => { setStatusFilter(v); setUrgencyFilter('all') }} isMobile={isMobile}
+        <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: isMobile ? '1 1 100%' : '0 0 auto', padding: '0 0.3rem', height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Keuze vast waarde={statusFilter} zet={(v) => { setStatusFilter(v); setUrgencyFilter('all') }} isMobile={isMobile}
             opties={[{ id: 'active', label: `Actief · ${stats.active}` }, { id: 'inactive', label: `Inactief · ${stats.inactive}` }, { id: 'all', label: `Alle · ${stats.total}` }]} />
           {statusFilter === 'active' && (<>
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-            <Keuze waarde={urgencyFilter} zet={setUrgencyFilter} isMobile={isMobile}
+            <Keuze vast waarde={urgencyFilter} zet={setUrgencyFilter} isMobile={isMobile}
               opties={[{ id: 'all', label: `Alle urgenties · ${stats.active}` }, { id: 'urgent', label: `Urgent · ${stats.urgent}` }, { id: 'warning', label: `Aandacht · ${stats.warning}` }, { id: 'ok', label: `Op schema · ${stats.ok}` }]} />
           </>)}
           {challengeIds.size > 0 && (<>
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-            <Keuze waarde={challengeFilter} zet={setChallengeFilter} isMobile={isMobile} uitlijning="rechts"
+            <Keuze vast waarde={challengeFilter} zet={setChallengeFilter} isMobile={isMobile} uitlijning="rechts"
               opties={[{ id: 'all', label: 'Iedereen' }, { id: 'challenge', label: `Challenge · ${challengeIds.size}` }]} />
           </>)}
         </div>

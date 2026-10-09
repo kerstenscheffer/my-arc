@@ -10,12 +10,14 @@ import { ChevronDown, Check } from 'lucide-react'
 // plaats van een <select>: de systeem-dropdown van de browser is een klein wit
 // lijstje dat niets met de app te maken heeft, en hij opende bovenaan het
 // scherm in plaats van onder de knop.
-function Keuze({ waarde, opties, zet, isMobile, uitlijning = 'links' }) {
+// `vast`: op eigen breedte (voor een rij menu's naast elkaar); anders deelt
+// hij de ruimte gelijk met zijn buren, zoals in het wisselvenster.
+function Keuze({ waarde, opties, zet, isMobile, uitlijning = 'links', vast = false }) {
   const [open, setOpen] = useState(false)
   const gekozen = opties.find(o => o.id === waarde) || opties[0]
 
   return (
-    <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+    <div style={{ flex: vast ? '0 0 auto' : 1, minWidth: 0, position: 'relative' }}>
       <button
         onClick={() => setOpen(v => !v)}
         style={{
