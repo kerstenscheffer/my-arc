@@ -1200,6 +1200,25 @@ export default function PlanAnalyzer({
   // client_meal_plans.template_name — dat is de bron die loadConceptPlan bij
   // terugkomst weer inleest. (De bibliotheek-modal doet iets anders: die legt
   // een los sjabloon in meal_plan_templates en laat dit plan ongemoeid.)
+  // Dit plan weg bij deze klant (niet het sjabloon waar het uit komt).
+  const verwijderHuidigPlan = async () => {
+    const id = planMeta?.id || selectedConceptId
+    if (!id) return
+    if (!window.confirm(`"${planMeta?.name || 'Dit plan'}" verwijderen bij ${clientRecord?.first_name || 'deze klant'}? Sjablonen blijven staan.`)) return
+    const { error } = await db.supabase.from('client_meal_plans').delete().eq('id', id)
+    if (error) { alert('Verwijderen mislukt: ' + error.message); return }
+    setSelectedConceptId(null); setPlanMeta(null); setWeekData(null); setActivated(false)
+    if (resolvedClientId) { loadAllPlanCount(resolvedClientId); loadConceptPlansForClient(resolvedClientId) }
+  }
+
+  // Alle maaltijden uit de week, het plan zelf blijft bestaan.
+  const leegWeek = async () => {
+    if (!weekData) return
+    if (!window.confirm('Alle maaltijden uit dit plan halen? Het plan zelf blijft bestaan.')) return
+    const leeg = weekData.map(d => ({ ...d, meals: {}, totals: calculateTotals({}) }))
+    await applyWeekUpdate(leeg, 'Plan leeggemaakt')
+  }
+
   const handleRenamePlan = async (nextName) => {
     const planId = actievePlanId
     if (!planId) throw new Error('Plan is nog niet opgeslagen')
@@ -1905,7 +1924,7 @@ export default function PlanAnalyzer({
       }}>
 
         {/* Titel van het geladen plan — bewerkbaar, slaat hard op dit plan op. */}
-        {(planMeta || selectedConceptId) && (
+        {(planMeta || selectedConceptId || resolvedClientId) && (
           <PlanTitleBar
             name={planMeta?.name}
             isActive={activated || planMeta?.isActive}
@@ -1915,6 +1934,13 @@ export default function PlanAnalyzer({
             onRename={handleRenamePlan}
             weekSaveState={weekSaveState}
             isMobile={m}
+            clients={clients} selectedClient={selectedClient || clientRecord} onSelectClient={onSelectClient}
+            heeftPlan={!!(planMeta || selectedConceptId)}
+            onSwitch={() => setShowPlanSwitcher(true)}
+            onNew={handleStartBlanco}
+            onDelete={verwijderHuidigPlan}
+            onClear={leegWeek}
+            onSaveTemplate={() => setShowPlanLibrary(true)}
           />
         )}
 
