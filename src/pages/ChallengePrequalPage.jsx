@@ -108,7 +108,15 @@ function bouwPayload(antw, uitkomst, afwijsreden, utm) {
     `Belang (1-10): ${antw.belang || '-'} · Trainen: ${antw.trainen || '-'} · Borg: ${antw.borg || '-'}`,
   ]
   if (afwijsreden) regels.push(`Afgewezen: ${afwijsreden}`)
+  // Alle vragen met hun antwoord, in volgorde: de lead-modal toont dit in
+  // de tab Vragen. Niet beantwoord (afgewezen vóór die vraag) = weggelaten.
+  const antwoorden = VRAGEN.map(q => {
+    const v = q.soort === 'contact' ? antw.telefoon : antw[q.id]
+    const tekst = Array.isArray(v) ? v.join(', ') : (v == null ? '' : String(v)).trim()
+    return tekst ? { vraag: q.vraag, antwoord: tekst } : null
+  }).filter(Boolean)
   return {
+    antwoorden,
     uitkomst, afwijsreden: afwijsreden || '',
     voornaam: antw.voornaam || '', email: antw.email || '', telefoon: antw.telefoon || '',
     qual_goal: [antw.doel, antw.kilos ? `${antw.kilos} kg kwijt` : null].filter(Boolean).join(' · '),

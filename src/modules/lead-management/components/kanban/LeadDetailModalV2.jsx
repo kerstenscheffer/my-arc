@@ -18,7 +18,7 @@ import { useModalHost } from '../../../../coach/ModalHost'
 import {
   X, Trash2, User, Target, Phone as PhoneCall, Magnet, FileText,
   Plus, AlertCircle, Zap, Heart, Flame, Check, Save,
-  ExternalLink, Tag, Trash, Copy, Pencil, MessageSquare, Eraser,
+  ExternalLink, Tag, Trash, Copy, Pencil, MessageSquare, Eraser, ListChecks,
 } from 'lucide-react'
 
 // Default template used when a magnet has no message_template stored. Same
@@ -91,7 +91,11 @@ export default function LeadDetailModalV2({
   coachId = null,
 }) {
   const modalHost = useModalHost()
-  const [activeTab, setActiveTab] = useState(initialTab)
+  // Leads uit de challenge-prekwalificatie krijgen een tab Vragen met alle
+  // antwoorden, en openen daar ook op.
+  const isPrequal = lead?.lead_source === 'challenge_prequal'
+  const tabs = isPrequal ? [{ id: 'vragen', label: 'Vragen', icon: ListChecks }, ...TABS] : TABS
+  const [activeTab, setActiveTab] = useState(isPrequal && initialTab === 'info' ? 'vragen' : initialTab)
 
   // Local edit state — optimistic; persists via debounced onEdit calls.
   const [info, setInfo] = useState({
@@ -441,7 +445,7 @@ export default function LeadDetailModalV2({
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           overflowX: 'auto', WebkitOverflowScrolling: 'touch',
         }}>
-          {TABS.map(tab => {
+          {tabs.map(tab => {
             const Icon = tab.icon
             const active = activeTab === tab.id
             return (
@@ -477,6 +481,7 @@ export default function LeadDetailModalV2({
           flex: 1, overflowY: 'auto',
           padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
         }}>
+          {activeTab === 'vragen' && <VragenTab leadId={lead?.id} />}
           {activeTab === 'info' && (
             <InfoTab info={info} persistInfo={persistInfo} savingField={savingField} campaigns={campaigns} />
           )}
@@ -1396,6 +1401,51 @@ function LeadMessagesTab({ lead, db, coachId, isMobile }) {
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+// Alle antwoorden uit de challenge-prekwalificatie, vraag voor vraag. Haalt
+// ze zelf op: het kaartje op het bord heeft niet alle kolommen. Oudere leads
+// (van vóór de kolom prequal_answers) lezen we uit de samenvatting in de
+// notities.
+function VragenTab({ leadId }) {
+  const [rij, setRij] = useState(null)
+  useEffect(() => {
+    if (!leadId) return
+    let weg = false
+    supabase.from('call_leads').select('prequal_answers, notes, unqualified_reason, created_at').eq('id', leadId).maybeSingle()
+      .then(({ data }) => { if (!weg) setRij(data || {}) }, () => { if (!weg) setRij({}) })
+    return () => { weg = true }
+  }, [leadId])
+
+  if (rij === null) return <div style={{ padding: '1.5rem 0', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', fontWeight: 700 }}>Laden…</div>
+
+  let paren = Array.isArray(rij.prequal_answers) ? rij.prequal_answers : []
+  let kop = null
+  if (!paren.length && rij.notes) {
+    const regels = String(rij.notes).split('\n').map(r => r.trim()).filter(Boolean)
+    if (/^Prekwalificatie/i.test(regels[0] || '')) kop = regels.shift()
+    paren = regels.flatMap(r => r.split(' · ')).map(stuk => {
+      const i = stuk.indexOf(':')
+      return i > 0 ? { vraag: stuk.slice(0, i).trim(), antwoord: stuk.slice(i + 1).trim() } : { vraag: '', antwoord: stuk }
+    }).filter(p => p.antwoord && p.antwoord !== '-')
+  }
+  if (!paren.length) return <div style={{ padding: '1.5rem 0', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', fontWeight: 700 }}>Geen antwoorden gevonden.</div>
+
+  return (
+    <div>
+      {(kop || rij.unqualified_reason) && (
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: '0.75rem', lineHeight: 1.45 }}>
+          {kop}{kop && rij.unqualified_reason ? ' · ' : ''}{rij.unqualified_reason ? `Afgewezen: ${rij.unqualified_reason}` : ''}
+        </div>
+      )}
+      {paren.map((p, i) => (
+        <div key={i} style={{ padding: '0.7rem 0', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+          {p.vraag && <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginBottom: 4, lineHeight: 1.35 }}>{p.vraag}</div>}
+          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{p.antwoord}</div>
+        </div>
+      ))}
     </div>
   )
 }
