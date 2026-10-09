@@ -681,8 +681,9 @@ export default function ClientHome({ client, db, setCurrentView }) {
             toonKop={false}
             toonMacros={false}
             onOpen={(blok) => {
-              // Training: meteen het logscherm van vandaag op de workoutpagina.
-              if (blok.type === 'training') { try { sessionStorage.setItem('myarc_open_workout', '1') } catch { /* geen opslag */ } }
+              // Training: meteen het logscherm van die dag op de workoutpagina.
+              // De dag gaat mee, anders opent morgen 'Pull' de 'Push' van vandaag.
+              if (blok.type === 'training') { try { sessionStorage.setItem('myarc_open_workout', blok.day || '1') } catch { /* geen opslag */ } }
               setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')
             }}
           />

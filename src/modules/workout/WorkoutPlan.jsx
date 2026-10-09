@@ -106,13 +106,14 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
   }, [schema?.id])
 
   // Vanuit de agenda op home ('Push' → play): meteen het logscherm van
-  // vandaag openen. Home zet een seintje in sessionStorage en wisselt naar
+  // die dag openen (seintje = dagsleutel, '1' = vandaag). Home zet een seintje in sessionStorage en wisselt naar
   // deze pagina; hier pakken we het één keer op.
   useEffect(() => {
     let seintje = null
     try { seintje = sessionStorage.getItem('myarc_open_workout'); sessionStorage.removeItem('myarc_open_workout') } catch { /* geen opslag */ }
     if (!seintje) return
-    setSelectedDayIdx(todayIndex)
+    const dagIdx = DAY_KEYS.indexOf(seintje)
+    setSelectedDayIdx(dagIdx >= 0 ? dagIdx : todayIndex)
     setWorkoutOpen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
