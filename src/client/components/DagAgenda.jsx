@@ -199,7 +199,9 @@ export default function DagAgenda({
     const lijst = [...(data?.blocksByDay?.[dag] || [])]
     const ochtend = lijst.find(b => b.type === 'sleep' && (b.meta?.wrapHalf === 'early' || b.start < 12 * 60))
     const opstaan = ochtend ? ochtend.end : 7 * 60
-    lijst.push({ id: `weging-${dag}`, day: dag, type: 'weging', label: 'Wegen', start: opstaan, end: opstaan + 5, meta: { virtueel: true } })
+    // Wegen standaard tien minuten na het opstaan (eerst plassen, dan wegen).
+    const wegen = Math.min(opstaan + 10, 24 * 60 - 5)
+    lijst.push({ id: `weging-${dag}`, day: dag, type: 'weging', label: 'Wegen', start: wegen, end: wegen + 5, meta: { virtueel: true } })
     return lijst.sort((a, b) => (lijstTijd(a) - lijstTijd(b)) || (a.type === 'sleep' ? -1 : b.type === 'sleep' ? 1 : 0) || (a.end - b.end))
   }, [data, dag])
 
