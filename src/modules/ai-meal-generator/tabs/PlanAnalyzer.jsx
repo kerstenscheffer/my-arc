@@ -26,6 +26,7 @@ import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
+import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 import { pasSupplementenToe } from './plan-analyzer/sjabloonExtras'
 import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
@@ -194,6 +195,7 @@ export default function PlanAnalyzer({
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
   // Keuzemenuutje van de zwevende 'maaltijd toevoegen'-knop.
   const [toevoegKeuze, setToevoegKeuze] = useState(false)
+  const [intakeOpen, setIntakeOpen] = useState(false)
   const [showPlanLibrary, setShowPlanLibrary] = useState(false)
   const [showTimingModal, setShowTimingModal] = useState(false)
   const [showWeekBalancer, setShowWeekBalancer] = useState(false)
@@ -1542,7 +1544,9 @@ export default function PlanAnalyzer({
   // Toggle een sectie in het dock-paneel (klik zelfde knop = sluiten).
   const toggleDock = (id) => setDockedSection(d => d === id ? null : id)
   const sidebarNav = [
-    { id: 'client', icon: '👤',                    label: 'Client',  active: dockedSection === 'client', onClick: () => toggleDock('client') },
+    // Client opent de intake van deze klant (zelfde venster als in CoachHub),
+    // niet meer het zijvak met klantinfo (9 okt 2026).
+    { id: 'client', icon: '👤',                    label: 'Client',  active: intakeOpen, onClick: () => setIntakeOpen(true) },
     { id: 'timing', icon: <Clock size={18} />,     label: 'Tijden',  active: dockedSection === 'timing', onClick: () => toggleDock('timing') },
     { id: 'dagen',  icon: <CalendarDays size={18} />, label: 'Dagen', active: dockedSection === 'dagen', onClick: () => toggleDock('dagen') },
     { id: 'week',   icon: <Grid3X3 size={18} />,   label: 'Week',    active: viewMode === 'week',        onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
@@ -2245,6 +2249,9 @@ export default function PlanAnalyzer({
       </div>
 
       {/* ════════════ MODALS ════════════ */}
+      {intakeOpen && (clientRecord || selectedClient) && (
+        <IntakeSummaryModal db={db} client={clientRecord || selectedClient} isMobile={m} onClose={() => setIntakeOpen(false)} />
+      )}
       {/* Waar geldt een bewerking? Zelfde blad als na een wissel. */}
       <BladModal
         open={!!editBereik}
