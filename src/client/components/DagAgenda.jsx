@@ -283,6 +283,8 @@ export default function DagAgenda({
       }),
     }
   }
+
+
   const nuMin = nu.getHours() * 60 + nu.getMinutes()
   const toonNuLijn = isVandaag && nuMin >= van && nuMin <= tot
 
@@ -344,6 +346,42 @@ export default function DagAgenda({
   }
 
   const sleutelVan = (blok) => blok.sourceId || `type:${String(blok.meta?.slot || '').replace(/\d+$/, '')}`
+
+  // ── Dagvoortgang ── Wat er vandaag af te vinken valt en hoeveel daarvan
+  // gedaan is: maaltijden, de nacht (als die voorbij is) en wegen. Een
+  // training kan de agenda nog niet als gedaan herkennen; die telt niet mee.
+  const voortgang = useMemo(() => {
+    let totaal = 0, gedaan = 0
+    lijstBlokken.forEach(b => {
+      if (b.type === 'meal') { totaal++; if (gelogd[sleutelVan(b)]) gedaan++ }
+      else if (b.type === 'sleep') { const z = slaapVan(b); if (z?.kan && z.datum === slaapDagIso) { totaal++; if (z.gelogd) gedaan++ } }
+      else if (b.type === 'weging') { const w = wegenVan(b); if (w?.kan) { totaal++; if (w.gelogd != null) gedaan++ } }
+    })
+    return { totaal, gedaan, rond: totaal > 0 && gedaan === totaal }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lijstBlokken, gelogd, slaapLogs, gewogenOp, slaapDagIso])
+  // Confetti als je zelf de laatste afvinkt; één keer per dag.
+  const [confetti, setConfetti] = useState(0)
+  const vorigeRond = useRef(null)
+  useEffect(() => {
+    if (laden) return
+    const was = vorigeRond.current
+    vorigeRond.current = voortgang.rond
+    if (was === false && voortgang.rond && Date.now() - (window.__arcLaatsteTik || 0) < 120000) {
+      const k = `arc_dag_rond_${slaapDagIso}`
+      let al = false
+      try { al = !!localStorage.getItem(k); localStorage.setItem(k, '1') } catch { /* geen opslag */ }
+      if (!al) {
+        setConfetti(c => c + 1)
+        if (navigator.vibrate) navigator.vibrate([20, 60, 20, 60, 40])
+      }
+    }
+  }, [voortgang.rond, laden, slaapDagIso])
+  useEffect(() => {
+    if (!confetti) return
+    const t = setTimeout(() => setConfetti(0), 2600)
+    return () => clearTimeout(t)
+  }, [confetti])
 
   // Afvinken vanuit de agenda schrijft dezelfde rij als de maaltijdpagina:
   // consumed_meals met source 'plan_check'. Anders zou het vinkje hier niet
@@ -489,6 +527,62 @@ export default function DagAgenda({
           </button>
         )}
       </div>
+
+      {/* Dagvoortgang: hoeveel van wat er af te vinken valt, is gedaan. */}
+      {voortgang.totaal > 0 && (
+        <div style={{ flexShrink: 0, paddingBottom: isMobile ? 10 : 12 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 6 }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 900, color: voortgang.rond ? '#10b981' : '#fff', letterSpacing: '-0.01em', transition: 'color 0.4s ease' }}>
+              {voortgang.rond ? 'Dag rond' : `${voortgang.gedaan} van ${voortgang.totaal} gedaan`}
+            </span>
+            <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 900, color: voortgang.rond ? '#10b981' : 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
+              {Math.round((voortgang.gedaan / voortgang.totaal) * 100)}%
+            </span>
+          </div>
+          <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div style={{
+              width: `${(voortgang.gedaan / voortgang.totaal) * 100}%`, height: '100%', borderRadius: 2,
+              background: voortgang.rond ? '#10b981' : '#fff',
+              transition: 'width 0.6s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s ease',
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* Confetti bij 'Dag rond': kort, over de lijst heen, niet aantikbaar. */}
+      {confetti > 0 && createPortal(
+        <div key={confetti} aria-hidden style={{ position: 'fixed', inset: 0, zIndex: 2147482900, pointerEvents: 'none', overflow: 'hidden' }}>
+          <style>{`
+            @keyframes arcConfetti { 0% { transform: translate3d(0,-10vh,0) rotate(0deg); opacity: 1 } 100% { transform: translate3d(var(--dx), 105vh, 0) rotate(var(--rot)); opacity: 0.9 } }
+            @keyframes arcDagRond { 0% { transform: translate(-50%,-50%) scale(0.6); opacity: 0 } 20% { transform: translate(-50%,-50%) scale(1.08); opacity: 1 } 35% { transform: translate(-50%,-50%) scale(1) } 80% { opacity: 1 } 100% { opacity: 0 } }
+          `}</style>
+          {Array.from({ length: 70 }, (_, i) => {
+            const kleur = ['#10b981', '#ffffff', '#facc15', '#34d399', '#e5e7eb'][i % 5]
+            const links = (i * 37) % 100
+            const vertraging = (i % 14) * 0.06
+            const duur = 1.6 + ((i * 13) % 9) / 10
+            return (
+              <span key={i} style={{
+                position: 'absolute', top: 0, left: `${links}%`,
+                width: i % 3 === 0 ? 6 : 8, height: i % 3 === 0 ? 10 : 5, borderRadius: i % 4 === 0 ? '50%' : 1.5,
+                background: kleur, '--dx': `${((i * 23) % 60) - 30}px`, '--rot': `${(i * 97) % 720}deg`,
+                animation: `arcConfetti ${duur}s cubic-bezier(0.25, 0.6, 0.4, 1) ${vertraging}s forwards`,
+              }} />
+            )
+          })}
+          <div style={{
+            position: 'absolute', left: '50%', top: '42%',
+            padding: '0.8rem 1.2rem', borderRadius: 16, background: 'rgba(10,10,10,0.92)',
+            border: '1px solid rgba(16,185,129,0.5)', color: '#fff', textAlign: 'center',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+            animation: 'arcDagRond 2.4s ease forwards',
+          }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Alles gedaan vandaag</div>
+            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#10b981', marginTop: 2 }}>Dag rond</div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Lijst: wat er vandaag staat, van vroeg naar laat. Eén regel per
           blok, met de tijden rechts — zoals de dagweergave van een
@@ -997,7 +1091,7 @@ function ActieKnop({ gedaan, titel, onClick, icoon }) {
   const bezigMetVieren = vier > 0
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); aangetikt.current = Date.now(); onClick?.() }}
+      onClick={(e) => { e.stopPropagation(); aangetikt.current = Date.now(); window.__arcLaatsteTik = Date.now(); onClick?.() }}
       title={titel} aria-label={titel}
       style={{
         ...kaartKnop, width: 30, height: 30, position: 'relative', overflow: 'visible',
@@ -1077,15 +1171,7 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
       {/* De foto vult de regel van lijn tot lijn: geen ronde hoeken, geen
           marge boven of onder. Regels zonder foto houden dezelfde breedte vrij,
           zodat de namen recht onder elkaar staan. */}
-      <div style={{
-        flex: 1, minWidth: 0, alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: 12,
-        // Afgevinkt: rustig weg dimmen en een stukje inschuiven, zodat wat
-        // nog te doen is naar voren komt. De overgang zelf is het moment.
-        opacity: afgerond ? 0.4 : 1,
-        transform: afgerond ? 'translateX(8px)' : 'none',
-        filter: afgerond ? 'grayscale(0.6)' : 'none',
-        transition: 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s ease',
-      }}>
+      <div style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: 12, opacity: afgerond ? 0.45 : 1 }}>
         {foto ? (
           <span style={{
             width: fotoMaat, alignSelf: 'stretch', flexShrink: 0,
