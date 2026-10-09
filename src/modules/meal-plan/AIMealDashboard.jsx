@@ -536,7 +536,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       <div style={{
         flexShrink: 0,
         display: 'flex', alignItems: 'stretch',
-        height: isMobile ? 40 : 48,
+        height: isMobile ? 48 : 56,
         paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
         boxSizing: 'content-box',
         background: '#0a0a0a',
@@ -544,22 +544,23 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       }}>
         {(() => {
           const knop = (aan, kant) => ({
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            // Tekst boven, icoon eronder.
+            display: 'inline-flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
             padding: isMobile ? '0 0.9rem' : '0 1.2rem',
             background: 'transparent', border: 'none',
             // Alleen een haarlijn aan de binnenkant; geen doos om de knop.
             [kant === 'links' ? 'borderRight' : 'borderLeft']: `1px solid ${LIJN_BOVENBALK}`,
             color: aan ? '#fff' : 'rgba(255,255,255,0.55)',
-            fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 900,
-            letterSpacing: '-0.015em',
+            fontSize: isMobile ? '0.7rem' : '0.76rem', fontWeight: 900, lineHeight: 1,
+            letterSpacing: '-0.01em',
             fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           })
           return (
             <>
               <button onClick={() => setShopOpen(true)} title="Boodschappenlijst" style={knop(true, 'links')}>
-                <ShoppingCart size={16} strokeWidth={2.8} />
                 Boodschappen
+                <ShoppingCart size={16} strokeWidth={2.8} />
               </button>
               {/* Lege ruimte tussen de twee lijntjes. */}
               <div style={{ flex: 1 }} />
@@ -569,8 +570,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
                 title="Inzicht van deze dag"
                 style={knop(true, 'rechts')}
               >
-                <BarChart3 size={16} strokeWidth={2.8} />
                 Inzicht
+                <BarChart3 size={16} strokeWidth={2.8} />
               </button>
               <button
                 onClick={toggleMealPlanVisible}
@@ -580,10 +581,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
                 title={mealPlanVisible ? 'Maaltijdplan verbergen' : 'Maaltijdplan tonen'}
                 style={{ ...knop(mealPlanVisible, 'rechts'), opacity: savingVisibility ? 0.6 : 1 }}
               >
+                Plan tonen
                 {mealPlanVisible
                   ? <Eye size={16} strokeWidth={2.8} />
                   : <EyeOff size={16} strokeWidth={2.8} />}
-                Plan tonen
               </button>
             </>
           )
