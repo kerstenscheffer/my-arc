@@ -136,23 +136,58 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', zIndex: 10500, animation: 'infoFadeIn 0.2s ease' }}>
       <div onClick={e => e.stopPropagation()} style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: isMobile ? '100%' : '600px', width: '100%', margin: '0 auto', background: '#0a0a0a', overflow: 'hidden' }}>
 
+        {/* ════ ZWARTE BALK BOVEN DE FOTO ════
+            Zelfde vorm als de balk boven de dag (Boodschappen / Plan tonen):
+            knoppen zonder kader over de volle hoogte, haarlijn aan de
+            binnenkant. Meal prep links, Aanpassen en sluiten rechts. Eerder
+            lagen ze als gekleurde pillen op de foto. */}
+        <div style={{
+          flexShrink: 0,
+          display: 'flex', alignItems: 'stretch',
+          height: isMobile ? 40 : 48,
+          paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
+          boxSizing: 'content-box',
+          background: '#0a0a0a',
+          borderBottom: '1px solid rgba(255,255,255,0.12)',
+        }}>
+          {(() => {
+            const LIJN = '1px solid rgba(255,255,255,0.12)'
+            const knop = (kant) => ({
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: isMobile ? '0 0.9rem' : '0 1.2rem',
+              background: 'transparent', border: 'none',
+              [kant === 'links' ? 'borderRight' : 'borderLeft']: LIJN,
+              color: '#fff',
+              fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 900,
+              letterSpacing: '-0.015em',
+              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            })
+            return (
+              <>
+                {canPrep && (
+                  <button onClick={() => setShowPrep(true)} style={knop('links')}>
+                    <ChefHat size={16} strokeWidth={2.8} /> Meal prep
+                  </button>
+                )}
+                <div style={{ flex: 1 }} />
+                {canEdit && (
+                  <button onClick={() => setShowEdit(true)} style={knop('rechts')}>
+                    <Pencil size={16} strokeWidth={2.8} /> Aanpassen
+                  </button>
+                )}
+                <button onClick={onClose} aria-label="Sluiten" title="Sluiten" style={{ ...knop('rechts'), padding: 0, width: isMobile ? 48 : 56 }}>
+                  <X size={18} strokeWidth={2.8} />
+                </button>
+              </>
+            )
+          })()}
+        </div>
+
         {/* Hero */}
         <div style={{ position: 'relative', height: isMobile ? '180px' : '220px', flexShrink: 0 }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${getMealImage()})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0) 30%, rgba(10,10,10,0.8) 70%, #0a0a0a 100%)' }} />
-          {/* Knoprij rechtsboven. Deze knoppen stonden los gepositioneerd met
-              een vaste right-offset per knop; bij een derde knop erbij ga je
-              dan zitten rekenen en schuift er eentje over de ander. Eén flex-rij
-              legt ze vanzelf naast elkaar. */}
-          <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            {canPrep && (
-              <button onClick={() => setShowPrep(true)} style={{ height: '36px', padding: '0 0.8rem', background: '#22c55e', border: 'none', borderRadius: '10px', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><ChefHat size={13} /> Meal preppen</button>
-            )}
-            {canEdit && (
-              <button onClick={() => setShowEdit(true)} style={{ height: '36px', padding: '0 0.8rem', background: '#fff', border: 'none', borderRadius: '10px', color: '#0a0a0a', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Pencil size={13} /> Aanpassen</button>
-            )}
-            <button onClick={onClose} style={{ width: '36px', height: '36px', flexShrink: 0, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={18} /></button>
-          </div>
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0) 30%, rgba(10,10,10,0.8) 70%, #0a0a0a 100%)' }} />
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 1rem' }}>
             <div style={{ fontSize: isMobile ? '1.5rem' : '1.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', marginBottom: '0.4rem', lineHeight: 1.1, textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
               {meal.name || meal.meal_name}
