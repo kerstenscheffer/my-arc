@@ -383,6 +383,39 @@ export default function DagAgenda({
     return () => clearTimeout(t)
   }, [confetti])
 
+  // ── Deck van afgeronde dingen ──
+  // Wat gedaan is, verdwijnt uit de lijst naar een stapeltje kaarten onder de
+  // voortgangsbalk. Vink je zelf iets af, dan klapt de regel eerst in en
+  // schiet hij omhoog (inklappen), daarna ligt hij op het deck.
+  const isGedaan = (b) => {
+    if (b.type === 'meal') return !!gelogd[sleutelVan(b)]
+    if (b.type === 'sleep') { const z = slaapVan(b); return !!(z?.kan && z.gelogd) }
+    if (b.type === 'weging') { const w = wegenVan(b); return !!(w?.kan && w.gelogd != null) }
+    return false
+  }
+  const gedaanBlokken = lijstBlokken.filter(isGedaan)
+  const gedaanIds = gedaanBlokken.map(b => b.id).join('|')
+  const [inklappen, setInklappen] = useState({}) // id → true tijdens de animatie
+  const [deckOpen, setDeckOpen] = useState(false)
+  const [deckPop, setDeckPop] = useState(0)
+  const vorigeGedaan = useRef(null)
+  useEffect(() => {
+    if (laden) return
+    const nu = new Set(gedaanIds ? gedaanIds.split('|') : [])
+    const was = vorigeGedaan.current
+    vorigeGedaan.current = nu
+    if (!was) return
+    const nieuw = [...nu].filter(id => !was.has(id))
+    if (!nieuw.length) return
+    setDeckPop(p => p + 1)
+    if (Date.now() - (window.__arcLaatsteTik || 0) > 120000) return
+    setInklappen(prev => { const n = { ...prev }; nieuw.forEach(id => { n[id] = true }); return n })
+    const t = setTimeout(() => setInklappen(prev => { const n = { ...prev }; nieuw.forEach(id => { delete n[id] }); return n }), 560)
+    return () => clearTimeout(t)
+  }, [gedaanIds, laden])
+  // Andere dag: opnieuw beginnen, geen animaties van de vorige dag.
+  useEffect(() => { vorigeGedaan.current = null; setDeckOpen(false); setInklappen({}) }, [dag, weekAnker])
+
   // Afvinken vanuit de agenda schrijft dezelfde rij als de maaltijdpagina:
   // consumed_meals met source 'plan_check'. Anders zou het vinkje hier niet
   // meetellen in de macro's daar, en andersom.
@@ -603,20 +636,101 @@ export default function DagAgenda({
               <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>Niets gepland op deze dag</span>
             </div>
           )}
-          {lijstBlokken.map(b => (
-            <LijstRegel
-              key={b.id}
-              blok={b}
-              isMobile={isMobile}
-              onOpen={onOpen}
-              afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
-              onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
-              onTijd={b.type === 'weging' ? null : () => setBewerk(b)}
-              bezig={toonNuLijn && nuMin >= b.start && nuMin < b.end}
-              slaap={slaapVan(b)}
-              wegen={wegenVan(b)}
-            />
+          <style>{`
+            @keyframes arcInklappen { 0% { max-height: 60px; opacity: 1; transform: translateY(0) scale(1) } 55% { opacity: 0.6; transform: translateY(-14px) scale(0.97) } 100% { max-height: 0; opacity: 0; transform: translateY(-34px) scale(0.92) } }
+            @keyframes arcDeckPop { 0% { transform: scale(1) } 35% { transform: scale(1.04) translateY(-2px) } 100% { transform: scale(1) } }
+            @keyframes arcDeckUit { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
+          `}</style>
+
+          {/* Het deck: stapeltje kaarten van wat gedaan is. Tik om open te waaieren. */}
+          {gedaanBlokken.length > 0 && (() => {
+            const fotos = gedaanBlokken.slice(-3).reverse().map(b => (
+              b.type === 'meal'
+                ? (resolveFoodImage({ image_url: b.meta?.image_url, name: b.sublabel }) || foodImageFallback(b.sublabel, b.meta?.slot, 120))
+                : null
+            ))
+            return (
+              <div style={{ padding: '10px 0 6px' }}>
+                <button
+                  onClick={() => setDeckOpen(o => !o)}
+                  aria-expanded={deckOpen}
+                  style={{
+                    position: 'relative', width: '100%', height: 52, padding: 0, background: 'transparent', border: 'none',
+                    cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {/* Kaarten erachter, iets scheef en kleiner: het stapeltje. */}
+                  {gedaanBlokken.length > 2 && <span style={{ position: 'absolute', left: 14, right: 14, top: 0, height: 44, borderRadius: 12, background: '#121212', border: '1px solid rgba(255,255,255,0.06)', transform: 'rotate(-1.6deg)' }} />}
+                  {gedaanBlokken.length > 1 && <span style={{ position: 'absolute', left: 7, right: 7, top: 3, height: 46, borderRadius: 12, background: '#151515', border: '1px solid rgba(255,255,255,0.08)', transform: 'rotate(1.2deg)' }} />}
+                  <span key={deckPop} style={{
+                    position: 'absolute', left: 0, right: 0, top: 6, height: 46, borderRadius: 12,
+                    background: '#181818', border: '1px solid rgba(16,185,129,0.35)',
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
+                    animation: deckPop ? 'arcDeckPop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1)' : 'none',
+                  }}>
+                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Check size={13} strokeWidth={3.4} color="#0a0a0a" />
+                    </span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
+                      {gedaanBlokken.length} gedaan
+                    </span>
+                    <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                      {fotos.map((f, i) => (
+                        <span key={i} style={{
+                          width: 26, height: 26, borderRadius: 7, marginLeft: i ? -8 : 0,
+                          border: '2px solid #181818', background: f ? `url(${f}) center/cover` : 'rgba(255,255,255,0.08)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          {!f && <Check size={12} strokeWidth={3} color="#10b981" />}
+                        </span>
+                      ))}
+                      <ChevronRight size={16} strokeWidth={3} color="rgba(255,255,255,0.45)" style={{ marginLeft: 8, transform: deckOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
+                    </span>
+                  </span>
+                </button>
+
+                {/* Opengewaaierd: alles wat gedaan is, terug te draaien. */}
+                {deckOpen && (
+                  <div style={{ marginTop: 8, animation: 'arcDeckUit 0.25s ease' }}>
+                    {gedaanBlokken.map(b => (
+                      <LijstRegel
+                        key={`gedaan-${b.id}`}
+                        blok={b}
+                        isMobile={isMobile}
+                        onOpen={onOpen}
+                        afgerond
+                        onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+                        onTijd={b.type === 'weging' ? null : () => setBewerk(b)}
+                        bezig={false}
+                        slaap={slaapVan(b)}
+                        wegen={wegenVan(b)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Wat nog moet. Net afgevinkt? Dan klapt de regel eerst in en
+              schiet hij omhoog naar het deck. */}
+          {lijstBlokken.filter(b => !isGedaan(b) || inklappen[b.id]).map(b => (
+            <div key={b.id} style={inklappen[b.id] ? { overflow: 'hidden', animation: 'arcInklappen 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards' } : undefined}>
+              <LijstRegel
+                blok={b}
+                isMobile={isMobile}
+                onOpen={onOpen}
+                afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
+                onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+                onTijd={b.type === 'weging' ? null : () => setBewerk(b)}
+                bezig={toonNuLijn && nuMin >= b.start && nuMin < b.end}
+                slaap={slaapVan(b)}
+                wegen={wegenVan(b)}
+              />
+            </div>
           ))}
+          {!laden && gedaanBlokken.length > 0 && gedaanBlokken.length === lijstBlokken.filter(b => b.type === 'meal' || b.type === 'weging' || b.type === 'sleep').length && lijstBlokken.every(b => isGedaan(b) || !['meal', 'weging'].includes(b.type)) && null}
         </div>
       )}
 
