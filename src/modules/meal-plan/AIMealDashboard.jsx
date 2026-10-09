@@ -4,6 +4,7 @@
 // ✅ v6.2 - Added: SupplementPlanPanel integration
 // ✅ v6.3 - Fixed: Supplement button styled to match dashboard design
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { SkeletStijl, SkeletBlok, SkeletKaart } from '../../ui/Skelet'
 import AIMealPlanService from './AIMealPlanService'
 
@@ -39,8 +40,6 @@ const DAYS_OF_WEEK = [
 // Kop van de voedingspagina: foto die onderin dood loopt in het zwart, met de
 // titel eroverheen. Zelfde vorm als de kop van de workout-pagina, zodat de
 // twee pagina's op elkaar lijken.
-// Haarlijn in de bovenbalk van de maaltijdpagina.
-const LIJN_BOVENBALK = 'rgba(255,255,255,0.12)'
 
 const MEAL_BANNER_URL = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1200&h=700&fit=crop&q=80'
 
@@ -536,11 +535,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       <div style={{
         flexShrink: 0,
         display: 'flex', alignItems: 'stretch',
-        height: isMobile ? 44 : 50,
+        height: isMobile ? 34 : 40,
         paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
         boxSizing: 'content-box',
         background: '#0a0a0a',
-        borderBottom: `1px solid ${LIJN_BOVENBALK}`,
       }}>
         {(() => {
           const knop = (aan) => ({
@@ -548,7 +546,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
             padding: isMobile ? '0 0.9rem' : '0 1.2rem',
             background: 'transparent', border: 'none',
             // Alleen het icoon: geen tekst, geen lijntjes ertussen.
-            minWidth: isMobile ? 48 : 56,
+            minWidth: isMobile ? 42 : 48,
             color: aan ? '#fff' : 'rgba(255,255,255,0.55)',
             fontSize: isMobile ? '0.7rem' : '0.76rem', fontWeight: 900, lineHeight: 1,
             letterSpacing: '-0.01em',
@@ -558,7 +556,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           return (
             <>
               <button onClick={() => setShopOpen(true)} title="Boodschappenlijst" aria-label="Boodschappenlijst" style={knop(true)}>
-                <ShoppingCart size={20} strokeWidth={2.6} />
+                <ShoppingCart size={17} strokeWidth={2.6} />
               </button>
               {/* Lege ruimte tussen de twee lijntjes. */}
               <div style={{ flex: 1 }} />
@@ -569,7 +567,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
                 aria-label="Inzicht van deze dag"
                 style={knop(true)}
               >
-                <BarChart3 size={20} strokeWidth={2.6} />
+                <BarChart3 size={17} strokeWidth={2.6} />
               </button>
               <button
                 onClick={toggleMealPlanVisible}
@@ -581,8 +579,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
                 style={{ ...knop(mealPlanVisible), opacity: savingVisibility ? 0.6 : 1 }}
               >
                 {mealPlanVisible
-                  ? <Eye size={20} strokeWidth={2.6} />
-                  : <EyeOff size={20} strokeWidth={2.6} />}
+                  ? <Eye size={17} strokeWidth={2.6} />
+                  : <EyeOff size={17} strokeWidth={2.6} />}
               </button>
             </>
           )
@@ -725,10 +723,13 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       />
 
       {/* Boodschappenlijst: schermvullend over de maaltijdpagina heen. */}
-      {shopOpen && (
+      {/* Via een portal: binnen de vaste maaltijdlaag (z-index 1) viel de
+          onderbalk over de lijst heen, vooral zichtbaar in de PWA. */}
+      {shopOpen && createPortal(
         <div style={{
           position: 'fixed', inset: 0, zIndex: 2147483000,
           background: '#0a0a0a', display: 'flex', flexDirection: 'column',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}>
           <div style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
@@ -755,7 +756,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <ShoppingHub client={client} db={db} />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* De dagen die je coach klaarzette, achter een tab tegen de linkerrand.
