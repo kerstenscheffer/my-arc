@@ -262,6 +262,32 @@ export default function DagAgenda({
     window.addEventListener('myarc:gewicht-gelogd', laadWeging)
     return () => { weg = true; window.removeEventListener('myarc:gewicht-gelogd', laadWeging) }
   }, [client?.id, db, slaapDagIso, versie])
+  // Training telt als gedaan bij de helft of meer van de geplande oefeningen
+  // met minstens één gelogde set (zelfde bron als de workoutpagina:
+  // workout_sessions + workout_progress van die datum).
+  const [gelogdeOefeningen, setGelogdeOefeningen] = useState(0)
+  useEffect(() => {
+    if (!client?.id || !db?.supabase || !slaapDagIso) return
+    let weg = false
+    const laad = async () => {
+      const { data: sessies } = await db.supabase.from('workout_sessions').select('id')
+        .eq('client_id', client.id).eq('workout_date', slaapDagIso).then(r => r, () => ({ data: [] }))
+      const ids = (sessies || []).map(x => x.id)
+      if (!ids.length) { if (!weg) setGelogdeOefeningen(0); return }
+      const { data: rijen } = await db.supabase.from('workout_progress').select('exercise_name, sets')
+        .in('session_id', ids).then(r => r, () => ({ data: [] }))
+      const namen = new Set((rijen || []).filter(r => Array.isArray(r.sets) ? r.sets.length > 0 : true).map(r => String(r.exercise_name || '').toLowerCase()).filter(Boolean))
+      if (!weg) setGelogdeOefeningen(namen.size)
+    }
+    laad()
+    window.addEventListener('myarc:workout-changed', laad)
+    return () => { weg = true; window.removeEventListener('myarc:workout-changed', laad) }
+  }, [client?.id, db, slaapDagIso, versie])
+  const trainingGedaan = (b) => {
+    if (b.type !== 'training' || !gelogdeOefeningen) return false
+    const gepland = Number(b.meta?.exercise_count) || 0
+    return gepland > 0 ? gelogdeOefeningen / gepland >= 0.5 : gelogdeOefeningen >= 3
+  }
   const wegenVan = (b) => (b.type === 'weging' && slaapDagIso ? {
     kan: slaapDagIso <= toIsoDate(nu),
     gelogd: gewogenOp,
@@ -356,10 +382,11 @@ export default function DagAgenda({
       if (b.type === 'meal') { totaal++; if (gelogd[sleutelVan(b)]) gedaan++ }
       else if (b.type === 'sleep') { const z = slaapVan(b); if (z?.kan && z.datum === slaapDagIso) { totaal++; if (z.gelogd) gedaan++ } }
       else if (b.type === 'weging') { const w = wegenVan(b); if (w?.kan) { totaal++; if (w.gelogd != null) gedaan++ } }
+      else if (b.type === 'training') { totaal++; if (trainingGedaan(b)) gedaan++ }
     })
     return { totaal, gedaan, rond: totaal > 0 && gedaan === totaal }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lijstBlokken, gelogd, slaapLogs, gewogenOp, slaapDagIso])
+  }, [lijstBlokken, gelogd, slaapLogs, gewogenOp, slaapDagIso, gelogdeOefeningen])
   // Confetti als je zelf de laatste afvinkt; één keer per dag.
   const [confetti, setConfetti] = useState(0)
   const vorigeRond = useRef(null)
@@ -391,6 +418,7 @@ export default function DagAgenda({
     if (b.type === 'meal') return !!gelogd[sleutelVan(b)]
     if (b.type === 'sleep') { const z = slaapVan(b); return !!(z?.kan && z.gelogd) }
     if (b.type === 'weging') { const w = wegenVan(b); return !!(w?.kan && w.gelogd != null) }
+    if (b.type === 'training') return trainingGedaan(b)
     return false
   }
   const gedaanBlokken = lijstBlokken.filter(isGedaan)
@@ -605,6 +633,7 @@ export default function DagAgenda({
               {gedaanBlokken.map((b, i) => {
                 const foto = b.type === 'meal'
                   ? (resolveFoodImage({ image_url: b.meta?.image_url, name: b.sublabel }) || foodImageFallback(b.sublabel, b.meta?.slot, 120))
+                  : b.type === 'training' ? workoutFoto(b.sublabel || b.label || 'Training')
                   : null
                 const Icoon = ICOON[b.type] || Check
                 const rot = ((i * 37) % 9) - 4
