@@ -98,6 +98,10 @@ export default function MealCard({
   const slotLabel = meal?.display_label || SLOT_LABELS[slot] || slot
   // Venster 'moment bewerken' (soort maaltijd + tijd), via tik op de foto.
   const [momentOpen, setMomentOpen] = useState(null)   // null of de positie van de foto
+  // Naam bewerken: null = niet bezig; naamKeuze = vraag 'deze dag of elke dag'.
+  const [naamEdit, setNaamEdit] = useState(null)
+  const [naamKeuze, setNaamKeuze] = useState(false)
+  const naamKnop = (vol) => ({ padding: '0.25rem 0.55rem', borderRadius: 6, fontFamily: 'inherit', fontSize: '0.68rem', fontWeight: 900, cursor: 'pointer', background: vol ? '#fff' : 'rgba(255,255,255,0.06)', color: vol ? '#0a0a0a' : '#fff', border: '1px solid rgba(255,255,255,0.14)' })
   const slotTime  = meal?.timing || SLOT_TIMES[slot] || ''
   const rawIngredients = meal?.ingredients_list || meal?.ingredients || null
   const ingredientList = parseIngredients(rawIngredients)
@@ -295,16 +299,43 @@ export default function MealCard({
             display: 'flex', alignItems: 'baseline', gap: 6,
             marginBottom: 4,
           }}>
-            <div style={{
-              flex: 1, minWidth: 0,
-              fontSize: m ? '0.9rem' : '0.98rem',
-              fontWeight: 800, color: '#fff',
-              letterSpacing: '-0.015em',
-              lineHeight: 1.2,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
-              {meal.name || meal.meal_name || 'Onbekend'}
-            </div>
+            {/* Naam: tik = bewerken, daarna kiezen voor deze dag of elke dag
+                waar deze maaltijd staat (9 okt 2026). */}
+            {naamEdit !== null ? (
+              <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+                <input autoFocus value={naamEdit} onChange={e => setNaamEdit(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && naamEdit.trim()) setNaamKeuze(true); if (e.key === 'Escape') { setNaamEdit(null); setNaamKeuze(false) } }}
+                  style={{ width: '100%', boxSizing: 'border-box', fontSize: m ? '0.9rem' : '0.98rem', fontWeight: 800, color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '0.15rem 0.4rem', outline: 'none', fontFamily: 'inherit' }} />
+                {!naamKeuze ? (
+                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    <button onClick={() => naamEdit.trim() && setNaamKeuze(true)} style={naamKnop(true)}>Opslaan</button>
+                    <button onClick={() => { setNaamEdit(null); setNaamKeuze(false) }} style={naamKnop(false)}>Annuleren</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Waar?</span>
+                    {[{ b: 'day', t: 'Alleen deze dag' }, { b: 'all', t: 'Elke dag' }].map(k => (
+                      <button key={k.b} onClick={() => {
+                        const nieuw = naamEdit.trim()
+                        setNaamEdit(null); setNaamKeuze(false)
+                        if (nieuw && onUpdateMeal) onUpdateMeal(dayIndex, slot, { ...meal, name: nieuw, meal_name: nieuw }, k.b)
+                      }} style={naamKnop(k.b === 'all')}>{k.t}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button onClick={(e) => { e.stopPropagation(); setNaamEdit(meal.name || meal.meal_name || '') }} title="Naam aanpassen" style={{
+                flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'text', fontFamily: 'inherit',
+                fontSize: m ? '0.9rem' : '0.98rem',
+                fontWeight: 800, color: '#fff',
+                letterSpacing: '-0.015em',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {meal.name || meal.meal_name || 'Onbekend'}
+              </button>
+            )}
           </div>
 
           {/* Macro-regel — dezelfde compacte stijl als de client card */}
