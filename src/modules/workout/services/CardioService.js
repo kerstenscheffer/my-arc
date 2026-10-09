@@ -183,6 +183,15 @@ const CardioService = {
     }))
   },
 
+  // Alle vaste blokken van één sport weg (bij bewerken: oud eruit, nieuw erin).
+  async verwijderVasteBlokken(clientId, soort, db) {
+    if (!db?.supabase || !clientId || !soort) return false
+    const { error } = await db.supabase.from('client_agenda_blocks').delete()
+      .eq('client_id', clientId).eq('type', 'custom').eq('label', `Cardio · ${soort}`).is('week_start', null)
+    if (error) { console.error('❌ verwijderVasteBlokken cardio:', error); return false }
+    return true
+  },
+
   // Blok weg; bij een vast blok telt het cardioplan opnieuw.
   async verwijderBlok(clientId, blok, db) {
     if (!db?.supabase || !blok?.id) return false
