@@ -4,6 +4,7 @@
 // ✅ v6.2 - Added: SupplementPlanPanel integration
 // ✅ v6.3 - Fixed: Supplement button styled to match dashboard design
 import React, { useState, useEffect } from 'react'
+import { SkeletStijl, SkeletBlok, SkeletKaart } from '../../ui/Skelet'
 import AIMealPlanService from './AIMealPlanService'
 
 // Core Components
@@ -487,23 +488,21 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     await loadDashboardData()
   }
 
+  // Skelet in de vorm van de pagina (kop met foto, macro's, maaltijden)
+  // in plaats van één spinner: je ziet de pagina al staan terwijl de
+  // maaltijden binnenkomen.
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#0a0a0a',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          width: '48px',
-          height: '48px',
-          border: '4px solid rgba(255, 215, 0, 0.2)',
-          borderTop: '4px solid #FFD700',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }} />
+      <div style={{ position: 'fixed', inset: 0, height: '100dvh', zIndex: 1, background: '#0a0a0a', overflow: 'hidden' }}>
+        <SkeletStijl />
+        <div style={{ height: isMobile ? 40 : 48, borderBottom: '1px solid rgba(255,255,255,0.06)' }} />
+        <div style={{ height: isMobile ? 190 : 230, background: 'rgba(255,255,255,0.04)', animation: 'skeletPuls 1.4s ease-in-out infinite' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-around', padding: '0.9rem 1rem' }}>
+          {[0, 1, 2, 3].map(i => <SkeletBlok key={i} breedte={44} hoogte={44} radius={22} />)}
+        </div>
+        <div style={{ padding: isMobile ? '0 0.6rem' : '0 1rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[0, 1, 2, 3].map(i => <SkeletKaart key={i} hoogte={72} foto={64} radius={12} />)}
+        </div>
       </div>
     )
   }

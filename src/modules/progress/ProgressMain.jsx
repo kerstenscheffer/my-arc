@@ -2,6 +2,7 @@
 // v6.2 - overflow hidden fix
 
 import React, { useState, useEffect } from 'react'
+import { SkeletStijl, SkeletBlok, SkeletKaart, SkeletGrafiek } from '../../ui/Skelet'
 import { createPortal } from 'react-dom'
 import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X } from 'lucide-react'
 
@@ -206,10 +207,16 @@ export default function ProgressMain({ db, client }) {
   const progressPercent = weightStats?.current && client?.target_weight
     ? Math.round((weightStats.current / parseFloat(client.target_weight)) * 100) : 0
 
+  // Skelet in de vorm van de pagina: groot getal, grafiek, twee kaarten.
   if (loading) {
     return (
-      <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
+      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: isMobile ? '1rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <SkeletStijl />
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, animation: 'skeletPuls 1.4s ease-in-out infinite' }}>
+          <SkeletBlok breedte={120} hoogte={44} radius={8} /><SkeletBlok breedte={80} hoogte={18} />
+        </div>
+        <SkeletGrafiek hoogte={isMobile ? 180 : 220} />
+        <SkeletKaart hoogte={88} foto={0} /><SkeletKaart hoogte={88} foto={0} />
       </div>
     )
   }

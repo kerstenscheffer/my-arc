@@ -239,7 +239,6 @@ const COACH_PHOTO_URL = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746
 function CoachNoteCard({ client, db }) {
   const isMobile = useIsMobile()
   const [note, setNote] = useState(null)
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!client?.id || !db?.supabase) { setLoading(false); return }
@@ -661,29 +660,9 @@ export default function ClientHome({ client, db, setCurrentView }) {
     setDagStand(prev => (richting === 0 ? vandaagStand() : verzetDag(prev, richting)))
   }
 
-  useEffect(() => { setTimeout(() => setLoading(false), 300) }, [])
 
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh', background: '#0a0a0a',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '40px', height: '40px',
-            border: '2px solid rgba(255, 255, 255, 0.08)',
-            borderTopColor: '#FFD700',
-            borderRadius: '50%', margin: '0 auto 0.75rem',
-            animation: 'spin 1s linear infinite',
-          }} />
-          <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem', fontWeight: 600 }}>
-            Laden…
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Geen spinner: de blokken op Home laden elk hun eigen data en staan
+  // meteen. Er zat hier een kunstmatige 300 ms wachttijd (9 okt 2026).
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: isMobile ? '9rem' : '6rem', background: '#0a0a0a' }}>
