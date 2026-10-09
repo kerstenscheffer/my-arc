@@ -1,855 +1,344 @@
 // src/modules/meal-plan/components/AIMealHistoryModal.jsx
-// 🎯 v3.0 — Rebuilt on consumed_meals (the actual log table)
-// InfoModal-style shell, gold theme, 3 tabs: Logboek / Stats / Patronen.
+//
+// Volledige geschiedenis van wat je hebt gegeten, op basis van consumed_meals.
+// Opent vanuit het Inzicht-venster. Zelfde taal als Inzicht: dik wit, geen
+// goud, geen dozen, kleur alleen voor het oordeel (groen op doel, oranje
+// onder, rood boven).
+//
+// Van boven naar onder:
+//   1. Cijfers over de gekozen periode: gem. kcal, gem. eiwit, dagen gelogd,
+//      dagen op doel.
+//   2. Verloop: staaf per dag (per week bij een lange periode) met de
+//      doellijn. Tik een staaf voor het getal.
+//   3. Macro's: gemiddelde eiwit/koolh./vet tegen je doel.
+//   4. Logboek: elke gelogde dag, nieuwste eerst; tik om de maaltijden te zien.
+//   5. Patronen: wat je het vaakst eet, en hoe laat je eet.
+//
+// Datums zijn lokaal. De vorige versie knipte de datum uit de UTC-tijd,
+// waardoor een maaltijd na 22:00 bij de volgende dag telde. Het venster gaat
+// via een portal naar de body: binnen de vaste maaltijdlaag viel het onder de
+// onderbalk.
 
-import React, { useEffect, useMemo, useState } from 'react'
-import {
-  X, BookOpen, BarChart3, Sparkles,
-  TrendingUp, TrendingDown, Minus, Award, Calendar, Clock,
-  Flame, Beef, Wheat, Droplet, ChevronRight,
-} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { X, ChevronDown, Clock } from 'lucide-react'
+import { foodImageFallback } from '../foodImageFallback'
 
-const G = {
-  primary:    '#FFD700',
-  secondary:  '#D4AF37',
-  bg:         'rgba(255, 215, 0, 0.06)',
-  bgStrong:   'rgba(255, 215, 0, 0.12)',
-  border:     'rgba(255, 215, 0, 0.18)',
-  textDim:    'rgba(255, 255, 255, 0.45)',
-  textFaint:  'rgba(255, 255, 255, 0.25)',
-  trackBg:    'rgba(255, 215, 0, 0.08)',
-  good:       '#10b981',
-  warn:       '#f59e0b',
-  bad:        '#ef4444',
-}
+const LIJN = 'rgba(255,255,255,0.08)'
+const GROEN = '#10b981'
+const ORANJE = '#f59e0b'
+const ROOD = '#ef4444'
 
-const PERIODS = [
-  { id: '7d',  label: '7 dagen',  days: 7 },
-  { id: '30d', label: '30 dagen', days: 30 },
-  { id: '90d', label: '90 dagen', days: 90 },
+const PERIODES = [
+  { id: 7, label: '7 dagen' },
+  { id: 30, label: '30 dagen' },
+  { id: 90, label: '90 dagen' },
+  { id: 365, label: '1 jaar' },
 ]
 
-const TABS = [
-  { id: 'logboek',  label: 'Logboek',  icon: BookOpen },
-  { id: 'stats',    label: 'Stats',    icon: BarChart3 },
-  { id: 'patronen', label: 'Patronen', icon: Sparkles },
-]
+const fmt = (n) => Math.round(n || 0).toLocaleString('nl-NL')
+const sleutel = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const vanSleutel = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+const plusDagen = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
+const kortDatum = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace(/\.$/, '')
 
-// ════════ Helpers ════════
-const isoDate = (d) => {
-  const x = d instanceof Date ? d : new Date(d)
-  return x.toISOString().split('T')[0]
-}
-const fmtNL = (n) => Math.round(n || 0).toLocaleString('nl-NL')
-const fmtDayLabel = (iso) => {
-  const d = new Date(iso + 'T00:00:00')
-  return d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
-}
-const fmtTime = (ts) => {
-  if (!ts) return ''
-  return new Date(ts).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+const kcalKleur = (waarde, doel) => {
+  if (!doel || !waarde) return 'rgba(255,255,255,0.3)'
+  const r = waarde / doel
+  if (r >= 0.9 && r <= 1.1) return GROEN
+  if (r > 1.1) return ROOD
+  return ORANJE
 }
 
-// Group meals by date and aggregate totals.
-const groupByDate = (meals) => {
-  const map = {}
-  for (const m of meals) {
-    const date = (m.consumed_at || '').split('T')[0]
-    if (!date) continue
-    if (!map[date]) {
-      map[date] = { date, meals: [], totals: { calories: 0, protein: 0, carbs: 0, fat: 0 } }
-    }
-    map[date].meals.push(m)
-    map[date].totals.calories += m.calories || 0
-    map[date].totals.protein  += parseFloat(m.protein) || 0
-    map[date].totals.carbs    += parseFloat(m.carbs)   || 0
-    map[date].totals.fat      += parseFloat(m.fat)     || 0
-  }
-  return map
-}
+const kopje = (tekst, extra = null) => (
+  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '1.6rem 0 0.75rem' }}>
+    <span style={{ fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{tekst}</span>
+    {extra && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{extra}</span>}
+  </div>
+)
 
-// Build a continuous date-array spanning `days` ending today.
-const fillDateRange = (byDate, days) => {
-  const result = []
-  const today = new Date()
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(today.getDate() - i)
-    const key = isoDate(d)
-    result.push(byDate[key] || { date: key, meals: [], totals: { calories: 0, protein: 0, carbs: 0, fat: 0 } })
-  }
-  return result
-}
+const Cijfer = ({ waarde, label, kleur = '#fff' }) => (
+  <div style={{ minWidth: 0 }}>
+    <div style={{ fontSize: '1.35rem', fontWeight: 900, color: kleur, lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{waarde}</div>
+    <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4 }}>{label}</div>
+  </div>
+)
 
-// Compliance = % days where calories are within ±tolerance of target.
-const computeCompliance = (days, targetKcal, tolerance = 0.10) => {
-  if (!targetKcal || days.length === 0) return { hit: 0, total: 0, pct: 0 }
-  const lo = targetKcal * (1 - tolerance)
-  const hi = targetKcal * (1 + tolerance)
-  const loggedDays = days.filter(d => d.totals.calories > 0)
-  const hit = loggedDays.filter(d => d.totals.calories >= lo && d.totals.calories <= hi).length
-  const total = loggedDays.length
-  return { hit, total, pct: total > 0 ? Math.round((hit / total) * 100) : 0 }
-}
-
-// Streak = max consecutive days (counting from most recent) hitting target.
-const computeStreak = (days, targetKcal, tolerance = 0.10) => {
-  if (!targetKcal) return 0
-  const lo = targetKcal * (1 - tolerance)
-  const hi = targetKcal * (1 + tolerance)
-  let streak = 0
-  for (let i = days.length - 1; i >= 0; i--) {
-    const c = days[i].totals.calories
-    if (c >= lo && c <= hi) streak++
-    else break
-  }
-  return streak
-}
-
-// Aggregate top meals by frequency.
-const computePatterns = (meals) => {
-  const map = new Map()
-  for (const m of meals) {
-    const key = (m.meal_name || '').trim().toLowerCase()
-    if (!key) continue
-    if (!map.has(key)) {
-      map.set(key, {
-        name: m.meal_name,
-        count: 0,
-        totalKcal: 0,
-        image_url: m.image_url || null,
-      })
-    }
-    const e = map.get(key)
-    e.count += 1
-    e.totalKcal += m.calories || 0
-    if (!e.image_url && m.image_url) e.image_url = m.image_url
-  }
-  return Array.from(map.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10)
-    .map(e => ({ ...e, avgKcal: e.count > 0 ? Math.round(e.totalKcal / e.count) : 0 }))
-}
-
-// Hour-bucket distribution: how many meals per hour-of-day.
-const computeHourDistribution = (meals) => {
-  const buckets = Array(24).fill(0)
-  for (const m of meals) {
-    if (!m.consumed_at) continue
-    const h = new Date(m.consumed_at).getHours()
-    if (h >= 0 && h < 24) buckets[h]++
-  }
-  return buckets
-}
-
-// ════════ Sparkline ════════
-const Sparkline = ({ days, target, height = 36 }) => {
-  if (!days || days.length === 0) return null
-  const values = days.map(d => d.totals.calories || 0)
-  const mx = Math.max(...values, target || 0, 1)
+function MacroRegel({ label, waarde, doel }) {
+  const pct = doel > 0 ? Math.min(100, (waarde / doel) * 100) : 0
   return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-end', gap: '2px',
-      height: `${height}px`, padding: '0 0',
-    }}>
-      {days.map((d, i) => {
-        const v = d.totals.calories || 0
-        const h = Math.max(2, (v / mx) * height)
-        const isToday = i === days.length - 1
-        const inRange = target > 0 && v >= target * 0.9 && v <= target * 1.1
-        const fill = v === 0
-          ? 'rgba(255,255,255,0.05)'
-          : inRange ? G.primary
-          : v > target * 1.1 ? G.warn
-          : 'rgba(255, 215, 0, 0.35)'
-        return (
-          <div
-            key={d.date}
-            title={`${fmtDayLabel(d.date)}: ${fmtNL(v)} kcal`}
-            style={{
-              flex: 1,
-              height: `${h}px`,
-              background: fill,
-              borderRadius: '2px',
-              opacity: isToday ? 1 : 0.85,
-              transition: 'all 0.2s ease',
-            }}
-          />
-        )
-      })}
-    </div>
-  )
-}
-
-// ════════ Tabs ════════
-function LogboekTab({ days, isMobile }) {
-  const sorted = [...days].reverse()  // most recent first
-  if (sorted.every(d => d.meals.length === 0)) {
-    return <Empty>Nog geen gelogde maaltijden in deze periode.</Empty>
-  }
-  return (
-    <div>
-      {sorted.map(day => (
-        day.meals.length > 0 && <DayCard key={day.date} day={day} isMobile={isMobile} />
-      ))}
-    </div>
-  )
-}
-
-function DayCard({ day, isMobile }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%',
-          display: 'flex', alignItems: 'center', gap: '0.75rem',
-          padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem',
-          background: 'transparent', border: 'none',
-          cursor: 'pointer', textAlign: 'left',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
-            fontWeight: 700, color: '#fff', textTransform: 'capitalize',
-            letterSpacing: '-0.01em', lineHeight: 1.2,
-          }}>
-            {fmtDayLabel(day.date)}
-          </div>
-          <div style={{
-            display: 'flex', gap: '0.625rem', marginTop: '0.25rem',
-            fontSize: isMobile ? '0.65rem' : '0.7rem', color: G.textDim,
-          }}>
-            <span><strong style={{ color: '#fff', fontWeight: 800 }}>{fmtNL(day.totals.calories)}</strong> kcal</span>
-            <span><strong style={{ color: '#fff', fontWeight: 800 }}>{fmtNL(day.totals.protein)}</strong>g E</span>
-            <span><strong style={{ color: '#fff', fontWeight: 800 }}>{fmtNL(day.totals.carbs)}</strong>g K</span>
-            <span><strong style={{ color: '#fff', fontWeight: 800 }}>{fmtNL(day.totals.fat)}</strong>g V</span>
-          </div>
-        </div>
-        <div style={{
-          fontSize: '0.6rem', fontWeight: 700, color: G.textFaint,
-          padding: '0.2rem 0.5rem',
-          background: G.bg, border: `1px solid ${G.border}`, borderRadius: '6px',
-          flexShrink: 0,
-        }}>
-          {day.meals.length}×
-        </div>
-        <ChevronRight size={14} color={G.textFaint} style={{
-          transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-          transition: 'transform 0.15s ease', flexShrink: 0,
-        }} />
-      </button>
-      {open && (
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          padding: isMobile ? '0.25rem 1rem 0.5rem' : '0.375rem 1.5rem 0.625rem',
-        }}>
-          {day.meals.map((m, idx) => (
-            <div key={m.id || idx} style={{
-              display: 'flex', alignItems: 'center', gap: '0.625rem',
-              padding: '0.45rem 0',
-              borderTop: idx > 0 ? '1px solid rgba(255,255,255,0.03)' : 'none',
-            }}>
-              {m.image_url ? (
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '6px',
-                  background: `url(${m.image_url}) center/cover`,
-                  flexShrink: 0, border: '1px solid rgba(255,255,255,0.06)',
-                }} />
-              ) : (
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '6px',
-                  background: G.bg, border: `1px solid ${G.border}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: G.primary, fontSize: '0.55rem', fontWeight: 800,
-                  flexShrink: 0,
-                }}>
-                  {(m.meal_name || '?').slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {m.meal_name || 'Onbekend'}
-                </div>
-                <div style={{ fontSize: '0.55rem', color: G.textFaint, marginTop: '0.1rem' }}>
-                  {fmtTime(m.consumed_at)}
-                </div>
-              </div>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: G.textDim, flexShrink: 0 }}>
-                {fmtNL(m.calories)} kcal
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StatsTab({ days, targets, isMobile }) {
-  const compliance = computeCompliance(days, targets.calories)
-  const streak = computeStreak(days, targets.calories)
-  const loggedDays = days.filter(d => d.totals.calories > 0)
-  const avgKcal = loggedDays.length > 0
-    ? Math.round(loggedDays.reduce((s, d) => s + d.totals.calories, 0) / loggedDays.length)
-    : 0
-  const avgProtein = loggedDays.length > 0
-    ? Math.round(loggedDays.reduce((s, d) => s + d.totals.protein, 0) / loggedDays.length)
-    : 0
-  const bestDay = loggedDays.reduce((b, d) => {
-    if (!targets.calories) return b
-    const dev = Math.abs(d.totals.calories - targets.calories)
-    if (!b || dev < b.dev) return { dev, day: d }
-    return b
-  }, null)
-  const worstDay = loggedDays.reduce((w, d) => {
-    if (!targets.calories) return w
-    const dev = Math.abs(d.totals.calories - targets.calories)
-    if (!w || dev > w.dev) return { dev, day: d }
-    return w
-  }, null)
-
-  const tileStyle = {
-    flex: 1, minWidth: 0,
-    padding: isMobile ? '0.75rem 0.875rem' : '1rem 1.125rem',
-    background: G.bg,
-    border: `1px solid ${G.border}`,
-    borderRadius: '12px',
-  }
-  const Tile = ({ children, label, value, sub, accent = G.primary }) => (
-    <div style={tileStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-        {children}
-        <span style={{
-          fontSize: '0.55rem', fontWeight: 700, color: accent,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
-        }}>{label}</span>
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 5 }}>
+        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>{label}</span>
+        <span style={{ marginLeft: 'auto', fontSize: '0.8rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+          {fmt(waarde)}g<span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{doel > 0 ? ` / ${fmt(doel)}g` : ''}</span>
+        </span>
       </div>
-      <div style={{
-        fontSize: isMobile ? '1.4rem' : '1.6rem',
-        fontWeight: 900, color: '#fff',
-        lineHeight: 1, letterSpacing: '-0.02em',
-      }}>
-        {value}
-      </div>
-      {sub && (
-        <div style={{
-          fontSize: '0.6rem', color: G.textDim, marginTop: '0.3rem',
-          fontWeight: 500,
-        }}>
-          {sub}
-        </div>
-      )}
-    </div>
-  )
-
-  return (
-    <div style={{ padding: isMobile ? '0.75rem 1rem 1rem' : '1rem 1.5rem 1.25rem' }}>
-      {/* Top row */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-        gap: '0.625rem',
-      }}>
-        <Tile
-          label="Compliance"
-          value={`${compliance.pct}%`}
-          sub={`${compliance.hit}/${compliance.total} dagen binnen ±10%`}
-        >
-          <Award size={12} color={G.primary} />
-        </Tile>
-        <Tile
-          label="Streak"
-          value={streak === 1 ? '1 dag' : `${streak} dagen`}
-          sub="op rij binnen kcal-doel"
-          accent={streak >= 3 ? G.good : G.primary}
-        >
-          <Flame size={12} color={streak >= 3 ? G.good : G.primary} />
-        </Tile>
-      </div>
-
-      <div style={{ height: '0.625rem' }} />
-
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-        gap: '0.625rem',
-      }}>
-        <Tile
-          label="Gem. kcal"
-          value={fmtNL(avgKcal)}
-          sub={targets.calories ? `Doel: ${fmtNL(targets.calories)}` : 'Geen doel'}
-        >
-          <Flame size={12} color={G.primary} />
-        </Tile>
-        <Tile
-          label="Gem. eiwit"
-          value={`${fmtNL(avgProtein)}g`}
-          sub={targets.protein ? `Doel: ${fmtNL(targets.protein)}g` : 'Geen doel'}
-        >
-          <Beef size={12} color={G.primary} />
-        </Tile>
-      </div>
-
-      {/* Best / worst day */}
-      {(bestDay || worstDay) && (
-        <div style={{ marginTop: '0.875rem' }}>
-          <div style={{
-            fontSize: '0.55rem', fontWeight: 800, color: G.textFaint,
-            textTransform: 'uppercase', letterSpacing: '0.06em',
-            marginBottom: '0.4rem',
-          }}>
-            Hoogtepunten
-          </div>
-          {bestDay && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '0.625rem 0.875rem',
-              background: 'rgba(16, 185, 129, 0.06)',
-              border: '1px solid rgba(16, 185, 129, 0.15)',
-              borderRadius: '10px', marginBottom: '0.4rem',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <TrendingUp size={14} color={G.good} />
-                <div>
-                  <div style={{ fontSize: '0.55rem', fontWeight: 700, color: G.good, textTransform: 'uppercase' }}>
-                    Dichtst bij doel
-                  </div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', textTransform: 'capitalize' }}>
-                    {fmtDayLabel(bestDay.day.date)}
-                  </div>
-                </div>
-              </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
-                {fmtNL(bestDay.day.totals.calories)} kcal
-              </div>
-            </div>
-          )}
-          {worstDay && worstDay !== bestDay && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '0.625rem 0.875rem',
-              background: 'rgba(245, 158, 11, 0.05)',
-              border: '1px solid rgba(245, 158, 11, 0.12)',
-              borderRadius: '10px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <TrendingDown size={14} color={G.warn} />
-                <div>
-                  <div style={{ fontSize: '0.55rem', fontWeight: 700, color: G.warn, textTransform: 'uppercase' }}>
-                    Grootste afwijking
-                  </div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', textTransform: 'capitalize' }}>
-                    {fmtDayLabel(worstDay.day.date)}
-                  </div>
-                </div>
-              </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
-                {fmtNL(worstDay.day.totals.calories)} kcal
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function PatronenTab({ meals, isMobile }) {
-  const top = useMemo(() => computePatterns(meals), [meals])
-  const hours = useMemo(() => computeHourDistribution(meals), [meals])
-  const hourMax = Math.max(...hours, 1)
-
-  if (top.length === 0) {
-    return <Empty>Nog geen patronen — log meer maaltijden.</Empty>
-  }
-
-  return (
-    <div>
-      {/* Top meals */}
-      <div style={{
-        padding: isMobile ? '0.875rem 1rem 0.5rem' : '1rem 1.5rem 0.625rem',
-      }}>
-        <div style={{
-          fontSize: '0.55rem', fontWeight: 800, color: G.textFaint,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
-        }}>
-          Top {top.length} meest gelogd
-        </div>
-      </div>
-      {top.map((p, idx) => (
-        <div key={p.name + idx} style={{
-          display: 'flex', alignItems: 'center', gap: '0.75rem',
-          padding: isMobile ? '0.6rem 1rem' : '0.7rem 1.5rem',
-          borderBottom: '1px solid rgba(255,255,255,0.04)',
-        }}>
-          <div style={{
-            fontSize: '0.55rem', fontWeight: 800, color: G.primary,
-            width: '18px', textAlign: 'center', flexShrink: 0,
-          }}>
-            {idx + 1}
-          </div>
-          {p.image_url ? (
-            <div style={{
-              width: '32px', height: '32px', borderRadius: '7px',
-              background: `url(${p.image_url}) center/cover`,
-              flexShrink: 0, border: '1px solid rgba(255,255,255,0.06)',
-            }} />
-          ) : (
-            <div style={{
-              width: '32px', height: '32px', borderRadius: '7px',
-              background: G.bg, border: `1px solid ${G.border}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: G.primary, fontSize: '0.6rem', fontWeight: 800,
-              flexShrink: 0,
-            }}>
-              {(p.name || '?').slice(0, 1).toUpperCase()}
-            </div>
-          )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: '0.85rem', fontWeight: 700, color: '#fff',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
-              {p.name}
-            </div>
-            <div style={{ fontSize: '0.6rem', color: G.textDim, marginTop: '0.1rem' }}>
-              gem. {fmtNL(p.avgKcal)} kcal
-            </div>
-          </div>
-          <div style={{
-            fontSize: '0.7rem', fontWeight: 800, color: G.primary,
-            padding: '0.2rem 0.5rem',
-            background: G.bg, border: `1px solid ${G.border}`, borderRadius: '6px',
-            flexShrink: 0,
-          }}>
-            {p.count}×
-          </div>
-        </div>
-      ))}
-
-      {/* Hour distribution */}
-      <div style={{ padding: isMobile ? '1rem' : '1.25rem 1.5rem' }}>
-        <div style={{
-          fontSize: '0.55rem', fontWeight: 800, color: G.textFaint,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
-          marginBottom: '0.625rem',
-        }}>
-          Wanneer log je?
-        </div>
-        <div style={{
-          display: 'flex', alignItems: 'flex-end', gap: '2px',
-          height: '52px',
-        }}>
-          {hours.map((c, h) => (
-            <div
-              key={h}
-              title={`${h}:00 — ${c} log${c === 1 ? '' : 's'}`}
-              style={{
-                flex: 1,
-                height: `${Math.max(2, (c / hourMax) * 52)}px`,
-                background: c > 0 ? G.primary : 'rgba(255,255,255,0.05)',
-                opacity: c > 0 ? (0.4 + (c / hourMax) * 0.6) : 0.3,
-                borderRadius: '2px',
-              }}
-            />
-          ))}
-        </div>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem',
-          fontSize: '0.5rem', color: G.textFaint, fontWeight: 600,
-        }}>
-          <span>0u</span><span>6u</span><span>12u</span><span>18u</span><span>24u</span>
-        </div>
+      <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: '#fff', borderRadius: 2 }} />
       </div>
     </div>
   )
 }
 
-function Empty({ children }) {
-  return (
-    <div style={{
-      padding: '3rem 1rem', textAlign: 'center',
-      color: G.textFaint, fontSize: '0.8rem',
-    }}>
-      {children}
-    </div>
-  )
-}
-
-// ════════ Main ════════
 export default function AIMealHistoryModal({ isOpen, onClose, db, clientId }) {
-  const isMobile = window.innerWidth <= 768
-  const [period, setPeriod] = useState('7d')
-  const [activeTab, setActiveTab] = useState('logboek')
-  const [meals, setMeals] = useState([])
-  const [targets, setTargets] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 })
-  const [loading, setLoading] = useState(true)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
+  const [periode, setPeriode] = useState(30)
+  const [maaltijden, setMaaltijden] = useState(null)
+  const [doel, setDoel] = useState({ kcal: 0, eiwit: 0, koolh: 0, vet: 0 })
+  const [openDag, setOpenDag] = useState(null)
+  const [staaf, setStaaf] = useState(null) // index van de aangetikte staaf
+  const [limiet, setLimiet] = useState(14)
 
-  const periodCfg = PERIODS.find(p => p.id === period) || PERIODS[0]
-
-  // Load consumed_meals + targets
   useEffect(() => {
     if (!isOpen || !db?.supabase || !clientId) return
-    let cancelled = false
-    setLoading(true)
-    const start = new Date()
-    start.setDate(start.getDate() - (periodCfg.days - 1))
-    const startIso = `${isoDate(start)}T00:00:00`
+    let weg = false
+    setMaaltijden(null); setStaaf(null); setLimiet(14)
+    const van = plusDagen(new Date(new Date().setHours(0, 0, 0, 0)), -(periode - 1))
     Promise.all([
-      db.supabase
-        .from('consumed_meals')
-        .select('id, meal_name, meal_id, image_url, calories, protein, carbs, fat, consumed_at, amount, per_unit, source')
-        .eq('client_id', clientId)
-        .gte('consumed_at', startIso)
-        .order('consumed_at', { ascending: false }),
-      db.supabase
-        .from('clients')
-        .select('target_calories, target_protein, target_carbs, target_fat')
-        .eq('id', clientId)
-        .single(),
-    ]).then(([mealsRes, clientRes]) => {
-      if (cancelled) return
-      setMeals(mealsRes.data || [])
-      const c = clientRes.data || {}
-      setTargets({
-        calories: c.target_calories || 0,
-        protein:  c.target_protein  || 0,
-        carbs:    c.target_carbs    || 0,
-        fat:      c.target_fat      || 0,
-      })
-    }).catch(err => {
-      console.error('History load failed:', err)
-      if (!cancelled) setMeals([])
-    }).finally(() => {
-      if (!cancelled) setLoading(false)
+      db.supabase.from('consumed_meals')
+        .select('id, meal_name, meal_type, image_url, calories, protein, carbs, fat, consumed_at')
+        .eq('client_id', clientId).gte('consumed_at', van.toISOString())
+        .order('consumed_at', { ascending: false })
+        .then(r => r, () => ({ data: [] })),
+      db.supabase.from('clients').select('target_calories, target_protein, target_carbs, target_fat').eq('id', clientId).maybeSingle()
+        .then(r => r, () => ({ data: null })),
+    ]).then(([m, c]) => {
+      if (weg) return
+      setMaaltijden(m?.data || [])
+      const k = c?.data || {}
+      setDoel({ kcal: Number(k.target_calories) || 0, eiwit: Number(k.target_protein) || 0, koolh: Number(k.target_carbs) || 0, vet: Number(k.target_fat) || 0 })
     })
-    return () => { cancelled = true }
-  }, [isOpen, db, clientId, period, periodCfg.days])
+    return () => { weg = true }
+  }, [isOpen, db, clientId, periode])
 
-  // Aggregate
-  const days = useMemo(() => {
-    const byDate = groupByDate(meals)
-    return fillDateRange(byDate, periodCfg.days)
-  }, [meals, periodCfg.days])
-
-  const totals = useMemo(() => {
-    const loggedDays = days.filter(d => d.totals.calories > 0)
-    if (loggedDays.length === 0) {
-      return { avgKcal: 0, avgP: 0, avgC: 0, avgF: 0, loggedDays: 0 }
-    }
-    const sum = loggedDays.reduce((s, d) => ({
-      kcal: s.kcal + d.totals.calories,
-      p:    s.p    + d.totals.protein,
-      c:    s.c    + d.totals.carbs,
-      f:    s.f    + d.totals.fat,
-    }), { kcal: 0, p: 0, c: 0, f: 0 })
-    return {
-      avgKcal: Math.round(sum.kcal / loggedDays.length),
-      avgP:    Math.round(sum.p    / loggedDays.length),
-      avgC:    Math.round(sum.c    / loggedDays.length),
-      avgF:    Math.round(sum.f    / loggedDays.length),
-      loggedDays: loggedDays.length,
-    }
-  }, [days])
-
-  const compliance = useMemo(
-    () => computeCompliance(days, targets.calories),
-    [days, targets.calories]
-  )
-
-  // ESC + body lock
   useEffect(() => {
     if (!isOpen) return
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
     window.addEventListener('keydown', onKey)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
-    }
+    return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
+
+  // Per lokale dag: maaltijden en totalen, voor elke dag in de periode.
+  const dagen = useMemo(() => {
+    const per = {}
+    ;(maaltijden || []).forEach(m => {
+      if (!m.consumed_at) return
+      const k = sleutel(new Date(m.consumed_at))
+      const d = (per[k] = per[k] || { k, maaltijden: [], kcal: 0, eiwit: 0, koolh: 0, vet: 0 })
+      d.maaltijden.push(m)
+      d.kcal += Number(m.calories) || 0
+      d.eiwit += parseFloat(m.protein) || 0
+      d.koolh += parseFloat(m.carbs) || 0
+      d.vet += parseFloat(m.fat) || 0
+    })
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0)
+    return Array.from({ length: periode }, (_, i) => {
+      const k = sleutel(plusDagen(vandaag, -(periode - 1 - i)))
+      return per[k] || { k, maaltijden: [], kcal: 0, eiwit: 0, koolh: 0, vet: 0 }
+    })
+  }, [maaltijden, periode])
 
   if (!isOpen) return null
 
-  return (
+  const gelogd = dagen.filter(d => d.maaltijden.length > 0)
+  const gem = (veld) => gelogd.length ? gelogd.reduce((t, d) => t + d[veld], 0) / gelogd.length : 0
+  const opDoel = doel.kcal ? gelogd.filter(d => d.kcal >= doel.kcal * 0.9 && d.kcal <= doel.kcal * 1.1).length : 0
+
+  // Verloop: per dag, of per week bij meer dan 31 dagen (anders worden de
+  // staven haarlijntjes). Een week telt het gemiddelde van de gelogde dagen.
+  const staven = periode <= 31
+    ? dagen.map(d => ({ label: kortDatum(vanSleutel(d.k)), kcal: d.kcal, gelogd: d.maaltijden.length > 0, sub: `${d.maaltijden.length} ${d.maaltijden.length === 1 ? 'maaltijd' : 'maaltijden'}` }))
+    : (() => {
+      const uit = []
+      for (let i = 0; i < dagen.length; i += 7) {
+        const blok = dagen.slice(i, i + 7)
+        const met = blok.filter(d => d.maaltijden.length)
+        uit.push({
+          label: `week van ${kortDatum(vanSleutel(blok[0].k))}`,
+          kcal: met.length ? met.reduce((t, d) => t + d.kcal, 0) / met.length : 0,
+          gelogd: met.length > 0,
+          sub: `gemiddeld · ${met.length}/7 dagen gelogd`,
+        })
+      }
+      return uit
+    })()
+  const staafMax = Math.max(doel.kcal * 1.25, ...staven.map(s => s.kcal), 1)
+  const gekozenStaaf = staaf != null ? staven[staaf] : null
+
+  // Patronen.
+  const top = (() => {
+    const map = new Map()
+    ;(maaltijden || []).forEach(m => {
+      const k = String(m.meal_name || '').trim().toLowerCase()
+      if (!k) return
+      const e = map.get(k) || { naam: m.meal_name, type: m.meal_type, foto: m.image_url, aantal: 0, kcal: 0 }
+      e.aantal++; e.kcal += Number(m.calories) || 0
+      if (!e.foto && m.image_url) e.foto = m.image_url
+      map.set(k, e)
+    })
+    return [...map.values()].sort((a, b) => b.aantal - a.aantal).slice(0, 8)
+  })()
+  const uren = Array(24).fill(0)
+  ;(maaltijden || []).forEach(m => { if (m.consumed_at) uren[new Date(m.consumed_at).getHours()]++ })
+  const urenMax = Math.max(...uren, 1)
+
+  const logboek = [...gelogd].reverse()
+
+  return createPortal(
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.9)',
-        backdropFilter: 'blur(12px)',
-        display: 'flex', flexDirection: 'column',
-        zIndex: 10500, animation: 'histFadeIn 0.2s ease',
+        position: 'fixed', inset: 0, zIndex: 2147482100,
+        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
+        padding: isMobile ? 0 : '1.5rem', paddingTop: 'env(safe-area-inset-top)',
       }}
     >
       <div
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         style={{
-          flex: 1, display: 'flex', flexDirection: 'column',
-          maxWidth: isMobile ? '100%' : '600px', width: '100%',
-          margin: '0 auto', background: '#0a0a0a', overflow: 'hidden',
+          width: '100%', maxWidth: isMobile ? '100%' : 560, height: isMobile ? '94vh' : '88vh',
+          background: '#0a0a0a', border: `1px solid ${LIJN}`, borderRadius: isMobile ? '20px 20px 0 0' : 20,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
-        {/* ── Top bar — period selector + close ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0.625rem 0.75rem',
-          borderBottom: `1px solid ${G.border}`,
-          paddingTop: 'max(0.625rem, env(safe-area-inset-top))',
-          flexShrink: 0,
-        }}>
-          <div style={{
-            display: 'flex', flex: 1, gap: '0.25rem',
-            padding: '0.2rem',
-            background: G.bg,
-            border: `1px solid ${G.border}`,
-            borderRadius: '8px',
-          }}>
-            {PERIODS.map(p => {
-              const active = period === p.id
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setPeriod(p.id)}
-                  style={{
-                    flex: 1,
-                    padding: '0.4rem 0.5rem',
-                    background: active ? G.bgStrong : 'transparent',
-                    border: 'none',
-                    borderRadius: '6px',
-                    color: active ? G.primary : G.textDim,
-                    fontSize: '0.65rem', fontWeight: active ? 800 : 600,
-                    letterSpacing: '0.04em',
-                    cursor: 'pointer',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    minHeight: '30px',
-                  }}
-                >
-                  {p.label}
-                </button>
-              )
-            })}
+        {/* Kop: titel, periode als dropdown, sluiten */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: isMobile ? '0.9rem 0.85rem 0.8rem 1rem' : '1rem 1rem 0.9rem 1.25rem', borderBottom: `1px solid ${LIJN}` }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Geschiedenis</div>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <select value={periode} onChange={e => setPeriode(Number(e.target.value))} style={{ appearance: 'none', WebkitAppearance: 'none', background: 'transparent', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', padding: '0 18px 0 0', cursor: 'pointer', outline: 'none' }}>
+              {PERIODES.map(p => <option key={p.id} value={p.id} style={{ background: '#0a0a0a' }}>{p.label}</option>)}
+            </select>
+            <ChevronDown size={15} color="#fff" strokeWidth={2.8} style={{ position: 'absolute', right: 0, pointerEvents: 'none' }} />
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Sluiten"
-            style={{
-              width: '34px', height: '34px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: G.bg,
-              border: `1px solid ${G.border}`,
-              borderRadius: '8px', color: G.primary,
-              cursor: 'pointer', touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent', flexShrink: 0,
-            }}
-          >
-            <X size={16} />
+          <button onClick={onClose} aria-label="Sluiten" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 11, background: 'rgba(255,255,255,0.06)', border: `1px solid ${LIJN}`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            <X size={18} strokeWidth={2.8} />
           </button>
         </div>
 
-        {/* ── Hero — averages + sparkline + compliance ── */}
-        <div style={{
-          padding: isMobile ? '1rem 1rem 0.875rem' : '1.25rem 1.5rem 1rem',
-          borderBottom: `1px solid ${G.border}`,
-          flexShrink: 0,
-        }}>
-          <div style={{
-            fontSize: '0.5rem', fontWeight: 800, color: G.primary,
-            textTransform: 'uppercase', letterSpacing: '0.12em',
-            marginBottom: '0.5rem',
-          }}>
-            Gemiddeld per dag
-          </div>
-          <div style={{
-            display: 'flex', alignItems: 'baseline', gap: '0.4rem',
-            marginBottom: '0.6rem',
-          }}>
-            <span style={{
-              fontSize: isMobile ? '2rem' : '2.4rem',
-              fontWeight: 900, color: '#fff',
-              letterSpacing: '-0.03em', lineHeight: 1,
-            }}>
-              {fmtNL(totals.avgKcal)}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: G.textDim, fontWeight: 600 }}>
-              kcal · {totals.avgP}g E · {totals.avgC}g K · {totals.avgF}g V
-            </span>
-          </div>
-
-          <Sparkline days={days} target={targets.calories} height={36} />
-
-          {targets.calories > 0 && (
-            <div style={{
-              marginTop: '0.625rem',
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              fontSize: '0.7rem', fontWeight: 600, color: G.textDim,
-            }}>
-              <Award size={12} color={compliance.pct >= 70 ? G.good : G.primary} />
-              <span style={{ color: '#fff', fontWeight: 800 }}>
-                {compliance.hit}/{compliance.total}
-              </span>
-              <span>dagen binnen kcal-doel</span>
-            </div>
-          )}
-        </div>
-
-        {/* ── Tabs ── */}
-        <div style={{
-          display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)',
-          flexShrink: 0,
-        }}>
-          {TABS.map(tab => {
-            const active = activeTab === tab.id
-            const TabIcon = tab.icon
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  flex: 1,
-                  padding: '0.65rem 0',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: active ? `2px solid ${G.primary}` : '2px solid transparent',
-                  color: active ? '#fff' : G.textFaint,
-                  fontSize: '0.7rem',
-                  fontWeight: active ? 800 : 600,
-                  cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <TabIcon size={13} />{tab.label}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* ── Content ── */}
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {loading ? (
-            <Empty>Laden…</Empty>
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '1rem 1rem 2rem' : '1.2rem 1.25rem 2rem' }}>
+          {maaltijden === null ? (
+            <div style={{ padding: '3rem 0', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Laden…</div>
+          ) : gelogd.length === 0 ? (
+            <div style={{ padding: '3rem 0', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>In deze periode is niets gelogd.</div>
           ) : (
             <>
-              {activeTab === 'logboek'  && <LogboekTab  days={days} isMobile={isMobile} />}
-              {activeTab === 'stats'    && <StatsTab    days={days} targets={targets} isMobile={isMobile} />}
-              {activeTab === 'patronen' && <PatronenTab meals={meals} isMobile={isMobile} />}
+              {/* ── 1. Cijfers ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                <Cijfer waarde={fmt(gem('kcal'))} label="gem. kcal" kleur={kcalKleur(gem('kcal'), doel.kcal) === 'rgba(255,255,255,0.3)' ? '#fff' : kcalKleur(gem('kcal'), doel.kcal)} />
+                <Cijfer waarde={`${fmt(gem('eiwit'))}g`} label="gem. eiwit" />
+                <Cijfer waarde={`${gelogd.length}/${periode}`} label="dagen gelogd" />
+                <Cijfer waarde={doel.kcal ? `${Math.round((opDoel / gelogd.length) * 100)}%` : '–'} label="op doel" kleur={doel.kcal ? (opDoel / gelogd.length >= 0.7 ? GROEN : opDoel / gelogd.length >= 0.4 ? ORANJE : ROOD) : '#fff'} />
+              </div>
+
+              {/* ── 2. Verloop ── */}
+              {kopje(periode <= 31 ? 'Verloop per dag' : 'Verloop per week', doel.kcal ? `doel ${fmt(doel.kcal)} kcal` : null)}
+              <div style={{ minHeight: 34, marginBottom: 6 }}>
+                {gekozenStaaf ? (
+                  <>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{fmt(gekozenStaaf.kcal)} kcal <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>· {gekozenStaaf.label}</span></div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{gekozenStaaf.gelogd ? gekozenStaaf.sub : 'niets gelogd'}</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Tik een staaf voor het getal.</div>
+                )}
+              </div>
+              <div style={{ position: 'relative', height: 130, display: 'flex', alignItems: 'flex-end', gap: staven.length > 20 ? 2 : 4 }}>
+                {doel.kcal > 0 && <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${(doel.kcal / staafMax) * 100}%`, borderTop: '1px dashed rgba(255,255,255,0.35)', pointerEvents: 'none' }} />}
+                {staven.map((s, i) => (
+                  <button key={i} onClick={() => setStaaf(staaf === i ? null : i)} aria-label={`${s.label} ${fmt(s.kcal)} kcal`} style={{ flex: 1, height: '100%', padding: 0, background: 'transparent', border: 'none', display: 'flex', alignItems: 'flex-end', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <span style={{ width: '100%', height: `${Math.max(s.gelogd ? 3 : 1.5, (s.kcal / staafMax) * 100)}%`, borderRadius: staven.length > 20 ? 2 : 5, background: s.gelogd ? kcalKleur(s.kcal, doel.kcal) : 'rgba(255,255,255,0.08)', opacity: staaf === null || staaf === i ? 1 : 0.4 }} />
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>
+                <span>{staven[0]?.label.replace('week van ', '')}</span><span>vandaag</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.9rem', marginTop: '0.6rem', fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: GROEN }} />op doel (±10%)</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: ORANJE }} />onder</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: ROOD }} />boven</span>
+              </div>
+
+              {/* ── 3. Macro's ── */}
+              {kopje('Gemiddelde macro\'s per gelogde dag')}
+              <MacroRegel label="Eiwit" waarde={gem('eiwit')} doel={doel.eiwit} />
+              <MacroRegel label="Koolhydraten" waarde={gem('koolh')} doel={doel.koolh} />
+              <MacroRegel label="Vet" waarde={gem('vet')} doel={doel.vet} />
+
+              {/* ── 4. Logboek ── */}
+              {kopje('Logboek', `${gelogd.length} ${gelogd.length === 1 ? 'dag' : 'dagen'}`)}
+              {logboek.slice(0, limiet).map((d, i) => {
+                const open = openDag === d.k
+                const datum = vanSleutel(d.k)
+                return (
+                  <div key={d.k} style={{ borderTop: i ? `1px solid ${LIJN}` : 'none' }}>
+                    <button onClick={() => setOpenDag(open ? null : d.k)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0', background: 'transparent', border: 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: kcalKleur(d.kcal, doel.kcal) }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 900, textTransform: 'capitalize' }}>{datum.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' }).replace(/\.$/, '')}</span>
+                        <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>{d.maaltijden.length} {d.maaltijden.length === 1 ? 'maaltijd' : 'maaltijden'} · {fmt(d.eiwit)}g eiwit</span>
+                      </span>
+                      <span style={{ flexShrink: 0, fontSize: '0.9rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{fmt(d.kcal)}<span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}> kcal</span></span>
+                      <ChevronDown size={16} color="rgba(255,255,255,0.45)" strokeWidth={2.6} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                    </button>
+                    {open && (
+                      <div style={{ padding: '0 0 0.7rem 18px' }}>
+                        {[...d.maaltijden].sort((a, b) => new Date(a.consumed_at) - new Date(b.consumed_at)).map(m => {
+                          const naam = m.meal_name || 'Maaltijd'
+                          const foto = m.image_url || foodImageFallback(naam, m.meal_type, 120)
+                          return (
+                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.35rem 0' }}>
+                              <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 9, backgroundImage: `url(${foto})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }} />
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam}</span>
+                                <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{new Date(m.consumed_at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}</span>
+                              </span>
+                              <span style={{ flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 900, color: '#fff' }}>{fmt(m.calories)} kcal</span>
+                                <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{fmt(m.protein)}g eiwit</span>
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {logboek.length > limiet && (
+                <button onClick={() => setLimiet(l => l + 14)} style={{ marginTop: 6, width: '100%', minHeight: 44, background: 'transparent', border: `1px solid rgba(255,255,255,0.2)`, borderRadius: 12, color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>Meer dagen</button>
+              )}
+
+              {/* ── 5. Patronen ── */}
+              {top.length > 0 && kopje('Wat je het vaakst eet')}
+              {top.map((p, i) => (
+                <div key={p.naam + i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.45rem 0', borderTop: i ? `1px solid ${LIJN}` : 'none' }}>
+                  <span style={{ width: 16, flexShrink: 0, fontSize: '0.7rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{i + 1}</span>
+                  <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 9, backgroundImage: `url(${p.foto || foodImageFallback(p.naam, p.type, 120)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.naam}</span>
+                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>gem. {fmt(p.kcal / p.aantal)} kcal</span>
+                  </span>
+                  <span style={{ flexShrink: 0, fontSize: '0.9rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{p.aantal}×</span>
+                </div>
+              ))}
+
+              {kopje('Hoe laat je eet', <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Clock size={12} strokeWidth={2.6} /> per uur</span>)}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 60 }}>
+                {uren.map((c, h) => (
+                  <div key={h} title={`${h}:00 · ${c}`} style={{ flex: 1, height: `${Math.max(2, (c / urenMax) * 100)}%`, borderRadius: 2, background: c ? '#fff' : 'rgba(255,255,255,0.06)', opacity: c ? 0.35 + (c / urenMax) * 0.65 : 1 }} />
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>
+                <span>0u</span><span>6u</span><span>12u</span><span>18u</span><span>24u</span>
+              </div>
             </>
           )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes histFadeIn { from { opacity: 0; } to { opacity: 1; } }
-      `}</style>
-    </div>
+    </div>,
+    document.body
   )
 }
