@@ -456,6 +456,26 @@ export default function WeekSchedule({
     if (!eigenVolgende) await WorkoutServiceNew.saveWeekPlanning(clientId, volgendeWeekSleutel, tempSchedule, db)
     await handleAutoSave(next)
   }
+  // Eigen training voorgoed uit het plan: uit de vaste indeling, uit deze
+  // week, en uit elke week die al vooruit gepland staat.
+  const verwijderEigenTrainingVoorgoed = async (day, rosterKey, key) => {
+    try {
+      const vast = (await db.getClientWorkoutSchedule(clientId)) || {}
+      const vastNieuw = Object.fromEntries(Object.entries(vast).filter(([, v]) => v !== key))
+      await db.updateClientWorkoutSchedule(clientId, vastNieuw)
+      const { data: weken } = await db.supabase.from('client_week_schedules')
+        .select('week_start, schedule').eq('client_id', clientId).gte('week_start', weekSleutel)
+        .then(r => r, () => ({ data: [] }))
+      for (const w of weken || []) {
+        const sch = w.schedule || {}
+        if (!Object.values(sch).includes(key)) continue
+        await WorkoutServiceNew.saveWeekPlanning(clientId, w.week_start, Object.fromEntries(Object.entries(sch).filter(([, v]) => v !== key)), db)
+      }
+    } catch (e) { console.error('eigen training voorgoed weghalen mislukt:', e); alert('⚠️ Weghalen mislukt.'); return }
+    await verwijderTraining(day, rosterKey)
+    setVastRooster(prev => Object.fromEntries(Object.entries(prev || {}).filter(([, v]) => v !== key)))
+  }
+
   // Vast cardio één week overslaan (skip_weeks); het plan blijft staan.
   const verwijderCardioDezeWeek = async (c) => {
     const { error } = await db.supabase.from('client_agenda_blocks')
@@ -468,7 +488,9 @@ export default function WeekSchedule({
   const vraagTraining = (day, rosterKey = null) => {
     const key = tempSchedule[rosterKey || day]
     const w = getWorkoutData(key)
-    setVerwijderVraag({ soort: 'training', titel: w?.name || w?.focus || 'Training', permanent: !!key && vastRooster[rosterKey || day] === key, item: day, rosterKey })
+    // Eigen training (custom_…): die mag de klant wél voorgoed uit zijn
+    // plan halen; dagen uit het plan van de coach niet.
+    setVerwijderVraag({ soort: 'training', titel: w?.name || w?.focus || 'Training', permanent: !!key && vastRooster[rosterKey || day] === key, item: day, rosterKey, eigen: String(key || '').startsWith('custom_'), key })
   }
   const vraagCardio = (c) => setVerwijderVraag({ soort: 'cardio', titel: c.soort, permanent: !c.eenmalig, item: c })
   const voerUit = async (hoe) => {
@@ -476,8 +498,11 @@ export default function WeekSchedule({
     setVerwijderVraag(null)
     if (!v) return
     if (v.soort === 'training') {
-      // Voorgoed uit het plan is voor de coach; de klant kan alleen deze week.
-      await verwijderTraining(v.item, v.rosterKey || null)
+      // Voorgoed uit het plan is voor de coach, behalve bij een eigen
+      // training: die haalt de klant zelf uit de vaste indeling én uit de
+      // weken die al vooruit gepland staan.
+      if (hoe === 'voorgoed' && v.eigen) await verwijderEigenTrainingVoorgoed(v.item, v.rosterKey || null, v.key)
+      else await verwijderTraining(v.item, v.rosterKey || null)
     } else {
       if (hoe === 'voorgoed' || !v.permanent) await verwijderCardio(v.item)
       else await verwijderCardioDezeWeek(v.item)
@@ -844,7 +869,7 @@ export default function WeekSchedule({
               {verwijderVraag.permanent ? (
                 <>
                   <button onClick={() => voerUit('deze_week')} style={vraagKnop(true)}>Alleen deze week</button>
-                  {verwijderVraag.soort === 'training' ? (
+                  {verwijderVraag.soort === 'training' && !verwijderVraag.eigen ? (
                     // Het plan is van de coach: een trainingsdag haal je er niet
                     // zelf uit. De knop staat er wel, maar op slot, met de reden.
                     <div style={{ ...vraagKnop(false), minHeight: 0, padding: '0.7rem 0.9rem', cursor: 'default', opacity: 0.55, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
