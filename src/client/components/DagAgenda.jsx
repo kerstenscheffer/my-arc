@@ -30,6 +30,8 @@ import MacroBoxes from './MacroBoxes'
 import BlokTijdSheet from './BlokTijdSheet'
 import DagindelingModal from './DagindelingModal'
 import { SlaapLogBlad } from '../../modules/progress/SlaapKnop'
+import WorkoutServiceNew from '../../modules/workout/services/WorkoutServiceNew'
+import { workoutCompletionPct } from '../../modules/workout/utils/exerciseCompletion'
 
 const LIJN = 'rgba(255,255,255,0.07)'
 const LIJN_ZACHT = 'rgba(255,255,255,0.04)'
@@ -262,32 +264,40 @@ export default function DagAgenda({
     window.addEventListener('myarc:gewicht-gelogd', laadWeging)
     return () => { weg = true; window.removeEventListener('myarc:gewicht-gelogd', laadWeging) }
   }, [client?.id, db, slaapDagIso, versie])
-  // Training telt als gedaan bij de helft of meer van de geplande oefeningen
-  // met minstens één gelogde set (zelfde bron als de workoutpagina:
-  // workout_sessions + workout_progress van die datum).
-  const [gelogdeOefeningen, setGelogdeOefeningen] = useState(0)
+  // Training: zelfde percentage als de workoutpagina (sets gedaan / sets
+  // gepland), over de oefeningen die deze week echt meetellen: met de
+  // week-overrides erop en zonder overgeslagen oefeningen. Vanaf 50% telt hij
+  // als gedaan. Eerst telden we tegen alle oefeningen uit het plan, en dan
+  // kwam een training met overgeslagen oefeningen nooit op afgerond.
+  const [trainingPct, setTrainingPct] = useState(0)
   useEffect(() => {
     if (!client?.id || !db?.supabase || !slaapDagIso) return
     let weg = false
     const laad = async () => {
-      const { data: sessies } = await db.supabase.from('workout_sessions').select('id')
-        .eq('client_id', client.id).eq('workout_date', slaapDagIso).then(r => r, () => ({ data: [] }))
-      const ids = (sessies || []).map(x => x.id)
-      if (!ids.length) { if (!weg) setGelogdeOefeningen(0); return }
-      const { data: rijen } = await db.supabase.from('workout_progress').select('exercise_name, sets')
-        .in('session_id', ids).then(r => r, () => ({ data: [] }))
-      const namen = new Set((rijen || []).filter(r => Array.isArray(r.sets) ? r.sets.length > 0 : true).map(r => String(r.exercise_name || '').toLowerCase()).filter(Boolean))
-      if (!weg) setGelogdeOefeningen(namen.size)
+      try {
+        const [{ data: klant }, { data: sessies }] = await Promise.all([
+          db.supabase.from('clients').select('assigned_schema_id, workout_schedule').eq('id', client.id).maybeSingle().then(r => r, () => ({ data: null })),
+          db.supabase.from('workout_sessions').select('id').eq('client_id', client.id).eq('workout_date', slaapDagIso).then(r => r, () => ({ data: [] })),
+        ])
+        const ids = (sessies || []).map(x => x.id)
+        if (!ids.length || !klant?.assigned_schema_id) { if (!weg) setTrainingPct(0); return }
+        const [{ data: logs }, { data: plan }] = await Promise.all([
+          db.supabase.from('workout_progress').select('exercise_name, sets').in('session_id', ids).then(r => r, () => ({ data: [] })),
+          db.supabase.from('workout_schemas').select('id, week_structure').eq('id', klant.assigned_schema_id).maybeSingle().then(r => r, () => ({ data: null })),
+        ])
+        if (!plan) { if (!weg) setTrainingPct(0); return }
+        const metOverrides = await WorkoutServiceNew.getSchemaWithOverrides(client.id, plan, db)
+        const weekdag = new Date(`${slaapDagIso}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+        const sleutel = klant.workout_schedule?.[weekdag]
+        const oefeningen = metOverrides?.week_structure?.[sleutel]?.exercises || []
+        if (!weg) setTrainingPct(workoutCompletionPct(oefeningen, logs || []))
+      } catch { if (!weg) setTrainingPct(0) }
     }
     laad()
     window.addEventListener('myarc:workout-changed', laad)
     return () => { weg = true; window.removeEventListener('myarc:workout-changed', laad) }
   }, [client?.id, db, slaapDagIso, versie])
-  const trainingGedaan = (b) => {
-    if (b.type !== 'training' || !gelogdeOefeningen) return false
-    const gepland = Number(b.meta?.exercise_count) || 0
-    return gepland > 0 ? gelogdeOefeningen / gepland >= 0.5 : gelogdeOefeningen >= 3
-  }
+  const trainingGedaan = (b) => b.type === 'training' && trainingPct >= 50
   const wegenVan = (b) => (b.type === 'weging' && slaapDagIso ? {
     kan: slaapDagIso <= toIsoDate(nu),
     gelogd: gewogenOp,
@@ -386,7 +396,7 @@ export default function DagAgenda({
     })
     return { totaal, gedaan, rond: totaal > 0 && gedaan === totaal }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lijstBlokken, gelogd, slaapLogs, gewogenOp, slaapDagIso, gelogdeOefeningen])
+  }, [lijstBlokken, gelogd, slaapLogs, gewogenOp, slaapDagIso, trainingPct])
   // Confetti als je zelf de laatste afvinkt; één keer per dag.
   const [confetti, setConfetti] = useState(0)
   const vorigeRond = useRef(null)
