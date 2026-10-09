@@ -41,10 +41,11 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
     if (fSoort === 'week' && !isWeek(t)) return false
     if (fSoort === 'dag' && isWeek(t)) return false
     const k = kcalVan(t)
-    if (fKcal === 'tot2000' && !(k > 0 && k < 2000)) return false
-    if (fKcal === '2000' && !(k >= 2000 && k < 2500)) return false
-    if (fKcal === '2500' && !(k >= 2500 && k < 3000)) return false
-    if (fKcal === '3000' && !(k >= 3000)) return false
+    // Stappen van 100 kcal, van 1500 tot 4000 (fKcal = ondergrens als tekst).
+    if (fKcal !== 'alle') {
+      const onder = Number(fKcal)
+      if (fKcal === 'tot1500' ? !(k > 0 && k < 1500) : fKcal === '4000+' ? !(k >= 4000) : !(k >= onder && k < onder + 100)) return false
+    }
     const v = variatieVan(t)
     if (fVariatie === 'veel' && !(v != null && v >= 0.6)) return false
     if (fVariatie === 'weinig' && !(v != null && v < 0.6)) return false
@@ -409,7 +410,11 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
               <div style={{ display: 'flex', alignItems: 'center', padding: m ? '0.4rem 1rem' : '0.5rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <Keuze waarde={fSoort} zet={setFSoort} isMobile={m} opties={[{ id: 'alle', label: 'Week en dag' }, { id: 'week', label: 'Weekplannen' }, { id: 'dag', label: 'Dagmenu\'s' }]} />
                 <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-                <Keuze waarde={fKcal} zet={setFKcal} isMobile={m} opties={[{ id: 'alle', label: 'Alle kcal' }, { id: 'tot2000', label: 'Tot 2000' }, { id: '2000', label: '2000–2500' }, { id: '2500', label: '2500–3000' }, { id: '3000', label: '3000+' }]} />
+                <Keuze waarde={fKcal} zet={setFKcal} isMobile={m} opties={[
+                  { id: 'alle', label: 'Alle kcal' }, { id: 'tot1500', label: 'Tot 1500' },
+                  ...Array.from({ length: 25 }, (_, i) => 1500 + i * 100).map(v => ({ id: String(v), label: `${v}–${v + 100}` })),
+                  { id: '4000+', label: '4000+' },
+                ]} />
                 <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
                 <Keuze waarde={fVariatie} zet={setFVariatie} isMobile={m} uitlijning="rechts" opties={[{ id: 'alle', label: 'Alle variatie' }, { id: 'veel', label: 'Veel variatie' }, { id: 'weinig', label: 'Weinig variatie' }]} />
               </div>
