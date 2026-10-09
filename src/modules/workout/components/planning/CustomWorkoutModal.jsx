@@ -43,6 +43,7 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
   const [naam, setNaam] = useState(existingWorkout?.name || '')
   const [oefeningen, setOefeningen] = useState(Array.isArray(existingWorkout?.exercises) ? existingWorkout.exercises : [])
   const [stap, setStap] = useState('dag')          // 'dag' | 'kiezen'
+  const [gekozenOpen, setGekozenOpen] = useState(false)   // lijstje met wat je al aangevinkt hebt
   const [bieb, setBieb] = useState([])
   const [laden, setLaden] = useState(false)
   const [zoek, setZoek] = useState('')
@@ -77,8 +78,10 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
   const fotoVan = useOefeningFotos(db, [...new Set([...lijst.map(e => e.name), ...oefeningen.map(e => e.name)])])
 
   const voegToe = (ex) => {
-    if (gekozen.has(String(ex.name).toLowerCase())) return
     if (navigator.vibrate) navigator.vibrate(10)
+    const naamL = String(ex.name).toLowerCase()
+    // Al aangevinkt? Dan weer eraf; zo corrigeer je zonder terug te hoeven.
+    if (gekozen.has(naamL)) { setOefeningen(l => l.filter(e => String(e.name).toLowerCase() !== naamL)); return }
     setOefeningen(l => [...l, naarDagOefening(ex)])
   }
   const haalWeg = (i) => setOefeningen(l => l.filter((_, j) => j !== i))
@@ -222,7 +225,7 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
               {lijst.map(ex => {
                 const al = gekozen.has(String(ex.name).toLowerCase())
                 return (
-                  <button key={ex.name} onClick={() => voegToe(ex)} disabled={al} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 6, borderRadius: 12, background: al ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${al ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`, color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: al ? 'default' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <button key={ex.name} onClick={() => voegToe(ex)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 6, borderRadius: 12, background: al ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${al ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`, color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: 9, backgroundImage: `url(${fotoVan(ex.name)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
@@ -234,10 +237,37 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
               })}
               <div style={{ height: 12 }} />
             </div>
-            <div style={{ padding: isMobile ? '0.6rem 1rem calc(0.9rem + env(safe-area-inset-bottom, 0px))' : '0.7rem 1.2rem 1.1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              <button onClick={() => setStap('dag')} style={{ width: '100%', minHeight: 48, borderRadius: 12, background: '#fff', color: '#0a0a0a', border: 'none', fontFamily: 'inherit', fontSize: '0.95rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation' }}>
-                Klaar · {oefeningen.length} {oefeningen.length === 1 ? 'oefening' : 'oefeningen'}
-              </button>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              {/* Wat je al hebt aangevinkt, uitklapbaar: zo zie je tussendoor
+                  je lijst zonder terug te gaan. Tik op × om er een af te halen. */}
+              {oefeningen.length > 0 && (
+                <>
+                  <button onClick={() => setGekozenOpen(v => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? '0.55rem 1rem' : '0.6rem 1.2rem', background: 'transparent', border: 'none', fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <span style={{ display: 'flex', gap: 3 }}>
+                      {oefeningen.slice(0, 4).map((e, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 6, backgroundImage: `url(${fotoVan(e.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.2)' }} />)}
+                    </span>
+                    <span style={{ flex: 1, textAlign: 'left', fontSize: '0.82rem', fontWeight: 900, color: '#fff' }}>{oefeningen.length} gekozen</span>
+                    <ChevronUp size={16} strokeWidth={2.8} color="#fff" style={{ transform: gekozenOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                  </button>
+                  {gekozenOpen && (
+                    <div style={{ maxHeight: isMobile ? 220 : 260, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '0 1rem 0.4rem' : '0 1.2rem 0.5rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {oefeningen.map((e, i) => (
+                        <div key={`${e.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
+                          <span style={{ width: 20, fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{i + 1}</span>
+                          <span style={{ width: 30, height: 30, borderRadius: 7, flexShrink: 0, backgroundImage: `url(${fotoVan(e.name)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                          <span style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</span>
+                          <button onClick={() => haalWeg(i)} aria-label={`${e.name} eraf`} style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}><X size={13} strokeWidth={2.8} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+              <div style={{ padding: isMobile ? '0.3rem 1rem calc(0.9rem + env(safe-area-inset-bottom, 0px))' : '0.3rem 1.2rem 1.1rem' }}>
+                <button onClick={() => setStap('dag')} style={{ width: '100%', minHeight: 48, borderRadius: 12, background: '#fff', color: '#0a0a0a', border: 'none', fontFamily: 'inherit', fontSize: '0.95rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation' }}>
+                  Klaar · {oefeningen.length} {oefeningen.length === 1 ? 'oefening' : 'oefeningen'}
+                </button>
+              </div>
             </div>
           </>
         )}
