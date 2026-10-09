@@ -77,7 +77,7 @@ export default function PlanTitleBar({
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: m ? '0.45rem 0.75rem 0.7rem' : '0.5rem 1rem 0.8rem', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: m ? '1.1rem 0.75rem 0.7rem' : '1.4rem 1rem 0.8rem', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative' }}>
       {/* Klant: tik = andere klant kiezen. */}
       <div style={{ position: 'relative' }}>
         <button onClick={() => onSelectClient && setKiezer(v => !v)} style={{ background: 'none', border: 'none', padding: '2px 6px', fontFamily: 'inherit', cursor: onSelectClient ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.12em', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
