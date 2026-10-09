@@ -216,7 +216,7 @@ export default function TrainingToevoegen({
               return (
                 <div style={{ position: 'relative', minWidth: 0 }}>
                   <button onClick={() => kies(item.key)} style={{
-                    width: '100%', height: isMobile ? 138 : 150, padding: 0, borderRadius: 14, overflow: 'hidden', textAlign: 'left',
+                    width: '100%', height: isMobile ? 104 : 112, padding: 0, borderRadius: 14, overflow: 'hidden', textAlign: 'left',
                     border: `1.5px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`, background: '#111',
                     cursor: 'pointer', fontFamily: 'inherit', color: '#fff', position: 'relative',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
