@@ -122,8 +122,9 @@ export default function MealDayNavHeader({
         padding: opFoto ? (isMobile ? '0.3rem 1.5rem' : '0.5rem 2.5rem') : (isMobile ? '0.65rem 1.5rem' : '0.8rem 2.5rem'),
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 10,
+        // Pijlen direct naast de dag, niet tegen de randen.
+        justifyContent: 'center',
+        gap: 4,
       }}>
         <button
           onClick={goPrev}
@@ -138,7 +139,7 @@ export default function MealDayNavHeader({
           onClick={onOpenSummary}
           aria-label="Open dag-samenvatting"
           style={{
-            flex: 1,
+            flex: '0 1 auto',
             background: 'transparent',
             border: 'none',
             padding: '0.3rem 0.5rem',
