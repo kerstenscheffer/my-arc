@@ -238,6 +238,9 @@ const COACH_PHOTO_URL = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746
 
 function CoachNoteCard({ client, db }) {
   const isMobile = useIsMobile()
+  // `loading` gaat niet meer over de hele pagina (geen spinner); de blokken
+  // die het zetten gebruiken het voor hun eigen staat.
+  const [loading, setLoading] = useState(false)
   const [note, setNote] = useState(null)
 
   useEffect(() => {
