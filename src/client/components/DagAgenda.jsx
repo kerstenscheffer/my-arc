@@ -1403,6 +1403,12 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
         }}>
           {naam || soort}
         </span>
+        {/* Werk loopt uren door: de eindtijd zacht achter de naam. */}
+        {blok.type === 'work' && blok.end > blok.start && (
+          <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
+            tot {tijd(blok.end)}
+          </span>
+        )}
         {wegen?.gelogd != null && (
           <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
             {nl1(wegen.gelogd)} kg
