@@ -4,6 +4,7 @@
 // chevron-knoppen binnenin elke card (zie DayCard). De cards reageren alleen
 // nog op tap-to-open.
 import DayCard from './DayCard'
+import { extraSleutels } from '../../utils/extraTrainingen'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function WeekGrid({
@@ -114,6 +115,15 @@ export default function WeekGrid({
         else pastBijPlanning = true
         const isCompleted = !!sessie && pastBijPlanning
         const gedaanAnders = sessie && !pastBijPlanning ? { naam: sessieNaam || 'Training' } : null
+        // Tweede (derde…) training op deze dag: eigen tegel, eigen gedaan-check.
+        const extraTrainingen = extraSleutels(tempSchedule, day).map(rk => {
+          const key = tempSchedule[rk]
+          const data = getWorkoutData(key)
+          const oef = new Set((data?.exercises || []).map(e => norm(e?.name)).filter(Boolean))
+          const klaar = !!sessie && sessieOef.length > 0 && oef.size > 0
+            && sessieOef.filter(n => oef.has(n)).length / Math.min(sessieOef.length, oef.size) >= 0.5
+          return { rosterKey: rk, key, data, klaar }
+        }).filter(x => x.data || isActivityKey(x.key))
         const isSelected = selectedWorkout === assignedWorkout
           || (selectedForSwap && selectedForSwap.day === day)
 
@@ -143,6 +153,9 @@ export default function WeekGrid({
             onCardioShiftLeft={onCardioShift ? (c) => onCardioShift(c, -1) : null}
             onCardioShiftRight={onCardioShift ? (c) => onCardioShift(c, +1) : null}
             onRemoveTraining={onRemoveTraining ? () => onRemoveTraining(day) : null}
+            extraTrainingen={extraTrainingen}
+            onOpenExtra={(key) => handleCardClick(day, key)}
+            onRemoveExtra={onRemoveTraining ? (rk) => onRemoveTraining(day, rk) : null}
             onRemoveCardio={onRemoveCardio}
             onOpenGedaan={onOpenGedaan ? () => onOpenGedaan(day) : null}
             gedaanAnders={gedaanAnders}

@@ -102,9 +102,10 @@ export default function DayCard({
   // Een gedane sessie die niet bij de geplande training hoort (bv. na een
   // planwissel): { naam }. Komt als eigen groene tegel boven de planning.
   gedaanAnders = null,
+  extraTrainingen = [], onOpenExtra = null, onRemoveExtra = null,
 }) {
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
-  const heeftTraining = !!workoutData || isActivity || !!gedaanAnders
+  const heeftTraining = !!workoutData || isActivity || !!gedaanAnders || extraTrainingen.length > 0
   const heeftCardio = Array.isArray(cardio) && cardio.length > 0
   const cardioKlaar = heeftCardio && cardio.every(c => c.gedaan)
   const handleClick = () => { if (onClick) onClick() }
@@ -228,6 +229,17 @@ export default function DayCard({
               onVerwijder={kanPlannen && onRemoveTraining ? onRemoveTraining : null}
             />
           )}
+          {extraTrainingen.map((x, i) => (
+            <Tegel key={x.rosterKey}
+              foto={getWorkoutImage(x.data || { name: x.key })}
+              eyebrow={`Training ${i + 2}`} titel={(x.data?.name || x.data?.focus || x.key || 'Training').trim()}
+              klaar={x.klaar}
+              kanSchuiven={false}
+              onClick={x.klaar && onOpenGedaan ? onOpenGedaan : (kanOpenen && onOpenExtra ? () => onOpenExtra(x.key) : undefined)}
+              isMobile={isMobile} icoon={Dumbbell}
+              onVerwijder={kanPlannen && onRemoveExtra ? () => onRemoveExtra(x.rosterKey) : null}
+            />
+          ))}
           {heeftCardio && (
             <Tegel
               foto={cardioFoto(cardio[0].soort)}

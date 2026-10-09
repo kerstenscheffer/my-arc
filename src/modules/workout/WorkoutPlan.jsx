@@ -108,10 +108,13 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
   // van TodaysWorkoutMain en scroll erheen. Geen aparte modal meer — de
   // data-flow gaat via TodaysWorkoutMain's `selectedDay` prop die zelf de
   // juiste workout laadt (custom, activity of schema-dag).
+  // Welke training van die dag (bij twee op één dag): de sleutel van de tegel.
+  const [selectedKey, setSelectedKey] = useState(null)
   const handleDayClick = (day, workoutKey) => {
     if (!workoutKey) return
     const dayIdx = weekDays.indexOf(day)
     if (dayIdx >= 0) setSelectedDayIdx(dayIdx)
+    setSelectedKey(workoutKey)
     setWorkoutOpen(true)
     // Scroll naar TodaysWorkoutMain zodat de net-geopende dropdown direct
     // in beeld is. Kleine timeout zodat React eerst kan rerenderen.
@@ -190,6 +193,7 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
           onSchemaUpdate={(updatedSchema) => setLocalSchema(updatedSchema)}
           scheduleReloadKey={scheduleReloadKey}
           selectedDay={selectedDayKey}
+          selectedWorkoutKey={selectedKey}
           expanded={workoutOpen}
           onExpandedChange={setWorkoutOpen}
         />

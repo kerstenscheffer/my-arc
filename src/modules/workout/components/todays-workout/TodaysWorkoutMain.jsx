@@ -10,12 +10,13 @@ import WorkoutServiceNew from '../../services/WorkoutServiceNew'
 import { workoutFoto } from '../../utils/workoutFoto'
 import { isWorkoutFullyLogged, workoutCompletionPct } from '../../utils/exerciseCompletion'
 import { ontleedPlanKey } from '../../utils/planKey'
+import { trainingenVanDag } from '../../utils/extraTrainingen'
 import CardioVandaag from './CardioVandaag'
 import { useCardioVanDag } from './useCardioVanDag'
 
 // onOpenPlanner is vervallen: op een dag zonder training staat geen knop meer,
 // je koppelt hem in de weekstrip eronder.
-export default function TodaysWorkoutMain({ client, schema, db, workoutService, onWorkoutCompleted, onSchemaUpdate, scheduleReloadKey, selectedDay, expanded: controlledExpanded, onExpandedChange }) {
+export default function TodaysWorkoutMain({ client, schema, db, workoutService, onWorkoutCompleted, onSchemaUpdate, scheduleReloadKey, selectedDay, selectedWorkoutKey = null, expanded: controlledExpanded, onExpandedChange }) {
   const isMobile = window.innerWidth <= 768
   // Controlled wanneer parent een `expanded` prop meegeeft (bv. zodat een
   // week-day-click de dropdown van buitenaf kan openen). Anders intern.
@@ -27,6 +28,10 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     if (onExpandedChange) onExpandedChange(next)
   }
   const [todaysWorkout, setTodaysWorkout] = useState(null)
+  // Twee trainingen op één dag: alle sleutels van de dag, en welke open staat.
+  const [dagSleutels, setDagSleutels] = useState([])
+  const [gekozenKey, setGekozenKey] = useState(null)
+  useEffect(() => { setGekozenKey(selectedWorkoutKey || null) }, [selectedWorkoutKey, selectedDay])
   const [todaysLogs, setTodaysLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [reloadKey, setReloadKey] = useState(0)
@@ -179,7 +184,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       loadTodaysWorkout()
       loadTodaysLogs()
     }
-  }, [schema?.id, client?.id, reloadKey, scheduleReloadKey, selectedDay])
+  }, [schema?.id, client?.id, reloadKey, scheduleReloadKey, selectedDay, gekozenKey])
 
   const loadTodaysWorkout = async () => {
     if (!client?.id || !db) { setLoading(false); return }
@@ -213,7 +218,10 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       const dayKey = (selectedDay && selectedDay !== 'today') ? selectedDay : weekDays[todayIndex].toLowerCase()
       // Map naar het Schema-formaat (eerste hoofdletter), bv 'monday' → 'Monday'.
       const todayName = dayKey.charAt(0).toUpperCase() + dayKey.slice(1)
-      let workoutKey = savedSchedule?.[todayName] || null
+      // Alle trainingen van de dag (hoofd + extra's); de gekozen tegel wint.
+      const sleutelsVanDag = trainingenVanDag(savedSchedule, todayName)
+      setDagSleutels(sleutelsVanDag)
+      let workoutKey = (gekozenKey && sleutelsVanDag.includes(gekozenKey)) ? gekozenKey : (sleutelsVanDag[0] || null)
 
       console.log('🏋️ dag:', todayName, '| workoutKey:', workoutKey)
 
@@ -383,6 +391,32 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     </div>
   )
 
+  // Schakelaar tussen de trainingen van de dag (alleen bij twee of meer).
+  const naamVanSleutel = (k) => {
+    if (!k) return 'Training'
+    const ws = freshSchema?.week_structure || {}
+    if (ws[k]) return ws[k].name || ws[k].focus || k
+    if (todaysWorkout && (todaysWorkout.workoutKey === k || (k.startsWith('custom_') && todaysWorkout.customData?.id === k.replace('custom_', '')))) return todaysWorkout.name || 'Training'
+    if (k.startsWith('custom_')) return 'Eigen training'
+    const pk = ontleedPlanKey(k)
+    return pk ? 'Ander plan' : k
+  }
+  const actieveSleutel = todaysWorkout?.customData?.id ? `custom_${todaysWorkout.customData.id}` : todaysWorkout?.workoutKey
+  const schakelaar = dagSleutels.length > 1 ? (
+    <div style={{ display: 'flex', gap: 6, padding: isMobile ? '0.6rem 1rem 0' : '0.75rem 1.5rem 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
+      {dagSleutels.map((k, i) => {
+        const aan = gekozenKey ? gekozenKey === k : (actieveSleutel ? actieveSleutel === k || (ontleedPlanKey(k)?.dagKey === actieveSleutel) : i === 0)
+        return (
+          <button key={k} onClick={() => setGekozenKey(k)} style={{
+            flexShrink: 0, padding: '0.45rem 0.85rem', borderRadius: 999, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
+            background: aan ? '#fff' : 'rgba(255,255,255,0.06)', color: aan ? '#0a0a0a' : '#fff',
+            border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>{i + 1}. {naamVanSleutel(k)}</button>
+        )
+      })}
+    </div>
+  ) : null
+
   const kaart = (
     <TodaysWorkoutCard
       workout={todaysWorkout}
@@ -419,7 +453,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
           background: '#0a0a0a',
           display: 'flex', flexDirection: 'column',
         }}>
-          <div style={{ flexShrink: 0 }}>{kaart}</div>
+          <div style={{ flexShrink: 0 }}>{schakelaar}{kaart}</div>
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <LogModal
               workout={todaysWorkout}
@@ -440,7 +474,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   return (
     <>
       {kop}
-      <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{kaart}</div>
+      <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -64 : -84 }}>{schakelaar}{kaart}</div>
       {/* Staat er die dag ook cardio, dan direct onder de training. */}
       <CardioVandaag lijst={cardioLijst} isMobile={isMobile} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

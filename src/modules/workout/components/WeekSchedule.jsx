@@ -11,6 +11,7 @@ import ActionButtons from './week-schedule/ActionButtons'
 import CardioService, { normaliseerSoort } from '../services/CardioService'
 import TrainingToevoegen from './TrainingToevoegen'
 import { ontleedPlanKey } from '../utils/planKey'
+import { voegTrainingToe, verwijderTrainingVanDag } from '../utils/extraTrainingen'
 import RealiteitBlad from '../../client-agenda/RealiteitBlad'
 import CardioGedaanBlad from './CardioGedaanBlad'
 import ExerciseLogModal from './todays-workout/components/ExerciseLogModal'
@@ -412,14 +413,16 @@ export default function WeekSchedule({
   // workout van vandaag) en de oude indeling klaarzetten als planning voor
   // volgende week, zodat het daarna vanzelf terugspringt — tenzij volgende
   // week al een eigen planning heeft, dan blijft die.
-  const bewaarGym = async ({ workoutKey, day, bereik }) => {
-    const next = { ...tempSchedule, [day]: workoutKey }
+  const bewaarGym = async ({ workoutKey, day, bereik, extra = false }) => {
+    // `extra`: naast de training die er al staat (tweede training op een
+    // dag), anders ervoor in de plaats.
+    const next = extra ? voegTrainingToe(tempSchedule, day, workoutKey) : { ...tempSchedule, [day]: workoutKey }
     if (isToekomst) {
       const ok = await WorkoutServiceNew.saveWeekPlanning(clientId, weekSleutel, next, db)
       if (!ok) throw new Error('niet opgeslagen')
       if (bereik === 'standaard') {
         const vast = (await db.getClientWorkoutSchedule(clientId)) || {}
-        await db.updateClientWorkoutSchedule(clientId, { ...vast, [day]: workoutKey })
+        await db.updateClientWorkoutSchedule(clientId, extra ? voegTrainingToe(vast, day, workoutKey) : { ...vast, [day]: workoutKey })
       }
       setTempSchedule(next)
       await loadCustomWorkoutsForSchedule(next)
@@ -436,9 +439,9 @@ export default function WeekSchedule({
 
   // Prullenbak op een trainingstegel: alleen deze week weg, zelfde weg als
   // 'eenmalig' toevoegen maar dan zonder die dag.
-  const verwijderTraining = async (day) => {
-    const next = { ...tempSchedule }
-    delete next[day]
+  const verwijderTraining = async (day, rosterKey = null) => {
+    // rosterKey = 'Thursday#2' voor een tweede training; zonder = de hoofdtraining.
+    const next = verwijderTrainingVanDag(tempSchedule, day, rosterKey)
     if (isToekomst) {
       const ok = await WorkoutServiceNew.saveWeekPlanning(clientId, weekSleutel, next, db)
       if (!ok) { alert('⚠️ Weghalen mislukt.'); return }
@@ -458,10 +461,11 @@ export default function WeekSchedule({
     setCardioVersie(v => v + 1)
     window.dispatchEvent(new CustomEvent('myarc:cardio-changed'))
   }
-  const vraagTraining = (day) => {
-    const key = tempSchedule[day]
+  // rosterKey = 'Thursday#2' voor een tweede training op die dag.
+  const vraagTraining = (day, rosterKey = null) => {
+    const key = tempSchedule[rosterKey || day]
     const w = getWorkoutData(key)
-    setVerwijderVraag({ soort: 'training', titel: w?.name || w?.focus || 'Training', permanent: !!key && vastRooster[day] === key, item: day })
+    setVerwijderVraag({ soort: 'training', titel: w?.name || w?.focus || 'Training', permanent: !!key && vastRooster[rosterKey || day] === key, item: day, rosterKey })
   }
   const vraagCardio = (c) => setVerwijderVraag({ soort: 'cardio', titel: c.soort, permanent: !c.eenmalig, item: c })
   const voerUit = async (hoe) => {
@@ -470,7 +474,7 @@ export default function WeekSchedule({
     if (!v) return
     if (v.soort === 'training') {
       // Voorgoed uit het plan is voor de coach; de klant kan alleen deze week.
-      await verwijderTraining(v.item)
+      await verwijderTraining(v.item, v.rosterKey || null)
     } else {
       if (hoe === 'voorgoed' || !v.permanent) await verwijderCardio(v.item)
       else await verwijderCardioDezeWeek(v.item)
