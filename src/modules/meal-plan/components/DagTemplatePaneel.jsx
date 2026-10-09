@@ -26,7 +26,11 @@ import {
 const DAGEN_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const LIJN = 'rgba(255,255,255,0.1)'
 
-const SLOT_VOLGORDE = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3', 'snack4']
+const SLOT_VOLGORDE = ['breakfast', 'snack1', 'lunch', 'snack2', 'pre_workout', 'dinner', 'snack3', 'snack4']
+const SLOT_NAAM = {
+  breakfast: 'Ontbijt', snack1: 'Tussendoor', lunch: 'Lunch', snack2: 'Tussendoor',
+  pre_workout: 'Pre-workout', dinner: 'Avondeten', snack3: 'Avondsnack', snack4: 'Avondsnack',
+}
 const slotRang = (slot) => {
   const i = SLOT_VOLGORDE.indexOf(slot)
   return i === -1 ? 99 : i
@@ -75,6 +79,8 @@ export default function DagTemplatePaneel({
   const [bezig, setBezig] = useState(false)
   const [klaar, setKlaar] = useState('')
   const [uitleg, setUitleg] = useState(false)
+  // Welke dagkaart staat uitgeklapt (info-knop): id of null.
+  const [inzage, setInzage] = useState(null)
 
   const laad = useCallback(async () => {
     if (!db?.supabase || !client?.id) return
@@ -303,13 +309,14 @@ export default function DagTemplatePaneel({
                       : ontleed(t)
                     const foto = dagFoto(t)
                     const namen = maaltijdNamen(t)
+                    const open = inzage === t.id
                     return (
+                      <div key={t.id} style={{ marginBottom: 10 }}>
                       <button
-                        key={t.id}
                         onClick={() => setGekozen(t)}
                         style={{
                           width: '100%', display: 'flex', alignItems: 'stretch', gap: 0,
-                          marginBottom: 10, padding: 0, overflow: 'hidden',
+                          padding: 0, overflow: 'hidden',
                           background: 'rgba(255,255,255,0.03)',
                           border: `1px solid ${LIJN}`, borderRadius: 14,
                           cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
@@ -358,6 +365,21 @@ export default function DagTemplatePaneel({
                           )}
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 2, paddingRight: 8, flexShrink: 0 }}>
+                          {/* Info: klapt onder de kaart uit wat er in deze dag zit. */}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Wat zit er in deze dag"
+                            aria-expanded={open}
+                            onClick={(e) => { e.stopPropagation(); setInzage(open ? null : t.id) }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setInzage(open ? null : t.id) } }}
+                            style={{
+                              width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: open ? '#fff' : 'rgba(255,255,255,0.55)', cursor: 'pointer',
+                            }}
+                          >
+                            <Info size={17} strokeWidth={2.6} />
+                          </span>
                           {vanMij && (
                             <span
                               role="button"
@@ -377,6 +399,41 @@ export default function DagTemplatePaneel({
                           <ChevronRight size={20} strokeWidth={3} color="rgba(255,255,255,0.3)" />
                         </span>
                       </button>
+                      {open && (() => {
+                        const rijen = Object.entries(slotsVanTemplate(t))
+                          .sort((a, b) => slotRang(a[0]) - slotRang(b[0]))
+                        const r = (n) => Math.round(Number(n) || 0)
+                        return (
+                          <div style={{ padding: '0.75rem 0.25rem 0.25rem' }}>
+                            <div style={{ display: 'flex', gap: 14, marginBottom: '0.6rem', fontSize: '0.78rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                              <span>{r(t.daily_calories)} kcal</span>
+                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{r(t.daily_protein)}g eiwit</span>
+                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{r(t.daily_carbs)}g koolh.</span>
+                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{r(t.daily_fat)}g vet</span>
+                            </div>
+                            {rijen.map(([slot, m], i) => {
+                              const naamM = m?.name || m?.meal_name || 'Maaltijd'
+                              const fotoM = m?.image_url || foodImageFallback(naamM, slot, 120)
+                              return (
+                                <div key={slot} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', borderTop: i ? `1px solid ${LIJN}` : 'none' }}>
+                                  <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 9, backgroundImage: `url(${fotoM})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }} />
+                                  <span style={{ flex: 1, minWidth: 0 }}>
+                                    <span style={{ display: 'block', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>
+                                      {SLOT_NAAM[slot] || slot}{m?.timing ? ` · ${m.timing}` : ''}
+                                    </span>
+                                    <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 800, color: '#fff', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naamM}</span>
+                                  </span>
+                                  <span style={{ flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                    <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 900, color: '#fff' }}>{r(m?.calories)} kcal</span>
+                                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{r(m?.protein)}g eiwit</span>
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
+                      </div>
                     )
                   })}
               </div>
