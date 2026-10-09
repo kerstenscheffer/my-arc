@@ -127,19 +127,28 @@ const CardioService = {
     return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`
   },
 
-  async planBlokken({ clientId, soort, duur, tijd, dagen, bereik, weekSleutel, notitie }, db) {
+  // Extra (coach, 9 okt 2026): tijdPerDag {monday:'07:30'} overschrijft `tijd`
+  // per dag; intensiteit ('rustig'|'gemiddeld'|'pittig'|'vol_gas'), afstandKm
+  // en notitie komen als sublabel op het blok (zichtbaar bij de klant) en bij
+  // 'standaard' ook in client_cardio_plan.
+  async planBlokken({ clientId, soort, duur, tijd, dagen, bereik, weekSleutel, notitie, tijdPerDag = null, intensiteit = null, afstandKm = null }, db) {
     if (!db?.supabase || !clientId || !soort || !Array.isArray(dagen) || dagen.length === 0) throw new Error('onvolledig')
     const label = `Cardio · ${soort}`
-    const [h, m] = String(tijd || '18:00').split(':').map(Number)
-    const startMin = (h || 0) * 60 + (m || 0)
-    const eindMin = Math.min(24 * 60, startMin + (Number(duur) || 30))
     const tijdStr = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}:00`
+    const minutenVan = (t) => { const [h, m] = String(t || '18:00').split(':').map(Number); return (h || 0) * 60 + (m || 0) }
+    const INTENS = { rustig: 'Rustig', gemiddeld: 'Gemiddeld', pittig: 'Pittig', vol_gas: 'Vol gas' }
+    const sublabel = [INTENS[intensiteit] || null, afstandKm ? `${String(afstandKm).replace('.', ',')} km` : null, notitie || null].filter(Boolean).join(' · ').slice(0, 120) || null
     const week = weekSleutel || this.maandagIso()
-    const rijen = dagen.map(d => ({
-      client_id: clientId, day: String(d).toLowerCase(), type: 'custom', label, sublabel: null,
-      start_time: tijdStr(startMin), end_time: tijdStr(eindMin), color: '#06b6d4',
-      week_start: bereik === 'eenmalig' ? week : null, updated_at: new Date().toISOString(),
-    }))
+    const rijen = dagen.map(d => {
+      const dag = String(d).toLowerCase()
+      const startMin = minutenVan(tijdPerDag?.[dag] || tijdPerDag?.[d] || tijd)
+      const eindMin = Math.min(24 * 60, startMin + (Number(duur) || 30))
+      return {
+        client_id: clientId, day: dag, type: 'custom', label, sublabel,
+        start_time: tijdStr(startMin), end_time: tijdStr(eindMin), color: '#06b6d4',
+        week_start: bereik === 'eenmalig' ? week : null, updated_at: new Date().toISOString(),
+      }
+    })
     const { error } = await db.supabase.from('client_agenda_blocks').insert(rijen)
     if (error) throw error
     if (bereik === 'standaard') {
@@ -151,7 +160,8 @@ const CardioService = {
       await this.savePlanItem({
         id: bestaand?.id || null, client_id: clientId, cardio_type: soort,
         times_per_week: (vaste || []).length || dagen.length, duration_minutes: duur,
-        intensity: bestaand?.intensity || null, notes: notitie ?? bestaand?.notes ?? null, sort_order: bestaand?.sort_order || 0,
+        intensity: intensiteit || bestaand?.intensity || null, distance_km: afstandKm || bestaand?.distance_km || null,
+        notes: notitie ?? bestaand?.notes ?? null, sort_order: bestaand?.sort_order || 0,
       }, db)
     }
     try { window.dispatchEvent(new CustomEvent('myarc:cardio-changed')) } catch { /* geen window */ }
@@ -162,7 +172,7 @@ const CardioService = {
   // de opgegeven maandag.
   async getBlokken(clientId, db, vanafMaandagIso = null) {
     if (!db?.supabase || !clientId) return []
-    let q = db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time, week_start, skip_weeks')
+    let q = db.supabase.from('client_agenda_blocks').select('id, day, label, sublabel, start_time, end_time, week_start, skip_weeks')
       .eq('client_id', clientId).eq('type', 'custom').ilike('label', 'Cardio ·%')
     if (vanafMaandagIso) q = q.or(`week_start.is.null,week_start.gte.${vanafMaandagIso}`)
     const { data, error } = await q

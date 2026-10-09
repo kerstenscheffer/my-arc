@@ -32,6 +32,13 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
   const [duur, setDuur] = useState(30)
   const [bereik, setBereik] = useState('standaard')
   const [notitie, setNotitie] = useState('')
+  // Dieper plannen (9 okt 2026): eigen sport, tijd per dag, intensiteit, afstand.
+  const [eigenSoort, setEigenSoort] = useState('')
+  const [tijdPerDag, setTijdPerDag] = useState({})
+  const [intensiteit, setIntensiteit] = useState(null)
+  const [afstand, setAfstand] = useState('')
+  const INTENSITEITEN = [{ id: 'rustig', label: 'Rustig', sub: 'zone 2, praten kan' }, { id: 'gemiddeld', label: 'Gemiddeld', sub: 'stevig, korte zinnen' }, { id: 'pittig', label: 'Pittig', sub: 'intervallen, buiten adem' }, { id: 'vol_gas', label: 'Vol gas', sub: 'maximaal' }]
+  const gekozenSoort = soort === '__eigen' ? eigenSoort.trim() : soort
   const dezeWeek = CardioService.maandagIso()
 
   const laad = async () => {
@@ -43,11 +50,14 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
   useEffect(() => { laad() }, [client?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const bewaar = async () => {
-    if (!soort || dagen.length === 0 || bezig) return
+    if (!gekozenSoort || dagen.length === 0 || bezig) return
     setBezig(true)
     try {
-      await CardioService.planBlokken({ clientId: client.id, soort, duur: Number(duur) || 30, tijd, dagen, bereik, weekSleutel: dezeWeek, notitie: notitie.trim() || null }, db)
-      setNieuwOpen(false); setSoort(null); setDagen([]); setNotitie('')
+      await CardioService.planBlokken({
+        clientId: client.id, soort: gekozenSoort, duur: Number(duur) || 30, tijd, dagen, bereik, weekSleutel: dezeWeek,
+        notitie: notitie.trim() || null, tijdPerDag, intensiteit, afstandKm: afstand ? Number(String(afstand).replace(',', '.')) || null : null,
+      }, db)
+      setNieuwOpen(false); setSoort(null); setEigenSoort(''); setDagen([]); setNotitie(''); setTijdPerDag({}); setIntensiteit(null); setAfstand('')
       await laad()
     } catch (e) { alert('Opslaan mislukt: ' + (e?.message || 'onbekende fout')) }
     finally { setBezig(false) }
@@ -127,7 +137,7 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
               {perSoort.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Elke week</div>}
               {perSoort.map(g => (
                 <Regel key={g.soort} titel={g.soort} foto={cardioFoto(g.soort)}
-                  sub={`${g.blokken.length}× per week · ${g.blokken[0]?.duur || '–'} min`}
+                  sub={[`${g.blokken.length}× per week · ${g.blokken[0]?.duur || '–'} min`, g.blokken.find(b => b.sublabel)?.sublabel].filter(Boolean).join(' · ')}
                   dagenChips={g.blokken.map(b => (
                     <span key={b.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', fontSize: '0.66rem', fontWeight: 900, color: '#fff' }}>
                       {DAG_KORT[b.day] || b.day} {b.tijd}
@@ -140,7 +150,7 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
               {eenmalig.length > 0 && <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6 }}>Eenmalig</div>}
               {eenmalig.map(b => (
                 <Regel key={b.id} titel={b.soort} foto={cardioFoto(b.soort)}
-                  sub={`${DAG_KORT[b.day] || b.day} · ${b.tijd}${b.duur ? ` · ${b.duur} min` : ''}`}
+                  sub={[`${DAG_KORT[b.day] || b.day} · ${b.tijd}${b.duur ? ` · ${b.duur} min` : ''}`, b.sublabel].filter(Boolean).join(' · ')}
                   eenmaligWeek={fmtWeek(b.week_start)} onWeg={() => weg(b)} />
               ))}
 
@@ -153,7 +163,11 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
                         const Icoon = s.icoon
                         return <button key={s.id} onClick={() => setSoort(s.id)} style={chip(soort === s.id)}><Icoon size={14} strokeWidth={2.4} />{s.id}</button>
                       })}
+                      <button onClick={() => setSoort('__eigen')} style={chip(soort === '__eigen')}><Plus size={14} strokeWidth={2.6} />Eigen…</button>
                     </div>
+                    {soort === '__eigen' && (
+                      <input autoFocus value={eigenSoort} onChange={e => setEigenSoort(e.target.value)} placeholder="Naam van de sport, bv. Boksen of Tennis" style={{ ...veld, marginTop: 8 }} />
+                    )}
                   </div>
                   <div>
                     <div style={labelStijl}>Dagen</div>
@@ -163,6 +177,17 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
                         return <button key={d.id} onClick={() => setDagen(l => aan ? l.filter(x => x !== d.id) : [...l, d.id])} style={chip(aan, { justifyContent: 'center', padding: '0.5rem 0' })}>{d.kort}</button>
                       })}
                     </div>
+                    {/* Per gekozen dag een eigen tijd; leeg = de tijd hieronder. */}
+                    {dagen.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                        {DAGEN_WEEK.filter(d => dagen.includes(d.id)).map(d => (
+                          <label key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.25rem 0.3rem 0.25rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.72rem', fontWeight: 900, color: '#fff' }}>
+                            {d.kort}
+                            <input type="time" value={tijdPerDag[d.id.toLowerCase()] || tijd} onChange={e => setTijdPerDag(m => ({ ...m, [d.id.toLowerCase()]: e.target.value }))} style={{ ...veld, width: 96, padding: '0.3rem 0.4rem', fontSize: '0.78rem' }} />
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <div style={{ flex: '1 1 120px' }}>
@@ -172,6 +197,21 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
                     <div style={{ flex: '1 1 120px' }}>
                       <div style={labelStijl}>Duur (min)</div>
                       <input type="number" inputMode="numeric" min={5} step={5} value={duur} onChange={e => setDuur(e.target.value)} style={veld} />
+                    </div>
+                    <div style={{ flex: '1 1 120px' }}>
+                      <div style={labelStijl}>Afstand (km, optioneel)</div>
+                      <input type="text" inputMode="decimal" value={afstand} onChange={e => setAfstand(e.target.value)} placeholder="bv. 5" style={veld} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={labelStijl}>Intensiteit</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                      {INTENSITEITEN.map(i => (
+                        <button key={i.id} onClick={() => setIntensiteit(intensiteit === i.id ? null : i.id)} style={chip(intensiteit === i.id, { flexDirection: 'column', alignItems: 'flex-start', gap: 1, padding: '0.45rem 0.6rem' })}>
+                          <span>{i.label}</span>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.6 }}>{i.sub}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <div>
@@ -184,7 +224,7 @@ export default function CardioPlanModal({ client, db, isMobile, onClose }) {
                   <input value={notitie} onChange={e => setNotitie(e.target.value)} placeholder="Notitie voor de klant (optioneel, bv. zone 2)" style={veld} />
                   <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                     <button onClick={() => setNieuwOpen(false)} style={{ ...knop, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}>Annuleren</button>
-                    <button onClick={bewaar} disabled={bezig || !soort || dagen.length === 0} style={{ ...knop, opacity: (bezig || !soort || dagen.length === 0) ? 0.4 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={bewaar} disabled={bezig || !gekozenSoort || dagen.length === 0} style={{ ...knop, opacity: (bezig || !gekozenSoort || dagen.length === 0) ? 0.4 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Check size={14} strokeWidth={3} /> {bezig ? 'Opslaan…' : `Inplannen${dagen.length ? ` (${dagen.length}×)` : ''}`}
                     </button>
                   </div>
