@@ -20,7 +20,8 @@ import { STAPPEN_EVENT } from '../../modules/steps/stappenSync'
 const nl = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n || 0))
 const kort = (n) => (n >= 10000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : nl(n))
 
-export default function StappenPil({ client, db, isMobile = false }) {
+// `kaal`: zonder bolletje, voor in de zwarte bovenbalk.
+export default function StappenPil({ client, db, isMobile = false, kaal = false }) {
   const [week, setWeek] = useState([])
   const [doel, setDoel] = useState(STANDAARD_DOEL)
   const [open, setOpen] = useState(false)
@@ -80,10 +81,11 @@ export default function StappenPil({ client, db, isMobile = false }) {
         aria-label={`Stappen vandaag: ${nl(stand)}. Bekijk je week.`}
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
-          padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.6rem',
+          padding: kaal ? '0 0.6rem' : (isMobile ? '0.3rem 0.5rem' : '0.35rem 0.6rem'),
+          height: kaal ? '100%' : undefined,
           borderRadius: 999,
-          background: 'rgba(255,255,255,0.05)',
-          border: `1px solid ${gehaald ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.1)'}`,
+          background: kaal ? 'transparent' : 'rgba(255,255,255,0.05)',
+          border: kaal ? 'none' : `1px solid ${gehaald ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.1)'}`,
           color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}

@@ -23,6 +23,7 @@ import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
 import DagAgenda from '../components/DagAgenda'
 import StappenPil from '../components/StappenPil'
+import ChallengeProgressTab from '../../modules/challenge-monitor/ChallengeProgressTab'
 import { vandaagStand, verzetDag } from '../components/dagNavigatie'
 import BelangrijkeVideo from '../components/BelangrijkeVideo'
 import FocusDezeWeek from '../../modules/client-checkin/FocusDezeWeek'
@@ -133,6 +134,22 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
   // datum-pilletje is weg; die schreeuwde harder dan waar het over ging.
   return (
     <div>
+      {/* Zwarte bovenbalk zoals op maaltijd en workout: midden de
+          challenge-stand (als je meedoet), rechts je stappen van vandaag. */}
+      <div style={{
+        display: 'flex', alignItems: 'stretch',
+        height: isMobile ? 34 : 40,
+        paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
+        boxSizing: 'content-box', background: '#0a0a0a',
+      }}>
+        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
+          <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
+        </div>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'stretch', paddingRight: isMobile ? '0.4rem' : '0.9rem' }}>
+          <StappenPil client={client} db={db} isMobile={isMobile} kaal />
+        </div>
+      </div>
       <div style={{
         position: 'relative', width: '100%',
         // Vaste verhouding van het beeld (1960x600), dus er wordt niets
@@ -151,16 +168,6 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
           height: '28%', pointerEvents: 'none',
           background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.75) 55%, #0a0a0a 100%)',
         }} />
-        {/* Stappen rechtsboven op de foto. Stond eerst naast de begroeting,
-            maar dat vroeg daar zoveel marge dat "Goedemiddag, Kersten" op een
-            telefoon over twee regels brak. */}
-        <div style={{
-          position: 'absolute', zIndex: 2,
-          top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 0.6rem)' : '0.9rem',
-          right: isMobile ? '0.9rem' : '1.5rem',
-        }}>
-          <StappenPil client={client} db={db} isMobile={isMobile} />
-        </div>
       </div>
 
       <div style={{

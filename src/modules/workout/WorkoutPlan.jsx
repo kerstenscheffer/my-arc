@@ -8,6 +8,7 @@ import PlanSwitchModal from './components/PlanSwitchModal'
 import WeekSchedule from './components/WeekSchedule'
 import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
 import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
+import ChallengeProgressTab from '../challenge-monitor/ChallengeProgressTab'
 import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 import CardioLogVanger from './components/CardioLogVanger'
 import HistorieBlad from './components/HistorieBlad'
@@ -175,7 +176,10 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
             <button onClick={() => setKrachtOpen(true)} title="Krachtoverzicht" style={knop('links')}>
               <TrendingUp size={16} strokeWidth={2.8} /> Kracht
             </button>
-            <div style={{ flex: 1 }} />
+            {/* Midden: de challenge-stand, als je meedoet. */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
+              <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
+            </div>
             <button onClick={() => setHistoryOpen(true)} title="Historie" style={knop('rechts')}>
               <History size={16} strokeWidth={2.8} /> Historie
             </button>

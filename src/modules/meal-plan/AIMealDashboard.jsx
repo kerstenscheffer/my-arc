@@ -61,6 +61,7 @@ const indexToDate = (idx, weekOffset = 0) => {
 
 // Challenge Sidebar
 import MealChallengeSidebar from '../../client/components/MealChallengeSidebar'
+import ChallengeProgressTab from '../challenge-monitor/ChallengeProgressTab'
 import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 
 // Modals
@@ -558,8 +559,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
               <button onClick={() => setShopOpen(true)} title="Boodschappenlijst" aria-label="Boodschappenlijst" style={knop(true)}>
                 <ShoppingCart size={17} strokeWidth={2.6} />
               </button>
-              {/* Lege ruimte tussen de twee lijntjes. */}
-              <div style={{ flex: 1 }} />
+              {/* Midden: de challenge-stand, als je meedoet. */}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
+                <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
+              </div>
               {/* Het inzicht van de dag. Zat eerst achter een tik op de datum. */}
               <button
                 onClick={() => setModals(prev => ({ ...prev, summary: true }))}

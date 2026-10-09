@@ -16,6 +16,7 @@
 // antwoord kunnen geven over hetzelfde geld.
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Trophy, Activity, Utensils, Weight, Camera, Phone, ClipboardCheck, X, Info } from 'lucide-react'
 import {
   EISEN, WEEK_EISEN, WEEK_LOOPT_DOOR, ALGEMENE_UITLEG,
@@ -36,7 +37,10 @@ const ICONEN = {
   calls: Phone,
 }
 
-export default function ChallengeProgressTab({ db, client, isMobile = false }) {
+// `inline`: geen zwevend bolletje maar een kaal knopje (beker + stand) dat in
+// de zwarte bovenbalk van een pagina staat. Een tik opent hetzelfde paneel,
+// bovenaan het scherm.
+export default function ChallengeProgressTab({ db, client, isMobile = false, inline = false }) {
   const [deelname, setDeelname] = useState(null)
   const [stand, setStand] = useState(null)
   const [open, setOpen] = useState(false)
@@ -68,6 +72,8 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
   useEffect(() => { if (open && client?.id) laad() }, [open])
 
   if (fout) {
+    // In de bovenbalk geen foutmelding: daar staat hij tussen andere knoppen.
+    if (inline) return null
     return (
       <div style={{
         position: 'fixed',
@@ -102,7 +108,27 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
   const kleur = gehaald ? GROEN : '#fff'
   const breedte = open ? (isMobile ? 'calc(100vw - 24px)' : 380) : (isMobile ? 74 : 80)
 
-  return (
+  // Kaal knopje voor in de bovenbalk.
+  if (inline && !open) {
+    return (
+      <button
+        onClick={() => { setOpen(true); setUitleg(null) }}
+        aria-label="Challenge-stand openen"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, height: '100%', padding: '0 0.6rem',
+          background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <Trophy size={16} strokeWidth={2.6} color={kleur} />
+        <span style={{ fontSize: '0.82rem', fontWeight: 900, color: kleur, fontVariantNumeric: 'tabular-nums' }}>
+          {behaald}<span style={{ color: 'rgba(255,255,255,0.35)' }}>/{EISEN.length}</span>
+        </span>
+      </button>
+    )
+  }
+
+  const paneel = (
     <div
       style={{
         position: 'fixed',
@@ -114,7 +140,7 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
         transform: 'translateX(-50%)',
         width: breedte,
         maxWidth: 'calc(100vw - 24px)',
-        zIndex: 80,
+        zIndex: inline ? 2147482500 : 80,
         background: `${ZWART}f0`,
         backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
         border: `1px solid ${gehaald ? 'rgba(16,185,129,0.35)' : LIJN}`,
@@ -257,6 +283,10 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
       )}
     </div>
   )
+
+  // Open vanuit de bovenbalk: het paneel los op het scherm, buiten de balk.
+  if (inline) return createPortal(paneel, document.body)
+  return paneel
 }
 
 // Eén wit blokje dat schuift tussen twee standen, zoals de schakelaars in de
