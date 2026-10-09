@@ -103,6 +103,7 @@ export default function DayCard({
   // planwissel): { naam }. Komt als eigen groene tegel boven de planning.
   gedaanAnders = null,
   extraTrainingen = [], onOpenExtra = null, onRemoveExtra = null,
+  onCardioInfo = null,
 }) {
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
   const heeftTraining = !!workoutData || isActivity || !!gedaanAnders || extraTrainingen.length > 0
@@ -249,7 +250,7 @@ export default function DayCard({
               kanSchuiven={!cardioKlaar && kanPlannen && !!onCardioShiftLeft}
               onLinks={() => onCardioShiftLeft?.(cardio[0])} onRechts={() => onCardioShiftRight?.(cardio[0])}
               kanLinks={dayIndex > 0} kanRechts={dayIndex < 6}
-              onClick={cardioKlaar && onOpenCardioGedaan ? () => onOpenCardioGedaan(cardio[0]) : (kanOpenen ? () => logCardio(cardio[0]) : undefined)}
+              onClick={cardioKlaar && onOpenCardioGedaan ? () => onOpenCardioGedaan(cardio[0]) : (kanOpenen ? () => logCardio(cardio[0]) : (kanBekijken && onCardioInfo ? () => onCardioInfo(cardio[0]) : undefined))}
               isMobile={isMobile} icoon={HeartPulse}
               onVerwijder={kanPlannen && onRemoveCardio ? () => onRemoveCardio(cardio[0]) : null}
             />

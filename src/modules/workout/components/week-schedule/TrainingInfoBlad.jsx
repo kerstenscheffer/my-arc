@@ -7,6 +7,7 @@
 
 import BladModal from '../todays-workout/components/BladModal'
 import useOefeningFotos from '../../utils/useOefeningFotos'
+import { cardioFoto } from '../../utils/workoutFoto'
 
 export default function TrainingInfoBlad({ open, training, db, isMobile, onClose }) {
   const oef = Array.isArray(training?.exercises) ? training.exercises : []
@@ -32,6 +33,32 @@ export default function TrainingInfoBlad({ open, training, db, isMobile, onClose
                   {[e.sets ? `${e.sets} × ${e.reps || '?'}` : null, e.rust ? `${e.rust} rust` : null, e.equipment].filter(Boolean).join(' · ')}
                 </div>
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </BladModal>
+  )
+}
+
+// Zelfde inkijkje voor een cardioblok: sport, tijd, duur, en of het elke
+// week of eenmalig is.
+export function CardioInfoBlad({ open, cardio, isMobile, onClose }) {
+  if (!open || !cardio) return null
+  const regels = [
+    ['Tijd', cardio.tijd || '–'],
+    ['Duur', cardio.duur ? `${cardio.duur} min` : '–'],
+    ['Herhaling', cardio.eenmalig ? 'Alleen deze week' : 'Elke week'],
+  ]
+  return (
+    <BladModal open={open} titel={cardio.soort || 'Cardio'} onClose={onClose} zIndex={2147483500}>
+      <div style={{ padding: isMobile ? '0.75rem 1rem 1.25rem' : '1rem 1.25rem 1.5rem' }}>
+        <div style={{ width: '100%', height: isMobile ? 140 : 170, borderRadius: 14, backgroundImage: `url(${cardioFoto(cardio.soort)})`, backgroundSize: 'cover', backgroundPosition: 'center', marginBottom: 12 }} />
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {regels.map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '0.6rem 0', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{k}</span>
+              <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{v}</span>
             </div>
           ))}
         </div>

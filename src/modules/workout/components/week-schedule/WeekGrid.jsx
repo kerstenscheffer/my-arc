@@ -19,6 +19,7 @@ export default function WeekGrid({
   trainingTijdPerDag = {},
   onPrevWeek = null, onNextWeek = null,
   onInfo = null,   // tik op een training in een week die je niet kunt openen: inkijken
+  onCardioInfo = null,
   onRemoveTraining = null, onRemoveCardio = null,
   onOpenGedaan = null, onOpenCardioGedaan = null,
   // Stappen per dag (zeven items: { steps, gehaald, toekomst, isVandaag }) en
@@ -169,6 +170,7 @@ export default function WeekGrid({
             kanPlannen={kanPlannen}
             kanOpenen={kanOpenen}
             kanBekijken={!kanOpenen && !!onInfo}
+            onCardioInfo={onCardioInfo}
             gedimd={gedimd}
             rust={rustPerDag[index] || null}
             cardio={cardioPerDag[index] || []}
