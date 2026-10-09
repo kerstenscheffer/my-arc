@@ -3,6 +3,8 @@
 import { useState, useEffect, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
 import LaadScherm from '../components/LaadScherm'
+// Klein en niet lazy: dit is juist wat je ziet terwijl de workout-code laadt.
+import { WorkoutPaginaSkelet } from '../modules/workout/components/WorkoutSkelet'
 import DatabaseService from '../services/DatabaseService'
 import { useLanguage } from '../contexts/LanguageContext'
 
@@ -378,7 +380,11 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             {!focusMode && !['meal', 'workout', 'home'].includes(currentView) && (
               <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
             )}
-            <Suspense fallback={<div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} /></div>}>
+            {/* Workout laadt in de vorm van de pagina (skelet), net als Meal;
+                de andere schermen houden voorlopig de spinner. */}
+            <Suspense fallback={currentView === 'workout'
+              ? <WorkoutPaginaSkelet isMobile={isMobile} />
+              : <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} /></div>}>
             {currentView === 'home' && (
               <ClientHome client={client} db={db} setCurrentView={setCurrentView} />
             )}

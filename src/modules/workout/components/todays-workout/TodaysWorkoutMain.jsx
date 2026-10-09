@@ -3,6 +3,7 @@
 // Dropdown-render: TodaysWorkoutCard is de altijd-zichtbare header. Klik
 // op de Start/Open knop klapt de inline LogModal-content open op de pagina
 // (geen modal-popup meer).
+import { WorkoutKopSkelet } from '../WorkoutSkelet'
 import { useState, useEffect, useRef } from 'react'
 import TodaysWorkoutCard from './TodaysWorkoutCard'
 import LogModal from './LogModal'
@@ -332,13 +333,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       {inhoud}
     </div>
   )
-  if (loading && !ooitGeladen.current) return (
-    <div style={{ padding: isMobile ? '1rem' : '1.5rem' }}>
-      <div style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '2rem', textAlign: 'center' }}>
-        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }} />
-      </div>
-    </div>
-  )
+  // Eerste keer laden: de vorm van de kop in plaats van een spinner.
+  if (loading && !ooitGeladen.current) return <WorkoutKopSkelet isMobile={isMobile} />
 
   // Geen training vandaag: dezelfde kop als een gewone dag — foto die onderin
   // wegloopt in het zwart met de titel eroverheen. Zonder foto viel de pagina
