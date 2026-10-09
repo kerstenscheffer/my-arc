@@ -730,7 +730,6 @@ export default function DagAgenda({
               />
             </div>
           ))}
-          {!laden && gedaanBlokken.length > 0 && gedaanBlokken.length === lijstBlokken.filter(b => b.type === 'meal' || b.type === 'weging' || b.type === 'sleep').length && lijstBlokken.every(b => isGedaan(b) || !['meal', 'weging'].includes(b.type)) && null}
         </div>
       )}
 
