@@ -33,3 +33,4 @@ src_backup_*
 *.backup
 *.bak
 *backup*/
+credits-backfill.log
