@@ -129,7 +129,7 @@ export default function DayCard({
     return { bg: 'rgba(255,255,255, 0.035)', border: 'rgba(255,255,255, 0.08)', label: 'rgba(255,255,255, 0.55)' }
   })()
 
-  const hoogte = isMobile ? 176 : 204
+  const hoogte = isMobile ? 144 : 168
   const dateNum = dayDate ? dayDate.getDate() : null
 
   const stappenKop = (() => {
