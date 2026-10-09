@@ -16,7 +16,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Moon, X, Check, Trash2, Lightbulb } from 'lucide-react'
+import { Moon, X, Check, Trash2, Lightbulb, ChevronLeft } from 'lucide-react'
 
 // Overgenomen uit het oude slaapblok op de pagina. Dat blok is weg; deze tips
 // waren het enige eraan dat niet in dit blad zat.
@@ -62,10 +62,6 @@ const linkKnop = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
-const kopje = {
-  fontSize: '0.56rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
-  textTransform: 'uppercase', letterSpacing: '0.11em', marginBottom: 6,
-}
 
 // Het blad 'Je nacht', los te openen voor elke nacht. `datum` is de dag
 // waarop je wakker werd (log_date). Gebruikt door de zwevende knop op de
@@ -88,6 +84,8 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
   const [eerdere, setEerdere] = useState([])
   const [toonEerdere, setToonEerdere] = useState(false)
   const [toonTips, setToonTips] = useState(false)
+  // Klik-door zoals het oefening- en cardio-logscherm: één vraag per stap.
+  const [stap, setStap] = useState(1)
 
   // Al gelogd die nacht? Dan vult het blad zich met wat er staat, zodat je 'm
   // bijwerkt in plaats van er een tweede naast te zetten. Bij het openen
@@ -96,7 +94,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
     if (!open || !client?.id || !db?.supabase) return
     let weg = false
     setBed(voorBed); setOpstaan(voorOpstaan); setUren(''); setUrenAangeraakt(false)
-    setKwaliteit(null); setStruggles(''); setAlGelogd(false); setFout(null)
+    setKwaliteit(null); setStruggles(''); setAlGelogd(false); setFout(null); setStap(1); setToonEerdere(false); setToonTips(false)
     db.supabase
       .from('sleep_logs')
       .select('id, bedtime, wake_time, hours_slept, quality, struggles')
@@ -181,136 +179,152 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
 
   if (!client?.id || !open) return null
 
-  return (
+  // Tijd ± minuten, rond de klok.
+  const schuif = (t, min) => {
+    const [h, m] = String(t || '00:00').split(':').map(Number)
+    let tot = ((h * 60 + m + min) % 1440 + 1440) % 1440
+    return `${String(Math.floor(tot / 60)).padStart(2, '0')}:${String(tot % 60).padStart(2, '0')}`
+  }
+  const urenNu = Number.isFinite(urenWaarde) ? urenWaarde : 0
+  const zetUren = (v) => { setUren(String(Math.max(0, Math.min(16, Math.round(v * 2) / 2)))); setUrenAangeraakt(true) }
+  const nlUren = (n) => String(n).replace('.', ',')
+  const kwaliteitKleur = (n) => (n >= 7 ? '#10b981' : n >= 5 ? '#f59e0b' : '#ef4444')
+
+  const groot = { fontSize: '2.8rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }
+  const rondKnop = {
+    width: 56, height: 56, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
+    fontFamily: 'inherit', fontSize: '1.5rem', fontWeight: 900, lineHeight: 1, cursor: 'pointer',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+  const kleinKnop = { ...rondKnop, width: 40, height: 40, borderRadius: 12, fontSize: '1rem' }
+  const primair = {
+    width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a',
+    fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: bezig ? 'default' : 'pointer',
+    opacity: bezig ? 0.6 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+  const vraag = (tekst) => (
+    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 16, letterSpacing: '-0.015em' }}>{tekst}</div>
+  )
+  // Grote kloktijd met − en + per kwartier, en eronder het gewone tijdveld
+  // voor wie precies wil zijn.
+  const klok = (waarde, zet) => (
     <>
-      {createPortal(
-        <div
-          onClick={() => setOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 2147483100,
-            background: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: 520, maxHeight: '92dvh', overflowY: 'auto',
-              background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '18px 18px 0 0',
-              padding: '0.9rem 1rem calc(env(safe-area-inset-bottom, 0px) + 1rem)',
-              boxShadow: '0 -20px 60px rgba(0,0,0,0.7)',
-              animation: 'slaapOmhoog 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem' }}>
-              <Moon size={17} color="#fff" strokeWidth={2.4} />
-              <span style={{ flex: 1, fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
-                Je nacht
-                {logDatum !== vandaagIso() && (
-                  <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
-                    {' · wakker op '}{new Date(`${logDatum}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
-                  </span>
-                )}
-              </span>
-              <button onClick={() => setOpen(false)} aria-label="Sluiten" style={{
-                width: 30, height: 30, padding: 0, background: 'transparent', border: 'none',
-                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              }}>
-                <X size={18} strokeWidth={3} />
-              </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 12 }}>
+        <button onClick={() => zet(schuif(waarde, -15))} aria-label="Kwartier eerder" style={rondKnop}>−</button>
+        <div style={{ ...groot, minWidth: 128, textAlign: 'center' }}>{waarde}</div>
+        <button onClick={() => zet(schuif(waarde, 15))} aria-label="Kwartier later" style={rondKnop}>+</button>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+        <input type="time" value={waarde} onChange={e => e.target.value && zet(e.target.value)} style={{ ...veld, width: 130, textAlign: 'center', colorScheme: 'dark' }} />
+      </div>
+    </>
+  )
+  const datumTekst = logDatum !== vandaagIso()
+    ? new Date(`${logDatum}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+    : null
+
+  return createPortal(
+    <div
+      onClick={() => setOpen(false)}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2147483100,
+        background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto',
+          background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20,
+          padding: '1.1rem 1rem 1.2rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+        }}
+      >
+        {/* Kop: terug, titel met stap, sluiten */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+          {stap > 1
+            ? <button onClick={() => setStap(n => n - 1)} aria-label="Vorige stap" style={kleinKnop}><ChevronLeft size={18} strokeWidth={2.8} /></button>
+            : <div style={{ width: 40 }} />}
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Slaap loggen · stap {stap} van 4
             </div>
-
-            <div style={{ display: 'flex', gap: 8, marginBottom: '0.9rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={kopje}>Naar bed</div>
-                <input type="time" value={bed} onChange={e => setBed(e.target.value)} style={veld} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={kopje}>Opgestaan</div>
-                <input type="time" value={opstaan} onChange={e => setOpstaan(e.target.value)} style={veld} />
-              </div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Moon size={15} strokeWidth={2.6} /> Je nacht{datumTekst && <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}> · {datumTekst}</span>}
             </div>
+          </div>
+          <button onClick={() => setOpen(false)} aria-label="Sluiten" style={kleinKnop}><X size={18} strokeWidth={2.8} /></button>
+        </div>
 
-            <div style={{ marginBottom: '0.9rem' }}>
-              <div style={kopje}>Uren geslapen</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="number" inputMode="decimal" step="0.5"
-                  value={urenAangeraakt ? uren : (berekend ?? '')}
-                  onChange={e => { setUren(e.target.value); setUrenAangeraakt(true) }}
-                  style={{ ...veld, width: 100 }}
-                />
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>
-                  {urenAangeraakt && berekend != null && urenWaarde !== berekend
-                    ? `tussen bed en opstaan zit ${berekend} uur`
-                    : 'uitgerekend uit de tijden — pas aan als je wakker lag'}
-                </span>
+        {stap === 1 && (
+          <>
+            {vraag('Hoe laat ging je naar bed?')}
+            {klok(bed, setBed)}
+            <button onClick={() => setStap(2)} style={primair}>Volgende</button>
+          </>
+        )}
+
+        {stap === 2 && (
+          <>
+            {vraag('Hoe laat stond je op?')}
+            {klok(opstaan, setOpstaan)}
+            <button onClick={() => setStap(3)} style={primair}>Volgende</button>
+          </>
+        )}
+
+        {stap === 3 && (
+          <>
+            {vraag('Hoeveel uur heb je echt geslapen?')}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 8 }}>
+              <button onClick={() => zetUren(urenNu - 0.5)} aria-label="Half uur minder" style={rondKnop}>−</button>
+              <div style={{ textAlign: 'center', minWidth: 110 }}>
+                <div style={groot}>{nlUren(urenNu)}</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>uur</div>
               </div>
+              <button onClick={() => zetUren(urenNu + 0.5)} aria-label="Half uur meer" style={rondKnop}>+</button>
             </div>
-
-            <div style={{ marginBottom: '0.9rem' }}>
-              <div style={kopje}>Hoe voelde het? 1 = slecht, 10 = top</div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
-                  const aan = kwaliteit === n
-                  return (
-                    <button
-                      key={n}
-                      onClick={() => setKwaliteit(aan ? null : n)}
-                      style={{
-                        flex: 1, minHeight: 40, borderRadius: 9,
-                        background: aan ? '#fff' : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.09)'}`,
-                        color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
-                        fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
-                        cursor: 'pointer', padding: 0,
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      {n}
-                    </button>
-                  )
-                })}
-              </div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 18, lineHeight: 1.4 }}>
+              {berekend != null ? `Tussen ${bed} en ${opstaan} zit ${nlUren(berekend)} uur. Lag je wakker, haal het eraf.` : 'Pas aan als je wakker lag.'}
             </div>
+            <button onClick={() => setStap(4)} style={primair}>Volgende</button>
+          </>
+        )}
 
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={kopje}>Wat ging er mis of juist goed?</div>
-              <textarea
-                value={struggles}
-                onChange={e => setStruggles(e.target.value)}
-                placeholder="Laat opgebleven, kind wakker, telefoon weggelegd…"
-                rows={2}
-                style={{ ...veld, minHeight: 64, padding: '0.6rem 0.75rem', fontSize: '0.85rem', fontWeight: 600, resize: 'vertical' }}
-              />
+        {stap === 4 && (
+          <>
+            {vraag('Hoe voelde je nacht?')}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 6 }}>
+              {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
+                const aan = kwaliteit === n
+                return (
+                  <button key={n} onClick={() => { setKwaliteit(aan ? null : n); if (navigator.vibrate) navigator.vibrate(10) }} style={{
+                    minHeight: 48, borderRadius: 12, padding: 0,
+                    background: aan ? kwaliteitKleur(n) : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${aan ? kwaliteitKleur(n) : 'rgba(255,255,255,0.12)'}`,
+                    color: aan ? '#0a0a0a' : '#fff', fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit',
+                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>{n}</button>
+                )
+              })}
             </div>
-
-            {fout && (
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: '0.6rem' }}>
-                {fout}
-              </div>
-            )}
-
-            <button
-              onClick={bewaar}
-              disabled={bezig}
-              style={{
-                width: '100%', minHeight: 48, borderRadius: 12, border: 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: '#fff', color: '#0a0a0a',
-                fontSize: '0.88rem', fontWeight: 900, letterSpacing: '-0.01em',
-                cursor: bezig ? 'default' : 'pointer', fontFamily: 'inherit',
-                opacity: bezig ? 0.6 : 1,
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Check size={16} strokeWidth={3} />
-              {bezig ? 'Opslaan…' : alGelogd ? 'Bijwerken' : 'Opslaan'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
+              <span>slecht</span><span>top</span>
+            </div>
+            <textarea
+              value={struggles}
+              onChange={e => setStruggles(e.target.value)}
+              placeholder="Wat ging er mis of juist goed? (mag leeg)"
+              rows={2}
+              style={{ ...veld, minHeight: 60, padding: '0.6rem 0.75rem', fontSize: '0.85rem', fontWeight: 600, resize: 'none', marginBottom: 14 }}
+            />
+            {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10 }}>{fout}</div>}
+            <button onClick={bewaar} disabled={bezig} style={primair}>
+              <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : alGelogd ? 'Bijwerken' : 'Opslaan'}
             </button>
 
-            <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12 }}>
               <button onClick={() => { setToonEerdere(v => !v); setToonTips(false) }} style={linkKnop}>
                 {toonEerdere ? 'Verberg nachten' : 'Eerdere nachten'}
               </button>
@@ -320,63 +334,41 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
             </div>
 
             {toonTips && (
-              <ul style={{
-                margin: '8px 0 0', padding: '0 0 0 1rem',
-                fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5,
-              }}>
+              <ul style={{ margin: '10px 0 0', padding: '0 0 0 1rem', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
                 {TIPS.map(t => <li key={t} style={{ marginBottom: 3 }}>{t}</li>)}
               </ul>
             )}
 
             {toonEerdere && (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: 10 }}>
                 {eerdere.length === 0 ? (
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', padding: '0.5rem 0' }}>
-                    Nog geen nachten gelogd.
-                  </div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', padding: '0.5rem 0' }}>Nog geen nachten gelogd.</div>
                 ) : eerdere.map(n => (
                   <div key={n.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '0.45rem 0', borderTop: '1px solid rgba(255,255,255,0.05)',
-                    fontSize: '0.74rem', fontWeight: 800, color: '#fff',
-                    fontVariantNumeric: 'tabular-nums',
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '0.45rem 0', borderTop: '1px solid rgba(255,255,255,0.05)',
+                    fontSize: '0.74rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums',
                   }}>
                     <span style={{ width: 62, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>
                       {new Date(`${n.log_date}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                     </span>
-                    <span style={{ width: 52 }}>{n.hours_slept != null ? `${n.hours_slept} u` : '—'}</span>
+                    <span style={{ width: 52 }}>{n.hours_slept != null ? `${nlUren(n.hours_slept)} u` : '—'}</span>
                     <span style={{ flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.35)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {n.bedtime ? `${String(n.bedtime).slice(0, 5)} → ${String(n.wake_time || '').slice(0, 5)}` : ''}
-                      {n.struggles ? ` · ${n.struggles}` : ''}
+                      {n.bedtime ? `${String(n.bedtime).slice(0, 5)} → ${String(n.wake_time || '').slice(0, 5)}` : ''}{n.struggles ? ` · ${n.struggles}` : ''}
                     </span>
-                    {n.quality != null && (
-                      <span style={{
-                        flexShrink: 0, fontWeight: 900,
-                        color: n.quality >= 7 ? '#10b981' : n.quality >= 5 ? '#f59e0b' : '#ef4444',
-                      }}>
-                        {n.quality}
-                      </span>
-                    )}
+                    {n.quality != null && <span style={{ flexShrink: 0, fontWeight: 900, color: kwaliteitKleur(n.quality) }}>{n.quality}</span>}
                     <button onClick={() => verwijder(n.id)} aria-label="Verwijderen" style={{
-                      width: 26, height: 26, flexShrink: 0, padding: 0, borderRadius: 7,
-                      background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.6)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                    }}>
-                      <Trash2 size={13} />
-                    </button>
+                      width: 26, height: 26, flexShrink: 0, padding: 0, borderRadius: 7, background: 'transparent', border: 'none',
+                      color: 'rgba(239,68,68,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                    }}><Trash2 size={13} /></button>
                   </div>
                 ))}
               </div>
             )}
-
-            <style>{`
-              @keyframes slaapOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
-            `}</style>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
+          </>
+        )}
+      </div>
+    </div>,
+    document.body
   )
 }
 
