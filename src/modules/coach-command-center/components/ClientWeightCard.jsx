@@ -15,7 +15,7 @@ import {
   BarChart3, Pause, CheckCircle2, Circle
 } from 'lucide-react'
 import DeleteClientModal from './DeleteClientModal'
-import { computePeriod } from './CoachingPeriodPanel'
+import { computePeriod } from './trajectPeriode'
 import ClientInsightModal from './ClientInsightModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
 import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks, maakConfig, tempoKleurVanDoel } from '../../weight-tracker/utils/coachingBand'
