@@ -190,7 +190,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         bedtime: bed || null,
         wake_time: opstaan || null,
         hours_slept: Number.isFinite(urenWaarde) ? urenWaarde : null,
-        quality: kwaliteit,
+        quality: kwaliteit ?? 7,
         struggles: struggles.trim() || null,
       }
       // Eén nacht per dag: bestaat er al een rij van vandaag, dan werken we die
@@ -379,23 +379,19 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
 
         {stap === 5 && (
           <>
-            {vraag('Hoe voelde je nacht?')}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 6 }}>
-              {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
-                const aan = kwaliteit === n
-                return (
-                  <button key={n} onClick={() => { setKwaliteit(aan ? null : n); if (navigator.vibrate) navigator.vibrate(10) }} style={{
-                    minHeight: 48, borderRadius: 12, padding: 0,
-                    background: aan ? kwaliteitKleur(n) : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${aan ? kwaliteitKleur(n) : 'rgba(255,255,255,0.12)'}`,
-                    color: aan ? '#0a0a0a' : '#fff', fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit',
-                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}>{n}</button>
-                )
-              })}
+            {vraag('Geef je slaapkwaliteit een score')}
+            {/* Slider zoals de andere stappen; staat op 7 tot je hem verschuift. */}
+            <HorizontaleSlider
+              waarden={Array.from({ length: 10 }, (_, k) => k + 1)}
+              waarde={kwaliteit ?? 7}
+              onChange={setKwaliteit}
+              itemBreedte={64}
+            />
+            <div style={{ textAlign: 'center', fontSize: '0.74rem', fontWeight: 900, color: kwaliteitKleur(kwaliteit ?? 7), marginTop: 2 }}>
+              {(() => { const k = kwaliteit ?? 7; return k <= 3 ? 'slecht' : k <= 5 ? 'matig' : k <= 7 ? 'goed' : k <= 9 ? 'heel goed' : 'top' })()}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
-              <span>slecht</span><span>top</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', margin: '4px 0 14px' }}>
+              <span>1 = slecht</span><span>10 = top</span>
             </div>
             <textarea
               value={struggles}
