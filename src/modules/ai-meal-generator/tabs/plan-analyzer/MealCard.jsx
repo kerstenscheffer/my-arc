@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays } from 'lucide-react'
+import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X } from 'lucide-react'
 import { portieInfo, stapPortie, portieLabel, portieUitleg } from './portie'
 import MealEditModal from './MealEditModal'
 
@@ -81,17 +81,7 @@ export default function MealCard({
   const [expanded, setExpanded] = useState(false)
   const [showScaler, setShowScaler]   = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [editingTiming, setEditingTiming] = useState(false)
-  const [showLabelMenu, setShowLabelMenu] = useState(false)
-  const labelBtnRef = useRef(null)
-  const [labelMenuPos, setLabelMenuPos] = useState(null)
-
-  const openLabelMenu = () => {
-    if (!labelBtnRef.current) return
-    const r = labelBtnRef.current.getBoundingClientRect()
-    setLabelMenuPos({ top: r.bottom + 4, left: r.left })
-    setShowLabelMenu(true)
-  }
+  // Label en tijd bewerken gaat via MomentVenster (tik op de foto).
 
   // Scaler state
   const [scalerData, setScalerData]     = useState(null)
@@ -105,8 +95,8 @@ export default function MealCard({
   const m = isMobile
   // Custom label uit meal.display_label gaat voor de slot-default.
   const slotLabel = meal?.display_label || SLOT_LABELS[slot] || slot
-  // Gekozen label dat nog op een bereik wacht (deze dag / elke dag).
-  const [labelKeuze, setLabelKeuze] = useState(null)
+  // Venster 'moment bewerken' (soort maaltijd + tijd), via tik op de foto.
+  const [momentOpen, setMomentOpen] = useState(false)
   const slotTime  = meal?.timing || SLOT_TIMES[slot] || ''
   const rawIngredients = meal?.ingredients_list || meal?.ingredients || null
   const ingredientList = parseIngredients(rawIngredients)
@@ -251,7 +241,8 @@ export default function MealCard({
     )
   }
 
-  const photoSize = m ? 70 : 80
+  // Zo compact als de maaltijdkaart van de klant (9 okt 2026).
+  const photoSize = m ? 60 : 66
 
   return (
     <div style={{
@@ -268,12 +259,19 @@ export default function MealCard({
       <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
         {/* Foto-kolom — gebruikt fallback per slot als meal geen eigen
             image_url heeft. Lege ai_meals laten geen kaal vlak meer zien. */}
-        <div style={{
+        <button onClick={(e) => { e.stopPropagation(); setMomentOpen(true) }} title="Moment en tijd aanpassen" style={{
           width: photoSize, height: photoSize,
-          flexShrink: 0,
+          flexShrink: 0, padding: 0, border: 'none', cursor: 'pointer',
           background: `url(${getMealImage(meal, slot)}) center/cover`,
-          position: 'relative',
+          position: 'relative', fontFamily: 'inherit', textAlign: 'left',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
+          {/* Moment + tijd in de foto, zoals op de klantkaart. Tik = bewerken. */}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.85) 100%)' }} />
+          <div style={{ position: 'absolute', left: 5, right: 4, bottom: 4, lineHeight: 1.1 }}>
+            <div style={{ fontSize: '0.5rem', fontWeight: 900, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{slotLabel}</div>
+            <div style={{ fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{slotTime || '—'}</div>
+          </div>
           {isPreWorkout && (
             <div style={{
               position: 'absolute', top: 4, left: 4,
@@ -283,137 +281,14 @@ export default function MealCard({
               letterSpacing: '0.04em',
             }}>PRE</div>
           )}
-        </div>
+        </button>
 
         {/* Info area */}
         <div style={{
           flex: 1, minWidth: 0,
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          padding: m ? '0.45rem 0.7rem 0.4rem' : '0.55rem 0.95rem 0.5rem',
+          padding: m ? '0.35rem 0.65rem' : '0.4rem 0.85rem',
         }}>
-          {/* Slot + timing op één regel */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            marginBottom: 4,
-          }}>
-            {/* Klikbare slot-label. Dropdown wordt via portal gerenderd
-                op document.body zodat de MealCard's overflow:hidden hem
-                niet afkapt. */}
-            <button
-              ref={labelBtnRef}
-              onClick={openLabelMenu}
-              style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                padding: 0,
-                display: 'flex', alignItems: 'center', gap: 3,
-                fontSize: m ? '0.55rem' : '0.6rem',
-                fontWeight: 800, color: GOLD,
-                textTransform: 'uppercase', letterSpacing: '0.1em',
-                lineHeight: 1, opacity: 0.85,
-                fontFamily: 'inherit',
-              }}
-            >
-              {slotLabel}
-              <span style={{ fontSize: '0.5rem', opacity: 0.5 }}>▾</span>
-            </button>
-            {showLabelMenu && labelMenuPos && createPortal(
-              <>
-                <div
-                  onClick={() => { setShowLabelMenu(false); setLabelKeuze(null) }}
-                  style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-                />
-                <div style={{
-                  position: 'fixed',
-                  top: labelMenuPos.top, left: labelMenuPos.left,
-                  zIndex: 9999,
-                  background: '#111',
-                  border: '1px solid rgba(255,215,0,0.2)',
-                  borderRadius: 8,
-                  minWidth: 160,
-                  boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
-                  overflow: 'hidden',
-                }}>
-                  {labelKeuze && (
-                    <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,215,0,0.06)' }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fff', marginBottom: 6 }}>"{labelKeuze}" waar?</div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {[{ b: 'day', t: 'Alleen deze dag' }, { b: 'slot', t: 'Elke dag' }].map(k => (
-                          <button key={k.b} onClick={() => { const opt = labelKeuze; setLabelKeuze(null); setShowLabelMenu(false); onUpdateMeal && onUpdateMeal(dayIndex, slot, { ...meal, display_label: opt }, k.b) }} style={{
-                            flex: 1, padding: '0.4rem 0.5rem', borderRadius: 7, fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer',
-                            background: k.b === 'slot' ? '#fff' : 'rgba(255,255,255,0.06)', color: k.b === 'slot' ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.14)',
-                          }}>{k.t}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {LABEL_OPTIONS.map((opt, i) => {
-                    const isSelected = slotLabel.toLowerCase() === opt.toLowerCase()
-                    return (
-                      <button key={opt}
-                        onClick={() => {
-                          // Eerst vragen waar het label geldt: alleen deze dag,
-                          // of dit moment op elke dag (issue 9 okt 2026).
-                          setLabelKeuze(opt)
-                        }}
-                        style={{
-                          width: '100%',
-                          display: 'block',
-                          padding: '0.6rem 0.8rem',
-                          background: isSelected ? 'rgba(255,215,0,0.08)' : 'transparent',
-                          border: 'none',
-                          borderBottom: i < LABEL_OPTIONS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                          color: isSelected ? GOLD : 'rgba(255,255,255,0.8)',
-                          fontSize: '0.8rem',
-                          fontWeight: isSelected ? 800 : 600,
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                        }}
-                      >
-                        {opt}
-                      </button>
-                    )
-                  })}
-                </div>
-              </>,
-              modalHost
-            )}
-            <span style={{ flex: 1 }} />
-            {editingTiming ? (
-              <input
-                type="time" defaultValue={slotTime || ''} autoFocus
-                onBlur={(e) => {
-                  if (e.target.value && onUpdateMeal) onUpdateMeal(dayIndex, slot, { ...meal, timing: e.target.value })
-                  setEditingTiming(false)
-                }}
-                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingTiming(false) }}
-                style={{
-                  background: 'rgba(255,215,0,0.06)',
-                  border: '1px solid rgba(255,215,0,0.25)',
-                  borderRadius: 3, color: GOLD,
-                  fontSize: '0.55rem', fontWeight: 800,
-                  padding: '0.05rem 0.25rem',
-                  fontFamily: 'inherit', outline: 'none', width: 68,
-                }}
-              />
-            ) : (
-              <button
-                onClick={() => setEditingTiming(true)}
-                style={{
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  padding: '0.05rem 0.2rem',
-                  display: 'flex', alignItems: 'center', gap: 3,
-                }}
-              >
-                <span style={{
-                  fontSize: '0.55rem', fontWeight: 700,
-                  color: slotTime ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.18)',
-                }}>{slotTime || '—'}</span>
-                <span style={{ fontSize: '0.5rem', color: 'rgba(255,215,0,0.4)' }}>✎</span>
-              </button>
-            )}
-          </div>
-
           {/* Naam + kcal */}
           <div style={{
             display: 'flex', alignItems: 'baseline', gap: 6,
@@ -484,6 +359,16 @@ export default function MealCard({
             label="Dagen"
             onClick={(e) => { e.stopPropagation(); onApplyToDays(dayIndex, slot, meal) }}
             m={m}
+          />
+        </>)}
+        {ingredientList.length > 0 && (<>
+          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
+          <ActionCell
+            icon={<List size={m ? 13 : 14} />}
+            label={`${ingredientList.length} ingr.`}
+            onClick={(e) => { e.stopPropagation(); setExpanded(p => !p) }}
+            m={m}
+            active={expanded}
           />
         </>)}
         <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
@@ -630,24 +515,6 @@ export default function MealCard({
       {/* ── INGREDIËNTEN toggle + uitklap ── */}
       {ingredientList.length > 0 && !showScaler && !showEditModal && (
         <>
-          <button
-            onClick={() => setExpanded(p => !p)}
-            style={{
-              width: '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '0.3rem 0.75rem',
-              background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
-              border: 'none', borderTop: `1px solid ${DIVIDER}`,
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ fontSize: '0.55rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>
-              {ingredientList.length} ingrediënten
-            </span>
-            <span style={{ fontSize: '0.55rem', color: 'rgba(255,215,0,0.5)', fontWeight: 700 }}>
-              {expanded ? '▲' : '▼'}
-            </span>
-          </button>
           {expanded && (
             <div style={{
               padding: '0.3rem 0.75rem 0.5rem',
@@ -682,6 +549,18 @@ export default function MealCard({
             </div>
           )}
         </>
+      )}
+
+      {momentOpen && createPortal(
+        <MomentVenster
+          label={slotLabel} tijd={slotTime} isMobile={m}
+          onClose={() => setMomentOpen(false)}
+          onSave={(label, tijd, bereik) => {
+            setMomentOpen(false)
+            onUpdateMeal && onUpdateMeal(dayIndex, slot, { ...meal, display_label: label, timing: tijd || meal.timing }, bereik)
+          }}
+        />,
+        modalHost
       )}
 
       {/* Edit — inline paneel ONDER de card (zelfde plek/stijl als de scaler). */}
@@ -759,4 +638,36 @@ function scalerBtnStyle(m, disabled, color) {
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   }
+}
+
+// Moment van de maaltijd aanpassen: soort (Ontbijt, Lunch, Pre workout…) en
+// tijd, voor alleen deze dag of voor dit moment op elke dag.
+function MomentVenster({ label, tijd, isMobile, onClose, onSave }) {
+  const [l, setL] = useState(label || '')
+  const [t, setT] = useState(tijd || '')
+  const chip = (aan) => ({
+    padding: '0.45rem 0.7rem', borderRadius: 999, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer',
+    background: aan ? '#fff' : 'rgba(255,255,255,0.05)', color: aan ? '#0a0a0a' : '#fff', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
+  })
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem', animation: 'momentIn 0.2s ease' }}>
+      <style>{'@keyframes momentIn { from { opacity: 0 } to { opacity: 1 } }'}</style>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: isMobile ? '18px 18px 0 0' : 16, padding: '1rem', fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Moment aanpassen</div>
+          <button onClick={onClose} aria-label="Sluiten" style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+        </div>
+        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Soort</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+          {LABEL_OPTIONS.map(o => <button key={o} onClick={() => setL(o)} style={chip(l.toLowerCase() === o.toLowerCase())}>{o}</button>)}
+        </div>
+        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Tijd</div>
+        <input type="time" value={t} onChange={e => setT(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '0.6rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: '1rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark', marginBottom: 16 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button onClick={() => onSave(l, t, 'day')} style={{ minHeight: 44, borderRadius: 10, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer' }}>Alleen deze dag</button>
+          <button onClick={() => onSave(l, t, 'slot')} style={{ minHeight: 44, borderRadius: 10, background: '#fff', border: 'none', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer' }}>Elke dag</button>
+        </div>
+      </div>
+    </div>
+  )
 }
