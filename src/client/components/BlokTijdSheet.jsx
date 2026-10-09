@@ -76,6 +76,10 @@ export default function BlokTijdSheet({
   const slaapUren = (() => { const m = op >= bed ? op - bed : (1440 - bed) + op; return Math.round((m / 60) * 10) / 10 })()
   const bedLabel = bed >= 12 * 60 ? 'gisteravond' : 'vannacht'
   const isOverschreven = !!blok.meta?.isOverridden
+  // De pre-workout heeft op een trainingsdag geen eigen tijd in het plan: hij
+  // staat altijd een uur vóór de training en schuift mee. 'Elke <dag>' kan
+  // daar dus niets opslaan (gaf 'Slot saturday.pre_workout bestaat niet').
+  const volgtTraining = !!(blok.meta?.preWorkout && blok.meta?.volgtTraining)
   const dagNaam = DAY_LABELS_NL_LONG[blok.day]?.toLowerCase() || 'week'
 
   const doe = async (fn) => {
@@ -306,9 +310,12 @@ export default function BlokTijdSheet({
                 {
                   id: 'altijd',
                   titel: blok.type === 'supplement' ? 'Elke dag' : `Elke ${dagNaam}`,
-                  uitleg: blok.type === 'supplement'
-                    ? 'Past je supplementenplan aan: voortaan elke dag op deze tijd.'
-                    : 'Past je plan aan, ook voor de weken hierna.',
+                  uitleg: volgtTraining
+                    ? 'Je pre-workout staat altijd een uur voor je training. Verzet je training, dan schuift hij mee.'
+                    : blok.type === 'supplement'
+                      ? 'Past je supplementenplan aan: voortaan elke dag op deze tijd.'
+                      : 'Past je plan aan, ook voor de weken hierna.',
+                  uit: volgtTraining,
                 },
                 ...(isWerk && zelfdeOpAndereDagen.length > 0 ? [{
                   id: 'werkdagen', titel: 'Elke werkdag',
@@ -319,13 +326,15 @@ export default function BlokTijdSheet({
                 return (
                   <button
                     key={k.id}
-                    onClick={() => setBereik(k.id)}
+                    onClick={() => { if (!k.uit) setBereik(k.id) }}
+                    disabled={k.uit}
                     style={{
+                      opacity: k.uit ? 0.5 : 1,
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                       padding: '0.7rem 0.8rem', borderRadius: 12,
                       background: aan ? 'rgba(255,255,255,0.08)' : 'transparent',
                       border: `1px solid ${aan ? 'rgba(255,255,255,0.5)' : LIJN}`,
-                      cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                      cursor: k.uit ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: 'left',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >

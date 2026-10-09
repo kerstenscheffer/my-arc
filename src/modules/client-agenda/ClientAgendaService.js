@@ -1629,6 +1629,9 @@ export class ClientAgendaService {
 
     const ws = plan?.week_structure || {}
     if (!ws[day] || !ws[day][slot]) {
+      // De pre-workout uit pre_workout_meal heeft geen slot per dag; hij
+      // volgt de training. Dat is geen fout van de klant, dus zeg wat wél kan.
+      if (slot === 'pre_workout') throw new Error('Je pre-workout staat altijd een uur voor je training. Verzet je training om hem mee te verplaatsen, of kies "Alleen deze dag".')
       throw new Error(`Slot ${day}.${slot} bestaat niet in dit meal-plan`)
     }
     // Een slot is meestal een object met de maaltijd erin, maar in oudere
