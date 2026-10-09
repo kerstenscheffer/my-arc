@@ -57,9 +57,17 @@ export default defineConfig(({ command }) => ({
         // deploy niet en blijven dus in de browsercache. De pagina's en
         // tabbladen zelf splitsen via React.lazy (App.jsx, CoachHub.jsx,
         // ClientDashboard.jsx).
+        //
+        // React zit bewust NIET in een eigen stuk. Met 'vendor-react' apart
+        // importeerden vendor en vendor-react elkaar over en weer (o.a. via de
+        // CommonJS-hulpcode van Rollup), en dan is React nog niet klaar als
+        // een ander stuk hem aanroept: "Cannot set properties of undefined
+        // (setting 'Children')" en een wit scherm in productie (9 okt 2026).
+        // Regel: alles wat React nodig heeft mag naar React wijzen, nooit
+        // andersom; React + de hulpcode staan daarom in 'vendor'.
         manualChunks(id) {
+          if (id.includes('commonjsHelpers') || id.startsWith('\0')) return 'vendor'
           if (!id.includes('node_modules')) return undefined
-          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) return 'vendor-react'
           if (id.includes('@supabase')) return 'vendor-supabase'
           if (id.includes('/recharts/') || id.includes('/d3-') || id.includes('/victory-')) return 'vendor-charts'
           if (id.includes('/jspdf') || id.includes('/html2canvas/')) return 'vendor-pdf'
