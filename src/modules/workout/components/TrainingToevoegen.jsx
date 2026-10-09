@@ -298,8 +298,20 @@ export default function TrainingToevoegen({
                     </div>
                   )
                 })}
-                <button onClick={() => { tik(); setEigenOpen(true) }} style={{ ...tegel(false), marginTop: 10, borderStyle: 'dashed', justifyContent: 'center' }}>
-                  <Plus size={16} strokeWidth={2.8} /><span style={{ fontSize: '0.9rem', fontWeight: 900 }}>Eigen training opstellen</span>
+                {/* Ruimte onderaan, anders staat de laatste kaart onder de ronde knop. */}
+                <div style={{ height: isMobile ? 96 : 104 }} />
+                {/* Eigen training opstellen: witte ronde knop linksonder, zoals
+                    de LOG-knop op de voedingspagina. */}
+                <button onClick={() => { tik(); setEigenOpen(true) }} aria-label="Eigen training opstellen" style={{
+                  position: 'fixed', left: isMobile ? 18 : 28, bottom: `calc(${isMobile ? 22 : 28}px + env(safe-area-inset-bottom, 0px))`, zIndex: 5,
+                  width: isMobile ? 76 : 84, height: isMobile ? 76 : 84, borderRadius: '50%',
+                  background: '#fff', border: 'none', color: '#0a0a0a', cursor: 'pointer', fontFamily: 'inherit',
+                  boxShadow: '0 14px 36px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0,
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  <Plus size={isMobile ? 34 : 38} strokeWidth={3} />
+                  <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: -3, lineHeight: 1 }}>Eigen</span>
                 </button>
 
                 {/* Oefeningen van een training, vóór je kiest. */}
