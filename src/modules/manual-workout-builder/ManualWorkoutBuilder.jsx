@@ -25,7 +25,7 @@ import KlantWeekrooster from './components/KlantWeekrooster'
 import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronUp } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -310,6 +310,17 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
   const updateDay = (dayId, updates) => {
     setWorkoutPlan(prev => ({ ...prev, days: prev.days.map(d => d.id === dayId ? { ...d, ...updates } : d) }))
+  }
+
+  // Volgorde van de dagen: een dag één plek omhoog of omlaag (pijltjes in
+  // de zijbalk). De nummering volgt vanzelf uit de volgorde.
+  const verplaatsDag = (index, richting) => {
+    setWorkoutPlan(prev => {
+      const j = index + richting
+      if (j < 0 || j >= prev.days.length) return prev
+      const days = [...prev.days]; const t = days[index]; days[index] = days[j]; days[j] = t
+      return { ...prev, days }
+    })
   }
 
   const deleteDay = (dayId) => {
@@ -708,10 +719,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               const aan = day.id === activeDay
               const aantal = (day.exercises || []).length
               return (
-                <button key={day.id} onClick={() => setActiveDay(day.id)}
+                <div key={day.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <button onClick={() => setActiveDay(day.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    width: '100%', padding: '0.3rem 0.5rem', borderRadius: 7,
+                    flex: 1, minWidth: 0, padding: '0.3rem 0.5rem', borderRadius: 7,
                     background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
                     border: `1px solid ${aan ? 'rgba(255,255,255,0.2)' : 'transparent'}`,
                     color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
@@ -731,6 +743,17 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                     {aantal}
                   </span>
                 </button>
+                {/* Omhoog / omlaag: volgorde van de dagen in het plan. */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flexShrink: 0 }}>
+                  {[{ r: -1, I: ChevronUp, l: 'Dag omhoog', uit: index === 0 }, { r: 1, I: ChevronDown, l: 'Dag omlaag', uit: index === workoutPlan.days.length - 1 }].map(k => (
+                    <button key={k.r} onClick={() => verplaatsDag(index, k.r)} disabled={k.uit} aria-label={k.l} title={k.l} style={{
+                      width: 22, height: 15, padding: 0, background: 'none', border: 'none', cursor: k.uit ? 'default' : 'pointer',
+                      color: k.uit ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}><k.I size={13} strokeWidth={3} /></button>
+                  ))}
+                </div>
+                </div>
               )
             })}
             <button onClick={() => setShowDayPicker(true)} style={zijKnop({ padding: '0.3rem 0.5rem', color: '#fff', fontWeight: 900 })}>
