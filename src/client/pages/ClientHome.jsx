@@ -152,9 +152,9 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
       </div>
       <div style={{
         position: 'relative', width: '100%',
-        // Vaste verhouding van het beeld (1960x600), dus er wordt niets
-        // bijgesneden en de hoogte klopt op elk scherm.
-        aspectRatio: '49 / 15',
+        // Lager dan het beeld zelf (1960x600 = 49/15): boven- en onderkant
+        // vallen er een stukje af, zodat de dag eerder in beeld is.
+        aspectRatio: '49 / 11',
         overflow: 'hidden',
       }}>
         <div style={{
