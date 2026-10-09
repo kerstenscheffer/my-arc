@@ -192,6 +192,8 @@ export default function PlanAnalyzer({
   const [validSchemaDagKeys, setValidSchemaDagKeys] = useState(null)
   const [viewMode, setViewMode] = useState('day')
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
+  // Keuzemenuutje van de zwevende 'maaltijd toevoegen'-knop.
+  const [toevoegKeuze, setToevoegKeuze] = useState(false)
   const [showPlanLibrary, setShowPlanLibrary] = useState(false)
   const [showTimingModal, setShowTimingModal] = useState(false)
   const [showWeekBalancer, setShowWeekBalancer] = useState(false)
@@ -2099,6 +2101,7 @@ export default function PlanAnalyzer({
             display: 'flex',
             flexDirection: m ? 'column' : 'row',
             WebkitOverflowScrolling: 'touch',
+            position: 'relative',
           }}>
             {/* Meal-cards strook — de ringen erboven, beide samen scrollend.
                 Onderaan ruimte voor de zwevende navbalk, anders ligt de
@@ -2106,6 +2109,8 @@ export default function PlanAnalyzer({
             <div style={{
               flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
               minWidth: 0, paddingBottom: navRuimte,
+              // Kaarten niet over de volle breedte: rechts mag zwart blijven.
+              maxWidth: m ? undefined : 640,
             }}>
               <DagRingen
                 totalen={{
@@ -2173,7 +2178,10 @@ export default function PlanAnalyzer({
                 const expectedSlots = mealSchedule?.num_meals
                   ? SLOTS.slice(0, Math.min(mealSchedule.num_meals, SLOTS.length))
                   : SLOTS.slice(0, 4)
-                if (!meal && !expectedSlots.includes(slot)) return null
+                // Lege slots tonen we niet meer ("Snack toevoegen"-regels);
+                // toevoegen gaat via de zwevende knop.
+                if (!meal) return null
+                void expectedSlots
                 const conflicts = getMealConflicts(meal)
                 return (
                   <MealCard key={slot} db={db} meal={meal} slot={slot} dayIndex={activeDay}
@@ -2184,61 +2192,6 @@ export default function PlanAnalyzer({
                     conflicts={conflicts} isMobile={m} />
                 )
               })}
-
-              {/* Nieuwe maaltijd: zoeken of zelf bouwen. Beide pakken de
-                  eerstvolgende vrije slot van deze dag. Dezelfde twee wegen
-                  als op een lege slot-kaart, zodat het overal hetzelfde werkt. */}
-              {currentDay && (() => {
-                const freeSlot = SLOTS.find(s => !currentDay.meals?.[s])
-                if (!freeSlot) return (
-                  <div style={{
-                    width: '100%', marginTop: '0.6rem', padding: m ? '0.7rem' : '0.8rem',
-                    textAlign: 'center', borderRadius: 12,
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px dashed rgba(255,255,255,0.1)',
-                    color: 'rgba(255,255,255,0.25)',
-                    fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 800,
-                  }}>
-                    Alle maaltijd-slots gevuld
-                  </div>
-                )
-                return (
-                  <div style={{ display: 'flex', gap: 8, marginTop: '0.6rem' }}>
-                    <button
-                      onClick={() => handleAdd(activeDay, freeSlot)}
-                      style={{
-                        flex: 1, minWidth: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                        padding: m ? '0.7rem' : '0.8rem',
-                        background: 'rgba(255,215,0,0.08)',
-                        border: '1px dashed rgba(255,215,0,0.4)',
-                        borderRadius: 12, color: '#FFD700',
-                        fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 800,
-                        cursor: 'pointer', fontFamily: 'inherit',
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <Plus size={16} /> Maaltijd toevoegen
-                    </button>
-                    <button
-                      onClick={() => setMakerState({ dayIndex: activeDay, slot: freeSlot })}
-                      style={{
-                        flex: '0 0 auto',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
-                        padding: m ? '0.7rem 1.1rem' : '0.8rem 1.3rem',
-                        background: '#fff',
-                        borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
-                        borderRadius: 12, color: '#0a0a0a',
-                        fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 900,
-                        cursor: 'pointer', fontFamily: 'inherit',
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      Maken
-                    </button>
-                  </div>
-                )
-              })()}
 
               {/* ── SUPPLEMENTEN ──
                   Uit het actieve supplementenplan. De maaltijdtijden van déze
@@ -2251,6 +2204,42 @@ export default function PlanAnalyzer({
                 isMobile={m}
               />
             </div>
+
+            {/* Maaltijd toevoegen: witte ronde knop linksonder in de
+                maaltijdkolom, zoals de LOG-knop op de voedingspagina. Tik =
+                kiezen tussen zoeken en zelf maken; pakt de eerste vrije slot. */}
+            {currentDay && (() => {
+              const freeSlot = SLOTS.find(sl => !currentDay.meals?.[sl])
+              return (
+                <>
+                  {toevoegKeuze && freeSlot && (
+                    <>
+                      <div onClick={() => setToevoegKeuze(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                      <div style={{ position: 'absolute', left: m ? 16 : 22, bottom: `calc(${navRuimte}px + ${m ? 86 : 96}px)`, zIndex: 41, background: '#141414', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, boxShadow: '0 18px 44px rgba(0,0,0,0.7)', padding: 4, minWidth: 180 }}>
+                        {[{ t: 'Maaltijd zoeken', f: () => handleAdd(activeDay, freeSlot) }, { t: 'Zelf maken', f: () => setMakerState({ dayIndex: activeDay, slot: freeSlot }) }].map(o => (
+                          <button key={o.t} onClick={() => { setToevoegKeuze(false); o.f() }} style={{ width: '100%', display: 'block', padding: '0.6rem 0.75rem', background: 'transparent', border: 'none', borderRadius: 8, color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>{o.t}</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <button
+                    onClick={() => freeSlot ? setToevoegKeuze(v => !v) : alert('Alle maaltijd-slots van deze dag zijn gevuld.')}
+                    aria-label="Maaltijd toevoegen" title="Maaltijd toevoegen"
+                    style={{
+                      position: 'absolute', left: m ? 16 : 22, bottom: `calc(${navRuimte}px + 10px)`, zIndex: 42,
+                      width: m ? 66 : 72, height: m ? 66 : 72, borderRadius: '50%',
+                      background: '#fff', border: 'none', color: '#0a0a0a', cursor: 'pointer',
+                      boxShadow: '0 14px 36px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      opacity: freeSlot ? 1 : 0.5, fontFamily: 'inherit',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                    <Plus size={m ? 30 : 32} strokeWidth={3} />
+                    <span style={{ fontSize: '0.56rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: -3, lineHeight: 1 }}>Meal</span>
+                  </button>
+                </>
+              )
+            })()}
           </div>
         )}
       </div>
