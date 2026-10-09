@@ -65,9 +65,12 @@ export default function MealPlanMain({ client, onNavigate, db }) {
     )
   }
   
-  // Plan-paneel: AI-dashboard als er een plan is, anders de fallback.
-  const planPanel = hasAIPlan ? (
-    <AIMealDashboard client={client} onNavigate={onNavigate} db={db} />
+  // Altijd het dashboard, ook zonder plan: dan draait het in de vrije stand
+  // (eten loggen, water, macro's uit het profiel). De oude melding "vraag je
+  // coach om een plan" is weg (issue 9 okt 2026). `hasAIPlan` blijft alleen
+  // voor de wikkel eromheen.
+  const planPanel = true ? (
+    <AIMealDashboard client={client} onNavigate={onNavigate} db={db} geenPlanOk />
   ) : (
     <div style={{
       minHeight: '60vh',

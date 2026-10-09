@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Trash2, Pencil, Check, ChevronRight, Copy, AlertTriangle, Bookmark } from 'lucide-react'
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
+import Keuze from '../../../meal-plan/components/Keuze'
 import { pasSupplementenToe, dagIndicesNaarSleutels, extrasSamenvatting } from './sjabloonExtras'
 
 export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onSaveAsTemplate, onClose, isMobile, embedded = false }) {
@@ -21,6 +22,34 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   const [confirmDelete, setConfirmDelete] = useState(null)
 
   const [templates, setTemplates] = useState([])
+  // Filters op de sjablonen: soort (week / dagmenu), kcal-bereik, variatie.
+  const [fSoort, setFSoort] = useState('alle')
+  const [fKcal, setFKcal] = useState('alle')
+  const [fVariatie, setFVariatie] = useState('alle')
+  const isWeek = (t) => t.plan_type === 'full_week' || (Array.isArray(t.week_structure) && t.week_structure.length >= 7)
+  const kcalVan = (t) => Number(t.daily_calories || t.base_macros?.calories) || 0
+  // Variatie: hoeveel verschillende maaltijden er in de week zitten tegenover
+  // het aantal plekken. Boven 0,6 = veel variatie, daaronder weinig.
+  const variatieVan = (t) => {
+    if (!isWeek(t) || !Array.isArray(t.week_structure)) return null
+    const alle = []
+    t.week_structure.forEach(d => Object.values(d?.meals || {}).forEach(m => { if (m) alle.push(String(m.meal_id || m.id || m.name || '')) }))
+    if (alle.length === 0) return null
+    return new Set(alle).size / alle.length
+  }
+  const zichtbareTemplates = templates.filter(t => {
+    if (fSoort === 'week' && !isWeek(t)) return false
+    if (fSoort === 'dag' && isWeek(t)) return false
+    const k = kcalVan(t)
+    if (fKcal === 'tot2000' && !(k > 0 && k < 2000)) return false
+    if (fKcal === '2000' && !(k >= 2000 && k < 2500)) return false
+    if (fKcal === '2500' && !(k >= 2500 && k < 3000)) return false
+    if (fKcal === '3000' && !(k >= 3000)) return false
+    const v = variatieVan(t)
+    if (fVariatie === 'veel' && !(v != null && v >= 0.6)) return false
+    if (fVariatie === 'weinig' && !(v != null && v < 0.6)) return false
+    return true
+  })
   const [loadingTemplates, setLoadingTemplates] = useState(false)
   const [copyingId, setCopyingId] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
@@ -376,11 +405,20 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
               <div style={{ padding: m ? '0.75rem 1rem' : '0.85rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>
 <span style={{ color: '#fff' }}>Gebruik</span> maakt een kopie voor deze klant. Het sjabloon blijft zoals het is.
               </div>
+              {/* Filters: soort, kcal, variatie. Zelfde keuzemenu's als overal. */}
+              <div style={{ display: 'flex', alignItems: 'center', padding: m ? '0.4rem 1rem' : '0.5rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <Keuze waarde={fSoort} zet={setFSoort} isMobile={m} opties={[{ id: 'alle', label: 'Week en dag' }, { id: 'week', label: 'Weekplannen' }, { id: 'dag', label: 'Dagmenu\'s' }]} />
+                <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                <Keuze waarde={fKcal} zet={setFKcal} isMobile={m} opties={[{ id: 'alle', label: 'Alle kcal' }, { id: 'tot2000', label: 'Tot 2000' }, { id: '2000', label: '2000–2500' }, { id: '2500', label: '2500–3000' }, { id: '3000', label: '3000+' }]} />
+                <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                <Keuze waarde={fVariatie} zet={setFVariatie} isMobile={m} uitlijning="rechts" opties={[{ id: 'alle', label: 'Alle variatie' }, { id: 'veel', label: 'Veel variatie' }, { id: 'weinig', label: 'Weinig variatie' }]} />
+              </div>
               {loadingTemplates && <Placeholder text="Sjablonen laden…" />}
+              {!loadingTemplates && templates.length > 0 && zichtbareTemplates.length === 0 && <Placeholder text="Geen sjabloon dat hierbij past." />}
               {!loadingTemplates && templates.length === 0 && (
                 <Placeholder text="Nog geen sjablonen. Bewaar een plan via 'Bewaren als sjabloon' op het tabblad van de klant." />
               )}
-              {templates.map(tmpl => {
+              {zichtbareTemplates.map(tmpl => {
                 const isCopying = copyingId === tmpl.id
                 const isCopied = copiedId === tmpl.id
                 const macros = tmpl.base_macros || {}
@@ -402,7 +440,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                           {tmpl.description}
                         </div>
                       )}
-                      <Meta items={[kcal && `${kcal} kcal`, protein && `${protein}g eiwit`, tmpl.meals_per_day && `${tmpl.meals_per_day}x per dag`, formatDate(tmpl.created_at), gebruikt > 0 && `${gebruikt}× gebruikt`]} />
+                      <Meta items={[isWeek(tmpl) ? 'Weekplan' : 'Dagmenu', kcal && `${kcal} kcal`, protein && `${protein}g eiwit`, tmpl.meals_per_day && `${tmpl.meals_per_day}x per dag`, variatieVan(tmpl) != null && (variatieVan(tmpl) >= 0.6 ? 'veel variatie' : 'weinig variatie'), gebruikt > 0 && `${gebruikt}× gebruikt`]} />
                       {extrasSamenvatting(tmpl) && (
                         <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', marginTop: 2, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {extrasSamenvatting(tmpl)}

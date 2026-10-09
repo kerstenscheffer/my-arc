@@ -137,7 +137,11 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   const [mealPlanVisible, setMealPlanVisible] = useState(client?.meal_plan_visible !== false)
   const [savingVisibility, setSavingVisibility] = useState(false)
   useEffect(() => { setMealPlanVisible(client?.meal_plan_visible !== false) }, [client?.meal_plan_visible])
-  const mealMode = mealPlanVisible ? 'plan' : 'free'
+  // Zonder actief plan altijd de vrije stand: eten loggen, water, macro's
+  // uit het profiel. Eerder verving een lege staat de hele pagina ("Geen
+  // actief meal plan"); dat is weg (issue 9 okt 2026).
+  const heeftPlan = !!dashboardData?.activePlan
+  const mealMode = (mealPlanVisible && heeftPlan) ? 'plan' : 'free'
 
   const toggleMealPlanVisible = async () => {
     if (savingVisibility || !client?.id) return
@@ -507,64 +511,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     )
   }
   
-  // Geen actief meal-plan: rustige empty state. Plan/Free-modus is geschrapt,
-  // dus de "Schakel naar Free"-knop is verwijderd. Coach maakt eerst plan.
-  if (!dashboardData?.activePlan) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#0a0a0a',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: isMobile ? '2rem 1rem' : '3rem 2rem'
-      }}>
-        <div style={{
-          textAlign: 'center',
-          maxWidth: '500px',
-          background: 'rgba(17, 17, 17, 0.6)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 215, 0, 0.18)',
-          borderRadius: '24px',
-          padding: isMobile ? '2rem 1.5rem' : '3rem 2.5rem',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
-        }}>
-          <h2 style={{
-            fontSize: isMobile ? '1.5rem' : '2rem',
-            fontWeight: '700',
-            color: '#FFD700',
-            marginBottom: '1rem'
-          }}>
-            Geen actief meal plan
-          </h2>
-          <p style={{
-            fontSize: isMobile ? '1rem' : '1.125rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            marginBottom: '1.5rem',
-            lineHeight: 1.6,
-          }}>
-            Je coach werkt aan jouw plan. Zodra het klaar staat verschijnt hier
-            je dagschema.
-          </p>
-          <button
-            onClick={() => onNavigate('home')}
-            style={{
-              padding: isMobile ? '0.75rem 2rem' : '0.875rem 2.5rem',
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '14px',
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontSize: '0.95rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            Terug naar Home
-          </button>
-        </div>
-      </div>
-    )
-  }
+  // (lege staat 'Geen actief meal plan' verwijderd: de pagina draait zonder
+  // plan in de vrije stand, zie mealMode.)
 
 
   return (

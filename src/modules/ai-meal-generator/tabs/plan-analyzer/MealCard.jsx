@@ -105,6 +105,8 @@ export default function MealCard({
   const m = isMobile
   // Custom label uit meal.display_label gaat voor de slot-default.
   const slotLabel = meal?.display_label || SLOT_LABELS[slot] || slot
+  // Gekozen label dat nog op een bereik wacht (deze dag / elke dag).
+  const [labelKeuze, setLabelKeuze] = useState(null)
   const slotTime  = meal?.timing || SLOT_TIMES[slot] || ''
   const rawIngredients = meal?.ingredients_list || meal?.ingredients || null
   const ingredientList = parseIngredients(rawIngredients)
@@ -317,7 +319,7 @@ export default function MealCard({
             {showLabelMenu && labelMenuPos && createPortal(
               <>
                 <div
-                  onClick={() => setShowLabelMenu(false)}
+                  onClick={() => { setShowLabelMenu(false); setLabelKeuze(null) }}
                   style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
                 />
                 <div style={{
@@ -331,15 +333,27 @@ export default function MealCard({
                   boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
                   overflow: 'hidden',
                 }}>
+                  {labelKeuze && (
+                    <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,215,0,0.06)' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fff', marginBottom: 6 }}>"{labelKeuze}" waar?</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {[{ b: 'day', t: 'Alleen deze dag' }, { b: 'slot', t: 'Elke dag' }].map(k => (
+                          <button key={k.b} onClick={() => { const opt = labelKeuze; setLabelKeuze(null); setShowLabelMenu(false); onUpdateMeal && onUpdateMeal(dayIndex, slot, { ...meal, display_label: opt }, k.b) }} style={{
+                            flex: 1, padding: '0.4rem 0.5rem', borderRadius: 7, fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer',
+                            background: k.b === 'slot' ? '#fff' : 'rgba(255,255,255,0.06)', color: k.b === 'slot' ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.14)',
+                          }}>{k.t}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {LABEL_OPTIONS.map((opt, i) => {
                     const isSelected = slotLabel.toLowerCase() === opt.toLowerCase()
                     return (
                       <button key={opt}
                         onClick={() => {
-                          setShowLabelMenu(false)
-                          if (onUpdateMeal) {
-                            onUpdateMeal(dayIndex, slot, { ...meal, display_label: opt })
-                          }
+                          // Eerst vragen waar het label geldt: alleen deze dag,
+                          // of dit moment op elke dag (issue 9 okt 2026).
+                          setLabelKeuze(opt)
                         }}
                         style={{
                           width: '100%',

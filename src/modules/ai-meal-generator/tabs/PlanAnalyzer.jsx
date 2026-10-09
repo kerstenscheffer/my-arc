@@ -291,10 +291,23 @@ export default function PlanAnalyzer({
 
   // ════════════ DATA LOADING ════════════
 
+  // Bij een andere klant hoort het open plan (van de vorige klant) los te
+  // laten: anders bleef loadConceptPlan het oude plan-id laden en stond je
+  // bij Lisa nog in het plan van Tim (issue 9 okt 2026). Ook een vers
+  // gegenereerd plan telt dan niet meer: dat hoorde bij de vorige klant.
+  const vorigeClientRef = useRef(resolvedClientId)
+  const [gegenereerdGenegeerd, setGegenereerdGenegeerd] = useState(false)
   useEffect(() => {
-    if (generatedPlan?.weekPlan) loadFromGeneratedPlan(generatedPlan)
+    const gewisseld = vorigeClientRef.current && resolvedClientId && vorigeClientRef.current !== resolvedClientId
+    vorigeClientRef.current = resolvedClientId
+    if (gewisseld) {
+      setGegenereerdGenegeerd(true)
+      if (selectedConceptId) { setSelectedConceptId(null); return }   // volgende run laadt de plannen van déze klant
+    }
+    if (generatedPlan?.weekPlan && !gegenereerdGenegeerd && !gewisseld) loadFromGeneratedPlan(generatedPlan)
     else if (selectedConceptId) loadConceptPlan(selectedConceptId)
     else if (resolvedClientId) loadConceptPlansForClient(resolvedClientId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedPlan, selectedConceptId, resolvedClientId])
 
   useEffect(() => {
@@ -1111,6 +1124,18 @@ export default function PlanAnalyzer({
     const { _replacesMealId, ...cleanMeal } = updatedMeal
     const matchingMealId = _replacesMealId || cleanMeal.meal_id || cleanMeal.id
 
+    // 'slot': dit slot op elke dag, ongeacht welke maaltijd erin staat.
+    // Voor de labels (Diner, Lunch, Pre workout): die horen bij het moment,
+    // niet bij de maaltijd.
+    if (bereik === 'slot') {
+      updated.forEach((day, di) => {
+        const m = day?.meals?.[slot]
+        if (!m) return
+        updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: { ...m, ...cleanMeal } } }
+      })
+      await applyWeekUpdate(updated, `Label aangepast (elke dag)`)
+      return
+    }
     if (bereik === 'day') {
       const m = updated[dayIndex]?.meals?.[slot]
       if (!m) return
