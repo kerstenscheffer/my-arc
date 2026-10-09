@@ -73,7 +73,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
         .select('*')
         .eq('client_id', client.id)
         .order('consumed_at', { ascending: false })
-        .limit(50)
+        .limit(80)
 
       if (error) throw error
 
@@ -92,11 +92,11 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
         }
       })
 
+      // Laatst gelogd bovenaan, ook een maaltijd die je net uit je plan
+      // afvinkte (source 'plan_check'). Eerst stond hier 'vaakst gelogd
+      // eerst', waardoor iets wat je net at onder je vaste dingen verdween.
       setRecentMeals(Array.from(freqMap.values())
-        .sort((a, b) => {
-          if (b.count !== a.count) return b.count - a.count
-          return new Date(b.consumed_at) - new Date(a.consumed_at)
-        }))
+        .sort((a, b) => new Date(b.consumed_at) - new Date(a.consumed_at)))
     } catch (err) {
       console.error('Failed to load recents:', err)
       setRecentMeals([])
@@ -585,7 +585,9 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
                   : ''
                 // Hoe vaak je het al logde staat op de foto in plaats van als
                 // los badgetje op een icoontje.
-                const vaker = meal.count > 1 ? `${meal.count}× gelogd` : 'Eerder gelogd'
+                const vaker = meal.source === 'plan_check'
+                  ? (meal.count > 1 ? `Uit je plan · ${meal.count}×` : 'Uit je plan')
+                  : (meal.count > 1 ? `${meal.count}× gelogd` : 'Eerder gelogd')
                 return (
                   <MealCard
                     key={meal.id || idx}
