@@ -309,7 +309,7 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
           )}
 
           {sterkerUit && training.sterker?.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], marginTop: space[2] }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], marginTop: space[2], maxHeight: isMobile ? 360 : 440, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: 2, overscrollBehavior: 'contain' }}>
               {training.sterker.map(s => (
                 <SterkerKaart
                   key={s.oefening}

@@ -359,9 +359,10 @@ function bouwTraining(sessies, oefeningen, weekStart, stand) {
     halfGelogd: half.length,
     oefeningen: new Set(oefDezeWeek.map(o => o.exercise_name)).size,
     sets,
-    // Hooguit drie: een lijst van tien "sterker geworden op" leest niemand,
-    // en dan valt de grootste sprong niet meer op.
-    sterker: vooruit.slice(0, 3),
-    meerOefeningen: Math.max(0, vooruit.length - 3),
+    // Alle oefeningen, grootste sprong eerst. Stond op drie afgekapt, maar
+    // dan kon je de rest nergens zien (9 okt 2026). De lijst scrolt in het
+    // scherm; wie wil, scrolt door.
+    sterker: vooruit,
+    meerOefeningen: 0,
   }
 }

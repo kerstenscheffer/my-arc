@@ -109,7 +109,6 @@ export const SECTIES = [
       {
         id: 'hulp_van_coach', type: 'tekst',
         vraag: 'Wat kan ik als coach doen om je te helpen je doelen te halen?',
-        hulp: 'Een aanpassing in je plan, uitleg, of gewoon dat ik je eraan herinner.',
         placeholder: 'Zeg het gerust rechtstreeks.',
       },
       {
