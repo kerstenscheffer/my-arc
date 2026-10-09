@@ -29,6 +29,14 @@ function slotNaarMoment(slot) {
   return 'snack'
 }
 
+// Avondsnack is in ai_meals geen eigen timing (die blijft 'snack'), maar wel
+// een eigen moment in de keuzelijst en een eigen lijst vaste swaps van de
+// coach ('avondsnack'). Herkend aan het slot of aan het label op de kaart.
+const isAvondsnack = (slot, meal) =>
+  /avond\s*snack|before_bed/i.test(`${slot || ''} ${meal?.display_label || ''} ${meal?.slot || ''} ${meal?.timeSlot || ''}`)
+const swapSlotNaarMoment = (s) => (/avondsnack|before_bed/i.test(String(s || '')) ? 'avondsnack' : slotNaarMoment(s))
+const basisMoment = (m) => (m === 'avondsnack' ? 'snack' : m)
+
 // Wisselopties dragen hun groep als label ('groep:Op brood'). Binnen een
 // moment staan ze in deze volgorde, met de groep als kopje erboven.
 const GROEP_VOLGORDE = ['Op brood', 'Bowl', 'Wrap', 'Warm', 'Licht en snel', 'Klassiek', 'Pasta en wok', 'Mexicaans', 'Zoet', 'Hartig']
@@ -92,8 +100,10 @@ export default function AIAlternativesModal({
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
 
-  // Slot van de huidige maaltijd → naar de 4 curatie-slots (snack1/2/3 → snack).
+  // Slot van de huidige maaltijd → naar de curatie-slots (snack1/2/3 → snack,
+  // behalve een avondsnack: die heeft een eigen lijst en een eigen moment).
   const slotKey = (() => {
+    if (isAvondsnack(currentMeal?.slot || currentMeal?.timeSlot, currentMeal)) return 'avondsnack'
     const v = String(currentMeal?.slot || currentMeal?.timeSlot || currentMeal?.timing?.[0] || '').toLowerCase()
     if (v.includes('breakfast') || v.includes('ontbijt')) return 'breakfast'
     if (v.includes('lunch')) return 'lunch'
@@ -109,6 +119,7 @@ export default function AIAlternativesModal({
     { id: 'lunch', label: 'Lunch' },
     { id: 'dinner', label: 'Diner' },
     { id: 'snack', label: 'Snack' },
+    { id: 'avondsnack', label: 'Avondsnack' },
     { id: 'pre_workout', label: 'Pre-workout' },
     { id: 'post_workout', label: 'Post-workout' },
   ]
@@ -199,10 +210,12 @@ export default function AIAlternativesModal({
           Object.entries(alleSlots).forEach(([slot, v]) => {
             const lijst = (v?.meal_ids || []).map(id => opId.get(id)).filter(Boolean)
             if (lijst.length === 0) return
-            const moment = slotNaarMoment(slot)
+            const moment = swapSlotNaarMoment(slot)
             perMoment[moment] = [...(perMoment[moment] || []), ...lijst]
           })
-          curated = (alleSlots?.[slotKey]?.meal_ids || []).map(id => opId.get(id)).filter(Boolean)
+          // Avondsnack zonder eigen lijst valt terug op de snacklijst.
+          const eigenIds = alleSlots?.[slotKey]?.meal_ids?.length ? alleSlots[slotKey].meal_ids : (alleSlots?.[basisMoment(slotKey)]?.meal_ids || [])
+          curated = eigenIds.map(id => opId.get(id)).filter(Boolean)
         }
       } catch (e) { /* geen curatie → gewoon de normale pool */ }
 
@@ -236,7 +249,7 @@ export default function AIAlternativesModal({
             if (!(perMoment[moment] || []).some(x => x.id === m.id)) {
               perMoment[moment] = [...(perMoment[moment] || []), m]
             }
-            if (moment === slotNaarMoment(slotKey) && !alGekozen.has(m.id)) {
+            if (moment === basisMoment(slotKey) && !alGekozen.has(m.id)) {
               curated = [...curated, m]
               alGekozen.add(m.id)
             }
@@ -295,7 +308,7 @@ export default function AIAlternativesModal({
       setMoment(slotKey)
       // Wisselopties voor dit moment gaan voor: dat is waar je voor wisselt.
       // Anders wat de coach voor dit slot heeft ingesteld.
-      if ((wissel[slotNaarMoment(slotKey)] || []).length > 0) setBron('wissel')
+      if ((wissel[basisMoment(slotKey)] || []).length > 0) setBron('wissel')
       else if (curated.length > 0) setBron('coach')
     } catch (error) {
       console.error('Failed to load alternatives:', error)
@@ -350,7 +363,7 @@ export default function AIAlternativesModal({
     let pool
     if (bron === 'wissel') {
       pool = (moment !== 'alles'
-        ? (wisselPerMoment[moment] || [])
+        ? (wisselPerMoment[basisMoment(moment)] || [])
         : Object.values(wisselPerMoment).flat()
       ).filter(nietZelf)
     }
@@ -359,7 +372,9 @@ export default function AIAlternativesModal({
       // heeft gezet. Zonder moment: eerst de lijst van het slot dat je
       // wisselt, daarna de rest.
       if (moment !== 'alles') {
-        pool = (coachPerMoment[moment] || []).filter(nietZelf)
+        // Geen eigen avondsnack-lijst? Dan de snacklijst.
+        const lijst = coachPerMoment[moment]?.length ? coachPerMoment[moment] : (coachPerMoment[basisMoment(moment)] || [])
+        pool = lijst.filter(nietZelf)
       } else {
         const gezien = new Set()
         pool = [...coachOptions, ...Object.values(coachPerMoment).flat()].filter(m => {
@@ -401,7 +416,7 @@ export default function AIAlternativesModal({
     if (moment !== 'alles' && bron !== 'coach' && bron !== 'wissel') {
       meals = pool.filter(m => {
         const set = momentenVan(m)
-        return set.size === 0 || set.has(moment)
+        return set.size === 0 || set.has(moment) || set.has(basisMoment(moment))
       })
     }
 
