@@ -302,6 +302,7 @@ export default function PlanAnalyzer({
   const vorigeClientRef = useRef(resolvedClientId)
   // Na een klantwissel meteen het actieve plan van de nieuwe klant openen.
   const naWisselActiefLaden = useRef(false)
+  const [wisselBezig, setWisselBezig] = useState(false)
   const [gegenereerdGenegeerd, setGegenereerdGenegeerd] = useState(false)
   useEffect(() => {
     const gewisseld = vorigeClientRef.current && resolvedClientId && vorigeClientRef.current !== resolvedClientId
@@ -309,8 +310,11 @@ export default function PlanAnalyzer({
     if (gewisseld) {
       // Alles van de vorige klant uit beeld: zonder dit bleef weekData (het
       // plan van Kersten) staan terwijl de kop al Tygo zei (9 okt 2026).
+      // Het oude plan blijft (gedimd) staan tot het nieuwe er is, zodat je
+      // niet eerst het beginscherm ziet flitsen (9 okt 2026).
       setGegenereerdGenegeerd(true)
-      setWeekData(null); setPlanMeta(null); setActivated(false)
+      setWisselBezig(true)
+      setActivated(false)
       setHistory([]); setHistoryIndex(-1)
       naWisselActiefLaden.current = true
       if (selectedConceptId) { setSelectedConceptId(null); return }   // volgende run laadt de plannen van déze klant
@@ -502,6 +506,7 @@ export default function PlanAnalyzer({
         templateName = tmpl?.name || null
       }
       setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated, templateId: data.template_id || null, templateName })
+      setWisselBezig(false)
       setPreWorkoutMeal(data.pre_workout_meal || null)
       setActivated(data.is_active || false)
       setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
@@ -539,6 +544,7 @@ export default function PlanAnalyzer({
       naWisselActiefLaden.current = false
       const eerste = actief?.data?.[0] || concepten?.data?.[0]
       if (eerste?.id) setSelectedConceptId(eerste.id)
+      else { setWeekData(null); setPlanMeta(null); setWisselBezig(false) }   // geen plannen: dan pas het beginscherm
     }
   }
 
@@ -1942,6 +1948,7 @@ export default function PlanAnalyzer({
       <div style={{
         flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
         position: 'sticky', top: kleefTop, height: paneelHoogte,
+        opacity: wisselBezig ? 0.5 : 1, transition: 'opacity 0.2s ease', pointerEvents: wisselBezig ? 'none' : undefined,
       }}>
 
         {/* Titel van het geladen plan — bewerkbaar, slaat hard op dit plan op. */}
