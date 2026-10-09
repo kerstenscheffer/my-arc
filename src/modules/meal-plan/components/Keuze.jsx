@@ -55,11 +55,13 @@ function Keuze({ waarde, opties, zet, isMobile, uitlijning = 'links' }) {
             position: 'absolute', top: 'calc(100% + 4px)', zIndex: 41,
             ...(uitlijning === 'rechts' ? { right: 0 } : { left: 0 }),
             minWidth: 168,
+            // Lange lijsten (sporten, templates) scrollen binnen het menu in
+            // plaats van onder de rand van het venster te verdwijnen.
+            maxHeight: 'min(280px, 55vh)', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
             background: '#141414',
             border: '1px solid rgba(255,255,255,0.14)',
             borderRadius: 12,
             boxShadow: '0 18px 44px rgba(0,0,0,0.7)',
-            overflow: 'hidden',
             padding: 4,
           }}>
             {opties.map(o => {
