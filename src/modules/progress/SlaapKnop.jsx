@@ -81,7 +81,6 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
   const [opstaan, setOpstaan] = useState(voorOpstaan || '07:00')
   // De geplande nacht uit de intake (clients.work_schedule, type 'slaap'):
   // de nacht die op logDatum eindigt, begon de avond ervoor.
-  const [gepland, setGepland] = useState(null) // { bed, op }
   // Gewicht na het opstaan: laatste weging als startpunt, en of deze ochtend
   // al gewogen is.
   const [gewicht, setGewicht] = useState(null)
@@ -109,7 +108,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
     if (!open || !client?.id || !db?.supabase) return
     let weg = false
     setBed(voorBed || '23:00'); setOpstaan(voorOpstaan || '07:00'); setUren(''); setUrenAangeraakt(false)
-    setGepland(null); setGewicht(null); setGewogen(false)
+    setGewicht(null); setGewogen(false)
     // Intake-planning: toon hem, en gebruik hem als startwaarde als de
     // aanroeper (bv. de maan-knop op tracking) zelf geen tijden meegaf.
     db.supabase.from('clients').select('work_schedule').eq('id', client.id).maybeSingle()
@@ -121,7 +120,6 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         const slaap = (Array.isArray(ws[sleutel]) ? ws[sleutel] : []).find(b => b?.type === 'slaap')
         if (slaap?.start && slaap?.end) {
           const g = { bed: String(slaap.start).slice(0, 5), op: String(slaap.end).slice(0, 5) }
-          setGepland(g)
           if (!voorBed) setBed(g.bed)
           if (!voorOpstaan) setOpstaan(g.op)
         }
