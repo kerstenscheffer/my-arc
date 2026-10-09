@@ -46,8 +46,10 @@ export default function SupplementProductenModal({ db, categorie, naam, emoji, c
   const [zekerId, setZekerId] = useState(null)
 
   const laad = async () => {
+    // 'oud' = de eerste, verzonnen catalogus (kapotte links). Blijft in de
+    // tabel omdat oude plannen er nog naar verwijzen, maar niet in beeld.
     const { data } = await db.supabase.from('supplement_products').select(VELDEN)
-      .eq('category', categorie).order('active', { ascending: false }).order('priority', { ascending: false })
+      .eq('category', categorie).neq('source', 'oud').order('active', { ascending: false }).order('priority', { ascending: false })
     setProducten(data || [])
   }
   useEffect(() => { laad() }, [categorie])
