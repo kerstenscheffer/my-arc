@@ -91,7 +91,9 @@ export default function FocusDezeWeek({ db, client, isMobile = false }) {
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Compact: één regel per doel, zonder kader. Naam links, een kort
+          balkje en de stand rechts. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 7 : 8 }}>
         {doelen.map((d, i) => {
           const t = typeVan(d.type)
           const gedaan = t && cijfers ? t.meet(cijfers) : null
@@ -100,43 +102,36 @@ export default function FocusDezeWeek({ db, client, isMobile = false }) {
           const deel = (gedaan != null && doel) ? Math.min(1, gedaan / doel) : null
 
           return (
-            <div key={i} style={{
-              padding: isMobile ? '0.7rem 0.8rem' : '0.8rem 0.9rem',
-              background: 'rgba(255,255,255,0.04)',
-              border: `1px solid ${klaar ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`,
-              borderRadius: 12,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span style={{
-                  flex: 1, fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900,
-                  color: '#fff', letterSpacing: '-0.015em',
-                }}>
-                  {doelTekst(d)}
-                </span>
-                {gedaan != null && doel != null && (
-                  <span style={{
-                    fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 900,
-                    color: klaar ? '#10b981' : '#fff', fontVariantNumeric: 'tabular-nums',
-                  }}>
-                    {gedaan}<span style={{ color: 'rgba(255,255,255,0.3)' }}>/{doel}</span>
-                  </span>
-                )}
-              </div>
-
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 22 }}>
+              <span style={{
+                flex: 1, minWidth: 0, fontSize: isMobile ? '0.84rem' : '0.88rem', fontWeight: 800,
+                color: klaar ? '#10b981' : '#fff', letterSpacing: '-0.015em',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {doelTekst(d)}
+              </span>
               {/* Balkje alleen als we het kunnen meten. Bij een eigen doel
                   ("om 23:00 in bed") weet de app niets, en dan is een lege
                   balk een verkeerde belofte. */}
               {deel != null && (
-                <div style={{
-                  marginTop: 8, height: 4, borderRadius: 2,
-                  background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+                <span style={{
+                  width: isMobile ? 56 : 72, height: 4, borderRadius: 2, flexShrink: 0,
+                  background: 'rgba(255,255,255,0.1)', overflow: 'hidden',
                 }}>
-                  <div style={{
-                    width: `${Math.round(deel * 100)}%`, height: '100%',
-                    background: klaar ? '#10b981' : '#fff',
-                    borderRadius: 2, transition: 'width 0.3s ease',
+                  <span style={{
+                    display: 'block', width: `${Math.round(deel * 100)}%`, height: '100%',
+                    background: klaar ? '#10b981' : '#fff', borderRadius: 2, transition: 'width 0.3s ease',
                   }} />
-                </div>
+                </span>
+              )}
+              {gedaan != null && doel != null && (
+                <span style={{
+                  flexShrink: 0, minWidth: 30, textAlign: 'right',
+                  fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 900,
+                  color: klaar ? '#10b981' : '#fff', fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {gedaan}<span style={{ color: 'rgba(255,255,255,0.3)' }}>/{doel}</span>
+                </span>
               )}
             </div>
           )
