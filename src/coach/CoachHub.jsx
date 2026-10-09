@@ -1,7 +1,8 @@
 // src/coach/CoachHub.jsx - REFACTOR v3.0
 // Gold Theme | Top Tabs | Hash Routing | Categorized Dropdown | Compact
 
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
+import lazy from '../lazyMetHerlaad'
 import { createPortal } from 'react-dom'
 import DatabaseService from '../services/DatabaseService'
 import useIsMobile from '../hooks/useIsMobile'
@@ -9,30 +10,7 @@ import { ModalHostProvider } from './ModalHost'
 
 // Component Imports (ALL PRESERVED)
 import CoachCommandCenter from '../modules/coach-command-center/CoachCommandCenter'
-import ClientInfoTab from './tabs/ClientInfoTab'
-import ClientViewTab from './tabs/ClientViewTab'
-import CoachChallengeHub from './pages/CoachChallengeHub'
-import MealPlanGenerator from '../modules/ai-meal-generator/MealPlanGenerator'
-import { CallPlanningTab } from '../modules/call-planning/CallPlanningComponents'
-import CoachVideoTab from '../modules/videos/CoachVideoTab'
-import CoachWorkoutAnalytics from './pages/CoachWorkoutAnalytics'
-import ManualWorkoutBuilder from '../modules/manual-workout-builder/ManualWorkoutBuilder'
-import LeadManagement from '../modules/lead-management/LeadManagement'
-import PlanWizardHub from '../modules/plan-wizard/PlanWizardHub'
-import CoachCheckinDashboard from '../modules/client-checkin/CoachCheckinDashboard'
-import CoachOutputDashboard from '../modules/output-planning/CoachOutputDashboard'
-import ProductivityHub from '../modules/productivity/ProductivityHub'
-import { FunnelDashboard } from '../modules/qualification-funnel'
-import ChallengeAdsDashboard from '../modules/challenge-ads/ChallengeAdsDashboard'
-import SpotsManager from '../modules/spots/SpotsManager'
-import AppVersiesPaneel from '../modules/app-update/AppVersiesPaneel'
-import NotificationHub from '../modules/notifications/NotificationHub'
-import TemplateManager from '../modules/meal-templates/TemplateManager'
-import IngredientPhotoManager from '../modules/ingredient-photos/IngredientPhotoManager'
-import MealGuideManager from '../modules/meal-plan/MealGuideManager'
-import SalesSection from '../modules/sales/SalesSection'
 import '../modules/supplements/SupplementPlanService'
-import SupplementsTab from '../modules/supplements/SupplementsTab'
 import DMBibleModal from '../modules/lead-management/components/DMBibleModal'
 import CoachNotificationBell from '../modules/notifications/CoachNotificationBell'
 import PortalSwitchButton from '../components/PortalSwitchButton'
@@ -47,15 +25,11 @@ import FloatingTaskTimer from '../modules/productivity/components/kanban/Floatin
 import WeekGoalsBar from './components/WeekGoalsBar'
 import StartTaskModal from '../modules/productivity/components/kanban/StartTaskModal'
 import ProductivityService from '../modules/productivity/ProductivityService'
-import CoachFAQManager from '../modules/faq/CoachFAQManager'
-import ResultsHub from '../modules/results/ResultsHub'
 import ClientContextPanel from '../modules/ai-meal-generator/tabs/plan-analyzer/ClientContextPanel'
 import WorkoutContextPanel from '../modules/coach-command-center/components/WorkoutContextPanel'
-import CoachAgendaTab from '../modules/client-agenda/CoachAgendaTab'
-import LabHub from '../modules/lab/LabHub'
-import CoachWeekReview from '../modules/week-review/CoachWeekReview'
 
 import {
+
   Home, Wand2, Send, Users, ClipboardCheck, UserPlus, Shield,
   Sparkles, Trophy, Video, Phone, Activity, BarChart3, LogOut,
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText, Columns2,
@@ -63,6 +37,37 @@ import {
   Bell, Bug, Lightbulb, Smartphone, AlertCircle, Image as ImageIcon, FlaskConical,
   Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck, Megaphone
 } from 'lucide-react'
+
+// Tabbladen als losse stukken: alleen het tabblad dat je opent wordt
+// opgehaald. Command blijft in de hoofdbundel (standaardtab).
+const ClientInfoTab = lazy(() => import('./tabs/ClientInfoTab'))
+const ClientViewTab = lazy(() => import('./tabs/ClientViewTab'))
+const CoachChallengeHub = lazy(() => import('./pages/CoachChallengeHub'))
+const MealPlanGenerator = lazy(() => import('../modules/ai-meal-generator/MealPlanGenerator'))
+const CallPlanningTab = lazy(() => import('../modules/call-planning/CallPlanningComponents').then(m => ({ default: m.CallPlanningTab })))
+const CoachVideoTab = lazy(() => import('../modules/videos/CoachVideoTab'))
+const CoachWorkoutAnalytics = lazy(() => import('./pages/CoachWorkoutAnalytics'))
+const ManualWorkoutBuilder = lazy(() => import('../modules/manual-workout-builder/ManualWorkoutBuilder'))
+const LeadManagement = lazy(() => import('../modules/lead-management/LeadManagement'))
+const PlanWizardHub = lazy(() => import('../modules/plan-wizard/PlanWizardHub'))
+const CoachCheckinDashboard = lazy(() => import('../modules/client-checkin/CoachCheckinDashboard'))
+const CoachOutputDashboard = lazy(() => import('../modules/output-planning/CoachOutputDashboard'))
+const ProductivityHub = lazy(() => import('../modules/productivity/ProductivityHub'))
+const FunnelDashboard = lazy(() => import('../modules/qualification-funnel').then(m => ({ default: m.FunnelDashboard })))
+const ChallengeAdsDashboard = lazy(() => import('../modules/challenge-ads/ChallengeAdsDashboard'))
+const SpotsManager = lazy(() => import('../modules/spots/SpotsManager'))
+const AppVersiesPaneel = lazy(() => import('../modules/app-update/AppVersiesPaneel'))
+const NotificationHub = lazy(() => import('../modules/notifications/NotificationHub'))
+const TemplateManager = lazy(() => import('../modules/meal-templates/TemplateManager'))
+const IngredientPhotoManager = lazy(() => import('../modules/ingredient-photos/IngredientPhotoManager'))
+const MealGuideManager = lazy(() => import('../modules/meal-plan/MealGuideManager'))
+const SalesSection = lazy(() => import('../modules/sales/SalesSection'))
+const SupplementsTab = lazy(() => import('../modules/supplements/SupplementsTab'))
+const CoachFAQManager = lazy(() => import('../modules/faq/CoachFAQManager'))
+const ResultsHub = lazy(() => import('../modules/results/ResultsHub'))
+const CoachAgendaTab = lazy(() => import('../modules/client-agenda/CoachAgendaTab'))
+const LabHub = lazy(() => import('../modules/lab/LabHub'))
+const CoachWeekReview = lazy(() => import('../modules/week-review/CoachWeekReview'))
 
 // ============================================
 // GOLD THEME
@@ -968,7 +973,7 @@ export default function CoachHub() {
                 '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px',
                 // De strook trok de navbalk-ruimte al van z'n hoogte af.
                 '--paneel-navruimte': '0px' }}>
-                <ModalHostProvider value={hostLinks}>{renderTabContent(activeTab)}</ModalHostProvider>
+                <ModalHostProvider value={hostLinks}><Suspense fallback={<div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} /></div>}>{renderTabContent(activeTab)}</Suspense></ModalHostProvider>
               </div>
             </div>
 
@@ -1001,11 +1006,11 @@ export default function CoachHub() {
                 '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px',
                 // De strook trok de navbalk-ruimte al van z'n hoogte af.
                 '--paneel-navruimte': '0px' }}>
-                <ModalHostProvider value={hostRechts}>{renderTabContent(splitTab)}</ModalHostProvider>
+                <ModalHostProvider value={hostRechts}><Suspense fallback={<div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} /></div>}>{renderTabContent(splitTab)}</Suspense></ModalHostProvider>
               </div>
             </div>
           </div>
-        ) : renderTabContent()}
+        ) : <Suspense fallback={<div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} /></div>}>{renderTabContent()}</Suspense>}
       </main>
 
       {/* ═══ FLOATING BOTTOM NAV ═══ */}

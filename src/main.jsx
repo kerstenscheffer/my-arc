@@ -1,10 +1,12 @@
 // src/main.jsx
 import './styles/theme.css'
+import { Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './styles/ai-generator.css'
 import './ui/tokens.css'   // design-contract tokens (goud), additief — laadt op elke pagina
 import App from './App.jsx'
+import LaadScherm from './components/LaadScherm'
 import { installeerTerugknop } from './terugknop'
 
 // ── Service-worker kill-switch ──────────────────────────────────────────────
@@ -29,8 +31,13 @@ installeerTerugknop()
 const container = document.getElementById('root');
 const root = createRoot(container);
 
+// Pagina's en tabbladen laden als losse stukken (React.lazy): een klant haalt
+// nooit de coachcode op en andersom, en de marketingpagina's zitten niet in
+// de app-bundel. LaadScherm is wat je ziet terwijl zo'n stuk binnenkomt.
 root.render(
-  <App />
+  <Suspense fallback={<LaadScherm />}>
+    <App />
+  </Suspense>
 );
 
 // TIJDELIJK UITGESCHAKELD - Service worker veroorzaakt mounting issues

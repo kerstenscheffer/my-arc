@@ -53,7 +53,20 @@ export default defineConfig(({ command }) => ({
     target: 'es2015',
     rollupOptions: {
       output: {
-        manualChunks: undefined // Let Vite handle chunking
+        // Grote bibliotheken in eigen, stabiele chunks: die veranderen bij een
+        // deploy niet en blijven dus in de browsercache. De pagina's en
+        // tabbladen zelf splitsen via React.lazy (App.jsx, CoachHub.jsx,
+        // ClientDashboard.jsx).
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) return 'vendor-react'
+          if (id.includes('@supabase')) return 'vendor-supabase'
+          if (id.includes('/recharts/') || id.includes('/d3-') || id.includes('/victory-')) return 'vendor-charts'
+          if (id.includes('/jspdf') || id.includes('/html2canvas/')) return 'vendor-pdf'
+          if (id.includes('@zxing')) return 'vendor-scanner'
+          if (id.includes('/lucide-react/')) return 'vendor-icons'
+          return 'vendor'
+        }
       }
     }
   },

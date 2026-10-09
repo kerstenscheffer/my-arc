@@ -1,17 +1,11 @@
 // src/client/ClientDashboard.jsx - CLEAN VERSION v2.0
 // ✅ ONLY STYLING CHANGED - All logic, state, routing, auth IDENTICAL
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import lazy from '../lazyMetHerlaad'
 import DatabaseService from '../services/DatabaseService'
 import { useLanguage } from '../contexts/LanguageContext'
 
 // Component Imports - ALLEEN ESSENTIEEL
-import ClientHome from './pages/ClientHome'
-import MealPlanMain from '../modules/meal-plan/MealPlanMain'
-import ClientWorkoutPlan from './pages/ClientWorkoutPlan'
-import ClientCalls from '../modules/call-planning/ClientCalls'
-import ProgressMain from '../modules/progress/ProgressMain'
-import ClientProfile from './pages/ClientProfile'
-import ShoppingHub from '../modules/shopping/ShoppingHub'
 import NotificationWidget from '../modules/notifications/NotificationWidget'
 import PWAUpdateBanner from '../components/PWAUpdateBanner'
 import ReviewPrompt from '../modules/app-review/ReviewPrompt'
@@ -32,6 +26,7 @@ import ClientAgendaView from '../modules/client-agenda/ClientAgendaView'
 
 // Lucide Icons
 import {
+
   Home,
   Dumbbell,
   Utensils,
@@ -43,6 +38,15 @@ import {
   Bell,
   HelpCircle,
   MoreHorizontal, Video } from 'lucide-react'
+
+// De zeven schermen als losse stukken: alleen het open scherm wordt opgehaald.
+const ClientHome = lazy(() => import('./pages/ClientHome'))
+const MealPlanMain = lazy(() => import('../modules/meal-plan/MealPlanMain'))
+const ClientWorkoutPlan = lazy(() => import('./pages/ClientWorkoutPlan'))
+const ClientCalls = lazy(() => import('../modules/call-planning/ClientCalls'))
+const ProgressMain = lazy(() => import('../modules/progress/ProgressMain'))
+const ClientProfile = lazy(() => import('./pages/ClientProfile'))
+const ShoppingHub = lazy(() => import('../modules/shopping/ShoppingHub'))
 
 // Initialize database
 const db = DatabaseService
@@ -393,6 +397,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             {!focusMode && !['meal', 'workout', 'home'].includes(currentView) && (
               <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
             )}
+            <Suspense fallback={<div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} /></div>}>
             {currentView === 'home' && (
               <ClientHome client={client} db={db} setCurrentView={setCurrentView} />
             )}
@@ -417,6 +422,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             {currentView === 'profile' && (
               <ClientProfile client={client} user={user} db={db} onClientUpdate={handleClientUpdate} />
             )}
+            </Suspense>
           </div>
         </div>
       </main>

@@ -1,71 +1,75 @@
 // src/App.jsx
-import UiDemo from './ui/UiDemo'   // interne controle-pagina (route /ui-demo, niet in menu's)
-import InfoPage from './pages/InfoPage'
-import SalesInfoPage from './pages/SalesInfoPage'
-import SalesSlider from './pages/SalesSlider'
-import SalesScrollPage from './pages/SalesScrollPageClean'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import SupportPage from './pages/SupportPage'
-import CoachingGuidePage from './pages/CoachingGuidePage'
-import MyArcInfo from './pages/myarcinfo/MyArcInfo'
-import IntakePage from './intake/IntakePage'
-import ThankYouPage from './intake/ThankYouPage'
-import ClientOnboarding from './client/pages/ClientOnboarding'
-import FunnelPage from './funnel/FunnelPage'
-import NinetyDaysFunnelPage from './funnel/90days/page'
-import FivePillarPage from './funnel/five-pilar/FivePillarPage'
-import TillTheGoalPage from './till-the-goal/TillTheGoalPage'
 
-import YourArcFunnel from './modules/funnel-pages/your-arc/YourArcFunnel'
-import MyArcFunnel from './modules/funnel-pages/my-arc/MyArcFunnelMain'
-import CheckoutPage from './pages/CheckoutPage'
-import BackInShapeCheckout from './pages/BackInShapeCheckout'
-import BackInShapeMonthlyCheckout from './pages/BackInShapeMonthlyCheckout'
-import EightWeekCheckout from './pages/EightWeekCheckout'
-import TwelveWeekCheckout from './pages/TwelveWeekCheckout'
-import CalorieCalculator from './pages/CalorieCalculator'
-import SixteenWeekCheckout from './pages/SixteenWeekCheckout'
-import SixteenWeekMonthlyCheckout from './pages/SixteenWeekMonthlyCheckout'
-import MonthlySubscriptionCheckout from './pages/MonthlySubscriptionCheckout'
-import MaandCheckout from './pages/MaandCheckout'
-import SixMonthSubscriptionCheckout from './pages/SixMonthSubscriptionCheckout'
-import PaymentSuccessRedirect from './pages/PaymentSuccessRedirect'
-import Homepage from './pages/Homepage'
-import LeadPicGenerator from './modules/lead-pic-generator/LeadPicGenerator'
-import LeadMessageFlow from './modules/lead-magnet/LeadMessageFlow'
-import QuizPage from './lead-magnet/QuizPage'
-import ResultPage from './lead-magnet/ResultPage'
-import SevenSecretsFunnel from './lead-magnet/7secretsfunnel/7SecretsFunnel'
-import GiveawayPage from './lead-magnet/7secretsfunnel/GiveawayPage'
-import SalesCallPage from './sales-call/SalesCallPage'
-import SixteenWeekPage from './pages/SixteenWeekPage'
 // /6weekchallenge draait sinds 15 sep op de checkout-opzet zonder betaaldeel
 // (hero, methode/voorwaarden/waarom, garanties, reviewslider). De oude
 // sales-call-6week-pagina staat er nog maar wordt niet meer gerenderd.
-import SixWeekChallengePage from './pages/SixWeekChallengePage'
-import ChallengeVslPage from './pages/ChallengeVslPage'
-import ChallengePrequalPage from './pages/ChallengePrequalPage'
-import SixWeekChallengeCheckout from './pages/SixWeekChallengeCheckout'
-import BackInShapePage from './sales-call/BackInShapePage'
-import VSLLandingPage from './sales-call-vsl/VSLLandingPage'
-import SalesCallVSLPage from './sales-call-vsl/SalesCallVSLPage'
-import NutritionIntakePage from './modules/nutrition-intake/NutritionIntakePage'
-import PublicIntakePage from './modules/public-intake/PublicIntakePage'
-import HubRouter from './modules/resource-hub/HubRouter'
-import QualificationFunnelPage from './modules/qualification-funnel'
-import LinkFunnelPage from './link-funnel/LinkFunnelPage'
 import { useState, useEffect } from 'react'
+import lazy from './lazyMetHerlaad'
 import Login from './components/Login'
-import ResetPassword from './components/ResetPassword'
-import ClientDashboard from './client/ClientDashboard'
-import CoachHub from './coach/CoachHub'
-import CoachHubV2 from './coach/CoachHubV2'
-import FunnelViewer from './pages/FunnelViewer'
 import DatabaseService from './services/DatabaseService'
 import { LanguageProvider } from './contexts/LanguageContext'
 import PWAInstaller from './components/PWAInstaller'
 import UpdateModal from './components/UpdateModal'
 import pushNotificationService from './services/PushNotificationService'
+
+// Pagina's als losse stukken (zie main.jsx voor het laadscherm).
+const UiDemo = lazy(() => import('./ui/UiDemo'))
+const InfoPage = lazy(() => import('./pages/InfoPage'))
+const SalesInfoPage = lazy(() => import('./pages/SalesInfoPage'))
+const SalesSlider = lazy(() => import('./pages/SalesSlider'))
+const SalesScrollPage = lazy(() => import('./pages/SalesScrollPageClean'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const SupportPage = lazy(() => import('./pages/SupportPage'))
+const CoachingGuidePage = lazy(() => import('./pages/CoachingGuidePage'))
+const MyArcInfo = lazy(() => import('./pages/myarcinfo/MyArcInfo'))
+const IntakePage = lazy(() => import('./intake/IntakePage'))
+const ThankYouPage = lazy(() => import('./intake/ThankYouPage'))
+const ClientOnboarding = lazy(() => import('./client/pages/ClientOnboarding'))
+const FunnelPage = lazy(() => import('./funnel/FunnelPage'))
+const NinetyDaysFunnelPage = lazy(() => import('./funnel/90days/page'))
+const FivePillarPage = lazy(() => import('./funnel/five-pilar/FivePillarPage'))
+const TillTheGoalPage = lazy(() => import('./till-the-goal/TillTheGoalPage'))
+const YourArcFunnel = lazy(() => import('./modules/funnel-pages/your-arc/YourArcFunnel'))
+const MyArcFunnel = lazy(() => import('./modules/funnel-pages/my-arc/MyArcFunnelMain'))
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
+const BackInShapeCheckout = lazy(() => import('./pages/BackInShapeCheckout'))
+const BackInShapeMonthlyCheckout = lazy(() => import('./pages/BackInShapeMonthlyCheckout'))
+const EightWeekCheckout = lazy(() => import('./pages/EightWeekCheckout'))
+const TwelveWeekCheckout = lazy(() => import('./pages/TwelveWeekCheckout'))
+const CalorieCalculator = lazy(() => import('./pages/CalorieCalculator'))
+const SixteenWeekCheckout = lazy(() => import('./pages/SixteenWeekCheckout'))
+const SixteenWeekMonthlyCheckout = lazy(() => import('./pages/SixteenWeekMonthlyCheckout'))
+const MonthlySubscriptionCheckout = lazy(() => import('./pages/MonthlySubscriptionCheckout'))
+const MaandCheckout = lazy(() => import('./pages/MaandCheckout'))
+const SixMonthSubscriptionCheckout = lazy(() => import('./pages/SixMonthSubscriptionCheckout'))
+const PaymentSuccessRedirect = lazy(() => import('./pages/PaymentSuccessRedirect'))
+const Homepage = lazy(() => import('./pages/Homepage'))
+const LeadPicGenerator = lazy(() => import('./modules/lead-pic-generator/LeadPicGenerator'))
+const LeadMessageFlow = lazy(() => import('./modules/lead-magnet/LeadMessageFlow'))
+const QuizPage = lazy(() => import('./lead-magnet/QuizPage'))
+const ResultPage = lazy(() => import('./lead-magnet/ResultPage'))
+const SevenSecretsFunnel = lazy(() => import('./lead-magnet/7secretsfunnel/7SecretsFunnel'))
+const GiveawayPage = lazy(() => import('./lead-magnet/7secretsfunnel/GiveawayPage'))
+const SalesCallPage = lazy(() => import('./sales-call/SalesCallPage'))
+const SixteenWeekPage = lazy(() => import('./pages/SixteenWeekPage'))
+const SixWeekChallengePage = lazy(() => import('./pages/SixWeekChallengePage'))
+const ChallengeVslPage = lazy(() => import('./pages/ChallengeVslPage'))
+const ChallengePrequalPage = lazy(() => import('./pages/ChallengePrequalPage'))
+const SixWeekChallengeCheckout = lazy(() => import('./pages/SixWeekChallengeCheckout'))
+const BackInShapePage = lazy(() => import('./sales-call/BackInShapePage'))
+const VSLLandingPage = lazy(() => import('./sales-call-vsl/VSLLandingPage'))
+const SalesCallVSLPage = lazy(() => import('./sales-call-vsl/SalesCallVSLPage'))
+const NutritionIntakePage = lazy(() => import('./modules/nutrition-intake/NutritionIntakePage'))
+const PublicIntakePage = lazy(() => import('./modules/public-intake/PublicIntakePage'))
+const HubRouter = lazy(() => import('./modules/resource-hub/HubRouter'))
+const QualificationFunnelPage = lazy(() => import('./modules/qualification-funnel'))
+const LinkFunnelPage = lazy(() => import('./link-funnel/LinkFunnelPage'))
+const ResetPassword = lazy(() => import('./components/ResetPassword'))
+const ClientDashboard = lazy(() => import('./client/ClientDashboard'))
+const CoachHub = lazy(() => import('./coach/CoachHub'))
+const CoachHubV2 = lazy(() => import('./coach/CoachHubV2'))
+const FunnelViewer = lazy(() => import('./pages/FunnelViewer'))
+
 
 const db = DatabaseService
 
