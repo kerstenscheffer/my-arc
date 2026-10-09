@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarDays, X, ChevronRight, Check, Loader, Trash2 } from 'lucide-react'
+import { CalendarDays, X, ChevronRight, Check, Loader, Trash2, Info } from 'lucide-react'
 import MealCard from './day-schedule/MealCard'
 import { foodImageFallback } from '../foodImageFallback'
 import {
@@ -74,6 +74,7 @@ export default function DagTemplatePaneel({
   const [doelDagen, setDoelDagen] = useState([dagIndex])
   const [bezig, setBezig] = useState(false)
   const [klaar, setKlaar] = useState('')
+  const [uitleg, setUitleg] = useState(false)
 
   const laad = useCallback(async () => {
     if (!db?.supabase || !client?.id) return
@@ -207,6 +208,21 @@ export default function DagTemplatePaneel({
               {gekozen ? `${maaltijden.length} maaltijden · ${Math.round(gekozen.daily_calories || 0)} kcal` : 'Kies een dag en zet hem op je week'}
             </div>
           </div>
+          {/* Uitleg: wat dagen zijn en wat de knoppen doen. Kaal icoon, geen kader. */}
+          <button
+            onClick={() => setUitleg(v => !v)}
+            aria-label="Uitleg"
+            aria-expanded={uitleg}
+            style={{
+              width: 38, height: 38, flexShrink: 0, padding: 0,
+              background: 'transparent', border: 'none',
+              color: uitleg ? '#fff' : 'rgba(255,255,255,0.55)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Info size={20} strokeWidth={2.6} />
+          </button>
           <button
             onClick={() => (gekozen ? setGekozen(null) : setOpen(false))}
             aria-label={gekozen ? 'Terug' : 'Sluiten'}
@@ -222,6 +238,21 @@ export default function DagTemplatePaneel({
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '0.9rem 1rem' : '1rem 1.25rem' }}>
+          {uitleg && (
+            <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: `1px solid ${LIJN}` }}>
+              {[
+                ['Wat is een dag?', 'Een compleet dagmenu: alle maaltijden van één dag. Je coach zet er voor je klaar, en je bewaart je eigen dagen met "Dag bewaren" boven je maaltijden.'],
+                ['Bekijken', 'Tik op een dag en je ziet alle maaltijden, zoals ze in je plan zouden staan.'],
+                ['Op je week zetten', 'Kies de dagen (Ma t/m Zo). "Alleen deze week" verdwijnt vanzelf na deze week. "Altijd" vervangt die dag voortaan in je plan.'],
+                ['Weghalen', 'Met het prullenbakje haal je een eigen dag weg. Je plan zelf verandert daar niet door.'],
+              ].map(([kop, tekst]) => (
+                <div key={kop} style={{ marginBottom: '0.7rem' }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff' }}>{kop}</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginTop: 2 }}>{tekst}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {laden && (
             <div style={{ padding: '2.5rem 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
               Laden…
