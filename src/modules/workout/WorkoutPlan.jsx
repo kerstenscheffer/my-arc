@@ -105,6 +105,18 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
     if (schema) setLocalSchema(schema)
   }, [schema?.id])
 
+  // Vanuit de agenda op home ('Push' → play): meteen het logscherm van
+  // vandaag openen. Home zet een seintje in sessionStorage en wisselt naar
+  // deze pagina; hier pakken we het één keer op.
+  useEffect(() => {
+    let seintje = null
+    try { seintje = sessionStorage.getItem('myarc_open_workout'); sessionStorage.removeItem('myarc_open_workout') } catch { /* geen opslag */ }
+    if (!seintje) return
+    setSelectedDayIdx(todayIndex)
+    setWorkoutOpen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Klik op een week-day-card: selecteer die dag, open de inline-dropdown
   // van TodaysWorkoutMain en scroll erheen. Geen aparte modal meer — de
   // data-flow gaat via TodaysWorkoutMain's `selectedDay` prop die zelf de
