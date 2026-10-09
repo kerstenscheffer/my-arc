@@ -160,8 +160,14 @@ export default function PlanSwitchModal({ client, db, isMobile = false, onClose,
   }, {})
 
   return createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: isMobile ? '90vh' : '85vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483600, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem', animation: 'planWisselAchtergrond 0.22s ease' }}>
+      {/* Het blad komt rustig van onderen omhoog (op desktop iets omhoog en
+          groter), de achtergrond vervaagt in. Daarvoor stond hij er ineens. */}
+      <style>{`
+        @keyframes planWisselAchtergrond { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes planWisselBlad { from { opacity: 0; transform: translateY(${isMobile ? '40px' : '18px'}) scale(${isMobile ? 1 : 0.98}); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      `}</style>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: isMobile ? '90vh' : '85vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden', animation: 'planWisselBlad 0.34s cubic-bezier(0.22, 1, 0.36, 1)' }}>
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? 'calc(0.8rem + env(safe-area-inset-top)) 0.9rem 0.7rem' : '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <Dumbbell size={17} color="#fff" />
           <div style={{ flex: 1, color: '#fff', fontWeight: 900, fontSize: '1rem', letterSpacing: '-0.02em' }}>Jouw trainingsplannen</div>
