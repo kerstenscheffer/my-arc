@@ -298,6 +298,46 @@ export default function DagAgenda({
     return () => { weg = true; window.removeEventListener('myarc:workout-changed', laad) }
   }, [client?.id, db, slaapDagIso, versie])
   const trainingGedaan = (b) => b.type === 'training' && trainingPct >= 50
+
+  // Supplementen afvinken: supplement_logs per supplement per dag, dezelfde
+  // tabel en sleutel als de maaltijdpagina. Een blok (meerdere supplementen op
+  // één moment) is gedaan als ze allemaal zijn afgevinkt; het vinkje zet ze
+  // allemaal aan of allemaal uit.
+  const [suppGelogd, setSuppGelogd] = useState(() => new Set())
+  useEffect(() => {
+    if (!client?.id || !db?.supabase || !slaapDagIso) return
+    let weg = false
+    db.supabase.from('supplement_logs').select('supplement_id').eq('client_id', client.id).eq('log_date', slaapDagIso)
+      .then(({ data }) => { if (!weg) setSuppGelogd(new Set((data || []).map(r => r.supplement_id))) }, () => {})
+    return () => { weg = true }
+  }, [client?.id, db, slaapDagIso, versie])
+  const suppIds = (b) => (b.meta?.items || []).map(x => x.id).filter(Boolean)
+  const supplementGedaan = (b) => { const ids = suppIds(b); return ids.length > 0 && ids.every(id => suppGelogd.has(id)) }
+  const wisselSupplementen = async (b) => {
+    const ids = suppIds(b)
+    if (!ids.length || !client?.id || !db?.supabase || !slaapDagIso) return
+    const aan = !supplementGedaan(b)
+    const vorige = suppGelogd
+    setSuppGelogd(prev => { const n = new Set(prev); ids.forEach(id => (aan ? n.add(id) : n.delete(id))); return n })
+    try {
+      if (aan) {
+        const ontbrekend = (b.meta?.items || []).filter(x => x.id && !vorige.has(x.id))
+        if (ontbrekend.length) {
+          const { error } = await db.supabase.from('supplement_logs').insert(ontbrekend.map(x => ({
+            client_id: client.id, supplement_id: x.id, supplement_name: x.naam, log_date: slaapDagIso,
+          })))
+          if (error && error.code !== '23505') throw error
+        }
+      } else {
+        const { error } = await db.supabase.from('supplement_logs').delete()
+          .eq('client_id', client.id).eq('log_date', slaapDagIso).in('supplement_id', ids)
+        if (error) throw error
+      }
+    } catch (e) {
+      console.error('Supplementen afvinken mislukt:', e)
+      setSuppGelogd(vorige)
+    }
+  }
   const wegenVan = (b) => (b.type === 'weging' && slaapDagIso ? {
     kan: slaapDagIso <= toIsoDate(nu),
     gelogd: gewogenOp,
@@ -393,10 +433,11 @@ export default function DagAgenda({
       else if (b.type === 'sleep') { const z = slaapVan(b); if (z?.kan && z.datum === slaapDagIso) { totaal++; if (z.gelogd) gedaan++ } }
       else if (b.type === 'weging') { const w = wegenVan(b); if (w?.kan) { totaal++; if (w.gelogd != null) gedaan++ } }
       else if (b.type === 'training') { totaal++; if (trainingGedaan(b)) gedaan++ }
+      else if (b.type === 'supplement' && suppIds(b).length) { totaal++; if (supplementGedaan(b)) gedaan++ }
     })
     return { totaal, gedaan, rond: totaal > 0 && gedaan === totaal }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lijstBlokken, gelogd, slaapLogs, gewogenOp, slaapDagIso, trainingPct])
+  }, [lijstBlokken, gelogd, slaapLogs, gewogenOp, slaapDagIso, trainingPct, suppGelogd])
   // Confetti als je zelf de laatste afvinkt; één keer per dag.
   const [confetti, setConfetti] = useState(0)
   const vorigeRond = useRef(null)
@@ -429,6 +470,7 @@ export default function DagAgenda({
     if (b.type === 'sleep') { const z = slaapVan(b); return !!(z?.kan && z.gelogd) }
     if (b.type === 'weging') { const w = wegenVan(b); return !!(w?.kan && w.gelogd != null) }
     if (b.type === 'training') return trainingGedaan(b)
+    if (b.type === 'supplement') return supplementGedaan(b)
     return false
   }
   const gedaanBlokken = lijstBlokken.filter(isGedaan)
@@ -685,7 +727,7 @@ export default function DagAgenda({
                   isMobile={isMobile}
                   onOpen={onOpen}
                   afgerond
-                  onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+                  onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null)}
                   onTijd={b.type === 'weging' ? null : () => setBewerk(b)}
                   bezig={false}
                   slaap={slaapVan(b)}
@@ -763,8 +805,8 @@ export default function DagAgenda({
                 blok={b}
                 isMobile={isMobile}
                 onOpen={onOpen}
-                afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
-                onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+                afgerond={(b.type === 'meal' && !!gelogd[sleutelVan(b)]) || (b.type === 'supplement' && supplementGedaan(b))}
+                onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null)}
                 onTijd={b.type === 'weging' ? null : () => setBewerk(b)}
                 bezig={toonNuLijn && nuMin >= b.start && nuMin < b.end}
                 slaap={slaapVan(b)}
@@ -848,8 +890,8 @@ export default function DagAgenda({
               pxVan={pxVan}
               uurHoogte={uurHoogte}
               onOpen={onOpen}
-              afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
-              onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+              afgerond={(b.type === 'meal' && !!gelogd[sleutelVan(b)]) || (b.type === 'supplement' && supplementGedaan(b))}
+              onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : (b.type === 'supplement' && suppIds(b).length ? () => wisselSupplementen(b) : null)}
               onTijd={() => setBewerk(b)}
               slaap={slaapVan(b)}
             />

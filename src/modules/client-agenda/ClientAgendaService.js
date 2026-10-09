@@ -757,6 +757,9 @@ export class ClientAgendaService {
               aantal: moment.items.length,
               emojis: moment.items.map(x => x.emoji).filter(Boolean).join(''),
               items: moment.items.map(x => ({
+                // Zelfde sleutel als de maaltijdpagina bij het afvinken
+                // (supplement_logs.supplement_id).
+                id: x.template_id || x.supplement_id || x.id || x.name,
                 naam: x.name,
                 emoji: x.emoji || null,
                 dosering: doseringTekst(x),
