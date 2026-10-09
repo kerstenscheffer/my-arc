@@ -29,6 +29,9 @@ class WorkoutService {
           duration: data.duration,
           description: data.description,
           is_template: data.is_template || false,
+          // Eigen trainingsdag met gymoefeningen (zelfde vorm als een dag in
+          // week_structure). Leeg voor de oude cardio-achtige eigen trainingen.
+          exercises: Array.isArray(data.exercises) ? data.exercises : [],
           created_at: new Date().toISOString()
         })
         .select()

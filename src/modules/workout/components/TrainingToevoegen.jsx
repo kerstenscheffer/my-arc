@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info } from 'lucide-react'
+import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info, Pencil } from 'lucide-react'
 import CustomWorkoutModal from './planning/CustomWorkoutModal'
 import { locatieVan, spiergroepenVan, SPIERGROEPEN } from '../utils/trainingFilters'
 import { maakPlanKey } from '../utils/planKey'
@@ -67,6 +67,7 @@ export default function TrainingToevoegen({
   const [dagen, setDagen] = useState([])
   const [eigen, setEigen] = useState([])
   const [eigenOpen, setEigenOpen] = useState(false)
+  const [eigenBewerk, setEigenBewerk] = useState(null)   // eigen training die open staat om te bewerken
   const [bezig, setBezig] = useState(false)
 
   useEffect(() => {
@@ -152,9 +153,13 @@ export default function TrainingToevoegen({
       {/* Eigen training opstellen zit in zijn eigen venster; dit venster gaat
           zolang even uit beeld. */}
       {eigenOpen && (
-        <CustomWorkoutModal workoutService={workoutService} clientId={clientId}
-          onClose={() => setEigenOpen(false)}
-          onSave={(w) => { if (w?.id) { setEigen(l => [w, ...l]); setWorkoutKey(`custom_${w.id}`); setStap('gym-dag') } }}
+        <CustomWorkoutModal workoutService={workoutService} clientId={clientId} db={db} existingWorkout={eigenBewerk}
+          onClose={() => { setEigenOpen(false); setEigenBewerk(null) }}
+          onSave={(w) => {
+            if (!w?.id) return
+            setEigen(l => l.some(x => x.id === w.id) ? l.map(x => x.id === w.id ? w : x) : [w, ...l])
+            setWorkoutKey(`custom_${w.id}`); setStap('gym-dag')
+          }}
         />
       )}
       {!eigenOpen && (
@@ -193,7 +198,7 @@ export default function TrainingToevoegen({
               { titel: 'Uit je plan', items: planDagen },
               { titel: 'Uit je andere plannen', items: andereDagen },
               { titel: 'Standaardtrainingen', items: standaardDagen },
-              { titel: 'Eigen trainingen', items: eigen.map(w => ({ key: `custom_${w.id}`, w, plan: 'Eigen', naam: w.name, sub: [w.type, w.duration ? `${w.duration} min` : null].filter(Boolean).join(' · ') })) },
+              { titel: 'Eigen trainingen', items: eigen.map(w => ({ key: `custom_${w.id}`, w, plan: 'Eigen', naam: w.name, eigen: w, sub: [Array.isArray(w.exercises) && w.exercises.length ? `${w.exercises.length} oefeningen` : w.type, w.duration ? `${w.duration} min` : null].filter(Boolean).join(' · ') })) },
             ].map(g => {
               const q = zoek.trim().toLowerCase()
               let items = g.items
@@ -231,6 +236,17 @@ export default function TrainingToevoegen({
                       {n != null && <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{n} oefeningen</div>}
                     </div>
                   </button>
+                  {item.eigen && (
+                    <button onClick={(e) => { e.stopPropagation(); tik(); setEigenBewerk(item.eigen); setEigenOpen(true) }} aria-label="Eigen training bewerken" style={{
+                      position: 'absolute', top: 7, right: Array.isArray(item.w?.exercises) && item.w.exercises.length > 0 ? 41 : 7, width: 28, height: 28, borderRadius: '50%', padding: 0,
+                      background: 'rgba(10,10,10,0.7)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <Pencil size={13} strokeWidth={2.6} />
+                    </button>
+                  )}
                   {Array.isArray(item.w?.exercises) && item.w.exercises.length > 0 && (
                     <button onClick={(e) => { e.stopPropagation(); tik(); setInfo(item) }} aria-label="Oefeningen bekijken" style={{
                       position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: '50%', padding: 0,

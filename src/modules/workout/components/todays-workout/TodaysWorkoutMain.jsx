@@ -258,7 +258,17 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
         try {
           const customWorkout = await workoutService.getCustomWorkoutById(customId)
           if (customWorkout) {
-            setTodaysWorkout({ name: customWorkout.name, focus: getLabel(customWorkout.type), geschatteTijd: `${customWorkout.duration} min`, exercises: [], workoutKey, dayKey: workoutKey, dayName: todayName, isCustom: true, customData: customWorkout })
+            // Met oefeningen (eigen gymdag, 9 okt 2026) toont de pagina de
+            // oefeningkaarten zoals bij een plan-dag; zonder is het de oude
+            // cardio-achtige eigen training.
+            const oef = Array.isArray(customWorkout.exercises) ? customWorkout.exercises : []
+            setTodaysWorkout({
+              name: customWorkout.name,
+              focus: oef.length ? 'Eigen training' : getLabel(customWorkout.type),
+              geschatteTijd: `${customWorkout.duration} min`,
+              exercises: oef, workoutKey, dayKey: workoutKey, dayName: todayName,
+              isCustom: true, customData: customWorkout,
+            })
           } else setTodaysWorkout(null)
         } catch { setTodaysWorkout(null) }
       } else {

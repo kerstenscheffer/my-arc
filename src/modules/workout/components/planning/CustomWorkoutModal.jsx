@@ -1,557 +1,247 @@
 // src/modules/workout/components/planning/CustomWorkoutModal.jsx
-// CUSTOM WORKOUT MODAL - Create & Edit 🎯
+//
+// Eigen training van de klant: een trainingsdag met gymoefeningen uit de
+// bibliotheek, zelf samengesteld. Naam, oefeningen (zoeken op naam, filter
+// op spiergroep), per oefening sets/reps/rust, volgorde, en opslaan. De dag
+// komt in custom_workouts (kolom exercises, zelfde vorm als een dag in
+// workout_schemas.week_structure) en staat daarna onder "Eigen trainingen"
+// in Training toevoegen, inzetbaar als gewone trainingsdag op de workout-
+// pagina (9 okt 2026). Verving het oude venster met cardio-types en duur.
 
-import { X, Save, Dumbbell, Clock } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { X, Search, Plus, Minus, ChevronUp, ChevronDown, Trash2, Check, ChevronLeft } from 'lucide-react'
+import ExerciseService from '../../../../services/ExerciseService'
+import useOefeningFotos from '../../utils/useOefeningFotos'
 
-export default function CustomWorkoutModal({
-  workoutService,
-  clientId,
-  existingWorkout = null,
-  onClose,
-  onSave
-}) {
+const SPIEREN = [
+  { id: 'chest', label: 'Borst' }, { id: 'back', label: 'Rug' }, { id: 'shoulders', label: 'Schouders' },
+  { id: 'legs', label: 'Benen' }, { id: 'biceps', label: 'Biceps' }, { id: 'triceps', label: 'Triceps' }, { id: 'abs', label: 'Core' },
+]
+const SPIER_NL = { chest: 'Borst', back: 'Rug', shoulders: 'Schouders', legs: 'Benen', biceps: 'Biceps', triceps: 'Triceps', abs: 'Core', calves: 'Kuiten', glutes: 'Billen' }
+
+// Oefening uit de bibliotheek → oefening in een trainingsdag.
+const naarDagOefening = (ex) => ({
+  name: ex.name,
+  sets: parseInt(ex.suggested_sets, 10) || 3,
+  reps: ex.suggested_reps || '8-12',
+  rust: ex.suggested_rest || '90s',
+  equipment: ex.equipment || '',
+  primairSpieren: ex.primair_spieren || '',
+  type: 'strength',
+  notes: '',
+  video_url: ex.video_url || null,
+  thumbnail_url: ex.thumbnail_url || null,
+  image_url: ex.image_url || null,
+})
+
+const schatMinuten = (oef) => Math.max(10, Math.round(oef.reduce((n, e) => n + (Number(e.sets) || 3) * 2.5, 0) + 5))
+
+export default function CustomWorkoutModal({ workoutService, clientId, db = null, existingWorkout = null, onClose, onSave }) {
   const isMobile = window.innerWidth <= 768
-  const [visible, setVisible] = useState(false)
-  const [saving, setSaving] = useState(false)
-  
-  // Form state
-  const [name, setName] = useState('')
-  const [type, setType] = useState('cardio')
-  const [duration, setDuration] = useState('')
-  const [description, setDescription] = useState('')
-  const [isTemplate, setIsTemplate] = useState(true)
-  const [errors, setErrors] = useState({})
-  
-  const workoutTypes = [
-    { value: 'cardio', label: 'Cardio', emoji: '❤️' },
-    { value: 'cycling', label: 'Fietsen', emoji: '🚴' },
-    { value: 'running', label: 'Hardlopen', emoji: '🏃' },
-    { value: 'swimming', label: 'Zwemmen', emoji: '🏊' },
-    { value: 'hiking', label: 'Wandelen/Hiking', emoji: '🥾' },
-    { value: 'yoga', label: 'Yoga/Stretching', emoji: '🧘' },
-    { value: 'sports', label: 'Sport (voetbal, tennis)', emoji: '⚽' },
-    { value: 'custom', label: 'Anders', emoji: '💪' }
-  ]
-  
+  const [naam, setNaam] = useState(existingWorkout?.name || '')
+  const [oefeningen, setOefeningen] = useState(Array.isArray(existingWorkout?.exercises) ? existingWorkout.exercises : [])
+  const [stap, setStap] = useState('dag')          // 'dag' | 'kiezen'
+  const [bieb, setBieb] = useState([])
+  const [laden, setLaden] = useState(false)
+  const [zoek, setZoek] = useState('')
+  const [spier, setSpier] = useState(null)
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState('')
+
   useEffect(() => {
-    // Load existing workout data if editing
-    if (existingWorkout) {
-      setName(existingWorkout.name || '')
-      setType(existingWorkout.type || 'cardio')
-      setDuration(existingWorkout.duration?.toString() || '')
-      setDescription(existingWorkout.description || '')
-      setIsTemplate(existingWorkout.is_template || false)
-    }
-    
-    setTimeout(() => setVisible(true), 50)
-    document.body.style.overflow = 'hidden'
-    
-    return () => {
-      document.body.style.overflow = 'auto'
-    }
-  }, [existingWorkout])
-  
-  const validate = () => {
-    const newErrors = {}
-    
-    if (!name.trim()) {
-      newErrors.name = 'Naam is verplicht'
-    }
-    
-    if (!duration || parseInt(duration) <= 0) {
-      newErrors.duration = 'Duur moet groter zijn dan 0'
-    }
-    
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    let weg = false
+    ;(async () => {
+      setLaden(true)
+      try {
+        const alle = await ExerciseService.getAllExercises()
+        if (!weg) setBieb((alle || []).filter(e => e.gym_friendly !== false))
+      } catch (e) { console.error('Oefeningen laden mislukt:', e); if (!weg) setBieb([]) }
+      finally { if (!weg) setLaden(false) }
+    })()
+    return () => { weg = true }
+  }, [])
+
+  const gekozen = useMemo(() => new Set(oefeningen.map(e => String(e.name).toLowerCase())), [oefeningen])
+  const lijst = useMemo(() => {
+    const q = zoek.trim().toLowerCase()
+    return bieb
+      .filter(e => !spier || String(e.primair_spieren || '').toLowerCase() === spier)
+      .filter(e => !q || String(e.name).toLowerCase().includes(q) || (e.tags || []).some(t => String(t).toLowerCase().includes(q)))
+      .slice(0, 80)
+  }, [bieb, zoek, spier])
+  const fotoVan = useOefeningFotos(db, [...new Set([...lijst.map(e => e.name), ...oefeningen.map(e => e.name)])])
+
+  const voegToe = (ex) => {
+    if (gekozen.has(String(ex.name).toLowerCase())) return
+    if (navigator.vibrate) navigator.vibrate(10)
+    setOefeningen(l => [...l, naarDagOefening(ex)])
   }
-  
-  const handleSave = async () => {
-    if (!validate()) return
-    
-    setSaving(true)
-    
+  const haalWeg = (i) => setOefeningen(l => l.filter((_, j) => j !== i))
+  const schuif = (i, d) => setOefeningen(l => {
+    const j = i + d
+    if (j < 0 || j >= l.length) return l
+    const k = [...l]; const t = k[i]; k[i] = k[j]; k[j] = t
+    return k
+  })
+  const zet = (i, veld, waarde) => setOefeningen(l => l.map((e, j) => j === i ? { ...e, [veld]: waarde } : e))
+
+  const bewaar = async () => {
+    if (!naam.trim()) { setFout('Geef je training een naam.'); return }
+    if (oefeningen.length === 0) { setFout('Voeg minstens één oefening toe.'); return }
+    setFout(''); setBezig(true)
     try {
-      const workoutData = {
-        name: name.trim(),
-        type,
-        duration: parseInt(duration),
-        description: description.trim(),
-        is_template: isTemplate
-      }
-      
-      let savedWorkout
-      
-      if (existingWorkout) {
-        // Update existing
-        savedWorkout = await workoutService.updateCustomWorkout(
-          existingWorkout.id,
-          workoutData
-        )
-      } else {
-        // Create new
-        savedWorkout = await workoutService.createCustomWorkout(
-          clientId,
-          workoutData
-        )
-      }
-      
-      if (navigator.vibrate) navigator.vibrate([50, 100, 50])
-      
-      handleClose()
-      
-      if (onSave) onSave(savedWorkout)
-      
-    } catch (error) {
-      console.error('❌ Save custom workout failed:', error)
-      alert('Kon workout niet opslaan. Probeer opnieuw.')
-      setSaving(false)
+      const data = { name: naam.trim(), type: 'gym', duration: schatMinuten(oefeningen), description: '', is_template: true, exercises: oefeningen }
+      const w = existingWorkout
+        ? await workoutService.updateCustomWorkout(existingWorkout.id, data)
+        : await workoutService.createCustomWorkout(clientId, data)
+      if (navigator.vibrate) navigator.vibrate([30, 50, 30])
+      onSave && onSave(w)
+      onClose && onClose()
+    } catch (e) {
+      console.error('Eigen training opslaan mislukt:', e)
+      setFout('Opslaan mislukt. Probeer het nog eens.')
+      setBezig(false)
     }
   }
-  
-  const handleClose = () => {
-    setVisible(false)
-    setTimeout(() => onClose(), 300)
-  }
-  
+
+  const knopRond = (extra = {}) => ({
+    width: 36, height: 36, borderRadius: 10, flexShrink: 0, padding: 0,
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', ...extra,
+  })
+  const invoer = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, color: '#fff', fontFamily: 'inherit', fontWeight: 800, outline: 'none', boxSizing: 'border-box' }
+  const chip = (aan) => ({
+    padding: '0.4rem 0.75rem', borderRadius: 999, flexShrink: 0,
+    border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.16)'}`,
+    background: aan ? '#fff' : 'rgba(255,255,255,0.05)', color: aan ? '#0a0a0a' : '#fff',
+    fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
+
+  // Stapper voor sets: tikken op - en +, geen toetsenbord nodig.
+  const Stapper = ({ waarde, onMin, onPlus }) => (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, padding: 2 }}>
+      <button onClick={onMin} aria-label="Minder" style={{ width: 30, height: 30, borderRadius: 8, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}><Minus size={14} strokeWidth={3} /></button>
+      <span style={{ minWidth: 22, textAlign: 'center', fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{waarde}</span>
+      <button onClick={onPlus} aria-label="Meer" style={{ width: 30, height: 30, borderRadius: 8, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}><Plus size={14} strokeWidth={3} /></button>
+    </div>
+  )
+
   return createPortal(
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.95)',
-        backdropFilter: 'blur(10px)',
-        zIndex: 10001,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: isMobile ? '0' : '2rem',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.3s ease-out'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) handleClose()
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          height: isMobile ? '100vh' : 'auto',
-          maxWidth: isMobile ? '100%' : '600px',
-          maxHeight: isMobile ? '100vh' : '85vh',
-          background: '#000',
-          border: isMobile ? 'none' : '2px solid rgba(249, 115, 22, 0.3)',
-          borderRadius: '0',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
-          opacity: visible ? 1 : 0,
-          transform: visible ? 'translateY(0)' : 'translateY(30px)',
-          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          padding: isMobile ? '1rem' : '1.5rem',
-          borderBottom: '1px solid rgba(249, 115, 22, 0.2)',
-          flexShrink: 0
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem'
-            }}>
-              <div style={{
-                width: isMobile ? '36px' : '40px',
-                height: isMobile ? '36px' : '40px',
-                borderRadius: '8px',
-                background: 'rgba(249, 115, 22, 0.2)',
-                border: '1px solid rgba(249, 115, 22, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                filter: 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.3))'
-              }}>
-                <Dumbbell size={isMobile ? 18 : 20} color="#f97316" />
-              </div>
-              
-              <h2 style={{
-                fontSize: isMobile ? '1.1rem' : '1.3rem',
-                fontWeight: '900',
-                color: '#fff',
-                margin: 0,
-                letterSpacing: '-0.02em',
-                textShadow: '0 0 20px rgba(249, 115, 22, 0.3)'
-              }}>
-                {existingWorkout ? 'Bewerk Training' : 'Eigen Training'}
-              </h2>
-            </div>
-            
-            <button
-              onClick={handleClose}
-              style={{
-                width: '44px',
-                height: '44px',
-                background: 'transparent',
-                border: '1px solid rgba(249, 115, 22, 0.3)',
-                borderRadius: '0',
-                color: '#f97316',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              <X size={isMobile ? 20 : 24} strokeWidth={2.5} />
-            </button>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483610, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? 0 : '1rem' }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: isMobile ? '100%' : 560, height: isMobile ? '100dvh' : 'min(90vh, 860px)',
+        display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflow: 'hidden',
+        background: '#0a0a0a', border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)', borderRadius: isMobile ? 0 : 20,
+        paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0, fontFamily: "'DM Sans', sans-serif",
+      }}>
+        {/* Kop */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: isMobile ? '0.9rem 1rem 0.6rem' : '1.1rem 1.2rem 0.7rem' }}>
+          {stap === 'kiezen' ? (
+            <button onClick={() => setStap('dag')} aria-label="Terug" style={knopRond()}><ChevronLeft size={18} strokeWidth={2.8} /></button>
+          ) : <div style={{ width: 36 }} />}
+          <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>{existingWorkout ? 'Eigen training bewerken' : 'Eigen training'}</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stap === 'kiezen' ? 'Kies oefeningen' : (naam.trim() || 'Nieuwe trainingsdag')}</div>
           </div>
+          <button onClick={onClose} aria-label="Sluiten" style={knopRond()}><X size={18} strokeWidth={2.8} /></button>
         </div>
-        
-        {/* Form Content */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: isMobile ? '1rem' : '1.5rem',
-          WebkitOverflowScrolling: 'touch'
-        }}>
-          {/* Naam */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '0.5rem'
-            }}>
-              Training Naam *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Bijv. MTB Intervals"
-              style={{
-                width: '100%',
-                padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.125rem',
-                background: 'rgba(249, 115, 22, 0.05)',
-                border: errors.name 
-                  ? '1px solid rgba(239, 68, 68, 0.5)'
-                  : '1px solid rgba(249, 115, 22, 0.2)',
-                borderRadius: '0',
-                color: '#fff',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                fontWeight: '600',
-                outline: 'none',
-                transition: 'all 0.3s ease'
-              }}
-            />
-            {errors.name && (
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#ef4444',
-                marginTop: '0.25rem',
-                fontWeight: '600'
-              }}>
-                {errors.name}
-              </p>
-            )}
-          </div>
-          
-          {/* Type */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '0.5rem'
-            }}>
-              Type Training
-            </label>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-              gap: '0.625rem'
-            }}>
-              {workoutTypes.map(wType => (
-                <button
-                  key={wType.value}
-                  onClick={() => setType(wType.value)}
-                  style={{
-                    padding: isMobile ? '0.75rem 0.625rem' : '0.875rem 0.75rem',
-                    background: type === wType.value
-                      ? 'rgba(249, 115, 22, 0.15)'
-                      : 'rgba(10, 10, 10, 0.8)',
-                    border: type === wType.value
-                      ? '1px solid rgba(249, 115, 22, 0.4)'
-                      : '1px solid rgba(249, 115, 22, 0.2)',
-                    borderRadius: '0',
-                    color: type === wType.value ? '#f97316' : 'rgba(255, 255, 255, 0.7)',
-                    fontSize: isMobile ? '0.8rem' : '0.85rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    textAlign: 'center',
-                    minHeight: '44px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.25rem',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  <span style={{ fontSize: isMobile ? '1.1rem' : '1.25rem' }}>
-                    {wType.emoji}
-                  </span>
-                  <span>{wType.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Duur */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '0.5rem'
-            }}>
-              Duur (minuten) *
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Clock
-                size={18}
-                color="rgba(249, 115, 22, 0.5)"
-                style={{
-                  position: 'absolute',
-                  left: '1rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none'
-                }}
-              />
-              <input
-                type="number"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                placeholder="40"
-                min="1"
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '0.75rem 1rem 0.75rem 3rem' : '0.875rem 1.125rem 0.875rem 3.5rem',
-                  background: 'rgba(249, 115, 22, 0.05)',
-                  border: errors.duration
-                    ? '1px solid rgba(239, 68, 68, 0.5)'
-                    : '1px solid rgba(249, 115, 22, 0.2)',
-                  borderRadius: '0',
-                  color: '#fff',
-                  fontSize: isMobile ? '0.9rem' : '1rem',
-                  fontWeight: '600',
-                  outline: 'none',
-                  transition: 'all 0.3s ease'
-                }}
-              />
-            </div>
-            {errors.duration && (
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#ef4444',
-                marginTop: '0.25rem',
-                fontWeight: '600'
-              }}>
-                {errors.duration}
-              </p>
-            )}
-          </div>
-          
-          {/* Beschrijving */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '0.5rem'
-            }}>
-              Notities / Beschrijving
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Bijv. Hoge intensiteit intervals, bergop climbs..."
-              rows={4}
-              style={{
-                width: '100%',
-                padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.125rem',
-                background: 'rgba(249, 115, 22, 0.05)',
-                border: '1px solid rgba(249, 115, 22, 0.2)',
-                borderRadius: '0',
-                color: '#fff',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: '500',
-                outline: 'none',
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                transition: 'all 0.3s ease'
-              }}
-            />
-          </div>
-          
-          {/* Template Toggle */}
-          <div style={{
-            padding: isMobile ? '1rem' : '1.125rem',
-            background: 'rgba(249, 115, 22, 0.05)',
-            border: '1px solid rgba(249, 115, 22, 0.15)',
-            borderRadius: '0'
-          }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              userSelect: 'none'
-            }}>
-              <input
-                type="checkbox"
-                checked={isTemplate}
-                onChange={(e) => setIsTemplate(e.target.checked)}
-                style={{
-                  width: '20px',
-                  height: '20px',
-                  cursor: 'pointer',
-                  accentColor: '#f97316'
-                }}
-              />
-              <div>
-                <div style={{
-                  fontSize: isMobile ? '0.85rem' : '0.9rem',
-                  color: '#fff',
-                  fontWeight: '700',
-                  marginBottom: '0.15rem'
-                }}>
-                  Opslaan als herbruikbare template
+
+        {stap === 'dag' ? (
+          <>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '0 1rem' : '0 1.2rem' }}>
+              <input value={naam} onChange={e => setNaam(e.target.value)} placeholder="Naam, bijv. Push thuis of Bovenlichaam" style={{ ...invoer, width: '100%', padding: '0.85rem 1rem', fontSize: '1rem', marginBottom: 12 }} />
+
+              {oefeningen.length === 0 ? (
+                <div style={{ padding: '2rem 1rem', textAlign: 'center', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 14 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff' }}>Nog geen oefeningen</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>Kies ze uit de bibliotheek: zoeken op naam of filteren op spiergroep.</div>
                 </div>
-                <div style={{
-                  fontSize: isMobile ? '0.7rem' : '0.75rem',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontWeight: '600'
-                }}>
-                  Je kunt deze training later snel hergebruiken
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {oefeningen.map((e, i) => (
+                    <div key={`${e.name}-${i}`} style={{ display: 'flex', gap: 10, padding: 8, borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: 10, backgroundImage: `url(${fotoVan(e.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
+                        <span style={{ position: 'absolute', top: 4, left: 4, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 5, background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: '0.6rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ flex: 1, minWidth: 0, fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</div>
+                          <button onClick={() => schuif(i, -1)} disabled={i === 0} aria-label="Omhoog" style={{ ...knopRond({ width: 28, height: 28, borderRadius: 8 }), opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} strokeWidth={3} /></button>
+                          <button onClick={() => schuif(i, 1)} disabled={i === oefeningen.length - 1} aria-label="Omlaag" style={{ ...knopRond({ width: 28, height: 28, borderRadius: 8 }), opacity: i === oefeningen.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} strokeWidth={3} /></button>
+                          <button onClick={() => haalWeg(i)} aria-label="Verwijderen" style={knopRond({ width: 28, height: 28, borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' })}><Trash2 size={13} strokeWidth={2.6} /></button>
+                        </div>
+                        <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 1 }}>{[SPIER_NL[String(e.primairSpieren).toLowerCase()] || e.primairSpieren, e.equipment].filter(Boolean).join(' · ')}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                          <Stapper waarde={e.sets} onMin={() => zet(i, 'sets', Math.max(1, (Number(e.sets) || 1) - 1))} onPlus={() => zet(i, 'sets', Math.min(10, (Number(e.sets) || 0) + 1))} />
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>sets ×</span>
+                          <input value={e.reps} onChange={ev => zet(i, 'reps', ev.target.value)} aria-label="Reps" style={{ ...invoer, width: 64, padding: '0.4rem 0.5rem', fontSize: '0.85rem', textAlign: 'center' }} />
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>reps · rust</span>
+                          <input value={e.rust} onChange={ev => zet(i, 'rust', ev.target.value)} aria-label="Rust" style={{ ...invoer, width: 56, padding: '0.4rem 0.5rem', fontSize: '0.85rem', textAlign: 'center' }} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              )}
+
+              <button onClick={() => setStap('kiezen')} style={{ width: '100%', minHeight: 48, marginTop: 10, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px dashed rgba(255,255,255,0.3)', color: '#fff', fontFamily: 'inherit', fontSize: '0.92rem', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}>
+                <Plus size={16} strokeWidth={3} /> Oefening toevoegen
+              </button>
+              {fout && <div style={{ marginTop: 10, fontSize: '0.82rem', fontWeight: 800, color: '#f59e0b' }}>{fout}</div>}
+              <div style={{ height: 12 }} />
+            </div>
+
+            <div style={{ padding: isMobile ? '0.6rem 1rem calc(0.9rem + env(safe-area-inset-bottom, 0px))' : '0.7rem 1.2rem 1.1rem', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+                {oefeningen.length} {oefeningen.length === 1 ? 'oefening' : 'oefeningen'}{oefeningen.length ? ` · ±${schatMinuten(oefeningen)} min` : ''}
               </div>
-            </label>
-          </div>
-        </div>
-        
-        {/* Footer Buttons */}
-        <div style={{
-          padding: isMobile ? '1rem' : '1.5rem',
-          borderTop: '1px solid rgba(249, 115, 22, 0.2)',
-          flexShrink: 0,
-          display: 'flex',
-          gap: '0.75rem'
-        }}>
-          <button
-            onClick={handleClose}
-            style={{
-              flex: 1,
-              padding: isMobile ? '0.875rem' : '1rem',
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '0',
-              color: '#ef4444',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              minHeight: '44px',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            Annuleren
-          </button>
-          
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{
-              flex: 2,
-              padding: isMobile ? '0.875rem' : '1rem',
-              background: saving
-                ? 'rgba(107, 114, 128, 0.3)'
-                : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-              border: 'none',
-              borderRadius: '0',
-              color: saving ? 'rgba(255, 255, 255, 0.5)' : '#000',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              cursor: saving ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: saving ? 'none' : '0 4px 20px rgba(249, 115, 22, 0.35)',
-              minHeight: '44px',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              opacity: saving ? 0.7 : 1
-            }}
-          >
-            {saving ? (
-              <>
-                <div style={{
-                  width: isMobile ? '16px' : '18px',
-                  height: isMobile ? '16px' : '18px',
-                  border: '2px solid rgba(0, 0, 0, 0.3)',
-                  borderTopColor: '#000',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                Opslaan...
-              </>
-            ) : (
-              <>
-                <Save size={isMobile ? 16 : 18} />
-                {existingWorkout ? 'Wijzigingen Opslaan' : 'Training Opslaan'}
-              </>
-            )}
-          </button>
-        </div>
+              <button onClick={bewaar} disabled={bezig} style={{ minHeight: 48, padding: '0 1.3rem', borderRadius: 12, background: '#fff', color: '#0a0a0a', border: 'none', fontFamily: 'inherit', fontSize: '0.95rem', fontWeight: 900, cursor: bezig ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, touchAction: 'manipulation', opacity: bezig ? 0.7 : 1 }}>
+                <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : existingWorkout ? 'Wijzigingen opslaan' : 'Training opslaan'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.2rem 0.5rem' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={16} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                <input value={zoek} onChange={e => setZoek(e.target.value)} placeholder="Zoek een oefening…" type="search" autoComplete="off" style={{ ...invoer, width: '100%', padding: '0.8rem 1rem 0.8rem 2.4rem', fontSize: '1rem' }} />
+              </div>
+              <div className="eigen-spieren" style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingTop: 8 }}>
+                <style>{'.eigen-spieren::-webkit-scrollbar{display:none}'}</style>
+                <button onClick={() => setSpier(null)} style={chip(!spier)}>Alles</button>
+                {SPIEREN.map(s => <button key={s.id} onClick={() => setSpier(spier === s.id ? null : s.id)} style={chip(spier === s.id)}>{s.label}</button>)}
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '0 1rem' : '0 1.2rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {laden && <div style={{ padding: '1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Bibliotheek laden…</div>}
+              {!laden && lijst.length === 0 && <div style={{ padding: '1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Geen oefening gevonden</div>}
+              {lijst.map(ex => {
+                const al = gekozen.has(String(ex.name).toLowerCase())
+                return (
+                  <button key={ex.name} onClick={() => voegToe(ex)} disabled={al} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 6, borderRadius: 12, background: al ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${al ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`, color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: al ? 'default' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: 9, backgroundImage: `url(${fotoVan(ex.name)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{[SPIER_NL[String(ex.primair_spieren).toLowerCase()] || ex.primair_spieren, ex.equipment].filter(Boolean).join(' · ')}</div>
+                    </div>
+                    <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: '50%', background: al ? '#10b981' : '#fff', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{al ? <Check size={16} strokeWidth={3} /> : <Plus size={16} strokeWidth={3} />}</span>
+                  </button>
+                )
+              })}
+              <div style={{ height: 12 }} />
+            </div>
+            <div style={{ padding: isMobile ? '0.6rem 1rem calc(0.9rem + env(safe-area-inset-bottom, 0px))' : '0.7rem 1.2rem 1.1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button onClick={() => setStap('dag')} style={{ width: '100%', minHeight: 48, borderRadius: 12, background: '#fff', color: '#0a0a0a', border: 'none', fontFamily: 'inherit', fontSize: '0.95rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation' }}>
+                Klaar · {oefeningen.length} {oefeningen.length === 1 ? 'oefening' : 'oefeningen'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
-      
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>,
     document.body
   )
