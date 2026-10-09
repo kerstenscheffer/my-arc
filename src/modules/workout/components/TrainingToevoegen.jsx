@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info } from 'lucide-react'
 import CustomWorkoutModal from './planning/CustomWorkoutModal'
+import { locatieVan, spiergroepenVan, SPIERGROEPEN } from '../utils/trainingFilters'
 import { maakPlanKey } from '../utils/planKey'
 import { CARDIO_SOORTEN } from '../cardioSoorten'
 import { getWorkoutImage } from './week-schedule/workoutImage'
@@ -33,6 +34,9 @@ export default function TrainingToevoegen({
   const [stap, setStap] = useState('soort')
   const [info, setInfo] = useState(null) // kaart waarvan de oefeningen open staan
   const [zoek, setZoek] = useState('')
+  // Filters boven de lijst: thuis/gym en spiergroep (9 okt 2026).
+  const [locatie, setLocatie] = useState('alles')
+  const [spier, setSpier] = useState(null)
   // De andere plannen van de klant: elke dag daaruit is ook te kiezen,
   // zonder van actief plan te wisselen (call Martijn, 8 okt 2026).
   const [anderePlannen, setAnderePlannen] = useState([])
@@ -192,9 +196,20 @@ export default function TrainingToevoegen({
               { titel: 'Eigen trainingen', items: eigen.map(w => ({ key: `custom_${w.id}`, w, plan: 'Eigen', naam: w.name, sub: [w.type, w.duration ? `${w.duration} min` : null].filter(Boolean).join(' · ') })) },
             ].map(g => {
               const q = zoek.trim().toLowerCase()
-              if (!q) return g
-              return { ...g, items: g.items.filter(i => `${i.naam} ${i.plan} ${(i.w?.exercises || []).map(e => e.name).join(' ')}`.toLowerCase().includes(q)) }
+              let items = g.items
+              if (locatie !== 'alles') items = items.filter(i => locatieVan(i.w, i.plan) === locatie)
+              if (spier) items = items.filter(i => spiergroepenVan(i.w).has(spier))
+              if (q) items = items.filter(i => `${i.naam} ${i.plan} ${(i.w?.exercises || []).map(e => e.name).join(' ')}`.toLowerCase().includes(q))
+              return { ...g, items }
             }).filter(g => g.items.length > 0)
+            const chip = (aan) => ({
+              padding: '0.4rem 0.75rem', borderRadius: 999, flexShrink: 0,
+              border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.16)'}`,
+              background: aan ? '#fff' : 'rgba(255,255,255,0.05)', color: aan ? '#0a0a0a' : '#fff',
+              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            })
+            const filterActief = locatie !== 'alles' || spier
             const kies = (key) => { tik(); setWorkoutKey(key); setStap('gym-dag') }
             const Kaart = ({ item }) => {
               const aan = workoutKey === item.key
@@ -242,7 +257,19 @@ export default function TrainingToevoegen({
                     color: '#fff', fontSize: '1rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none',
                   }}
                 />
-                {groepen.length === 0 && <div style={{ padding: '1.5rem 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Niets gevonden voor "{zoek}"</div>}
+                {/* Filters: eerst waar (thuis/gym), dan welke spiergroep. Eén
+                    rij die opzij scrolt op een telefoon. */}
+                <div className="training-filters" style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, marginBottom: 8 }}>
+                  <style>{'.training-filters::-webkit-scrollbar{display:none}'}</style>
+                  {[{ id: 'alles', label: 'Alles' }, { id: 'thuis', label: 'Thuis' }, { id: 'gym', label: 'Gym' }].map(l => (
+                    <button key={l.id} onClick={() => setLocatie(l.id)} style={chip(locatie === l.id)}>{l.label}</button>
+                  ))}
+                  <span style={{ width: 1, background: 'rgba(255,255,255,0.14)', margin: '0 4px', flexShrink: 0 }} />
+                  {SPIERGROEPEN.map(g => (
+                    <button key={g.id} onClick={() => setSpier(spier === g.id ? null : g.id)} style={chip(spier === g.id)}>{g.label}</button>
+                  ))}
+                </div>
+                {groepen.length === 0 && <div style={{ padding: '1.5rem 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{zoek ? `Niets gevonden voor "${zoek}"` : filterActief ? 'Geen training die hierbij past' : 'Geen trainingen'}</div>}
                 {groepen.map((g, gi) => {
                   // Standaardtrainingen per plan onder elkaar, met de plannaam
                   // als tussenkop; anders is het één lange muur van kaarten.
