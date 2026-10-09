@@ -1193,6 +1193,27 @@ export class ClientAgendaService {
     }
   }
 
+  async zetSupplementTijd({ clientId, items, newStartMin }) {
+    const ids = new Set((items || []).map(x => x.id).filter(Boolean))
+    if (!clientId || !ids.size) throw new Error('Geen supplementen om te verzetten')
+    const { data, error } = await this.supabase.from('supplement_plans')
+      .select('id, supplements').eq('client_id', clientId).eq('status', 'active')
+      .order('updated_at', { ascending: false }).limit(1)
+    if (error) throw error
+    const plan = data?.[0]
+    if (!plan || !Array.isArray(plan.supplements)) throw new Error('Geen actief supplementenplan')
+    const klok = `${String(Math.floor(newStartMin / 60) % 24).padStart(2, '0')}:${String(newStartMin % 60).padStart(2, '0')}`
+    const supplements = plan.supplements.map(sp => {
+      const sleutel = sp.template_id || sp.supplement_id || sp.id || sp.name
+      if (!ids.has(sleutel)) return sp
+      return { ...sp, timing: { ...(sp.timing || {}), specific_time: klok } }
+    })
+    const { error: fout } = await this.supabase.from('supplement_plans')
+      .update({ supplements, updated_at: new Date().toISOString() }).eq('id', plan.id)
+    if (fout) throw fout
+    return true
+  }
+
   async deleteBlock(id) {
     const { error } = await this.supabase
       .from('client_agenda_blocks')
@@ -1391,6 +1412,16 @@ export class ClientAgendaService {
         startMin: newStartMin, endMin: newEndMin,
         color: block.color,
       })
+      return true
+    }
+
+    // Supplementen hebben geen agendablok: hun tijd staat in het actieve
+    // supplementenplan (timing.specific_time gaat daar altijd voor). 'Elke
+    // dag' zet die tijd voor alle supplementen in dit blok. Eerst probeerde
+    // dit een client_agenda_blocks-rij van type 'supplement' te maken, en
+    // die weigert de type-check.
+    if (block.type === 'supplement') {
+      await this.zetSupplementTijd({ clientId: block.clientId, items: block.meta?.items || [], newStartMin })
       return true
     }
 

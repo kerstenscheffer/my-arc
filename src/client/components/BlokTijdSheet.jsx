@@ -290,8 +290,10 @@ export default function BlokTijdSheet({
                 },
                 {
                   id: 'altijd',
-                  titel: `Elke ${dagNaam}`,
-                  uitleg: 'Past je plan aan, ook voor de weken hierna.',
+                  titel: blok.type === 'supplement' ? 'Elke dag' : `Elke ${dagNaam}`,
+                  uitleg: blok.type === 'supplement'
+                    ? 'Past je supplementenplan aan: voortaan elke dag op deze tijd.'
+                    : 'Past je plan aan, ook voor de weken hierna.',
                 },
               ].map(k => {
                 const aan = bereik === k.id
