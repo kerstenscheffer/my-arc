@@ -2237,6 +2237,8 @@ export default function PlanAnalyzer({
                 maaltijdTijden={maaltijdTijdenVanDag}
                 dagSleutel={DAYS[activeDay]?.id}
                 isMobile={m}
+                db={db} clientId={resolvedClientId}
+                onChanged={(lijst) => { setSupplementen(lijst); setAgendaRefreshKey(k => k + 1) }}
               />
             </div>
 
