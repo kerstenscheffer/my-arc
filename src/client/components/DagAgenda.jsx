@@ -933,7 +933,8 @@ function SlaapActie({ slaap, compact = false }) {
 }
 
 // Eén actieknop voor de lijst: kaal icoon, vast formaat, grijs of groen.
-function ActieKnop({ gedaan, titel, onClick, Icoon }) {
+function ActieKnop({ gedaan, titel, onClick, icoon }) {
+  const Icoon = icoon
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick?.() }}
@@ -1033,17 +1034,17 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
             gedaan={!!slaap.gelogd}
             titel={slaap.gelogd ? 'Slaap bijwerken' : 'Slaap loggen'}
             onClick={slaap.onLog}
-            Icoon={slaap.gelogd ? Check : Moon}
+            icoon={slaap.gelogd ? Check : Moon}
           />
         ) : onAfronden ? (
           <ActieKnop
             gedaan={afgerond}
             titel={afgerond ? 'Toch niet gegeten' : 'Afronden'}
             onClick={onAfronden}
-            Icoon={Check}
+            icoon={Check}
           />
         ) : isTraining && onOpen ? (
-          <ActieKnop gedaan={false} titel="Open je schema" onClick={() => onOpen(blok)} Icoon={Play} />
+          <ActieKnop gedaan={false} titel="Open je schema" onClick={() => onOpen(blok)} icoon={Play} />
         ) : null}
       </div>
     </div>
