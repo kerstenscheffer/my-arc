@@ -96,6 +96,8 @@ export default function StappenPil({ client, db, isMobile = false, kaal = false 
           letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums',
         }}>
           {kort(stand)}
+          {/* In de bovenbalk ook het doel erbij: 5.105/8.500. */}
+          {kaal && doel > 0 && <span style={{ color: 'rgba(255,255,255,0.35)' }}>/{kort(doel)}</span>}
         </span>
         {/* Streepje van hoever je bent: net genoeg om te zien of je op koers
             ligt zonder het getal te lezen. */}

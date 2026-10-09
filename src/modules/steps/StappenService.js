@@ -108,11 +108,24 @@ const StappenService = {
     return data
   },
 
+  // Het stappendoel. Eerst wat de klant zichzelf in zijn laatste check-in
+  // voornam (doelen_komende_week, type 'stappen'): dat is zijn doel van nu.
+  // Anders het vaste doel op de klant, anders de standaard.
   async haalDoel(db, clientId) {
     if (!db?.supabase || !clientId) return STANDAARD_DOEL
-    const { data } = await db.supabase
-      .from('clients').select('step_goal').eq('id', clientId).maybeSingle()
-    return Number(data?.step_goal) > 0 ? Number(data.step_goal) : STANDAARD_DOEL
+    const [{ data: klant }, { data: checkin }] = await Promise.all([
+      db.supabase.from('clients').select('step_goal').eq('id', clientId).maybeSingle()
+        .then(r => r, () => ({ data: null })),
+      db.supabase.from('client_checkins').select('doelen_komende_week')
+        .eq('client_id', clientId).eq('formulier_versie', 4).not('doelen_komende_week', 'is', null)
+        .order('checkin_date', { ascending: false }).limit(1).maybeSingle()
+        .then(r => r, () => ({ data: null })),
+    ])
+    const uitCheckin = Array.isArray(checkin?.doelen_komende_week)
+      ? Number(checkin.doelen_komende_week.find(d => d?.type === 'stappen')?.doel_getal)
+      : NaN
+    if (uitCheckin > 0) return uitCheckin
+    return Number(klant?.step_goal) > 0 ? Number(klant.step_goal) : STANDAARD_DOEL
   },
 
   async zetDoel(db, clientId, doel) {
