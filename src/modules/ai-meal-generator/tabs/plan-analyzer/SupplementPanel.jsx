@@ -20,7 +20,8 @@
 //    schuift het supplement mee als je die maaltijd verzet.
 
 import { useEffect, useState } from 'react'
-import { Pill, X, Check, Loader, Dumbbell, Plus, Trash2 } from 'lucide-react'
+import { Pill, X, Check, Loader, Dumbbell, Plus, Trash2, ShoppingCart } from 'lucide-react'
+import SupplementProductenModal from '../../../supplements/SupplementProductenModal'
 // SupplementPlanService plakt getSupplementTemplates/enrich… op DatabaseService.
 // Zonder deze import bestaan die methodes hier niet: nu leunt het op CoachHub
 // die het bestand toevallig ook importeert, en dat is geen afspraak waar je op
@@ -51,6 +52,8 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
   const [supplementen, setSupplementen] = useState([])
   const [templates, setTemplates] = useState([])
   const [toevoegenOpen, setToevoegenOpen] = useState(false)
+  // Supplement waarvan de winkels (Waar koop je het) open staan.
+  const [winkelsVan, setWinkelsVan] = useState(null)
   // Zelf een supplement maken. Uit app_issues: "in plan analyzer wil ik zelf
   // ook supplementen toevoegen, bijv pre workout." De lijst kwam alleen uit
   // supplement_templates, dus wat daar niet in stond kon je niet toewijzen.
@@ -331,6 +334,12 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
                       onChange={e => pas(i, { dosage: { ...(s.dosage || {}), unit: e.target.value } })}
                       style={{ ...veld, width: 62 }}
                     />
+                    {s.template_id && (
+                      <button onClick={() => setWinkelsVan(s)} title="Waar koop je het: winkels en producten" style={{
+                        ...sluitKnop, width: 26, height: 26, border: 'none', background: 'none',
+                        color: 'rgba(255,255,255,0.6)',
+                      }}><ShoppingCart size={14} /></button>
+                    )}
                     <button onClick={() => verwijder(i)} title="Verwijderen" style={{
                       ...sluitKnop, width: 26, height: 26, border: 'none', background: 'none',
                       color: 'rgba(255,255,255,0.3)',
@@ -564,6 +573,10 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
             {bezig ? 'Opslaan…' : vuil ? 'Wijzigingen bewaren…' : 'Opgeslagen'}
           </button>
         </div>
+      )}
+      {winkelsVan && (
+        <SupplementProductenModal db={db} categorie={winkelsVan.template_id} naam={winkelsVan.name}
+          emoji={winkelsVan.emoji} coachId={coachId} isMobile={m} onClose={() => setWinkelsVan(null)} />
       )}
     </div>
   )

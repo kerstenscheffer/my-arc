@@ -8,7 +8,7 @@
 // van een lege kop te tonen.
 
 import React, { useState, useEffect } from 'react'
-import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen } from 'lucide-react'
+import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
 
 export default function SupplementInfoModal({ supplement, isMobile, onClose, db }) {
@@ -29,6 +29,27 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
             () => { if (leeft) setSjabloon({ sources: [], benefits: null }) })
     return () => { leeft = false }
   }, [db, sp?.id])
+
+  // Waar koop je het: producten uit de catalogus (supplement_products) van
+  // dezelfde soort, bij verschillende winkels. Live uit de tabel en niet uit
+  // het plan: prijzen en links veranderen, het plan is een momentopname.
+  // Dode links vallen weg; 'geblokkeerd' betekent alleen dat de winkel onze
+  // prijscheck weert, de link zelf werkt dan gewoon.
+  const [producten, setProducten] = useState([])
+  useEffect(() => {
+    if (!db?.supabase || !sp?.id) { setProducten([]); return }
+    let leeft = true
+    db.supabase
+      .from('supplement_products')
+      .select('id, product_name, brand, store, price, url, image_url, link_status, last_checked_at, in_stock')
+      .eq('category', sp.id).eq('active', true)
+      .order('priority', { ascending: false })
+      .then(({ data }) => { if (leeft) setProducten((data || []).filter(p => p.url && p.link_status !== 'dood')) },
+            () => { if (leeft) setProducten([]) })
+    return () => { leeft = false }
+  }, [db, sp?.id])
+  const prijsTekst = (p) => p == null ? null : `€${Number(p).toFixed(2).replace('.', ',')}`
+  const laatstGecontroleerd = producten.reduce((max, p) => (p.last_checked_at && (!max || p.last_checked_at > max) ? p.last_checked_at : max), null)
 
   const bronnen = sjabloon ? (Array.isArray(sjabloon.sources) ? sjabloon.sources : []) : null
 
@@ -152,6 +173,42 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
               {kop('Hoe te nemen')}
               <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
                 {sp.instructies}
+              </div>
+            </div>
+          )}
+
+          {producten.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
+              {kop('Waar koop je het', <ShoppingCart size={11} />)}
+              {producten.map(p => (
+                <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" style={{
+                  display: 'flex', alignItems: 'center', gap: 10, minHeight: 56,
+                  padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  textDecoration: 'none', color: 'inherit',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  {/* Productfoto's zijn vrijwel altijd op wit geschoten. */}
+                  <div style={{ width: 44, height: 44, borderRadius: 8, background: '#fff', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {p.image_url
+                      ? <img src={p.image_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      : <span style={{ fontSize: 18 }}>{sp.emoji || '💊'}</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.product_name}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {[p.brand, p.store].filter(Boolean).join(' · ')}{p.in_stock === false ? ' · uitverkocht' : ''}
+                    </div>
+                  </div>
+                  {prijsTekst(p.price) && (
+                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>{prijsTekst(p.price)}</span>
+                  )}
+                  <ExternalLink size={15} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
+                </a>
+              ))}
+              <div style={{ marginTop: 6, fontSize: '0.68rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                Gekozen door je coach. Prijzen{laatstGecontroleerd ? ` van ${new Date(laatstGecontroleerd).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}, de winkel kan afwijken.
               </div>
             </div>
           )}
