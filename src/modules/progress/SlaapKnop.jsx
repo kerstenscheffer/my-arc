@@ -68,7 +68,9 @@ const linkKnop = {
 // waarop je wakker werd (log_date). Gebruikt door de zwevende knop op de
 // trackingpagina en door het slaapblok in de agenda op home. Eén tabel
 // (sleep_logs), dus de coach ziet het in coach-insight, waar je ook logt.
-export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed = null, voorOpstaan = null, onOpgeslagen, onStatus }) {
+// `alleenGewicht`: alleen de weegstap, als los scherm (regel 'Wegen' in de
+// agenda). Opslaan of overslaan sluit het blad.
+export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed = null, voorOpstaan = null, onOpgeslagen, onStatus, alleenGewicht = false, onGewicht }) {
   const logDatum = datum || vandaagIso()
   const setOpen = (v) => { if (!v) onClose?.() }
   const [bed, setBed] = useState(voorBed || '23:00')
@@ -129,7 +131,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         if (r?.weight) { setGewicht(Number(r.weight)); setGewogen(String(r.date).slice(0, 10) === logDatum) }
         else setGewicht(80)
       }, () => { if (!weg) setGewicht(80) })
-    setKwaliteit(null); setStruggles(''); setAlGelogd(false); setFout(null); setStap(1); setToonEerdere(false); setToonTips(false)
+    setKwaliteit(null); setStruggles(''); setAlGelogd(false); setFout(null); setStap(alleenGewicht ? 3 : 1); setToonEerdere(false); setToonTips(false)
     db.supabase
       .from('sleep_logs')
       .select('id, bedtime, wake_time, hours_slept, quality, struggles')
@@ -269,9 +271,11 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
       setGewichtBezig(false)
       if (!r?.success) { setFout('Gewicht opslaan mislukt'); return }
       setGewogen(true)
+      onGewicht?.({ datum: logDatum, gewicht: Math.round(gewicht * 10) / 10 })
       window.dispatchEvent(new CustomEvent('myarc:gewicht-gelogd'))
     }
     setFout(null)
+    if (alleenGewicht) { setOpen(false); return }
     setStap(4)
   }
   const datumTekst = logDatum !== vandaagIso()
@@ -297,15 +301,18 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
       >
         {/* Kop: terug, titel met stap, sluiten */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-          {stap > 1
+          {stap > 1 && !alleenGewicht
             ? <button onClick={() => setStap(n => n - 1)} aria-label="Vorige stap" style={kleinKnop}><ChevronLeft size={18} strokeWidth={2.8} /></button>
             : <div style={{ width: 40 }} />}
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Ochtend loggen · stap {stap} van 5
+              {alleenGewicht ? 'Gewicht loggen' : `Ochtend loggen · stap ${stap} van 5`}
             </div>
             <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <Moon size={15} strokeWidth={2.6} /> Je nacht{datumTekst && <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}> · {datumTekst}</span>}
+              {alleenGewicht
+                ? <><Scale size={15} strokeWidth={2.6} /> Je weging</>
+                : <><Moon size={15} strokeWidth={2.6} /> Je nacht</>}
+              {datumTekst && <span style={{ fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}> · {datumTekst}</span>}
             </div>
           </div>
           <button onClick={() => setOpen(false)} aria-label="Sluiten" style={kleinKnop}><X size={18} strokeWidth={2.8} /></button>

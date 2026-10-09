@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, List,
-  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal,
+  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal, Scale,
 } from 'lucide-react'
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
@@ -46,6 +46,7 @@ const ICOON = {
   sleep: Moon,
   work: Briefcase,
   supplement: Pill,
+  weging: Scale,
 }
 
 const TYPE_LABEL = {
@@ -53,6 +54,7 @@ const TYPE_LABEL = {
   sleep: 'Slaap',
   work: 'Werk',
   supplement: 'Supplementen',
+  weging: 'Wegen',
 }
 
 const dagSleutelVan = (d) => DAYS[(d.getDay() + 6) % 7]
@@ -189,10 +191,17 @@ export default function DagAgenda({
     [data, dag]
   )
   // Voor de lijst: gewoon op tijd, zonder kolomverdeling.
-  const lijstBlokken = useMemo(
-    () => [...(data?.blocksByDay?.[dag] || [])].sort((a, b) => (a.start - b.start) || (a.end - b.end)),
-    [data, dag]
-  )
+  // Het ochtenddeel van de slaap (00:00 tot opstaan) staat op de opstatijd:
+  // dat is het moment dat je er iets mee doet. Direct daarna een regel
+  // 'Wegen', want daar hoort je weging bij.
+  const lijstTijd = (b) => (b.type === 'sleep' && b.meta?.wrapHalf === 'early' ? b.end : b.start)
+  const lijstBlokken = useMemo(() => {
+    const lijst = [...(data?.blocksByDay?.[dag] || [])]
+    const ochtend = lijst.find(b => b.type === 'sleep' && (b.meta?.wrapHalf === 'early' || b.start < 12 * 60))
+    const opstaan = ochtend ? ochtend.end : 7 * 60
+    lijst.push({ id: `weging-${dag}`, day: dag, type: 'weging', label: 'Wegen', start: opstaan, end: opstaan + 5, meta: { virtueel: true } })
+    return lijst.sort((a, b) => (lijstTijd(a) - lijstTijd(b)) || (a.type === 'sleep' ? -1 : b.type === 'sleep' ? 1 : 0) || (a.end - b.end))
+  }, [data, dag])
 
   // Het venster volgt de dag: begint bij het eerste blok (afgerond naar het
   // hele uur) en eindigt bij het laatste. Een vast raster van 6:00 tot 24:00
@@ -240,6 +249,22 @@ export default function DagAgenda({
       }, () => { if (!weg) setSlaapLogs({}) })
     return () => { weg = true }
   }, [client?.id, db, slaapDagIso, morgenIso, versie])
+  const [gewogenOp, setGewogenOp] = useState(null) // kg of null
+  const [wegenBlad, setWegenBlad] = useState(false)
+  useEffect(() => {
+    if (!client?.id || !db?.supabase || !slaapDagIso) return
+    let weg = false
+    const laadWeging = () => db.supabase.from('weight_challenge_logs').select('weight').eq('client_id', client.id).eq('date', slaapDagIso).maybeSingle()
+      .then(({ data }) => { if (!weg) setGewogenOp(data?.weight != null ? Number(data.weight) : null) }, () => {})
+    laadWeging()
+    window.addEventListener('myarc:gewicht-gelogd', laadWeging)
+    return () => { weg = true; window.removeEventListener('myarc:gewicht-gelogd', laadWeging) }
+  }, [client?.id, db, slaapDagIso, versie])
+  const wegenVan = (b) => (b.type === 'weging' && slaapDagIso ? {
+    kan: slaapDagIso <= toIsoDate(nu),
+    gelogd: gewogenOp,
+    onLog: () => setWegenBlad(true),
+  } : null)
   const minNaarTijd = (m) => (Number.isFinite(m) ? `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` : null)
   const slaapVan = (b) => {
     if (b.type !== 'sleep' || !slaapDagIso) return null
@@ -490,9 +515,10 @@ export default function DagAgenda({
               onOpen={onOpen}
               afgerond={b.type === 'meal' && !!gelogd[sleutelVan(b)]}
               onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
-              onTijd={() => setBewerk(b)}
+              onTijd={b.type === 'weging' ? null : () => setBewerk(b)}
               bezig={toonNuLijn && nuMin >= b.start && nuMin < b.end}
               slaap={slaapVan(b)}
+              wegen={wegenVan(b)}
             />
           ))}
         </div>
@@ -589,6 +615,15 @@ export default function DagAgenda({
         voorBed={slaapBlad?.bed || null}
         voorOpstaan={slaapBlad?.op || null}
         onOpgeslagen={(r) => { if (r?.datum) setSlaapLogs(prev => ({ ...prev, [r.datum]: { uren: r.uren, kwaliteit: r.kwaliteit } })) }}
+        onGewicht={(r) => { if (r?.datum === slaapDagIso) setGewogenOp(r.gewicht) }}
+      />
+      <SlaapLogBlad
+        open={wegenBlad}
+        onClose={() => setWegenBlad(false)}
+        client={client} db={db}
+        datum={slaapDagIso}
+        alleenGewicht
+        onGewicht={(r) => { if (r?.datum === slaapDagIso) setGewogenOp(r.gewicht) }}
       />
 
       {/* Tijd verzetten: dezelfde sheet vanuit de lijst en vanuit het rooster. */}
@@ -955,7 +990,7 @@ function ActieKnop({ gedaan, titel, onClick, icoon }) {
 // is de tijd vol wit en staat er een stipje voor; de rest is zachter.
 // Maaltijd en training: tik op de regel opent.
 const REGEL_HOOGTE = 54
-function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezig, slaap = null }) {
+function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezig, slaap = null, wegen = null }) {
   const isMaaltijd = blok.type === 'meal'
   const isTraining = blok.type === 'training'
   const Icoon = ICOON[blok.type] || Calendar
@@ -993,7 +1028,7 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {tijd(blok.start)}
+        {tijd(blok.type === 'sleep' && blok.meta?.wrapHalf === 'early' ? blok.end : blok.start)}
       </button>
 
       {/* De foto vult de regel van lijn tot lijn: geen ronde hoeken, geen
@@ -1017,6 +1052,11 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
         }}>
           {naam || soort}
         </span>
+        {wegen?.gelogd != null && (
+          <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
+            {nl1(wegen.gelogd)} kg
+          </span>
+        )}
         {slaap?.gelogd?.uren != null && (
           <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
             {nl1(slaap.gelogd.uren)}u{slaap.gelogd.kwaliteit != null ? ` · ${slaap.gelogd.kwaliteit}` : ''}
@@ -1029,7 +1069,14 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
           vinkje. Training: play. Slaap: maantje, na loggen een groen vinkje
           (de uren staan dan zacht achter de naam). */}
       <div style={{ flexShrink: 0, width: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {slaap?.kan ? (
+        {wegen?.kan ? (
+          <ActieKnop
+            gedaan={wegen.gelogd != null}
+            titel={wegen.gelogd != null ? 'Weging bijwerken' : 'Gewicht loggen'}
+            onClick={wegen.onLog}
+            icoon={wegen.gelogd != null ? Check : Scale}
+          />
+        ) : slaap?.kan ? (
           <ActieKnop
             gedaan={!!slaap.gelogd}
             titel={slaap.gelogd ? 'Slaap bijwerken' : 'Slaap loggen'}
