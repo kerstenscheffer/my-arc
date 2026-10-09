@@ -98,15 +98,16 @@ export default function DagBewaarBalk({
               de naam aan staan in plaats van aan de andere kant van de regel. */}
           <span style={{ flex: 1 }} />
         </button>
-        <span style={{
-          flexShrink: 0, fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.06em',
-          textTransform: 'uppercase', padding: '3px 7px', borderRadius: 6,
-          color: vanMij ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
-          background: vanMij ? '#fff' : 'transparent',
-          border: vanMij ? 'none' : `1px solid ${LIJN}`,
-        }}>
-          {vanMij ? 'Jouw dag' : 'Van je coach'}
-        </span>
+        {/* Alleen bij een dag van de coach een label; een eigen dag heeft er geen nodig. */}
+        {!vanMij && (
+          <span style={{
+            flexShrink: 0, fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.06em',
+            textTransform: 'uppercase', padding: '3px 7px', borderRadius: 6,
+            color: 'rgba(255,255,255,0.6)', background: 'transparent', border: `1px solid ${LIJN}`,
+          }}>
+            Van je coach
+          </span>
+        )}
       </div>
     )
   }
