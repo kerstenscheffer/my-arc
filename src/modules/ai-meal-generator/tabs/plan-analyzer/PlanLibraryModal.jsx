@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Bookmark, Trash2, Download, Loader } from 'lucide-react'
+import { X, Bookmark, Trash2, Download, Check } from 'lucide-react'
+import { Placeholder, Meta, PrimairKnop, SecundairKnop, IconKnop } from './PlanSwitcherModal'
 import { supplementenVoorSjabloon, extrasSamenvatting } from './sjabloonExtras'
 
 export default function PlanLibraryModal({
@@ -18,8 +19,11 @@ export default function PlanLibraryModal({
 }) {
   const modalHost = useModalHost()
   const m = isMobile
+  // Standaard de titel zoals hij nu bovenaan staat: wie net de titel aanpast
+  // en op opslaan drukt, wil het sjabloon onder die naam.
   const [name, setName] = useState(() =>
-    planMeta?.name ? `${planMeta.name} (kopie)` : (clientName ? `Plan ${clientName}` : ''))
+    planMeta?.name || (clientName ? `Plan ${clientName}` : ''))
+  const [confirmDelete, setConfirmDelete] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [justSaved, setJustSaved] = useState(false)
@@ -87,14 +91,15 @@ export default function PlanLibraryModal({
     setSaving(false)
   }
 
-  const handleDelete = async (id, e) => {
-    e.stopPropagation()
-    if (!window.confirm('Dit opgeslagen plan definitief verwijderen?')) return
+  // Twee tikken, zoals in het plannenpaneel: eerst 'Zeker?', dan weg.
+  const handleDelete = async (id) => {
+    if (confirmDelete !== id) { setConfirmDelete(id); return }
     setDeletingId(id)
     try {
       const { error } = await db.supabase.from('meal_plan_templates').delete().eq('id', id)
       if (error) throw error
       setPlans(prev => prev.filter(p => p.id !== id))
+      setConfirmDelete(null)
     } catch (err) { console.warn('Delete failed:', err) }
     setDeletingId(null)
   }
@@ -105,93 +110,120 @@ export default function PlanLibraryModal({
     catch { return '' }
   }
 
-  const modal = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0a0a0a' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.8rem', borderBottom: '1px solid rgba(255,215,0,0.2)', flexShrink: 0 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#FFD700', fontWeight: 800, fontSize: m ? '0.8rem' : '0.85rem' }}>
-          <Bookmark size={15} /> Plannen bibliotheek
-        </span>
-        <button onClick={onClose} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}><X size={15} /></button>
-      </div>
+  const pad = m ? '0.75rem 1rem' : '0.85rem 1.5rem'
+  const extras = extrasSamenvatting({ pre_workout_meal: preWorkoutMeal, supplements: supplementen })
 
-      {/* Opslaan */}
-      <div style={{ padding: m ? '0.7rem 0.8rem' : '0.85rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,215,0,0.02)', flexShrink: 0 }}>
-        <div style={{ fontSize: m ? '0.6rem' : '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>
-          Kopie bewaren als sjabloon
-        </div>
-        {/* Expliciet: dit maakt een los, herbruikbaar sjabloon. De titel van
-            het plan zelf pas je aan in de titelbalk bovenaan de analyzer. */}
-        <div style={{ fontSize: m ? '0.55rem' : '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginBottom: '0.4rem', lineHeight: 1.3 }}>
-          Voor hergebruik bij andere clients — hernoemt dit plan niet.
-        </div>
-        {extrasSamenvatting({ pre_workout_meal: preWorkoutMeal, supplements: supplementen }) && (
-          <div style={{ fontSize: m ? '0.6rem' : '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: '0.45rem' }}>
-            Gaat mee: {extrasSamenvatting({ pre_workout_meal: preWorkoutMeal, supplements: supplementen })}
+  const inhoud = (
+    <>
+      {/* Kop, zoals het plannenpaneel. */}
+      {!embedded && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: m ? '0.75rem 1rem 0.25rem' : '1rem 1.5rem 0.25rem', flexShrink: 0 }}>
+          <div style={{ flex: 1, fontSize: m ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
+            Bewaren als sjabloon
           </div>
-        )}
-        <input
-          value={name}
-          onChange={e => { setName(e.target.value); setError('') }}
-          placeholder="bijv. Cut 2000kcal - 4 meals"
-          style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.6rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 7, color: '#fff', fontSize: m ? '0.8rem' : '0.85rem', fontWeight: 600, fontFamily: 'inherit', outline: 'none', marginBottom: '0.45rem' }}
-        />
-        {error && <div style={{ fontSize: '0.6rem', color: '#ef4444', marginBottom: '0.4rem' }}>{error}</div>}
-        <button onClick={handleSave} disabled={saving} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.55rem', background: justSaved ? 'rgba(16,185,129,0.15)' : 'rgba(255,215,0,0.12)', border: `1px solid ${justSaved ? 'rgba(16,185,129,0.5)' : 'rgba(255,215,0,0.4)'}`, borderRadius: 7, color: justSaved ? '#10b981' : '#FFD700', fontSize: m ? '0.75rem' : '0.8rem', fontWeight: 800, cursor: saving ? 'default' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
-          {saving ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Bookmark size={14} />}
-          {justSaved ? 'Sjabloon bewaard ✓' : (saving ? 'Bewaren…' : 'Bewaar als sjabloon')}
-        </button>
+          <button onClick={onClose} aria-label="Sluit" style={{
+            width: 36, height: 36, flexShrink: 0,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 10, color: '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <X size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+      )}
+
+      {/* Bewaren: naam, wat er meegaat, één witte knop. */}
+      <div style={{ padding: pad, borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, marginBottom: 10 }}>
+          Een losse kopie voor andere klanten. Dit plan blijft zoals het is.
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            value={name}
+            onChange={e => { setName(e.target.value); setError(''); setJustSaved(false) }}
+            onKeyDown={e => { if (e.key === 'Enter' && !saving) handleSave() }}
+            placeholder="Naam van het sjabloon"
+            style={{
+              flex: 1, minWidth: 0, minHeight: 44, padding: '0 0.75rem',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.25)',
+              borderRadius: 10, color: '#fff', fontSize: '0.9rem', fontWeight: 800,
+              fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+          {justSaved ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 44, color: '#22c55e', fontSize: '0.8rem', fontWeight: 900, flexShrink: 0 }}>
+              <Check size={15} strokeWidth={3} /> Bewaard
+            </span>
+          ) : (
+            <PrimairKnop onClick={handleSave} disabled={saving} dimmed={saving}>
+              <Bookmark size={14} strokeWidth={2.6} /> {saving ? 'Bewaren…' : 'Bewaar'}
+            </PrimairKnop>
+          )}
+        </div>
+        {extras && <Meta items={[`Gaat mee: ${extras}`]} />}
+        {error && <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ef4444', marginTop: 6 }}>{error}</div>}
       </div>
 
-      {/* Opgeslagen plannen */}
-      <div style={{ padding: m ? '0.5rem 0.8rem 0.35rem' : '0.6rem 1rem 0.4rem', flexShrink: 0 }}>
-        <div style={{ fontSize: m ? '0.6rem' : '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Opgeslagen plannen ({plans.length})
-        </div>
+      {/* Bestaande weekplan-sjablonen. */}
+      <div style={{ padding: m ? '0.75rem 1rem 0.35rem' : '0.85rem 1.5rem 0.35rem', fontSize: '0.86rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>
+        Weekplan-sjablonen{plans.length > 0 ? ` (${plans.length})` : ''}
       </div>
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {loading && <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)' }}>Laden…</div>}
-        {!loading && plans.length === 0 && (
-          <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)' }}>Nog geen opgeslagen plannen</div>
-        )}
-        {!loading && plans.map(p => (
-          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: m ? '0.55rem 0.8rem' : '0.65rem 1rem', borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: m ? '0.8rem' : '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {p.name || p.template_name || 'Naamloos plan'}
-              </div>
-              <div style={{ display: 'flex', gap: '0.4rem', fontSize: m ? '0.55rem' : '0.6rem', marginTop: 2, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
-                {p.daily_calories ? <span style={{ color: 'rgba(255,215,0,0.7)', fontWeight: 800 }}>{p.daily_calories} kcal</span> : null}
-                {p.daily_protein ? <span>{p.daily_protein}g E</span> : null}
-                {p.meals_per_day ? <span>· {p.meals_per_day} meals</span> : null}
-                {p.created_at ? <span>· {fmtDate(p.created_at)}</span> : null}
-              </div>
-              {extrasSamenvatting(p) && (
-                <div style={{ fontSize: m ? '0.55rem' : '0.6rem', marginTop: 2, color: 'rgba(255,255,255,0.55)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {extrasSamenvatting(p)}
+        {loading && <Placeholder text="Laden…" />}
+        {!loading && plans.length === 0 && <Placeholder text="Nog geen sjablonen bewaard." />}
+        {!loading && plans.map(p => {
+          const isConfirmDel = confirmDelete === p.id
+          return (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: pad, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: m ? '0.92rem' : '0.98rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.name || p.template_name || 'Naamloos plan'}
                 </div>
+                <Meta items={[p.daily_calories && `${p.daily_calories} kcal`, p.daily_protein && `${p.daily_protein}g eiwit`, p.meals_per_day && `${p.meals_per_day}x per dag`, fmtDate(p.created_at)]} />
+                {extrasSamenvatting(p) && (
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', marginTop: 2, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {extrasSamenvatting(p)}
+                  </div>
+                )}
+              </div>
+              {onLoad && (
+                <SecundairKnop onClick={() => onLoad(p.week_structure, p.name || p.template_name, { pre_workout_meal: p.pre_workout_meal || null, supplements: p.supplements || [] })}>
+                  <Download size={13} strokeWidth={2.5} /> Laden
+                </SecundairKnop>
               )}
+              <IconKnop
+                danger={isConfirmDel}
+                onClick={() => handleDelete(p.id)}
+                onBlur={() => setTimeout(() => setConfirmDelete(null), 200)}
+                title={isConfirmDel ? 'Nogmaals om te verwijderen' : 'Verwijderen'}
+              >
+                {isConfirmDel
+                  ? <span style={{ fontSize: '0.72rem', fontWeight: 900, padding: '0 0.3rem' }}>{deletingId === p.id ? 'Bezig…' : 'Zeker?'}</span>
+                  : <Trash2 size={14} />}
+              </IconKnop>
             </div>
-            <button onClick={() => onLoad?.(p.week_structure, p.name || p.template_name, { pre_workout_meal: p.pre_workout_meal || null, supplements: p.supplements || [] })} title="Dit plan laden in het huidige plan"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.6rem', flexShrink: 0, background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.35)', borderRadius: 6, color: '#FFD700', fontSize: m ? '0.68rem' : '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
-              <Download size={13} /> Laden
-            </button>
-            <button onClick={(e) => handleDelete(p.id, e)} disabled={deletingId === p.id} title="Verwijderen"
-              style={{ width: 30, height: 30, flexShrink: 0, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              {deletingId === p.id ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={14} />}
-            </button>
-          </div>
-        ))}
+          )
+        })}
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </>
+  )
+
+  const modal = (
+    <div
+      onClick={embedded ? undefined : (e) => e.target === e.currentTarget && onClose()}
+      style={embedded
+        ? { display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#0a0a0a' }
+        : { position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? 0 : '1rem' }}
+    >
+      <div style={embedded
+        ? { background: '#0a0a0a', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+        : { background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: m ? '16px 16px 0 0' : 16, width: m ? '100%' : 520, maxHeight: m ? '85vh' : '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {inhoud}
+      </div>
     </div>
   )
 
   if (embedded) return modal
-  return createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, height: m ? '90vh' : '70vh', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>{modal}</div>
-    </div>,
-    modalHost
-  )
+  return createPortal(modal, modalHost)
 }

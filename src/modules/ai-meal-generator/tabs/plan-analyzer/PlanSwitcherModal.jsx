@@ -486,11 +486,11 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   return createPortal(<>{modal}<style>{`@keyframes psmSpin { to { transform: rotate(360deg) } }`}</style></>, modalHost)
 }
 
-function Placeholder({ text }) {
+export function Placeholder({ text }) {
   return <div style={{ padding: '2rem 1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: 700, lineHeight: 1.45 }}>{text}</div>
 }
 
-function Meta({ items, inline = false }) {
+export function Meta({ items, inline = false }) {
   const filtered = (items || []).filter(Boolean)
   if (filtered.length === 0) return null
   return (
@@ -519,7 +519,7 @@ function Tag({ children, uit = false }) {
 }
 
 // Eén gevulde witte knop per rij.
-function PrimairKnop({ children, onClick, disabled, dimmed, compact }) {
+export function PrimairKnop({ children, onClick, disabled, dimmed, compact }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
       minHeight: compact ? 40 : 40, padding: compact ? '0 0.7rem' : '0 0.9rem',
@@ -533,7 +533,7 @@ function PrimairKnop({ children, onClick, disabled, dimmed, compact }) {
   )
 }
 
-function SecundairKnop({ children, onClick, disabled, breed }) {
+export function SecundairKnop({ children, onClick, disabled, breed }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
       width: breed ? '100%' : undefined, minHeight: breed ? 44 : 40, padding: '0 0.9rem', flexShrink: 0,
@@ -547,7 +547,7 @@ function SecundairKnop({ children, onClick, disabled, breed }) {
 }
 
 // Kale iconen zonder vakje. Rood alleen zolang je op "Zeker?" staat.
-function IconKnop({ children, onClick, onBlur, danger, title }) {
+export function IconKnop({ children, onClick, onBlur, danger, title }) {
   return (
     <button onClick={onClick} onBlur={onBlur} title={title} aria-label={title} style={{
       minHeight: 40, minWidth: 40, padding: 0,
