@@ -21,12 +21,14 @@ const SPIEREN = [
 ]
 const SPIER_NL = { chest: 'Borst', back: 'Rug', shoulders: 'Schouders', legs: 'Benen', biceps: 'Biceps', triceps: 'Triceps', abs: 'Core', calves: 'Kuiten', glutes: 'Billen' }
 
-// Oefening uit de bibliotheek → oefening in een trainingsdag.
+// Oefening uit de bibliotheek → oefening in een trainingsdag. Vaste start
+// voor elke oefening (2 sets, 8-12 reps, 2 min rust), niet de suggesties uit
+// de bibliotheek: dat is wat Kersten zijn klanten standaard laat doen.
 const naarDagOefening = (ex) => ({
   name: ex.name,
-  sets: parseInt(ex.suggested_sets, 10) || 3,
-  reps: ex.suggested_reps || '8-12',
-  rust: ex.suggested_rest || '90s',
+  sets: 2,
+  reps: '8-12',
+  rust: '2 min',
   equipment: ex.equipment || '',
   primairSpieren: ex.primair_spieren || '',
   type: 'strength',
