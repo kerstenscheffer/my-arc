@@ -40,6 +40,37 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
   // Verslepen: extra hoogte boven de standaardplek, in px.
   const [hoogte, setHoogte] = useState(() => Math.max(0, Number(lees(SLEUTEL_HOOGTE)) || 0))
   const [ingeklapt, setIngeklapt] = useState(() => lees(SLEUTEL_INGEKLAPT) === '1')
+
+  // Onder een venster blijven. Het voedingsscherm is zelf een vaste laag
+  // (z-index 1) en de vensters daarin (maaltijdinfo, wisselen, loggen)
+  // komen daardoor nooit boven deze fles (z-index 95) uit, hoe hoog hun
+  // eigen z-index ook is (9 okt 2026). Daarom kijkt de fles zelf of er een
+  // venster openstaat: een vaste laag met z-index ≥ 1000 die het grootste
+  // deel van het scherm bedekt. Dan verdwijnt hij tot het venster dicht is.
+  const [vensterOpen, setVensterOpen] = useState(false)
+  useEffect(() => {
+    const isVenster = (el) => {
+      if (!(el instanceof HTMLElement)) return false
+      const cs = getComputedStyle(el)
+      if (cs.position !== 'fixed') return false
+      const z = parseInt(cs.zIndex, 10)
+      if (!(z >= 1000)) return false
+      const r = el.getBoundingClientRect()
+      return r.width >= window.innerWidth * 0.6 && r.height >= window.innerHeight * 0.5
+    }
+    const kandidaten = (node) => (node instanceof HTMLElement) ? [node, ...node.children] : []
+    const open = new Set()
+    const mo = new MutationObserver((muts) => {
+      let gewijzigd = false
+      muts.forEach(m => {
+        m.addedNodes.forEach(n => kandidaten(n).forEach(el => { if (isVenster(el)) { open.add(el); gewijzigd = true } }))
+        m.removedNodes.forEach(n => { open.forEach(el => { if (n === el || (n instanceof HTMLElement && n.contains(el))) { open.delete(el); gewijzigd = true } }) })
+      })
+      if (gewijzigd) setVensterOpen(open.size > 0)
+    })
+    mo.observe(document.body, { childList: true, subtree: true })
+    return () => mo.disconnect()
+  }, [])
   const sleep = useRef({ actief: false, startY: 0, startHoogte: 0, verplaatst: false })
 
   const sleepStart = (e) => {
@@ -125,6 +156,8 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
   }
 
   if (!geladen || !client?.id) return null
+
+  if (vensterOpen) return null
 
   if (ingeklapt) {
     return (
