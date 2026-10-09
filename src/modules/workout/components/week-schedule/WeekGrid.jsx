@@ -3,6 +3,7 @@
 // Toont een rij van 7 dag-cards. Drag-and-drop is verwijderd ten gunste van
 // chevron-knoppen binnenin elke card (zie DayCard). De cards reageren alleen
 // nog op tap-to-open.
+import { useEffect, useRef, useState } from 'react'
 import DayCard from './DayCard'
 import { extraSleutels } from '../../utils/extraTrainingen'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -50,7 +51,26 @@ export default function WeekGrid({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
-  return (<>
+  // Wisselen van week: de nieuwe week schuift binnen van de kant waar je
+  // heen gaat (volgende week van rechts, vorige van links) met een korte
+  // vervaging. Daarvoor was het een harde wissel. De richting volgt uit de
+  // datum van de maandag: nieuwer dan de vorige = naar rechts.
+  const weekStempel = dayDates?.[0] ? dayDates[0].getTime() : 0
+  const vorigeStempel = useRef(weekStempel)
+  const [schuif, setSchuif] = useState(0) // 1 = van rechts, -1 = van links
+  useEffect(() => {
+    if (vorigeStempel.current && weekStempel && weekStempel !== vorigeStempel.current) {
+      setSchuif(weekStempel > vorigeStempel.current ? 1 : -1)
+      if (navigator.vibrate) navigator.vibrate(8)
+    }
+    vorigeStempel.current = weekStempel
+  }, [weekStempel])
+
+  return (<div key={weekStempel} style={{ minWidth: 0, width: '100%', animation: schuif ? `weekSchuif${schuif > 0 ? 'Rechts' : 'Links'} 0.32s cubic-bezier(0.22, 1, 0.36, 1)` : 'none' }}>
+    <style>{`
+      @keyframes weekSchuifRechts { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes weekSchuifLinks  { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
+    `}</style>
     {/* Eén dagenstrook boven het rooster, in dezelfde kolommen als de
         kaarten: dag en datum, vandaag als witte pil. De kaarten zelf hebben
         geen label meer, dus de tegels krijgen de hoogte. */}
@@ -169,5 +189,5 @@ export default function WeekGrid({
         )
       })}
     </div>
-  </>)
+  </div>)
 }
