@@ -37,6 +37,7 @@ export default function TrainingToevoegen({
   const [zoek, setZoek] = useState('')
   // Filters boven de lijst: thuis/gym en spiergroep (9 okt 2026).
   const [locatie, setLocatie] = useState('alles')
+  const [bron, setBron] = useState('alles')     // 'alles' | 'coach' | 'eigen'
   const [spier, setSpier] = useState(null)
   // De andere plannen van de klant: elke dag daaruit is ook te kiezen,
   // zonder van actief plan te wisselen (call Martijn, 8 okt 2026).
@@ -195,12 +196,15 @@ export default function TrainingToevoegen({
           {stap === 'gym-welke' && (() => {
             // Kaarten met foto, in groepen. Tik = kiezen; het i-knopje laat
             // de oefeningen zien voordat je kiest.
+            // Eigen trainingen meteen onder het plan: dat zijn de twee die je
+            // het vaakst pakt. De bron-keuze laat alleen coach- of alleen
+            // eigen trainingen zien.
             const groepen = [
-              { titel: 'Uit je plan', items: planDagen },
-              { titel: 'Uit je andere plannen', items: andereDagen },
-              { titel: 'Standaardtrainingen', items: standaardDagen },
-              { titel: 'Eigen trainingen', items: eigen.map(w => ({ key: `custom_${w.id}`, w, plan: 'Eigen', naam: w.name, eigen: w, sub: [Array.isArray(w.exercises) && w.exercises.length ? `${w.exercises.length} oefeningen` : w.type, w.duration ? `${w.duration} min` : null].filter(Boolean).join(' · ') })) },
-            ].map(g => {
+              { titel: 'Uit je plan', bron: 'coach', items: planDagen },
+              { titel: 'Eigen trainingen', bron: 'eigen', items: eigen.map(w => ({ key: `custom_${w.id}`, w, plan: 'Eigen', naam: w.name, eigen: w, sub: [Array.isArray(w.exercises) && w.exercises.length ? `${w.exercises.length} oefeningen` : w.type, w.duration ? `${w.duration} min` : null].filter(Boolean).join(' · ') })) },
+              { titel: 'Uit je andere plannen', bron: 'coach', items: andereDagen },
+              { titel: 'Standaardtrainingen', bron: 'coach', items: standaardDagen },
+            ].filter(g => bron === 'alles' || g.bron === bron).map(g => {
               const q = zoek.trim().toLowerCase()
               let items = g.items
               if (locatie !== 'alles') items = items.filter(i => locatieVan(i.w, i.plan) === locatie)
@@ -274,8 +278,11 @@ export default function TrainingToevoegen({
                   <Keuze waarde={locatie} zet={setLocatie} isMobile={isMobile}
                     opties={[{ id: 'alles', label: 'Thuis en gym' }, { id: 'thuis', label: 'Thuis' }, { id: 'gym', label: 'Gym' }]} />
                   <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-                  <Keuze waarde={spier || 'alle'} zet={(v) => setSpier(v === 'alle' ? null : v)} isMobile={isMobile} uitlijning="rechts"
+                  <Keuze waarde={spier || 'alle'} zet={(v) => setSpier(v === 'alle' ? null : v)} isMobile={isMobile}
                     opties={[{ id: 'alle', label: 'Alle spiergroepen' }, ...SPIERGROEPEN]} />
+                  <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                  <Keuze waarde={bron} zet={setBron} isMobile={isMobile} uitlijning="rechts"
+                    opties={[{ id: 'alles', label: 'Coach en eigen' }, { id: 'coach', label: 'Van je coach' }, { id: 'eigen', label: 'Eigen trainingen' }]} />
                 </div>
                 {groepen.length === 0 && <div style={{ padding: '1.5rem 0', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{zoek ? `Niets gevonden voor "${zoek}"` : filterActief ? 'Geen training die hierbij past' : 'Geen trainingen'}</div>}
                 {groepen.map((g, gi) => {
