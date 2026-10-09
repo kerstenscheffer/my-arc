@@ -932,6 +932,22 @@ function SlaapActie({ slaap, compact = false }) {
   )
 }
 
+// Eén actieknop voor de lijst: kaal icoon, vast formaat, grijs of groen.
+function ActieKnop({ gedaan, titel, onClick, Icoon }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+      title={titel} aria-label={titel}
+      style={{
+        ...kaartKnop, width: 30, height: 30,
+        color: gedaan ? '#10b981' : 'rgba(255,255,255,0.6)',
+      }}
+    >
+      <Icoon size={18} strokeWidth={2.8} />
+    </button>
+  )
+}
+
 // Eén regel in de lijst. Vaste structuur: de tijd helemaal links in een
 // vaste kolom, dan foto of icoon, de naam, en rechts hooguit één actie.
 // Elke regel even hoog, met een dunne lijn ertussen. Loopt het blok nu, dan
@@ -1000,29 +1016,35 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
         }}>
           {naam || soort}
         </span>
+        {slaap?.gelogd?.uren != null && (
+          <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
+            {nl1(slaap.gelogd.uren)}u{slaap.gelogd.kwaliteit != null ? ` · ${slaap.gelogd.kwaliteit}` : ''}
+          </span>
+        )}
       </div>
 
-      {/* Hooguit één actie. */}
-      <div style={{ flexShrink: 0, minWidth: 26, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-        {slaap ? <SlaapActie slaap={slaap} />
-          : onAfronden ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onAfronden() }}
-              title={afgerond ? 'Toch niet gegeten' : 'Afronden'}
-              aria-label={afgerond ? 'Afvinken ongedaan maken' : 'Afronden'}
-              style={{ ...kaartKnop, width: 26, height: 26, color: afgerond ? '#10b981' : 'rgba(255,255,255,0.55)' }}
-            >
-              <Check size={17} strokeWidth={3} />
-            </button>
-          ) : isTraining && onOpen ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onOpen(blok) }}
-              title="Open je schema" aria-label="Open je schema"
-              style={{ ...kaartKnop, width: 26, height: 26 }}
-            >
-              <Play size={14} strokeWidth={3.2} fill="#fff" />
-            </button>
-          ) : null}
+      {/* Hooguit één actie, voor alles dezelfde vorm: een kaal icoon in een
+          vast vak. Grijs = nog te doen, groen vinkje = gedaan. Maaltijd:
+          vinkje. Training: play. Slaap: maantje, na loggen een groen vinkje
+          (de uren staan dan zacht achter de naam). */}
+      <div style={{ flexShrink: 0, width: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {slaap?.kan ? (
+          <ActieKnop
+            gedaan={!!slaap.gelogd}
+            titel={slaap.gelogd ? 'Slaap bijwerken' : 'Slaap loggen'}
+            onClick={slaap.onLog}
+            Icoon={slaap.gelogd ? Check : Moon}
+          />
+        ) : onAfronden ? (
+          <ActieKnop
+            gedaan={afgerond}
+            titel={afgerond ? 'Toch niet gegeten' : 'Afronden'}
+            onClick={onAfronden}
+            Icoon={Check}
+          />
+        ) : isTraining && onOpen ? (
+          <ActieKnop gedaan={false} titel="Open je schema" onClick={() => onOpen(blok)} Icoon={Play} />
+        ) : null}
       </div>
     </div>
   )
