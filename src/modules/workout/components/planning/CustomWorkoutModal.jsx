@@ -101,9 +101,16 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
     setFout(''); setBezig(true)
     try {
       const data = { name: naam.trim(), type: 'gym', duration: schatMinuten(oefeningen), description: '', is_template: true, exercises: oefeningen }
-      const w = existingWorkout
+      let w = existingWorkout
         ? await workoutService.updateCustomWorkout(existingWorkout.id, data)
         : await workoutService.createCustomWorkout(clientId, data)
+      // Zekerheid: komen de oefeningen niet terug (oude service in een
+      // niet-herladen pagina, of een insert die het veld laat vallen), dan
+      // zetten we ze er apart bij. Zonder dit stond er twee keer een lege
+      // training (CHEST, test · 9 okt 2026).
+      if (w?.id && (!Array.isArray(w.exercises) || w.exercises.length !== oefeningen.length)) {
+        w = await workoutService.updateCustomWorkout(w.id, { exercises: oefeningen })
+      }
       if (navigator.vibrate) navigator.vibrate([30, 50, 30])
       onSave && onSave(w)
       onClose && onClose()
