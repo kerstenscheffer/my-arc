@@ -19,7 +19,7 @@ import BudgetService from '../BudgetService'
 
 // Foto boven de pagina — dezelfde opbouw als de Meal-pagina: compacte foto,
 // de dag met de pijlen eroverheen, daaronder de rest.
-const SHOPPING_BANNER_URL = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=700&fit=crop&q=80'
+export const SHOPPING_BANNER_URL = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=700&fit=crop&q=80'
 
 const WEEK_OPTIES = [
   { id: 1, label: '1 week' },

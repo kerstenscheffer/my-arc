@@ -4,7 +4,55 @@ import React, { useState, useEffect } from 'react'
 import ShoppingService from './ShoppingService'
 import { ShoppingCart } from 'lucide-react'
 
-import WeekShoppingTab from './tabs/WeekShoppingTab'
+import WeekShoppingTab, { SHOPPING_BANNER_URL } from './tabs/WeekShoppingTab'
+import { SkeletStijl, SkeletBlok } from '../../ui/Skelet'
+
+// Laden in de vorm van de lijst, zoals Meal en Workout (9 okt 2026): de echte
+// bannerfoto staat er meteen, daaronder de balk Deze dag / Hele week, de titel
+// en een paar categorieën met regels. Zelfde maten als WeekShoppingTab en
+// CompactShoppingCategory, zodat er niets verspringt als de lijst er is.
+function BoodschappenSkelet({ isMobile }) {
+  const zij = isMobile ? '1rem' : '1.5rem'
+  const lijn = '1px solid rgba(255,255,255,0.1)'
+  const puls = { animation: 'skeletPuls 1.4s ease-in-out infinite' }
+  return (
+    <div aria-hidden style={{ background: '#0a0a0a', minHeight: '100vh' }}>
+      <SkeletStijl />
+      <div style={{ position: 'relative', height: isMobile ? 124 : 165 }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${SHOPPING_BANNER_URL})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.12) 18%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.88) 72%, #0a0a0a 100%)' }} />
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: isMobile ? 10 : 14, display: 'flex', justifyContent: 'center' }}>
+          <SkeletBlok breedte={isMobile ? 150 : 190} hoogte={isMobile ? 22 : 26} radius={8} />
+        </div>
+      </div>
+      <div style={{ height: isMobile ? 44 : 48, borderBottom: lijn, margin: isMobile ? '0.25rem 0 0' : '0.4rem 0 0', display: 'flex', alignItems: 'center', gap: 16, padding: `0 ${zij}` }}>
+        <SkeletBlok breedte={70} hoogte={14} /><SkeletBlok breedte={70} hoogte={14} />
+        <div style={{ flex: 1 }} />
+        <SkeletBlok breedte={48} hoogte={14} /><SkeletBlok breedte={56} hoogte={14} />
+      </div>
+      <div style={{ padding: `0 ${zij}`, marginTop: isMobile ? '0.9rem' : '1.1rem' }}>
+        <SkeletBlok breedte="52%" hoogte={isMobile ? 22 : 26} radius={7} />
+      </div>
+      {[5, 4, 3].map((regels, c) => (
+        <div key={c} style={{ marginTop: isMobile ? '1.4rem' : '1.7rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `0 ${zij} 0.55rem`, borderBottom: lijn }}>
+            <SkeletBlok breedte="34%" hoogte={18} />
+            <div style={{ flex: 1 }} />
+            <SkeletBlok breedte={34} hoogte={34} radius={10} /><SkeletBlok breedte={34} hoogte={34} radius={10} />
+          </div>
+          {Array.from({ length: regels }).map((_, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52, padding: `0 ${zij}`, borderBottom: i < regels - 1 ? lijn : 'none', ...puls }}>
+              <SkeletBlok breedte={22} hoogte={22} radius={11} />
+              <SkeletBlok breedte={`${46 + ((i * 17) % 30)}%`} hoogte={13} />
+              <div style={{ flex: 1 }} />
+              <SkeletBlok breedte={46} hoogte={13} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function ShoppingHub({ client, db, onNavigate }) {
   const [service] = useState(() => new ShoppingService(db))
@@ -48,8 +96,10 @@ export default function ShoppingHub({ client, db, onNavigate }) {
     }
   }, [client])
   
+  // Alleen de eerste keer het skelet. Verversen (na een planwijziging of
+  // via onRefresh) laat de lijst staan tot de nieuwe er is, in plaats van
+  // hem weg te halen voor een laadscherm.
   const loadShoppingData = async () => {
-    setLoading(true)
     try {
       const activePlan = await service.getActiveMealPlan(client.id)
       
@@ -85,37 +135,8 @@ export default function ShoppingHub({ client, db, onNavigate }) {
     }
   }
   
-  // Loading state — minimal spinner, no glow/pulse/glassmorphism
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '60vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            border: '3px solid rgba(255, 255, 255, 0.15)',
-            borderTopColor: '#fff',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-            margin: '0 auto 1rem'
-          }} />
-          <div style={{
-            fontSize: isMobile ? '0.75rem' : '0.85rem',
-            fontWeight: '600',
-            color: 'rgba(255, 255, 255, 0.5)'
-          }}>
-            Boodschappenlijst laden...
-          </div>
-        </div>
-      </div>
-    )
-  }
-  
+  if (loading && !shoppingData) return <BoodschappenSkelet isMobile={isMobile} />
+
   return (
     <div style={{
       minHeight: '100vh',
