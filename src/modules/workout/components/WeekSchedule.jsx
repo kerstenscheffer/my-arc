@@ -416,6 +416,21 @@ export default function WeekSchedule({
   // workout van vandaag) en de oude indeling klaarzetten als planning voor
   // volgende week, zodat het daarna vanzelf terugspringt — tenzij volgende
   // week al een eigen planning heeft, dan blijft die.
+  // 'Standaard' moet ook landen in weken die al vooruit gepland staan (die
+  // hebben een eigen rij en volgen de vaste indeling niet). Zonder dit
+  // stond 'test' standaard in het plan, maar niet in volgende week (ks10k,
+  // 9 okt 2026).
+  const zetInToekomstWeken = async (vanafNa, day, workoutKey, extra) => {
+    const { data: weken } = await db.supabase.from('client_week_schedules')
+      .select('week_start, schedule').eq('client_id', clientId).gt('week_start', vanafNa)
+      .then(r => r, () => ({ data: [] }))
+    for (const w of weken || []) {
+      const sch = w.schedule || {}
+      const nieuw = extra ? voegTrainingToe(sch, day, workoutKey) : { ...sch, [day]: workoutKey }
+      await WorkoutServiceNew.saveWeekPlanning(clientId, w.week_start, nieuw, db)
+    }
+  }
+
   const bewaarGym = async ({ workoutKey, day, bereik, extra = false }) => {
     // `extra`: naast de training die er al staat (tweede training op een
     // dag), anders ervoor in de plaats.
@@ -426,6 +441,7 @@ export default function WeekSchedule({
       if (bereik === 'standaard') {
         const vast = (await db.getClientWorkoutSchedule(clientId)) || {}
         await db.updateClientWorkoutSchedule(clientId, extra ? voegTrainingToe(vast, day, workoutKey) : { ...vast, [day]: workoutKey })
+        await zetInToekomstWeken(weekSleutel, day, workoutKey, extra)
       }
       setTempSchedule(next)
       await loadCustomWorkoutsForSchedule(next)
@@ -437,7 +453,9 @@ export default function WeekSchedule({
       if (!eigenVolgende) await WorkoutServiceNew.saveWeekPlanning(clientId, volgendeWeekSleutel, tempSchedule, db)
     }
     await handleAutoSave(next)
+    if (bereik === 'standaard') await zetInToekomstWeken(weekSleutel, day, workoutKey, extra)
     await loadCustomWorkoutsForSchedule(next)
+    await laadBuurWeken()
   }
 
   // Prullenbak op een trainingstegel: alleen deze week weg, zelfde weg als
