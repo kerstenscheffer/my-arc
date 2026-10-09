@@ -101,15 +101,15 @@ function ClientKiezer({ clients = [], selectedClient, onSelectClient, compact, m
     // Zijbalk: 72/92px breed, dus alleen de voornaam en die mag afgekapt.
     return (
       <div style={{
-        position: 'relative', width: m ? 58 : 78, padding: '8px 4px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+        position: 'relative', width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
+        display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
         background: selectedClient ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.025)',
         border: `1px solid ${selectedClient ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.07)'}`,
         borderRadius: 8, cursor: 'pointer',
       }}>
         <Users size={18} color={selectedClient ? '#FFD700' : 'rgba(255,255,255,0.65)'} />
         <span style={{
-          fontSize: '0.58rem', fontWeight: 800,
+          fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800,
           color: selectedClient ? '#FFD700' : 'rgba(255,255,255,0.6)',
           maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
@@ -1563,12 +1563,15 @@ export default function PlanAnalyzer({
           Bredere kolom (72/92 ipv 56/80), iconen 18px (was 14), labels
           0.58rem (was 0.42 ≈ 5px). Inactieve knoppen krijgen een subtiele
           achtergrond + border zodat ze duidelijk als tap-target ogen. */}
+      {/* Op desktop is de zijbalk 40% breed (knoppen met icoon en tekst naast
+          elkaar), de maaltijden 60% rechts (Kersten, 9 okt 2026). Op een
+          telefoon blijft het een smalle kolom. */}
       <div style={{
-        width: m ? 72 : 92, flexShrink: 0,
+        width: m ? 72 : '40%', maxWidth: m ? undefined : 520, flexShrink: 0,
         background: '#080808',
         borderRight: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '10px 0', gap: 6,
+        display: 'flex', flexDirection: 'column', alignItems: m ? 'center' : 'stretch',
+        padding: m ? '10px 0' : '12px 14px', gap: 6, boxSizing: 'border-box',
         paddingBottom: navRuimte,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         // Meescrollen met de pagina, niet mee naar beneden verdwijnen —
@@ -1582,15 +1585,15 @@ export default function PlanAnalyzer({
           onSelectClient={onSelectClient} compact m={m} />
         {onOpenTargets && (
           <button onClick={onOpenTargets} title="Client & targets instellen" style={{
-            width: m ? 58 : 78, padding: '8px 4px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
+            display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
             background: 'rgba(255,255,255,0.025)',
             border: '1px solid rgba(255,255,255,0.07)',
             borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
             <SlidersHorizontal size={18} color="rgba(255,255,255,0.65)" />
-            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Targets</span>
+            <span style={{ fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Targets</span>
           </button>
         )}
 
@@ -1602,8 +1605,8 @@ export default function PlanAnalyzer({
               onClick={handleActivate}
               disabled={activating || isActiveAlready}
               style={{
-                width: m ? 58 : 78, padding: '8px 4px',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
+                display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
                 background: 'rgba(16,185,129,0.08)',
                 border: '1px solid rgba(16,185,129,0.3)',
                 borderRadius: 8,
@@ -1614,7 +1617,7 @@ export default function PlanAnalyzer({
               {activating
                 ? <Loader size={18} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} />
                 : <Check size={18} color="#10b981" />}
-              <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#10b981' }}>
+              <span style={{ fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800, color: '#10b981' }}>
                 {isActiveAlready ? 'Actief' : 'Activeer'}
               </span>
             </button>
@@ -1627,8 +1630,8 @@ export default function PlanAnalyzer({
             als knoppen herkenbaar zijn. Active state krijgt gold accent. */}
         {sidebarNav.map(btn => (
           <button key={btn.id} onClick={btn.onClick} title={btn.label} style={{
-            width: m ? 58 : 78, padding: '8px 4px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
+            display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
             background: btn.active ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.025)',
             border: `1px solid ${btn.active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.07)'}`,
             borderRadius: 8, cursor: 'pointer',
@@ -1643,7 +1646,7 @@ export default function PlanAnalyzer({
               {btn.icon}
             </span>
             <span style={{
-              fontSize: '0.58rem', fontWeight: 800,
+              fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800,
               color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.6)',
               letterSpacing: '0.01em',
             }}>{btn.label}</span>
@@ -1662,14 +1665,14 @@ export default function PlanAnalyzer({
         {/* Waarschuwing indicator */}
         {warningCount > 0 && (
           <div style={{
-            width: m ? 58 : 78, padding: '6px 4px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            width: m ? 58 : '100%', padding: m ? '6px 4px' : '0.55rem 0.85rem', boxSizing: 'border-box',
+            display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
             background: 'rgba(239,68,68,0.08)',
             border: '1px solid rgba(239,68,68,0.3)',
             borderRadius: 8,
           }}>
             <AlertTriangle size={16} color="#ef4444" />
-            <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ef4444' }}>{warningCount}d</span>
+            <span style={{ fontSize: m ? '0.55rem' : '0.8rem', fontWeight: 800, color: '#ef4444' }}>{warningCount}d</span>
           </div>
         )}
 
@@ -1680,8 +1683,8 @@ export default function PlanAnalyzer({
         {/* Bottom acties — zelfde stijl als nav */}
         {sidebarBottom.map(btn => (
           <button key={btn.id} onClick={btn.onClick} disabled={btn.disabled} title={btn.label} style={{
-            width: m ? 58 : 78, padding: '8px 4px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
+            display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
             background: 'rgba(255,255,255,0.025)',
             border: '1px solid rgba(255,255,255,0.07)',
             borderRadius: 8,
@@ -1694,7 +1697,7 @@ export default function PlanAnalyzer({
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>{btn.icon}</span>
             <span style={{
-              fontSize: '0.58rem', fontWeight: 800,
+              fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800,
               color: btn.disabled ? 'rgba(255,255,255,0.25)' : (btn.color || 'rgba(255,255,255,0.6)'),
             }}>{btn.label}</span>
           </button>
