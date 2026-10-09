@@ -15,6 +15,7 @@ import {
   BarChart3, Pause, CheckCircle2, Circle
 } from 'lucide-react'
 import DeleteClientModal from './DeleteClientModal'
+import { computePeriod } from './CoachingPeriodPanel'
 import ClientInsightModal from './ClientInsightModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
 import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks, maakConfig, tempoKleurVanDoel } from '../../weight-tracker/utils/coachingBand'
@@ -265,6 +266,15 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // #0a0a0a met een subtiele goud-rand — geen gradients, niet druk.
   const cardBorderLeft = `3px solid ${urgencyColor}`
 
+  // Looptijd van het traject als dunne lijn bovenaan de kaart: wit is wat
+  // er al om is, grijs wat er nog rest. Zelfde som als het trajectpaneel.
+  const traject = computePeriod(client)
+  const trajectTekst = traject
+    ? (traject.isOver
+      ? `Traject afgelopen · ${traject.weeksTotal} weken, eind ${traject.endDate}`
+      : `Week ${Math.min(traject.weeksTotal, traject.weeksDone + 1)} van ${traject.weeksTotal} · nog ${traject.weeksRemaining} ${traject.weeksRemaining === 1 ? 'week' : 'weken'}${(client.coaching_status || 'active') === 'paused' ? ' · gepauzeerd' : ''}`)
+    : null
+
   // De cijfers op de kaartregel. Terug naar het weekgemiddelde tegenover vorige
   // week en het verschil sinds de start: dat is wat je in de lijst wilt zien.
   // Tempo nu en tempo fase stonden hier even, maar die horen bij de grafiek —
@@ -366,6 +376,15 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       // lopen gelijk.
       display: 'flex', alignItems: 'stretch',
     }}>
+
+      {/* Trajectlijn: hoeveel van de looptijd om is. Bovenaan over de volle
+          breedte, 2px, zodat je de lijst kunt scannen op wie bijna klaar is.
+          Rood zodra het traject voorbij is en er geen nieuwe periode staat. */}
+      {traject && !isInactive && (
+        <div title={trajectTekst} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'rgba(255,255,255,0.12)', zIndex: 3 }}>
+          <div style={{ height: '100%', width: `${traject.isOver ? 100 : traject.pct}%`, background: traject.isOver ? '#ef4444' : '#fff', transition: 'width 0.3s ease' }} />
+        </div>
+      )}
 
       {/* Bolletje rechtsboven: deze klant heeft een check-in ingediend die jij
           nog niet hebt ingezien. Bewust niet meer dan een stip — je scant de

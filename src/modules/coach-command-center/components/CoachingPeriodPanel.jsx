@@ -35,7 +35,8 @@ const formatDate = (iso) => {
 }
 
 // Bereken: eind-datum, weken-gedaan, weken-totaal, weken-resterend, percentage
-function computePeriod(client) {
+// Ook gebruikt door de klantkaart in Command (trajectlijn bovenaan).
+export function computePeriod(client) {
   const start = client.coaching_start_date
   const weeks = client.coaching_total_weeks
   const pausedDays = client.coaching_paused_days_total || 0
