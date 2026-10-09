@@ -16,20 +16,20 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Moon, X, Check, Trash2, Lightbulb, ChevronLeft, Scale } from 'lucide-react'
+import { Moon, X, Check, Trash2, Lightbulb, ChevronLeft, Scale, History } from 'lucide-react'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
 import HorizontaleSlider from '../../client/components/HorizontaleSlider'
 
 // Overgenomen uit het oude slaapblok op de pagina. Dat blok is weg; deze tips
 // waren het enige eraan dat niet in dit blad zat.
 const TIPS = [
-  'Ga elke dag op dezelfde tijd naar bed én sta op dezelfde tijd op — ook in het weekend.',
-  'Houd je slaapkamer koel: 17–19 °C is ideaal voor diepe slaap.',
+  'Ga elke dag op dezelfde tijd naar bed en sta op dezelfde tijd op, ook in het weekend.',
+  'Houd je slaapkamer koel. Tussen 17 en 19 °C slaap je het diepst.',
   'Zorg voor volledige duisternis. Gebruik een slaapmasker of verduisteringsgordijnen.',
-  'Geen schermen binnen 45 minuten voor bedtijd — blauw licht remt melatonine.',
+  'Leg je scherm 45 minuten voor bedtijd weg. Blauw licht remt melatonine.',
   "Neem 's avonds een warme douche: de afkoeling daarna versnelt het inslapen.",
-  'Eet je laatste maaltijd 2–3 uur voor bedtijd.',
-  'Kom zodra je wekker gaat meteen uit bed — snoozen verstoort je ritme.',
+  'Eet je laatste maaltijd 2 tot 3 uur voor bedtijd.',
+  'Sta op zodra je wekker gaat. Snoozen verstoort je ritme.',
   'Ga binnen 30 minuten na het opstaan naar buiten voor daglicht.',
 ]
 
@@ -405,12 +405,12 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
               <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : alGelogd ? 'Bijwerken' : 'Opslaan'}
             </button>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
               <button onClick={() => { setToonEerdere(v => !v); setToonTips(false) }} style={linkKnop}>
-                {toonEerdere ? 'Verberg nachten' : 'Eerdere nachten'}
+                <History size={13} strokeWidth={2.6} /> {toonEerdere ? 'Verberg nachten' : 'Eerdere nachten'}
               </button>
               <button onClick={() => { setToonTips(v => !v); setToonEerdere(false) }} style={linkKnop}>
-                <Lightbulb size={12} strokeWidth={2.8} /> Beter slapen
+                <Lightbulb size={13} strokeWidth={2.6} color="#facc15" /> Beter slapen
               </button>
             </div>
 
