@@ -428,67 +428,46 @@ export default function DagAgenda({
         </div>
       )}
 
-      {/* Schakelaar tussen lijst en rooster, met rechts de knop om het op het
-          hele scherm te zetten. */}
+      {/* Kaal rijtje iconen rechts: wisselen tussen lijst en rooster, je
+          dagindeling, en (alleen in het rooster) op het hele scherm. De grote
+          schakelaar was drukker dan de dag eronder. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
-        paddingBottom: isMobile ? 10 : 12,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexShrink: 0,
+        paddingBottom: isMobile ? 4 : 6,
       }}>
-        <div style={{
-          position: 'relative', display: 'flex', flex: 1, height: 30, padding: 3,
-          background: 'rgba(255,255,255,0.04)', border: `1px solid ${LIJN}`, borderRadius: 10,
-        }}>
-          <div style={{
-            position: 'absolute', top: 3, bottom: 3, width: 'calc(50% - 3px)',
-            left: weergave === 'lijst' ? 3 : '50%', borderRadius: 8, background: '#fff',
-            transition: 'left 0.2s cubic-bezier(0.4,0,0.2,1)',
-          }} />
-          {[
-            { id: 'lijst', label: 'Lijst', Icoon: List },
-            { id: 'rooster', label: 'Rooster', Icoon: CalendarClock },
-          ].map(v => (
-            <button
-              key={v.id}
-              onClick={() => setWeergave(v.id)}
-              style={{
-                position: 'relative', flex: 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900,
-                color: weergave === v.id ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <v.Icoon size={12} strokeWidth={2.8} />
-              {v.label}
-            </button>
-          ))}
-        </div>
-        {/* Naar het vaste frame van je week: slaap, werk, training, eten.
-            Hier verzet je één dag; daar zet je wat elke week geldt. */}
+        <button
+          onClick={() => setWeergave(weergave === 'lijst' ? 'rooster' : 'lijst')}
+          title={weergave === 'lijst' ? 'Als rooster' : 'Als lijst'}
+          aria-label={weergave === 'lijst' ? 'Als rooster' : 'Als lijst'}
+          style={{ ...pijlKnop, width: 28, height: 28, color: 'rgba(255,255,255,0.6)' }}
+        >
+          {weergave === 'lijst' ? <CalendarClock size={16} strokeWidth={2.6} /> : <List size={16} strokeWidth={2.6} />}
+        </button>
         <button
           onClick={() => setDagindeling(true)}
           title="Mijn dagindeling"
           aria-label="Mijn dagindeling"
-          style={{ ...pijlKnop, width: 28, height: 28 }}
+          style={{ ...pijlKnop, width: 28, height: 28, color: 'rgba(255,255,255,0.6)' }}
         >
-          <SlidersHorizontal size={15} strokeWidth={3} />
+          <SlidersHorizontal size={15} strokeWidth={2.6} />
         </button>
-        <button
-          onClick={() => setVolledig(v => !v)}
-          title={volledig ? 'Sluiten' : 'Op het hele scherm'}
-          aria-label={volledig ? 'Sluiten' : 'Op het hele scherm'}
-          style={{ ...pijlKnop, width: 28, height: 28 }}
-        >
-          {volledig ? <X size={17} strokeWidth={3} /> : <Maximize2 size={15} strokeWidth={3} />}
-        </button>
+        {(weergave === 'rooster' || volledig) && (
+          <button
+            onClick={() => setVolledig(v => !v)}
+            title={volledig ? 'Sluiten' : 'Op het hele scherm'}
+            aria-label={volledig ? 'Sluiten' : 'Op het hele scherm'}
+            style={{ ...pijlKnop, width: 28, height: 28, color: 'rgba(255,255,255,0.6)' }}
+          >
+            {volledig ? <X size={17} strokeWidth={2.8} /> : <Maximize2 size={15} strokeWidth={2.6} />}
+          </button>
+        )}
       </div>
 
       {/* Lijst: wat er vandaag staat, van vroeg naar laat. Eén regel per
           blok, met de tijden rechts — zoals de dagweergave van een
           agenda-app. Beantwoordt "wat moet ik vandaag" zonder scrollen. */}
       {weergave === 'lijst' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: `1px solid ${LIJN}` }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {laden && (
             <div style={{ padding: '1.2rem 0', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
               Dag laden…
@@ -933,30 +912,30 @@ function TijdStempel({ blok, onTijd, kleur }) {
 const nl1 = (n) => String(Math.round(Number(n) * 10) / 10).replace('.', ',')
 function SlaapActie({ slaap, compact = false }) {
   if (!slaap?.kan) return null
+  const knop = {
+    flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0,
+    background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+    fontSize: compact ? '0.62rem' : '0.74rem', fontWeight: 900, whiteSpace: 'nowrap',
+    fontVariantNumeric: 'tabular-nums', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
   if (slaap.gelogd) {
     return (
-      <button onClick={(e) => { e.stopPropagation(); slaap.onLog() }} title="Slaap bijwerken" style={{
-        flexShrink: 0, padding: 0, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-        fontSize: compact ? '0.62rem' : '0.72rem', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap',
-        fontVariantNumeric: 'tabular-nums', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      }}>
+      <button onClick={(e) => { e.stopPropagation(); slaap.onLog() }} title="Slaap bijwerken" style={{ ...knop, color: '#10b981' }}>
         {slaap.gelogd.uren != null ? `${nl1(slaap.gelogd.uren)}u` : '✓'}{slaap.gelogd.kwaliteit != null ? ` · ${slaap.gelogd.kwaliteit}` : ''}
       </button>
     )
   }
   return (
-    <button onClick={(e) => { e.stopPropagation(); slaap.onLog() }} title="Slaap loggen" aria-label="Slaap loggen" style={{
-      flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
-      height: compact ? 18 : 24, padding: compact ? '0 6px' : '0 9px', borderRadius: 999,
-      background: '#fff', border: 'none', color: '#0a0a0a', cursor: 'pointer', fontFamily: 'inherit',
-      fontSize: compact ? '0.6rem' : '0.7rem', fontWeight: 900, whiteSpace: 'nowrap',
-      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-    }}>
-      <Moon size={compact ? 10 : 12} strokeWidth={2.8} /> Log
+    <button onClick={(e) => { e.stopPropagation(); slaap.onLog() }} title="Slaap loggen" aria-label="Slaap loggen" style={{ ...knop, color: '#fff' }}>
+      <Moon size={compact ? 11 : 14} strokeWidth={2.6} /> Log
     </button>
   )
 }
 
+// Eén regel in de lijst, zo rustig mogelijk: foto of icoon, de naam, één
+// tijd rechts en hooguit één actie. Geen streep, geen soortlabel eronder,
+// geen eindtijd (die staat in het rooster). Loopt het blok nu, dan staat er
+// een wit stipje voor de naam. Maaltijd en training: tik op de regel opent.
 function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezig, slaap = null }) {
   const isMaaltijd = blok.type === 'meal'
   const isTraining = blok.type === 'training'
@@ -967,111 +946,78 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
     ? (resolveFoodImage({ image_url: blok.meta?.image_url, name: naam }) || foodImageFallback(naam, blok.meta?.slot, 200))
     : isTraining ? workoutFoto(naam || soort)
     : null
+  const opent = onOpen && (isMaaltijd || isTraining)
+  const fotoMaat = isMobile ? 34 : 38
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: isMobile ? '0.55rem 0' : '0.65rem 0',
-      borderBottom: `1px solid ${LIJN_ZACHT}`,
-      opacity: afgerond ? 0.6 : 1,
-    }}>
-      <span style={{
-        width: 3, alignSelf: 'stretch', flexShrink: 0, borderRadius: 2,
-        background: bezig ? '#fff' : 'rgba(255,255,255,0.3)',
-        minHeight: 26,
-      }} />
-
-      {/* Maaltijd en training krijgen hun foto mee; de rest een icoon. Een
-          regel met een bord eten ernaast herken je sneller dan een regel met
-          een vorkje. */}
+    <div
+      onClick={opent ? () => onOpen(blok) : undefined}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: isMobile ? '0.5rem 0' : '0.55rem 0',
+        opacity: afgerond ? 0.45 : 1,
+        cursor: opent ? 'pointer' : 'default',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
       {foto ? (
         <span style={{
-          width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, flexShrink: 0,
-          borderRadius: 8, overflow: 'hidden',
+          width: fotoMaat, height: fotoMaat, flexShrink: 0, borderRadius: 9,
           background: `url(${foto}) center/cover`,
-          border: '1px solid rgba(255,255,255,0.08)',
         }} />
       ) : (
-        <Icoon size={12} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+        <span style={{ width: fotoMaat, height: fotoMaat, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icoon size={15} color="rgba(255,255,255,0.45)" strokeWidth={2.4} />
+        </span>
       )}
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800,
-          color: afgerond ? 'rgba(255,255,255,0.45)' : '#fff',
-          textDecoration: afgerond ? 'line-through' : 'none',
-          letterSpacing: '-0.015em', lineHeight: 1.25,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {naam || soort}
-        </div>
-        {naam && soort && (
-          <div style={{
-            fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)',
-            textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {soort}
-          </div>
-        )}
+      <div style={{
+        flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7,
+        fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 800, color: '#fff',
+        letterSpacing: '-0.015em',
+      }}>
+        {bezig && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />}
+        <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam || soort}</span>
       </div>
 
-      {/* Vaste breedte voor de tijden, en daarnaast een vast vak voor de
-          knoppen. Zonder dat schoven de tijden per regel op: een blok zonder
-          knoppen duwde ze naar rechts en een maaltijd met twee knoppen naar
-          links, en dan staat er geen kolom meer. */}
-      {/* De tijd is de knop: tikken opent het wiel waarmee je hem verzet.
-          Een apart potloodje erbij maakte de regel drukker dan de agenda
-          waar hij op lijkt. */}
+      {/* Eén tijd. Tikken verzet hem (zelfde wiel als eerst). Bij een
+          maaltijd staat het moment er zacht voor: 'ontbijt 08:10'. */}
       <button
-        onClick={onTijd || undefined}
+        onClick={(e) => { e.stopPropagation(); onTijd?.() }}
         disabled={!onTijd}
         title={onTijd ? 'Tijd aanpassen' : undefined}
         style={{
-          flexShrink: 0, width: 44, padding: 0, textAlign: 'right', lineHeight: 1.25,
-          background: 'transparent', border: 'none', fontFamily: 'inherit',
-          cursor: onTijd ? 'pointer' : 'default',
+          flexShrink: 0, padding: 0, background: 'transparent', border: 'none', fontFamily: 'inherit',
+          cursor: onTijd ? 'pointer' : 'default', whiteSpace: 'nowrap',
+          fontSize: '0.76rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <div style={{
-          fontSize: '0.74rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums',
-          textDecoration: onTijd ? 'underline' : 'none',
-          textDecorationColor: 'rgba(255,255,255,0.25)',
-          textUnderlineOffset: 3,
-        }}>
-          {tijd(blok.start)}
-        </div>
-        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', fontVariantNumeric: 'tabular-nums' }}>
-          {tijd(blok.end)}
-        </div>
+        {isMaaltijd && soort && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'lowercase' }}>{soort} </span>}
+        {tijd(blok.start)}
       </button>
 
-      <div style={{
-        flexShrink: 0, width: slaap?.kan ? 'auto' : 50, minWidth: 50,
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
-      }}>
-        {slaap && <SlaapActie slaap={slaap} />}
-        {onAfronden && (
-          <button
-            onClick={onAfronden}
-            title={afgerond ? 'Toch niet gegeten' : 'Afronden'}
-            aria-label={afgerond ? 'Afvinken ongedaan maken' : 'Afronden'}
-            style={{ ...kaartKnop, color: afgerond ? '#10b981' : '#fff' }}
-          >
-            <Check size={15} strokeWidth={3.2} />
-          </button>
-        )}
-        {onOpen && (isMaaltijd || isTraining) && (
-          <button
-            onClick={() => onOpen(blok)}
-            title={isTraining ? 'Open je schema' : 'Open in je maaltijdplan'}
-            aria-label={isTraining ? 'Open je schema' : 'Open in je maaltijdplan'}
-            style={kaartKnop}
-          >
-            {isTraining ? <Play size={14} strokeWidth={3.2} fill="#fff" /> : <Pijl size={15} strokeWidth={3.2} />}
-          </button>
-        )}
+      {/* Hooguit één actie. */}
+      <div style={{ flexShrink: 0, minWidth: 26, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+        {slaap ? <SlaapActie slaap={slaap} />
+          : onAfronden ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onAfronden() }}
+              title={afgerond ? 'Toch niet gegeten' : 'Afronden'}
+              aria-label={afgerond ? 'Afvinken ongedaan maken' : 'Afronden'}
+              style={{ ...kaartKnop, width: 26, height: 26, color: afgerond ? '#10b981' : 'rgba(255,255,255,0.55)' }}
+            >
+              <Check size={17} strokeWidth={3} />
+            </button>
+          ) : isTraining && onOpen ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpen(blok) }}
+              title="Open je schema" aria-label="Open je schema"
+              style={{ ...kaartKnop, width: 26, height: 26 }}
+            >
+              <Play size={14} strokeWidth={3.2} fill="#fff" />
+            </button>
+          ) : null}
       </div>
     </div>
   )

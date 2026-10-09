@@ -106,28 +106,8 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
 
   const firstName = client?.first_name || 'Champion'
 
-  // Traject-voortgang voor in de balk: "Week X/Y" + dunne balk.
-  const startStr = client?.coaching_start_date
-  const totalWeeks = client?.coaching_total_weeks
-  const endStr = client?.subscription_end_date
-  let curWeek = null, weeksTotal = null
-  if (startStr) {
-    const start = new Date(startStr)
-    const elapsedWeeks = Math.floor(Math.max(0, (today.getTime() - start.getTime()) / 86400000) / 7)
-    if (totalWeeks && totalWeeks > 0) {
-      // Traject-lengte staat op de client (coaching_total_weeks) — leidend.
-      weeksTotal = totalWeeks
-      curWeek = Math.min(weeksTotal, elapsedWeeks + 1)
-    } else if (endStr) {
-      // Anders afleiden uit de einddatum.
-      const end = new Date(endStr)
-      weeksTotal = Math.ceil(Math.max(1, (end.getTime() - start.getTime()) / 86400000) / 7)
-      curWeek = Math.min(weeksTotal, elapsedWeeks + 1)
-    } else {
-      // Open-ended: alleen hoeveelste week.
-      curWeek = elapsedWeeks + 1
-    }
-  }
+  // De trajectweek (week 12/12) stond hier naast de datum; weggehaald voor
+  // een rustiger kop (9 okt 2026).
 
   // Zelfde kop als de maaltijd- en workout-pagina: eerst de foto over de
   // volle breedte, daaronder de tekst in bold wit. De gouden dag met het
@@ -197,9 +177,6 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
           )}
           <span style={{ color: isVandaag === false ? '#fff' : 'inherit' }}>
             {dayName.toLowerCase()} {dateLabel}
-            {curWeek != null && (
-              <> · week {curWeek}{weeksTotal != null && `/${weeksTotal}`}</>
-            )}
           </span>
           {onVerzet && (
             <button onClick={() => onVerzet(1)} aria-label="Volgende dag" style={dagPijlKnop}>

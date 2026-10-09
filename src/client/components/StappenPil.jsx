@@ -97,10 +97,11 @@ export default function StappenPil({ client, db, isMobile = false, kaal = false 
         }}>
           {kort(stand)}
           {/* In de bovenbalk ook het doel erbij: 5.105/8.500. */}
-          {kaal && doel > 0 && <span style={{ color: 'rgba(255,255,255,0.35)' }}>/{kort(doel)}</span>}
+          {kaal && doel > 0 && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.64rem', fontWeight: 800 }}>/{kort(doel)}</span>}
         </span>
-        {/* Streepje van hoever je bent: net genoeg om te zien of je op koers
-            ligt zonder het getal te lezen. */}
+        {/* Streepje van hoever je bent; in de bovenbalk niet, daar staat het
+            doel er al als getal bij. */}
+        {!kaal && (
         <span style={{
           width: 18, height: 3, borderRadius: 2, flexShrink: 0,
           background: 'rgba(255,255,255,0.14)', overflow: 'hidden',
@@ -110,6 +111,7 @@ export default function StappenPil({ client, db, isMobile = false, kaal = false 
             background: gehaald ? '#10b981' : '#fff',
           }} />
         </span>
+        )}
       </button>
 
       {open && (

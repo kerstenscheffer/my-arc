@@ -177,7 +177,7 @@ export default function FocusDezeWeek({ db, client, isMobile = false, compact = 
           return (
             <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: klaar ? '#10b981' : '#fff', fontSize: '0.78rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
               <Icoon size={14} strokeWidth={2.6} />
-              {x.gedaan}<span style={{ color: 'rgba(255,255,255,0.35)' }}>/{x.doel}</span>
+              {x.gedaan}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.66rem', fontWeight: 800 }}>/{x.doel}</span>
             </span>
           )
         })}

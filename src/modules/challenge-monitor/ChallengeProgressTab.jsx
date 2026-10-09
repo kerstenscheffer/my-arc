@@ -122,7 +122,7 @@ export default function ChallengeProgressTab({ db, client, isMobile = false, inl
       >
         <Trophy size={16} strokeWidth={2.6} color={kleur} />
         <span style={{ fontSize: '0.82rem', fontWeight: 900, color: kleur, fontVariantNumeric: 'tabular-nums' }}>
-          {behaald}<span style={{ color: 'rgba(255,255,255,0.35)' }}>/{EISEN.length}</span>
+          {behaald}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontWeight: 800 }}>/{EISEN.length}</span>
         </span>
       </button>
     )
