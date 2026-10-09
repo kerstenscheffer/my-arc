@@ -256,11 +256,6 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
       <HorizontaleSlider waarden={lijst} waarde={opVijf(waarde)} onChange={zet} itemBreedte={84} />
     </div>
   )
-  const planRegel = gepland ? (
-    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: -8, marginBottom: 16 }}>
-      Volgens je intake: {gepland.bed} – {gepland.op}
-    </div>
-  ) : null
   const bewaarGewicht = async (verder) => {
     if (gewichtBezig) return
     if (verder && gewicht) {
@@ -319,7 +314,6 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         {stap === 1 && (
           <>
             {vraag('Hoe laat ging je naar bed?')}
-            {planRegel}
             {klok(bed, setBed, BEDTIJDEN)}
             <button onClick={() => setStap(2)} style={primair}>Volgende</button>
           </>
@@ -328,7 +322,6 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         {stap === 2 && (
           <>
             {vraag('Hoe laat stond je op?')}
-            {planRegel}
             {klok(opstaan, setOpstaan, OPSTAATIJDEN)}
             <button onClick={() => setStap(3)} style={primair}>Volgende</button>
           </>
