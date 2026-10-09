@@ -13,6 +13,15 @@ import { getAIMealPlanningService } from '../modules/ai-meal-generator/AIMealPla
 
 
 
+// Kolommen van `clients` voor lijsten (Command, CoachHub). Alles behalve
+// `profile_image` (base64-foto's, 8,4 MB over alle klanten) en
+// `personal_info` (oude intake-JSON, 3,3 MB): die twee leest niets meer in
+// de app, maar met select('*') kwamen ze bij elke lading mee. De klantenlijst
+// was daardoor 11,9 MB en 6,7 s, en alles in Command wachtte daarop
+// (gemeten 9 okt 2026). Nieuwe kolom op clients? Hier toevoegen, anders
+// komt hij niet in de lijsten.
+export const CLIENT_KOLOMMEN_LIJST = 'legacy_id, trainer_id, first_name, last_name, email, phone, goal, experience, status, last_workout, assigned_plan_id, notes, created_at, updated_at, assigned_schema_id, schema_assigned_at, auth_user_id, id, age, height, current_weight, target_weight, gender, primary_goal, strength_goals, visual_goals, current_training, days_per_week, minutes_per_session, meal_preferences, injuries, medications, medical_notes, training_info, nutrition_info, video_intro, video_workout, video_nutrition, video_technique, video_motivation, video_checkin, coach_id, last_invite_sent, activated_at, goal_weight, workout_streak, last_workout_date, start_weight, location, date_of_birth, emergency_contact_name, emergency_contact_phone, body_fat_percentage, muscle_mass, goal_urgency, goal_deadline, weekly_weight_goal, target_calories, target_protein, target_carbs, target_fat, activity_level, workout_days_per_week, workout_type, job_type, sleep_hours, stress_level, dietary_type, allergies, intolerances, loved_foods, hated_foods, favorite_cuisines, budget_per_week, cooking_skill, cooking_time, meal_prep_preference, medical_conditions, pregnant, breastfeeding, supplements, tracking_method, weigh_in_frequency, alcohol_frequency, coach_notes, ai_notes, profile_updated_at, water_intake_target, workout_schedule, stripe_customer_id, stripe_subscription_id, payment_plan, last_payment_date, total_paid, subscription_end_date, has_completed_meal_setup, manual_macro_targets, tdee, calorie_target, surplus, training_time, training_days, motivation, training_experience, gym_name, coaching_style_pref, communication_pref, previous_coaching, intake_completed, intake_completed_at, variety_preference, meals_per_day, budget_baseline_set_at, budget_total_baseline, budget_breakfast_out_freq, budget_lunch_out_freq, budget_dinner_out_freq, budget_delivery_freq, budget_going_out_freq, budget_snacks_freq, budget_breakdown, meal_tracking_style, work_schedule, preferred_training_days, current_body_fat, target_body_fat, current_body_fat_2, biggest_obstacle, coaching_expectations, coaching_goals_extra, goal_timeline, sales_call_notes, coaching_method, current_eating, meal_context, client_expectations, wat_werkte_eerder, waarom_gestopt, muscle_goal_type, lichaam_omschrijving, fitness_doel_tags, muscle_focus_tags, has_weight_goal, coaching_goal_tags, onboarding_step, onboarding_checks, exercise_preferences, meal_view_mode, coaching_start_date, coaching_total_weeks, coaching_status, coaching_paused_at, coaching_pause_reason, coaching_paused_days_total, maintenance_settings, meal_plan_visible, profile_photo_url, quick_win_2weeks, supplementen_nu, intake_slotwoord, agenda_toelichting, eigen_blokken, motivation_verbatim, daily_steps, kaart_kleur, step_goal, actieve_gym_id'
+
 class DatabaseServiceClass {
   constructor() {
     // Cache management
@@ -308,7 +317,7 @@ async getAIMealService() {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('*')
+        .select(CLIENT_KOLOMMEN_LIJST)
         .eq('trainer_id', tid)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
@@ -356,7 +365,7 @@ async getAIMealService() {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('*')
+        .select(CLIENT_KOLOMMEN_LIJST)
         .eq('trainer_id', tid)
         .order('status', { ascending: true })
         .order('created_at', { ascending: false })
