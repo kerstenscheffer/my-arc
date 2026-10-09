@@ -563,7 +563,7 @@ export default function DagAgenda({
 
       {/* Dagvoortgang: hoeveel van wat er af te vinken valt, is gedaan. */}
       {voortgang.totaal > 0 && (
-        <div style={{ flexShrink: 0, paddingBottom: isMobile ? 10 : 12 }}>
+        <div style={{ flexShrink: 0, paddingBottom: weergave === 'lijst' && gedaanBlokken.length > 0 ? 0 : (isMobile ? 10 : 12) }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 6 }}>
             <span style={{ fontSize: '0.78rem', fontWeight: 900, color: voortgang.rond ? '#10b981' : '#fff', letterSpacing: '-0.01em', transition: 'color 0.4s ease' }}>
               {voortgang.rond ? 'Dag rond' : `${voortgang.gedaan} van ${voortgang.totaal} gedaan`}
@@ -579,6 +579,74 @@ export default function DagAgenda({
               transition: 'width 0.6s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s ease',
             }} />
           </div>
+        </div>
+      )}
+
+      {/* Het deck: de fotootjes en icoontjes van wat gedaan is als kaartjes die
+          iets scheef over elkaar liggen, strak onder de voortgangsbalk. Het
+          nieuwste kaartje valt er bovenop. Tik om open te waaieren. */}
+      {weergave === 'lijst' && gedaanBlokken.length > 0 && (
+        <div style={{ flexShrink: 0, paddingBottom: isMobile ? 10 : 12 }}>
+          <style>{`
+            @keyframes arcKaartErbij { 0% { transform: translateY(-16px) rotate(var(--r)) scale(1.25); opacity: 0 } 60% { transform: translateY(2px) rotate(var(--r)) scale(0.96); opacity: 1 } 100% { transform: translateY(0) rotate(var(--r)) scale(1) } }
+            @keyframes arcDeckUit { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: none } }
+          `}</style>
+          <button
+            onClick={() => setDeckOpen(o => !o)}
+            aria-expanded={deckOpen}
+            aria-label={`${gedaanBlokken.length} gedaan, ${deckOpen ? 'inklappen' : 'bekijken'}`}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0 0',
+              background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', paddingLeft: 2 }}>
+              {gedaanBlokken.map((b, i) => {
+                const foto = b.type === 'meal'
+                  ? (resolveFoodImage({ image_url: b.meta?.image_url, name: b.sublabel }) || foodImageFallback(b.sublabel, b.meta?.slot, 120))
+                  : null
+                const Icoon = ICOON[b.type] || Check
+                const rot = ((i * 37) % 9) - 4
+                const laatste = i === gedaanBlokken.length - 1
+                return (
+                  <span key={b.id} style={{
+                    '--r': `${rot}deg`,
+                    width: 28, height: 36, marginLeft: i ? -12 : 0, borderRadius: 6, flexShrink: 0,
+                    border: '2px solid #0a0a0a', boxShadow: '0 3px 8px rgba(0,0,0,0.5)',
+                    background: foto ? `url(${foto}) center/cover` : '#1c1c1c',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transform: `rotate(${rot}deg)`, zIndex: i,
+                    animation: laatste && deckPop ? 'arcKaartErbij 0.5s cubic-bezier(0.3, 1.3, 0.5, 1)' : 'none',
+                  }}>
+                    {!foto && <Icoon size={13} strokeWidth={2.6} color="#10b981" />}
+                  </span>
+                )
+              })}
+            </span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap' }}>
+              {gedaanBlokken.length} gedaan
+            </span>
+            <ChevronRight size={15} strokeWidth={3} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto', transform: deckOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
+          </button>
+          {deckOpen && (
+            <div style={{ marginTop: 8, animation: 'arcDeckUit 0.25s ease' }}>
+              {gedaanBlokken.map(b => (
+                <LijstRegel
+                  key={`gedaan-${b.id}`}
+                  blok={b}
+                  isMobile={isMobile}
+                  onOpen={onOpen}
+                  afgerond
+                  onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
+                  onTijd={b.type === 'weging' ? null : () => setBewerk(b)}
+                  bezig={false}
+                  slaap={slaapVan(b)}
+                  wegen={wegenVan(b)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -638,80 +706,7 @@ export default function DagAgenda({
           )}
           <style>{`
             @keyframes arcInklappen { 0% { max-height: 60px; opacity: 1; transform: translateY(0) scale(1) } 55% { opacity: 0.6; transform: translateY(-14px) scale(0.97) } 100% { max-height: 0; opacity: 0; transform: translateY(-34px) scale(0.92) } }
-            @keyframes arcDeckPop { 0% { transform: scale(1) } 35% { transform: scale(1.04) translateY(-2px) } 100% { transform: scale(1) } }
-            @keyframes arcDeckUit { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
           `}</style>
-
-          {/* Het deck: stapeltje kaarten van wat gedaan is. Tik om open te waaieren. */}
-          {gedaanBlokken.length > 0 && (() => {
-            const fotos = gedaanBlokken.slice(-3).reverse().map(b => (
-              b.type === 'meal'
-                ? (resolveFoodImage({ image_url: b.meta?.image_url, name: b.sublabel }) || foodImageFallback(b.sublabel, b.meta?.slot, 120))
-                : null
-            ))
-            return (
-              <div style={{ padding: '10px 0 6px' }}>
-                <button
-                  onClick={() => setDeckOpen(o => !o)}
-                  aria-expanded={deckOpen}
-                  style={{
-                    position: 'relative', width: '100%', height: 52, padding: 0, background: 'transparent', border: 'none',
-                    cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  {/* Kaarten erachter, iets scheef en kleiner: het stapeltje. */}
-                  {gedaanBlokken.length > 2 && <span style={{ position: 'absolute', left: 14, right: 14, top: 0, height: 44, borderRadius: 12, background: '#121212', border: '1px solid rgba(255,255,255,0.06)', transform: 'rotate(-1.6deg)' }} />}
-                  {gedaanBlokken.length > 1 && <span style={{ position: 'absolute', left: 7, right: 7, top: 3, height: 46, borderRadius: 12, background: '#151515', border: '1px solid rgba(255,255,255,0.08)', transform: 'rotate(1.2deg)' }} />}
-                  <span key={deckPop} style={{
-                    position: 'absolute', left: 0, right: 0, top: 6, height: 46, borderRadius: 12,
-                    background: '#181818', border: '1px solid rgba(16,185,129,0.35)',
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
-                    animation: deckPop ? 'arcDeckPop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1)' : 'none',
-                  }}>
-                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Check size={13} strokeWidth={3.4} color="#0a0a0a" />
-                    </span>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
-                      {gedaanBlokken.length} gedaan
-                    </span>
-                    <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
-                      {fotos.map((f, i) => (
-                        <span key={i} style={{
-                          width: 26, height: 26, borderRadius: 7, marginLeft: i ? -8 : 0,
-                          border: '2px solid #181818', background: f ? `url(${f}) center/cover` : 'rgba(255,255,255,0.08)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          {!f && <Check size={12} strokeWidth={3} color="#10b981" />}
-                        </span>
-                      ))}
-                      <ChevronRight size={16} strokeWidth={3} color="rgba(255,255,255,0.45)" style={{ marginLeft: 8, transform: deckOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
-                    </span>
-                  </span>
-                </button>
-
-                {/* Opengewaaierd: alles wat gedaan is, terug te draaien. */}
-                {deckOpen && (
-                  <div style={{ marginTop: 8, animation: 'arcDeckUit 0.25s ease' }}>
-                    {gedaanBlokken.map(b => (
-                      <LijstRegel
-                        key={`gedaan-${b.id}`}
-                        blok={b}
-                        isMobile={isMobile}
-                        onOpen={onOpen}
-                        afgerond
-                        onAfronden={b.type === 'meal' ? () => wisselAfgerond(b) : null}
-                        onTijd={b.type === 'weging' ? null : () => setBewerk(b)}
-                        bezig={false}
-                        slaap={slaapVan(b)}
-                        wegen={wegenVan(b)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })()}
 
           {/* Wat nog moet. Net afgevinkt? Dan klapt de regel eerst in en
               schiet hij omhoog naar het deck. */}
