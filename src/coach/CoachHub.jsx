@@ -494,29 +494,10 @@ export default function CoachHub() {
   // ============================================
   // RENDER TAB CONTENT
   // ============================================
+  // Geen hub-brede spinner meer: het tabblad staat er meteen en laadt zijn
+  // eigen blokken (zie src/ui/Skelet.jsx). De lijsten uit initializeHub
+  // (klanten, schema's, templates) vullen zich terwijl je al kijkt.
   const renderTabContent = (tabId = activeTab) => {
-    if (loading) {
-      return (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '4rem',
-          minHeight: '50vh'
-        }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: `2px solid ${G.border}`,
-            borderTopColor: G.primary,
-            borderRadius: '50%',
-            animation: 'chSpin 0.8s linear infinite'
-          }} />
-        </div>
-      )
-    }
-
     switch (tabId) {
       case 'command':
         return (

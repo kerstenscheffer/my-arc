@@ -5,6 +5,7 @@
 // sales-call-6week-pagina staat er nog maar wordt niet meer gerenderd.
 import { useState, useEffect } from 'react'
 import lazy from './lazyMetHerlaad'
+import LaadScherm from './components/LaadScherm'
 import Login from './components/Login'
 import DatabaseService from './services/DatabaseService'
 import { LanguageProvider } from './contexts/LanguageContext'
@@ -486,13 +487,7 @@ function App() {
   // AUTHENTICATED ROUTES (Login Required)
   // ==============================================
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Loading...</div>
-      </div>
-    )
-  }
+  if (loading) return <LaadScherm />
 
   // ==============================================
   // MAIN ROUTE - CLIENT LOGIN AS DEFAULT (/)

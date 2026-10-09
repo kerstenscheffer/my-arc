@@ -2,6 +2,7 @@
 // ✅ ONLY STYLING CHANGED - All logic, state, routing, auth IDENTICAL
 import { useState, useEffect, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
+import LaadScherm from '../components/LaadScherm'
 import DatabaseService from '../services/DatabaseService'
 import { useLanguage } from '../contexts/LanguageContext'
 
@@ -241,27 +242,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
     setClient(prev => ({ ...prev, ...updatedClient }))
   }
 
-  if (loading) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', background: '#0a0a0a',
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '40px', height: '40px',
-            border: '2px solid rgba(255, 255, 255, 0.06)',
-            borderTopColor: 'rgba(255, 255, 255, 0.3)',
-            borderRadius: '50%', margin: '0 auto 1rem',
-            animation: 'spin 0.8s linear infinite'
-          }} />
-          <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '0.85rem', fontWeight: '500' }}>
-            Loading...
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <LaadScherm />
 
   if (error) {
     return (
