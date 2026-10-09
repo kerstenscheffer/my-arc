@@ -96,7 +96,7 @@ export default function MealCard({
   // Custom label uit meal.display_label gaat voor de slot-default.
   const slotLabel = meal?.display_label || SLOT_LABELS[slot] || slot
   // Venster 'moment bewerken' (soort maaltijd + tijd), via tik op de foto.
-  const [momentOpen, setMomentOpen] = useState(false)
+  const [momentOpen, setMomentOpen] = useState(null)   // null of de positie van de foto
   const slotTime  = meal?.timing || SLOT_TIMES[slot] || ''
   const rawIngredients = meal?.ingredients_list || meal?.ingredients || null
   const ingredientList = parseIngredients(rawIngredients)
@@ -259,7 +259,7 @@ export default function MealCard({
       <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
         {/* Foto-kolom — gebruikt fallback per slot als meal geen eigen
             image_url heeft. Lege ai_meals laten geen kaal vlak meer zien. */}
-        <button onClick={(e) => { e.stopPropagation(); setMomentOpen(true) }} title="Moment en tijd aanpassen" style={{
+        <button onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setMomentOpen({ top: r.bottom + 6, left: r.left, boven: r.top }) }} title="Moment en tijd aanpassen" style={{
           width: photoSize, height: photoSize,
           flexShrink: 0, padding: 0, border: 'none', cursor: 'pointer',
           background: `url(${getMealImage(meal, slot)}) center/cover`,
@@ -553,10 +553,10 @@ export default function MealCard({
 
       {momentOpen && createPortal(
         <MomentVenster
-          label={slotLabel} tijd={slotTime} isMobile={m}
-          onClose={() => setMomentOpen(false)}
+          label={slotLabel} tijd={slotTime} isMobile={m} pos={momentOpen}
+          onClose={() => setMomentOpen(null)}
           onSave={(label, tijd, bereik) => {
-            setMomentOpen(false)
+            setMomentOpen(null)
             onUpdateMeal && onUpdateMeal(dayIndex, slot, { ...meal, display_label: label, timing: tijd || meal.timing }, bereik)
           }}
         />,
@@ -642,30 +642,37 @@ function scalerBtnStyle(m, disabled, color) {
 
 // Moment van de maaltijd aanpassen: soort (Ontbijt, Lunch, Pre workout…) en
 // tijd, voor alleen deze dag of voor dit moment op elke dag.
-function MomentVenster({ label, tijd, isMobile, onClose, onSave }) {
+function MomentVenster({ label, tijd, isMobile, pos, onClose, onSave }) {
+  // Klein venster direct onder de foto (of erboven als er onder te weinig
+  // ruimte is), binnen het scherm gehouden. Niet meer midden in beeld.
+  const BREED = 300, HOOG = 280
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  const left = Math.max(8, Math.min((pos?.left || 8), vw - BREED - 8))
+  const top = (pos?.top || 8) + HOOG > vh - 8 ? Math.max(8, (pos?.boven || 0) - HOOG - 6) : (pos?.top || 8)
   const [l, setL] = useState(label || '')
   const [t, setT] = useState(tijd || '')
   const chip = (aan) => ({
-    padding: '0.45rem 0.7rem', borderRadius: 999, fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer',
+    padding: '0.3rem 0.55rem', borderRadius: 999, fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer',
     background: aan ? '#fff' : 'rgba(255,255,255,0.05)', color: aan ? '#0a0a0a' : '#fff', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
   })
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem', animation: 'momentIn 0.2s ease' }}>
-      <style>{'@keyframes momentIn { from { opacity: 0 } to { opacity: 1 } }'}</style>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: isMobile ? '18px 18px 0 0' : 16, padding: '1rem', fontFamily: "'DM Sans', sans-serif" }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Moment aanpassen</div>
-          <button onClick={onClose} aria-label="Sluiten" style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'transparent' }}>
+      <style>{'@keyframes momentIn { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }'}</style>
+      <div onClick={e => e.stopPropagation()} style={{ position: 'fixed', top, left, width: BREED, maxWidth: 'calc(100vw - 16px)', background: '#141414', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, padding: '0.75rem', boxShadow: '0 18px 44px rgba(0,0,0,0.7)', fontFamily: "'DM Sans', sans-serif", animation: 'momentIn 0.16s ease' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Moment aanpassen</div>
+          <button onClick={onClose} aria-label="Sluiten" style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
         </div>
-        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Soort</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Soort</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
           {LABEL_OPTIONS.map(o => <button key={o} onClick={() => setL(o)} style={chip(l.toLowerCase() === o.toLowerCase())}>{o}</button>)}
         </div>
-        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Tijd</div>
-        <input type="time" value={t} onChange={e => setT(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '0.6rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: '1rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark', marginBottom: 16 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <button onClick={() => onSave(l, t, 'day')} style={{ minHeight: 44, borderRadius: 10, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer' }}>Alleen deze dag</button>
-          <button onClick={() => onSave(l, t, 'slot')} style={{ minHeight: 44, borderRadius: 10, background: '#fff', border: 'none', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer' }}>Elke dag</button>
+        <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Tijd</div>
+        <input type="time" value={t} onChange={e => setT(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '0.4rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark', marginBottom: 10 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <button onClick={() => onSave(l, t, 'day')} style={{ minHeight: 34, borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer' }}>Alleen deze dag</button>
+          <button onClick={() => onSave(l, t, 'slot')} style={{ minHeight: 34, borderRadius: 8, background: '#fff', border: 'none', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer' }}>Elke dag</button>
         </div>
       </div>
     </div>
