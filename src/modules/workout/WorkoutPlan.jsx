@@ -156,32 +156,31 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
           blokken onder de workout van vandaag; hier kosten ze geen ruimte en
           zie je sneller de weekplanning en cardio. */}
       {!workoutOpen && (() => {
-        const lijn = 'rgba(255,255,255,0.12)'
-        const knop = (kant) => ({
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          padding: isMobile ? '0 0.9rem' : '0 1.2rem',
-          background: 'transparent', border: 'none',
-          [kant === 'links' ? 'borderRight' : 'borderLeft']: `1px solid ${lijn}`,
-          color: '#fff', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 900,
-          letterSpacing: '-0.015em', fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+        // Zelfde als de maaltijdpagina: alleen kleine iconen, geen tekst en
+        // geen lijntjes; in het midden de challenge-stand.
+        const knop = {
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          minWidth: isMobile ? 42 : 48, padding: isMobile ? '0 0.9rem' : '0 1.2rem',
+          background: 'transparent', border: 'none', color: '#fff',
+          fontFamily: 'inherit', cursor: 'pointer',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        })
+        }
         return (
           <div style={{
             display: 'flex', alignItems: 'stretch',
-            height: isMobile ? 40 : 48,
+            height: isMobile ? 34 : 40,
             paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
-            boxSizing: 'content-box', background: '#0a0a0a', borderBottom: `1px solid ${lijn}`,
+            boxSizing: 'content-box', background: '#0a0a0a',
           }}>
-            <button onClick={() => setKrachtOpen(true)} title="Krachtoverzicht" style={knop('links')}>
-              <TrendingUp size={16} strokeWidth={2.8} /> Kracht
+            <button onClick={() => setKrachtOpen(true)} title="Krachtoverzicht" aria-label="Krachtoverzicht" style={knop}>
+              <TrendingUp size={17} strokeWidth={2.6} />
             </button>
             {/* Midden: de challenge-stand, als je meedoet. */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
               <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
             </div>
-            <button onClick={() => setHistoryOpen(true)} title="Historie" style={knop('rechts')}>
-              <History size={16} strokeWidth={2.8} /> Historie
+            <button onClick={() => setHistoryOpen(true)} title="Historie" aria-label="Historie" style={knop}>
+              <History size={17} strokeWidth={2.6} />
             </button>
           </div>
         )
