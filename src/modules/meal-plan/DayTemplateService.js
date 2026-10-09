@@ -116,6 +116,20 @@ export const niveauVoorDoel = (doelKcal) => {
   ), DAGMENU_NIVEAUS[0])
 }
 
+// De wisselopties (ai_meals met internal_name wissel{niveau}_{slot}_…) hebben
+// fijnere stappen dan de dagmenu's: ook 2250 en 2750. Bewust een eigen lijst:
+// de dagtemplates bestaan alleen op 2000/2500/3000, en wie 2250 als doel heeft
+// moet die dagen gewoon blijven zien.
+export const WISSEL_NIVEAUS = [2000, 2250, 2500, 2750, 3000]
+
+export const wisselNiveauVoorDoel = (doelKcal) => {
+  const doel = Number(doelKcal)
+  if (!Number.isFinite(doel) || doel <= 0) return null
+  return WISSEL_NIVEAUS.reduce((beste, niveau) => (
+    Math.abs(niveau - doel) < Math.abs(beste - doel) ? niveau : beste
+  ), WISSEL_NIVEAUS[0])
+}
+
 // Hoort een dagtemplate bij dit niveau? De dagen schommelen rond hun doel
 // (1971–2019 voor het 2000-menu), dus we kijken of het dichtstbijzijnde
 // niveau van die dag hetzelfde is.

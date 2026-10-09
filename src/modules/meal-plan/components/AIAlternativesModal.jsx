@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react'
 import MealCard from './day-schedule/MealCard'
 import Keuze from './Keuze'
 import { foodImageFallback } from '../foodImageFallback'
-import { niveauVoorDoel } from '../DayTemplateService'
+import { niveauVoorDoel, wisselNiveauVoorDoel } from '../DayTemplateService'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
@@ -27,6 +27,18 @@ function slotNaarMoment(slot) {
   if (v.includes('pre')) return 'pre_workout'
   if (v.includes('post')) return 'post_workout'
   return 'snack'
+}
+
+// Wisselopties dragen hun groep als label ('groep:Op brood'). Binnen een
+// moment staan ze in deze volgorde, met de groep als kopje erboven.
+const GROEP_VOLGORDE = ['Op brood', 'Bowl', 'Wrap', 'Warm', 'Licht en snel', 'Klassiek', 'Pasta en wok', 'Mexicaans', 'Zoet', 'Hartig']
+const groepVan = (m) => {
+  const l = (Array.isArray(m?.labels) ? m.labels : []).map(String).find(x => x.startsWith('groep:'))
+  return l ? l.slice(6) : null
+}
+const wisselNiveauVan = (m) => {
+  const l = (Array.isArray(m?.labels) ? m.labels : []).map(String).find(x => x.startsWith('wissel_'))
+  return l ? Number(l.slice(7)) : null
 }
 
 export default function AIAlternativesModal({
@@ -67,6 +79,8 @@ export default function AIAlternativesModal({
   // dus "Coach-suggesties + Lunch" hoort zijn lunch-lijst te tonen — niet de
   // lijst van het slot dat je toevallig wisselt, gefilterd op timing.
   const [coachPerMoment, setCoachPerMoment] = useState({})
+  // Vaste wisselopties voor het kcal-niveau van de klant, per moment.
+  const [wisselPerMoment, setWisselPerMoment] = useState({})
   // Maaltijd die naar "Mijn maaltijden" gaat; het blad vraagt eerst bij welk
   // moment hij hoort.
   const [sterMeal, setSterMeal] = useState(null)
@@ -101,6 +115,7 @@ export default function AIAlternativesModal({
 
   const bronOpties = [
     { id: 'alles', label: 'Overal zoeken' },
+    ...(Object.keys(wisselPerMoment).length > 0 ? [{ id: 'wissel', label: 'Wisselopties' }] : []),
     ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Coach-suggesties' }] : []),
     ...(customMeals.length > 0 ? [{ id: 'mine', label: 'Mijn maaltijden' }] : []),
     { id: 'db', label: 'Maaltijden-database' },
@@ -229,6 +244,31 @@ export default function AIAlternativesModal({
         }
       } catch (e) { console.warn('Dagmenu-suggesties laden mislukt:', e?.message) }
 
+      // Wisselopties: per niveau en moment een vaste set gerechten die binnen
+      // dezelfde kcal-band vallen. Geen schalen: elk niveau heeft zijn eigen
+      // porties in hele eenheden.
+      let wissel = {}
+      try {
+        const wNiveau = wisselNiveauVoorDoel(client?.target_calories || doelKcal || (await (async () => {
+          if (!client?.id) return null
+          const { data: rij } = await db.supabase.from('clients').select('target_calories').eq('id', client.id).maybeSingle()
+          return rij?.target_calories || null
+        })()))
+        if (wNiveau) {
+          const { data: opties, error: wFout } = await db.supabase
+            .from('ai_meals').select('*').like('internal_name', `wissel${wNiveau}_%`)
+          if (wFout) console.warn('Wisselopties:', wFout.message)
+          ;(opties || []).forEach(m => {
+            const mo = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
+            wissel[mo] = [...(wissel[mo] || []), m]
+          })
+          Object.values(wissel).forEach(lijst => lijst.sort((a, b) => {
+            const ga = GROEP_VOLGORDE.indexOf(groepVan(a)), gb = GROEP_VOLGORDE.indexOf(groepVan(b))
+            return ga !== gb ? ga - gb : String(a.name).localeCompare(String(b.name))
+          }))
+        }
+      } catch (e) { console.warn('Wisselopties laden mislukt:', e?.message) }
+
       // Eigen maaltijden van de klant (ai_custom_meals), zodat je ook daarnaar
       // kunt wisselen. getMealById ondersteunt al custom-meal-IDs.
       let custom = []
@@ -249,11 +289,14 @@ export default function AIAlternativesModal({
       setCustomMeals(custom)
       setCoachOptions(curated)
       setCoachPerMoment(perMoment)
+      setWisselPerMoment(wissel)
       // Wissel je een ontbijt, dan wil je bijna altijd een ander ontbijt zien.
       // "Alle maaltijden" is één tik weg.
       setMoment(slotKey)
-      // Heeft de coach opties ingesteld voor dit slot? Toon die als eerste.
-      if (curated.length > 0) setBron('coach')
+      // Wisselopties voor dit moment gaan voor: dat is waar je voor wisselt.
+      // Anders wat de coach voor dit slot heeft ingesteld.
+      if ((wissel[slotNaarMoment(slotKey)] || []).length > 0) setBron('wissel')
+      else if (curated.length > 0) setBron('coach')
     } catch (error) {
       console.error('Failed to load alternatives:', error)
     } finally {
@@ -283,6 +326,7 @@ export default function AIAlternativesModal({
     return label ? Number(label.replace('dagmenu_', '')) : null
   }
   const huidigNiveau = niveauVoorDoel(client?.target_calories || doelKcal) || niveauVan(currentMeal)
+  const huidigWisselNiveau = wisselNiveauVoorDoel(client?.target_calories || doelKcal) || wisselNiveauVan(currentMeal)
 
   const momentenVan = (m) => {
     const uit = new Set()
@@ -304,7 +348,13 @@ export default function AIAlternativesModal({
 
     // 1. Waar zoeken we?
     let pool
-    if (bron === 'coach') {
+    if (bron === 'wissel') {
+      pool = (moment !== 'alles'
+        ? (wisselPerMoment[moment] || [])
+        : Object.values(wisselPerMoment).flat()
+      ).filter(nietZelf)
+    }
+    else if (bron === 'coach') {
       // Kies je een moment, dan zie je de lijst die de coach voor dát moment
       // heeft gezet. Zonder moment: eerst de lijst van het slot dat je
       // wisselt, daarna de rest.
@@ -348,7 +398,7 @@ export default function AIAlternativesModal({
     // maaltijd overheen leggen zou precies de suggesties wegfilteren die de
     // coach bewust op die plek zette.
     let meals = pool
-    if (moment !== 'alles' && bron !== 'coach') {
+    if (moment !== 'alles' && bron !== 'coach' && bron !== 'wissel') {
       meals = pool.filter(m => {
         const set = momentenVan(m)
         return set.size === 0 || set.has(moment)
@@ -366,6 +416,12 @@ export default function AIAlternativesModal({
         return !n || n === huidigNiveau
       })
     }
+    // Wisselopties van een ander niveau horen nooit in de lijst: die zijn
+    // voor een ander caloriedoel gemaakt.
+    meals = meals.filter(m => {
+      const n = wisselNiveauVan(m)
+      return !n || !huidigWisselNiveau || n === huidigWisselNiveau
+    })
 
     // 4. Grenzen op kcal en eiwit. Wie een maximum of minimum invult, wil die
     // maaltijden zien en de rest niet — ook niet onderaan.
@@ -381,6 +437,9 @@ export default function AIAlternativesModal({
     // 5. Volgorde.
     const opCal = (m) => m.calories || 0
     const opProt = (m) => m.protein || 0
+    // Wisselopties staan op groep (Op brood, Wrap, Warm, …); die volgorde is
+    // al gezet bij het laden.
+    if (bron === 'wissel' && sortering === 'smart') return meals
     switch (sortering) {
       case 'same-cal':
         return [...meals].sort((a, b) => Math.abs(opCal(a) - currentCal) - Math.abs(opCal(b) - currentCal))
@@ -725,8 +784,18 @@ export default function AIAlternativesModal({
             </div>
           ) : filteredMeals.length > 0 ? (
             filteredMeals.map((meal, idx) => (
+              <React.Fragment key={meal.id || idx}>
+              {bron === 'wissel' && sortering === 'smart' && !searchTerm && groepVan(meal)
+                && groepVan(meal) !== groepVan(filteredMeals[idx - 1]) && (
+                <div style={{
+                  padding: `${idx === 0 ? '0.2rem' : '0.9rem'} ${isMobile ? '0.9rem' : '1.25rem'} 0.35rem`,
+                  fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.06em',
+                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)',
+                }}>
+                  {groepVan(meal)}
+                </div>
+              )}
               <SuggestieKaart
-                key={meal.id || idx}
                 meal={meal}
                 currentMeal={currentMeal}
                 isSelected={selectedMeal?.id === meal.id}
@@ -736,6 +805,7 @@ export default function AIAlternativesModal({
                 onSter={() => setSterMeal(meal)}
                 onInfo={() => openInfo(meal)}
               />
+              </React.Fragment>
             ))
           ) : (
             <div style={{ textAlign: 'center', padding: '3rem 1.25rem' }}>
@@ -750,7 +820,9 @@ export default function AIAlternativesModal({
                     coach kiest ze voor deze plek in de dag. Een moment-filter
                     erbovenop levert dan al snel niets op, en dat is geen fout
                     maar een lege doorsnede. Zeg dat dan ook. */}
-                {bron === 'coach' && moment !== 'alles'
+                {bron === 'wissel'
+                  ? 'Voor dit moment zijn er geen wisselopties. Zoek overal voor de rest.'
+                  : bron === 'coach' && moment !== 'alles'
                   ? `Je coach heeft voor ${(momentOpties.find(o => o.id === moment)?.label || moment).toLowerCase()} geen suggesties gezet.`
                   : bron === 'coach'
                     ? 'Je coach heeft nog geen suggesties gezet.'
