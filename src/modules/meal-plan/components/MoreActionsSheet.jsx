@@ -4,6 +4,7 @@
 // (plan bewerken via week planner, coach strategy wizard).
 
 import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Pill, FileText, Calendar, Wand2, ChevronRight, X } from 'lucide-react'
 
 const G = {
@@ -85,7 +86,9 @@ export default function MoreActionsSheet({
 
   if (!isOpen) return null
 
-  return (
+  // Via een portal: de maaltijdpagina is een vast vlak met z-index 1, en
+  // daarbinnen kwam dit blad niet boven de onderbalk uit.
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -222,5 +225,5 @@ export default function MoreActionsSheet({
         `}</style>
       </div>
     </div>
-  )
+  , document.body)
 }

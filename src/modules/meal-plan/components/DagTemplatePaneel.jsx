@@ -14,6 +14,7 @@
 // verdwijnt vanzelf, de tweede blijft staan.
 
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { CalendarDays, X, ChevronRight, Check, Loader, Trash2 } from 'lucide-react'
 import MealCard from './day-schedule/MealCard'
 import { foodImageFallback } from '../foodImageFallback'
@@ -171,7 +172,10 @@ export default function DagTemplatePaneel({
   }
 
   // ── Het paneel ────────────────────────────────────────────────────────
-  return (
+  // Via een portal naar de body. De maaltijdpagina is één vast vlak met
+  // z-index 1; binnen dat vlak kwam dit paneel nooit boven de onderbalk, de
+  // log-knop en de zwevende knoppen uit, hoe hoog z'n eigen z-index ook was.
+  return createPortal(
     <div
       onClick={(e) => { if (e.target === e.currentTarget) setOpen(false) }}
       style={{
@@ -431,5 +435,5 @@ export default function DagTemplatePaneel({
         </div>
       </div>
     </div>
-  )
+  , document.body)
 }
