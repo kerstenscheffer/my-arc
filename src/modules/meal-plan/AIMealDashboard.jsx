@@ -11,7 +11,7 @@ import AIMealPlanService from './AIMealPlanService'
 import AIDaySchedule from './components/AIDaySchedule'
 import DagTemplatePaneel from './components/DagTemplatePaneel'
 import ShoppingHub from '../shopping/ShoppingHub'
-import { ShoppingCart, X, Eye, EyeOff } from 'lucide-react'
+import { ShoppingCart, X, Eye, EyeOff, BarChart3 } from 'lucide-react'
 import AIWeekPlanner from './components/AIWeekPlanner'
 import MealSetupWizard from './components/wizard/MealSetupWizard'
 
@@ -563,6 +563,15 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
               </button>
               {/* Lege ruimte tussen de twee lijntjes. */}
               <div style={{ flex: 1 }} />
+              {/* Het inzicht van de dag. Zat eerst achter een tik op de datum. */}
+              <button
+                onClick={() => setModals(prev => ({ ...prev, summary: true }))}
+                title="Inzicht van deze dag"
+                style={knop(true, 'rechts')}
+              >
+                <BarChart3 size={16} strokeWidth={2.8} />
+                Inzicht
+              </button>
               <button
                 onClick={toggleMealPlanVisible}
                 disabled={savingVisibility}

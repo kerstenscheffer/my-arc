@@ -62,7 +62,8 @@ export default function MealDayNavHeader({
   else if (diff === -1) relative = 'Gisteren'
   else if (diff === 1)  relative = 'Morgen'
 
-  const dateLabel = currentDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
+  // Korte datum ('9 okt') voor de ene regel naast de dagnaam.
+  const dateLabel = currentDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace(/\.$/, '')
 
   // Aan het begin of eind van de week springt de pijl naar de week ernaast,
   // en land je op de dag die er in de tijd naast ligt (zondag ↔ maandag).
@@ -149,26 +150,31 @@ export default function MealDayNavHeader({
             minWidth: 0,
           }}
         >
+          {/* Eén regel: 'Vrijdag · 9 okt'. Het inzicht zit nu achter de knop in
+              de balk bovenaan, dus geen 'tik voor agenda' meer. */}
           <div style={{
-            // Tekst groter — was 0.95/1.05rem, nu 1.15/1.3rem zodat de
-            // dagnaam echt de blikvanger is.
-            fontSize: opFoto ? (isMobile ? '1.45rem' : '2rem') : (isMobile ? '1.15rem' : '1.3rem'),
+            fontSize: opFoto ? (isMobile ? '1.12rem' : '1.5rem') : (isMobile ? '1rem' : '1.15rem'),
             fontWeight: 900,
             color: opFoto ? '#fff' : '#FFD700',
-            letterSpacing: opFoto ? '-0.03em' : '-0.02em',
+            letterSpacing: '-0.02em',
             textShadow: opFoto ? '0 2px 12px rgba(0,0,0,0.7)' : 'none',
             lineHeight: 1.1,
             display: 'flex', alignItems: 'center', gap: 8,
             whiteSpace: 'nowrap',
           }}>
-            {dayInfo?.name || '—'}
+            <span>
+              {dayInfo?.name || '—'}
+              <span style={{ fontWeight: 800, color: opFoto ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.6)' }}>
+                {' · '}{dateLabel}{weekOffset === 1 ? ' · volgende week' : weekOffset === -1 ? ' · vorige week' : ''}
+              </span>
+            </span>
             {relative && (
               <span style={{
-                fontSize: '0.65rem',
+                fontSize: '0.6rem',
                 fontWeight: 900,
                 color: 'rgba(0,0,0,0.85)',
                 background: opFoto ? '#fff' : '#FFD700',
-                padding: '2px 7px',
+                padding: '2px 6px',
                 borderRadius: 4,
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
@@ -176,16 +182,6 @@ export default function MealDayNavHeader({
                 {relative}
               </span>
             )}
-          </div>
-          <div style={{
-            // Datum-regel ook iets groter en helderder.
-            fontSize: isMobile ? '0.78rem' : '0.85rem',
-            fontWeight: opFoto ? 800 : 600,
-            color: opFoto ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.6)',
-            lineHeight: 1,
-            textShadow: opFoto ? '0 2px 10px rgba(0,0,0,0.75)' : 'none',
-          }}>
-            {dateLabel}{weekOffset === 0 ? '' : weekOffset === 1 ? ' · volgende week' : weekOffset === -1 ? ' · vorige week' : ''} · tik voor agenda
           </div>
         </button>
 
