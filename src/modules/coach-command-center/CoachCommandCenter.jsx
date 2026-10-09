@@ -13,8 +13,20 @@ import { PRIVE, zetPrivacy, herstelPrivacy } from './utils/privacyModus'
 
 export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onNavigateTab, onOpenMealPanel, onOpenWorkoutPanel }) {
   const isMobile = window.innerWidth <= 768
-  const [loading, setLoading] = useState(true)
-  const [clientsWithData, setClientsWithData] = useState([])
+  // Laatste volledige stand van de vorige keer (sessionStorage): daarmee
+  // staat de lijst meteen, in de goede volgorde en op de goede hoogte, en
+  // worden de cijfers daarna stil ververst. Zonder snapshot (eerste keer in
+  // deze browsersessie) een skelet van kaarten met dezelfde maat, tot de
+  // urgentie-sortering er is. Zo verspringt er niets tijdens het laden
+  // (Kersten, 9 okt 2026: "visueel moet het zijn alsof er niks gebeurt").
+  const SNAPSHOT_SLEUTEL = 'myarc:command-snapshot'
+  const snapshot = (() => {
+    try { const r = sessionStorage.getItem(SNAPSHOT_SLEUTEL); return r ? JSON.parse(r) : null } catch { return null }
+  })()
+  const [loading, setLoading] = useState(!snapshot)
+  const [clientsWithData, setClientsWithData] = useState(snapshot?.clients || [])
+  // 'skelet' = nog geen gesorteerde lijst; 'klaar' = echte kaarten.
+  const [kaartFase, setKaartFase] = useState(snapshot ? 'klaar' : 'skelet')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [urgencyFilter, setUrgencyFilter] = useState('all')
@@ -22,7 +34,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   // een deelname loopt van datum tot datum en zegt niets over de klant zelf.
   const [challengeIds, setChallengeIds] = useState(() => new Set())
   const [challengeFilter, setChallengeFilter] = useState('all')
-  const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
+  const [stats, setStats] = useState(snapshot?.stats || { total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
   const [showAddClient, setShowAddClient] = useState(false)
   const [journeyClient, setJourneyClient] = useState(null)
@@ -93,7 +105,9 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   }, [])
 
   const loadData = async () => {
-    setLoading(true)
+    // Met snapshot: niets leegmaken, geen spinner; alles komt stil in de plaats.
+    const stil = clientsWithData.length > 0
+    if (!stil) setLoading(true)
     try {
       const user = await db.getCurrentUser().catch(() => null)
       if (user) setCoachId(user.id)
@@ -124,9 +138,20 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
       })
 
       const phase0 = clients.map(emptyClientShape)
-      setClientsWithData(phase0)
-      setStats(computeStats(phase0))
-      setLoading(false)   // ← lijst is meteen zichtbaar
+      if (!stil) {
+        // Lege kaarten tonen zou de hoogte en de volgorde nog laten
+        // verspringen; de lijst staat er, maar als skelet tot stap 2.
+        setClientsWithData(phase0)
+        setStats(computeStats(phase0))
+        setLoading(false)
+      } else {
+        // Nieuwe of verdwenen klanten alvast meenemen, bestaande kaarten
+        // houden hun data uit de snapshot tot de verse er is.
+        setClientsWithData(prev => {
+          const oud = new Map(prev.map(c => [c.id, c]))
+          return phase0.map(c => oud.get(c.id) ? { ...oud.get(c.id), ...clients.find(x => x.id === c.id) } : c)
+        })
+      }
 
       // ── Stap 2: weight + coaching logs (kritisch voor urgentie-sortering) ──
       const [dataWithWeight, coachingLogDataEarly, openCheckins] = await Promise.all([
@@ -196,10 +221,13 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           openCheckin: openCheckins[c.id] || null,
           latestCoachingLog: coachingLogDataEarly[c.id] || c.latestCoachingLog,
         }))
-        const sorted = service.sortByUrgency(merged)
+        // Stil (snapshot): in de plaats, nog niet opnieuw sorteren; dat doen
+        // we één keer aan het eind, zodat kaarten niet twee keer verspringen.
+        const sorted = stil ? merged : service.sortByUrgency(merged)
         setStats(computeStats(sorted))
         return sorted
       })
+      setKaartFase('klaar')
 
       // ── Stap 3: rich data (photos, workouts, meals, plan, etc.) ──
       const [photoData, workoutData, mealData, coachingPlanData, exerciseProgress, circumferenceData] = await Promise.all([
@@ -223,10 +251,12 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
         }))
         const sorted = service.sortByUrgency(updated)
         setStats(computeStats(sorted))
+        // Volledige stand bewaren voor de volgende keer in deze sessie.
+        try { sessionStorage.setItem(SNAPSHOT_SLEUTEL, JSON.stringify({ clients: sorted, stats: computeStats(sorted), t: Date.now() })) } catch { /* te groot of geen storage */ }
         return sorted
       })
 
-    } catch (error) { console.error('❌ Error loading:', error); setLoading(false) }
+    } catch (error) { console.error('❌ Error loading:', error); setLoading(false); setKaartFase('klaar') }
   }
 
   const handleToggleStatus = async (clientId, currentStatus) => {
@@ -507,9 +537,25 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             </div>
           )}
 
-          {/* CLIENT CARDS */}
-          <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem' }}>
-            {filteredClients.map(client => (
+          {/* CLIENT CARDS — als skelet tot de urgentie-sortering er is, dan
+              één keer in met een korte fade. Zelfde hoogte als de echte kaart. */}
+          <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem', animation: kaartFase === 'klaar' ? 'ccKaartIn 0.28s ease' : 'none' }}>
+            <style>{'@keyframes ccKaartIn { from { opacity: 0.35; } to { opacity: 1; } } @keyframes ccSkelet { 0% { opacity: 0.55; } 50% { opacity: 0.85; } 100% { opacity: 0.55; } }'}</style>
+            {kaartFase === 'skelet' && filteredClients.map(client => (
+              <div key={client.id} style={{ height: isMobile ? 88 : 92, borderRadius: isMobile ? 12 : 14, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderLeft: '3px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'stretch', overflow: 'hidden', animation: 'ccSkelet 1.4s ease-in-out infinite' }}>
+                <div style={{ width: isMobile ? 56 : 64, background: 'rgba(255,255,255,0.06)' }} />
+                <div style={{ flex: 1, padding: '0.7rem 0.8rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ width: '42%', height: 14, borderRadius: 6, background: 'rgba(255,255,255,0.1)' }} />
+                    <div style={{ width: 64, height: 18, borderRadius: 6, background: 'rgba(255,255,255,0.12)' }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {[52, 52, 52].map((w, i) => <div key={i} style={{ width: w, height: 22, borderRadius: 6, background: 'rgba(255,255,255,0.07)' }} />)}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {kaartFase === 'klaar' && filteredClients.map(client => (
               <ClientWeightCard
                 key={client.id}
                 client={client}

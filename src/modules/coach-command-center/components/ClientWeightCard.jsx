@@ -368,6 +368,9 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       border: '1px solid rgba(255,255,255,0.08)',
       borderLeft: cardBorderLeft,
       borderRadius: isMobile ? '12px' : '14px',
+      // Vaste minimale hoogte: dezelfde als het skelet in Command, zodat de
+      // kaart niet groeit of krimpt wanneer de data binnenkomt.
+      minHeight: isMobile ? 88 : 92,
       overflow: 'hidden', position: 'relative',
       transition: 'all 0.2s ease', transform: 'translateZ(0)',
       opacity: isInactive ? 0.55 : 1,
