@@ -2113,8 +2113,8 @@ export default function PlanAnalyzer({
             <div style={{
               flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
               minWidth: 0, paddingBottom: navRuimte,
-              // Kaarten niet over de volle breedte: rechts mag zwart blijven.
-              maxWidth: m ? undefined : 640,
+              // Een klein beetje lucht rechts, zodat de kaarten niet tegen de rand staan.
+              paddingRight: m ? 0 : 16,
             }}>
               <DagRingen
                 totalen={{
@@ -2218,8 +2218,8 @@ export default function PlanAnalyzer({
                 <>
                   {toevoegKeuze && freeSlot && (
                     <>
-                      <div onClick={() => setToevoegKeuze(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-                      <div style={{ position: 'absolute', left: m ? 16 : 22, bottom: `calc(${navRuimte}px + ${m ? 86 : 96}px)`, zIndex: 41, background: '#141414', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, boxShadow: '0 18px 44px rgba(0,0,0,0.7)', padding: 4, minWidth: 180 }}>
+                      <div onClick={() => setToevoegKeuze(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+                      <div style={{ position: 'fixed', right: m ? 16 : 28, bottom: m ? 182 : 196, zIndex: 91, background: '#141414', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, boxShadow: '0 18px 44px rgba(0,0,0,0.7)', padding: 4, minWidth: 180 }}>
                         {[{ t: 'Maaltijd zoeken', f: () => handleAdd(activeDay, freeSlot) }, { t: 'Zelf maken', f: () => setMakerState({ dayIndex: activeDay, slot: freeSlot }) }].map(o => (
                           <button key={o.t} onClick={() => { setToevoegKeuze(false); o.f() }} style={{ width: '100%', display: 'block', padding: '0.6rem 0.75rem', background: 'transparent', border: 'none', borderRadius: 8, color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>{o.t}</button>
                         ))}
@@ -2230,7 +2230,9 @@ export default function PlanAnalyzer({
                     onClick={() => freeSlot ? setToevoegKeuze(v => !v) : alert('Alle maaltijd-slots van deze dag zijn gevuld.')}
                     aria-label="Maaltijd toevoegen" title="Maaltijd toevoegen"
                     style={{
-                      position: 'absolute', left: m ? 16 : 22, bottom: `calc(${navRuimte}px + 10px)`, zIndex: 42,
+                      // Vast in beeld rechtsonder, boven de navigatiebalk (de
+                      // linkerkant is hier de zijbalk).
+                      position: 'fixed', right: m ? 16 : 28, bottom: m ? 96 : 102, zIndex: 92,
                       width: m ? 66 : 72, height: m ? 66 : 72, borderRadius: '50%',
                       background: '#fff', border: 'none', color: '#0a0a0a', cursor: 'pointer',
                       boxShadow: '0 14px 36px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)',
