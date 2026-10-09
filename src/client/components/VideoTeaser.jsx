@@ -20,6 +20,7 @@ import fileService from '../../modules/videos/FileService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'
 import { extractYouTubeId, getYouTubeThumbnail } from '../../modules/videos/utils/youtubeHelpers'
 import { zetVideoBalkHoogte, VIDEO_BALK } from './videoBalkHoogte'
+import useVensterOpen from './useVensterOpen'
 
 // De twee knoppen op de balk: kaal en wit, zoals overal.
 const balkKnop = {
@@ -54,6 +55,9 @@ export default function VideoTeaser({
   // en leek het knopje kapot.
   const [handmatig, setHandmatig] = useState(false)
   const timers = useRef([])
+  // Onder een venster (maaltijdinfo e.d.) hoort de balk niet te hangen:
+  // zelfde reden als bij de waterfles, zie useVensterOpen.
+  const vensterOpen = useVensterOpen()
 
   // Wat er langskomt hangt af van waar je bent. Op home de video's die de
   // coach in de slider heeft gezet — algemene dingen. Op een pagina met een
@@ -183,9 +187,10 @@ export default function VideoTeaser({
             : `translateX(-50%) ${open ? 'translateY(0) scale(1)' : 'translateY(115%) scale(0.96)'}`,
           transformOrigin: 'bottom center',
           width: isMobile ? 'auto' : 'min(680px, calc(100vw - 32px))',
-          opacity: open ? 1 : 0,
+          opacity: open && !vensterOpen ? 1 : 0,
+          visibility: vensterOpen ? 'hidden' : 'visible',
           transition: 'transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease',
-          pointerEvents: open ? 'auto' : 'none',
+          pointerEvents: open && !vensterOpen ? 'auto' : 'none',
           zIndex: 100,
           overflow: 'hidden',
           display: 'flex', alignItems: 'center',
