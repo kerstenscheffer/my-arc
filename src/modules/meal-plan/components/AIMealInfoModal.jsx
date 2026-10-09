@@ -1,6 +1,7 @@
 // src/modules/meal-plan/components/AIMealInfoModal.jsx
 // 🎯 v2.2 - DEBUG versie met volledige logging
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCircle, Sparkles, Pencil, HelpCircle } from 'lucide-react'
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
 import ClientMealEditModal from './ClientMealEditModal'
@@ -132,7 +133,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
     ...(effectiveMeal.faq?.length ? [{ id: 'faq', label: 'Vragen', icon: HelpCircle }] : []),
   ]
 
-  return (
+  return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', zIndex: 10500, animation: 'infoFadeIn 0.2s ease' }}>
       <div onClick={e => e.stopPropagation()} style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: isMobile ? '100%' : '600px', width: '100%', margin: '0 auto', background: '#0a0a0a', overflow: 'hidden' }}>
 
@@ -251,7 +252,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
         />
       )}
     </div>
-  )
+  , document.body)
 }
 
 function InfoTab({ meal, ingredients, loading, calcMacros, isMobile, db, clientId }) {

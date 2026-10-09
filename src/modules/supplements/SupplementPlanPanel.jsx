@@ -3,6 +3,7 @@
 // ✅ Inspired by AIMealInfoModal design
 
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import DatabaseService from '../../services/DatabaseService'
 import { 
   X, Pill, Sun, Moon, Info, ShoppingCart, 
@@ -87,7 +88,7 @@ export default function SupplementPlanPanel({
     { id: 'evening', label: 'Avond', icon: Moon }
   ]
   
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -332,7 +333,7 @@ export default function SupplementPlanPanel({
         }
       `}</style>
     </div>
-  )
+  , document.body)
 }
 
 // ── SUPPLEMENT LIST COMPONENT ──

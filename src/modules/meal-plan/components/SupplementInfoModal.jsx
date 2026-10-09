@@ -8,6 +8,7 @@
 // van een lege kop te tonen.
 
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
 
@@ -86,7 +87,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
     </div>
   )
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -116,13 +117,13 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
             position: 'absolute', inset: 0,
             background: 'linear-gradient(to top, rgba(15,15,15,0.95), rgba(15,15,15,0.2))',
           }} />
-          <button onClick={onClose} style={{
-            position: 'absolute', right: 10, top: 10,
-            width: 30, height: 30, borderRadius: 8,
+          <button onClick={onClose} aria-label="Sluiten" style={{
+            position: 'absolute', right: 10, top: 10, zIndex: 2,
+            width: 40, height: 40, borderRadius: 12,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)',
-            color: '#fff', cursor: 'pointer',
-          }}><X size={15} /></button>
+            background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.25)',
+            color: '#fff', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}><X size={20} strokeWidth={2.8} /></button>
           <div style={{ position: 'absolute', left: 14, bottom: 10, right: 50 }}>
             <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               {sp.emoji} Supplement
@@ -304,5 +305,5 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
         </div>
       </div>
     </div>
-  )
+  , document.body)
 }
