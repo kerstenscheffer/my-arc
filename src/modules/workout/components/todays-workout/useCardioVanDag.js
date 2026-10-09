@@ -28,7 +28,7 @@ export function useCardioVanDag(client, db, datum) {
     const dagSleutel = DAG_SLEUTELS[(datum.getDay() + 6) % 7]
     const datumIso = iso(datum)
     Promise.all([
-      db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time, week_start, skip_weeks')
+      db.supabase.from('client_agenda_blocks').select('id, day, label, sublabel, start_time, end_time, week_start, skip_weeks')
         .eq('client_id', client.id).eq('type', 'custom').ilike('label', 'Cardio ·%')
         .eq('day', dagSleutel)
         .or(`week_start.is.null,week_start.eq.${iso(maandag)}`)
@@ -44,7 +44,7 @@ export function useCardioVanDag(client, db, datum) {
         const [eh, em] = String(blok.end_time || '').split(':').map(Number)
         const duur = Number.isFinite(h) && Number.isFinite(eh) ? Math.max(0, (eh * 60 + em) - (h * 60 + m)) : null
         const log = (logs || []).find(l => normaliseerSoort(l.cardio_type) === normaliseerSoort(soort) && String(l.logged_date).slice(0, 10) === datumIso) || null
-        return { id: blok.id, soort, tijd: String(blok.start_time || '').slice(0, 5), duur, gedaan: !!log, log, datum: datumIso }
+        return { id: blok.id, soort, sublabel: blok.sublabel || null, tijd: String(blok.start_time || '').slice(0, 5), duur, gedaan: !!log, log, datum: datumIso }
       }))
     })
     return () => { weg = true }

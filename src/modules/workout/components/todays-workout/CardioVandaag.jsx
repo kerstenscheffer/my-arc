@@ -37,6 +37,9 @@ export default function CardioVandaag({ lijst, isMobile, volledig = false }) {
               {[c.tijd, c.duur ? `${c.duur} min` : null].filter(Boolean).join(' · ')}
               {lijst.length > 1 && ` · +${lijst.length - 1} meer`}
             </div>
+            {c.sublabel && (
+              <div style={{ marginTop: 3, fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 800, color: '#06b6d4', textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>{c.sublabel}</div>
+            )}
           </div>
           {!c.gedaan && (
             <button onClick={() => logCardio(c)} style={{
@@ -68,8 +71,8 @@ export default function CardioVandaag({ lijst, isMobile, volledig = false }) {
               {c.gedaan ? <Check size={11} strokeWidth={3.5} /> : <HeartPulse size={11} strokeWidth={2.6} />} {c.gedaan ? 'Gedaan' : 'Cardio'}
             </div>
             <div style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.soort}</div>
-            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
-              {[c.tijd, c.duur ? `${c.duur} min` : null].filter(Boolean).join(' · ')}
+            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {[c.tijd, c.duur ? `${c.duur} min` : null, c.sublabel].filter(Boolean).join(' · ')}
             </div>
           </div>
           {!c.gedaan && (

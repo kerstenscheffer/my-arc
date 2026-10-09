@@ -222,7 +222,7 @@ export default function WeekSchedule({
     const maandag = (() => { const d = getThisMonday(); d.setDate(d.getDate() + weekOffset * 7); return d })()
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     Promise.all([
-      db.supabase.from('client_agenda_blocks').select('id, day, label, start_time, end_time, week_start, skip_weeks')
+      db.supabase.from('client_agenda_blocks').select('id, day, label, sublabel, start_time, end_time, week_start, skip_weeks')
         .eq('client_id', clientId).eq('type', 'custom').ilike('label', 'Cardio ·%')
         // Vaste blokken (week_start leeg) elke week; eenmalige alleen in hun week.
         .or(`week_start.is.null,week_start.eq.${iso(maandag)}`)
@@ -630,7 +630,7 @@ export default function WeekSchedule({
             !cardioBlokken.some(b2 => b2.day === dagVanLog(l) && normaliseerSoort(String(b2.label).replace(/^Cardio\s*·\s*/, '')) === normaliseerSoort(soort))
           )) || null
           const gedaan = !!log
-          return { id: b.id, day: b.day, soort, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, log, eenmalig: !!b.week_start, skipWeeks: b.skip_weeks || [] }
+          return { id: b.id, day: b.day, soort, sublabel: b.sublabel || null, tijd: String(b.start_time || '').slice(0, 5), duur, gedaan, log, eenmalig: !!b.week_start, skipWeeks: b.skip_weeks || [] }
         })
       if (lijst.length) uit[i] = lijst
     })

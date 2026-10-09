@@ -49,6 +49,7 @@ export function CardioInfoBlad({ open, cardio, isMobile, onClose }) {
     ['Tijd', cardio.tijd || '–'],
     ['Duur', cardio.duur ? `${cardio.duur} min` : '–'],
     ['Herhaling', cardio.eenmalig ? 'Alleen deze week' : 'Elke week'],
+    ...(cardio.sublabel ? [['Van je coach', cardio.sublabel]] : []),
   ]
   return (
     <BladModal open={open} titel={cardio.soort || 'Cardio'} onClose={onClose} zIndex={2147483500}>
