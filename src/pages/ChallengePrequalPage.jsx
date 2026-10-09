@@ -1,10 +1,10 @@
 // src/pages/ChallengePrequalPage.jsx
 //
-// Prekwalificatie voor de 6 Weken Challenge: tien korte vragen, één per
+// Prekwalificatie voor de 6 Weken Challenge: korte vragen, één per
 // scherm, vóór iemand een kennismaking inplant. Drie uitkomsten:
 //   A  past          -> Calendly, met naam en e-mail al ingevuld
-//   B  nog niet      -> gratis content en Instagram
-//   C  past niet     -> vriendelijk afgewezen, link naar gratis content
+//   B  nog niet      -> gratis video (10 kg in 16 weken) en Instagram
+//   C  past niet     -> vriendelijk afgewezen, dezelfde gratis video
 //
 // Elke inzending wordt een lead op het bord van Kersten via de
 // database-functie submit_challenge_prequal: A in "Call voorgesteld", B en
@@ -17,22 +17,29 @@
 // Werkt los op /challenge/start én in het blad van de VSL (/challenge).
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, ArrowRight, Check, Instagram, Gift } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Instagram, Play } from 'lucide-react'
 import db from '../services/DatabaseService'
 import { meet, pixel, herkomst, volgTijdOpPagina } from './challengeTracking'
+import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
 const GOLD = '#FFD700'
 const GOUD_KNOP = 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const INSTAGRAM = 'https://instagram.com/myarc.nl'
-const GRATIS_CONTENT = '/7secrets'
+// Gratis waarde aan het eind: de video waarin Kersten uitlegt hoe je 10 kg
+// verliest in 16 weken. Ingesloten op de pagina, met een knop naar YouTube.
+const GRATIS_VIDEO_ID = 'OLxhzi-QQmQ'
+const GRATIS_VIDEO_URL = `https://youtu.be/${GRATIS_VIDEO_ID}`
 
 // ── De vragen ───────────────────────────────────────────────────────────────
 //
-// `soort`: tekst | keuze | meerkeuze | lang | schaal | contact
+// `soort`: tekst | email | keuze | meerkeuze | lang | schaal | contact
 // `afwijzen(antwoord)` geeft 'B' of 'C' terug als deze keuze het einde is.
 const VRAGEN = [
   { id: 'voornaam', soort: 'tekst', vraag: 'Wat is je voornaam?', placeholder: 'Je voornaam' },
+  // Vraag 2: het e-mailadres. Wordt meteen vastgelegd (save_prequal_email),
+  // ook als iemand daarna afhaakt of wordt afgewezen.
+  { id: 'email', soort: 'email', vraag: 'Wat is je e-mailadres?', placeholder: 'jouw@email.nl' },
   {
     id: 'leeftijd', soort: 'keuze', vraag: 'Hoe oud ben je?',
     opties: ['Onder 18', '18–24', '25–34', '35–44', '45–54', '55+'],
@@ -71,7 +78,7 @@ const VRAGEN = [
     opties: ['Ja', 'Ik wil er eerst meer over horen', 'Nee'],
     afwijzen: (a) => (a === 'Nee' ? 'C' : null),
   },
-  { id: 'contact', soort: 'contact', vraag: 'Waar kan ik je bereiken?' },
+  { id: 'contact', soort: 'contact', vraag: 'Op welk nummer kan ik je appen?' },
 ]
 
 const utmUitUrl = () => {
@@ -180,7 +187,8 @@ export function PrequalFlow({ m = false, compact = false }) {
     if (q.soort === 'tekst' || q.soort === 'lang') return String(v || '').trim().length > 0
     if (q.soort === 'keuze' || q.soort === 'schaal') return v != null && v !== ''
     if (q.soort === 'meerkeuze') return Array.isArray(v) && v.length > 0
-    if (q.soort === 'contact') return emailOk(antw.email) && telOk(antw.telefoon) && antw.akkoord === true
+    if (q.soort === 'email') return emailOk(antw.email)
+    if (q.soort === 'contact') return telOk(antw.telefoon) && antw.akkoord === true
     return false
   }
 
@@ -191,6 +199,7 @@ export function PrequalFlow({ m = false, compact = false }) {
       const { data, error } = await db.supabase.rpc('submit_challenge_prequal', { p: payload })
       if (error) throw error
       setEinde({ uitkomst, reden, leadId: data })
+      if (emailOk(antw.email)) db.supabase.rpc('save_prequal_email', { p_email: antw.email, p_lead_id: data, p_uitkomst: uitkomst }).then(r => r, () => null)
       setStap('klaar')
       meet('form_klaar', { meta: { uitkomst, reden: reden || null }, lead_id: data })
       if (uitkomst === 'A') pixel('Lead', { content_name: '6 weken challenge prequal' })
@@ -202,10 +211,15 @@ export function PrequalFlow({ m = false, compact = false }) {
 
   const verder = () => {
     if (!vraag || !ingevuld(vraag)) return
+    if (vraag.id === 'email') {
+      // Niet wachten: het formulier gaat door, ook als dit even niet lukt.
+      db.supabase.rpc('save_prequal_email', { p_email: antw.email, p_voornaam: antw.voornaam || null, p_utm: utm.current })
+        .then(r => r, () => null)
+    }
     const uitkomst = vraag.afwijzen?.(antw[vraag.id])
     if (uitkomst) {
-      // Afgewezen vóór de contactvraag: we hebben dan geen e-mail, maar wel
-      // een naam en de antwoorden. Alleen opslaan als er een naam is.
+      // Afgewezen vóór de contactvraag: geen telefoon, maar wel naam,
+      // e-mail (vraag 2) en de antwoorden.
       return verstuur(uitkomst, vraag.afwijsTekst || `${vraag.vraag} → ${antw[vraag.id]}`)
     }
     if (stap === VRAGEN.length - 1) return verstuur('A', null)
@@ -234,13 +248,34 @@ export function PrequalFlow({ m = false, compact = false }) {
         <div ref={bovenRef} />
         <div style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.15em', color: GOLD, textTransform: 'uppercase', marginBottom: '0.8rem' }}>Gratis 6 Weken Challenge</div>
         {kop('Past de 6 Weken Challenge bij jou?')}
-        {sub('Beantwoord 10 korte vragen (2 minuten). Past het, dan plan je direct je kennismaking met mij in.')}
+        {sub(`Beantwoord ${VRAGEN.length} korte vragen (2 minuten). Past het, dan plan je direct je kennismaking met mij in.`)}
         <button onClick={() => { setStap(0); meet('form_start') }} style={{ ...knopGoud(m), marginTop: '1.6rem' }}>
           Start de vragen <ArrowRight size={22} strokeWidth={2.6} />
         </button>
       </div>
     )
   }
+
+
+  // De gratis waarde: video ingesloten, met een knop naar YouTube eronder.
+  const gratisVideo = (
+    <>
+      <div style={{ marginTop: '1.4rem', fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.15em', color: GOLD, textTransform: 'uppercase' }}>Gratis voor jou</div>
+      <div style={{ marginTop: '0.4rem', fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, color: '#fff', lineHeight: 1.2 }}>Zo verlies je 10 kg in 16 weken</div>
+      <div style={{ marginTop: '0.8rem', position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#000' }}>
+        <iframe
+          src={appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${GRATIS_VIDEO_ID}?rel=0&playsinline=1`)}
+          title="Zo verlies je 10 kg in 16 weken"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+        />
+      </div>
+      <a href={GRATIS_VIDEO_URL} target="_blank" rel="noopener noreferrer" onClick={() => meet('gratis_video', { meta: { uitkomst: einde?.uitkomst || null } })} style={{ ...knopGoud(m), marginTop: '1rem', textDecoration: 'none' }}>
+        <Play size={22} strokeWidth={2.6} /> Bekijk op YouTube
+      </a>
+    </>
+  )
 
   // ── Eindschermen ──
   if (stap === 'klaar' && einde) {
@@ -268,8 +303,8 @@ export function PrequalFlow({ m = false, compact = false }) {
           <div ref={bovenRef} />
           {kop(`Dank je${naam ? `, ${naam}` : ''}!`)}
           {sub(einde.reden?.startsWith('Voor de challenge') ? einde.reden : 'Nu lijkt het nog niet het juiste moment voor de challenge.')}
-          {sub('Hier is mijn gratis content om alvast te starten. En volg me op Instagram voor dagelijkse tips.')}
-          <a href={GRATIS_CONTENT} style={{ ...knopGoud(m), marginTop: '1.6rem', textDecoration: 'none' }}><Gift size={22} strokeWidth={2.6} /> Gratis starten</a>
+          {sub('Hier is een video waarin ik precies uitleg hoe je 10 kg verliest in 16 weken. Zo kun je alvast zelf starten.')}
+          {gratisVideo}
           <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopGoud(m), marginTop: '0.7rem', background: 'rgba(255,255,255,0.08)', color: '#fff', textDecoration: 'none', boxShadow: 'none', border: '1px solid rgba(255,255,255,0.2)' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
         </div>
       )
@@ -278,9 +313,9 @@ export function PrequalFlow({ m = false, compact = false }) {
       <div style={buitenkant}>
         <div ref={bovenRef} />
         {kop('Dank je voor het invullen.')}
-        {sub('De challenge past op dit moment niet bij je situatie.')}
-        {sub('Volg me op Instagram voor dagelijkse tips.')}
-        <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopGoud(m), marginTop: '1.6rem', textDecoration: 'none' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
+        {sub('De challenge past op dit moment niet bij je situatie. Wel heb ik deze video voor je, waarin ik uitleg hoe je 10 kg verliest in 16 weken.')}
+        {gratisVideo}
+        <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopGoud(m), marginTop: '0.7rem', background: 'rgba(255,255,255,0.08)', color: '#fff', textDecoration: 'none', boxShadow: 'none', border: '1px solid rgba(255,255,255,0.2)' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
       </div>
     )
   }
@@ -346,10 +381,23 @@ export function PrequalFlow({ m = false, compact = false }) {
             })}
           </div>
         )}
+        {vraag.soort === 'email' && (
+          <>
+            <input
+              type="email" inputMode="email" autoComplete="email" autoFocus
+              value={antw.email || ''} placeholder={vraag.placeholder}
+              onChange={e => zet('email', e.target.value.trim())}
+              onKeyDown={e => { if (e.key === 'Enter') verder() }}
+              style={invoer(m)}
+            />
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+              Geen spam. Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>privacyverklaring</a>.
+            </div>
+          </>
+        )}
         {vraag.soort === 'contact' && (
           <>
-            <input type="email" inputMode="email" autoComplete="email" autoFocus value={antw.email || ''} placeholder="E-mailadres" onChange={e => zet('email', e.target.value)} style={invoer(m)} />
-            <input type="tel" inputMode="tel" autoComplete="tel" value={antw.telefoon || ''} placeholder="Telefoonnummer (WhatsApp)" onChange={e => zet('telefoon', e.target.value)} style={invoer(m)} />
+            <input type="tel" inputMode="tel" autoComplete="tel" autoFocus value={antw.telefoon || ''} placeholder="Telefoonnummer (WhatsApp)" onChange={e => zet('telefoon', e.target.value)} style={invoer(m)} />
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: '0.4rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45 }}>
               <input type="checkbox" checked={antw.akkoord === true} onChange={e => zet('akkoord', e.target.checked)} style={{ width: 20, height: 20, marginTop: 2, accentColor: GOLD, flexShrink: 0 }} />
               <span>Ik ga akkoord dat Kersten contact met me opneemt. Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>privacyverklaring</a>.</span>
