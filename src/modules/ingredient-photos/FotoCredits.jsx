@@ -22,12 +22,15 @@ export default function FotoCredits({ db, onClose }) {
   useEffect(() => {
     let weg = false
     ;(async () => {
-      const { data } = await db.supabase
-        .from('ai_ingredients')
+      // Ingrediënten én maaltijden: beide tabellen hebben dezelfde kolommen.
+      const lees = (tabel) => db.supabase
+        .from(tabel)
         .select('image_author, image_author_url')
         .eq('image_source', 'unsplash')
         .not('image_author', 'is', null)
         .then(r => r, () => ({ data: [] }))
+      const [ingr, meals] = await Promise.all([lees('ai_ingredients'), lees('ai_meals')])
+      const data = [...(ingr?.data || []), ...(meals?.data || [])]
 
       if (weg) return
       // Eén regel per fotograaf, met hoeveel foto's van hem in de app staan.

@@ -161,7 +161,7 @@ const normalize = (s) => (s || '')
 // "zoete aardappel" niet óók nog als "aardappel" meetelt.
 const SORTED = [...DICT].sort((a, b) => b[0].length - a[0].length)
 
-function buildQuery(rawName) {
+export function buildQuery(rawName) {
   const name = (rawName || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim()
   const plain = normalize(rawName).replace(NOISE, ' ').replace(/\s+/g, ' ').trim()
   let hay = ` ${name} `
@@ -315,4 +315,6 @@ async function main() {
   console.log(`log: ${LOG_PATH}${DRY ? '  (er is niets naar de database geschreven)' : ''}`)
 }
 
-main()
+// Alleen draaien als dit bestand zelf gestart is; de credits-backfill
+// importeert buildQuery hieruit.
+if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())) main()
