@@ -949,7 +949,7 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
     : isTraining ? workoutFoto(naam || soort)
     : null
   const opent = onOpen && (isMaaltijd || isTraining)
-  const fotoMaat = 34
+  const fotoMaat = 58
 
   return (
     <div
@@ -979,14 +979,17 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
         {tijd(blok.start)}
       </button>
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, opacity: afgerond ? 0.45 : 1 }}>
+      {/* De foto vult de regel van lijn tot lijn: geen ronde hoeken, geen
+          marge boven of onder. Regels zonder foto houden dezelfde breedte vrij,
+          zodat de namen recht onder elkaar staan. */}
+      <div style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: 12, opacity: afgerond ? 0.45 : 1 }}>
         {foto ? (
           <span style={{
-            width: fotoMaat, height: fotoMaat, flexShrink: 0, borderRadius: 8,
+            width: fotoMaat, alignSelf: 'stretch', flexShrink: 0,
             background: `url(${foto}) center/cover`,
           }} />
         ) : (
-          <span style={{ width: fotoMaat, height: fotoMaat, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ width: fotoMaat, alignSelf: 'stretch', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Icoon size={15} color="rgba(255,255,255,0.45)" strokeWidth={2.4} />
           </span>
         )}
