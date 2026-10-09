@@ -970,18 +970,59 @@ function SlaapActie({ slaap, compact = false }) {
 }
 
 // Eén actieknop voor de lijst: kaal icoon, vast formaat, grijs of groen.
+// Springt hij van 'te doen' naar 'gedaan', dan viert hij dat even: het vinkje
+// knalt op en veert terug, een groene ring loopt naar buiten, zes stipjes
+// spatten weg en de telefoon tikt. Kort genoeg om niet te storen, genoeg om
+// het afvinken fijn te maken.
+const VIER_CSS = `
+@keyframes arcVinkPop { 0% { transform: scale(0.6) } 45% { transform: scale(1.45) } 70% { transform: scale(0.9) } 100% { transform: scale(1) } }
+@keyframes arcVinkRing { 0% { transform: scale(0.4); opacity: 0.9 } 100% { transform: scale(2.4); opacity: 0 } }
+@keyframes arcVinkVonk { 0% { transform: rotate(var(--hoek)) translateY(0) scale(1); opacity: 1 } 100% { transform: rotate(var(--hoek)) translateY(-22px) scale(0.3); opacity: 0 } }
+`
 function ActieKnop({ gedaan, titel, onClick, icoon }) {
   const Icoon = icoon
+  const vorige = useRef(gedaan)
+  // Alleen vieren als je zelf op deze knop tikte (binnen twee minuten: slaap
+  // en wegen lopen via een blad). Anders zou alles wat bij het laden al
+  // gedaan blijkt, bij elk bezoek opknallen.
+  const aangetikt = useRef(0)
+  const [vier, setVier] = useState(0)
+  useEffect(() => {
+    if (gedaan && !vorige.current && Date.now() - aangetikt.current < 120000) {
+      setVier(v => v + 1)
+      if (navigator.vibrate) navigator.vibrate([12, 40, 18])
+    }
+    vorige.current = gedaan
+  }, [gedaan])
+  const bezigMetVieren = vier > 0
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+      onClick={(e) => { e.stopPropagation(); aangetikt.current = Date.now(); onClick?.() }}
       title={titel} aria-label={titel}
       style={{
-        ...kaartKnop, width: 30, height: 30,
+        ...kaartKnop, width: 30, height: 30, position: 'relative', overflow: 'visible',
         color: gedaan ? '#10b981' : 'rgba(255,255,255,0.6)',
       }}
     >
-      <Icoon size={18} strokeWidth={2.8} />
+      <style>{VIER_CSS}</style>
+      {bezigMetVieren && (
+        <span key={`fx-${vier}`} aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <span style={{
+            position: 'absolute', inset: 2, borderRadius: '50%', border: '2px solid #10b981',
+            animation: 'arcVinkRing 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
+          }} />
+          {[0, 60, 120, 180, 240, 300].map(h => (
+            <span key={h} style={{
+              position: 'absolute', left: '50%', top: '50%', width: 4, height: 4, marginLeft: -2, marginTop: -2,
+              borderRadius: '50%', background: '#10b981', '--hoek': `${h}deg`,
+              animation: 'arcVinkVonk 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
+            }} />
+          ))}
+        </span>
+      )}
+      <span key={`ic-${vier}`} style={{ display: 'flex', animation: bezigMetVieren && gedaan ? 'arcVinkPop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1)' : 'none' }}>
+        <Icoon size={18} strokeWidth={2.8} />
+      </span>
     </button>
   )
 }
