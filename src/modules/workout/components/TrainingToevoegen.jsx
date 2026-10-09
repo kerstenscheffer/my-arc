@@ -38,6 +38,8 @@ export default function TrainingToevoegen({
   // Filters boven de lijst: thuis/gym en spiergroep (9 okt 2026).
   const [locatie, setLocatie] = useState('alles')
   const [bron, setBron] = useState('alles')     // 'alles' | 'coach' | 'eigen'
+  // Staat er al een training op de gekozen dag: erbij (standaard) of ervoor in de plaats.
+  const [naast, setNaast] = useState(true)
   const [spier, setSpier] = useState(null)
   // De andere plannen van de klant: elke dag daaruit is ook te kiezen,
   // zonder van actief plan te wisselen (call Martijn, 8 okt 2026).
@@ -137,7 +139,7 @@ export default function TrainingToevoegen({
     if (bezig) return
     setBezig(true)
     try {
-      if (soortTraining === 'gym') await onBewaarGym({ workoutKey, day: dag, bereik })
+      if (soortTraining === 'gym') await onBewaarGym({ workoutKey, day: dag, bereik, extra: naast && !!tempSchedule?.[dag] })
       else await onBewaarCardio({ soort: sport, duur, tijd, dagen, bereik })
       if (navigator.vibrate) navigator.vibrate([20, 40, 20])
       onClose()
@@ -382,7 +384,7 @@ export default function TrainingToevoegen({
                 })}
               </div>
               {stap === 'gym-dag' && (
-                <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.4 }}>Staat er al iets op die dag, dan komt {naamVan(workoutKey)} daarvoor in de plaats.</div>
+                <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.4 }}>Staat er al iets op die dag, dan komt {naamVan(workoutKey)} er standaard naast; in de volgende stap kun je ook vervangen.</div>
               )}
               {stap === 'cardio-dagen' && (
                 <button onClick={() => dagen.length && setStap('bereik')} disabled={!dagen.length} style={primair(!dagen.length)}>{dagen.length ? `Volgende · ${dagen.length}×` : 'Kies één of meer dagen'}</button>
@@ -424,6 +426,19 @@ export default function TrainingToevoegen({
           {stap === 'bereik' && (
             <>
               <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 14 }}>{samenvatting}</div>
+              {/* Al een training op die dag: erbij, of ervoor in de plaats. */}
+              {soortTraining === 'gym' && tempSchedule?.[dag] && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+                  {[{ id: true, label: `Naast ${naamVan(tempSchedule[dag])}` }, { id: false, label: `In plaats van ${naamVan(tempSchedule[dag])}` }].map(o => (
+                    <button key={String(o.id)} onClick={() => { tik(); setNaast(o.id) }} style={{
+                      minHeight: 44, padding: '0.4rem 0.6rem', borderRadius: 10, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer',
+                      background: naast === o.id ? '#fff' : 'rgba(255,255,255,0.05)', color: naast === o.id ? '#0a0a0a' : '#fff',
+                      border: `1px solid ${naast === o.id ? '#fff' : 'rgba(255,255,255,0.14)'}`, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{o.label}</button>
+                  ))}
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <button onClick={() => bewaar('standaard')} disabled={bezig} style={tegel(false, { minHeight: 64 })}>
                   <Repeat size={18} strokeWidth={2.4} style={{ flexShrink: 0 }} />
