@@ -11,7 +11,7 @@ import { useOnderMarge } from '../../../client/components/videoBalkHoogte'
 
 export default function MealLogFAB({ onClick, isMobile: propMobile }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
-  const size = isMobile ? 76 : 84
+  const size = isMobile ? 64 : 72
   // Boven de navigatiebalk (op 22, ~62 hoog) met wat lucht ertussen. Komt de
   // video-balk omhoog, dan schuift deze knop mee omhoog en zakt hij daarna
   // weer terug — vast op de hoogste stand stond hij raar hoog te zweven.
@@ -50,9 +50,9 @@ export default function MealLogFAB({ onClick, isMobile: propMobile }) {
         e.currentTarget.style.transform = 'scale(1)'
       }}
     >
-      <Plus size={isMobile ? 34 : 38} strokeWidth={3} />
+      <Plus size={isMobile ? 28 : 32} strokeWidth={3} />
       <span style={{
-        fontSize: '0.62rem', fontWeight: 900,
+        fontSize: '0.56rem', fontWeight: 900,
         letterSpacing: '0.08em', textTransform: 'uppercase',
         marginTop: -3,
         lineHeight: 1,
