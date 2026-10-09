@@ -46,14 +46,18 @@ export default function WaterFles({ client, db, isMobile = false, onderMarge = 9
   const vensterOpen = useVensterOpen()
   const sleep = useRef({ actief: false, startY: 0, startHoogte: 0, verplaatst: false })
 
+  // De pointer pas vastpakken zodra er echt gesleept wordt. Vastpakken bij
+  // het indrukken maakte van elke tik een sleep: met pointer capture gaat
+  // de click naar de omhullende div in plaats van naar de knop, dus de
+  // fles telde geen 100 ml meer (9 okt 2026).
   const sleepStart = (e) => {
-    sleep.current = { actief: true, startY: e.clientY, startHoogte: hoogte, verplaatst: false }
-    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* leeg */ }
+    sleep.current = { actief: true, startY: e.clientY, startHoogte: hoogte, verplaatst: false, id: e.pointerId, doel: e.currentTarget }
   }
   const sleepBeweeg = (e) => {
     if (!sleep.current.actief) return
     const dy = sleep.current.startY - e.clientY
     if (!sleep.current.verplaatst && Math.abs(dy) < 8) return
+    if (!sleep.current.verplaatst) { try { sleep.current.doel?.setPointerCapture(sleep.current.id) } catch { /* leeg */ } }
     sleep.current.verplaatst = true
     const max = Math.max(0, window.innerHeight - 260)
     setHoogte(Math.min(max, Math.max(0, sleep.current.startHoogte + dy)))
