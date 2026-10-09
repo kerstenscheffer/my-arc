@@ -11,7 +11,8 @@
 // heeft voorgenomen.
 
 import { useEffect, useState } from 'react'
-import { Target } from 'lucide-react'
+import { Target, Dumbbell, Weight, Utensils } from 'lucide-react'
+import BladModal from '../workout/components/todays-workout/components/BladModal'
 import { typeVan, doelTekst } from './doelen'
 
 const isoDag = (d) => {
@@ -19,7 +20,13 @@ const isoDag = (d) => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-export default function FocusDezeWeek({ db, client, isMobile = false }) {
+// Icoontje per meetbaar doel, voor de compacte vorm in de bovenbalk.
+const ICOON = { trainen: Dumbbell, wegen: Weight, voeding: Utensils }
+
+// `compact`: alleen de meetbare doelen als 'icoon 3/5' naast elkaar, voor in
+// de zwarte bovenbalk van home. Een tik opent alle doelen in een blad.
+export default function FocusDezeWeek({ db, client, isMobile = false, compact = false }) {
+  const [blad, setBlad] = useState(false)
   const [doelen, setDoelen] = useState(null)
   const [cijfers, setCijfers] = useState(null)
   const [vanaf, setVanaf] = useState(null)
@@ -71,8 +78,15 @@ export default function FocusDezeWeek({ db, client, isMobile = false }) {
     ? new Date(`${String(vanaf).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
     : null
 
-  return (
-    <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+  const meetbaar = doelen.map(d => {
+    const t = typeVan(d.type)
+    const gedaan = t && cijfers ? t.meet(cijfers) : null
+    const doel = Number(d.doel_getal) || null
+    return { d, key: t?.key, gedaan, doel }
+  }).filter(x => x.gedaan != null && x.doel != null)
+
+  const volledig = (inBlad) => (
+    <div style={{ padding: inBlad ? 0 : (isMobile ? '0 1rem' : '0 1.5rem') }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         marginBottom: isMobile ? '0.6rem' : '0.7rem',
@@ -138,5 +152,39 @@ export default function FocusDezeWeek({ db, client, isMobile = false }) {
         })}
       </div>
     </div>
+  )
+
+  if (!compact) return volledig(false)
+
+  return (
+    <>
+      <button
+        onClick={() => setBlad(true)}
+        aria-label="Jouw focus deze week"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 10, height: '100%', padding: '0 0.6rem',
+          background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {meetbaar.length === 0 ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#fff', fontSize: '0.78rem', fontWeight: 900 }}>
+            <Target size={15} strokeWidth={2.6} /> {doelen.length}
+          </span>
+        ) : meetbaar.slice(0, 3).map((x, i) => {
+          const Icoon = ICOON[x.key] || Target
+          const klaar = x.gedaan >= x.doel
+          return (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: klaar ? '#10b981' : '#fff', fontSize: '0.78rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
+              <Icoon size={14} strokeWidth={2.6} />
+              {x.gedaan}<span style={{ color: 'rgba(255,255,255,0.35)' }}>/{x.doel}</span>
+            </span>
+          )
+        })}
+      </button>
+      <BladModal open={blad} titel="Jouw focus deze week" onClose={() => setBlad(false)} zIndex={2147482600}>
+        {volledig(true)}
+      </BladModal>
+    </>
   )
 }

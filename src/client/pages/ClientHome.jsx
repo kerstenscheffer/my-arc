@@ -142,7 +142,9 @@ function WelcomeSection({ client, db, datum, onVerzet, isVandaag }) {
         paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
         boxSizing: 'content-box', background: '#0a0a0a',
       }}>
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', alignItems: 'stretch', paddingLeft: isMobile ? '0.4rem' : '0.9rem', minWidth: 0 }}>
+          <FocusDezeWeek db={db} client={client} isMobile={isMobile} compact />
+        </div>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
           <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
         </div>
@@ -684,45 +686,33 @@ export default function ClientHome({ client, db, setCurrentView }) {
         onVerzet={verzetAgendaDag}
       />
 
-      {/* Belangrijke video van de coach: onder de begroeting met de dagkiezer,
-          boven de agenda van vandaag. Bovenaan zou hij over de herofoto heen
-          liggen; hier is hij het eerste wat je leest zodra je door de foto heen
-          bent. Verdwijnt zodra je 'm hebt afgespeeld of afgevinkt. */}
-      <div style={{ marginTop: isMobile ? '1.1rem' : '1.4rem' }}>
+      {/* ── De dag als agenda ─────────────────────────────────────────────
+          Direct onder de dag: dit is waar je vandaag staat. De doelen van deze
+          week staan compact linksboven in de zwarte balk (FocusDezeWeek
+          compact), niet meer als losse kaarten ertussen. Geen FadeOnScroll:
+          het eerste wat je ziet hoort er meteen te staan. */}
+      <div style={{ marginTop: isMobile ? '0.6rem' : '0.9rem' }}>
+        <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+          <DagAgenda
+            client={client}
+            db={db}
+            isMobile={isMobile}
+            hoogte={isMobile ? 520 : 620}
+            dag={dagStand.dag}
+            weekAnker={dagStand.weekAnker}
+            onVerzetDag={verzetAgendaDag}
+            toonKop={false}
+            toonMacros={false}
+            onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
+          />
+        </div>
+      </div>
+
+      {/* Belangrijke video van de coach, onder de agenda. Verdwijnt zodra je
+          'm hebt afgespeeld of afgevinkt. */}
+      <div style={{ marginTop: isMobile ? '1.4rem' : '1.75rem' }}>
         <BelangrijkeVideo client={client} pagina="home" isMobile={isMobile} />
       </div>
-
-      {/* Wat de klant zichzelf deze week heeft voorgenomen, met hoe ver hij is.
-          Boven de agenda: je doelen horen te sturen wat je vandaag doet, niet
-          onderaan de pagina te staan als naslagwerk. Tekent zichzelf niet als
-          er geen doelen zijn. */}
-      <div style={{ marginTop: isMobile ? '1.4rem' : '1.75rem' }}>
-        <FocusDezeWeek db={db} client={client} isMobile={isMobile} />
-      </div>
-
-      {/* ── De dag als agenda ─────────────────────────────────────────────
-          Eigen component (DagAgenda), los van het coach-gereedschap. Dit is
-          waar de dag staat: de macro's, de maaltijden met hun afrondknop en
-          de training met zijn startknop. Daarom bovenaan, direct onder de
-          begroeting. */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '1.1rem' : '1.4rem' }}>
-          <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-            <DagAgenda
-              client={client}
-              db={db}
-              isMobile={isMobile}
-              hoogte={isMobile ? 520 : 620}
-              dag={dagStand.dag}
-              weekAnker={dagStand.weekAnker}
-              onVerzetDag={verzetAgendaDag}
-              toonKop={false}
-              toonMacros={false}
-              onOpen={(blok) => setCurrentView && setCurrentView(blok.type === 'training' ? 'workout' : 'meal')}
-            />
-          </div>
-        </div>
-      </FadeOnScroll>
 
       {/* Wat er nog los boven de acties staat: de eerstvolgende call. */}
       <FadeOnScroll>
