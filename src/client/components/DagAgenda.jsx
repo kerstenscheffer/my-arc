@@ -669,11 +669,20 @@ export default function DagAgenda({
             </span>
           </div>
           <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-            <div style={{
-              width: `${(voortgang.gedaan / voortgang.totaal) * 100}%`, height: '100%', borderRadius: 2,
-              background: voortgang.rond ? '#10b981' : '#fff',
-              transition: 'width 0.6s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s ease',
-            }} />
+            {/* Kleur loopt mee met de voortgang: van wit naar groen. */}
+            {(() => {
+              const t = voortgang.gedaan / voortgang.totaal
+              const mix = (a, b) => Math.round(a + (b - a) * t)
+              const kleur = `rgb(${mix(255, 16)}, ${mix(255, 185)}, ${mix(255, 129)})`
+              return (
+                <div style={{
+                  width: `${t * 100}%`, height: '100%', borderRadius: 2,
+                  background: kleur,
+                  boxShadow: t > 0.5 ? `0 0 ${Math.round(t * 10)}px rgba(16,185,129,${(t * 0.5).toFixed(2)})` : 'none',
+                  transition: 'width 0.6s cubic-bezier(0.22, 1, 0.36, 1), background 0.6s ease, box-shadow 0.6s ease',
+                }} />
+              )
+            })()}
           </div>
         </div>
       )}
