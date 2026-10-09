@@ -293,11 +293,11 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
         {/* Kop: terug, titel met stap, sluiten */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
           {stap > 1 && !alleenGewicht
-            ? <button onClick={() => setStap(n => n - 1)} aria-label="Vorige stap" style={kleinKnop}><ChevronLeft size={18} strokeWidth={2.8} /></button>
+            ? <button onClick={() => setStap(n => (n === 4 ? 2 : n - 1))} aria-label="Vorige stap" style={kleinKnop}><ChevronLeft size={18} strokeWidth={2.8} /></button>
             : <div style={{ width: 40 }} />}
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              {alleenGewicht ? 'Gewicht loggen' : `Ochtend loggen · stap ${stap} van 5`}
+              {alleenGewicht ? 'Gewicht loggen' : `Slaap loggen · stap ${stap <= 2 ? stap : stap - 1} van 4`}
             </div>
             <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               {alleenGewicht
@@ -321,13 +321,14 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
           <>
             {vraag('Hoe laat stond je op?')}
             {klok(opstaan, setOpstaan, OPSTAATIJDEN)}
-            <button onClick={() => setStap(3)} style={primair}>Volgende</button>
+            <button onClick={() => setStap(4)} style={primair}>Volgende</button>
           </>
         )}
 
-        {/* Na het opstaan: weeg je even. Zelfde opslag als de gewichtstracker,
+        {/* Weegstap: alleen als los scherm vanuit de regel 'Wegen'
+            (alleenGewicht). Hoort niet in de nachtlog. Zelfde opslag als de gewichtstracker,
             dus het telt ook voor je challenge. */}
-        {stap === 3 && (
+        {stap === 3 && alleenGewicht && (
           <>
             {vraag('Weeg je even?')}
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: -8, marginBottom: 16 }}>
