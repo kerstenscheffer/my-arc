@@ -430,17 +430,25 @@ export default function DagAgenda({
   useEffect(() => {
     if (laden) return
     const nu = new Set(gedaanIds ? gedaanIds.split('|') : [])
-    const was = vorigeGedaan.current
+    // Wat er gedaan was toen je home de vorige keer zag (deze sessie, deze
+    // dag). Zo zie je ook het afronden van iets wat je elders logde, zoals je
+    // training op de workoutpagina, als je terugkomt.
+    const opslagSleutel = `arc_home_gedaan_${slaapDagIso}`
+    let wasUitOpslag = null
+    try { const r = sessionStorage.getItem(opslagSleutel); if (r != null) wasUitOpslag = new Set(r ? r.split('|') : []) } catch { /* geen opslag */ }
+    try { sessionStorage.setItem(opslagSleutel, gedaanIds) } catch { /* geen opslag */ }
+    const was = vorigeGedaan.current || wasUitOpslag
+    const vanElders = !vorigeGedaan.current && !!wasUitOpslag
     vorigeGedaan.current = nu
     if (!was) return
     const nieuw = [...nu].filter(id => !was.has(id))
     if (!nieuw.length) return
     setDeckPop(p => p + 1)
-    if (Date.now() - (window.__arcLaatsteTik || 0) > 120000) return
+    if (!vanElders && Date.now() - (window.__arcLaatsteTik || 0) > 120000) return
     setInklappen(prev => { const n = { ...prev }; nieuw.forEach(id => { n[id] = true }); return n })
     const t = setTimeout(() => setInklappen(prev => { const n = { ...prev }; nieuw.forEach(id => { delete n[id] }); return n }), 560)
     return () => clearTimeout(t)
-  }, [gedaanIds, laden])
+  }, [gedaanIds, laden, slaapDagIso])
   // Andere dag: opnieuw beginnen, geen animaties van de vorige dag.
   useEffect(() => { vorigeGedaan.current = null; setDeckOpen(false); setInklappen({}) }, [dag, weekAnker])
 
