@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info, Pencil } from 'lucide-react'
+import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info, Pencil, Trash2 } from 'lucide-react'
 import CustomWorkoutModal from './planning/CustomWorkoutModal'
 import { locatieVan, spiergroepenVan, SPIERGROEPEN } from '../utils/trainingFilters'
 import Keuze from '../../meal-plan/components/Keuze'
@@ -236,6 +236,24 @@ export default function TrainingToevoegen({
                       {n != null && <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{n} oefeningen</div>}
                     </div>
                   </button>
+                  {/* Verwijderen: alleen deze eigen training; staat hij nog in
+                      het rooster, dan verdwijnt die tegel daar ook. */}
+                  {item.eigen && (
+                    <button onClick={async (e) => {
+                      e.stopPropagation(); tik()
+                      if (!window.confirm(`"${item.naam}" verwijderen?`)) return
+                      const ok = await workoutService.deleteCustomWorkout(item.eigen.id)
+                      if (ok) setEigen(l => l.filter(x => x.id !== item.eigen.id)); else alert('Verwijderen mislukt.')
+                    }} aria-label="Eigen training verwijderen" style={{
+                      position: 'absolute', top: 7, right: Array.isArray(item.w?.exercises) && item.w.exercises.length > 0 ? 75 : 41, width: 28, height: 28, borderRadius: '50%', padding: 0,
+                      background: 'rgba(239,68,68,0.18)', border: '1px solid rgba(239,68,68,0.45)', color: '#fca5a5',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <Trash2 size={13} strokeWidth={2.6} />
+                    </button>
+                  )}
                   {item.eigen && (
                     <button onClick={(e) => { e.stopPropagation(); tik(); setEigenBewerk(item.eigen); setEigenOpen(true) }} aria-label="Eigen training bewerken" style={{
                       position: 'absolute', top: 7, right: Array.isArray(item.w?.exercises) && item.w.exercises.length > 0 ? 41 : 7, width: 28, height: 28, borderRadius: '50%', padding: 0,
