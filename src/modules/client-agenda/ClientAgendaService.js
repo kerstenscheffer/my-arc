@@ -194,7 +194,11 @@ export class ClientAgendaService {
     const tot = new Date(weekEindDatum); tot.setHours(23, 59, 59, 999)
 
     const veilig = (q) => q.then(r => r, (e) => { console.warn('realiteit laden:', e?.message); return { data: [] } })
-    const [sessies, wegingen, maaltijden, checkins, cardio] = await Promise.all([
+    // Slaap: de nacht die op log_date eindigt begon de avond ervoor, dus ook
+    // de log van de maandag ná deze week hoort er (met zijn avonddeel op
+    // zondag) bij.
+    const naWeek = new Date(weekEindDatum); naWeek.setDate(naWeek.getDate() + 1)
+    const [sessies, wegingen, maaltijden, checkins, cardio, slaap, supps] = await Promise.all([
       veilig(this.supabase.from('workout_sessions')
         .select('id, workout_date, day_name, created_at, completed_at, duration_minutes, is_completed, exercises_completed')
         .eq('client_id', clientId).gte('workout_date', weekStart).lte('workout_date', weekEnd)),
@@ -210,6 +214,12 @@ export class ClientAgendaService {
       veilig(this.supabase.from('cardio_logs')
         .select('id, cardio_type, duration_minutes, distance_km, steps, logged_date, created_at, intensity, calories, calories_source')
         .eq('client_id', clientId).gte('logged_date', weekStart).lte('logged_date', weekEnd)),
+      veilig(this.supabase.from('sleep_logs')
+        .select('id, log_date, bedtime, wake_time, hours_slept, quality, struggles, notes')
+        .eq('client_id', clientId).gte('log_date', weekStart).lte('log_date', toIsoDate(naWeek))),
+      veilig(this.supabase.from('supplement_logs')
+        .select('id, supplement_id, supplement_name, log_date, taken_at, created_at')
+        .eq('client_id', clientId).gte('log_date', weekStart).lte('log_date', weekEnd)),
     ])
 
     // Oefening-logs van deze sessies: einde van de training.
@@ -314,12 +324,58 @@ export class ClientAgendaService {
       })
     })
 
+    // ── Slaap ── Van bedtijd tot opstaan, over middernacht in twee delen:
+    // het avonddeel op de dag ervoor, het ochtenddeel op log_date.
+    const dagVanIso = (iso) => DAYS[(new Date(`${iso}T12:00:00`).getDay() + 6) % 7]
+    const minUitKlok = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(t || '')); return m ? (+m[1]) * 60 + (+m[2]) : null }
+    ;(slaap.data || []).forEach(n => {
+      const datum = String(n.log_date).slice(0, 10)
+      const bed = minUitKlok(n.bedtime)
+      const op = minUitKlok(n.wake_time)
+      const uren = n.hours_slept != null ? String(Math.round(Number(n.hours_slept) * 10) / 10).replace('.', ',') : null
+      const sub = [uren ? `${uren}u` : null, n.quality != null ? `${n.quality}/10` : null].filter(Boolean).join(' · ')
+      const meta = { echt: true, slaap: true, uren: n.hours_slept, kwaliteit: n.quality, notitie: n.struggles || n.notes || null, bed: n.bedtime ? String(n.bedtime).slice(0, 5) : null, op: n.wake_time ? String(n.wake_time).slice(0, 5) : null, datum }
+      const basis = { type: 'sleep', label: 'Slaap', sublabel: sub || 'Gelogd', color: SLEEP_COLOR, source: 'realiteit', editable: false }
+      const vorige = new Date(`${datum}T12:00:00`); vorige.setDate(vorige.getDate() - 1)
+      const vorigeIso = toIsoDate(vorige)
+      if (bed != null && op != null && bed > op) {
+        if (vorigeIso >= weekStart && vorigeIso <= weekEnd) push(dagVanIso(vorigeIso), { ...basis, id: `echt-slaap-${n.id}-avond`, day: dagVanIso(vorigeIso), start: bed, end: 24 * 60, meta })
+        if (datum >= weekStart && datum <= weekEnd) push(dagVanIso(datum), { ...basis, id: `echt-slaap-${n.id}-ochtend`, day: dagVanIso(datum), start: 0, end: op, meta })
+      } else if (datum >= weekStart && datum <= weekEnd) {
+        // Geen tijden (of niet over middernacht): een blok tot het opstaan.
+        const eind = op ?? 7 * 60
+        const start = bed != null && bed < eind ? bed : Math.max(0, eind - Math.round((Number(n.hours_slept) || 8) * 60))
+        push(dagVanIso(datum), { ...basis, id: `echt-slaap-${n.id}`, day: dagVanIso(datum), start, end: eind, meta })
+      }
+    })
+
+    // ── Supplementen ── Per moment van afvinken één blok met de namen.
+    const suppPerMoment = new Map()
+    ;(supps.data || []).forEach(r => {
+      const ts = r.taken_at || r.created_at
+      const datum = String(r.log_date).slice(0, 10)
+      const dag = dagVanIso(datum)
+      const min = ts ? Math.round(minVan(ts) / 5) * 5 : 8 * 60
+      const k = `${dag}|${min}`
+      if (!suppPerMoment.has(k)) suppPerMoment.set(k, { dag, min, namen: [], datum })
+      suppPerMoment.get(k).namen.push(r.supplement_name || r.supplement_id)
+    })
+    suppPerMoment.forEach((g, k) => {
+      push(g.dag, {
+        id: `echt-supp-${k}`, day: g.dag, type: 'supplement',
+        label: 'Supplementen', sublabel: g.namen.join(' · '),
+        start: g.min, end: Math.min(24 * 60, g.min + 10), color: SUPPLEMENT_COLOR, source: 'realiteit', editable: false,
+        meta: { echt: true, items: g.namen.map(naam => ({ naam })), datum: g.datum },
+      })
+    })
+
     Object.keys(blocksByDay).forEach(d => { blocksByDay[d] = sortAndAssign(blocksByDay[d]) })
     return {
       blocksByDay, weekAnchor: anchor, weekStart, weekEnd,
       aantallen: {
         trainingen: (sessies.data || []).length, wegingen: (wegingen.data || []).length,
         maaltijden: (maaltijden.data || []).length, checkins: (checkins.data || []).length, cardio: (cardio.data || []).length,
+        slaap: (slaap.data || []).length, supplementen: (supps.data || []).length,
       },
     }
   }

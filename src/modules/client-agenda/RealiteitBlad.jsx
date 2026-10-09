@@ -167,14 +167,49 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null }) {
   )
 }
 
+// Slaap: van bed tot opstaan, uren, cijfer en wat de klant erbij schreef.
+function SlaapInhoud({ blok }) {
+  const m = blok.meta || {}
+  const k = m.kwaliteit
+  const kleur = k == null ? '#fff' : k >= 7 ? '#10b981' : k >= 5 ? '#f59e0b' : '#ef4444'
+  const cel = (waarde, label, c = '#fff') => (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: '1.35rem', fontWeight: 900, color: c, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{waarde}</div>
+      <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2 }}>{label}</div>
+    </div>
+  )
+  return (
+    <div style={{ paddingBottom: '0.75rem' }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+        {cel(m.bed || '–', 'naar bed')}
+        {cel(m.op || '–', 'opgestaan')}
+        {cel(m.uren != null ? `${String(Math.round(Number(m.uren) * 10) / 10).replace('.', ',')}u` : '–', 'geslapen')}
+        {cel(k != null ? `${k}/10` : '–', 'kwaliteit', kleur)}
+      </div>
+      {m.notitie && (
+        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, paddingLeft: 8, borderLeft: '2px solid rgba(255,255,255,0.3)' }}>{m.notitie}</div>
+      )}
+    </div>
+  )
+}
+
 export default function RealiteitBlad({ blok, db, isMobile, onClose, onOefening = null }) {
   const open = !!blok
-  const titel = blok ? (blok.type === 'meal' ? blok.sublabel : blok.type === 'training' ? (blok.sublabel || 'Training') : blok.sublabel || blok.label) : ''
+  const titel = blok ? (blok.type === 'meal' ? blok.sublabel : blok.type === 'training' ? (blok.sublabel || 'Training') : blok.meta?.slaap ? 'Slaap' : blok.type === 'supplement' ? 'Supplementen' : blok.sublabel || blok.label) : ''
   return (
     <BladModal open={open} titel={titel} onClose={onClose} zIndex={10600}>
       {blok?.type === 'meal' && <MaaltijdInhoud blok={blok} db={db} isMobile={isMobile} />}
       {blok?.type === 'training' && <TrainingInhoud blok={blok} db={db} isMobile={isMobile} onOefening={onOefening} />}
-      {blok && blok.type !== 'meal' && blok.type !== 'training' && (
+      {blok?.meta?.slaap && <SlaapInhoud blok={blok} />}
+      {blok?.type === 'supplement' && (
+        <div style={{ paddingBottom: '0.75rem' }}>
+          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Afgevinkt om {tijd(blok.start)}</div>
+          {(blok.meta?.items || []).map((x, i) => (
+            <div key={i} style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', padding: '0.35rem 0', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>{x.naam}</div>
+          ))}
+        </div>
+      )}
+      {blok && blok.type !== 'meal' && blok.type !== 'training' && !blok.meta?.slaap && blok.type !== 'supplement' && (
         <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', paddingBottom: '0.5rem' }}>
           {blok.label} · {tijd(blok.start)}
         </div>
