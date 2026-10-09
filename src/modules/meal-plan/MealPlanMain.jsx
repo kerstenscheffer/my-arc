@@ -69,27 +69,7 @@ export default function MealPlanMain({ client, onNavigate, db }) {
   // (eten loggen, water, macro's uit het profiel). De oude melding "vraag je
   // coach om een plan" is weg (issue 9 okt 2026). `hasAIPlan` blijft alleen
   // voor de wikkel eromheen.
-  const planPanel = true ? (
-    <AIMealDashboard client={client} onNavigate={onNavigate} db={db} geenPlanOk />
-  ) : (
-    <div style={{
-      minHeight: '60vh',
-      background: '#0a0a0a',
-      padding: '2rem',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      <div style={{ textAlign: 'center', maxWidth: '500px' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'white', marginBottom: '1rem' }}>
-          Geen Meal Plan Actief
-        </h2>
-        <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-          Vraag je coach om een AI meal plan voor je te genereren!
-        </p>
-      </div>
-    </div>
-  )
+  const planPanel = <AIMealDashboard client={client} onNavigate={onNavigate} db={db} />
 
   // De tabs Voedingsgids / Gelegenheden / Slim kiezen zijn voor nu verborgen
   // (op verzoek). Alleen het plan wordt getoond. De componenten + 'tab'-state
