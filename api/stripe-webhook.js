@@ -45,13 +45,12 @@ async function stopAlsTweedeBetaling(invoice) {
   }
 }
 
-// Service key komt uit Vercel env (SUPABASE_SERVICE_KEY). De oude key
-// stond hier hardcoded; na het zetten van de env var moet die geroteerd
-// worden in het Supabase dashboard (en de fallback hieronder weg).
+// Service key komt uitsluitend uit Vercel env (SUPABASE_SERVICE_KEY). Hier
+// stond tot 10 okt 2026 de echte service_role-sleutel als fallback, in een
+// openbare repo. Nooit meer een sleutel in code: alleen env-variabelen.
 const supabase = createClient(
   process.env.SUPABASE_URL || 'https://xlaycpwpnhjmulfsnynh.supabase.co',
   process.env.SUPABASE_SERVICE_KEY
-    || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsYXljcHdwbmhqbXVsZnNueW5oIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTAxMTM0NSwiZXhwIjoyMDcwNTg3MzQ1fQ.Pq3ikZmgbMKia_KxEVfVs_QktFuI-fLy-Awh_Cf104w'
 );
 
 export default async function handler(req, res) {
