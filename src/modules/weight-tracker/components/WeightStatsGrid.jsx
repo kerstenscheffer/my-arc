@@ -9,7 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { weightGoalColor } from '../utils/weightGoalColor'
 import {
   maakConfig, trendReeks, tempoPerWeek, weekFractie, lijnenOpWeek, ernstVan, kleurVoorErnst,
-  tempoOordeel, zaterdagReeks, bereikTekst, laatsteZaterdag, vensterGemiddelde, tempoKleurVanDoel,
+  tempoOordeel, zaterdagReeks, bereikTekst, laatsteZaterdag, vensterGemiddelde, tempoKleurVanDoel, startInWeek,
 } from '../utils/coachingBand'
 
 const PERIODES = [
@@ -399,12 +399,16 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
     const za = laatsteZaterdag(vandaag)
     const dagenSinds = Math.round((vandaag.getTime() - new Date(`${za}T00:00:00`).getTime()) / 86400000)
     const isoVandaag = `${vandaag.getFullYear()}-${String(vandaag.getMonth() + 1).padStart(2, '0')}-${String(vandaag.getDate()).padStart(2, '0')}`
+    // De eerste faseweek rekent vanaf het startgewicht, zie startInWeek.
+    const start = faseStart && faseStartGewicht != null ? { datum: faseStart, gewicht: faseStartGewicht } : null
     const nu = dagenSinds > 0 ? vensterGemiddelde(binnenFase, isoVandaag, dagenSinds) : { gemiddelde: null, metingen: 0 }
-    const vorig = vensterGemiddelde(binnenFase, za)
+    const vorig = startInWeek(start, isoVandaag, za)
+      ? { gemiddelde: faseStartGewicht, metingen: 0, vanStart: true }
+      : vensterGemiddelde(binnenFase, za)
     const lopend = []
-    if (dagenSinds > 0 && (nu.metingen > 0 || vorig.metingen > 0)) {
+    if (dagenSinds > 0 && (nu.metingen > 0 || vorig.metingen > 0 || vorig.vanStart)) {
       const verschil = (nu.gemiddelde != null && vorig.gemiddelde != null) ? Math.round((nu.gemiddelde - vorig.gemiddelde) * 100) / 100 : null
-      const genoeg = nu.metingen >= 3 && vorig.metingen >= 3
+      const genoeg = nu.metingen >= 3 && (vorig.vanStart || vorig.metingen >= 3)
       lopend.push({
         sleutel: 'lopend',
         waarde: verschil,
@@ -413,11 +417,12 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         kop: 'Deze week',
         onder: verschil == null
           ? (nu.metingen === 0 ? 'nog geen weging sinds zaterdag' : 'vorige week geen wegingen')
-          : genoeg ? `gem. ${nu.gemiddelde} vs ${vorig.gemiddelde} kg` : `${vorig.metingen} en ${nu.metingen} wegingen`,
+          : genoeg ? `gem. ${nu.gemiddelde} vs ${vorig.vanStart ? 'start ' : ''}${vorig.gemiddelde} kg`
+            : vorig.vanStart ? `vanaf start, ${nu.metingen} wegingen` : `${vorig.metingen} en ${nu.metingen} wegingen`,
       })
     }
-    const zaterdagen = zaterdagReeks(binnenFase).map((z, i) => {
-      const genoeg = z.nu.metingen >= 3 && z.vorige.metingen >= 3
+    const zaterdagen = zaterdagReeks(binnenFase, undefined, undefined, undefined, start).map((z, i) => {
+      const genoeg = z.nu.metingen >= 3 && (z.vorige.vanStart || z.vorige.metingen >= 3)
       return {
         sleutel: z.zaterdag,
         waarde: z.verschil,
@@ -426,11 +431,11 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         kop: i === 0 ? 'Laatste zaterdag' : i === 1 ? 'Zaterdag ervoor' : `${i} zaterdagen terug`,
         onder: genoeg
           ? `za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
-          : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
+          : z.vorige.vanStart ? `vanaf start, ${z.nu.metingen} wegingen` : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
       }
     })
     return [...lopend, ...zaterdagen]
-  }, [binnenFase, bandConfig, sortedHistory]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [binnenFase, bandConfig, sortedHistory, faseStart, faseStartGewicht]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Weeknummer voor het label bij het gemiddelde ("Gemiddeld w38").
   const weekNummer = (() => {

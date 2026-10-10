@@ -496,11 +496,26 @@ export function vensterGemiddelde(history, eindIso, dagen = STANDAARD.venster_da
   return { gemiddelde: Math.round((som / waarden.length) * 100) / 100, metingen: waarden.length }
 }
 
-export function zaterdagTempo(history, anker = new Date(), dagen = STANDAARD.venster_dagen) {
+// Startpunt van een fase als vergelijking voor de eerste week.
+//
+// `start` = { datum, gewicht }. Valt de fasestart in deze week (na de vorige
+// zaterdag, uiterlijk deze zaterdag), dan vergelijken we niet met de week
+// ervoor maar met het startgewicht. Anders telde de eerste week nergens mee en
+// kwamen de weektempo's opgeteld lang niet uit op 'Sinds fase' (Kersten,
+// 10 okt 2026).
+export function startInWeek(start, za, vorigeZa) {
+  const datum = start?.datum ? String(start.datum).slice(0, 10) : null
+  const gewicht = start?.gewicht != null ? parseFloat(start.gewicht) : NaN
+  return !!datum && Number.isFinite(gewicht) && datum > vorigeZa && datum <= za
+}
+
+export function zaterdagTempo(history, anker = new Date(), dagen = STANDAARD.venster_dagen, start = null) {
   const za = laatsteZaterdag(anker)
   const vorigeZa = iso(new Date(new Date(`${za}T00:00:00`).getTime() - 7 * dagInMs))
   const nu = vensterGemiddelde(history, za, dagen)
-  const vorige = vensterGemiddelde(history, vorigeZa, dagen)
+  const vorige = startInWeek(start, za, vorigeZa)
+    ? { gemiddelde: parseFloat(start.gewicht), metingen: 0, vanStart: true }
+    : vensterGemiddelde(history, vorigeZa, dagen)
   const verschil = (nu.gemiddelde != null && vorige.gemiddelde != null)
     ? Math.round((nu.gemiddelde - vorige.gemiddelde) * 100) / 100
     : null
@@ -510,14 +525,16 @@ export function zaterdagTempo(history, anker = new Date(), dagen = STANDAARD.ven
 // Dezelfde som voor een rij zaterdagen achter elkaar, van nieuw naar oud.
 //
 // Stopt zodra er in beide vensters niets meer staat — dan is de historie op en
-// zouden er alleen lege blokjes bijkomen.
-export function zaterdagReeks(history, anker = new Date(), maxWeken = 26, dagen = STANDAARD.venster_dagen) {
+// zouden er alleen lege blokjes bijkomen. Met `start` (zie startInWeek) is de
+// week van de fasestart de laatste: die rekent vanaf het startgewicht.
+export function zaterdagReeks(history, anker = new Date(), maxWeken = 26, dagen = STANDAARD.venster_dagen, start = null) {
   const uit = []
   let za = laatsteZaterdag(anker)
   for (let i = 0; i < maxWeken; i++) {
-    const t = zaterdagTempo(history, new Date(`${za}T00:00:00`), dagen)
-    if (t.nu.metingen === 0 && t.vorige.metingen === 0) break
+    const t = zaterdagTempo(history, new Date(`${za}T00:00:00`), dagen, start)
+    if (t.nu.metingen === 0 && t.vorige.metingen === 0 && !t.vorige.vanStart) break
     uit.push(t)
+    if (t.vorige.vanStart) break
     za = iso(new Date(new Date(`${za}T00:00:00`).getTime() - 7 * dagInMs))
   }
   return uit

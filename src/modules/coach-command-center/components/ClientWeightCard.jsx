@@ -285,11 +285,14 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   const fmtV = (v) => v != null ? `${v > 0 ? '+' : ''}${v}` : '—'
   const kaartWeken = [
     { sleutel: 'lopend', kort: 'Deze week', val: fmtV(weekDiff), color: tempoKleur(weekDiff, weekGenoeg) },
-    ...zaterdagReeks(history).map((z, i) => ({
+    // Zelfde reeks als de klantpagina: de eerste faseweek vanaf het startgewicht.
+    ...zaterdagReeks(history, undefined, undefined, undefined,
+      fase?.started_on && fase?.start_gewicht != null ? { datum: fase.started_on, gewicht: fase.start_gewicht } : null,
+    ).map((z, i) => ({
       sleutel: z.zaterdag,
       kort: i === 0 ? 'Zaterdag' : `za ${fmtDag(z.zaterdag)}`,
       val: fmtV(z.verschil),
-      color: tempoKleur(z.verschil, z.nu.metingen >= 3 && z.vorige.metingen >= 3),
+      color: tempoKleur(z.verschil, z.nu.metingen >= 3 && (z.vorige.vanStart || z.vorige.metingen >= 3)),
     })),
   ]
   const sindsStart = {
