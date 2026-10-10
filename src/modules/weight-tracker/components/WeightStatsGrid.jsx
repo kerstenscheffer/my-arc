@@ -9,7 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { weightGoalColor } from '../utils/weightGoalColor'
 import {
   maakConfig, trendReeks, tempoPerWeek, weekFractie, lijnenOpWeek, ernstVan, kleurVoorErnst,
-  tempoOordeel, zaterdagReeks, bereikTekst, laatsteZaterdag, vensterGemiddelde, tempoKleurVanDoel, startInWeek,
+  tempoOordeel, zaterdagReeks, bereikTekst, laatsteZaterdag, vensterGemiddelde, tempoKleurVanDoel, startInWeek, actueelGemiddelde,
 } from '../utils/coachingBand'
 
 const PERIODES = [
@@ -112,8 +112,11 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   const latestEntry = faseHistory[faseHistory.length - 1]
   const basisGewicht = faseStartGewicht ?? (firstEntry ? parseFloat(firstEntry.weight) : null)
 
+  // Gemiddelde van nu min het startpunt, zodat de weekkaarten er opgeteld
+  // precies op uitkomen (zie actueelGemiddelde).
+  const actueel = actueelGemiddelde(faseHistory)
   const totalChange = (basisGewicht != null && latestEntry && (faseStartGewicht != null || faseHistory.length >= 2))
-    ? parseFloat((parseFloat(latestEntry.weight) - basisGewicht).toFixed(1))
+    ? Math.round(((actueel ?? parseFloat(latestEntry.weight)) - basisGewicht) * 100) / 100
     : null
 
   // Waartegen kleuren we? De fase, als die er is. Anders de klant-rij.
@@ -428,7 +431,8 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         waarde: z.verschil,
         genoeg,
         kleur: kleurVoor(z.verschil, genoeg),
-        kop: i === 0 ? 'Laatste zaterdag' : i === 1 ? 'Zaterdag ervoor' : `${i} zaterdagen terug`,
+        // Op zaterdag zelf ís de laatste zaterdag deze week.
+        kop: (i === 0 && z.zaterdag === isoVandaag) ? 'Deze week' : i === 0 ? 'Laatste zaterdag' : i === 1 ? 'Zaterdag ervoor' : `${i} zaterdagen terug`,
         onder: genoeg
           ? `za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
           : z.vorige.vanStart ? `vanaf start, ${z.nu.metingen} wegingen` : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,

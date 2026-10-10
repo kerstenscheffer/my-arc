@@ -18,7 +18,7 @@ import DeleteClientModal from './DeleteClientModal'
 import { computePeriod } from './trajectPeriode'
 import ClientInsightModal from './ClientInsightModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
-import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks, maakConfig, tempoKleurVanDoel } from '../../weight-tracker/utils/coachingBand'
+import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks, maakConfig, tempoKleurVanDoel, startInWeek, actueelGemiddelde } from '../../weight-tracker/utils/coachingBand'
 
 // Platte actieknop: geen vlak, geen rand — alleen icoon + woord. Drie
 // omkaderde knoppen naast elkaar maakten de kaart onrustig.
@@ -181,11 +181,16 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   const dagenSindsZa = Math.round((nuDag.getTime() - new Date(`${zaIso}T00:00:00`).getTime()) / 86400000)
   const isoVandaag = vandaag
   const lopendNu = dagenSindsZa > 0 ? vensterGemiddelde(history, isoVandaag, dagenSindsZa) : { gemiddelde: null, metingen: 0 }
-  const lopendVorig = vensterGemiddelde(history, zaIso)
+  // Begon de fase deze week, dan is het startgewicht het vergelijkpunt.
+  const faseStartPunt = client?.fase?.started_on && client?.fase?.start_gewicht != null
+    ? { datum: client.fase.started_on, gewicht: client.fase.start_gewicht } : null
+  const lopendVorig = startInWeek(faseStartPunt, isoVandaag, zaIso)
+    ? { gemiddelde: parseFloat(faseStartPunt.gewicht), metingen: 0, vanStart: true }
+    : vensterGemiddelde(history, zaIso)
   const weekDiff = (lopendNu.gemiddelde != null && lopendVorig.gemiddelde != null)
     ? Math.round((lopendNu.gemiddelde - lopendVorig.gemiddelde) * 100) / 100
     : null
-  const weekGenoeg = lopendNu.metingen >= 3 && lopendVorig.metingen >= 3
+  const weekGenoeg = lopendNu.metingen >= 3 && (lopendVorig.vanStart || lopendVorig.metingen >= 3)
   const za = zaterdagTempo(history, nuDag)
   const zaGenoeg = za.nu.metingen >= 3 && za.vorige.metingen >= 3
   const fmtDag = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
@@ -214,8 +219,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     ? parseFloat(fase.start_gewicht)
     : (firstEntry ? parseFloat(firstEntry.weight) : null)
 
+  // Gemiddelde van nu min het startpunt: sluit exact op de weekkaarten.
+  const actueel = actueelGemiddelde(faseHistory, nuDag)
   const totalChange = (basisGewicht != null && latestEntry && (fase?.start_gewicht != null || faseHistory.length >= 2))
-    ? parseFloat((parseFloat(latestEntry.weight) - basisGewicht).toFixed(1))
+    ? Math.round(((actueel ?? parseFloat(latestEntry.weight)) - basisGewicht) * 100) / 100
     : null
 
   const startDatum = fase?.started_on || firstEntry?.date || null
@@ -284,13 +291,14 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // zaterdagen terug in de tijd. Sinds start staat er vast naast.
   const fmtV = (v) => v != null ? `${v > 0 ? '+' : ''}${v}` : '—'
   const kaartWeken = [
-    { sleutel: 'lopend', kort: 'Deze week', val: fmtV(weekDiff), color: tempoKleur(weekDiff, weekGenoeg) },
+    // Op zaterdag is de zaterdagkaart zelf deze week; dan geen lege kaart ervoor.
+    ...(dagenSindsZa > 0 ? [{ sleutel: 'lopend', kort: 'Deze week', val: fmtV(weekDiff), color: tempoKleur(weekDiff, weekGenoeg) }] : []),
     // Zelfde reeks als de klantpagina: de eerste faseweek vanaf het startgewicht.
     ...zaterdagReeks(history, undefined, undefined, undefined,
       fase?.started_on && fase?.start_gewicht != null ? { datum: fase.started_on, gewicht: fase.start_gewicht } : null,
     ).map((z, i) => ({
       sleutel: z.zaterdag,
-      kort: i === 0 ? 'Zaterdag' : `za ${fmtDag(z.zaterdag)}`,
+      kort: i === 0 ? (dagenSindsZa === 0 ? 'Deze week' : 'Zaterdag') : `za ${fmtDag(z.zaterdag)}`,
       val: fmtV(z.verschil),
       color: tempoKleur(z.verschil, z.nu.metingen >= 3 && (z.vorige.vanStart || z.vorige.metingen >= 3)),
     })),

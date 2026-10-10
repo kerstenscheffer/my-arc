@@ -522,6 +522,22 @@ export function zaterdagTempo(history, anker = new Date(), dagen = STANDAARD.ven
   return { zaterdag: za, vorigeZaterdag: vorigeZa, nu, vorige, verschil }
 }
 
+// Waar staat hij nu, als gemiddelde: het venster sinds de laatste zaterdag
+// (zo t/m vandaag) als daar al gewogen is, anders de zeven dagen tot en met
+// die zaterdag. Dat is precies het eindpunt van de weekkaarten, dus 'Sinds
+// fase' = dit min het startgewicht sluit exact op de kaarten opgeteld.
+// Een losse ochtendweging gaf dagruis van een paar ons (Kersten, 10 okt 2026).
+export function actueelGemiddelde(history, vandaag = new Date()) {
+  const nu = new Date(vandaag); nu.setHours(0, 0, 0, 0)
+  const za = laatsteZaterdag(nu)
+  const dagenSinds = Math.round((nu.getTime() - new Date(`${za}T00:00:00`).getTime()) / dagInMs)
+  if (dagenSinds > 0) {
+    const lopend = vensterGemiddelde(history, iso(nu), dagenSinds)
+    if (lopend.gemiddelde != null) return lopend.gemiddelde
+  }
+  return vensterGemiddelde(history, za).gemiddelde
+}
+
 // Dezelfde som voor een rij zaterdagen achter elkaar, van nieuw naar oud.
 //
 // Stopt zodra er in beide vensters niets meer staat — dan is de historie op en
