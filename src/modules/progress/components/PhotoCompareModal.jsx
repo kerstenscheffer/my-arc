@@ -84,6 +84,25 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
 
   const wissel = () => { const l = leftId; setLeftId(rightId); setRightId(l) }
 
+  // Hoek van een foto verzetten. Klanten kiezen bij het uploaden nog wel eens
+  // de verkeerde kant; dan staat een zijkant tussen de voorkanten. De foto
+  // verhuist naar de gekozen hoek, en je blijft op de huidige hoek kijken.
+  const [hoekFout, setHoekFout] = useState(null)
+  const zetHoek = async (foto, nieuw) => {
+    if (!foto || nieuw === angleOf(foto)) return
+    const vorige = photos
+    const metadata = { ...(foto.metadata || {}), subtype: nieuw }
+    setHoekFout(null)
+    setPhotos(ps => ps.map(p => (p.id === foto.id ? { ...p, metadata } : p)))
+    const { data, error } = await db.supabase
+      .from('ch8_progress_photos').update({ metadata }).eq('id', foto.id).select('id')
+    if (error || !data?.length) {
+      console.error('Hoek wijzigen mislukt:', error)
+      setPhotos(vorige)
+      setHoekFout('Hoek wijzigen lukte niet. Probeer het opnieuw.')
+    }
+  }
+
   // De vergelijking als één afbeelding bewaren.
   const download = async () => {
     if (!left || !right || bezig) return
@@ -147,6 +166,27 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', fontWeight: 700 }}>Geen foto</div>
         )}
         <span style={{ position: 'absolute', top: 8, left: 8, background: label === 'VOOR' ? 'rgba(0,0,0,0.7)' : '#fff', color: label === 'VOOR' ? '#fff' : '#0a0a0a', fontSize: m ? '0.6rem' : '0.66rem', fontWeight: 900, padding: '0.18rem 0.5rem', borderRadius: 6, letterSpacing: '0.08em' }}>{label}</span>
+        {/* Verkeerde hoek gekozen bij uploaden? Hier verzetten. */}
+        {photo && (
+          <select
+            value={angleOf(photo)}
+            onChange={e => zetHoek(photo, e.target.value)}
+            title="Hoek van deze foto wijzigen"
+            style={{
+              position: 'absolute', top: 8, right: 8, maxWidth: 'calc(100% - 70px)',
+              background: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', borderRadius: 6,
+              fontSize: m ? '0.6rem' : '0.66rem', fontWeight: 900, padding: '0.22rem 0.4rem',
+              fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+            }}
+          >
+            {['front', 'back', 'side'].map(a => (
+              <option key={a} value={a} style={{ background: '#111' }}>{angleLabel(a)}</option>
+            ))}
+            {!['front', 'back', 'side'].includes(angleOf(photo)) && (
+              <option value={angleOf(photo)} style={{ background: '#111' }}>{angleLabel(angleOf(photo))}</option>
+            )}
+          </select>
+        )}
       </div>
       <select value={value || ''} onChange={e => onChange(e.target.value)} style={selectStyle}>
         {forAngle.map((p, i) => (
@@ -206,6 +246,10 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                 )
               })}
             </div>
+
+            {hoekFout && (
+              <div style={{ marginBottom: '0.75rem', color: '#ef4444', fontSize: '0.78rem', fontWeight: 800 }}>{hoekFout}</div>
+            )}
 
             {forAngle.length < 2 ? (
               <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 600 }}>
