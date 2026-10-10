@@ -19,7 +19,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, ArrowRight, Check, Instagram, Play } from 'lucide-react'
 import db from '../services/DatabaseService'
-import { meet, pixel, herkomst, volgTijdOpPagina } from './challengeTracking'
+import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies } from './challengeTracking'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
 const GOLD = '#FFD700'
@@ -203,14 +203,15 @@ export function PrequalFlow({ m = false, compact = false }) {
   const verstuur = async (uitkomst, reden) => {
     setBezig(true); setFout('')
     try {
-      const payload = bouwPayload(antw, uitkomst, reden, utm.current)
+      const payload = { ...bouwPayload(antw, uitkomst, reden, utm.current), ...metaCookies() }
       const { data, error } = await db.supabase.rpc('submit_challenge_prequal', { p: payload })
       if (error) throw error
       setEinde({ uitkomst, reden, leadId: data })
       if (emailOk(antw.email)) db.supabase.rpc('save_prequal_email', { p_email: antw.email, p_lead_id: data, p_uitkomst: uitkomst }).then(r => r, () => null)
       setStap('klaar')
       meet('form_klaar', { meta: { uitkomst, reden: reden || null }, lead_id: data })
-      if (uitkomst === 'A') pixel('Lead', { content_name: '6 weken challenge prequal' })
+      // Zelfde event_id als de server (Conversions API): Meta telt hem één keer.
+      if (uitkomst === 'A') pixel('Lead', { content_name: '6 weken challenge prequal' }, `lead_${data}`)
     } catch (e) {
       console.error('prequal opslaan mislukt:', e)
       setFout('Opslaan lukte niet. Probeer het nog een keer.')

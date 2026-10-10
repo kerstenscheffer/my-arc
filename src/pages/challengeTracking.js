@@ -69,8 +69,27 @@ export function meet(event, extra = {}) {
 }
 
 // Meta Pixel (staat in index.html). Alleen aanroepen als hij er is.
-export function pixel(naam, data) {
-  try { if (typeof window.fbq === 'function') window.fbq('track', naam, data || {}) } catch { /* leeg */ }
+// `eventId`: hetzelfde id als de server via de Conversions API stuurt
+// (bv. lead_<id>), zodat Meta browser- en server-event als één telt.
+export function pixel(naam, data, eventId) {
+  try {
+    if (typeof window.fbq !== 'function') return
+    if (eventId) window.fbq('track', naam, data || {}, { eventID: eventId })
+    else window.fbq('track', naam, data || {})
+  } catch { /* leeg */ }
+}
+
+// Facebook-cookies voor de Conversions API: _fbp (browser) en _fbc (klik op
+// een advertentie). Ontbreekt _fbc maar staat er een fbclid in de herkomst,
+// dan bouwen we hem zoals Meta voorschrijft: fb.1.<ms>.<fbclid>.
+export function metaCookies() {
+  const koek = (n) => { try { const m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : null } catch { return null } }
+  const fbp = koek('_fbp')
+  let fbc = koek('_fbc')
+  if (!fbc) { const id = herkomst().fbclid; if (id) fbc = `fb.1.${Date.now()}.${id}` }
+  let bronUrl = null
+  try { bronUrl = window.location.origin + window.location.pathname } catch { /* leeg */ }
+  return { fbp: fbp || '', fbc: fbc || '', bron_url: bronUrl || '' }
 }
 
 // Tijd op de pagina: elke 15 s een tussenstand en bij het verlaten de
