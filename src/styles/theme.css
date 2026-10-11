@@ -660,13 +660,15 @@ body {
   border-bottom: 1px solid rgba(16, 185, 129, 0.1);
 }
 
-/* Ensure no horizontal scroll */
+/* Ensure no horizontal scroll or PWA horizontal rubber-band swipe */
 html {
   overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 body {
   overflow-x: hidden;
+  overscroll-behavior-x: none;
   position: relative;
 }
 

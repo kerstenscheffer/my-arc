@@ -11,6 +11,7 @@
 // opnieuw gekozen hoeft te worden.
 
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, X, Check, ChefHat, Trash2 } from 'lucide-react'
 import {
   haalSausIdeeen, haalSauzenVoorMaaltijd, voegSausToe, verwijderSaus, sausMacros,
@@ -147,11 +148,11 @@ function SausKiezer({ db, clientId, mealId, isMobile, alGekozen, onSluit, onToeg
     { soort: 'zelfgemaakt', kop: 'Zelf maken' },
   ]
 
-  return (
+  return createPortal(
     <div
       onClick={onSluit}
       style={{
-        position: 'fixed', inset: 0, zIndex: 10070, background: 'rgba(0,0,0,0.82)',
+        position: 'fixed', inset: 0, zIndex: 10600, background: 'rgba(0,0,0,0.82)',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
     >
@@ -276,5 +277,5 @@ function SausKiezer({ db, clientId, mealId, isMobile, alGekozen, onSluit, onToeg
         })}
       </div>
     </div>
-  )
+  , document.body)
 }
