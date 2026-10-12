@@ -8,15 +8,18 @@
 //   day  = alleen de dag die open staat
 //   all  = overal in de week waar de oude maaltijd staat
 //   week = dit slot op alle zeven dagen (alleen bij wisselen)
+//   dagen = dit slot op de dagen die de coach aantikt (alleen bij wisselen);
+//           onKies('dagen', [0..6])
 
-import React from 'react'
-import { Repeat, CalendarDays, CalendarRange } from 'lucide-react'
+import React, { useState } from 'react'
+import { Repeat, CalendarDays, CalendarRange, CalendarCheck, Check } from 'lucide-react'
 
 const SLOT_KORT = {
   breakfast: 'ontbijt', lunch: 'lunch', dinner: 'diner',
   snack1: 'snack 1', snack2: 'snack 2', snack3: 'snack 3', snack4: 'snack 4',
   avondsnack: 'avondsnack', pre_workout: 'pre-workout',
 }
+const DAG_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const slotKort = (slot) => SLOT_KORT[slot] || String(slot || '').replace(/_/g, ' ')
 
 export default function BereikKeuze({
@@ -25,8 +28,12 @@ export default function BereikKeuze({
   plekken = [],          // [{ dag: 'Ma', slot: 'lunch' }]
   metAlleDagen = false,  // derde keuze: dit slot op alle dagen
   bezig = null,          // key van de keuze die nu opslaat
+  dagIndex = null,       // open dag (0 = ma), vooraf aangevinkt bij 'Kies dagen'
   onKies,
 }) {
+  const [kiesOpen, setKiesOpen] = useState(false)
+  const [gekozen, setGekozen] = useState(() => new Set(dagIndex != null ? [dagIndex] : []))
+  const wissel = (i) => setGekozen(g => { const n = new Set(g); if (n.has(i)) n.delete(i); else n.add(i); return n })
   const aantal = Array.isArray(plekken) ? plekken.length : 0
   const plekkenTekst = aantal === 0
     ? 'staat verder nergens in de week'
@@ -52,6 +59,12 @@ export default function BereikKeuze({
       title: 'Alle dagen',
       sub: `${slotKort(slot)} op 7 dagen`,
       effect: `zet ${nieuweNaam || 'de nieuwe maaltijd'} als ${slotKort(slot)} op elke dag van de week`,
+    }, {
+      key: 'dagen', Icon: CalendarCheck,
+      title: 'Kies dagen',
+      sub: `${slotKort(slot)} op de dagen die jij aantikt`,
+      effect: 'bijvoorbeeld alleen de trainingsdagen, of ma, wo en vr',
+      open: true,
     }] : []),
   ]
 
@@ -71,7 +84,7 @@ export default function BereikKeuze({
           return (
             <button
               key={opt.key}
-              onClick={() => !bezig && !uit && onKies(opt.key)}
+              onClick={() => { if (bezig || uit) return; if (opt.open) setKiesOpen(v => !v); else onKies(opt.key) }}
               disabled={!!bezig || uit}
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left',
@@ -105,6 +118,41 @@ export default function BereikKeuze({
             </button>
           )
         })}
+        {/* Dagen aantikken: zeven knoppen op één regel, dan bevestigen. */}
+        {kiesOpen && (
+          <div style={{ padding: '0.2rem 0 0.1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
+              {DAG_KORT.map((d, i) => {
+                const aan = gekozen.has(i)
+                return (
+                  <button key={d} onClick={() => wissel(i)} disabled={!!bezig} style={{
+                    minHeight: 40, borderRadius: 10, fontFamily: 'inherit',
+                    background: aan ? '#fff' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                    color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                    fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>{d}</button>
+                )
+              })}
+            </div>
+            <button
+              onClick={() => gekozen.size && !bezig && onKies('dagen', [...gekozen].sort((a, b) => a - b))}
+              disabled={!gekozen.size || !!bezig}
+              style={{
+                width: '100%', minHeight: 46, marginTop: 8, borderRadius: 12, border: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: gekozen.size ? '#fff' : 'rgba(255,255,255,0.08)',
+                color: gekozen.size ? '#0a0a0a' : 'rgba(255,255,255,0.35)',
+                fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit',
+                cursor: gekozen.size && !bezig ? 'pointer' : 'default',
+              }}
+            >
+              <Check size={15} strokeWidth={2.8} />
+              {bezig === 'dagen' ? 'Bezig…' : `Wissel op ${gekozen.size} dag${gekozen.size === 1 ? '' : 'en'}`}
+            </button>
+          </div>
+        )}
       </div>
       <style>{`@keyframes bereikSpin { to { transform: rotate(360deg); } }`}</style>
     </>

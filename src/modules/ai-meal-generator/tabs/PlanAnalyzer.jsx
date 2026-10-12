@@ -834,7 +834,8 @@ export default function PlanAnalyzer({
   // hoeveelheden als 122,5 g brood. De gekozen maaltijd komt er 1-op-1 in.
   // bereik: 'day' = alleen de open dag, 'all' = overal waar de oude maaltijd
   // staat, 'week' = dit slot op alle zeven dagen.
-  const handleSwapSelect = async (newMeal, bereik = 'day') => {
+  // bereik 'dagen' = dit slot op de aangetikte dagen (`dagen` = [0..6]).
+  const handleSwapSelect = async (newMeal, bereik = 'day', dagen = null) => {
     if (!swapState) return
     // Pre-workout heeft geen dag (dayIndex null): DAYS[null].full gooide
     // hier een fout vóór het opslaan, dus de maaltijd kwam nooit aan.
@@ -849,16 +850,29 @@ export default function PlanAnalyzer({
       const oudId = oud?.meal_id || oud?.id
       const updated = weekData.map(dag => ({ ...dag, meals: { ...(dag?.meals || {}) } }))
       let geraakt = 0
-      updated.forEach(dag => {
-        Object.entries(dag.meals).forEach(([s, m]) => {
-          const raak = bereik === 'week' ? s === slot : (m && (m.meal_id || m.id) === oudId)
-          if (!raak) return
-          dag.meals[s] = withSlotTiming(newMeal, s, m)
+      if (bereik === 'dagen') {
+        // Ook op een dag waar dit slot nog leeg is: dan komt hij erbij.
+        ;(dagen || []).forEach(di => {
+          const dag = updated[di]
+          if (!dag) return
+          dag.meals[slot] = withSlotTiming(newMeal, slot, dag.meals[slot])
+          dag.totals = calculateTotals(dag.meals)
           geraakt++
         })
-        dag.totals = calculateTotals(dag.meals)
-      })
-      const omschrijving = bereik === 'week'
+      } else {
+        updated.forEach(dag => {
+          Object.entries(dag.meals).forEach(([s, m]) => {
+            const raak = bereik === 'week' ? s === slot : (m && (m.meal_id || m.id) === oudId)
+            if (!raak) return
+            dag.meals[s] = withSlotTiming(newMeal, s, m)
+            geraakt++
+          })
+          dag.totals = calculateTotals(dag.meals)
+        })
+      }
+      const omschrijving = bereik === 'dagen'
+        ? `Swap ${slot} op ${geraakt} dag${geraakt === 1 ? '' : 'en'} → ${newMeal.name || '?'}`
+        : bereik === 'week'
         ? `Swap ${slot} op alle dagen → ${newMeal.name || '?'}`
         : `Swap overal (${geraakt}×): ${oud?.name || '?'} → ${newMeal.name || '?'}`
       await applyWeekUpdate(updated, omschrijving)
@@ -1847,6 +1861,7 @@ export default function PlanAnalyzer({
             <WisselModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
               clientId={resolvedClientId || null}
               dagNaam={DAYS[swapState.dayIndex]?.full?.toLowerCase() || null}
+              dagIndex={swapState.dayIndex ?? null}
               tijd={swapState.timing || null}
               plekken={swapState.slot === PRE_WORKOUT_SLOT ? undefined : plekkenVanMaaltijd(swapState.meal)}
               targetCalories={targets?.calories || clientRecord?.target_calories || null}

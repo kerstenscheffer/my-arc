@@ -101,7 +101,7 @@ export default function WisselModal({
   // maaltijd verder nog in de week staat [{ dag, slot }]. Is plekken
   // undefined (pre-workout: één maaltijd voor het hele plan), dan wordt de
   // vraag overgeslagen.
-  dagNaam = null, plekken = undefined,
+  dagNaam = null, plekken = undefined, dagIndex = null,
   // Toegevoegd vanuit de agenda: de getikte tijd ('18:00').
   tijd = null,
   onSelect, onClose, isMobile, embedded = false,
@@ -491,12 +491,12 @@ export default function WisselModal({
   }
 
   const [bezig, setBezig] = useState(null)
-  const bevestig = async (bereik = 'day') => {
+  const bevestig = async (bereik = 'day', dagen = null) => {
     if (!selectedMeal || bezig) return
     const gekozen = selectedMeal
     setBezig(bereik)
     try {
-      await onSelect?.(gekozen, bereik)
+      await onSelect?.(gekozen, bereik, dagen)
       setSelectedMeal(null)
     } finally {
       setBezig(null)
@@ -999,7 +999,7 @@ export default function WisselModal({
                 vraag="Waar geldt deze wissel?"
                 dagNaam={dagNaam} slot={slot}
                 oudeNaam={currentMeal?.name} nieuweNaam={selectedMeal?.name}
-                plekken={plekken} metAlleDagen
+                plekken={plekken} metAlleDagen dagIndex={dagIndex}
                 bezig={bezig} onKies={bevestig}
               />
             ) : (
