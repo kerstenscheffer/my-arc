@@ -12,6 +12,7 @@ import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X } from 'luc
 import { portieInfo, stapPortie, portieLabel, portieUitleg } from './portie'
 import MealEditModal from './MealEditModal'
 import Keuze from '../../../meal-plan/components/Keuze'
+import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 
 const GOLD = '#FFD700'
 const DIVIDER = 'rgba(255,255,255,0.06)'
@@ -32,19 +33,11 @@ const SLOT_TIMES = {
   snack1: '10:00', snack2: '15:30', snack3: '21:00',
 }
 
-// Fallback foto's per slot wanneer ai_meals.image_url leeg is — zelfde set
-// die de client-meal-card gebruikt. Ongeveer 50% van de meals heeft geen
-// eigen foto in de DB, dus zonder fallback bleef het kale "geen foto"-vlak.
-const SLOT_FALLBACK_IMG = {
-  breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&h=200&fit=crop&q=80',
-  lunch:     'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=200&h=200&fit=crop&q=80',
-  dinner:    'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200&h=200&fit=crop&q=80',
-  snack1:    'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=200&h=200&fit=crop&q=80',
-  snack2:    'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=200&h=200&fit=crop&q=80',
-  snack3:    'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=200&h=200&fit=crop&q=80',
-}
-const FALLBACK_GENERIC = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop&q=80'
-const getMealImage = (meal, slot) => meal?.image_url || SLOT_FALLBACK_IMG[slot] || FALLBACK_GENERIC
+// Zelfde foto als de klant op zijn maaltijdpagina ziet (day-schedule/MealCard):
+// eigen image_url, anders de foto bij de titel (kwark → zuivel, kip, rijst…).
+// Eerst stond hier per slot één vaste stockfoto, waardoor de coach iets anders
+// zag dan de klant (Kersten, 12 okt 2026).
+const getMealImage = (meal, slot) => meal?.image_url || foodImageFallback(meal?.name || meal?.title, slot, 200)
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
