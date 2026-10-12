@@ -528,12 +528,8 @@ export default function KanbanCard({
     if (e.target.closest('textarea')) return
     if (e.target.closest('[data-no-click]')) return
 
-    // Sales-section keeps its dedicated modal (different flow).
-    const isSalesSection = sectionTitle?.toLowerCase().includes('sales')
-    if (isSalesSection && onSalesCallClick) {
-      onSalesCallClick(lead)
-      return
-    }
+    // Ook in de sales-kolom opent de kaart het infovenster (Kersten, 12 okt
+    // 2026). Het sales-call-scherm zit achter het SALES-label.
 
     // Default: open the tabbed detail modal — replaces the old inline
     // info-toggle. onClick prop still fired so external listeners survive.
@@ -749,16 +745,21 @@ export default function KanbanCard({
           )}
 
           {/* Sales call badge */}
+          {/* Klik op het label = sales-call-scherm; de kaart zelf opent info. */}
           {sectionTitle?.toLowerCase().includes('sales') && (
-            <span style={{
-              display: 'flex', alignItems: 'center', gap: '2px',
-              padding: '1px 5px',
-              background: 'rgba(255,215,0,0.08)',
-              border: '1px solid rgba(255,215,0,0.25)',
-              borderRadius: '3px'
-            }}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSalesCallClick?.(lead) }}
+              title="Open sales call"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '2px',
+                padding: '1px 5px',
+                background: 'rgba(255,215,0,0.08)',
+                border: '1px solid rgba(255,215,0,0.25)',
+                borderRadius: '3px', cursor: 'pointer', fontFamily: 'inherit',
+              }}>
               <span style={{ fontSize: '0.6rem', fontWeight: '700', color: '#FFD700', letterSpacing: '0.04em' }}>SALES</span>
-            </span>
+            </button>
           )}
 
           {/* DM-Run knop — alleen in de "Nieuwe volgers"-kolom. Goud = nog te
