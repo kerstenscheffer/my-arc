@@ -177,15 +177,38 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
   // Onder de twee metingen valt er geen lijn te trekken; dan is een vlak met
   // één stip alleen maar ruis.
   if (punten.length < 2) {
+    // Nog geen lijn te trekken: toon alvast een grijze voorbeeldgrafiek, zodat
+    // je ziet wat hier komt te staan. Bewust geen verwachting, puur de vorm.
+    const voorbeeld = [40, 41, 41, 43, 44, 44.5, 46, 47].map((v, i) => ({ i, v }))
     return (
       <div style={{
         margin: isMobile ? '0.75rem 1rem 0' : '0.9rem 1.25rem 0',
-        padding: '0.85rem 0', borderTop: `1px solid ${LIJN}`,
-        fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)',
+        paddingTop: '0.85rem', borderTop: `1px solid ${LIJN}`,
       }}>
-        {punten.length === 1
-          ? 'Nog één training met deze oefening — vanaf de tweede zie je hier je verloop.'
-          : 'Nog geen eerdere trainingen met deze oefening.'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <TrendingUp size={14} color="rgba(255,255,255,0.4)" strokeWidth={2.6} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)' }}>Krachtverloop</span>
+        </div>
+        <div style={{ position: 'relative', width: '100%', height: isMobile ? 150 : 180 }}>
+          <ResponsiveContainer>
+            <ComposedChart data={voorbeeld} margin={{ top: 16, right: 10, bottom: 0, left: 10 }}>
+              <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis dataKey="i" hide />
+              <YAxis domain={[36, 50]} hide />
+              <Line dataKey="v" stroke="rgba(255,255,255,0.16)" strokeWidth={2.4} strokeDasharray="5 5"
+                dot={false} activeDot={false} isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            textAlign: 'center', padding: '0 1.5rem', pointerEvents: 'none',
+            fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4,
+          }}>
+            {punten.length === 1
+              ? 'Nog één training, vanaf de volgende komt hier je lijn'
+              : 'Hier komt je krachtverloop zodra je deze oefening logt'}
+          </div>
+        </div>
       </div>
     )
   }
