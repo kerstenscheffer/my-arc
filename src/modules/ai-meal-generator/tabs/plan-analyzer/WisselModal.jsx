@@ -30,7 +30,7 @@ function slotNaarMoment(slot) {
   if (v.includes('lunch')) return 'lunch'
   if (v.includes('dinner') || v.includes('diner') || v.includes('avondeten')) return 'dinner'
   if (v.includes('pre')) return 'pre_workout'
-  if (v.includes('post')) return 'post_workout'
+  if (v.includes('post') || v.includes('after')) return 'post_workout'
   return 'snack'
 }
 
@@ -204,7 +204,11 @@ export default function WisselModal({
     }
   }
 
-  const slotKey = isAvondsnack(slot, currentMeal) ? 'avondsnack' : slotNaarMoment(slot || currentMeal?.slot)
+  // Het label op de kaart wint van het slot: zet je een lunch om naar 'Diner',
+  // dan blijft het slot 'lunch' maar hoort de swaplijst bij diner te openen.
+  const slotKey = currentMeal?.display_label
+    ? swapSlotNaarMoment(currentMeal.display_label)
+    : isAvondsnack(slot, currentMeal) ? 'avondsnack' : slotNaarMoment(slot || currentMeal?.slot)
   const huidigId = currentMeal?.meal_id || currentMeal?.id || null
 
   const bronOpties = [
