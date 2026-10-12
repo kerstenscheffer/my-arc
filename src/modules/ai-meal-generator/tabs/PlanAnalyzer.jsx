@@ -1050,10 +1050,22 @@ export default function PlanAnalyzer({
   // supplementenplan van de klant, met de trainingsdagen-regel ingevuld.
   const handleLoadSavedPlan = async (ws, name, extra = {}) => {
     if (!ws) return
-    const days = await hydrateWeekStructure(ws)
-    if (!days) return
+    const hydrated = await hydrateWeekStructure(ws)
+    if (!hydrated) return
     const planId = actievePlanId
-    const preWorkoutUitSjabloon = extra?.pre_workout_meal || null
+    // Oudere sjablonen hebben de pre-workout niet in een eigen kolom maar als
+    // slot op de trainingsdagen van de klant waar ze van gemaakt zijn (bij
+    // Patrick: alleen di en do, terwijl hij 5x traint). Haal hem eruit en zet
+    // hem in de kolom; die verschijnt dan op álle trainingsdagen van déze klant.
+    const prePerDag = hydrated.find(d => d.meals?.[PRE_WORKOUT_SLOT])?.meals?.[PRE_WORKOUT_SLOT] || null
+    const preWorkoutUitSjabloon = extra?.pre_workout_meal || prePerDag
+    const days = prePerDag
+      ? hydrated.map(d => {
+          if (!d.meals?.[PRE_WORKOUT_SLOT]) return d
+          const { [PRE_WORKOUT_SLOT]: _weg, ...meals } = d.meals
+          return { ...d, meals, totals: calculateTotals(meals) }
+        })
+      : hydrated
     const pasExtrasToe = async () => {
       if (!extra?.supplements?.length || !resolvedClientId) return
       try {
