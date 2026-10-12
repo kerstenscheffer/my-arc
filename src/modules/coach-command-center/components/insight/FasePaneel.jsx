@@ -11,13 +11,13 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Flag, Plus, Check, X, ChevronLeft, Flame, Egg, Wheat, Droplet } from 'lucide-react'
+import { Flag, Plus, Check, X, ChevronLeft, Info, Flame, Egg, Wheat, Droplet } from 'lucide-react'
 import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/utils/fase'
 import { maakConfig, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'
 import HorizontaleSlider from '../../../../client/components/HorizontaleSlider'
 import { intakeLichaamFotos } from '../../utils/intakeLichaam'
-import { calcTDEE, computeMacros } from '../../../macros/macroRules'
-import { LIFESTYLE_LEVELS } from './insightTokens'
+import { calcBMR, computeMacros } from '../../../macros/macroRules'
+import { LIFESTYLE_LEVELS, DEFAULT_LIFESTYLE, CARDIO_TYPES, DEFAULT_KCAL_PER_SESSION } from './insightTokens'
 import { Ring } from './MacroRingen'
 import { logClientChanges, pickTrackedFields } from '../../utils/clientChangeLogger'
 
@@ -47,6 +47,7 @@ export default function FasePaneel({
   const [stap, setStap] = useState(1)
   const [toonBand, setToonBand] = useState(false)
   const [openMacro, setOpenMacro] = useState('target_protein')
+  const [toonOpbouw, setToonOpbouw] = useState(false)
 
   const laad = async () => {
     if (!client?.id || !db?.supabase) return
@@ -122,18 +123,55 @@ export default function FasePaneel({
 
   // Onderhoud waarmee de flow begint: wat er bij de klant staat, anders
   // Mifflin × leefstijl. Afgerond op 25, net als de slider.
-  const startTdee = () => {
-    const opgeslagen = parseFloat(client?.tdee)
-    if (Number.isFinite(opgeslagen) && opgeslagen > 0) return Math.round(opgeslagen / 25) * 25
+  // Hoe het onderhoud is opgebouwd — dezelfde som als het macro-paneel
+  // (Mifflin × leefstijl + training + cardio, of de handmatige waarde), met
+  // de instellingen die daar zijn opgeslagen. Voor de i-knop in de flow.
+  const tdeeOpbouw = () => {
+    const ms = client?.maintenance_settings || {}
     const leeftijd = Number.isFinite(parseFloat(client?.age)) ? parseFloat(client.age)
       : client?.date_of_birth ? Math.floor((Date.now() - new Date(client.date_of_birth).getTime()) / (365.25 * 86400000)) : null
-    const factor = LIFESTYLE_LEVELS[client?.maintenance_settings?.lifestyle_level || client?.activity_level]?.factor || 1.4
-    const t = calcTDEE({ weight: laatsteGewicht, height: client?.height, age: leeftijd, gender: client?.gender, activity: factor })
+    const niveau = LIFESTYLE_LEVELS[ms.lifestyle_level] ? ms.lifestyle_level
+      : LIFESTYLE_LEVELS[client?.activity_level] ? client.activity_level : DEFAULT_LIFESTYLE
+    const factor = LIFESTYLE_LEVELS[niveau].factor
+    const bmr = calcBMR({ weight: laatsteGewicht, height: client?.height, age: leeftijd, gender: client?.gender })
+    const regels = []
+    let totaal = null
+    if (ms.include_manual && parseInt(ms.manual_tdee) > 0) {
+      totaal = parseInt(ms.manual_tdee)
+      regels.push(['Handmatig ingesteld', totaal])
+    } else if (bmr != null) {
+      const vrouw = /^(f|v)/i.test(client?.gender || '')
+      regels.push([`BMR · ${komma(laatsteGewicht, 1)} kg, ${client.height} cm, ${leeftijd} jr, ${vrouw ? 'vrouw' : 'man'}`, bmr])
+      const basis = Math.round(bmr * factor)
+      regels.push([`× ${String(factor).replace('.', ',')} leefstijl (${LIFESTYLE_LEVELS[niveau].label.split(' (')[0].toLowerCase()})`, `+${basis - bmr}`])
+      totaal = basis
+      const dagen = parseInt(ms.training_days) || 0
+      const perSessie = parseInt(ms.kcal_per_session) || DEFAULT_KCAL_PER_SESSION
+      if (ms.include_training !== false && dagen > 0) {
+        const t = Math.round(dagen * perSessie / 7)
+        regels.push([`Training · ${dagen}× ${perSessie} kcal / 7`, `+${t}`]); totaal += t
+      }
+      if (ms.include_cardio && Array.isArray(ms.cardio_activities)) {
+        const week = ms.cardio_activities.reduce((som, c) => som + (parseInt(c.min) || 0) * (parseInt(c.sessions) || 0) * (CARDIO_TYPES[c.type]?.kcalPerMin || 0), 0)
+        const c = Math.round(week / 7)
+        if (c > 0) { regels.push(['Cardio / 7', `+${c}`]); totaal += c }
+      }
+      if (ms.include_log) regels.push(['+ correctie uit eetlog (in macro-paneel)', ''])
+    }
+    const opgeslagen = parseFloat(client?.tdee)
+    return { regels, totaal, opgeslagen: Number.isFinite(opgeslagen) && opgeslagen > 0 ? Math.round(opgeslagen) : null }
+  }
+
+  // Onderhoud waarmee de flow begint: wat er bij de klant staat, anders de
+  // som hierboven. Afgerond op 25, net als de slider.
+  const startTdee = () => {
+    const o = tdeeOpbouw()
+    const t = o.opgeslagen ?? o.totaal
     return t ? Math.round(t / 25) * 25 : 2500
   }
 
   const startNieuw = () => {
-    setFout(null); setStap(1); setToonBand(false); setOpenMacro('target_protein')
+    setFout(null); setStap(1); setToonBand(false); setOpenMacro('target_protein'); setToonOpbouw(false)
     setNieuw(metBand({
       tdee: startTdee(),
       tdeeAangeraakt: false,
@@ -375,7 +413,29 @@ export default function FasePaneel({
 
           {huidig === 'tdee' && (
             <>
-              {vraag('Onderhoud (TDEE)')}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 16 }}>
+                <span style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Onderhoud (TDEE)</span>
+                <button onClick={() => setToonOpbouw(v => !v)} aria-label="Hoe is dit berekend?" style={{
+                  background: 'none', border: 'none', padding: 2, cursor: 'pointer', display: 'inline-flex',
+                  color: toonOpbouw ? '#fff' : 'rgba(255,255,255,0.45)',
+                }}><Info size={16} strokeWidth={2.6} /></button>
+              </div>
+              {toonOpbouw && (() => {
+                const o = tdeeOpbouw()
+                const regel = (l, w, dik) => (
+                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: '0.74rem', fontWeight: dik ? 900 : 700, color: dik ? '#fff' : 'rgba(255,255,255,0.6)', padding: '2px 0' }}>
+                    <span>{l}</span><span style={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{w}</span>
+                  </div>
+                )
+                return (
+                  <div style={{ marginBottom: 14, padding: '0 4px' }}>
+                    {o.regels.length === 0 && regel('Geen lengte, leeftijd of geslacht bekend', '')}
+                    {o.regels.map(([l, w]) => regel(l, w))}
+                    {o.totaal != null && <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 4, paddingTop: 4 }}>{regel('Berekend nu', o.totaal, true)}</div>}
+                    {o.opgeslagen != null && o.opgeslagen !== o.totaal && regel('Opgeslagen bij klant (startwaarde)', o.opgeslagen, true)}
+                  </div>
+                )
+              })()}
               {groot({
                 waarden: reeks(1200, 4500, 25), waarde: Number(nieuw.tdee) || 2500,
                 toon: v => String(v), itemBreedte: 88,
