@@ -32,7 +32,18 @@ const LINK_VOORBEELD = 'https://www.myarcfitness.com/challenge?utm_source=meta&u
 
 export default function ChallengeAdsDashboard({ db, isMobile }) {
   const m = isMobile
-  const [periode, setPeriode] = useState('14')
+  // Gekozen periode onthouden, ook 'vanaf' (Kersten, 12 okt 2026).
+  const [periode, setPeriodeState] = useState(() => {
+    try {
+      const p = localStorage.getItem('arc_ads_periode')
+      if (p === 'vanaf') return localStorage.getItem('arc_ads_vanaf') ? 'vanaf' : '14'
+      return PERIODES.some(x => x.id === p) ? p : '14'
+    } catch { return '14' }
+  })
+  const setPeriode = (p) => {
+    setPeriodeState(p)
+    try { localStorage.setItem('arc_ads_periode', p) } catch { /* geen opslag */ }
+  }
   // Eigen startdatum ('vanaf'): bijv. de dag dat een nieuwe campagne live ging.
   // Onthouden per browser, zodat je hem niet elke keer opnieuw kiest.
   const [vanafDatum, setVanafDatum] = useState(() => {
