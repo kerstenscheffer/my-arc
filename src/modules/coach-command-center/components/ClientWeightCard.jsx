@@ -723,6 +723,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           onNavigateTab={onNavigateTab}
           db={db}
           coachId={coachId}
+          dagCheck={{ gehad, bezig: checkBezig, onWissel: wisselDagCheck }}
           onOpenMealPanel={onOpenMealPanel}
           onOpenWorkoutPanel={onOpenWorkoutPanel}
           onSwitchToClientView={(c) => {

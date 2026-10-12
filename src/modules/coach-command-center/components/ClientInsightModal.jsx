@@ -2,7 +2,7 @@
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
 import React, { useState, useRef } from 'react'
-import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink, CalendarCheck } from 'lucide-react'
+import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink, CalendarCheck, Circle, CheckCircle2 } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
@@ -72,7 +72,7 @@ function groupPhotosByMonthAndDay(photos) {
   return months
 }
 
-export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onSwitchToClientView }) {
+export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onSwitchToClientView, dagCheck = null }) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [photoZoom, setPhotoZoom] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
@@ -332,6 +332,13 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     }} />
                   </button>
 
+                  {dagCheck && (
+                    <button onClick={dagCheck.onWissel} disabled={dagCheck.bezig}
+                      title={dagCheck.gehad ? 'Vandaag afgevinkt — klik om terug te draaien' : 'Vandaag afvinken'}
+                      style={{ ...kopKnop(), color: dagCheck.gehad ? '#10b981' : 'rgba(255,255,255,0.45)', opacity: dagCheck.bezig ? 0.5 : 1 }}>
+                      {dagCheck.gehad ? <CheckCircle2 size={17} /> : <Circle size={17} />}
+                    </button>
+                  )}
                   <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={kopKnop()}>
                     <ClipboardCheck size={17} />
                   </button>
@@ -410,6 +417,13 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   </span>
                 )}
                 <span style={{ flex: 1 }} />
+                {dagCheck && (
+                  <button onClick={dagCheck.onWissel} disabled={dagCheck.bezig}
+                    title={dagCheck.gehad ? 'Vandaag afgevinkt — tik om terug te draaien' : 'Vandaag afvinken'}
+                    style={{ ...kopKnop(), width: 34, height: 34, color: dagCheck.gehad ? '#10b981' : 'rgba(255,255,255,0.45)', opacity: dagCheck.bezig ? 0.5 : 1 }}>
+                    {dagCheck.gehad ? <CheckCircle2 size={17} /> : <Circle size={17} />}
+                  </button>
+                )}
                 <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <ClipboardCheck size={17} />
                 </button>
