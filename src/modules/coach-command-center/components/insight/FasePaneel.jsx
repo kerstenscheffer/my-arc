@@ -11,11 +11,15 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Flag, Plus, Check, X, ChevronLeft } from 'lucide-react'
+import { Flag, Plus, Check, X, ChevronLeft, Flame, Egg, Wheat, Droplet } from 'lucide-react'
 import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/utils/fase'
 import { maakConfig, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'
 import HorizontaleSlider from '../../../../client/components/HorizontaleSlider'
 import { intakeLichaamFotos } from '../../utils/intakeLichaam'
+import { calcTDEE, computeMacros } from '../../../macros/macroRules'
+import { LIFESTYLE_LEVELS } from './insightTokens'
+import { Ring } from './MacroRingen'
+import { logClientChanges, pickTrackedFields } from '../../utils/clientChangeLogger'
 
 const vandaag = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -42,6 +46,7 @@ export default function FasePaneel({
   // Het formulier is een klik-door pop-up: één vraag per stap.
   const [stap, setStap] = useState(1)
   const [toonBand, setToonBand] = useState(false)
+  const [openMacro, setOpenMacro] = useState('target_protein')
 
   const laad = async () => {
     if (!client?.id || !db?.supabase) return
@@ -115,9 +120,25 @@ export default function FasePaneel({
   }
   const metBand = (n) => (n.tempoAangeraakt ? n : { ...n, ...autoBand(n) })
 
+  // Onderhoud waarmee de flow begint: wat er bij de klant staat, anders
+  // Mifflin × leefstijl. Afgerond op 25, net als de slider.
+  const startTdee = () => {
+    const opgeslagen = parseFloat(client?.tdee)
+    if (Number.isFinite(opgeslagen) && opgeslagen > 0) return Math.round(opgeslagen / 25) * 25
+    const leeftijd = Number.isFinite(parseFloat(client?.age)) ? parseFloat(client.age)
+      : client?.date_of_birth ? Math.floor((Date.now() - new Date(client.date_of_birth).getTime()) / (365.25 * 86400000)) : null
+    const factor = LIFESTYLE_LEVELS[client?.maintenance_settings?.lifestyle_level || client?.activity_level]?.factor || 1.4
+    const t = calcTDEE({ weight: laatsteGewicht, height: client?.height, age: leeftijd, gender: client?.gender, activity: factor })
+    return t ? Math.round(t / 25) * 25 : 2500
+  }
+
   const startNieuw = () => {
-    setFout(null); setStap(1); setToonBand(false)
+    setFout(null); setStap(1); setToonBand(false); setOpenMacro('target_protein')
     setNieuw(metBand({
+      tdee: startTdee(),
+      tdeeAangeraakt: false,
+      eiwit: null,   // null = regel per kilo (computeMacros)
+      vet: null,
       doel: huidige?.doel === 'cut' ? 'build' : 'cut',
       started_on: vandaag(),
       start_gewicht: laatsteGewicht || '',
@@ -130,6 +151,18 @@ export default function FasePaneel({
       // de coach ziet het staan en past het aan voordat hij opslaat.
       surplus: String(kcalPerWeektempo(huidige?.doel === 'cut' ? 0.25 : -0.5)),
     }))
+  }
+
+  // Doel-kcal en macro's uit wat er in de flow staat. Eiwit en vet volgen de
+  // regel per kilo tot je ze zelf draait; koolhydraten vullen de rest.
+  const macrosVan = (n) => {
+    if (!n) return null
+    const kcal = Math.round(Number(n.tdee) + (Number(n.surplus) || 0))
+    const auto = computeMacros({ weight: Number(n.start_gewicht) || laatsteGewicht || 80, tdee: kcal, surplus: 0 })
+    const eiwit = n.eiwit ?? auto?.protein ?? 0
+    const vet = n.vet ?? auto?.fat ?? 0
+    const koolh = Math.max(0, Math.round((kcal - eiwit * 4 - vet * 9) / 4))
+    return { target_calories: kcal, target_protein: eiwit, target_carbs: koolh, target_fat: vet }
   }
 
   const bewaar = async () => {
@@ -175,9 +208,24 @@ export default function FasePaneel({
           ? { surplus: Math.round(Number(nieuw.surplus)) } : {}),
         start_weight: rij.start_gewicht,
         ...(rij.doel_gewicht ? { target_weight: rij.doel_gewicht, goal_weight: rij.doel_gewicht } : {}),
+        // Onderhoud en macro's in dezelfde klap. Heeft de coach het onderhoud
+        // zelf bijgesteld (vaak omlaag, omdat de formule te hoog schat), dan
+        // als handmatige waarde, anders rekent het macro-paneel hem terug.
+        tdee: Math.round(Number(nieuw.tdee)),
+        ...(nieuw.tdeeAangeraakt ? {
+          maintenance_settings: { ...(client.maintenance_settings || {}), include_manual: true, manual_tdee: Math.round(Number(nieuw.tdee)) },
+        } : {}),
+        ...macrosVan(nieuw),
+        surplus: macrosVan(nieuw).target_calories - Math.round(Number(nieuw.tdee)),
+        manual_macro_targets: true,
       }
+      const voor = pickTrackedFields(client)
       const { error: kFout } = await db.supabase.from('clients').update(klantUpdate).eq('id', client.id)
       if (kFout) throw kFout
+      try {
+        window.dispatchEvent(new CustomEvent('myarc:macros-gewijzigd', { detail: { clientId: client.id, ...klantUpdate } }))
+      } catch { /* geen window */ }
+      logClientChanges({ db, clientId: client.id, before: voor, after: klantUpdate, source: 'fase_flow' }).catch(() => {})
 
       setNieuw(null)
       await laad()
@@ -196,7 +244,8 @@ export default function FasePaneel({
   const sluit = () => setNieuw(null)
   const faseModal = () => {
     const metTempo = nieuw.doel !== 'recomp' && nieuw.doel !== 'maintain'
-    const STAPPEN = ['doel', 'datum', 'gewicht', ...(metTempo ? ['tempo'] : []), 'kcal', 'doelgewicht']
+    const STAPPEN = ['doel', 'datum', 'gewicht', ...(metTempo ? ['tempo'] : []), 'tdee', 'kcal', 'macros', 'doelgewicht']
+    const m = macrosVan(nieuw)
     const huidig = STAPPEN[stap - 1]
     const laatste = stap === STAPPEN.length
     const dagOffset = Math.round((new Date(`${nieuw.started_on}T00:00:00`) - new Date(`${vandaag()}T00:00:00`)) / 86400000)
@@ -324,6 +373,20 @@ export default function FasePaneel({
             </>
           )}
 
+          {huidig === 'tdee' && (
+            <>
+              {vraag('Onderhoud (TDEE)')}
+              {groot({
+                waarden: reeks(1200, 4500, 25), waarde: Number(nieuw.tdee) || 2500,
+                toon: v => String(v), itemBreedte: 88,
+                onChange: v => setNieuw(n => ({ ...n, tdee: v, tdeeAangeraakt: true })),
+              })}
+              {onder(nieuw.tdeeAangeraakt
+                ? `kcal per dag · zelf ingesteld (was ${startTdee()})`
+                : 'kcal per dag · schat de formule te hoog, zet hem lager')}
+            </>
+          )}
+
           {huidig === 'kcal' && (
             <>
               {vraag(Number(nieuw.surplus) < 0 ? 'Tekort per dag' : 'Surplus per dag')}
@@ -332,9 +395,47 @@ export default function FasePaneel({
                 toon: v => `${v > 0 ? '+' : ''}${v}`, itemBreedte: 88,
                 onChange: v => setNieuw(n => ({ ...n, surplus: String(v), surplusAangeraakt: true })),
               })}
-              {onder('kcal per dag · voorstel bij dit tempo')}
+              {onder(`${nieuw.tdee} ${Number(nieuw.surplus) < 0 ? '−' : '+'} ${Math.abs(Number(nieuw.surplus) || 0)} = ${m.target_calories} kcal per dag`)}
             </>
           )}
+
+          {huidig === 'macros' && (() => {
+            const RINGEN = [
+              { veld: 'target_calories', label: 'Kcal', kleur: '#fff', eenheid: 'kcal', icoon: <Flame size={10} color="#fff" strokeWidth={2.8} />, waarden: reeks(1000, 5000, 25) },
+              { veld: 'target_protein', label: 'Eiwit', kleur: '#ef4444', eenheid: 'gram', kcal: 4, icoon: <Egg size={10} color="#ef4444" strokeWidth={2.8} />, waarden: reeks(40, 400, 5) },
+              { veld: 'target_carbs', label: 'Koolh', kleur: '#f59e0b', eenheid: 'gram', kcal: 4, icoon: <Wheat size={10} color="#f59e0b" strokeWidth={2.8} />, waarden: reeks(0, 800, 5) },
+              { veld: 'target_fat', label: 'Vet', kleur: '#3b82f6', eenheid: 'gram', kcal: 9, icoon: <Droplet size={10} color="#3b82f6" strokeWidth={2.8} />, waarden: reeks(20, 250, 5) },
+            ]
+            const open = RINGEN.find(r => r.veld === openMacro) || RINGEN[1]
+            // Kcal of koolhydraten draaien = het tekort verschuift; eiwit of
+            // vet draaien = koolhydraten vangen het op, kcal blijft staan.
+            const zet = (v) => setNieuw(n => {
+              if (open.veld === 'target_calories') return { ...n, surplus: String(v - Number(n.tdee)), surplusAangeraakt: true }
+              if (open.veld === 'target_protein') return { ...n, eiwit: v }
+              if (open.veld === 'target_fat') return { ...n, vet: v }
+              const mm = macrosVan(n)
+              const kcal = mm.target_protein * 4 + mm.target_fat * 9 + v * 4
+              return { ...n, surplus: String(kcal - Number(n.tdee)), surplusAangeraakt: true }
+            })
+            return (
+              <>
+                {vraag('Macro\'s')}
+                <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 14 }}>
+                  {RINGEN.map(r => (
+                    <Ring key={r.veld} label={r.label} kleur={r.kleur} eenheid={r.eenheid} icoon={r.icoon}
+                      waarde={m[r.veld]}
+                      aandeel={r.kcal ? Math.round((m[r.veld] * r.kcal / Math.max(1, m.target_calories)) * 100) : null}
+                      open={openMacro === r.veld} onOpen={() => setOpenMacro(r.veld)} />
+                  ))}
+                </div>
+                <HorizontaleSlider key={open.veld} waarden={open.waarden} waarde={m[open.veld]} onChange={zet}
+                  toon={v => String(v)} itemBreedte={72} hoogte={60} groot="1.5rem" />
+                {onder(`${open.label} · ${open.veld === 'target_protein' || open.veld === 'target_fat'
+                  ? 'koolhydraten vullen de rest'
+                  : `tekort wordt ${Number(nieuw.surplus) || 0} kcal`}`)}
+              </>
+            )
+          })()}
 
           {huidig === 'doelgewicht' && (
             <>

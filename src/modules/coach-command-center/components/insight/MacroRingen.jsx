@@ -50,7 +50,7 @@ const RINGEN = [
   },
 ]
 
-function Ring({ label, kleur, waarde, eenheid, aandeel, icoon, isMobile, gewijzigd, open, onOpen }) {
+export function Ring({ label, kleur, waarde, eenheid, aandeel, icoon, isMobile, gewijzigd, open, onOpen }) {
   const maat = isMobile ? 54 : 60
   const dikte = 5
   const r = (maat - dikte) / 2
