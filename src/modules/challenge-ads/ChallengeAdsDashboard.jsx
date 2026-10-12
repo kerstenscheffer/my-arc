@@ -10,7 +10,7 @@
 // geschikt of niet, en calls gepland.
 
 import { useEffect, useState } from 'react'
-import { RefreshCw, Megaphone, Clock, Play, ClipboardList, CalendarCheck, UserX, Copy, Check } from 'lucide-react'
+import { RefreshCw, Megaphone, Clock, Play, ClipboardList, CalendarCheck, UserX, Copy, Check, CalendarDays } from 'lucide-react'
 
 const GOLD = '#FFD700'
 
@@ -33,6 +33,16 @@ const LINK_VOORBEELD = 'https://www.myarcfitness.com/challenge?utm_source=meta&u
 export default function ChallengeAdsDashboard({ db, isMobile }) {
   const m = isMobile
   const [periode, setPeriode] = useState('14')
+  // Eigen startdatum ('vanaf'): bijv. de dag dat een nieuwe campagne live ging.
+  // Onthouden per browser, zodat je hem niet elke keer opnieuw kiest.
+  const [vanafDatum, setVanafDatum] = useState(() => {
+    try { return localStorage.getItem('arc_ads_vanaf') || '' } catch { return '' }
+  })
+  const kiesVanaf = (iso) => {
+    setVanafDatum(iso)
+    try { if (iso) localStorage.setItem('arc_ads_vanaf', iso); else localStorage.removeItem('arc_ads_vanaf') } catch { /* geen opslag */ }
+    setPeriode(iso ? 'vanaf' : '14')
+  }
   const [rijen, setRijen] = useState([])
   const [laden, setLaden] = useState(true)
   const [fout, setFout] = useState('')
@@ -43,7 +53,9 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     try {
       const dagen = PERIODES.find(p => p.id === periode)?.dagen || 14
       const tot = new Date(); tot.setHours(23, 59, 59, 999)
-      const van = new Date(); van.setDate(van.getDate() - dagen + 1); van.setHours(0, 0, 0, 0)
+      const van = (periode === 'vanaf' && vanafDatum)
+        ? new Date(`${vanafDatum}T00:00:00`)
+        : (() => { const d = new Date(); d.setDate(d.getDate() - dagen + 1); d.setHours(0, 0, 0, 0); return d })()
       const { data, error } = await db.supabase.rpc('get_challenge_ad_stats', { p_van: van.toISOString(), p_tot: new Date(tot.getTime() + 1).toISOString() })
       if (error) throw error
       setRijen(data || [])
@@ -52,7 +64,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       setFout(e.message || 'Laden mislukt')
     } finally { setLaden(false) }
   }
-  useEffect(() => { laad() }, [periode]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { laad() }, [periode, vanafDatum]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const som = (k) => rijen.reduce((s, r) => s + (Number(r[k]) || 0), 0)
   const totaal = {
@@ -96,7 +108,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           <div style={{ fontSize: m ? '1.1rem' : '1.25rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Ads · 6 Weken Challenge</div>
           <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Vanaf de klik op de advertentie. CTR en kosten staan in Meta Ads Manager.</div>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           {PERIODES.map(p => (
             <button key={p.id} onClick={() => setPeriode(p.id)} style={{
               padding: '0.45rem 0.8rem', borderRadius: 10, fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
@@ -104,6 +116,26 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
               border: `1px solid ${periode === p.id ? '#fff' : 'rgba(255,255,255,0.12)'}`,
             }}>{p.label}</button>
           ))}
+          {/* Vanaf een eigen datum t/m vandaag. */}
+          <label title="Vanaf een datum" style={{
+            position: 'relative', display: 'flex', alignItems: 'center', gap: 6,
+            padding: '0.45rem 0.8rem', borderRadius: 10, fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+            background: periode === 'vanaf' ? '#fff' : 'rgba(255,255,255,0.06)', color: periode === 'vanaf' ? '#000' : 'rgba(255,255,255,0.75)',
+            border: `1px solid ${periode === 'vanaf' ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+          }}>
+            <CalendarDays size={14} strokeWidth={2.6} />
+            {vanafDatum
+              ? `Vanaf ${new Date(`${vanafDatum}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
+              : 'Vanaf…'}
+            <input
+              type="date"
+              value={vanafDatum}
+              max={new Date().toLocaleDateString('sv-SE')}
+              onChange={e => kiesVanaf(e.target.value)}
+              onClick={e => { if (vanafDatum && periode !== 'vanaf') { e.preventDefault(); setPeriode('vanaf') } else { try { e.currentTarget.showPicker?.() } catch { /* oudere browser */ } } }}
+              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+            />
+          </label>
           <button onClick={laad} aria-label="Verversen" style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <RefreshCw size={15} style={{ animation: laden ? 'spin 1s linear infinite' : 'none' }} />
           </button>
