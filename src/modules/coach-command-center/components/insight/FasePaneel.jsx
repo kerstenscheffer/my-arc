@@ -10,12 +10,13 @@
 // op leunen. Zonder die synchronisatie zou je twee waarheden hebben.
 
 import { useEffect, useState } from 'react'
-import { Flag, Plus, Check, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Flag, Plus, Check, X, ChevronLeft } from 'lucide-react'
 import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/utils/fase'
 import { maakConfig, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'
 import HorizontaleSlider from '../../../../client/components/HorizontaleSlider'
 
-const vandaag = () => new Date().toISOString().split('T')[0]
+const vandaag = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
 
 // `toonOordeel` staat uit zodra de coaching-band eronder hangt: die zegt
@@ -37,6 +38,9 @@ export default function FasePaneel({
   const [nieuw, setNieuw] = useState(null)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
+  // Het formulier is een klik-door pop-up: één vraag per stap.
+  const [stap, setStap] = useState(1)
+  const [toonBand, setToonBand] = useState(false)
 
   const laad = async () => {
     if (!client?.id || !db?.supabase) return
@@ -111,7 +115,7 @@ export default function FasePaneel({
   const metBand = (n) => (n.tempoAangeraakt ? n : { ...n, ...autoBand(n) })
 
   const startNieuw = () => {
-    setFout(null)
+    setFout(null); setStap(1); setToonBand(false)
     setNieuw(metBand({
       doel: huidige?.doel === 'cut' ? 'build' : 'cut',
       started_on: vandaag(),
@@ -188,6 +192,178 @@ export default function FasePaneel({
   // lege strook met een randje.
   if (!toonKop && !nieuw) return null
 
+  const sluit = () => setNieuw(null)
+  const faseModal = () => {
+    const metTempo = nieuw.doel !== 'recomp' && nieuw.doel !== 'maintain'
+    const STAPPEN = ['doel', 'datum', 'gewicht', ...(metTempo ? ['tempo'] : []), 'kcal', 'doelgewicht']
+    const huidig = STAPPEN[stap - 1]
+    const laatste = stap === STAPPEN.length
+    const dagOffset = Math.round((new Date(`${nieuw.started_on}T00:00:00`) - new Date(`${vandaag()}T00:00:00`)) / 86400000)
+    const vraag = (t) => <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center', marginBottom: 16, letterSpacing: '-0.015em' }}>{t}</div>
+    const onder = (t) => <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', margin: '2px 0 18px', lineHeight: 1.4 }}>{t}</div>
+    const groot = (props) => <HorizontaleSlider itemBreedte={80} groot="1.7rem" {...props} />
+    return createPortal(
+      <div onClick={sluit} style={{
+        position: 'fixed', inset: 0, zIndex: 2147483100,
+        background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto',
+          background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20,
+          padding: '1.1rem 1rem 1.2rem', boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+            {stap > 1
+              ? <button onClick={() => setStap(n => n - 1)} aria-label="Vorige stap" style={kleinKnop}><ChevronLeft size={18} strokeWidth={2.8} /></button>
+              : <div style={{ width: 40 }} />}
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                Nieuwe fase · stap {stap} van {STAPPEN.length}
+              </div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Flag size={15} strokeWidth={2.6} /> {DOELEN[nieuw.doel]?.label || 'Fase'}
+              </div>
+            </div>
+            <button onClick={sluit} aria-label="Sluiten" style={kleinKnop}><X size={18} strokeWidth={2.8} /></button>
+          </div>
+
+          {huidig === 'doel' && (
+            <>
+              {vraag('Wat is het doel?')}
+              {Object.entries(DOELEN).map(([k, v]) => {
+                const aan = nieuw.doel === k
+                return (
+                  <button key={k} onClick={() => setNieuw(n => {
+                    const week = k === 'build' ? 0.25 : k === 'cut' ? -0.5 : 0
+                    return metBand({
+                      ...n, doel: k, week_doel_kg: String(week),
+                      surplus: n.surplusAangeraakt ? n.surplus : String(kcalPerWeektempo(week)),
+                    })
+                  })} style={{
+                    width: '100%', minHeight: 52, marginBottom: 8, padding: '0 1rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.1)'}`, borderRadius: 14,
+                    color: aan ? '#0a0a0a' : '#fff', fontSize: '0.95rem', fontWeight: 900,
+                    fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation',
+                  }}>
+                    {v.label}{aan && <Check size={18} strokeWidth={3} />}
+                  </button>
+                )
+              })}
+              <div style={{ height: 10 }} />
+            </>
+          )}
+
+          {huidig === 'datum' && (
+            <>
+              {vraag('Wanneer start de fase?')}
+              {groot({
+                waarden: reeks(-90, 60, 1), waarde: dagOffset, itemBreedte: 96,
+                toon: v => { const d = new Date(); d.setDate(d.getDate() + v); return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) },
+                onChange: v => { const d = new Date(); d.setDate(d.getDate() + v); setNieuw(n => ({ ...n, started_on: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })) },
+              })}
+              {onder(dagOffset === 0 ? 'Vandaag' : datumNL(nieuw.started_on))}
+            </>
+          )}
+
+          {huidig === 'gewicht' && (
+            <>
+              {vraag('Startgewicht')}
+              {groot({
+                waarden: reeks(basisKg - 15, basisKg + 15, 0.1),
+                waarde: Number(nieuw.start_gewicht) || basisKg, toon: v => komma(v, 1),
+                onChange: v => setNieuw(n => metBand({ ...n, start_gewicht: String(v) })),
+              })}
+              {onder('kg · laatste meting staat al klaar')}
+            </>
+          )}
+
+          {huidig === 'tempo' && (
+            <>
+              {vraag('Hoeveel per week?')}
+              {groot({
+                waarden: reeks(-1.5, 1, 0.05), waarde: Number(nieuw.week_doel_kg) || 0,
+                toon: v => `${v > 0 ? '+' : ''}${komma(v, 2)}`,
+                onChange: v => setNieuw(n => metBand({
+                  ...n, week_doel_kg: String(v),
+                  surplus: n.surplusAangeraakt ? n.surplus : String(kcalPerWeektempo(v)),
+                })),
+              })}
+              {onder('kg per week')}
+            </>
+          )}
+
+          {huidig === 'kcal' && (
+            <>
+              {vraag(Number(nieuw.surplus) < 0 ? 'Tekort per dag' : 'Surplus per dag')}
+              {groot({
+                waarden: reeks(-1500, 1000, 25), waarde: Number(nieuw.surplus) || 0,
+                toon: v => `${v > 0 ? '+' : ''}${v}`, itemBreedte: 88,
+                onChange: v => setNieuw(n => ({ ...n, surplus: String(v), surplusAangeraakt: true })),
+              })}
+              {onder('kcal per dag · voorstel bij dit tempo')}
+            </>
+          )}
+
+          {huidig === 'doelgewicht' && (
+            <>
+              {vraag('Doelgewicht')}
+              {groot({
+                waarden: ['', ...reeks(basisKg - 40, basisKg + 30, 0.5)],
+                waarde: nieuw.doel_gewicht === '' ? '' : Number(nieuw.doel_gewicht),
+                toon: v => (v === '' ? '—' : komma(v, 1)),
+                onChange: v => setNieuw(n => ({ ...n, doel_gewicht: v === '' ? '' : String(v) })),
+              })}
+              {onder('kg · mag leeg')}
+              {metTempo && (
+                <div style={{ textAlign: 'center', marginTop: -8, marginBottom: 14 }}>
+                  <button onClick={() => setToonBand(v => !v)} style={{
+                    background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+                    fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
+                  }}>
+                    {grenzenTekst || 'Band'} · {toonBand ? 'sluiten' : 'aanpassen'}
+                  </button>
+                  {toonBand && (
+                    <div style={{ marginTop: 8, textAlign: 'left' }}>
+                      <SliderVeld label="Tempo minstens" eenheid="kg/wk"
+                        waarden={reeks(0.05, 2, 0.05)} waarde={Number(nieuw.tempo_min_kg) || 0.05}
+                        toon={v => komma(v, 2)}
+                        zet={v => setNieuw(n => ({ ...n, tempo_min_kg: String(v), tempoAangeraakt: true }))} />
+                      <SliderVeld label="Tempo hoogstens" eenheid="kg/wk"
+                        waarden={reeks(0.05, 2, 0.05)} waarde={Number(nieuw.tempo_max_kg) || 0.05}
+                        toon={v => komma(v, 2)}
+                        zet={v => setNieuw(n => ({ ...n, tempo_max_kg: String(v), tempoAangeraakt: true }))} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {fout && <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', marginBottom: 10, textAlign: 'center' }}>{fout}</div>}
+
+          {laatste
+            ? (
+              <button onClick={bewaar} disabled={bezig || !nieuw.start_gewicht} style={{ ...primairKnop, opacity: (bezig || !nieuw.start_gewicht) ? 0.5 : 1 }}>
+                <Check size={16} strokeWidth={3} /> {bezig ? 'Opslaan…' : 'Fase starten'}
+              </button>
+            )
+            : <button onClick={() => setStap(n => n + 1)} style={primairKnop}>Volgende</button>}
+          {laatste && (
+            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
+              De vorige fase wordt afgesloten.
+            </div>
+          )}
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
+  if (!toonKop) return faseModal()
+
   const p = isMobile ? '0.7rem 0.75rem' : '0.8rem 1rem'
 
   return (
@@ -240,103 +416,7 @@ export default function FasePaneel({
         </div>
       )}
 
-      {/* Nieuwe fase instellen */}
-      {nieuw && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Doel en startdatum: twee dropdowns op één regel. */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Kies label="Doel" waarde={nieuw.doel} isMobile={isMobile}
-              opties={Object.entries(DOELEN).map(([k, v]) => [k, v.label])}
-              zet={k => setNieuw(n => {
-                const week = k === 'build' ? 0.25 : k === 'cut' ? -0.5 : 0
-                return metBand({
-                  ...n, doel: k, week_doel_kg: String(week),
-                  surplus: n.surplusAangeraakt ? n.surplus : String(kcalPerWeektempo(week)),
-                })
-              })} />
-            <label style={{ flex: 1, minWidth: isMobile ? 130 : 160, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={kopjeStijl}>Startdatum</span>
-              <input type="date" value={nieuw.started_on}
-                onChange={e => setNieuw(n => ({ ...n, started_on: e.target.value }))}
-                style={{ ...kiesStijl, colorScheme: 'dark' }} />
-            </label>
-          </div>
-
-          {/* De getallen als sliders, zoals de gewichtsslider bij de klant.
-              Twee kolommen op desktop, onder elkaar op mobiel. */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', columnGap: 16, rowGap: 4 }}>
-            <SliderVeld label="Startgewicht" eenheid="kg"
-              waarden={reeks(basisKg - 15, basisKg + 15, 0.1)}
-              waarde={Number(nieuw.start_gewicht) || basisKg}
-              toon={v => komma(v, 1)}
-              zet={v => setNieuw(n => metBand({ ...n, start_gewicht: String(v) }))} />
-            {/* Tempo en tekort horen bij elkaar: verander je het tempo, dan
-                schuift het voorgestelde tekort mee. Heb je het tekort zelf al
-                aangeraakt, dan blijft het staan. */}
-            <SliderVeld label="Per week" eenheid="kg"
-              waarden={reeks(-1.5, 1, 0.05)}
-              waarde={Number(nieuw.week_doel_kg) || 0}
-              toon={v => `${v > 0 ? '+' : ''}${komma(v, 2)}`}
-              zet={v => setNieuw(n => metBand({
-                ...n, week_doel_kg: String(v),
-                surplus: n.surplusAangeraakt ? n.surplus : String(kcalPerWeektempo(v)),
-              }))} />
-            <SliderVeld label="Tekort/surplus" eenheid="kcal/dag"
-              waarden={reeks(-1500, 1000, 25)}
-              waarde={Number(nieuw.surplus) || 0}
-              toon={v => `${v > 0 ? '+' : ''}${v}`}
-              itemBreedte={64}
-              zet={v => setNieuw(n => ({ ...n, surplus: String(v), surplusAangeraakt: true }))} />
-            <SliderVeld label="Doelgewicht" eenheid="kg · optioneel"
-              waarden={['', ...reeks(basisKg - 40, basisKg + 30, 0.5)]}
-              waarde={nieuw.doel_gewicht === '' ? '' : Number(nieuw.doel_gewicht)}
-              toon={v => (v === '' ? '—' : komma(v, 1))}
-              zet={v => setNieuw(n => ({ ...n, doel_gewicht: v === '' ? '' : String(v) }))} />
-
-            {/* Hoeveel afwijking van dat tempo je goedvindt. Standaard het
-                tempo min en plus 0,2 kg; schuif je zelf, dan blijft het staan. */}
-            {nieuw.doel !== 'recomp' && nieuw.doel !== 'maintain' && (
-              <>
-                <SliderVeld label="Tempo minstens" eenheid="kg/wk"
-                  waarden={reeks(0.05, 2, 0.05)}
-                  waarde={Number(nieuw.tempo_min_kg) || 0.05}
-                  toon={v => komma(v, 2)}
-                  zet={v => setNieuw(n => ({ ...n, tempo_min_kg: String(v), tempoAangeraakt: true }))} />
-                <SliderVeld label="Tempo hoogstens" eenheid="kg/wk"
-                  waarden={reeks(0.05, 2, 0.05)}
-                  waarde={Number(nieuw.tempo_max_kg) || 0.05}
-                  toon={v => komma(v, 2)}
-                  zet={v => setNieuw(n => ({ ...n, tempo_max_kg: String(v), tempoAangeraakt: true }))} />
-              </>
-            )}
-          </div>
-          {grenzenTekst && (
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{grenzenTekst}</div>
-          )}
-
-          {fout && <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#ef4444' }}>{fout}</div>}
-
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => setNieuw(null)} style={{
-              flex: 2, padding: '0.6rem', minHeight: 42, background: 'none',
-              border: '1px solid rgba(255,255,255,0.2)', color: '#fff',
-              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-            }}><X size={13} style={{ verticalAlign: -2 }} /> Annuleren</button>
-            <button onClick={bewaar} disabled={bezig || !nieuw.start_gewicht} style={{
-              flex: 8, padding: '0.6rem', minHeight: 42,
-              background: (bezig || !nieuw.start_gewicht) ? 'rgba(255,255,255,0.06)' : '#fff',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: (bezig || !nieuw.start_gewicht) ? 'rgba(255,255,255,0.3)' : '#0a0a0a',
-              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: (bezig || !nieuw.start_gewicht) ? 'default' : 'pointer',
-            }}><Check size={13} style={{ verticalAlign: -2 }} /> {bezig ? 'Opslaan…' : 'Fase starten'}</button>
-          </div>
-
-          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
-            De vorige fase wordt afgesloten. Doel en weektempo gaan mee naar de macro-berekening en de gewichtstrend.
-          </div>
-        </div>
-      )}
+      {nieuw && faseModal()}
 
       {/* Afgesloten fases: wat heeft de vorige opgeleverd? */}
       {!nieuw && fases.length > 1 && (
@@ -363,24 +443,19 @@ const reeks = (van, tot, stap) => {
 }
 const komma = (v, d) => Number(v).toFixed(d).replace('.', ',')
 
+const kleinKnop = {
+  width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
+  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+const primairKnop = {
+  width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+  background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a',
+  fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+
 const kopjeStijl = { fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }
-const kiesStijl = {
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-  color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
-  padding: '0.45rem 0.6rem', outline: 'none', minHeight: 40, width: '100%', boxSizing: 'border-box', cursor: 'pointer',
-}
-
-function Kies({ label, waarde, opties, zet, isMobile }) {
-  return (
-    <label style={{ flex: 1, minWidth: isMobile ? 130 : 160, display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <span style={kopjeStijl}>{label}</span>
-      <select value={waarde} onChange={e => zet(e.target.value)} style={kiesStijl}>
-        {opties.map(([k, l]) => <option key={k} value={k} style={{ background: '#111' }}>{l}</option>)}
-      </select>
-    </label>
-  )
-}
-
 function SliderVeld({ label, eenheid, waarden, waarde, toon, zet, itemBreedte = 58 }) {
   return (
     <div style={{ minWidth: 0 }}>
