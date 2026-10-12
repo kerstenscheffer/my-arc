@@ -2957,7 +2957,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         .is('reverted_at', null)
         .order('challenge_deadline', { ascending: true, nullsFirst: false })
       if (alleen && alleen !== 'alle') q = q.eq('challenge_status', alleen)
-      if (coachId) q = q.eq('coach_id', coachId)
+      // Geen coach_id-filter: RLS toont de challenges van het hele team, zodat
+      // Marcel ook de challenges ziet die Kersten heeft vastgelegd (en andersom).
       const { data, error } = await q
       if (error) throw error
       const vandaag = new Date().toISOString().split('T')[0]
