@@ -196,10 +196,8 @@ function Sectie({ id, icoon, titel, samenvatting, kleur = '#fff', open, onWissel
 
 // ── Stripe-achtige bouwstenen ──────────────────────────────────────────────
 
-const kaart = {
-  background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 16, padding: '1.1rem 1.2rem', minWidth: 0,
-}
+// Geen kaders: de blokken zweven op de pagina, ruimte doet het scheiden.
+const kaart = { minWidth: 0 }
 const kaartKop = { fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', gap: 6 }
 
 const dagLabel = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
@@ -448,7 +446,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.82rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
 
       {/* ═══ RIJ 1: rapport + grafiek ═══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : 'minmax(0, 340px) minmax(0, 1fr)', gap: 12, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : 'minmax(0, 340px) minmax(0, 1fr)', gap: m ? 28 : 40, marginBottom: m ? 32 : 44 }}>
         <div style={{ ...kaart, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <div style={{ ...kaartKop, alignSelf: 'flex-start' }}><Gauge size={14} strokeWidth={2.6} /> Rapportcijfer</div>
           <div style={{ position: 'relative', marginTop: 10 }}>
@@ -507,7 +505,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       </div>
 
       {/* ═══ RIJ 2: KPI's met sparkline en verschil ═══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: m ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: m ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: m ? 28 : 40, marginBottom: m ? 32 : 44 }}>
         <KpiKaart icoon={MousePointerClick} label="Bezoekers" waarde={totaal.sessies} vorig={vorig.sessies} data={perDag} sleutel="sessies" kleur="#fff" sub="klikten op je advertentie" />
         <KpiKaart icoon={ClipboardCheck} label="Formulier af" waarde={totaal.form_klaar} vorig={vorig.form_klaar} data={perDag} sleutel="form_klaar" kleur="#60a5fa" sub={`${totaal.form_start} begonnen eraan`} />
         <KpiKaart icoon={UserCheck} label="Geschikt" waarde={totaal.geschikt} vorig={vorig.geschikt} data={perDag} sleutel="geschikt" kleur={ORANJE} sub="passen bij de challenge" />
@@ -515,7 +513,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       </div>
 
       {/* ═══ RIJ 3: trechter + verbeterpunten ═══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: twee, gap: 12, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: twee, gap: m ? 28 : 40, marginBottom: m ? 32 : 44 }}>
         <div style={kaart}>
           <div style={kaartKop}><Filter size={14} strokeWidth={2.6} /> Waar haken mensen af?</div>
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -573,7 +571,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       </div>
 
       {/* ═══ RIJ 4: advertenties ═══ */}
-      <div style={{ ...kaart, marginBottom: 12 }}>
+      <div style={{ ...kaart, marginBottom: m ? 28 : 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={kaartKop}><Megaphone size={14} strokeWidth={2.6} /> Welke advertentie werkt?</div>
           <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{echteHooks.length} advertenties · oordeel vanaf {MIN_HOOK} bezoekers</span>
