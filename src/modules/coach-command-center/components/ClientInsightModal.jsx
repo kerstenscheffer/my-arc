@@ -1,7 +1,7 @@
 // src/modules/coach-command-center/components/ClientInsightModal.jsx
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink, CalendarCheck, Circle, CheckCircle2 } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
@@ -11,6 +11,7 @@ import CheckinsColumn from './insight/CheckinsColumn'
 import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
+import TrajectModal from './TrajectModal'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
@@ -101,6 +102,18 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [localClient, setLocalClient] = useState(null)
   const [monthlyChecked, setMonthlyChecked] = useState(false)
   const containerRef = useRef(null)
+  // Looptijd-blad: 'start' (nog geen looptijd) of 'verleng'. Een klant zonder
+  // startdatum krijgt de vraag vanzelf, één keer per sessie.
+  const [trajectModus, setTrajectModus] = useState(null)
+  const gevraagdRef = useRef(new Set())
+  useEffect(() => {
+    if (!isOpen || !client?.id || gevraagdRef.current.has(client.id)) return
+    const c = localClient ? { ...client, ...localClient } : client
+    if ((c.coaching_start_date && c.coaching_total_weeks) || c.coaching_status === 'ended') return
+    gevraagdRef.current.add(client.id)
+    setTrajectModus('start')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, client?.id])
 
   if (!isOpen || !client) return null
 
@@ -368,6 +381,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 coachId={coachId}
                 isMobile={false}
                 onClientUpdate={handleClientUpdate}
+                onTraject={setTrajectModus}
               />
             </div>
           )}
@@ -469,6 +483,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   coachId={coachId}
                   isMobile={isMobile}
                   onClientUpdate={handleClientUpdate}
+                  onTraject={setTrajectModus}
                 />
               )}
               {/* ═══ MAANDELIJKSE CHECK BANNER (mobiel) ═══ */}
@@ -727,6 +742,15 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           }}
         />
       )}
+
+      <TrajectModal
+        open={!!trajectModus}
+        modus={trajectModus || 'verleng'}
+        client={effectiveClient}
+        coachId={coachId}
+        onClose={() => setTrajectModus(null)}
+        onClientUpdate={handleClientUpdate}
+      />
 
       <SendNotificationModal
         open={showNotify}

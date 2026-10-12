@@ -13,7 +13,7 @@ import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   Clock, Play, Pause, Square, Settings, Check, X, AlertCircle,
-  Calendar, Hourglass,
+  Calendar, Hourglass, CalendarPlus,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 
@@ -37,7 +37,7 @@ const formatDate = (iso) => {
 // Bereken: eind-datum, weken-gedaan, weken-totaal, weken-resterend, percentage
 import { computePeriod } from './trajectPeriode'
 
-export default function CoachingPeriodPanel({ client, coachId, isMobile, onClientUpdate }) {
+export default function CoachingPeriodPanel({ client, coachId, isMobile, onClientUpdate, onTraject }) {
   const modalHost = useModalHost()
   const [editing, setEditing] = useState(false)
   const [draftStart, setDraftStart] = useState(client.coaching_start_date || new Date().toISOString().split('T')[0])
@@ -157,6 +157,17 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     } catch (err) {
       console.error('Reopen failed:', err)
     } finally { setBusy(false) }
+  }
+
+  // ── Nog geen looptijd: één knop naar het klik-door blad ──────────────────
+  if (!period && !editing && onTraject) {
+    return (
+      <div style={panelShell(null, isMobile)}>
+        <button onClick={() => onTraject('start')} style={{ ...primaryBtnStyle(false), height: 36, minHeight: 36 }}>
+          <Clock size={14} strokeWidth={2.8} /> Startdatum en looptijd instellen
+        </button>
+      </div>
+    )
   }
 
   // ── Setup-mode ────────────────────────────────────────────────────────────
@@ -308,6 +319,11 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
 
           {/* Kale icoonknoppen, geen vakjes. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', flexShrink: 0, marginLeft: 'auto' }}>
+            {onTraject && (
+              <button onClick={() => onTraject('verleng')} disabled={busy} title="Verlengen" style={{ ...ikoonKnop('#fff'), width: 'auto', padding: '0 0.45rem', gap: 4, fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit' }}>
+                <CalendarPlus size={15} /> Verleng
+              </button>
+            )}
             {status === 'active' && (
               <button onClick={() => setShowPauseModal(true)} disabled={busy} title="Pauzeer coaching" style={ikoonKnop('#f59e0b')}>
                 <Pause size={15} />
