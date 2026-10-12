@@ -15,6 +15,7 @@ import { Flag, Plus, Check, X, ChevronLeft } from 'lucide-react'
 import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/utils/fase'
 import { maakConfig, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'
 import HorizontaleSlider from '../../../../client/components/HorizontaleSlider'
+import { intakeLichaamFotos } from '../../utils/intakeLichaam'
 
 const vandaag = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -227,6 +228,34 @@ export default function FasePaneel({
             </div>
             <button onClick={sluit} aria-label="Sluiten" style={kleinKnop}><X size={18} strokeWidth={2.8} /></button>
           </div>
+
+          {/* Wat de klant in de intake aanklikte: zo ziet hij er nu uit (of
+              ertussenin) en daar wil hij naartoe. Staat bij elke stap, zodat
+              je tempo en tekort kiest met het doel voor ogen. */}
+          {(() => {
+            const { nu, doel } = intakeLichaamFotos(client)
+            if (!nu.length && !doel.length) return null
+            const groep = (titel, fotos) => fotos.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                <div style={{ fontSize: '0.58rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{titel}</div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {fotos.map(f => (
+                    <div key={f.img} style={{ textAlign: 'center' }}>
+                      <img src={f.img} alt={f.label} style={{ width: 64, height: 84, objectFit: 'cover', borderRadius: 10, display: 'block', background: '#151515' }} />
+                      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: '#fff', marginTop: 3, maxWidth: 64, lineHeight: 1.2 }}>{f.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 18 }}>
+                {groep(nu.length > 1 ? 'Nu · tussenin' : 'Nu', nu)}
+                {nu.length > 0 && doel.length > 0 && <span style={{ fontSize: '1.2rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)' }}>→</span>}
+                {groep('Wil naar', doel)}
+              </div>
+            )
+          })()}
 
           {huidig === 'doel' && (
             <>
