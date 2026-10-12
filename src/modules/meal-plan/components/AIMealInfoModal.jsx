@@ -10,7 +10,7 @@ import { foodImageFallback } from '../foodImageFallback'
 import MealPrepModal from './MealPrepModal'
 import SausBlok from './SausBlok'
 
-export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, onSaved }) {
+export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, datum, onSaved }) {
   const isMobile = window.innerWidth <= 768
   const [activeTab, setActiveTab] = useState('info')
   const [ingredients, setIngredients] = useState([])
@@ -245,6 +245,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
           planId={planId}
           dayName={dayName}
           isToday={isToday}
+          datum={datum}
           clientId={client.id}
           isMobile={isMobile}
           onClose={() => setShowEdit(false)}

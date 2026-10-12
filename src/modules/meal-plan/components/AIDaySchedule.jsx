@@ -4,6 +4,7 @@
 // ✅ EDIT: editingMeal state + FoodLogModal editMeal prop
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { getOverrides, lokaleDatum } from '../DayTemplateService'
+import { laadDagAanpassingen } from '../dagAanpassingen'
 import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd } from '../utils/preWorkoutMeal'
 import { ClientAgendaService } from '../../client-agenda/ClientAgendaService'
 import DaySelector from './day-schedule/DaySelector'
@@ -403,7 +404,13 @@ export default function AIDaySchedule({
       // Een dagtemplate voor deze week wint van het weekplan.
       const dayPlan = tijdelijk || activePlan?.week_structure?.[dayKey]
       if (!dayPlan) { setDisplayMeals([]); setLoading(false); return }
-      
+
+      // Maaltijden die de klant voor díé datum heeft aangepast ("alleen
+      // vandaag"). Die winnen van het plan, ook als je de dag later bekijkt
+      // en dan pas afvinkt.
+      const datum = datumVanDag(dayIndex)
+      const aangepast = (await laadDagAanpassingen(db.supabase, client?.id, datum))[datum] || {}
+
       const meals = []
       const getMealData = async (mealRef) => {
         if (!mealRef) return null
@@ -447,7 +454,7 @@ export default function AIDaySchedule({
         const stored = dayPlan[slot]
         const displayLabel = (stored && typeof stored === 'object' && stored.display_label) || null
         const meta = SLOT_META[slot] || {}
-        const d = await getMealData(stored)
+        const d = aangepast[slot] || await getMealData(stored)
         if (!d) continue
         const label = displayLabel || meta.label || pretty(slot)
         let plannedTime = parseTime(typeof stored === 'object' ? stored.timing : null) ?? meta.time ?? 12
@@ -484,6 +491,7 @@ export default function AIDaySchedule({
         ? null
         : preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
       if (preWorkout) {
+        if (aangepast[PRE_WORKOUT_SLOT]) Object.assign(preWorkout, aangepast[PRE_WORKOUT_SLOT], { timing: preWorkout.timing })
         const pwTekst = preWorkoutTijd(trainingStarts[dayKey], preWorkout.timing)
         const pwTijd = parseTime(pwTekst) ?? 15.5
         meals.push({

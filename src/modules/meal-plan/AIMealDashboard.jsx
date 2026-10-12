@@ -838,7 +838,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           client={client}
           planId={dashboardData.activePlan?.id}
           dayName={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
-          isToday={dayKeyToIndex(selectedDay) === getTodayIndex()}
+          // Ook de week telt: dezelfde weekdag volgende week is niet vandaag.
+          isToday={weekOffset === 0 && dayKeyToIndex(selectedDay) === getTodayIndex()}
+          datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
           onSaved={() => { setModals(prev => ({ ...prev, info: null })); loadDashboardData() }}
         />
       )}

@@ -6,9 +6,10 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Repeat, CalendarDays, Zap } from 'lucide-react'
 import MealEditModal from '../../ai-meal-generator/tabs/plan-analyzer/MealEditModal'
+import { werkGelogdeMaaltijdBij } from '../dagAanpassingen'
 
 export default function ClientMealEditModal({
-  db, service, meal, planId, dayName, isToday, clientId, onClose, onSaved, isMobile,
+  db, service, meal, planId, dayName, isToday, datum, clientId, onClose, onSaved, isMobile,
 }) {
   const slot = meal?.slot
   const [enriched, setEnriched] = useState(null)
@@ -90,6 +91,9 @@ export default function ClientMealEditModal({
       } else if (scopeKey === 'today') {
         await service.overrideMealForToday(clientId, slot, snap)
       }
+      // Al afgevinkt op de dag die je bekijkt? Dan telt de log vanaf nu de
+      // aangepaste versie, niet meer het origineel.
+      await werkGelogdeMaaltijdBij(db.supabase, clientId, targetMealId, scopeKey === 'today' ? new Date() : (datum || null), snap)
       onSaved?.()
     } catch (e) {
       console.error('❌ Client meal save failed:', e)
