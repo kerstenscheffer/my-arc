@@ -654,6 +654,14 @@ export default function PlanAnalyzer({
     : clientIntake?.training?.training_days?.length > 0 ? clientIntake.training.training_days
     : voorkeurDagen.length ? voorkeurDagen
     : []
+  // Trainingsdagen als 'monday'-sleutels — het supplementenpaneel markeert
+  // ze, want creatine of een shake zet je meestal juist daarop. Staat hier
+  // bovenaan omdat ook de vroege return (geen plan) ze aan PlanLibraryModal
+  // geeft; verderop gaf dat 'Cannot access before initialization'.
+  const trainingDayKeys = (trainingDays || [])
+    .map(c => ({ ma: 0, di: 1, wo: 2, do: 3, vr: 4, za: 5, zo: 6 })[c])
+    .filter(i => i != null).sort((a, b) => a - b)
+    .map(i => DAYS[i]?.id).filter(Boolean)
   const mealSchedule = clientIntake?.meal_schedule || null
   const trainingTime = clientIntake?.training?.default_time || null
 
@@ -1516,9 +1524,6 @@ export default function PlanAnalyzer({
     return uit
   })()
 
-  // Trainingsdagen als 'monday'-sleutels — het supplementenpaneel markeert
-  // ze, want creatine of een shake zet je meestal juist daarop.
-  const trainingDayKeys = trainingDayIndices.map(i => DAYS[i]?.id).filter(Boolean)
 
   // Dagtotaal inclusief de pre-workout maaltijd uit de losse kolom. Die staat
   // niet in week_structure en dus niet in currentDay.meals, waardoor het

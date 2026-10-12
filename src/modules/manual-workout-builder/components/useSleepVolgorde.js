@@ -38,6 +38,11 @@ const INTERACTIEF = 'button, input, textarea, select, a, [data-geen-sleep]'
 export default function useSleepVolgorde(aantal, opVolgorde, { gap = 10 } = {}) {
   const lijstRef = useRef(null)
   const [sleep, setSleep] = useState(null) // { van, naar, dy, hoogte }
+  // Laatste stand ook in een ref: bij loslaten lezen we 'naar' hieruit. Eerst
+  // stond opVolgorde ín de updater van setSleep, en die draait tijdens het
+  // renderen; dan zet de ouder state midden in een render van DayBuilder.
+  const sleepRef = useRef(null)
+  sleepRef.current = sleep
   const bezigRef = useRef(false)
   const start = useRef(null)               // { y, x, van, hoogte, el, pointerId, timer, actief }
 
@@ -135,10 +140,9 @@ export default function useSleepVolgorde(aantal, opVolgorde, { gap = 10 } = {}) 
       const { van } = s
       start.current = null
       bezigRef.current = false
-      setSleep(cur => {
-        if (cur && cur.naar !== van) opVolgorde(van, cur.naar)
-        return null
-      })
+      const cur = sleepRef.current
+      setSleep(null)
+      if (cur && cur.naar !== van) opVolgorde(van, cur.naar)
     },
     onPointerCancel: annuleer,
     // Een klik die het einde van een sleep is, mag niets openen.
