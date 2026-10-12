@@ -22,6 +22,7 @@
 
 import { standaardWeekindeling, trainingsdagenUitIntake } from './standaardWeekindeling'
 import { laadSupplementen, groepeerPerMoment, doseringTekst, geldtOpDag } from '../supplements/utils/supplementSchedule'
+import { laadDagAanpassingen } from '../meal-plan/dagAanpassingen'
 
 export const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
@@ -386,7 +387,7 @@ export class ClientAgendaService {
     const weekEndDate = new Date(anchor); weekEndDate.setDate(weekEndDate.getDate() + 6)
     const weekEnd = toIsoDate(weekEndDate)
 
-    const [mealPlan, schema, customBlocks, schedulePakket, overrides, intakeSchedule, supplementen] = await Promise.all([
+    const [mealPlan, schema, customBlocks, schedulePakket, overrides, intakeSchedule, supplementen, maaltijdAanpassingen] = await Promise.all([
       forcedMealPlanId ? this._loadMealPlanById(forcedMealPlanId) : this._loadMealPlan(clientId),
       this._loadWorkoutSchema(clientId),
       this._loadCustomBlocks(clientId),
@@ -394,6 +395,9 @@ export class ClientAgendaService {
       this._loadOverrides(clientId, weekStart, weekEnd),
       this._loadIntakeSchedule(clientId),
       laadSupplementen(this.supabase, clientId),
+      // Maaltijden die de klant voor één datum heeft aangepast; die winnen van
+      // het weekplan, anders vinkt de agenda de originele macro's af.
+      laadDagAanpassingen(this.supabase, clientId, weekStart, weekEnd),
     ])
 
     // Geen weekindeling maar wél een schema? Dan delen we hem zelf in. Zonder
@@ -506,9 +510,14 @@ export class ClientAgendaService {
       DAYS.forEach(day => {
         const dayData = mealWeek[day]
         if (!dayData) return
-        Object.entries(dayData).forEach(([slot, meal]) => {
+        const aangepast = maaltijdAanpassingen?.[toIsoDate(dateForDay(anchor, day))] || {}
+        Object.entries(dayData).forEach(([slot, planMeal]) => {
           if (slot === 'totals' || slot === 'is_training_day') return
-          if (!meal || typeof meal !== 'object') return
+          if (!planMeal || typeof planMeal !== 'object') return
+          // Tijd en label blijven van het plan; inhoud en macro's van de aanpassing.
+          const meal = aangepast[slot]
+            ? { ...planMeal, ...aangepast[slot], timing: planMeal.timing, display_label: planMeal.display_label }
+            : planMeal
           // Klok-tijd bepalen: meal.timing indien geldig, anders slot-default.
           // (ai_meals slaat .timing soms als type-array op → geen klok-tijd.)
           const timing = parseTime(meal.timing) ?? parseTime(SLOT_DEFAULT_TIME[slot])

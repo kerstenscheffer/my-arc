@@ -487,11 +487,14 @@ export default function AIDaySchedule({
       // verhuist deze maaltijd vanzelf mee.
       // Niet als de dag zelf al een pre-workout slot heeft: die is in de lus
       // hierboven al opgepikt en zou anders twee keer op de tijdlijn staan.
-      const preWorkout = dayPlan?.[PRE_WORKOUT_SLOT]
+      const preWorkoutPlan = dayPlan?.[PRE_WORKOUT_SLOT]
         ? null
         : preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
+      // Kopie, niet het object uit het plan zelf aanpassen.
+      const preWorkout = preWorkoutPlan && aangepast[PRE_WORKOUT_SLOT]
+        ? { ...preWorkoutPlan, ...aangepast[PRE_WORKOUT_SLOT], timing: preWorkoutPlan.timing }
+        : preWorkoutPlan
       if (preWorkout) {
-        if (aangepast[PRE_WORKOUT_SLOT]) Object.assign(preWorkout, aangepast[PRE_WORKOUT_SLOT], { timing: preWorkout.timing })
         const pwTekst = preWorkoutTijd(trainingStarts[dayKey], preWorkout.timing)
         const pwTijd = parseTime(pwTekst) ?? 15.5
         meals.push({
