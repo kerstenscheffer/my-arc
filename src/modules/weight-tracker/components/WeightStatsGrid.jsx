@@ -438,7 +438,15 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           : z.vorige.vanStart ? `vanaf start, ${z.nu.metingen} wegingen` : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
       }
     })
-    return [...lopend, ...zaterdagen]
+    const echt = [...lopend, ...zaterdagen]
+    if (echt.length) return echt
+    // Nog geen wegingen: de strook staat er al, grijs en leeg, zodat je ziet
+    // waar je weektempo komt te staan.
+    const grijs = 'rgba(255,255,255,0.3)'
+    return ['Deze week', 'Laatste zaterdag', 'Zaterdag ervoor', '3 zaterdagen terug'].map((kop, i) => ({
+      sleutel: `leeg-${i}`, waarde: null, genoeg: false, kleur: grijs, kop,
+      onder: i === 0 ? 'nog geen wegingen' : '—',
+    }))
   }, [binnenFase, bandConfig, sortedHistory, faseStart, faseStartGewicht]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Weeknummer voor het label bij het gemiddelde ("Gemiddeld w38").
