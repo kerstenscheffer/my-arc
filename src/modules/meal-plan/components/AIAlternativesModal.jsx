@@ -102,15 +102,25 @@ export default function AIAlternativesModal({
 
   // Slot van de huidige maaltijd → naar de curatie-slots (snack1/2/3 → snack,
   // behalve een avondsnack: die heeft een eigen lijst en een eigen moment).
+  // Het label op de kaart wint van het slot: een coach die een lunchplek
+  // "Diner" noemt (maaltijden verschoven in het plan), bedoelt een diner, en
+  // dan hoort de swaplijst op diner te openen (Mark Behr, 12 okt 2026).
   const slotKey = (() => {
     if (isAvondsnack(currentMeal?.slot || currentMeal?.timeSlot, currentMeal)) return 'avondsnack'
-    const v = String(currentMeal?.slot || currentMeal?.timeSlot || currentMeal?.timing?.[0] || '').toLowerCase()
-    if (v.includes('breakfast') || v.includes('ontbijt')) return 'breakfast'
-    if (v.includes('lunch')) return 'lunch'
-    if (v.includes('dinner') || v.includes('diner')) return 'dinner'
-    if (v.includes('pre')) return 'pre_workout'
-    if (v.includes('post')) return 'post_workout'
-    return 'snack'
+    const herken = (tekst) => {
+      const v = String(tekst || '').toLowerCase()
+      if (v.includes('breakfast') || v.includes('ontbijt')) return 'breakfast'
+      if (v.includes('lunch')) return 'lunch'
+      if (v.includes('dinner') || v.includes('diner') || v.includes('avondeten')) return 'dinner'
+      if (v.includes('pre')) return 'pre_workout'
+      if (v.includes('post')) return 'post_workout'
+      if (v.includes('snack')) return 'snack'
+      return null
+    }
+    // Een label zonder herkenbaar moment ("Maaltijd 3") valt terug op het slot.
+    return herken(currentMeal?.display_label)
+      || herken(currentMeal?.slot || currentMeal?.timeSlot || currentMeal?.timing?.[0])
+      || 'snack'
   })()
 
   const momentOpties = [
@@ -160,7 +170,7 @@ export default function AIAlternativesModal({
     try {
       const smartAlts = await service.getSmartAlternatives(
         currentMeal,
-        currentMeal.slot || currentMeal.timeSlot
+        slotKey
       )
       
       // Favorieten worden hier niet meer opgehaald: dat filter is vervangen
