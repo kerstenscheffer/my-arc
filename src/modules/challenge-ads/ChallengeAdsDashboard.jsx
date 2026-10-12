@@ -17,8 +17,8 @@
 //
 // CTR en kosten staan hier niet: die zitten in Meta Ads Manager.
 
-import { useEffect, useState } from 'react'
-import { RefreshCw, Copy, Check, CalendarDays, ChevronDown, ChevronUp } from 'lucide-react'
+import { createElement, useEffect, useState } from 'react'
+import { RefreshCw, Copy, Check, CalendarDays, ChevronDown, Filter, Lightbulb, Megaphone, Table2, Link2 } from 'lucide-react'
 
 const PERIODES = [
   { id: '7', label: '7 dagen', dagen: 7 },
@@ -163,8 +163,28 @@ function Stempel({ oordeel, klein }) {
   )
 }
 
-function Kop({ children }) {
-  return <div style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 6 }}>{children}</div>
+// Eén uitklapregel: icoon, titel, een korte samenvatting rechts en een pijl.
+// Dicht zie je in één oogopslag wat waar zit én hoe het ervoor staat.
+function Sectie({ id, icoon, titel, samenvatting, kleur = '#fff', open, onWissel, children }) {
+  return (
+    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <button onClick={() => onWissel(id)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0.95rem 0',
+        background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}>
+        <span style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {createElement(icoon, { size: 18, strokeWidth: 2.4, color: kleur })}
+        </span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em' }}>{titel}</span>
+        {samenvatting && (
+          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: kleur === '#fff' ? 'rgba(255,255,255,0.5)' : kleur, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '45%' }}>{samenvatting}</span>
+        )}
+        <ChevronDown size={18} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && <div style={{ paddingBottom: '1rem' }}>{children}</div>}
+    </div>
+  )
 }
 
 function Getal({ label, waarde, dik }) {
@@ -203,7 +223,15 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const [laden, setLaden] = useState(true)
   const [fout, setFout] = useState('')
   const [gekopieerd, setGekopieerd] = useState(false)
-  const [toonDetails, setToonDetails] = useState(false)
+  // Welke secties open staan; onthouden per browser.
+  const [open, setOpen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('arc_ads_open') || '["trechter"]') } catch { return ['trechter'] }
+  })
+  const wissel = (id) => setOpen(prev => {
+    const nieuw = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    try { localStorage.setItem('arc_ads_open', JSON.stringify(nieuw)) } catch { /* geen opslag */ }
+    return nieuw
+  })
 
   const laad = async () => {
     setLaden(true); setFout('')
@@ -260,6 +288,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     .slice(0, 3)
 
   const hooks = groepeerHooks(rijen)
+  const winnaars = hooks.filter(h => hookOordeel(h).id === 'goed').length
+  const zwakste = verbeterpunten[0] || null
 
   const kolommen = [
     { k: 'hook', label: 'Hook (utm_content)', links: true },
@@ -325,8 +355,10 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       </div>
 
       {/* ═══ DE TRECHTER ═══ */}
-      <Kop>Waar haken mensen af?</Kop>
-      <div style={{ marginBottom: '1.6rem' }}>
+      <Sectie id="trechter" icoon={Filter} titel="Waar haken mensen af?" open={open.includes('trechter')} onWissel={wissel}
+        kleur={zwakste ? zwakste.oordeel.kleur : '#fff'}
+        samenvatting={zwakste ? `lekt bij: ${zwakste.label.toLowerCase()}` : 'alles op koers'}>
+      <div>
         {stappen.map((st, i) => {
           const breedte = totaal.sessies > 0 ? Math.max(1.5, (st.aantal / totaal.sessies) * 100) : 0
           return (
@@ -350,12 +382,13 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           )
         })}
       </div>
+      </Sectie>
 
       {/* ═══ WAT KUN JE VERBETEREN ═══ */}
       {verbeterpunten.length > 0 && (
-        <>
-          <Kop>Wat kun je verbeteren?</Kop>
-          <div style={{ marginBottom: '1.8rem' }}>
+        <Sectie id="verbeter" icoon={Lightbulb} titel="Wat kun je verbeteren?" open={open.includes('verbeter')} onWissel={wissel}
+          kleur={ORANJE} samenvatting={`${verbeterpunten.length} ${verbeterpunten.length === 1 ? 'tip' : 'tips'}`}>
+          <div>
             {verbeterpunten.map((st, i) => (
               <div key={st.id} style={{ display: 'flex', gap: 12, padding: '0.65rem 0', borderBottom: i < verbeterpunten.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
                 <span style={{ fontSize: '1.1rem', fontWeight: 900, color: st.oordeel.kleur, minWidth: 18 }}>{i + 1}</span>
@@ -366,11 +399,13 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
               </div>
             ))}
           </div>
-        </>
+        </Sectie>
       )}
 
       {/* ═══ HOOKS: welke advertentie wint? ═══ */}
-      <Kop>Welke advertentie werkt?</Kop>
+      <Sectie id="hooks" icoon={Megaphone} titel="Welke advertentie werkt?" open={open.includes('hooks')} onWissel={wissel}
+        kleur={winnaars > 0 ? GROEN : '#fff'}
+        samenvatting={winnaars > 0 ? `${winnaars} ${winnaars === 1 ? 'winnaar' : 'winnaars'} · ${hooks.filter(h => !h.onbekend).length} advertenties` : `${hooks.filter(h => !h.onbekend).length} advertenties`}>
       <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
         Beste bovenaan. Pas vanaf {MIN_HOOK} bezoekers zegt een advertentie echt iets.
       </div>
@@ -402,11 +437,11 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         })}
       </div>
 
+      </Sectie>
+
       {/* Alle ruwe regels, voor wie het precies wil zien. */}
-      <button onClick={() => setToonDetails(v => !v)} style={{ background: 'none', border: 'none', padding: '0.4rem 0', color: 'rgba(255,255,255,0.55)', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
-        {toonDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />} Alle cijfers per regel
-      </button>
-      {toonDetails && (
+      <Sectie id="tabel" icoon={Table2} titel="Alle cijfers per regel" open={open.includes('tabel')} onWissel={wissel}
+        samenvatting={`${rijen.length} regels`}>
         <div style={{ overflowX: 'auto', marginTop: 6 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: m ? '0.76rem' : '0.82rem', minWidth: 760 }}>
             <thead>
@@ -432,11 +467,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             </tbody>
           </table>
         </div>
-      )}
+      </Sectie>
 
       {/* Link-conventie */}
-      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ fontSize: '0.85rem', fontWeight: 900, marginBottom: 6 }}>Link voor in de advertentie</div>
+      <Sectie id="link" icoon={Link2} titel="Link voor in de advertentie" open={open.includes('link')} onWissel={wissel}
+        samenvatting="kopiëren">
+      <div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <code style={{ flex: 1, fontSize: '0.74rem', color: 'rgba(255,255,255,0.8)', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{LINK_VOORBEELD}</code>
           <button onClick={kopieer} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.7rem', borderRadius: 10, background: gekopieerd ? 'rgba(16,185,129,0.15)' : '#fff', color: gekopieerd ? GROEN : '#000', border: 'none', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -447,6 +483,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           Meta vult {'{{campaign.name}}'} en {'{{ad.name}}'} zelf in. Geef elke hook een eigen advertentienaam, dan staat hij hier als aparte regel.
         </div>
       </div>
+      </Sectie>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
