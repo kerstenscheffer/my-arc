@@ -10,7 +10,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-export default function HorizontaleSlider({ waarden, waarde, onChange, toon = (v) => String(v), itemBreedte = 72, hoogte = 86 }) {
+// `groot` = lettergrootte van het gekozen getal; kleiner in compacte formulieren.
+export default function HorizontaleSlider({ waarden, waarde, onChange, toon = (v) => String(v), itemBreedte = 72, hoogte = 86, groot = '2.1rem' }) {
   const ref = useRef(null)
   const wrapRef = useRef(null)
   const vindIdx = useCallback((v) => {
@@ -89,7 +90,7 @@ export default function HorizontaleSlider({ waarden, waarde, onChange, toon = (v
                 flexShrink: 0, width: itemBreedte, height: '100%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', userSelect: 'none', fontVariantNumeric: 'tabular-nums',
-                fontSize: sel ? '2.1rem' : '0.8rem', fontWeight: sel ? 900 : 600,
+                fontSize: sel ? groot : '0.8rem', fontWeight: sel ? 900 : 600,
                 letterSpacing: sel ? '-0.03em' : 0,
                 color: sel ? '#fff' : 'rgba(255,255,255,0.25)',
                 transition: 'font-size 0.15s ease, color 0.15s ease',
