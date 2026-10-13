@@ -728,6 +728,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
           selectedDay="today"
           targets={targets || { calories: 0, protein: 0, carbs: 0, fat: 0 }}
           isMobile={isMobile}
+          zwevend
         />
       )}
 

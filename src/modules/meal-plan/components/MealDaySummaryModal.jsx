@@ -20,6 +20,7 @@ import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays } from 'lucide-react'
 import { foodImageFallback } from '../foodImageFallback'
 import { kcalKleur } from '../utils/kcalKleur'
+import useZwevendVenster from '../../../components/useZwevendVenster'
 
 const LIJN = 'rgba(255,255,255,0.08)'
 const GROEN = '#10b981'
@@ -70,8 +71,12 @@ export default function MealDaySummaryModal({
   onOpenFullHistory,  // () => void
   targets = {},       // { calories, protein, carbs, fat }
   isMobile: propMobile,
+  // Coach Inzicht: als zwevend venster naast je werk — te verslepen aan de
+  // kop, groter of kleiner aan de hoek, zonder gedimde achtergrond.
+  zwevend = false,
 }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
+  const venster = useZwevendVenster({ isMobile, standaard: { w: 540, h: 820 } })
 
   // De dag waarmee het venster opent: de dag die op de maaltijdpagina openstaat.
   const startDatum = useMemo(() => {
@@ -188,8 +193,8 @@ export default function MealDaySummaryModal({
 
   return createPortal(
     <div
-      onClick={onClose}
-      style={{
+      onClick={zwevend ? undefined : onClose}
+      style={zwevend ? { position: 'fixed', inset: 0, zIndex: 2147482000, pointerEvents: 'none' } : {
         position: 'fixed', inset: 0, zIndex: 2147482000,
         background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
         display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
@@ -198,14 +203,21 @@ export default function MealDaySummaryModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
+        style={zwevend ? {
+          ...venster.vensterStijl, zIndex: 2147482000, pointerEvents: 'auto',
+          background: '#0a0a0a', border: isMobile ? 'none' : `1px solid ${LIJN}`, borderRadius: isMobile ? 0 : 16,
+          boxShadow: '0 12px 28px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.35)',
+        } : {
           width: '100%', maxWidth: isMobile ? '100%' : 540, maxHeight: isMobile ? '92vh' : '88vh',
           background: '#0a0a0a', border: `1px solid ${LIJN}`, borderRadius: isMobile ? '20px 20px 0 0' : 20,
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
-        {/* Kop: gekozen dag met pijlen, sluiten */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: isMobile ? '0.9rem 0.75rem 0.8rem 1rem' : '1rem 1rem 0.9rem 1.25rem', borderBottom: `1px solid ${LIJN}` }}>
+        {/* Kop: gekozen dag met pijlen, sluiten. Zwevend ook het sleephandvat. */}
+        <div
+          {...(zwevend ? venster.sleepHandvat : {})}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isMobile ? '0.9rem 0.75rem 0.8rem 1rem' : '1rem 1rem 0.9rem 1.25rem', borderBottom: `1px solid ${LIJN}`, ...(zwevend ? (venster.sleepHandvat.style || {}) : {}) }}
+        >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Inzicht</div>
             <div style={{ fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -375,6 +387,11 @@ export default function MealDaySummaryModal({
             </>
           )}
         </div>
+        {zwevend && venster.formaatHandvat && (
+          <div {...venster.formaatHandvat} style={{ position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, cursor: 'se-resize', display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: 3 }}>
+            <div style={{ width: 9, height: 9, borderRight: '2px solid rgba(255,255,255,0.25)', borderBottom: '2px solid rgba(255,255,255,0.25)' }} />
+          </div>
+        )}
       </div>
     </div>,
     document.body
