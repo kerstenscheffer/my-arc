@@ -27,6 +27,9 @@ export default function useZwevendVenster({ isMobile, standaard = { w: 480, h: 6
   ))
   const [plek, setPlek] = useState(() => (isMobile ? { x: 0, y: 0 } : midden(standaard)))
   const [ingeklapt, setIngeklapt] = useState(false)
+  // Volledig scherm: tijdelijk over alles heen. Grootte en plek blijven
+  // bewaard, zodat je terugkomt waar je was.
+  const [volledig, setVolledig] = useState(false)
   const [sleept, setSleept] = useState(false)
   const [schaalt, setSchaalt] = useState(false)
   const sleepOffset = useRef({ x: 0, y: 0 })
@@ -38,12 +41,12 @@ export default function useZwevendVenster({ isMobile, standaard = { w: 480, h: 6
   })
 
   const sleepStart = useCallback((e) => {
-    if (isMobile) return
+    if (isMobile || volledig) return
     e.preventDefault()
     const p = punt(e)
     sleepOffset.current = { x: p.x - plek.x, y: p.y - plek.y }
     setSleept(true)
-  }, [plek, isMobile])
+  }, [plek, isMobile, volledig])
 
   const sleepBeweeg = useCallback((e) => {
     const p = punt(e)
@@ -92,16 +95,24 @@ export default function useZwevendVenster({ isMobile, standaard = { w: 480, h: 6
     setGrootte(g)
     setPlek(midden(g))
     setIngeklapt(false)
+    setVolledig(false)
   }, [isMobile, standaard.w, standaard.h])
+
+  const wisselVolledig = useCallback(() => {
+    setVolledig(v => !v)
+    setIngeklapt(false)
+  }, [])
+
+  const vol = isMobile || volledig
 
   // Alles wat het venster zelf aan style nodig heeft, zodat de aanroeper
   // alleen nog zijn eigen kleuren toevoegt.
   const vensterStijl = {
     position: 'fixed',
-    left: isMobile ? 0 : plek.x,
-    top: isMobile ? 0 : plek.y,
-    width: isMobile ? '100vw' : grootte.w,
-    height: isMobile ? '100dvh' : (ingeklapt ? 'auto' : grootte.h),
+    left: vol ? 0 : plek.x,
+    top: vol ? 0 : plek.y,
+    width: vol ? '100vw' : grootte.w,
+    height: vol ? '100dvh' : (ingeklapt ? 'auto' : grootte.h),
     zIndex: 2147483000,
     isolation: 'isolate',
     display: 'flex',
@@ -112,17 +123,17 @@ export default function useZwevendVenster({ isMobile, standaard = { w: 480, h: 6
   }
 
   // Op de kop plakken: daarmee versleep je het venster.
-  const sleepHandvat = isMobile ? {} : {
+  const sleepHandvat = vol ? {} : {
     onMouseDown: sleepStart,
     onTouchStart: sleepStart,
     style: { cursor: sleept ? 'grabbing' : 'grab', userSelect: 'none' },
   }
 
   // Op het hoekje rechtsonder plakken.
-  const formaatHandvat = isMobile ? null : {
+  const formaatHandvat = vol ? null : {
     onMouseDown: schaalStarten,
     onTouchStart: schaalStarten,
   }
 
-  return { plek, grootte, ingeklapt, setIngeklapt, sleept, schaalt, herstel, vensterStijl, sleepHandvat, formaatHandvat }
+  return { plek, grootte, ingeklapt, setIngeklapt, volledig, wisselVolledig, sleept, schaalt, herstel, vensterStijl, sleepHandvat, formaatHandvat }
 }

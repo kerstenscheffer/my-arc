@@ -2,7 +2,7 @@
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink, CalendarCheck, Circle, CheckCircle2 } from 'lucide-react'
+import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink, CalendarCheck, CalendarDays, Circle, CheckCircle2 } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
@@ -14,6 +14,7 @@ import CoachingPeriodPanel from './CoachingPeriodPanel'
 import TrajectModal from './TrajectModal'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
+import AgendaVenster from './AgendaVenster'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
 import { fotoWeergaveUrl } from '../../progress/fotoWeergave'
 import PhotoCompareModal from '../../progress/components/PhotoCompareModal'
@@ -98,6 +99,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   }
   const [showNotify, setShowNotify] = useState(false)
   const [showIntake, setShowIntake] = useState(false)
+  const [showAgenda, setShowAgenda] = useState(false)
 
   const [localClient, setLocalClient] = useState(null)
   const [monthlyChecked, setMonthlyChecked] = useState(false)
@@ -355,6 +357,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={kopKnop()}>
                     <ClipboardCheck size={17} />
                   </button>
+                  <button onClick={() => setShowAgenda(v => !v)} title="Agenda" style={kopKnop()}>
+                    <CalendarDays size={17} />
+                  </button>
                   <button onClick={() => toggleSectie('logboek')} title="Logboek" style={kopKnop()}>
                     <BookOpen size={17} />
                   </button>
@@ -440,6 +445,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 )}
                 <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <ClipboardCheck size={17} />
+                </button>
+                <button onClick={() => setShowAgenda(v => !v)} title="Agenda" style={{ ...kopKnop(), width: 34, height: 34 }}>
+                  <CalendarDays size={17} />
                 </button>
                 <button onClick={() => toggleSectie('logboek')} title="Logboek" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <BookOpen size={17} />
@@ -722,6 +730,11 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </div>
           )}
         </div>
+      )}
+
+      {/* ═══ AGENDA (zwevend venster) ═══ */}
+      {showAgenda && effectiveClient && (
+        <AgendaVenster db={db} client={effectiveClient} isMobile={isMobile} onClose={() => setShowAgenda(false)} />
       )}
 
       {/* ═══ INTAKE SUMMARY MODAL ═══ */}
