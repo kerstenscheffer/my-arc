@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
+import { dagVenster, lokaleIso } from '../../utils/dagVenster'
 
 const DAYS_NL = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
 const DAYS_SHORT = ['ZO', 'MA', 'DI', 'WO', 'DO', 'VR', 'ZA']
@@ -28,14 +29,15 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today)
         date.setDate(today.getDate() - i)
-        const dateStr = date.toISOString().split('T')[0]
+        const dateStr = lokaleIso(date)
+        const { vanaf, tot } = dagVenster(date)
 
         const { data, error } = await db.supabase
           .from('consumed_meals')
           .select('meal_name, meal_type, calories, protein, carbs, fat, consumed_at, source')
           .eq('client_id', client.id)
-          .gte('consumed_at', `${dateStr}T00:00:00`)
-          .lt('consumed_at', `${dateStr}T23:59:59`)
+          .gte('consumed_at', vanaf)
+          .lt('consumed_at', tot)
           .order('consumed_at', { ascending: true })
 
         if (error) throw error

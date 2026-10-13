@@ -20,6 +20,7 @@ import MealSetupWizard from './components/wizard/MealSetupWizard'
 import MealDayNavHeader from './components/MealDayNavHeader'
 import MealDaySummaryModal from './components/MealDaySummaryModal'
 import MacroHero from './components/MacroHero'
+import { dagVenster } from './utils/dagVenster'
 import MealLogFAB from './components/MealLogFAB'
 import DonePanel from './components/DonePanel'
 import MoreActionsSheet from './components/MoreActionsSheet'
@@ -266,7 +267,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   }
   
   const calculateConsumedFromDB = async (data) => {
-    const today = new Date().toISOString().split('T')[0]
+    // Lokale dag, zelfde venster als de tijdlijn (zie utils/dagVenster).
+    const { vanaf, tot } = dagVenster(new Date())
    
     let totalConsumed = {
       calories: 0,
@@ -281,8 +283,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         .from('consumed_meals')
         .select('calories, protein, carbs, fat')
         .eq('client_id', client.id)
-        .gte('consumed_at', `${today}T00:00:00`)
-        .lt('consumed_at', `${today}T23:59:59`)
+        .gte('consumed_at', vanaf)
+        .lt('consumed_at', tot)
 
       if (!consumedError && consumedData) {
         consumedData.forEach(meal => {
@@ -841,7 +843,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           // Ook de week telt: dezelfde weekdag volgende week is niet vandaag.
           isToday={weekOffset === 0 && dayKeyToIndex(selectedDay) === getTodayIndex()}
           datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
-          onSaved={() => { setModals(prev => ({ ...prev, info: null })); loadDashboardData() }}
+          // Ook de ringen van een andere dag verversen: een aanpassing achteraf
+          // werkt de log van die dag bij, en MacroHero hield de oude som vast.
+          onSaved={() => { setModals(prev => ({ ...prev, info: null })); setPastDayRefreshKey(k => k + 1); loadDashboardData() }}
         />
       )}
       

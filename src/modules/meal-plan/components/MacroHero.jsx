@@ -11,6 +11,7 @@
 // Dag/Week-tabs zijn weggehaald — week-gem zit nu in MealDaySummaryModal.
 
 import React, { useEffect, useState } from 'react'
+import { dagVenster, lokaleIso } from '../utils/dagVenster'
 import MacroBoxes from '../../../client/components/MacroBoxes'
 
 const G = {
@@ -27,16 +28,14 @@ const fmt = (n) => Math.round(n || 0).toLocaleString('nl-NL')
 // Fetch totals for a specific day (used when looking at a non-today day).
 const fetchDayTotals = async (db, clientId, dateStr) => {
   if (!db?.supabase || !clientId || !dateStr) return null
-  // Use next-day midnight as upper bound to include the full last second.
-  const [yr, mo, dy] = dateStr.split('-').map(Number)
-  const nd = new Date(yr, mo - 1, dy + 1)
-  const nextDateStr = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}-${String(nd.getDate()).padStart(2, '0')}`
+  // Lokale dag, net als de tijdlijn eronder (zie utils/dagVenster).
+  const { vanaf, tot } = dagVenster(dateStr)
   const { data, error } = await db.supabase
     .from('consumed_meals')
     .select('calories, protein, carbs, fat')
     .eq('client_id', clientId)
-    .gte('consumed_at', `${dateStr}T00:00:00`)
-    .lt('consumed_at', `${nextDateStr}T00:00:00`)
+    .gte('consumed_at', vanaf)
+    .lt('consumed_at', tot)
   if (error) return null
   return (data || []).reduce((t, m) => ({
     calories: t.calories + (m.calories || 0),
@@ -46,11 +45,7 @@ const fetchDayTotals = async (db, clientId, dateStr) => {
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
 }
 
-const toIsoDate = (date) => {
-  if (!date) return null
-  const d = date instanceof Date ? date : new Date(date)
-  return d.toISOString().split('T')[0]
-}
+const toIsoDate = (date) => (date ? lokaleIso(date) : null)
 
 // ── Budget ring ───────────────────────────────────────────────────────────
 // Vult zich naarmate hij eet (consumed/target). In het midden: het aantal
