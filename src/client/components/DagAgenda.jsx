@@ -1437,7 +1437,9 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
           vast vak. Grijs = nog te doen, groen vinkje = gedaan. Maaltijd:
           vinkje. Training: play. Slaap: maantje, na loggen een groen vinkje
           (de uren staan dan zacht achter de naam). */}
-      <div style={{ flexShrink: 0, width: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Minstens 30 breed en rechts uitgelijnd: 'Log' + maan is breder dan
+          een kaal icoon en liep met een vaste breedte rechts de regel uit. */}
+      <div style={{ flexShrink: 0, minWidth: 30, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         {wegen?.kan ? (
           <ActieKnop
             gedaan={wegen.gelogd != null}
