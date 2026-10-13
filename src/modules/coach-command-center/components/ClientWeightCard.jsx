@@ -726,19 +726,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           dagCheck={{ gehad, bezig: checkBezig, onWissel: wisselDagCheck }}
           onOpenMealPanel={onOpenMealPanel}
           onOpenWorkoutPanel={onOpenWorkoutPanel}
-          onSwitchToClientView={(c) => {
-            localStorage.setItem('coachPreviewClientId', c.id)
-            localStorage.setItem('isClientMode', 'true')
-            // CoachHub gebruikt hash-tabs (bv. /#command). Alleen href='/' zetten
-            // verandert dan enkel de hash → geen volledige reload → App leest
-            // isClientMode niet opnieuw. Forceer daarom een echte reload.
-            if (window.location.pathname !== '/') {
-              window.location.href = '/'
-            } else {
-              window.location.hash = ''
-              window.location.reload()
-            }
-          }}
+          // Meekijken binnen je eigen CoachHub, op de pagina van deze klant.
+          // Eerst zette dit de hele app in klantmodus met een herlaadbeurt,
+          // en dat werkte niet (13 okt 2026).
+          onSwitchToClientView={(c) => { window.location.hash = `client-view:${c.id}` }}
         />,
         modalHost
       )}

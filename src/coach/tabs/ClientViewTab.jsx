@@ -22,8 +22,33 @@ export default function ClientViewTab({ db, isMobile }) {
   const [clients, setClients] = useState([])
   const [laden, setLaden] = useState(true)
   const [zoek, setZoek] = useState('')
-  const [gekozen, setGekozen] = useState(null)
+  // Een klant kan al meekomen in de hash: #client-view:<id>. Zo opent de
+  // knop in Coach Inzicht dit scherm meteen op die klant.
+  const idUitHash = () => {
+    const [tab, id] = window.location.hash.replace('#', '').split(':')
+    return tab === 'client-view' && id ? id : null
+  }
+  const [gekozen, setGekozen] = useState(() => { const id = idUitHash(); return id ? { id } : null })
   const [poging, setPoging] = useState(0)
+
+  useEffect(() => {
+    const opHash = () => { const id = idUitHash(); if (id) setGekozen(g => (g?.id === id ? g : { id })) }
+    window.addEventListener('hashchange', opHash)
+    return () => window.removeEventListener('hashchange', opHash)
+  }, [])
+
+  // Kwam de klant uit de hash, dan kennen we eerst alleen zijn id; de naam
+  // vullen we aan zodra de lijst er is.
+  useEffect(() => {
+    if (!gekozen?.id || gekozen.first_name || gekozen.email) return
+    const c = clients.find(x => x.id === gekozen.id)
+    if (c) setGekozen(c)
+  }, [clients, gekozen])
+
+  const sluit = () => {
+    setGekozen(null)
+    if (idUitHash()) window.history.replaceState(null, '', '#client-view')
+  }
 
   useEffect(() => {
     let leeft = true
@@ -169,7 +194,7 @@ export default function ClientViewTab({ db, isMobile }) {
           — je bent zelf ingelogd, dus wat je aanklikt telt als jou
         </span>
         <button
-          onClick={() => setGekozen(null)}
+          onClick={sluit}
           title="Andere klant kiezen"
           style={{
             marginLeft: 'auto', flexShrink: 0,

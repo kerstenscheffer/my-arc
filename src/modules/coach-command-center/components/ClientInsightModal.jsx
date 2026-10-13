@@ -2,7 +2,7 @@
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink, CalendarCheck, CalendarDays, Circle, CheckCircle2 } from 'lucide-react'
+import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink, CalendarCheck, CalendarDays, Circle, CheckCircle2, Eye } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
@@ -371,8 +371,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     <Bell size={17} strokeWidth={2.4} />
                   </button>
                   {onSwitchToClientView && (
-                    <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={kopKnop()}>
-                      <ExternalLink size={17} />
+                    <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Meekijken op de pagina van de klant" style={kopKnop()}>
+                      <Eye size={17} />
                     </button>
                   )}
                   <button onClick={onClose} title="Sluiten" style={kopKnop()}>
@@ -463,8 +463,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   <Bell size={17} strokeWidth={2.4} />
                 </button>
                 {onSwitchToClientView && (
-                  <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={{ ...kopKnop(), width: 34, height: 34 }}>
-                    <ExternalLink size={17} />
+                  <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Meekijken op de pagina van de klant" style={{ ...kopKnop(), width: 34, height: 34 }}>
+                    <Eye size={17} />
                   </button>
                 )}
                 <button onClick={onClose} title="Sluiten" style={{ ...kopKnop(), width: 36, height: 36 }}>
