@@ -45,12 +45,71 @@ async function stopAlsTweedeBetaling(invoice) {
   }
 }
 
+// Abonnementen met een afgesproken looptijd ("3-months", "4-months",
+// "6-months" in de metadata) stoppen vanzelf na precies zoveel termijnen.
+// Checkout Sessions kennen geen cancel_at, dus dat zetten we hier zodra het
+// abonnement bestaat. We lezen het abonnement altijd opnieuw bij Stripe op
+// (de webhook-body wordt niet ondertekend gecontroleerd), en raken alleen
+// verse abonnementen zonder cancel_at aan — bestaande blijven zoals ze zijn.
+const EEN_UUR = 3600;
+const MAX_LEEFTIJD = 2 * 24 * 3600; // ouder dan twee dagen: niet aankomen
+
+export function maandenUitDuur(duur) {
+  const m = String(duur || '').trim().match(/^(\d{1,2})[-\s]?(months?|maanden?|mnd)$/i);
+  const n = m ? parseInt(m[1], 10) : NaN;
+  return n >= 1 && n <= 36 ? n : null;
+}
+
+// Moment van de (N+1)e verlenging: anker + N kalendermaanden (UTC). Een uur
+// ervoor stoppen, zodat Stripe op de grens geen nieuwe factuur meer maakt
+// (zelfde marge als het 2-termijnen-plan).
+export function stopMomentNa(anker, maanden) {
+  const d = new Date(anker * 1000);
+  const dag = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + maanden);
+  // 31 jan + 1 maand = 28/29 feb, niet 3 maart (zo rekent Stripe ook).
+  const laatste = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(dag, laatste));
+  return Math.floor(d.getTime() / 1000) - EEN_UUR;
+}
+
+async function zetEinddatum(subId, bron) {
+  if (!subId) return;
+  try {
+    const sub = await stripe.subscriptions.retrieve(subId);
+    if (sub.metadata?.plan === PLAN_2X) return;           // heeft eigen stop
+    if (sub.cancel_at || sub.cancel_at_period_end || sub.status === 'canceled') return;
+    if (Date.now() / 1000 - (sub.created || 0) > MAX_LEEFTIJD) {
+      console.log('Einddatum: abonnement te oud, niet aangepast', subId);
+      return;
+    }
+    const maanden = maandenUitDuur(sub.metadata?.duration);
+    if (!maanden) {
+      console.log(`Einddatum: geen of onbekende duration ("${sub.metadata?.duration ?? ''}") op ${subId} (${bron}), niets aangepast`);
+      return;
+    }
+    const anker = sub.billing_cycle_anchor || sub.start_date || sub.created;
+    const cancelAt = stopMomentNa(anker, maanden);
+    await stripe.subscriptions.update(subId, { cancel_at: cancelAt, proration_behavior: 'none' });
+    console.log(`Einddatum: ${subId} stopt na ${maanden} termijnen, cancel_at ${new Date(cancelAt * 1000).toISOString()}`);
+  } catch (e) {
+    console.error('Einddatum zetten mislukt:', subId, e.message);
+  }
+}
+
 // Service key komt uitsluitend uit Vercel env (SUPABASE_SERVICE_KEY). Hier
 // stond tot 10 okt 2026 de echte service_role-sleutel als fallback, in een
 // openbare repo. Nooit meer een sleutel in code: alleen env-variabelen.
+// SUPABASE_URL is op Vercel-prod kapot (rommel eromheen, zie public-intake.js);
+// createClient gooit daarop bij het laden en dan crasht de hele webhook. Neem
+// de eerste geldige URL.
+const SUPABASE_URL = [process.env.SUPABASE_URL, process.env.VITE_SUPABASE_URL]
+  .map(v => String(v || '').trim().replace(/^["']|["']$/g, ''))
+  .find(v => /^https?:\/\/\S+$/.test(v)) || 'https://xlaycpwpnhjmulfsnynh.supabase.co';
 const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://xlaycpwpnhjmulfsnynh.supabase.co',
-  process.env.SUPABASE_SERVICE_KEY
+  SUPABASE_URL,
+  String(process.env.SUPABASE_SERVICE_KEY || '').trim() || 'ontbreekt'
 );
 
 export default async function handler(req, res) {
@@ -59,15 +118,33 @@ export default async function handler(req, res) {
   }
 
   try {
-    const event = req.body;
+    // Echtheid: de body wordt niet ondertekend gecontroleerd (geen ruwe body
+    // in deze Vercel-functie). Daarom halen we het event zelf opnieuw op bij
+    // Stripe op basis van het id. Een verzonnen POST heeft geen geldig id en
+    // wordt geweigerd; een echte krijgt de inhoud zoals Stripe die kent.
+    const id = req.body?.id;
+    if (!id || !/^evt_/.test(id)) return res.status(400).json({ error: 'Geen event-id' });
+    let event;
+    try {
+      event = await stripe.events.retrieve(id);
+    } catch (e) {
+      console.warn('Webhook: event niet bij Stripe gevonden, genegeerd:', id, e.message);
+      return res.status(400).json({ error: 'Onbekend event' });
+    }
     console.log('Webhook received:', event.type);
 
     switch (event.type) {
       // Payment events
       case 'checkout.session.completed':
-        await handleCheckoutCompleted(event.data.object);
+        // handleCheckoutCompleted (payments-rij + automatisch een klantrecord
+        // zonder coach) staat uit: klanten komen via de intake (/myintake) en
+        // omzet via het leadbord. Deze webhook stond tot 13 okt 2026 uit in
+        // Stripe; aanzetten zou anders dubbele klanten opleveren.
         if (event.data.object?.metadata?.plan === PLAN_2X) {
           await stopNaTweedeTermijn(event.data.object);
+        } else if (event.data.object?.subscription) {
+          // Vangnet als customer.subscription.created gemist werd.
+          await zetEinddatum(event.data.object.subscription, 'checkout.session.completed');
         }
         break;
       
@@ -77,6 +154,8 @@ export default async function handler(req, res) {
       
       // Subscription events
       case 'customer.subscription.created':
+        // Eerst de einddatum: de opslag hieronder kan falen, de stop niet.
+        await zetEinddatum(event.data.object?.id, 'customer.subscription.created');
         await handleSubscriptionCreated(event.data.object);
         break;
       
@@ -112,7 +191,8 @@ export default async function handler(req, res) {
 // ONE-TIME PAYMENT HANDLERS
 // ============================================
 
-async function handleCheckoutCompleted(session) {
+// Uitgeschakeld (zie checkout.session.completed hierboven); bewaard voor als het terug moet.
+async function _handleCheckoutCompleted(session) {
   console.log('Processing checkout:', session.id);
   
   try {
