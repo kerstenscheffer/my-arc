@@ -185,23 +185,25 @@ export default function KrachtBlad({ db, client, isMobile }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: isMobile ? '0.92rem' : '1rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.naam}</div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {o.laatste.ruwGewicht} kg × {o.laatste.reps} · {kort(o.laatste.datum)} · {o.aantal}×
+                    {/* Regel 1: wat er op de stang lag, eerste training → laatste.
+                        Zelfde gewicht? Dan zie je het aan de herhalingen. */}
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
+                      {o.aantal < 2
+                        ? `${nl1(o.laatste.ruwGewicht)} kg × ${o.laatste.reps}`
+                        : Number(o.eerste.ruwGewicht) === Number(o.laatste.ruwGewicht)
+                          ? `${nl1(o.laatste.ruwGewicht)} kg: ${o.eerste.reps} → ${o.laatste.reps} herhalingen`
+                          : `${nl1(o.eerste.ruwGewicht)} kg × ${o.eerste.reps} → ${nl1(o.laatste.ruwGewicht)} kg × ${o.laatste.reps}`}
                     </div>
-                    <div style={{ fontSize: '0.64rem', fontWeight: 800, color: kleur, marginTop: 3 }}>
+                    {/* Regel 2: over hoeveel trainingen en welke periode. */}
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {o.aantal < 2
+                        ? `1 training · ${kort(o.laatste.datum)}`
+                        : `${o.aantal} trainingen · ${kort(o.eerste.datum)} – ${kort(o.laatste.datum)}`}
+                    </div>
+                    {/* Regel 3: het oordeel tegen de norm van de fase. */}
+                    <div style={{ fontSize: '0.66rem', fontWeight: 800, color: kleur, marginTop: 3 }}>
                       {o.oordeel ? oordeelTekst(o.oordeel, o.norm) : 'Eén training, nog geen verloop'}{o.isPR ? ' · PR' : ''}
                     </div>
-                    {/* Wat het verschil op de stang betekent: de echte beste set
-                        van de eerste training naast die van de laatste. Zelfde
-                        gewicht? Dan zie je het aan de herhalingen. */}
-                    {o.aantal > 1 && (
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
-                        {Number(o.eerste.ruwGewicht) === Number(o.laatste.ruwGewicht)
-                          ? `Op ${nl1(o.laatste.ruwGewicht)} kg: ${o.eerste.reps} → ${o.laatste.reps} herhalingen`
-                          : `${nl1(o.eerste.ruwGewicht)} kg × ${o.eerste.reps} → ${nl1(o.laatste.ruwGewicht)} kg × ${o.laatste.reps}`}
-                        <span style={{ color: 'rgba(255,255,255,0.4)' }}> · sinds {kort(o.eerste.datum)}</span>
-                      </div>
-                    )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{nl1(o.laatste.gewicht)}<span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)', letterSpacing: 0 }}> kg</span></div>
