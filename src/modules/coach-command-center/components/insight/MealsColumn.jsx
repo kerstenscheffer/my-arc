@@ -191,7 +191,8 @@ const BRON_ICOON = {
   plan: ClipboardCheck, wissel: Repeat, aangepast: Pencil, database: Database, barcode: ScanBarcode,
   extern: Search, eigen: ChefHat, zelf: Keyboard, opnieuw: History, bewerkt: Pencil, onbekend: UtensilsCrossed,
 }
-// Wat jij klaarzette (plan, wissel, aanpassing) in goud; wat de klant zelf
+// Wat jij klaarzette (plan, wissel, aanpassing) in groen (Kersten: geen goud
+// in deze sectie, accent = groen); wat de klant zelf
 // vond of bedacht neutraal. Zo zie je in één oogopslag hoeveel er uit het
 // plan komt.
 const uitPlan = (bron) => bron === 'plan' || bron === 'wissel' || bron === 'aangepast'
@@ -203,8 +204,8 @@ function BronPill({ bron }) {
     <span title={BRONNEN[bron]?.uitleg} style={{
       display: 'inline-flex', alignItems: 'center', gap: 4, height: 18, padding: '0 7px',
       borderRadius: radius.pill,
-      border: `1px solid ${goud ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.18)'}`,
-      color: goud ? colors.accent : 'rgba(255,255,255,0.75)',
+      border: `1px solid ${goud ? 'rgba(34,197,94,0.5)' : 'rgba(255,255,255,0.18)'}`,
+      color: goud ? colors.success : 'rgba(255,255,255,0.75)',
       fontSize: '0.6rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em',
       whiteSpace: 'nowrap',
     }}>
@@ -513,7 +514,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
               <button
                 onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
                 title="Plan Analyzer" aria-label="Plan Analyzer"
-                style={{ ...secundaireKnop, padding: 0, width: 44, border: `1px solid ${colors.accent}`, color: colors.accent }}
+                style={{ ...secundaireKnop, padding: 0, width: 44, border: '1px solid rgba(34,197,94,0.6)', color: colors.success }}
               >
                 <BarChart3 size={17} strokeWidth={2.6} />
               </button>
@@ -544,7 +545,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             return (
               <div key={wk} style={{ marginTop: '0.6rem' }}>
                 <div style={{ padding: pad, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 900, color: colors.accent, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{weekNaam(wk)}</span>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{weekNaam(wk)}</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 800, color: colors.textMuted, fontVariantNumeric: 'tabular-nums' }}>{dagen.length} {dagen.length === 1 ? 'dag' : 'dagen'} · gem. {gem.toLocaleString('nl-NL')} kcal</span>
                 </div>
                 {dagen.map(dag => {
@@ -562,9 +563,9 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                       display: 'block', width: '100%', margin: 0,
                       padding: isMobile ? '0.7rem 0.9rem' : '0.75rem 1.1rem',
                       textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                      background: dag === vandaagSleutel ? 'rgba(255,215,0,0.05)' : colors.surface,
+                      background: dag === vandaagSleutel ? 'rgba(34,197,94,0.06)' : colors.surface,
                       border: 'none', borderBottom: `1px solid ${colors.borderSubtle}`,
-                      borderLeft: `3px solid ${dag === vandaagSleutel ? colors.accent : 'transparent'}`,
+                      borderLeft: `3px solid ${dag === vandaagSleutel ? colors.success : 'transparent'}`,
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -587,7 +588,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                             {mixLijst.map(([b, n]) => {
                               const Icoon = BRON_ICOON[b] || UtensilsCrossed
                               return (
-                                <span key={b} title={BRONNEN[b]?.tekst} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.68rem', fontWeight: 800, color: uitPlan(b) ? colors.accent : colors.textSecondary }}>
+                                <span key={b} title={BRONNEN[b]?.tekst} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.68rem', fontWeight: 800, color: uitPlan(b) ? colors.success : colors.textSecondary }}>
                                   <Icoon size={11} strokeWidth={2.6} /> {n} {BRONNEN[b]?.tekst.toLowerCase()}
                                 </span>
                               )
