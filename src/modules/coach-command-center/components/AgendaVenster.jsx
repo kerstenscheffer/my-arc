@@ -11,11 +11,18 @@ import { useModalHost } from '../../../coach/ModalHost'
 import useZwevendVenster from '../../../components/useZwevendVenster'
 import ClientAgendaView from '../../client-agenda/ClientAgendaView'
 
+// Breed genoeg voor de hele week naast elkaar; op een kleiner scherm de
+// breedte van het scherm min een randje.
+const STANDAARD = {
+  w: Math.min(1180, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 48),
+  h: 800,
+}
+
 export default function AgendaVenster({ db, client, isMobile, onClose }) {
   const modalHost = useModalHost()
   const {
     ingeklapt, setIngeklapt, volledig, wisselVolledig, vensterStijl, sleepHandvat, formaatHandvat,
-  } = useZwevendVenster({ isMobile, standaard: { w: 760, h: 760 } })
+  } = useZwevendVenster({ isMobile, standaard: STANDAARD })
   const naam = [client?.first_name, client?.last_name].filter(Boolean).join(' ').trim()
 
   const venster = (
