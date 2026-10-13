@@ -33,6 +33,14 @@ export default async function handler(req, res) {
       }
     }
 
+    // Eenmalige betaling: klant + betaalmiddel bewaren voor latere afschrijving
+    // (kaart als kaart, iDEAL als SEPA-incasso). Abonnementen doen dit al zelf.
+    // Zelfde instelling als create-checkout-session.js.
+    if (isOneTime) {
+      sessionConfig.customer_creation = 'always'
+      sessionConfig.payment_intent_data = { setup_future_usage: 'off_session' }
+    }
+
     // Add subscription metadata only for subscriptions
     if (!isOneTime) {
       sessionConfig.subscription_data = {

@@ -32,13 +32,13 @@ export default async function handler(req, res) {
           quantity: 1,
         }];
 
-    // 6 Weken Challenge (eenmalig): de betaling is een borg. Klant +
+    // Elke eenmalige betaling (o.a. de borg van de 6 Weken Challenge): klant +
     // betaalmiddel bewaren, zodat er later zonder dat de klant erbij is
-    // afgeschreven kan worden (off_session). Op het niveau van de betaling, niet
+    // afgeschreven kan worden (off_session). Abonnementen doen dit al zelf. Op het niveau van de betaling, niet
     // per methode: zo bewaart Stripe een kaart als kaart en een iDEAL-betaling
     // als SEPA-incasso. Per methode weigert Stripe het voor iDEAL ("must be
     // none"); top-level wordt geaccepteerd (beide getest 13 okt 2026 op live).
-    const isBorg = checkoutMode === 'payment' && plan === '6-week-challenge';
+    const isBorg = checkoutMode === 'payment';
     const borgVelden = isBorg ? {
       customer_creation: 'always',
       payment_intent_data: { setup_future_usage: 'off_session' },
