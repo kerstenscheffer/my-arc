@@ -298,31 +298,31 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                       één rij keuzes; de streepjes ertussen houden ze uit elkaar
                       zonder dat er vakjes omheen hoeven. Aan/uit blijft: elke
                       aangezette sectie komt er als kolom bij. */}
-                  <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                    {SECTIES.map((sec, i) => {
+                  {/* Als iconen: korter dan de woorden, de naam staat in de
+                      tooltip. Aan = wit op een licht vlak, uit = gedimd. */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                    {SECTIES.map((sec) => {
                       const aan = openSecties.includes(sec.id)
+                      const Icoon = sec.icon
                       return (
-                        <React.Fragment key={sec.id}>
-                          {i > 0 && (
-                            <span aria-hidden style={{
-                              width: 1, height: 12, background: 'rgba(255,255,255,0.14)', flexShrink: 0,
-                            }} />
-                          )}
-                          <button
-                            onClick={() => toggleSectie(sec.id)}
-                            title={aan ? `${sec.label} verbergen` : `${sec.label} erbij`}
-                            style={{
-                              background: 'none', border: 'none', padding: '0.3rem 0.6rem',
-                              color: aan ? '#fff' : 'rgba(255,255,255,0.4)',
-                              fontSize: '0.78rem', fontWeight: aan ? 900 : 700,
-                              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-                              letterSpacing: '-0.01em',
-                              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                            }}
-                          >
-                            {sec.label}
-                          </button>
-                        </React.Fragment>
+                        <button
+                          key={sec.id}
+                          onClick={() => toggleSectie(sec.id)}
+                          title={aan ? `${sec.label} verbergen` : `${sec.label} erbij`}
+                          aria-label={sec.label}
+                          aria-pressed={aan}
+                          style={{
+                            width: 36, height: 36, padding: 0, borderRadius: 10,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
+                            border: 'none',
+                            color: aan ? '#fff' : 'rgba(255,255,255,0.4)',
+                            cursor: 'pointer',
+                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          }}
+                        >
+                          <Icoon size={18} strokeWidth={aan ? 2.6 : 2.2} />
+                        </button>
                       )
                     })}
                   </div>
