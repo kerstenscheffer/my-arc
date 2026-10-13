@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import CustomExerciseModal from './CustomExerciseModal'
 import ExerciseService from '../../../../../services/ExerciseService'
 import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
+import { logPlanWijziging } from '../../../services/planWijzigingLog'
 
 const getFallbackImage = (exercise) => {
   const muscles = (exercise.primair_spieren || '').toLowerCase()
@@ -275,6 +276,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
       await WorkoutServiceNew.saveWeeklyOverride(
         client.id, schema.id, workoutDayKey, exerciseIndex, updatedExercise, db
       )
+      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'wissel_week', oefening: newExercise.name, was: exercise._originalName || exercise.name })
 
       const coachId = client?.coach_id || client?.trainer_id
       if (coachId) {
@@ -330,11 +332,13 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
         // oefening "was: X", ook na een permanente wissel.
         _originalName: exercise._originalName || exercise.name,
         _swappedAt: new Date().toISOString(),
+        _doorKlant: true,
       }
       // Schrijf permanent naar schema
       await db.updateExerciseInSchema(schema.id, workoutDayKey, exerciseIndex, updatedExercise)
       // Verwijder de weekly override als die bestaat
       await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, exerciseIndex, db)
+      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'wissel_permanent', oefening: newExercise.name, was: exercise.name })
 
       const coachId = client?.coach_id || client?.trainer_id
       if (coachId) {

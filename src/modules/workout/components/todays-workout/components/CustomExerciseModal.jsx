@@ -3,6 +3,7 @@ import { X, Search, AlertCircle, CheckCircle, Camera, Image, BookmarkPlus, Zap }
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import ExerciseService from '../../../../../services/ExerciseService'
+import { logPlanWijziging } from '../../../services/planWijzigingLog'
 
 export default function CustomExerciseModal({ onClose, onSave, client, db, schema }) {
   const isMobile = window.innerWidth <= 768
@@ -131,7 +132,8 @@ export default function CustomExerciseModal({ onClose, onSave, client, db, schem
             reps: savedExercise.reps, rust: savedExercise.rust,
             primairSpieren: savedExercise.primairSpieren,
             equipment: savedExercise.equipment,
-            image_url: savedExercise.image_url, type: 'custom'
+            image_url: savedExercise.image_url, type: 'custom',
+            _doorKlant: true, _toegevoegdAt: new Date().toISOString(),
           }]
         }
       }
@@ -141,6 +143,7 @@ export default function CustomExerciseModal({ onClose, onSave, client, db, schem
         .eq('id', schema.id)
 
       if (error) throw error
+      logPlanWijziging(db, { client, schema, dayKey: selectedDay, soort: 'toegevoegd', oefening: savedExercise.name })
       if (navigator.vibrate) navigator.vibrate(50)
       onSave({ ...savedExercise, _addedToDay: selectedDay })
     } catch (error) {

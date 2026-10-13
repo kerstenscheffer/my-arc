@@ -4,7 +4,7 @@
 // Props: { workoutData, exerciseProgress, isMobile, onNavigateWorkout, client, onClose }
 // ============================================
 import React, { useState, useMemo, useEffect } from 'react'
-import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight } from 'lucide-react'
+import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward } from 'lucide-react'
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
@@ -62,6 +62,63 @@ const KAART = {
   borderRadius: 12, overflow: 'hidden', position: 'relative',
 }
 const SECTIEKOP = { padding: '0.3rem 0.9rem 0.45rem', fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }
+
+// Wat de klant zelf aan zijn plan veranderde (client_plan_changes): wissels,
+// toevoegingen, weghalen, overslaan. Met "door klant" erbij, zodat je ziet dat
+// het niet jouw plan meer is zoals jij het maakte (Kersten, 13 okt 2026).
+const SOORT = {
+  wissel_week: { icoon: ArrowLeftRight, tekst: (r) => `${r.was || '?'} → ${r.oefening || '?'}`, sub: 'gewisseld voor deze week' },
+  wissel_permanent: { icoon: ArrowLeftRight, tekst: (r) => `${r.was || '?'} → ${r.oefening || '?'}`, sub: 'permanent gewisseld' },
+  toegevoegd: { icoon: Plus, tekst: (r) => r.oefening || 'Oefening', sub: 'permanent in plan gezet' },
+  toegevoegd_week: { icoon: Plus, tekst: (r) => r.oefening || 'Oefening', sub: 'toegevoegd' },
+  verwijderd: { icoon: Trash2, tekst: (r) => r.oefening || 'Oefening', sub: 'uit plan gehaald' },
+  overgeslagen: { icoon: SkipForward, tekst: (r) => r.oefening || 'Oefening', sub: 'overgeslagen deze week' },
+}
+
+function PlanWijzigingen({ db, client, isMobile }) {
+  const [rijen, setRijen] = useState([])
+  const [alles, setAlles] = useState(false)
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) { setRijen([]); return }
+    db.supabase.from('client_plan_changes')
+      .select('id, day_key, dag_naam, soort, oefening, was, door, created_at')
+      .eq('client_id', client.id)
+      .order('created_at', { ascending: false })
+      .limit(40)
+      .then(({ data }) => setRijen(data || []), () => setRijen([]))
+  }, [client?.id, db])
+  if (!rijen.length) return null
+  const zichtbaar = alles ? rijen : rijen.slice(0, 5)
+  return (
+    <div style={{ marginBottom: '0.4rem' }}>
+      <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Aangepast in plan</div>
+      {zichtbaar.map(r => {
+        const m = SOORT[r.soort] || SOORT.toegevoegd
+        const Icoon = m.icoon
+        const datum = new Date(r.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+        return (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: isMobile ? '0.45rem 0.9rem' : '0.5rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <Icoon size={14} strokeWidth={2.6} color="#fff" style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.tekst(r)}</div>
+              <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {m.sub}{r.dag_naam ? ` · ${r.dag_naam}` : ''} · {datum}
+              </div>
+            </div>
+            <span style={{ flexShrink: 0, fontSize: '0.6rem', fontWeight: 900, color: r.door === 'coach' ? 'rgba(255,255,255,0.5)' : '#fff', border: `1px solid ${r.door === 'coach' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)'}`, borderRadius: 999, padding: '2px 7px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              door {r.door === 'coach' ? 'coach' : 'klant'}
+            </span>
+          </div>
+        )
+      })}
+      {rijen.length > 5 && (
+        <button onClick={() => setAlles(v => !v)} style={{ background: 'none', border: 'none', padding: '0.4rem 0.9rem', color: 'rgba(255,255,255,0.55)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {alles ? 'Minder tonen' : `Alle ${rijen.length} tonen`}
+        </button>
+      )}
+    </div>
+  )
+}
 
 export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose }) {
   const [view, setView] = useState('sessions')
@@ -297,6 +354,8 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <StappenInsight db={db} client={client} isMobile={isMobile} />
           {/* Cardio die de client zelf logt (cardio_logs) — read-only voor coach */}
           <CardioInsightBlock db={db} client={client} isMobile={isMobile} />
+          {/* Wat de klant zelf aan het plan veranderde, met "door klant" erbij. */}
+          <PlanWijzigingen db={db} client={client} isMobile={isMobile} />
           {workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
           {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => {
             const parsed = parseSessionNote(w.notes)
@@ -512,7 +571,7 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
                 {selectedSession._wissels?.[String(ex.name || '').trim().toLowerCase()] && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2, fontSize: '0.7rem', fontWeight: 800, color: '#f59e0b' }}>
                     <ArrowLeftRight size={11} strokeWidth={2.6} />
-                    Gewisseld · was {selectedSession._wissels[String(ex.name || '').trim().toLowerCase()]}
+                    Gewisseld door klant · was {selectedSession._wissels[String(ex.name || '').trim().toLowerCase()]}
                   </div>
                 )}
                 {ex.sets?.length > 0 ? (

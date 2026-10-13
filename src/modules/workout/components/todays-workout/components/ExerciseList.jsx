@@ -5,6 +5,7 @@ import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
 import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
+import { logPlanWijziging } from '../../../services/planWijzigingLog'
 
 // De kop boven een blok oefeningen. In de schema's staat het veld bijna altijd
 // in het Engels ('chest', 'triceps'), maar er zit ook een handvol Nederlands
@@ -78,12 +79,15 @@ export default function ExerciseList({
     if (error) throw error
   }
 
-  const handleAddExercise = async (newExercise) => {
+  const handleAddExercise = async (binnen) => {
     try {
+      // Gemarkeerd als door de klant toegevoegd: de coach ziet het in het inzicht.
+      const newExercise = binnen._addedToDay ? binnen : { ...binnen, _doorKlant: true, _toegevoegdAt: new Date().toISOString() }
       const updatedExercises = [...localExercises, newExercise]
       setLocalExercises(updatedExercises)
       if (!newExercise._addedToDay) {
         await saveExercises(updatedExercises)
+        logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: newExercise._pendingPermanent ? 'toegevoegd_week' : 'toegevoegd', oefening: newExercise.name })
       }
       if (navigator.vibrate) navigator.vibrate([50, 100, 50])
       setShowAddModal(false)
@@ -97,9 +101,11 @@ export default function ExerciseList({
 
   const handleDelete = async (index) => {
     try {
+      const weg = localExercises[index]
       const updatedExercises = localExercises.filter((_, i) => i !== index)
       setLocalExercises(updatedExercises)
       await saveExercises(updatedExercises)
+      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'verwijderd', oefening: weg?.name })
       // Week-overrides hangen aan de index; alles achter de verwijderde
       // oefening schuift een plek op.
       if (client?.id && schema?.id && workoutDayKey) {
@@ -125,6 +131,7 @@ export default function ExerciseList({
       client.id, schema.id, workoutDayKey, index, { ...bron, _overgeslagen: true }, db
     )
     if (!bewaard) throw new Error('niet opgeslagen')
+    logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'overgeslagen', oefening: bron?.name })
     setLocalExercises(prev => prev.map((ex, i) => i === index ? { ...ex, _overgeslagen: true } : ex))
     if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
   }
@@ -159,9 +166,10 @@ export default function ExerciseList({
   const handleMakePermanent = async (index) => {
     try {
       const updatedExercises = localExercises.map((ex, i) =>
-        i === index ? { ...ex, _pendingPermanent: false } : ex
+        i === index ? { ...ex, _pendingPermanent: false, _doorKlant: true, _toegevoegdAt: ex._toegevoegdAt || new Date().toISOString() } : ex
       )
       await saveExercises(updatedExercises)
+      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'toegevoegd', oefening: localExercises[index]?.name })
       setLocalExercises(updatedExercises)
       if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
     } catch (e) {
