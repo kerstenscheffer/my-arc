@@ -239,9 +239,6 @@ function bouwDagen(rijen, wissels) {
   return uit
 }
 
-const kaart = {
-  background: colors.surface, border: `1px solid ${colors.borderSubtle}`, borderRadius: 14,
-}
 const secundaireKnop = {
   minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
   padding: '0 14px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: radius.btn,
@@ -312,9 +309,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     carbs: client.target_carbs || 0, fat: client.target_fat || 0,
   } : null)
   const vandaagSleutel = sleutelVan(new Date())
-  const today = dailyLog[vandaagSleutel] || { calories: 0, protein: 0, carbs: 0, fat: 0 }
   const days = useMemo(() => Object.keys(dailyLog).sort((a, b) => (a < b ? 1 : -1)), [dailyLog])
-  const laatste7 = days.filter(d => d > sleutelVan(dagenTerug(7))).length
 
   const pct = (val, target) => target > 0 ? Math.min(100, Math.round((val / target) * 100)) : 0
   // Binnen 10% van het doel is op doel (groen = behaald); verder eraf blijft wit.
@@ -502,73 +497,41 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     <>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '1.5rem' }}>
-          {/* Kop: titel + het Inzicht-scherm dat de klant ook heeft. */}
-          <div style={{ padding: isMobile ? '0.75rem 0.9rem 0' : '0.9rem 1.1rem 0', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Eén regel: welk plan actief is, met Plan Analyzer, Genereer en
+              het Inzicht-scherm van de klant. Geen kaart eromheen. */}
+          <div style={{ padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Voeding</div>
-              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: colors.textSecondary }}>
-                {laatste7} van de laatste 7 dagen gelogd
+              <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {mealData.plan ? (mealData.plan.name || 'Voedingsplan') : 'Nog geen plan'}
+              </div>
+              <div style={{ fontSize: '0.66rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: mealData.plan?.isActive ? colors.success : colors.textMuted, marginTop: 1 }}>
+                {mealData.plan ? (mealData.plan.isActive ? 'Actief' : 'Concept') : 'Voedingsplan'}
+                {laden && <span style={{ color: colors.textMuted, textTransform: 'none', letterSpacing: 0, fontWeight: 700 }}> · laden…</span>}
               </div>
             </div>
+            {onNavigatePlan && (
+              <button
+                onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
+                title="Plan Analyzer" aria-label="Plan Analyzer"
+                style={{ ...secundaireKnop, padding: 0, width: 44, border: `1px solid ${colors.accent}`, color: colors.accent }}
+              >
+                <BarChart3 size={17} strokeWidth={2.6} />
+              </button>
+            )}
+            {onNavigatePlan && db && (
+              <button onClick={() => setShowGenerateModal(true)} title="Automatisch plan genereren" aria-label="Plan genereren" style={{ ...secundaireKnop, padding: 0, width: 44 }}>
+                <Zap size={17} strokeWidth={2.6} />
+              </button>
+            )}
             <button onClick={() => setStatsOpen(true)} style={secundaireKnop} title="Maand- en dagoverzicht, zoals de klant het ziet">
               <CalendarDays size={15} strokeWidth={2.6} /> Inzicht
             </button>
           </div>
 
-          <div style={{ padding: isMobile ? '0.8rem 0.9rem 0' : '0.9rem 1.1rem 0', fontSize: '0.66rem', fontWeight: 900, color: colors.accent, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vandaag</div>
-          {targets ? (
-            <MacroBar items={[
-              { label: 'Kcal', val: Math.round(today.calories), target: targets.calories },
-              { label: 'Eiwit', val: Math.round(today.protein), target: targets.protein },
-              { label: 'Koolh', val: Math.round(today.carbs), target: targets.carbs },
-              { label: 'Vet', val: Math.round(today.fat), target: targets.fat },
-            ]} />
-          ) : (
-            <div style={{ padding: pad, margin: '0.6rem 0', fontSize: '0.78rem', fontWeight: 700, color: colors.textMuted }}>
-              Nog geen macrodoelen. Maak een plan, dan zie je hier hoe vandaag ervoor staat.
-            </div>
-          )}
-
-          {/* Plan + acties */}
-          {onNavigatePlan && (
-            <div style={{ ...kaart, margin: isMobile ? '0 0.9rem 0.75rem' : '0 1.1rem 0.85rem', padding: '0.75rem 0.85rem' }}>
-              <div style={{ fontSize: '0.62rem', fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Voedingsplan</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {mealData.plan ? (mealData.plan.name || 'Mealplan') : 'Nog geen plan'}
-                </span>
-                {mealData.plan && (
-                  <span style={{ fontSize: '0.66rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: mealData.plan.isActive ? colors.success : colors.textMuted }}>
-                    {mealData.plan.isActive ? 'Actief' : 'Concept'}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: '0.65rem' }}>
-                <button
-                  onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
-                  style={{ ...secundaireKnop, flex: 1, border: `1px solid ${colors.accent}`, color: colors.accent }}
-                >
-                  <BarChart3 size={15} strokeWidth={2.6} /> Plan Analyzer
-                </button>
-                {db && (
-                  <button onClick={() => setShowGenerateModal(true)} title="Automatisch plan genereren" style={secundaireKnop}>
-                    <Zap size={15} strokeWidth={2.6} /> Genereer
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Waterdoel — in liters op de klant (clients.water_intake_target). De
               fles op de maaltijdpagina rekent daarmee; 3 liter is de standaard
               als je niets invult. */}
           <WaterDoel client={client} db={db} isMobile={isMobile} />
-
-          {/* ── Gelogd, per dag ── */}
-          <div style={{ padding: isMobile ? '1.1rem 0.9rem 0.25rem' : '1.25rem 1.1rem 0.3rem', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={kopje}>Gelogd</span>
-            {laden && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: colors.textMuted }}>laden…</span>}
-          </div>
 
           {days.length === 0 && !laden ? (
             <div style={{ padding: pad, fontSize: '0.8rem', fontWeight: 700, color: colors.textMuted, lineHeight: 1.45 }}>
@@ -596,10 +559,12 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                   const datum = vanSleutel(dag)
                   return (
                     <button key={dag} onClick={() => { setSelectedDay(dag); setView('detail') }} style={{
-                      ...kaart, display: 'block', width: `calc(100% - ${isMobile ? '1.8rem' : '2.2rem'})`,
-                      margin: isMobile ? '0 0.9rem 6px' : '0 1.1rem 6px', padding: '0.65rem 0.8rem',
+                      display: 'block', width: '100%', margin: 0,
+                      padding: isMobile ? '0.7rem 0.9rem' : '0.75rem 1.1rem',
                       textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                      border: `1px solid ${dag === vandaagSleutel ? 'rgba(255,215,0,0.45)' : colors.borderSubtle}`,
+                      background: dag === vandaagSleutel ? 'rgba(255,215,0,0.05)' : colors.surface,
+                      border: 'none', borderBottom: `1px solid ${colors.borderSubtle}`,
+                      borderLeft: `3px solid ${dag === vandaagSleutel ? colors.accent : 'transparent'}`,
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
