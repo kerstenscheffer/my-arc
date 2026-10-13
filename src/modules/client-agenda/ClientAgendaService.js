@@ -549,6 +549,8 @@ export class ClientAgendaService {
               image_url: meal.image_url || null,
               icon: meal.icon || null,
               mealPlanId: mealPlan.id,
+              // Mee de log in bij afvinken, zodat de coach ziet wat erin zat.
+              ingredients: Array.isArray(meal.ingredients_list) ? meal.ingredients_list : [],
             },
           })
         })

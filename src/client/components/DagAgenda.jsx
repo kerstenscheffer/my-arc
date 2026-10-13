@@ -549,6 +549,7 @@ export default function DagAgenda({
       meal_id: blok.sourceId || null,
       meal_type: String(blok.meta?.slot || '').replace(/\d+$/, '') || null,
       ...macro,
+      ingredients: Array.isArray(blok.meta?.ingredients) ? blok.meta.ingredients : [],
       amount: 1,
       per_unit: 'portion',
       consumed_at: nuIso.toISOString(),

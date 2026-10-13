@@ -298,13 +298,49 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
   const meerTerug = eersteLog && new Date(eersteLog) < vanaf
   const laadOuder = () => setVanaf(v => { const d = new Date(v); d.setDate(d.getDate() - STAP_DAGEN); return d })
 
+  // Wat zat erin, en wat heeft de klant veranderd? Een log vanuit de agenda
+  // kreeg tot 13 okt geen ingrediënten mee. Dan vallen we terug op de
+  // aangepaste versie van die dag (ai_meal_progress.edited_meal) en anders op
+  // het recept zelf. Het recept is ook de maat voor de aanpassingen.
+  const [infoBron, setInfoBron] = useState(null)     // 'log' | 'aangepast' | 'recept'
+  const [infoVerschil, setInfoVerschil] = useState(null) // [{ soort, name, van, naar, unit }]
   const openInfo = async (meal) => {
     setInfoMeal(meal)
-    setInfoIngredienten(null)
-    const uit = await schrijfIngredientenUit(db, meal.ingredients)
+    setInfoIngredienten(null); setInfoBron(null); setInfoVerschil(null)
+    let recept = null, aangepast = null
+    if (meal.meal_id && db?.supabase) {
+      const dag = sleutelVan(new Date(meal.time))
+      const [r, p] = await Promise.all([
+        db.supabase.from('ai_meals').select('ingredients_list').eq('id', meal.meal_id).maybeSingle().then(x => x, () => ({ data: null })),
+        db.supabase.from('ai_meal_progress').select('consumed_meals').eq('client_id', client.id).eq('date', dag).maybeSingle().then(x => x, () => ({ data: null })),
+      ])
+      recept = Array.isArray(r.data?.ingredients_list) && r.data.ingredients_list.length ? r.data.ingredients_list : null
+      const slot = Object.values(p.data?.consumed_meals || {}).find(v => v?.meal_id === meal.meal_id && Array.isArray(v?.edited_meal?.ingredients_list))
+      aangepast = slot?.edited_meal?.ingredients_list?.length ? slot.edited_meal.ingredients_list : null
+    }
+    const gelogd = meal.ingredients?.length ? meal.ingredients : null
+    const gebruikt = gelogd || aangepast || recept || []
+    const [uit, receptUit] = await Promise.all([
+      schrijfIngredientenUit(db, gebruikt),
+      recept && gebruikt !== recept ? schrijfIngredientenUit(db, recept) : Promise.resolve(null),
+    ])
     setInfoIngredienten(uit)
+    setInfoBron(gelogd ? 'log' : aangepast ? 'aangepast' : recept ? 'recept' : null)
+    if (receptUit) {
+      const sleutel = (x) => String(x.name || '').trim().toLowerCase()
+      const nu = new Map(uit.map(x => [sleutel(x), x]))
+      const was = new Map(receptUit.map(x => [sleutel(x), x]))
+      const verschil = []
+      receptUit.forEach(o => {
+        const n = nu.get(sleutel(o))
+        if (!n) verschil.push({ soort: 'weg', name: o.name, van: o.amount, unit: o.unit })
+        else if (Math.round(n.amount) !== Math.round(o.amount)) verschil.push({ soort: 'anders', name: o.name, van: o.amount, naar: n.amount, unit: n.unit })
+      })
+      uit.forEach(n => { if (!was.has(sleutel(n))) verschil.push({ soort: 'erbij', name: n.name, naar: n.amount, unit: n.unit }) })
+      setInfoVerschil(verschil)
+    }
   }
-  const sluitInfo = () => { setInfoMeal(null); setInfoIngredienten(null) }
+  const sluitInfo = () => { setInfoMeal(null); setInfoIngredienten(null); setInfoBron(null); setInfoVerschil(null) }
 
   // De doelen van de klant zelf (clients.target_*), dezelfde als de macroringen
   // in de gewichtsectie. Eerst stonden hier de daily_*-getallen van het nieuwste
@@ -460,8 +496,30 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                 </div>
               )}
 
+              {/* Wat de klant veranderde ten opzichte van het recept. */}
+              {infoVerschil?.length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>
+                    Aanpassingen t.o.v. het recept
+                  </div>
+                  {infoVerschil.map((v, i) => (
+                    <div key={`${v.name}-${i}`} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '0.4rem 0', borderBottom: i < infoVerschil.length - 1 ? `1px solid ${colors.borderSubtle}` : 'none' }}>
+                      <span style={{ width: 44, flexShrink: 0, fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: v.soort === 'erbij' ? colors.success : v.soort === 'weg' ? colors.danger : 'rgba(255,255,255,0.6)' }}>
+                        {v.soort === 'erbij' ? 'Erbij' : v.soort === 'weg' ? 'Weg' : 'Anders'}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.name}</span>
+                      <span style={{ flexShrink: 0, fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', fontVariantNumeric: 'tabular-nums' }}>
+                        {v.soort === 'anders'
+                          ? `${Math.round(v.van)} → ${Math.round(v.naar)}${eenheid(v.unit)}`
+                          : v.soort === 'weg' ? `${Math.round(v.van)}${eenheid(v.unit)}` : `${Math.round(v.naar)}${eenheid(v.unit)}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>
-                Ingrediënten
+                Ingrediënten{infoBron === 'aangepast' ? ' · aangepaste versie van die dag' : infoBron === 'recept' ? ' · volgens het recept' : ''}
               </div>
               {infoIngredienten === null ? (
                 <div style={{ padding: '1rem 0', color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem' }}>Laden…</div>
