@@ -360,7 +360,9 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
 
         {stap === 4 && (
           <>
-            {vraag('Hoeveel uur heb je denk je echt geslapen?')}
+            {vraag(berekend != null
+              ? `Je zei van ${bed} tot ${opstaan}, dat is ${nlUren(berekend)} uur. Hoeveel heb je daarvan echt geslapen?`
+              : 'Hoeveel uur heb je echt geslapen?')}
             <div style={{ marginBottom: 4 }}>
               <HorizontaleSlider
                 waarden={Array.from({ length: 33 }, (_, i) => i / 2)}
@@ -371,7 +373,7 @@ export function SlaapLogBlad({ open, onClose, client, db, datum = null, voorBed 
               />
             </div>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 18, lineHeight: 1.4 }}>
-              (Lag je wakker?)
+              Lag je een tijd wakker? Trek dat eraf.
             </div>
             <button onClick={() => setStap(5)} style={primair}>Volgende</button>
           </>

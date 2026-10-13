@@ -1260,6 +1260,8 @@ function TijdStempel({ blok, onTijd, kleur }) {
 // dat je nodig hebt om te zien waar je bent.
 // Slaapblok: nog niet gelogd → witte knop 'Log' om het te stimuleren;
 // gelogd → uren en cijfer in groen. Tik op het getal om het bij te werken.
+// Paars-blauw voor de maan: zo zie je dat je je slaap hier kunt loggen.
+const SLAAP_PAARS = '#a78bfa'
 const nl1 = (n) => String(Math.round(Number(n) * 10) / 10).replace('.', ',')
 function SlaapActie({ slaap, compact = false }) {
   if (!slaap?.kan) return null
@@ -1278,7 +1280,7 @@ function SlaapActie({ slaap, compact = false }) {
   }
   return (
     <button onClick={(e) => { e.stopPropagation(); slaap.onLog() }} title="Slaap loggen" aria-label="Slaap loggen" style={{ ...knop, color: '#fff' }}>
-      <Moon size={compact ? 11 : 14} strokeWidth={2.6} /> Log
+      Log <Moon size={compact ? 11 : 14} strokeWidth={2.6} color={SLAAP_PAARS} />
     </button>
   )
 }
@@ -1293,7 +1295,9 @@ const VIER_CSS = `
 @keyframes arcVinkRing { 0% { transform: scale(0.4); opacity: 0.9 } 100% { transform: scale(2.4); opacity: 0 } }
 @keyframes arcVinkVonk { 0% { transform: rotate(var(--hoek)) translateY(0) scale(1); opacity: 1 } 100% { transform: rotate(var(--hoek)) translateY(-22px) scale(0.3); opacity: 0 } }
 `
-function ActieKnop({ gedaan, titel, onClick, icoon }) {
+// `label` + `kleur`: zolang hij nog niet gedaan is staat er een woord voor
+// het icoon ('Log') en krijgt het icoon een eigen kleur (slaap: paars).
+function ActieKnop({ gedaan, titel, onClick, icoon, label = null, kleur = null }) {
   const Icoon = icoon
   const vorige = useRef(gedaan)
   // Alleen vieren als je zelf op deze knop tikte (binnen twee minuten: slaap
@@ -1314,8 +1318,9 @@ function ActieKnop({ gedaan, titel, onClick, icoon }) {
       onClick={(e) => { e.stopPropagation(); aangetikt.current = Date.now(); window.__arcLaatsteTik = Date.now(); onClick?.() }}
       title={titel} aria-label={titel}
       style={{
-        ...kaartKnop, width: 30, height: 30, position: 'relative', overflow: 'visible',
-        color: gedaan ? '#10b981' : 'rgba(255,255,255,0.6)',
+        ...kaartKnop, width: label && !gedaan ? 'auto' : 30, height: 30, position: 'relative', overflow: 'visible',
+        ...(label && !gedaan ? { gap: 5, padding: '0 2px' } : {}),
+        color: gedaan ? '#10b981' : (kleur || 'rgba(255,255,255,0.6)'),
       }}
     >
       <style>{VIER_CSS}</style>
@@ -1334,6 +1339,7 @@ function ActieKnop({ gedaan, titel, onClick, icoon }) {
           ))}
         </span>
       )}
+      {label && !gedaan && <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>{label}</span>}
       <span key={`ic-${vier}`} style={{ display: 'flex', animation: bezigMetVieren && gedaan ? 'arcVinkPop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1)' : 'none' }}>
         <Icoon size={18} strokeWidth={2.8} />
       </span>
@@ -1445,6 +1451,8 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
             titel={slaap.gelogd ? 'Slaap bijwerken' : 'Slaap loggen'}
             onClick={slaap.onLog}
             icoon={slaap.gelogd ? Check : Moon}
+            label="Log"
+            kleur={SLAAP_PAARS}
           />
         ) : onAfronden ? (
           <ActieKnop
