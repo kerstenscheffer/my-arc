@@ -307,11 +307,12 @@ export default function MealCard({
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Waar?</span>
-                    {[{ b: 'day', t: 'Alleen deze dag' }, { b: 'all', t: 'Elke dag' }].map(k => (
+                    {[{ b: 'day', t: 'Alleen deze dag' }, { b: 'all', t: 'Overal waar deze maaltijd staat' }].map(k => (
                       <button key={k.b} onClick={() => {
                         const nieuw = naamEdit.trim()
                         setNaamEdit(null); setNaamKeuze(false)
-                        if (nieuw && onUpdateMeal) onUpdateMeal(dayIndex, slot, { ...meal, name: nieuw, meal_name: nieuw }, k.b)
+                        // Alleen de naam: de rest (porties, tijd) blijft per dag zoals hij was.
+                        if (nieuw && onUpdateMeal) onUpdateMeal(dayIndex, slot, { ...meal, name: nieuw, meal_name: nieuw }, k.b, ['name', 'meal_name'])
                       }} style={naamKnop(k.b === 'all')}>{k.t}</button>
                     ))}
                   </div>
@@ -582,7 +583,10 @@ export default function MealCard({
           onClose={() => setMomentOpen(null)}
           onSave={(label, tijd, bereik) => {
             setMomentOpen(null)
-            onUpdateMeal && onUpdateMeal(dayIndex, slot, { ...meal, display_label: label, timing: tijd || meal.timing }, bereik)
+            // Alleen label en tijd, en 'Overal' = waar deze maaltijd staat. Dit
+            // was 'dit moment op elke dag', en dan werd elk diner van de week
+            // vervangen door de maaltijd van deze dag (13 okt 2026).
+            onUpdateMeal && onUpdateMeal(dayIndex, slot, { ...meal, display_label: label, timing: tijd || meal.timing }, bereik, ['display_label', 'timing'])
           }}
         />,
         modalHost
@@ -666,7 +670,7 @@ function scalerBtnStyle(m, disabled, color) {
 }
 
 // Moment van de maaltijd aanpassen: soort (Ontbijt, Lunch, Pre workout…) en
-// tijd, voor alleen deze dag of voor dit moment op elke dag.
+// tijd, voor alleen deze dag of overal waar deze maaltijd in de week staat.
 function MomentVenster({ label, tijd, isMobile, pos, onClose, onSave }) {
   // Klein venster direct onder de foto (of erboven als er onder te weinig
   // ruimte is), binnen het scherm gehouden. Niet meer midden in beeld.
@@ -695,7 +699,7 @@ function MomentVenster({ label, tijd, isMobile, pos, onClose, onSave }) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <button onClick={() => onSave(l, t, 'day')} style={{ minHeight: 34, borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'inherit', fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer' }}>Alleen deze dag</button>
-          <button onClick={() => onSave(l, t, 'slot')} style={{ minHeight: 34, borderRadius: 8, background: '#fff', border: 'none', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer' }}>Elke dag</button>
+          <button onClick={() => onSave(l, t, 'all')} style={{ minHeight: 34, borderRadius: 8, background: '#fff', border: 'none', color: '#0a0a0a', fontFamily: 'inherit', fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer' }}>Overal waar hij staat</button>
         </div>
       </div>
     </div>

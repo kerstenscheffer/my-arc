@@ -1184,13 +1184,20 @@ export default function PlanAnalyzer({
   // bereik 'all' (standaard, ook voor kleine inline-wijzigingen zoals tijd
   // of label): overal in de week waar dezelfde maaltijd staat.
   // bereik 'day': alleen dit slot op deze dag.
-  const handleUpdateMeal = async (dayIndex, slot, updatedMeal, bereik = 'all') => {
+  //
+  // `velden`: alleen deze velden overnemen (naam, of label + tijd). Zonder dit
+  // ging de hele maaltijd van de open dag — porties, macro's, tijd — over de
+  // andere dagen heen, ook waar diezelfde maaltijd anders geschaald stond.
+  const handleUpdateMeal = async (dayIndex, slot, updatedMeal, bereik = 'all', velden = null) => {
     if (!weekData) return
     const updated = [...weekData]
     // Bij "Kopie" heeft updatedMeal een NIEUWE id; we matchen dan op de oude
     // (_replacesMealId) zodat de nieuwe meal de oude in het plan vervangt.
-    const { _replacesMealId, ...cleanMeal } = updatedMeal
-    const matchingMealId = _replacesMealId || cleanMeal.meal_id || cleanMeal.id
+    const { _replacesMealId, ...volledig } = updatedMeal
+    const matchingMealId = _replacesMealId || volledig.meal_id || volledig.id
+    const cleanMeal = Array.isArray(velden)
+      ? Object.fromEntries(velden.filter(k => k in volledig).map(k => [k, volledig[k]]))
+      : volledig
 
     // 'slot': dit slot op elke dag, ongeacht welke maaltijd erin staat.
     // Voor de labels (Diner, Lunch, Pre workout): die horen bij het moment,
@@ -1209,10 +1216,17 @@ export default function PlanAnalyzer({
       if (!m) return
       updated[dayIndex] = { ...updated[dayIndex], meals: { ...updated[dayIndex].meals, [slot]: { ...m, ...cleanMeal } } }
       updated[dayIndex].totals = calculateTotals(updated[dayIndex].meals)
-      await applyWeekUpdate(updated, `Aangepast: ${cleanMeal.name} (${DAYS[dayIndex]?.full || 'één dag'})`)
+      await applyWeekUpdate(updated, `Aangepast: ${volledig.name || volledig.meal_name || 'maaltijd'} (${DAYS[dayIndex]?.full || 'één dag'})`)
       return
     }
 
+    // De open plek zelf altijd, ook als de maaltijd geen id heeft (dan matcht
+    // hieronder niets en gebeurde er voorheen helemaal niets).
+    const eigen = updated[dayIndex]?.meals?.[slot]
+    if (eigen) {
+      updated[dayIndex] = { ...updated[dayIndex], meals: { ...updated[dayIndex].meals, [slot]: { ...eigen, ...cleanMeal } } }
+      updated[dayIndex].totals = calculateTotals(updated[dayIndex].meals)
+    }
     // Update alle slots in de hele week die dezelfde meal_id hebben
     updated.forEach((day, di) => {
       Object.entries(day.meals).forEach(([s, m]) => {
@@ -1228,7 +1242,7 @@ export default function PlanAnalyzer({
       })
     })
 
-    await applyWeekUpdate(updated, `Aangepast: ${cleanMeal.name} (alle dagen)`)
+    await applyWeekUpdate(updated, `Aangepast: ${volledig.name || volledig.meal_name || 'maaltijd'} (overal waar hij staat)`)
   }
 
   // Na opslaan in de bewerk-modal (of de portie-schaler) eerst vragen waar
