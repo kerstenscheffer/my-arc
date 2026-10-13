@@ -25,6 +25,7 @@ import { supabase } from '../lib/supabase'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
 import VideoReminderPopup from './components/VideoReminderPopup'
 import CheckinModal from './components/CheckinModal'
+import AccountOpSlot from './components/AccountOpSlot'
 import ClientAgendaView from '../modules/client-agenda/ClientAgendaView'
 
 // Lucide Icons
@@ -94,6 +95,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   }, [currentView])
   const [user, setUser] = useState(null)
   const [client, setClient] = useState(null)
+  // Account op slot (coaching gestopt): de klant ziet alleen het slotscherm.
+  const [opSlot, setOpSlot] = useState(false)
   const [schema, setSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showCheckinModal, setShowCheckinModal] = useState(false)
@@ -195,6 +198,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       }
 
       if (!clientData) { setError('Client account niet gevonden voor: ' + authUser.email); setLoading(false); return }
+      // Op slot geldt alleen voor de klant zelf; de coach die meekijkt ziet
+      // gewoon zijn app.
+      setOpSlot(!!clientData.account_locked_at && !previewClientId && !uitSleutel)
       setClient(clientData)
       if (clientData.assigned_schema_id) {
         try { const schemaData = await db.getClientSchema(clientData.id); setSchema(schemaData) }
@@ -216,14 +222,14 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   // Health, daarna leest het alleen nog. En telkens als de app terugkomt van de
   // achtergrond, want tussendoor loop je door.
   useEffect(() => {
-    if (!client?.id) return
+    if (!client?.id || opSlot) return
     syncStappen(db, client.id, { bijOpstart: true })
     const opVoorgrond = () => {
       if (document.visibilityState === 'visible') syncStappen(db, client.id)
     }
     document.addEventListener('visibilitychange', opVoorgrond)
     return () => document.removeEventListener('visibilitychange', opVoorgrond)
-  }, [client?.id])
+  }, [client?.id, opSlot])
 
   // ── Auth-refresh na login op ander apparaat ──
   // Na een TOKEN_REFRESHED-event is de sessie op dit apparaat bijgewerkt maar
@@ -245,6 +251,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   }
 
   if (loading) return <LaadScherm />
+  if (opSlot && client) return <AccountOpSlot client={client} onLogout={handleLogout} />
 
   if (error) {
     return (

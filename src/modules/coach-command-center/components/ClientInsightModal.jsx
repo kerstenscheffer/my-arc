@@ -339,7 +339,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    Looptijd
+                    Looptijd{effectiveClient.account_locked_at && <span style={{ color: '#ef4444', fontWeight: 900 }}> · op slot</span>}
                     <ChevronDown size={13} strokeWidth={2.6} style={{
                       transform: looptijdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s',
                     }} />
@@ -472,7 +472,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                Looptijd
+                Looptijd{effectiveClient.account_locked_at && <span style={{ color: '#ef4444', fontWeight: 900 }}> · op slot</span>}
                 <ChevronDown size={12} strokeWidth={2.6} style={{
                   transform: looptijdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s',
                 }} />

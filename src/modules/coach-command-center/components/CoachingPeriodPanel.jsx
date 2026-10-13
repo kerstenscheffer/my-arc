@@ -13,7 +13,7 @@ import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   Clock, Play, Pause, Square, Settings, Check, X, AlertCircle,
-  Calendar, Hourglass, CalendarPlus,
+  Calendar, Hourglass, CalendarPlus, Lock, LockOpen,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 
@@ -147,6 +147,25 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     } finally { setBusy(false) }
   }
 
+  // Account op slot: de klant ziet in zijn app alleen een pauzescherm, maar
+  // alles blijft bewaard. Ontgrendelen zet de app terug zoals hij was.
+  const opSlot = !!client.account_locked_at
+  const wisselSlot = async () => {
+    const zetten = !opSlot
+    if (zetten && !window.confirm('Account op slot zetten?\n\nDe klant ziet in de app alleen een pauzescherm en krijgt geen meldingen meer. Alle data blijft bewaard.')) return
+    setBusy(true)
+    try {
+      const payload = zetten
+        ? { account_locked_at: new Date().toISOString(), coaching_status: 'ended', coaching_paused_at: null, coaching_pause_reason: null }
+        : { account_locked_at: null, account_locked_reason: null }
+      const { error } = await supabase.from('clients').update(payload).eq('id', client.id)
+      if (error) throw error
+      onClientUpdate?.(payload)
+    } catch (err) {
+      console.error('Slot wisselen mislukt:', err); alert('Opslaan mislukt')
+    } finally { setBusy(false) }
+  }
+
   const reopenCoaching = async () => {
     setBusy(true)
     try {
@@ -163,9 +182,15 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
   if (!period && !editing && onTraject) {
     return (
       <div style={panelShell(null, isMobile)}>
-        <button onClick={() => onTraject('start')} style={{ ...primaryBtnStyle(false), height: 36, minHeight: 36 }}>
-          <Clock size={14} strokeWidth={2.8} /> Startdatum en looptijd instellen
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => onTraject('start')} style={{ ...primaryBtnStyle(false), height: 36, minHeight: 36 }}>
+            <Clock size={14} strokeWidth={2.8} /> Startdatum en looptijd instellen
+          </button>
+          <span style={{ flex: 1 }} />
+          <button onClick={wisselSlot} disabled={busy} title={opSlot ? 'Account ontgrendelen' : 'Account op slot (coaching gestopt)'} style={{ ...ikoonKnop(opSlot ? '#ef4444' : undefined), width: 'auto', padding: '0 0.4rem', gap: 4, fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit' }}>
+            {opSlot ? <><LockOpen size={15} /> Ontgrendel</> : <Lock size={15} />}
+          </button>
+        </div>
       </div>
     )
   }
@@ -280,6 +305,11 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
             <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
               {sm.label}
             </span>
+            {opSlot && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.82rem', fontWeight: 900, color: '#ef4444', whiteSpace: 'nowrap' }}>
+                <Lock size={12} strokeWidth={2.8} /> op slot
+              </span>
+            )}
             {client.payment_plan && paymentMeta(client.payment_plan) && (
               <>
                 <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>·</span>
@@ -344,6 +374,9 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
                 <Play size={15} />
               </button>
             )}
+            <button onClick={wisselSlot} disabled={busy} title={opSlot ? 'Account ontgrendelen' : 'Account op slot (coaching gestopt)'} style={ikoonKnop(opSlot ? '#ef4444' : undefined)}>
+              {opSlot ? <LockOpen size={15} /> : <Lock size={15} />}
+            </button>
             <button onClick={() => setEditing(true)} title="Periode aanpassen" style={ikoonKnop()}>
               <Settings size={15} />
             </button>
