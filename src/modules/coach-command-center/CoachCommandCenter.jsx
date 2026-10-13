@@ -35,6 +35,8 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   // een deelname loopt van datum tot datum en zegt niets over de klant zelf.
   const [challengeIds, setChallengeIds] = useState(() => new Set())
   const [challengeFilter, setChallengeFilter] = useState('all')
+  // Afgevinkt vandaag (het rondje op de kaart): 'open' = nog langs, 'gedaan' = al gehad.
+  const [vinkFilter, setVinkFilter] = useState('all')
   const [stats, setStats] = useState(snapshot?.stats || { total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
   const [showAddClient, setShowAddClient] = useState(false)
@@ -300,9 +302,18 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   const gehadVandaag = actieveKlanten.filter(c => c.dagCheck?.dagen?.includes(vandaagStr)).length
   const nogTeGaan = actieveKlanten.length - gehadVandaag
 
+  const isGehad = (c) => !!c.dagCheck?.dagen?.includes(vandaagStr)
+  // Tellers in het menu binnen de gekozen status, zodat ze kloppen met de lijst.
+  const binnenStatus = clientsWithData.filter(c => statusFilter === 'all' || c.status === statusFilter)
+  const vinkGedaan = binnenStatus.filter(isGehad).length
+  const vinkOpen = binnenStatus.length - vinkGedaan
+
   const filteredClients = clientsWithData.filter(client => {
     if (statusFilter !== 'all' && client.status !== statusFilter) return false
     if (challengeFilter === 'challenge' && !challengeIds.has(client.id)) return false
+    // Vóór de urgentie-switch: die returnt zelf.
+    if (vinkFilter === 'open' && isGehad(client)) return false
+    if (vinkFilter === 'gedaan' && !isGehad(client)) return false
     if (searchQuery && !`${client.first_name} ${client.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())) return false
     if (urgencyFilter !== 'all' && client.status === 'active') {
       const ws = client.weightData?.weightStatus || 'unknown'
@@ -387,6 +398,9 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             <Keuze vast waarde={urgencyFilter} zet={setUrgencyFilter} isMobile={isMobile}
               opties={[{ id: 'all', label: `Alle urgenties · ${stats.active}` }, { id: 'urgent', label: `Urgent · ${stats.urgent}` }, { id: 'warning', label: `Aandacht · ${stats.warning}` }, { id: 'ok', label: `Op schema · ${stats.ok}` }]} />
           </>)}
+          <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+          <Keuze vast waarde={vinkFilter} zet={setVinkFilter} isMobile={isMobile}
+            opties={[{ id: 'all', label: 'Vinkjes' }, { id: 'open', label: `Nog langs · ${vinkOpen}` }, { id: 'gedaan', label: `Afgevinkt · ${vinkGedaan}` }]} />
           {challengeIds.size > 0 && (<>
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
             <Keuze vast waarde={challengeFilter} zet={setChallengeFilter} isMobile={isMobile} uitlijning="rechts"
@@ -514,7 +528,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             </div>
           )}
 
-          {(statusFilter !== 'active' || urgencyFilter !== 'all' || challengeFilter !== 'all' || searchQuery) && (
+          {(statusFilter !== 'active' || urgencyFilter !== 'all' || challengeFilter !== 'all' || vinkFilter !== 'all' || searchQuery) && (
             <div style={{ padding: isMobile ? '0.375rem 1rem' : '0.375rem 2rem', fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               {filteredClients.length} van {stats.total}{searchQuery && ` · "${searchQuery}"`}
             </div>
