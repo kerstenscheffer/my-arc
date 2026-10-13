@@ -32,7 +32,19 @@ export default async function handler(req, res) {
           quantity: 1,
         }];
 
-    const session = await stripe.checkout.sessions.create({
+    // 6 Weken Challenge (eenmalig): de betaling is een borg. Klant +
+    // betaalmiddel bewaren, zodat er later zonder dat de klant erbij is
+    // afgeschreven kan worden (off_session). Op het niveau van de betaling, niet
+    // per methode: zo bewaart Stripe een kaart als kaart en een iDEAL-betaling
+    // als SEPA-incasso. Per methode weigert Stripe het voor iDEAL ("must be
+    // none"); top-level wordt geaccepteerd (beide getest 13 okt 2026 op live).
+    const isBorg = checkoutMode === 'payment' && plan === '6-week-challenge';
+    const borgVelden = isBorg ? {
+      customer_creation: 'always',
+      payment_intent_data: { setup_future_usage: 'off_session' },
+    } : {};
+
+    const basis = {
       // iDEAL ondersteunt geen recurring; subscriptions dus alleen kaart.
       payment_method_types: checkoutMode === 'subscription' ? ['card'] : ['card', 'ideal'],
       line_items: lineItems,
@@ -46,7 +58,9 @@ export default async function handler(req, res) {
         customer_name: name || '',
         customer_phone: phone || '',
       }
-    });
+    };
+
+    const session = await stripe.checkout.sessions.create({ ...basis, ...borgVelden });
 
     res.status(200).json({ sessionId: session.id, url: session.url });
   } catch (error) {
