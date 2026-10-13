@@ -305,10 +305,29 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
   }
   const sluitInfo = () => { setInfoMeal(null); setInfoIngredienten(null) }
 
-  const targets = mealData.targets || (client?.target_calories ? {
-    calories: client.target_calories || 0, protein: client.target_protein || 0,
-    carbs: client.target_carbs || 0, fat: client.target_fat || 0,
-  } : null)
+  // De doelen van de klant zelf (clients.target_*), dezelfde als de macroringen
+  // in de gewichtsectie. Eerst stonden hier de daily_*-getallen van het nieuwste
+  // plan voorop; die lopen achter zodra je de ringen bijstelt, en dan kleurde
+  // een dag die net goed zat als "boven het doel". Vers opgehalen, want de
+  // client-prop kan van vóór de laatste aanpassing zijn.
+  const [klantDoel, setKlantDoel] = useState(null)
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return
+    let weg = false
+    const lees = () => db.supabase.from('clients')
+      .select('target_calories, target_protein, target_carbs, target_fat').eq('id', client.id).maybeSingle()
+      .then(({ data }) => { if (!weg && data) setKlantDoel(data) }, () => {})
+    lees()
+    // Stel je de ringen bij terwijl dit openstaat, dan volgt dit meteen.
+    const bijgewerkt = (e) => { if (e?.detail?.clientId === client.id) lees() }
+    window.addEventListener('myarc:macros-gewijzigd', bijgewerkt)
+    return () => { weg = true; window.removeEventListener('myarc:macros-gewijzigd', bijgewerkt) }
+  }, [db, client?.id])
+  const doelBron = klantDoel || client
+  const targets = Number(doelBron?.target_calories) > 0 ? {
+    calories: Math.round(Number(doelBron.target_calories) || 0), protein: Math.round(Number(doelBron.target_protein) || 0),
+    carbs: Math.round(Number(doelBron.target_carbs) || 0), fat: Math.round(Number(doelBron.target_fat) || 0),
+  } : (mealData.targets || null)
   const vandaagSleutel = sleutelVan(new Date())
   const days = useMemo(() => Object.keys(dailyLog).sort((a, b) => (a < b ? 1 : -1)), [dailyLog])
 
