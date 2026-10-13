@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import MealDaySummaryModal from '../../../meal-plan/components/MealDaySummaryModal'
 import { BRONNEN, bronVan, wisselsPerDag } from '../../../meal-plan/utils/logBron'
+import { kcalKleur } from '../../../meal-plan/utils/kcalKleur'
 import { colors, radius } from '../../../../ui/tokens'
 import GeneratePlanModal from './GeneratePlanModal'
 import MealCard from '../../../meal-plan/components/day-schedule/MealCard'
@@ -570,7 +571,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                 {dagen.map(dag => {
                   const d = dailyLog[dag]
                   const kcal = Math.round(d.calories)
-                  const goed = targets && opDoel(kcal, targets.calories)
+                  const kleur = targets ? kcalKleur(kcal, targets.calories, '#fff') : '#fff'
                   // Hoeveel uit het plan, en wat de klant zelf deed, als
                   // icoontjes met aantallen: de mix van de dag in één regel.
                   const mix = {}
@@ -594,13 +595,13 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                            <span style={{ fontSize: '0.95rem', fontWeight: 900, color: goed ? colors.success : '#fff', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{kcal.toLocaleString('nl-NL')}</span>
+                            <span style={{ fontSize: '0.95rem', fontWeight: 900, color: kleur, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{kcal.toLocaleString('nl-NL')}</span>
                             <span style={{ fontSize: '0.7rem', fontWeight: 800, color: colors.textMuted }}>{targets ? `/ ${Math.round(targets.calories).toLocaleString('nl-NL')} kcal` : 'kcal'}</span>
                             <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary, fontVariantNumeric: 'tabular-nums' }}>E {Math.round(d.protein)}g</span>
                           </div>
                           {targets?.calories > 0 && (
                             <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct(kcal, targets.calories)}%`, background: goed ? colors.success : 'rgba(255,255,255,0.7)', borderRadius: 2 }} />
+                              <div style={{ height: '100%', width: `${pct(kcal, targets.calories)}%`, background: kleur, borderRadius: 2 }} />
                             </div>
                           )}
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginTop: 6 }}>

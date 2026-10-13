@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays } from 'lucide-react'
 import { foodImageFallback } from '../foodImageFallback'
+import { kcalKleur } from '../utils/kcalKleur'
 
 const LIJN = 'rgba(255,255,255,0.08)'
 const GROEN = '#10b981'
@@ -36,14 +37,8 @@ const vanSleutel = (s) => { const [y, m, d] = s.split('-').map(Number); return n
 const maandagVan = (d) => { const m = new Date(d); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m }
 const plusDagen = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
 
-// Hoe ligt de inname tegen het doel? Binnen 10% = op doel.
-const kcalKleur = (waarde, doel) => {
-  if (!doel || !waarde) return 'rgba(255,255,255,0.35)'
-  const r = waarde / doel
-  if (r >= 0.9 && r <= 1.1) return GROEN
-  if (r > 1.1) return ROOD
-  return ORANJE
-}
+// Hoe ligt de inname tegen het doel? Tot 100 kcal ernaast (nog groen) = op doel.
+// Op het verschil in kcal, met een vloeiende overgang: zie utils/kcalKleur.js.
 
 function MacroBalk({ label, waarde, doel }) {
   const pct = doel > 0 ? Math.min(100, (waarde / doel) * 100) : 0
@@ -155,7 +150,7 @@ export default function MealDaySummaryModal({
     kcal: gelogdeDagen.reduce((t, w) => t + w.kcal, 0) / gelogdeDagen.length,
     eiwit: gelogdeDagen.reduce((t, w) => t + w.eiwit, 0) / gelogdeDagen.length,
   } : null
-  const opDoel = doel.kcal ? gelogdeDagen.filter(w => w.kcal >= doel.kcal * 0.9 && w.kcal <= doel.kcal * 1.1).length : 0
+  const opDoel = doel.kcal ? gelogdeDagen.filter(w => Math.abs(w.kcal - doel.kcal) <= 100).length : 0
   const staafMax = Math.max(doel.kcal * 1.25, ...week.map(w => w.kcal), 1)
 
   // Reeks: dagen op rij met logs, tot en met vandaag (of gisteren als je
@@ -326,9 +321,13 @@ export default function MealDaySummaryModal({
                 </div>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.9rem', marginTop: '0.7rem', fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: GROEN }} />op doel (±10%)</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: ORANJE }} />onder</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: ROOD }} />boven</span>
+                {/* Kleur = hoeveel kcal ernaast, eronder of erboven. */}
+                {[['±50', 50], ['±100', 100], ['±200', 200], ['300+', 300]].map(([tekst, af]) => (
+                  <span key={tekst} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: kcalKleur(1000 + af, 1000) }} />{tekst}
+                  </span>
+                ))}
+                <span>kcal ernaast</span>
                 {doel.kcal > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, borderTop: '1px dashed rgba(255,255,255,0.5)' }} />doel</span>}
               </div>
 
