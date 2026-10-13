@@ -253,7 +253,7 @@ export default function MealDaySummaryModal({
                 <MacroBalk label="Vet" waarde={dag.vet} doel={doel.vet} />
               </div>
 
-              {inDezeWeek && gekozenSleutel !== sleutel(startDatum) && (
+              {onDayChange && inDezeWeek && gekozenSleutel !== sleutel(startDatum) && (
                 <button
                   onClick={() => { onDayChange?.(DAYS_OF_WEEK[(gekozen.getDay() + 6) % 7]); onClose?.() }}
                   style={{ marginTop: '1rem', width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'transparent', border: `1px solid rgba(255,255,255,0.2)`, borderRadius: 12, color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}

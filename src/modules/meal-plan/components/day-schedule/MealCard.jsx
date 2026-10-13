@@ -67,6 +67,8 @@ export default function MealCard({
   compact = false,
   // De hele kaart tikbaar maken (bijvoorbeeld: open de ingrediënten).
   onTik = null,
+  // Klein label boven de naam: waar de log vandaan komt (Plan, Barcode…).
+  label = null,
 }) {
   const photoSize = compact ? (isMobile ? 60 : 66) : (isMobile ? 78 : 90)
   // Een lege string betekent bewust geen label op de foto (ingrediënten).
@@ -167,6 +169,8 @@ export default function MealCard({
           }}>
             {meal.meal_name || meal.name || 'Maaltijd'}
           </div>
+
+          {label && <div style={{ display: 'flex', marginBottom: compact ? 3 : 5 }}>{label}</div>}
 
           {ondertitel && (
             <div style={{

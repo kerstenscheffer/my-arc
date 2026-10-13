@@ -57,7 +57,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
           fiber: existing.fiber_per_100g || 0, sugar: existing.sugar_per_100g || 0,
           saturated_fat: existing.saturated_fat_per_100g || 0, sodium: existing.sodium_per_100g || 0,
           defaultPortion: existing.default_portion_gram || 100, image_url: existing.image_url,
-          type: 'ingredient', source: 'myarc', per100g: true
+          type: 'ingredient', source: 'barcode', per100g: true
         })
         return
       }
@@ -200,7 +200,9 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
       calories: product.calories_per_100g || 0, protein: product.protein_per_100g || 0,
       carbs: product.carbs_per_100g || 0, fat: product.fat_per_100g || 0,
       image_url: product.image_url, barcode: barcode || product.barcode,
-      type: 'product', source: product._isExisting ? 'myarc' : 'openfoodfacts', per100g: true
+      // Gescand, ook als het product al in de database stond: de coach wil
+      // zien dat de klant de scanner gebruikte (logBron.js).
+      type: 'product', source: 'barcode', per100g: true
     })
   }
 
@@ -215,7 +217,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
         calories: corrected.calories_per_100g || 0, protein: corrected.protein_per_100g || 0,
         carbs: corrected.carbs_per_100g || 0, fat: corrected.fat_per_100g || 0,
         defaultPortion: corrected.default_portion_gram || 100, image_url: corrected.image_url,
-        type: 'ingredient', source: 'myarc', per100g: true
+        type: 'ingredient', source: 'barcode', per100g: true
       })
     } else {
       await saveAndSelect(corrected, corrected.barcode)
