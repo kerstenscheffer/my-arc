@@ -6,10 +6,12 @@
 // intake-venster (useZwevendVenster), zodat je ze naast elkaar kunt hebben.
 
 import { createPortal } from 'react-dom'
-import { X, GripVertical, Minus, Maximize2, Minimize2, CalendarDays } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, GripVertical, Minus, Maximize2, Minimize2, CalendarDays, UtensilsCrossed } from 'lucide-react'
 import { useModalHost } from '../../../coach/ModalHost'
 import useZwevendVenster from '../../../components/useZwevendVenster'
 import ClientAgendaView from '../../client-agenda/ClientAgendaView'
+import AIMealDashboard from '../../meal-plan/AIMealDashboard'
 
 // Breed genoeg voor de hele week naast elkaar; op een kleiner scherm de
 // breedte van het scherm min een randje.
@@ -19,15 +21,53 @@ const STANDAARD = {
 }
 
 export default function AgendaVenster({ db, client, isMobile, onClose }) {
+  return (
+    <KlantVenster titel="Agenda" Icoon={CalendarDays} client={client} isMobile={isMobile} onClose={onClose}>
+      <ClientAgendaView client={client} db={db} isMobile={isMobile} viewerRole="coach" />
+    </KlantVenster>
+  )
+}
+
+// De maaltijdpagina van de klant, zoals hij hem zelf ziet: dagkiezer,
+// macrobalk, maaltijden, Aanpassen en Wisselen. Alles wat je aanpast staat
+// meteen in zijn plan. Afvinken en loggen staan uit (alleenKijken): dat zou in
+// zijn logboek belanden alsof hij het zelf deed.
+export function MaaltijdVenster({ db, client, isMobile, onClose }) {
+  // De volledige klantrij: de lijst in Coach Command haalt bewust niet alle
+  // kolommen op, en de maaltijdpagina heeft o.a. macrodoelen en het
+  // trainingsrooster nodig.
+  const [volledig, setVolledig] = useState(null)
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return
+    let weg = false
+    db.supabase.from('clients').select('*').eq('id', client.id).maybeSingle()
+      .then(({ data }) => { if (!weg) setVolledig(data || client) }, () => { if (!weg) setVolledig(client) })
+    return () => { weg = true }
+  }, [db, client?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    // zIndex net boven Coach Inzicht (10000) en ónder de pop-ups van de
+    // maaltijdpagina (info 10500, aanpassen 11000): die gaan via een portal
+    // naar de body en moeten boven dit venster uitkomen.
+    <KlantVenster titel="Voedingsplan" Icoon={UtensilsCrossed} client={client} isMobile={isMobile} onClose={onClose} standaard={{ w: 520, h: 860 }} zIndex={10050}>
+      {volledig
+        ? <AIMealDashboard client={volledig} db={db} alleenKijken onNavigate={() => {}} />
+        : <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700 }}>Laden…</div>}
+    </KlantVenster>
+  )
+}
+
+function KlantVenster(props) {
+  const { titel, Icoon, client, isMobile, onClose, standaard = STANDAARD, zIndex = null, children } = props
   const modalHost = useModalHost()
   const {
     ingeklapt, setIngeklapt, volledig, wisselVolledig, vensterStijl, sleepHandvat, formaatHandvat,
-  } = useZwevendVenster({ isMobile, standaard: STANDAARD })
+  } = useZwevendVenster({ isMobile, standaard: { ...standaard, w: Math.min(standaard.w, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 48) } })
   const naam = [client?.first_name, client?.last_name].filter(Boolean).join(' ').trim()
 
   const venster = (
     <div style={{
       ...vensterStijl,
+      ...(zIndex != null ? { zIndex } : {}),
       background: 'rgba(10,10,10,0.96)',
       backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
       border: volledig || isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
@@ -46,9 +86,9 @@ export default function AgendaVenster({ db, client, isMobile, onClose }) {
         }}
       >
         {!isMobile && !volledig && <GripVertical size={13} color="rgba(255,255,255,0.25)" style={{ flexShrink: 0 }} />}
-        <CalendarDays size={15} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+        <Icoon size={15} color="#fff" strokeWidth={2.6} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em', flexShrink: 0 }}>Agenda</span>
+          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em', flexShrink: 0 }}>{titel}</span>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{naam}</span>
         </div>
         {!isMobile && !volledig && (
@@ -67,8 +107,8 @@ export default function AgendaVenster({ db, client, isMobile, onClose }) {
       </div>
 
       {!ingeklapt && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <ClientAgendaView client={client} db={db} isMobile={isMobile} viewerRole="coach" />
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', position: 'relative' }}>
+          {children}
         </div>
       )}
 

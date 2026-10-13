@@ -85,7 +85,7 @@ import WeeklyNutritionOverview from './components/food-log/WeeklyNutritionOvervi
 // ✅ NIEUW: Client Documents (PDF viewer)
 import ClientDocumentsSection from '../coach-command-center/components/insight/ClientDocumentsSection'
 
-export default function AIMealDashboard({ client, onNavigate, db }) {
+export default function AIMealDashboard({ client, onNavigate, db, alleenKijken = false }) {
   const [service] = useState(() => new AIMealPlanService(db))
   const isMobile = window.innerWidth <= 768
   
@@ -696,6 +696,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
 
       {/* ════ TIMELINE (overhaul phase 5: direct AIDaySchedule, mode-aware) ════ */}
       <AIDaySchedule
+        alleenKijken={alleenKijken}
         onOpenDagen={() => setDagenOpen(true)}
         mode={mealMode || 'plan'}
         hideTotalsBar
@@ -784,11 +785,12 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
 
       </div>
 
-      {/* Eén ronde witte log-knop — vervangt alle inline log-knoppen. */}
-      <MealLogFAB
+      {/* Eén ronde witte log-knop — vervangt alle inline log-knoppen. Niet
+          voor een meekijkende coach: die logt niet namens de klant. */}
+      {!alleenKijken && <MealLogFAB
         onClick={() => { setFoodLogTab('search'); setFoodLogTrigger(n => n + 1) }}
         isMobile={isMobile}
-      />
+      />}
 
       {/* Week Planner */}
       {showWeekPlanner && (

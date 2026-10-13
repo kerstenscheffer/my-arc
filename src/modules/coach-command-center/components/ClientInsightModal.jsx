@@ -14,7 +14,7 @@ import CoachingPeriodPanel from './CoachingPeriodPanel'
 import TrajectModal from './TrajectModal'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
-import AgendaVenster from './AgendaVenster'
+import AgendaVenster, { MaaltijdVenster } from './AgendaVenster'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
 import { fotoWeergaveUrl } from '../../progress/fotoWeergave'
 import PhotoCompareModal from '../../progress/components/PhotoCompareModal'
@@ -100,6 +100,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [showNotify, setShowNotify] = useState(false)
   const [showIntake, setShowIntake] = useState(false)
   const [showAgenda, setShowAgenda] = useState(false)
+  const [showMaaltijden, setShowMaaltijden] = useState(false)
 
   const [localClient, setLocalClient] = useState(null)
   const [monthlyChecked, setMonthlyChecked] = useState(false)
@@ -360,6 +361,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   <button onClick={() => setShowAgenda(v => !v)} title="Agenda" style={kopKnop()}>
                     <CalendarDays size={17} />
                   </button>
+                  <button onClick={() => setShowMaaltijden(v => !v)} title="Voedingsplan van de klant" style={kopKnop()}>
+                    <UtensilsCrossed size={17} />
+                  </button>
                   <button onClick={() => toggleSectie('logboek')} title="Logboek" style={kopKnop()}>
                     <BookOpen size={17} />
                   </button>
@@ -448,6 +452,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 </button>
                 <button onClick={() => setShowAgenda(v => !v)} title="Agenda" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <CalendarDays size={17} />
+                </button>
+                <button onClick={() => setShowMaaltijden(v => !v)} title="Voedingsplan van de klant" style={{ ...kopKnop(), width: 34, height: 34 }}>
+                  <UtensilsCrossed size={17} />
                 </button>
                 <button onClick={() => toggleSectie('logboek')} title="Logboek" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <BookOpen size={17} />
@@ -735,6 +742,10 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
       {/* ═══ AGENDA (zwevend venster) ═══ */}
       {showAgenda && effectiveClient && (
         <AgendaVenster db={db} client={effectiveClient} isMobile={isMobile} onClose={() => setShowAgenda(false)} />
+      )}
+
+      {showMaaltijden && effectiveClient && (
+        <MaaltijdVenster db={db} client={effectiveClient} isMobile={isMobile} onClose={() => setShowMaaltijden(false)} />
       )}
 
       {/* ═══ INTAKE SUMMARY MODAL ═══ */}

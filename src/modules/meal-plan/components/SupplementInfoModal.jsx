@@ -91,7 +91,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 10000,
+        position: 'fixed', inset: 0, zIndex: 10520,
         background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center',
         padding: m ? 0 : '1.5rem',

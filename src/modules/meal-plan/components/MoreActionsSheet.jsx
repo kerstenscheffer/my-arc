@@ -96,7 +96,9 @@ export default function MoreActionsSheet({
         inset: 0,
         background: 'rgba(0,0,0,0.7)',
         backdropFilter: 'blur(4px)',
-        zIndex: 2000,
+        // Boven het meekijkvenster van de coach (10050); acties sluiten dit
+        // blad eerst, dus wat erna opent zit er niet onder.
+        zIndex: 10450,
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',

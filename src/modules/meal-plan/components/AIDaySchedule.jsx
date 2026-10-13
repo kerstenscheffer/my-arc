@@ -43,6 +43,9 @@ export default function AIDaySchedule({
   // its own at page-level (so they don't appear twice).
   hideDayPicker = false,
   hideTotalsBar = false,
+  // Coach die meekijkt (Coach Inzicht): aanpassen en wisselen mag, afvinken
+  // en loggen niet — dat zou in het logboek van de klant belanden.
+  alleenKijken = false,
   // Trigger-teller die de FoodLogModal opent — telt mee zodra de FAB
   // in AIMealDashboard wordt aangeraakt. Geeft een minimaal interface
   // tussen ouder en kind zonder de showFoodLog-state op te tillen.
@@ -783,25 +786,26 @@ export default function AIDaySchedule({
           checkedMeals={checkedMeals}
           supplementenPerMoment={supplementenPerMoment}
           supplementLogs={suppLogs}
-          onSupplementCheck={wisselSupplement}
+          onSupplementCheck={alleenKijken ? () => {} : wisselSupplement}
           onSupplementInfo={setSuppInfo}
-          onMealCheck={handleMealCheck}
+          onMealCheck={alleenKijken ? () => {} : handleMealCheck}
           onOpenInfo={onOpenInfo}
           onOpenAlternatives={onOpenAlternatives}
           isToday={isVandaag()}
           isMobile={isMobile}
           consumedMeals={consumedMeals}
           onOpenFoodLog={(momentId) => {
+            if (alleenKijken) return
             setDefaultMealMoment(momentId || null)
             setShowFoodLog(true)
           }}
-          onDeleteConsumedMeal={handleDeleteConsumedMeal}
+          onDeleteConsumedMeal={alleenKijken ? () => {} : handleDeleteConsumedMeal}
           onEditConsumedMeal={(meal) => {
             setEditingMeal(meal)
             setShowFoodLog(true)
           }}
           onPlanMealLog={async (meal) => {
-            if (!db?.supabase || !client?.id) return
+            if (alleenKijken || !db?.supabase || !client?.id) return
             // Slot tegen dubbel klikken. Lezen-dan-schrijven is niet
             // waterdicht: twee klikken vlak na elkaar lezen allebei "nog niet
             // gelogd" voordat de eerste heeft ingevoegd.

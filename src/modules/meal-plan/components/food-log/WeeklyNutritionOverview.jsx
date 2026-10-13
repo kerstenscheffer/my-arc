@@ -99,7 +99,7 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
     <div style={{
       position: 'fixed', inset: 0,
       background: '#0a0a0a',
-      zIndex: 10000,
+      zIndex: 10520,
       display: 'flex', flexDirection: 'column',
       animation: 'wnoFadeIn 0.2s ease'
     }}>
