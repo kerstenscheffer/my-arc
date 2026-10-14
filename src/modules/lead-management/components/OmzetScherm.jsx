@@ -188,7 +188,8 @@ export default function OmzetScherm({
                   aan={paneel === 'jij'} onClick={() => setPaneel(p => (p === 'jij' ? null : 'jij'))} />
               )}
               <VerdeelVak kleur={KLEUR_PARTNER} titel={isOwner ? `Naar ${partnerName}` : 'Jij ontvangt'} bedrag={partner}
-                sub={verdeling.settled ? `betaald${verdeling.paidAt ? ' ' + datumKort(verdeling.paidAt) : ''}` : verdeling.outstanding > 0 ? `${eur(verdeling.outstanding)} open` : 'niets open'}
+                status={verdeling.settled ? { betaald: true, tekst: 'Betaald' } : verdeling.outstanding > 0 ? { betaald: false, tekst: 'Open' } : null}
+                sub={verdeling.settled ? `op ${verdeling.paidAt ? datumKort(verdeling.paidAt) : 'tijd'}` : verdeling.outstanding > 0 && verdeling.outstanding < partner ? `${eur(verdeling.outstanding)} nog over te maken` : 'klik voor details'}
                 aan={paneel === 'partner'} onClick={() => setPaneel(p => (p === 'partner' ? null : 'partner'))} />
               {/* Het grijze stuk van de balk. */}
               <VerdeelVak kleur={KLEUR_LASTEN} titel="Vaste lasten" bedrag={lasten} sub="gaat eerst van de omzet af" />
@@ -302,7 +303,7 @@ function StapelBalk({ delen, totaal, hoog = false }) {
   )
 }
 
-function VerdeelVak({ kleur, titel, bedrag, sub, aan, onClick }) {
+function VerdeelVak({ kleur, titel, bedrag, sub, aan, onClick, status = null }) {
   const klikbaar = !!onClick
   return (
     <button onClick={onClick} disabled={!klikbaar} style={{
@@ -313,7 +314,16 @@ function VerdeelVak({ kleur, titel, bedrag, sub, aan, onClick }) {
         <span style={{ width: 9, height: 9, borderRadius: 3, background: kleur, flexShrink: 0 }} />{titel}
         {klikbaar && <ChevronDown size={14} style={{ opacity: 0.6, transform: aan ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />}
       </span>
-      <span style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{eur(bedrag)}</span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{eur(bedrag)}</span>
+        {status && (
+          <span style={{
+            fontSize: '0.72rem', fontWeight: 900, padding: '2px 8px', borderRadius: 999,
+            color: status.betaald ? '#10b981' : '#f59e0b',
+            background: status.betaald ? 'rgba(16,185,129,0.14)' : 'rgba(245,158,11,0.14)',
+          }}>{status.tekst}</span>
+        )}
+      </span>
       <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{sub}</span>
     </button>
   )
