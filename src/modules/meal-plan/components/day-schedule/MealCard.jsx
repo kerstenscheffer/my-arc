@@ -184,9 +184,15 @@ export default function MealCard({
           flex: 1, minWidth: 0,
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
           // Compacter dan eerst: minder lucht boven de naam en onder de macro's.
-          padding: compact ? (isMobile ? '0.3rem 0.65rem 0.25rem' : '0.35rem 0.8rem 0.3rem') : (isMobile ? '0.3rem 0.7rem 0.2rem' : '0.4rem 0.95rem 0.3rem'),
+          // Losse zijden in plaats van één padding plus paddingRight: React
+          // waarschuwt (en rendert soms fout) als je die twee mengt.
+          paddingTop: compact ? (isMobile ? '0.3rem' : '0.35rem') : (isMobile ? '0.3rem' : '0.4rem'),
+          paddingBottom: compact ? (isMobile ? '0.25rem' : '0.3rem') : (isMobile ? '0.2rem' : '0.3rem'),
+          paddingLeft: compact ? (isMobile ? '0.65rem' : '0.8rem') : (isMobile ? '0.7rem' : '0.95rem'),
           // Ruimte voor het prullenbakje, anders loopt de naam eronder.
-          paddingRight: onVerwijder && !hoekKnop ? (isMobile ? '2rem' : '2.4rem') : undefined,
+          paddingRight: onVerwijder && !hoekKnop
+            ? (isMobile ? '2rem' : '2.4rem')
+            : (compact ? (isMobile ? '0.65rem' : '0.8rem') : (isMobile ? '0.7rem' : '0.95rem')),
         }}>
           <div style={{
             fontSize: isMobile ? '0.9rem' : '0.98rem',
