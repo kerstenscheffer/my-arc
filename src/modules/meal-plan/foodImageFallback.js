@@ -88,7 +88,7 @@ const LOCAL = [
   { m: ['pizza'], f: 'pizza.png' },
   { m: ['croissant'], f: 'croissant.png' },
   { m: ['slagroomtaart'], f: 'slagroomtaart.png' },
-  { m: ['taart', 'cake', 'gebak', 'tiramisu', 'tompouce', 'mousse', 'cheesecake', 'schwarzwalder', 'appeltaart', 'gebakje', 'soesjes', 'bossche bol'], f: 'taart.avif' },
+  { m: ['taart', 'cake', 'gebak', 'spekkoek', 'tiramisu', 'tompouce', 'mousse', 'cheesecake', 'schwarzwalder', 'appeltaart', 'gebakje', 'soesjes', 'bossche bol'], f: 'taart.avif' },
   { m: ['chips', 'crisps', 'kroepoek', 'nachos', 'tortilla chips', 'pringles', 'borrelnootjes'], f: 'chips.jpeg' },
   { m: ['cola'], f: 'cola.png' },
   { m: ['bier', 'beer'], f: 'bier.jpeg' },
@@ -118,7 +118,7 @@ const LOCAL = [
   { m: ['granola', 'crunchy'], u: '1568371676223-7e6fc0fa62b1' },
   { m: ['cornflakes', 'corn flakes'], u: '1736605406266-dbb985ef3325' },
   { m: ['ontbijtgranen', 'cereal', 'cruesli', 'special k'], u: '1714686650962-c5c4d33213b8' },
-  { m: ['pannenkoek', 'pannenkoeken', 'pancake', 'poffertjes'], u: '1490457843367-34b21b6ccd85' },
+  { m: ['pannenkoek', 'pannenkoeken', 'pannekoek', 'pannekoeken', 'pancake', 'poffertjes', 'flensje'], u: '1490457843367-34b21b6ccd85' },
   { m: ['tomaat', 'tomaten', 'tomato', 'cherrytomaat'], u: '1571680322279-a226e6a4cc2a' },
   { m: ['ui', 'uien', 'onion', 'sjalot'], u: '1587735243474-5426387356db' },
   { m: ['champignon', 'champignons', 'paddenstoel', 'mushroom'], u: '1623491208688-82a9b3f4e5c9' },
@@ -267,16 +267,27 @@ export function matchFoodImage(title, size = 200) {
   if (!volledig) return null
   const hoofd = volledig.split(SCHEIDING)[0].trim() || volledig
   const woorden = hoofd.split(' ')
-  let beste = null
+  // Eerst per woord de beste treffer: heel woord boven staart boven begin, en
+  // bij gelijk het langste trefwoord. Zo is "pannenkoeken" een pannenkoek en
+  // niet (via de staart "koek") een koekje.
+  const perWoord = new Map()
   for (const g of LOCAL) {
     for (const sleutel of g.m) {
       const k = norm(sleutel)
       if (!k) continue
       const t = zoekTreffer(woorden, k)
       if (!t) continue
-      const score = (isVorm(k) ? 1000 : 0) + t.soort * 100 - t.plek * 20 + k.length
-      if (!beste || score > beste.score) beste = { score, g }
+      const kwaliteit = t.soort * 100 + k.length
+      const huidig = perWoord.get(t.plek)
+      if (!huidig || kwaliteit > huidig.kwaliteit) perWoord.set(t.plek, { kwaliteit, g, k, plek: t.plek, soort: t.soort })
     }
+  }
+  // Dan tussen de woorden: een productvorm (sap, skyr, jam) gaat voor een
+  // ingrediënt, daarna het eerste woord.
+  let beste = null
+  for (const w of perWoord.values()) {
+    const score = (isVorm(w.k) ? 1000 : 0) + w.soort * 100 - w.plek * 20 + w.k.length
+    if (!beste || score > beste.score) beste = { score, g: w.g }
   }
   if (!beste) return null
   return beste.g.u ? U(beste.g.u, size) : `/food/${beste.g.f}`
