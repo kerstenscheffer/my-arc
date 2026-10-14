@@ -3,7 +3,7 @@
 // die winkel krijgt de parameter mee en de korting gaat bij het afrekenen
 // vanzelf. De code staat erbij voor wie het handmatig wil invullen.
 const KORTINGEN = [
-  { domein: 'bigbuffalo.nl', param: 'growi', waarde: 'kersten1', code: 'KERSTEN1', procent: 15 },
+  { domein: 'bigbuffalo.nl', param: 'growi', waarde: 'kersten1', code: 'KERSTEN1', procent: 15, coachGebruikt: true },
 ]
 
 function kortingVoor(url) {
@@ -30,4 +30,10 @@ export function winkelCode(url) {
 
 export function winkelProcent(url) {
   return kortingVoor(url)?.procent || null
+}
+
+// Gebruikt de coach zelf producten van deze winkel? Dan krijgt de klant dat
+// als label bij het product te zien.
+export function winkelVanCoach(url) {
+  return !!kortingVoor(url)?.coachGebruikt
 }

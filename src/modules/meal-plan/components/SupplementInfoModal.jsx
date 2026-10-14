@@ -11,7 +11,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
-import { winkelUrl, winkelCode, winkelProcent } from '../../supplements/utils/winkelKorting'
+import { winkelUrl, winkelCode, winkelProcent, winkelVanCoach } from '../../supplements/utils/winkelKorting'
 
 export default function SupplementInfoModal({ supplement, isMobile, onClose, db }) {
   const m = isMobile
@@ -196,6 +196,13 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                       : <span style={{ fontSize: 18 }}>{sp.emoji || '💊'}</span>}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
+                    {winkelVanCoach(p.url) && (
+                      <span style={{
+                        display: 'inline-block', marginBottom: 2, padding: '1px 6px', borderRadius: 999,
+                        background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)',
+                        fontSize: '0.6rem', fontWeight: 900, color: '#10b981', letterSpacing: '0.02em',
+                      }}>Gebruikt door coach</span>
+                    )}
                     <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {p.product_name}
                     </div>
