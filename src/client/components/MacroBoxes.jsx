@@ -2,10 +2,36 @@
 // Gedeelde "4 macro-vakken" — Kcal / Koolh / Eiwit / Vet, elk met een %-ring
 // en "x over / te veel". Gebruikt op de client-home (TodayCard) én op de
 // meal-pagina (via MacroHero variant="boxes"), zodat ze identiek zijn.
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Flame, Wheat, Egg, Droplet } from 'lucide-react'
 
-function MacroBox({ label, icon, color, consumed, target, unitLabel, kaal = false, compact = false }) {
+// Telt een getal soepel naar de nieuwe waarde (600 ms, zelfde curve als de
+// ring). Zonder dit sprong het percentage in één keer terwijl de ring nog
+// onderweg was.
+function useTelOp(doel, duur = 600) {
+  const [waarde, setWaarde] = useState(doel)
+  const huidig = useRef(doel)
+  useEffect(() => {
+    const van = huidig.current
+    if (van === doel) return
+    const start = performance.now()
+    let frame
+    const stap = (nu) => {
+      const t = Math.min(1, (nu - start) / duur)
+      const e = 1 - Math.pow(1 - t, 3)
+      const v = van + (doel - van) * e
+      huidig.current = v
+      setWaarde(v)
+      if (t < 1) frame = requestAnimationFrame(stap)
+    }
+    frame = requestAnimationFrame(stap)
+    return () => cancelAnimationFrame(frame)
+  }, [doel, duur])
+  return waarde
+}
+
+function MacroBox({ label, icon, color, consumed: echt, target, unitLabel, kaal = false, compact = false }) {
+  const consumed = useTelOp(Number(echt) || 0)
   const pct = target > 0 ? Math.min(100, Math.round((consumed / target) * 100)) : 0
   const over = Math.round((target || 0) - (consumed || 0))
   // Compact: kleinere ring en kleinere cijfers, voor de meal-pagina waar de
@@ -23,7 +49,7 @@ function MacroBox({ label, icon, color, consumed, target, unitLabel, kaal = fals
       <div style={{ position: 'relative', width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
           <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} fill="none" />
-          <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.4,0,0.2,1)' }} />
+          <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 900, color }}>{pct}<span style={{ fontSize: '0.6em' }}>%</span></span>

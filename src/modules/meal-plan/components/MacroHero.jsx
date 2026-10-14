@@ -10,7 +10,7 @@
 //
 // Dag/Week-tabs zijn weggehaald — week-gem zit nu in MealDaySummaryModal.
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { dagVenster, lokaleIso } from '../utils/dagVenster'
 import MacroBoxes from '../../../client/components/MacroBoxes'
 
@@ -302,15 +302,19 @@ export default function MacroHero({
   const [dayLoading, setDayLoading] = useState(false)
   const dateKey = toIsoDate(selectedDate)
 
-  // When refreshKey changes, clear the cached value for the current day
-  // so the next effect re-fetches fresh data.
+  // When refreshKey changes, re-fetch the current day and overwrite the
+  // cached value. Niet eerst de cache legen: dan viel de weergave even terug
+  // op nul en sprongen de ringen bij elke afronding naar 0% en weer terug.
+  // Nu blijft het oude getal staan tot het nieuwe binnen is, en loopt de
+  // ring daar soepel naartoe.
   useEffect(() => {
-    if (!dateKey) return
-    setDayCache(prev => {
-      if (prev[dateKey] === undefined) return prev
-      const { [dateKey]: _, ...rest } = prev
-      return rest
+    if (!refreshKey || selectedIsToday) return
+    if (!dateKey || !db || !clientId) return
+    let cancelled = false
+    fetchDayTotals(db, clientId, dateKey).then(totals => {
+      if (!cancelled && totals) setDayCache(prev => ({ ...prev, [dateKey]: totals }))
     })
+    return () => { cancelled = true }
   }, [refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -329,16 +333,21 @@ export default function MacroHero({
     return () => { cancelled = true }
   }, [selectedIsToday, dateKey, db, clientId, dayCache])
 
+  // Wat er het laatst stond. Wissel je van dag en is de nieuwe dag nog niet
+  // binnen, dan blijft dit staan in plaats van nul; zo lopen de ringen van de
+  // ene dag naar de andere in plaats van eerst leeg te springen.
+  const laatsteWeergave = useRef({ calories: 0, protein: 0, carbs: 0, fat: 0 })
   const display = selectedIsToday
     ? (consumed || {})
-    : (dayCache[dateKey] || { calories: 0, protein: 0, carbs: 0, fat: 0 })
+    : (dayCache[dateKey] || laatsteWeergave.current)
+  laatsteWeergave.current = display
   const t = targets || {}
   const showShim = !selectedIsToday && dayCache[dateKey] === undefined && dayLoading
 
   // 'boxes' = de 4 macro-vakken (zelfde als client-home), dag-bewust via `display`.
   if (variant === 'boxes') {
     return (
-      <div style={{ padding: isMobile ? '0 0.9rem 0.4rem' : '0 1.5rem 0.6rem', maxWidth: 1400, margin: '0 auto', opacity: showShim ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
+      <div style={{ padding: isMobile ? '0 0.9rem 0.4rem' : '0 1.5rem 0.6rem', maxWidth: 1400, margin: '0 auto', }}>
         <MacroBoxes consumed={display} targets={t} kaal={zonderKader} compact={zonderKader} />
       </div>
     )
