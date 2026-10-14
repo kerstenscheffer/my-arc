@@ -135,7 +135,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
           }}><X size={20} strokeWidth={2.8} /></button>
           <div style={{ position: 'absolute', left: 14, bottom: 10, right: 50 }}>
             <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              {sp.emoji} Supplement
+              Supplement
             </div>
             <div style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff' }}>
               {sp.naam}
@@ -205,11 +205,9 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {winkelVanCoach(p.url) && (
-                      <span style={{
-                        display: 'inline-block', marginBottom: 2, padding: '1px 6px', borderRadius: 999,
-                        background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)',
-                        fontSize: '0.6rem', fontWeight: 900, color: '#10b981', letterSpacing: '0.02em',
-                      }}>Aangeraden door Kersten</span>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#fff', marginBottom: 1 }}>
+                        Aangeraden door Kersten
+                      </div>
                     )}
                     <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {p.product_name}
