@@ -144,7 +144,7 @@ export default class CommandCenterService {
       const [workoutsResult, clientsResult] = await Promise.all([
         this.supabase
           .from('workout_sessions')
-          .select('id, client_id, workout_date, day_name, is_completed, exercises_completed, completed_at, notes')
+          .select('id, client_id, workout_date, day_name, day_display_name, is_completed, exercises_completed, completed_at, notes')
           .in('client_id', clientIds)
           .gte('workout_date', ninetyDaysAgo.toISOString().split('T')[0])
           .order('workout_date', { ascending: false }),
@@ -170,6 +170,17 @@ export default class CommandCenterService {
         if (schemaErr) console.error('❌ Schema fetch error:', schemaErr)
         schemasData = schemas || []
       }
+      // Ook de andere plannen van de klant: wie wisselt van plan (Upper/Lower
+      // naar Full body) heeft oude sessies die bij dát plan horen. Alleen
+      // tegen het actieve plan raden gaf al die sessies de naam van het
+      // nieuwe plan (Martijn, 14 okt 2026).
+      const { data: eigenPlannen } = await this.supabase
+        .from('workout_schemas')
+        .select('id, client_id, name, week_structure')
+        .in('client_id', clientIds)
+        .then(r => r, () => ({ data: [] }))
+      const plannenByClient = {}
+      ;(eigenPlannen || []).forEach(s => { (plannenByClient[s.client_id] ||= []).push(s) })
 
       const schemaMap = {}
       schemasData.forEach(s => { schemaMap[s.id] = s })
@@ -189,21 +200,31 @@ export default class CommandCenterService {
       //      overlap is om op te vertrouwen.
       const namenVan = (lijst) => new Set((Array.isArray(lijst) ? lijst : [])
         .map(e => String(e?.name || '').trim().toLowerCase()).filter(Boolean))
-      const trainingNaam = (w, schema, schedule) => {
+      // De naam die bij het loggen is opgeslagen is de waarheid: die hoort
+      // bij het plan van dat moment. Alleen generieke namen tellen niet.
+      const GENERIEK = /^(quick log\b.*|training|workout|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)$/i
+      const opgeslagenNaam = (w) => {
+        const n = String(w.day_display_name || '').trim()
+        return n && !GENERIEK.test(n) ? n : null
+      }
+      const trainingNaam = (w, schema, schedule, andere = []) => {
+        const bewaard = opgeslagenNaam(w)
+        if (bewaard) return bewaard
         const ws = schema?.week_structure
-        if (!ws || typeof ws !== 'object') return null
+        const plannen = [schema, ...andere.filter(p => p.id !== schema?.id)].filter(p => p?.week_structure && typeof p.week_structure === 'object')
+        if (plannen.length === 0) return null
         const gelogd = namenVan(w.exercises_completed)
         let beste = null, besteScore = 0
-        Object.values(ws).forEach(dag => {
+        plannen.forEach(plan => Object.values(plan.week_structure).forEach(dag => {
           if (!dag || typeof dag !== 'object') return
           const inDag = namenVan(dag.exercises)
           let gedeeld = 0
           gelogd.forEach(n => { if (inDag.has(n)) gedeeld++ })
           if (gedeeld > besteScore) { besteScore = gedeeld; beste = dag }
-        })
+        }))
         const genoeg = gelogd.size > 0 && (besteScore >= 2 || besteScore / gelogd.size >= 0.5)
         if (genoeg && (beste?.name || beste?.focus)) return beste.name || beste.focus
-        if (schedule && w.day_name) {
+        if (schedule && w.day_name && ws) {
           const sleutel = Object.keys(schedule).find(k => k.toLowerCase() === String(w.day_name).toLowerCase())
           const dag = sleutel ? ws[schedule[sleutel]] : null
           if (dag?.name || dag?.focus) return dag.name || dag.focus
@@ -219,7 +240,7 @@ export default class CommandCenterService {
       workouts?.forEach(w => {
         const cd = workoutsByClient[w.client_id]
         if (cd) {
-          w.workout_naam = trainingNaam(w, schemaByClient[w.client_id], scheduleByClient[w.client_id])
+          w.workout_naam = trainingNaam(w, schemaByClient[w.client_id], scheduleByClient[w.client_id], plannenByClient[w.client_id] || [])
           cd.workouts.push(w); cd.totalWorkouts++
           if (w.is_completed) cd.completedWorkouts++
           if (!cd.lastWorkoutDate) {

@@ -788,10 +788,16 @@ async naamVanTrainingsdag(clientId, datum) {
       .select('workout_schedule, assigned_schema_id').eq('id', clientId).maybeSingle()
     const rooster = klant?.workout_schedule || {}
     const weekdag = new Date(`${datum}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
-    const sleutel = rooster[weekdag] || rooster[weekdag.toLowerCase()] || null
-    if (!sleutel || !klant?.assigned_schema_id) return null
+    let sleutel = rooster[weekdag] || rooster[weekdag.toLowerCase()] || null
+    let planId = klant?.assigned_schema_id || null
+    // Dag uit een ánder plan van de klant: 'plan_<schemaId>__<dagKey>'.
+    // Die kreeg eerder geen naam, en dan raadde het coach-inzicht later
+    // tegen het actieve plan.
+    const m = typeof sleutel === 'string' && sleutel.match(/^plan_(.+?)__(.+)$/)
+    if (m) { planId = m[1]; sleutel = m[2] }
+    if (!sleutel || !planId) return null
     const { data: plan } = await this.supabase.from('workout_schemas')
-      .select('week_structure').eq('id', klant.assigned_schema_id).maybeSingle()
+      .select('week_structure').eq('id', planId).maybeSingle()
     const dag = plan?.week_structure?.[sleutel]
     return (dag?.name || dag?.focus || '').trim() || null
   } catch { return null }
