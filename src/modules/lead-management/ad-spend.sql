@@ -6,6 +6,12 @@
 -- public.sync_meta_ad_spend(). Die doet pas iets als Vault deze twee heeft:
 --   select vault.create_secret('<token met ads_read>', 'meta_ads_token');
 --   select vault.create_secret('<advertentieaccount-id, bv. act_123>', 'meta_ad_account_id');
+-- Een naam bestaat maar één keer in Vault; een nieuw token zet je met
+--   select vault.update_secret((select id from vault.secrets where name='meta_ads_token'), '<token>');
+-- Sinds 14 okt 2026: user-token (Graph API Explorer, app "MY ARC Omzet",
+-- ads_read), geldig tot 13 dec 2026. Account act_2123893951757727
+-- (Ad Acc 1 | MYARC BM). Een systeemgebruiker-token verloopt nooit; dat
+-- lukte nog niet door een sms-blokkade bij Meta.
 -- Handmatig ingevulde bedragen (bron 'handmatig') overschrijft hij niet.
 --
 -- Tabel: ad_spend (coach_id, period date, bedrag, bron 'handmatig'|'meta',
