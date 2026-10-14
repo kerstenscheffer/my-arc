@@ -3,6 +3,7 @@
 // ✅ Inspired by AIMealInfoModal design
 
 import React, { useState, useEffect } from 'react'
+import { winkelUrl } from './utils/winkelKorting'
 import { createPortal } from 'react-dom'
 import DatabaseService from '../../services/DatabaseService'
 import { 
@@ -844,7 +845,7 @@ function BuyTab({ supplement, isMobile }) {
         return (
           <a
             key={idx}
-            href={product.url}
+            href={winkelUrl(product.url)}
             target="_blank"
             rel="noopener noreferrer"
             style={{

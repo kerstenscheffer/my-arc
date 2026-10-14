@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
+import { winkelUrl, winkelCode } from '../../supplements/utils/winkelKorting'
 
 export default function SupplementInfoModal({ supplement, isMobile, onClose, db }) {
   const m = isMobile
@@ -182,7 +183,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
             <div style={{ marginBottom: '1rem' }}>
               {kop('Waar koop je het', <ShoppingCart size={11} />)}
               {producten.map(p => (
-                <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" style={{
+                <a key={p.id} href={winkelUrl(p.url)} target="_blank" rel="noopener noreferrer" style={{
                   display: 'flex', alignItems: 'center', gap: 10, minHeight: 56,
                   padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
                   textDecoration: 'none', color: 'inherit',
@@ -201,6 +202,11 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {[p.brand, p.store].filter(Boolean).join(' · ')}{p.in_stock === false ? ' · uitverkocht' : ''}
                     </div>
+                    {winkelCode(p.url) && (
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', marginTop: 1 }}>
+                        Korting met code {winkelCode(p.url)}, gaat vanzelf via deze link
+                      </div>
+                    )}
                   </div>
                   {prijsTekst(p.price) && (
                     <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>{prijsTekst(p.price)}</span>
