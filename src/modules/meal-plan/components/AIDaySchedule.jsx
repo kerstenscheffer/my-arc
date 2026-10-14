@@ -659,7 +659,8 @@ export default function AIDaySchedule({
       // De macro's van vandaag meteen bijwerken (rekent met de maaltijd die je
       // aantikte). Op een andere dag hoeft dat niet: die telt niet mee in de
       // dagtotalen van vandaag.
-      if (isVandaagNu()) onUncheckMeal(meal.slot, meal)
+      const bijVandaag = isVandaagNu()
+      if (bijVandaag) onUncheckMeal(meal.slot, meal)
 
       // De plan_check-rij weghalen. Blijft die staan, dan blijft MacroHero de
       // calorieën tellen en zet het herstel-effect het vinkje bij de volgende
@@ -690,7 +691,12 @@ export default function AIDaySchedule({
         vraag.then(({ error }) => {
           // Rond: het herstel-effect mag deze slot weer normaal behandelen.
           netUitgevinkt.current.delete(uitvinkSleutel)
-          if (!error) return
+          if (!error) {
+            // Andere dag: de balk van die dag opnieuw laten tellen, anders
+            // bleven de macro's staan na het ongedaan maken.
+            if (!bijVandaag && onPastDayUpdate) onPastDayUpdate()
+            return
+          }
           console.error('Failed to remove plan_check on uncheck:', error)
           // Mislukt het, dan zetten we het vinkje terug: anders lijkt het weg
           // terwijl het na een herlaadbeurt weer staat.
@@ -827,6 +833,9 @@ export default function AIDaySchedule({
               return { ...prev, [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: waarde } }
             })
             zetVinkVoorDeze(true)
+            // Vastleggen bij de klik: swipet de klant tijdens het opslaan naar
+            // een andere dag, dan hoort de update nog bij deze dag.
+            const bijVandaag = isVandaag()
             try {
               // Dubbel-bewaking op de BEKEKEN dag, niet op vandaag.
               //
@@ -926,12 +935,21 @@ export default function AIDaySchedule({
                   if (!dagKey) return prev
                   return { ...prev, [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: true } }
                 })
-                if (onMealLogged) onMealLogged({
-                  calories: meal.calories || 0,
-                  protein: meal.protein || 0,
-                  carbs: meal.carbs || 0,
-                  fat: meal.fat || 0
-                })
+                // Vandaag: de dagtotalen van de ouder ophogen. Een andere dag:
+                // die totalen zijn van vandaag, dus daar niets bij optellen,
+                // maar MacroHero laten herladen voor de bekeken dag. Dit riep
+                // altijd onMealLogged aan: afronden op gisteren telde dan bij
+                // vandaag op en de balk van gisteren bleef staan.
+                if (bijVandaag) {
+                  if (onMealLogged) onMealLogged({
+                    calories: meal.calories || 0,
+                    protein: meal.protein || 0,
+                    carbs: meal.carbs || 0,
+                    fat: meal.fat || 0
+                  })
+                } else if (onPastDayUpdate) {
+                  onPastDayUpdate()
+                }
                 console.log('✅ Plan meal auto-logged:', meal.name)
               }
             } catch (err) {
