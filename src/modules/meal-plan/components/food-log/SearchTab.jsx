@@ -190,20 +190,35 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   // ── PRODUCTEN search ──
   const searchProducts = async (query) => {
     try {
-      const { data: ingredients } = await db.supabase
-        .from('ai_ingredients')
-        .select('id, name, name_en, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, default_portion_gram, category, image_url, brand, log_count, barcode, source')
-        .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
-        .order('log_count', { ascending: false, nullsFirst: false })
-        .limit(20)
+      // Slim zoeken in de database (zoek_ingredienten): tikfouten
+      // ("sinasappel"), meervoud ("aardbei" -> "aardbeien"), samenstellingen
+      // met het kernwoord achteraan ("sap" -> sinaasappelsap, appelsap),
+      // basisproduct boven merkvariant, populair en eigen historie omhoog,
+      // dubbelingen eruit. De volgorde komt kant-en-klaar terug.
+      //
+      // Hiervoor: ilike '%term%' met de 20 meest gelogde treffers. Een tikfout
+      // vond niets, en "Aardbeien" kon wegvallen achter twintig populaire
+      // jams en yoghurts.
+      const { data: slim, error: slimFout } = await db.supabase
+        .rpc('zoek_ingredienten', { p_q: query, p_client: client?.id || null, p_limit: 30 })
+      let ingredients = slimFout ? null : slim
+      const alGesorteerd = !!ingredients
+      if (slimFout) {
+        console.warn('Slim zoeken mislukt, terugval op eenvoudig zoeken:', slimFout.message)
+        const { data } = await db.supabase
+          .from('ai_ingredients')
+          .select('id, name, name_en, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, default_portion_gram, category, image_url, brand, log_count, barcode, source')
+          .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
+          .order('log_count', { ascending: false, nullsFirst: false })
+          .limit(20)
+        ingredients = data
+      }
 
       const allResults = []
       if (ingredients) {
-        // Sort priority:
-        //   1. Relevance (exact > starts-as-word > starts > word-boundary > contains)
-        //   2. Generic items (no barcode / manual source) over branded variants
-        //   3. log_count desc (popular items first within same relevance bucket)
-        const sorted = ingredients.sort((a, b) => {
+        // Alleen bij de terugval zelf sorteren: relevantie, dan basisproduct,
+        // dan populariteit.
+        const sorted = alGesorteerd ? ingredients : ingredients.sort((a, b) => {
           const rA = computeRelevance(a.name, query)
           const rB = computeRelevance(b.name, query)
           if (rA !== rB) return rA - rB
@@ -228,6 +243,10 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       setResults(allResults)
       setLoading(false)
 
+      // Online (FatSecret) alleen als aanvulling: bij weinig eigen treffers,
+      // en altijd onderaan. Eerder werd alles opnieuw gesorteerd en drong een
+      // online product voor de basisproducten.
+      if (allResults.length >= 8) return
       setOffLoading(true)
       try {
         if (fatSecretService) {
@@ -249,19 +268,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             // Merge + re-sort by relevance so an exact-match FatSecret item
             // can outrank myarc derivatives. myarc keeps a tie-break edge
             // through log_count when relevance is equal.
-            setResults(prev => {
-              const combined = [...prev, ...ext]
-              combined.sort((a, b) => {
-                const rA = computeRelevance(a.name, query)
-                const rB = computeRelevance(b.name, query)
-                if (rA !== rB) return rA - rB
-                const aMyarc = a.source === 'myarc' ? 0 : 1
-                const bMyarc = b.source === 'myarc' ? 0 : 1
-                if (aMyarc !== bMyarc) return aMyarc - bMyarc
-                return 0
-              })
-              return combined
-            })
+            setResults(prev => [...prev, ...ext])
           }
         }
       } catch {} finally { setOffLoading(false) }
@@ -275,12 +282,21 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   // ── MAALTIJDEN search ──
   const searchMeals = async (query) => {
     try {
-      const [mealsRes, customRes] = await Promise.all([
-        db.supabase
+      // Zelfde slimme zoeker als bij producten (zoek_maaltijden). Valt die
+      // weg, dan het oude ilike-zoeken.
+      const zoekMaaltijden = async () => {
+        const r = await db.supabase.rpc('zoek_maaltijden', { p_q: query, p_client: client?.id || null, p_limit: 20 })
+        if (!r.error) return { data: (r.data || []).map(x => x.meal), gesorteerd: true }
+        console.warn('Slim zoeken maaltijden mislukt, terugval:', r.error.message)
+        const oud = await db.supabase
           .from('ai_meals')
           .select('id, name, name_en, calories, protein, carbs, fat, image_url, timing, ingredients_list')
           .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
-          .limit(20),
+          .limit(20)
+        return { data: oud.data, gesorteerd: false }
+      }
+      const [mealsRes, customRes] = await Promise.all([
+        zoekMaaltijden(),
         client?.id
           ? db.supabase
               .from('ai_custom_meals')
@@ -311,7 +327,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
 
       if (mealsRes.data) {
         // Sort by relevance so exact "rijst" outranks "rijst-yoghurt-bowl" etc.
-        const sortedMeals = mealsRes.data.slice().sort((a, b) => {
+        const sortedMeals = mealsRes.gesorteerd ? mealsRes.data : mealsRes.data.slice().sort((a, b) => {
           const rA = computeRelevance(a.name, query)
           const rB = computeRelevance(b.name, query)
           return rA - rB
