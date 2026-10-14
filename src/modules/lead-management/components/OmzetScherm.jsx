@@ -32,7 +32,7 @@ const BRONNEN = [
 const BRON = Object.fromEntries(BRONNEN.map(b => [b.id, b]))
 const KLEUR_JIJ = '#10b981'
 const KLEUR_PARTNER = '#3b82f6'
-const KLEUR_LASTEN = 'rgba(255,255,255,0.22)'
+const KLEUR_LASTEN = '#6b7280'
 
 const eur = (n) => '€' + Math.round(n || 0).toLocaleString('nl-NL')
 const kort = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(Math.round(n)))
@@ -182,7 +182,7 @@ export default function OmzetScherm({
               { kleur: KLEUR_PARTNER, waarde: partner },
               { kleur: KLEUR_LASTEN, waarde: lasten },
             ]} totaal={verdeelTotaal} />
-            <div style={{ display: 'grid', gridTemplateColumns: isOwner ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 8, marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isOwner ? 3 : 2}, minmax(0, 1fr))`, gap: isMobile ? 10 : 24, marginTop: 12 }}>
               {isOwner && (
                 <VerdeelVak kleur={KLEUR_JIJ} titel="Jij houdt" bedrag={jij} sub={`na ${eur(lasten)} vaste lasten`}
                   aan={paneel === 'jij'} onClick={() => setPaneel(p => (p === 'jij' ? null : 'jij'))} />
@@ -190,6 +190,8 @@ export default function OmzetScherm({
               <VerdeelVak kleur={KLEUR_PARTNER} titel={isOwner ? `Naar ${partnerName}` : 'Jij ontvangt'} bedrag={partner}
                 sub={verdeling.settled ? `betaald${verdeling.paidAt ? ' ' + datumKort(verdeling.paidAt) : ''}` : verdeling.outstanding > 0 ? `${eur(verdeling.outstanding)} open` : 'niets open'}
                 aan={paneel === 'partner'} onClick={() => setPaneel(p => (p === 'partner' ? null : 'partner'))} />
+              {/* Het grijze stuk van de balk. */}
+              <VerdeelVak kleur={KLEUR_LASTEN} titel="Vaste lasten" bedrag={lasten} sub="gaat eerst van de omzet af" />
             </div>
 
             {paneel === 'jij' && (
@@ -301,15 +303,15 @@ function StapelBalk({ delen, totaal, hoog = false }) {
 }
 
 function VerdeelVak({ kleur, titel, bedrag, sub, aan, onClick }) {
+  const klikbaar = !!onClick
   return (
-    <button onClick={onClick} style={{
-      ...tik, textAlign: 'left', padding: '0.8rem 0.9rem', borderRadius: 12, minWidth: 0,
-      background: aan ? kleur + '22' : kleur + '12', border: `1px solid ${kleur}${aan ? 'aa' : '55'}`,
-      display: 'flex', flexDirection: 'column', gap: 3,
+    <button onClick={onClick} disabled={!klikbaar} style={{
+      ...tik, cursor: klikbaar ? 'pointer' : 'default', textAlign: 'left', padding: 0, minWidth: 0,
+      background: 'none', border: 'none', display: 'flex', flexDirection: 'column', gap: 3,
     }}>
       <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>
-        <span style={{ width: 9, height: 9, borderRadius: 3, background: kleur }} />{titel}
-        <ChevronDown size={14} style={{ marginLeft: 'auto', opacity: 0.6, transform: aan ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+        <span style={{ width: 9, height: 9, borderRadius: 3, background: kleur, flexShrink: 0 }} />{titel}
+        {klikbaar && <ChevronDown size={14} style={{ opacity: 0.6, transform: aan ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />}
       </span>
       <span style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{eur(bedrag)}</span>
       <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{sub}</span>
