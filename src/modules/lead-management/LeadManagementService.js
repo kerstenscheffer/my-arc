@@ -2757,6 +2757,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         naam: r.lead_name || 'Lead',
         // Soort voor de lijst "Recente betalingen": nieuw, verlenging of upsell.
         soort: r.outcome_type === 'verlenging' ? 'verlenging' : r.outcome_type === 'upsell' ? 'upsell' : 'nieuw',
+        // Bron voor het omzetscherm: waar komt het geld vandaan.
+        bron: r.sale_kind === 'challenge' ? 'challenge'
+          : r.outcome_type === 'verlenging' ? 'verlenging'
+          : r.outcome_type === 'upsell' ? 'vervolg' : 'coaching',
         // Challenge-geld dat nog terug kan: het staat op de rekening, maar is
         // nog niet van ons. In de grafiek krijgt dat deel een eigen kleur.
         challenge: r.sale_kind === 'challenge' && r.challenge_status !== 'behouden',
@@ -2794,26 +2798,35 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const restStart = heeftRest ? s.restDatum : s.date
 
         if (heeftRest && s.reservering > 0) {
-          boek(monthKey(s.date), s.reservering)
+          boek(monthKey(s.date), s.reservering, 'Aanbetaling', s.date)
         }
         if (restBedrag <= 0) return
 
         if (s.type === 'monthly' && s.months > 1) {
           const per = restBedrag / s.months
           for (let i = 0; i < s.months; i++) {
-            boek(monthKey(startOfMonth(restStart, i)), per)
+            const d = new Date(restStart.getFullYear(), restStart.getMonth() + i, Math.min(restStart.getDate(), 28))
+            boek(monthKey(startOfMonth(restStart, i)), per, `Termijn ${i + 1} van ${s.months}`, i === 0 ? restStart : d)
           }
         } else {
-          boek(monthKey(restStart), restBedrag)
+          boek(monthKey(restStart), restBedrag, heeftRest ? 'Restbetaling' : 'In één keer', restStart)
         }
       }
 
-      sales.forEach(s => verdeel(s, (k, bedrag) => {
+      // Per maand ook de losse betalingen en het bedrag per bron, voor het
+      // omzetscherm (waar komt het vandaan + alle transacties).
+      const perBron = {}
+      const boekingen = []
+      sales.forEach(s => verdeel(s, (k, bedrag, termijn, datum) => {
         cash[k] = (cash[k] || 0) + bedrag
         if (s.challenge) cashChallenge[k] = (cashChallenge[k] || 0) + bedrag
+        perBron[k] = perBron[k] || {}
+        perBron[k][s.bron] = (perBron[k][s.bron] || 0) + bedrag
+        boekingen.push({ maand: k, naam: s.naam, bedrag: Math.round(bedrag), bron: s.bron, termijn, datum: (datum || s.date).toISOString(), toegezegd: false })
       }))
-      openstaand.forEach(s => verdeel(s, (k, bedrag) => {
+      openstaand.forEach(s => verdeel(s, (k, bedrag, termijn, datum) => {
         cashPending[k] = (cashPending[k] || 0) + bedrag
+        boekingen.push({ maand: k, naam: s.naam, bedrag: Math.round(bedrag), bron: s.bron, termijn, datum: (datum || s.date).toISOString(), toegezegd: true })
       }))
 
       // MRR nu + actieve maandplannen (maandplannen die deze maand nog lopen).
@@ -2841,6 +2854,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           amount: Math.round(cash[k] || 0),
           challengeAmount: Math.round(cashChallenge[k] || 0),
           pendingAmount: Math.round(cashPending[k] || 0),
+          perBron: Object.fromEntries(Object.entries(perBron[k] || {}).map(([b, v]) => [b, Math.round(v)])),
           isPast: i < 0,
           isCurrent: i === 0,
         })
@@ -2852,6 +2866,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         totalBooked: Math.round(totalBooked),
         months,
         saleCount: sales.length,
+        boekingen: boekingen.sort((a, b) => new Date(b.datum) - new Date(a.datum)),
         // Toegezegd, nog niet binnen. Nergens in de bedragen hierboven
         // meegeteld — dit is de lijst die je nog moet ophalen.
         toegezegdTotaal: Math.round(openstaand.reduce((a, s) => a + s.total, 0)),
@@ -2877,7 +2892,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       }
     } catch (error) {
       console.error('❌ getRevenueProjection failed:', error)
-      return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0, toegezegdTotaal: 0, toegezegdAantal: 0, toegezegd: [], sales: [] }
+      return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0, toegezegdTotaal: 0, toegezegdAantal: 0, toegezegd: [], sales: [], boekingen: [] }
     }
   }
 
