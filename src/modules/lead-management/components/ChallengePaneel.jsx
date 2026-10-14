@@ -15,7 +15,7 @@
 //   Terugbetaald  — geld terug. Valt overal uit, ook uit de cashflow.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Gift, ArrowUpRight, Check, Undo2, Clock } from 'lucide-react'
+import { ArrowUpRight, Check, Undo2 } from 'lucide-react'
 
 const LIJN = 'rgba(255,255,255,0.08)'
 // Challenge-geld is wit zoals de rest — het staat op de rekening — maar met
@@ -31,10 +31,17 @@ const veld = {
   outline: 'none', boxSizing: 'border-box',
 }
 
+// "dylan_bastiaan dylan_bastiaan": voor- en achternaam zijn bij Instagram-
+// leads vaak allebei de gebruikersnaam. Dan één keer tonen.
+const naamVan = (n) => {
+  const delen = String(n || '').trim().split(/\s+/)
+  return delen.length === 2 && delen[0] === delen[1] ? delen[0] : n
+}
+
 const knop = (kleur, vol = false) => ({
-  flex: 1, minWidth: 84, minHeight: 36,
-  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-  padding: '0 0.5rem', borderRadius: 9,
+  flexShrink: 0, minHeight: 30,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+  padding: '0 0.65rem', borderRadius: 999,
   background: vol ? kleur : 'transparent',
   border: `1px solid ${vol ? kleur : (kleur === '#fff' ? 'rgba(255,255,255,0.25)' : kleur + '55')}`,
   color: vol ? '#0a0a0a' : kleur,
@@ -54,28 +61,24 @@ function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald }) {
   const partnerDeel = (!isNaN(bedragNum) && pctNum > 0) ? bedragNum * (pctNum / 100) : null
 
   return (
-    <div style={{ padding: '0.75rem 0', borderBottom: `1px solid ${LIJN_ZACHT}`, opacity: bezig ? 0.5 : 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <Gift size={14} color="rgba(255,255,255,0.4)" strokeWidth={2.6} style={{ flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ padding: '0.6rem 0', borderBottom: `1px solid ${LIJN_ZACHT}`, opacity: bezig ? 0.5 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 180px', minWidth: 0 }}>
           <div style={{
-            fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em',
+            fontSize: '0.88rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
-            {ch.leadName}
+            {naamVan(ch.leadName)}
           </div>
-          <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
-            {euro(ch.bedrag)} {ch.betaald ? 'in bewaring' : 'toegezegd · nog niet betaald'}
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+            {euro(ch.bedrag)}
             {ch.deadline && (
-              <span style={{ color: ch.verlopen ? '#10b981' : 'rgba(255,255,255,0.35)' }}>
-                {' · '}{ch.verlopen ? 'termijn voorbij' : `terug te vragen tot ${new Date(ch.deadline).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
+              <span style={{ color: ch.verlopen ? '#10b981' : 'rgba(255,255,255,0.4)' }}>
+                {' · '}{ch.verlopen ? 'termijn voorbij' : `tot ${new Date(ch.deadline).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
               </span>
             )}
           </div>
         </div>
-        {ch.verlopen && <Clock size={13} color="#10b981" strokeWidth={3} style={{ flexShrink: 0 }} />}
-      </div>
-
       {!ch.betaald ? (
         // Nog niet betaald: eerst moet het geld binnenkomen, pas dan valt er
         // iets te behouden of terug te betalen.
@@ -84,7 +87,7 @@ function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald }) {
             <Check size={12} strokeWidth={3.4} /> Betaald
           </button>
           <button style={knop('#ef4444')} disabled={bezig} onClick={() => doe(() => onAfronden(ch, 'terugbetaald'))}>
-            <Undo2 size={12} strokeWidth={3.4} /> Gaat niet door
+            Gaat niet door
           </button>
         </div>
       ) : !vervolg ? (
@@ -96,11 +99,13 @@ function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald }) {
             <ArrowUpRight size={12} strokeWidth={3.4} /> Doorgezet
           </button>
           <button style={knop('#ef4444')} disabled={bezig} onClick={() => doe(() => onAfronden(ch, 'terugbetaald'))}>
-            <Undo2 size={12} strokeWidth={3.4} /> Terugbetaald
+            <Undo2 size={12} strokeWidth={3.4} /> Terug
           </button>
         </div>
-      ) : (
-        <div>
+      ) : null}
+      </div>
+      {ch.betaald && vervolg && (
+        <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <input
               type="number" inputMode="decimal" autoFocus value={bedrag}
@@ -181,7 +186,7 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
   const totaal = inBewaring.reduce((s, c) => s + c.bedrag, 0)
   const totaalToegezegd = toegezegd.reduce((s, c) => s + c.bedrag, 0)
   const verlopen = inBewaring.filter(c => c.verlopen)
-  const kopje = { fontSize: '0.95rem', fontWeight: 900, color: '#fff', margin: '1.25rem 0 0.25rem' }
+  const kopje = { fontSize: '0.78rem', fontWeight: 900, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '1rem 0 0.1rem' }
   const regel = (ch) => (
     <Regel
       key={ch.movementId}
@@ -209,8 +214,8 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
   return (
     <div>
       <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: '1.25rem 3.5rem',
-        paddingBottom: '1.25rem', borderBottom: `1px solid ${LIJN}`, marginBottom: '1rem',
+        display: 'flex', flexWrap: 'wrap', gap: '1rem 2.5rem',
+        paddingBottom: '1rem', borderBottom: `1px solid ${LIJN}`, marginBottom: '0.75rem',
       }}>
         {[
           { label: `In bewaring · ${inBewaring.length} challenge${inBewaring.length === 1 ? '' : 's'}`, waarde: euro(totaal) },
@@ -219,12 +224,12 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
         ].map(k => (
           <div key={k.label}>
             <div style={{
-              fontSize: '2.2rem', fontWeight: 900, lineHeight: 1,
+              fontSize: '1.6rem', fontWeight: 900, lineHeight: 1,
               color: '#fff', letterSpacing: '-0.035em',
             }}>
               {k.waarde}
             </div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginTop: 8 }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 5 }}>
               {k.label}
             </div>
           </div>
@@ -232,11 +237,10 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
       </div>
 
       <div style={{
-        fontSize: '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)',
-        lineHeight: 1.5, marginBottom: '1rem',
+        fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)',
+        lineHeight: 1.45, marginBottom: '0.5rem',
       }}>
-        Dit geld staat op de rekening maar telt nog niet als omzet, en er gaat
-        geen commissie overheen zolang de klant het kan terugvragen.
+        Telt nog niet als omzet en er gaat geen commissie over zolang de klant het kan terugvragen.
       </div>
 
       {toegezegd.length > 0 && (
@@ -247,7 +251,7 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
       )}
       {inBewaring.length > 0 && (
         <>
-          <div style={{ ...kopje, marginTop: toegezegd.length ? '1.75rem' : 0 }}>In bewaring</div>
+          <div style={{ ...kopje, marginTop: toegezegd.length ? '1.25rem' : 0 }}>In bewaring</div>
           {inBewaring.map(regel)}
         </>
       )}
