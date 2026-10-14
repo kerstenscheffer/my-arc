@@ -18,7 +18,7 @@ import { useModalHost } from '../../../../coach/ModalHost'
 import {
   X, Trash2, User, Target, Phone as PhoneCall, Magnet, FileText,
   Plus, AlertCircle, Zap, Heart, Flame, Check, Save,
-  ExternalLink, Tag, Trash, Copy, Pencil, MessageSquare, Eraser, ListChecks,
+  ExternalLink, Tag, Trash, Copy, Pencil, MessageSquare, Eraser, ListChecks, MessageCircle,
 } from 'lucide-react'
 
 // Default template used when a magnet has no message_template stored. Same
@@ -433,6 +433,26 @@ export default function LeadDetailModalV2({
                 {salesFilledCount > 0 && <span style={{ color: '#FFD700' }}>· {salesFilledCount}/5 sales</span>}
               </div>
             </div>
+            {waNummer(info.phone) && (
+              <a
+                href={`https://wa.me/${waNummer(info.phone)}`}
+                target="_blank" rel="noopener noreferrer"
+                title="WhatsApp openen"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  height: '32px', padding: '0 0.7rem',
+                  background: 'rgba(37,211,102,0.12)',
+                  border: '1px solid rgba(37,211,102,0.35)',
+                  borderRadius: '6px',
+                  color: '#25D366', fontSize: '0.75rem', fontWeight: 800,
+                  textDecoration: 'none', flexShrink: 0,
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <MessageCircle size={15} />
+                {!isMobile && 'WhatsApp'}
+              </a>
+            )}
             <button onClick={onClose} aria-label="Sluiten" style={iconBtnStyle}>
               <X size={16} />
             </button>
@@ -1530,6 +1550,16 @@ const inputStyle = {
   boxSizing: 'border-box',
   fontFamily: 'inherit',
   lineHeight: 1.4,
+}
+
+// Telefoonnummer naar het formaat van wa.me: alleen cijfers, met landcode.
+// Een Nederlands 06-nummer (0612345678) wordt 31612345678, 0031… wordt 31….
+function waNummer(tel) {
+  if (!tel) return null
+  let n = String(tel).replace(/\D/g, '')
+  if (n.startsWith('00')) n = n.slice(2)
+  else if (n.startsWith('0')) n = '31' + n.slice(1)
+  return n.length >= 8 ? n : null
 }
 
 const iconBtnStyle = {
