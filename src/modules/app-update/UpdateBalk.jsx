@@ -1,8 +1,9 @@
 // src/modules/app-update/UpdateBalk.jsx
 //
 // Twee standen:
-//   zacht      Eén regel bovenaan de app: er staat een nieuwe versie klaar.
-//              Wie wegklikt heeft er geen last meer van tot de vólgende versie.
+//   zacht      Een pop-up: er staat een nieuwe versie klaar. "Later" houdt
+//              hem drie dagen weg; daarna komt hij terug tot er geüpdatet is.
+//              (Tot 14 okt 2026 was dit een dunne balk, die viel niet op.)
 //   verplicht  De klant zit onder de minimumversie (app_release.min_version):
 //              een scherm over alles heen met alleen een knop naar de winkel.
 //              Zo gebruikt niemand een versie waar de rest van het systeem
@@ -11,7 +12,7 @@
 // Werkt op iOS en Android; op het web doet dit niets.
 
 import { useEffect, useState } from 'react'
-import { ArrowDownToLine, X } from 'lucide-react'
+import { ArrowDownToLine } from 'lucide-react'
 import db from '../../services/DatabaseService'
 import { APP_VERSIE, isNativeApp, beoordeelVersie } from './appVersie'
 
@@ -35,8 +36,8 @@ export default function UpdateBalk({ isMobile }) {
       if (!uitkomst) { setStand(null); return }
       if (!uitkomst.verplicht) {
         let weg = null
-        try { weg = localStorage.getItem('myarc_update_weg') } catch { /* leeg */ }
-        if (weg === uitkomst.nieuwe) return
+        try { weg = JSON.parse(localStorage.getItem('myarc_update_weg') || 'null') } catch { /* leeg */ }
+        if (weg?.versie === uitkomst.nieuwe && Date.now() - weg.tijd < 3 * 864e5) return
       }
       setStand(uitkomst)
     }
@@ -54,52 +55,65 @@ export default function UpdateBalk({ isMobile }) {
   if (stand.verplicht) return <UpdateVerplicht stand={stand} />
 
   const sluit = () => {
-    try { localStorage.setItem('myarc_update_weg', stand.nieuwe) } catch { /* leeg */ }
+    try { localStorage.setItem('myarc_update_weg', JSON.stringify({ versie: stand.nieuwe, tijd: Date.now() })) } catch { /* leeg */ }
     setStand(null)
   }
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 12,
-      padding: isMobile ? '0.75rem 1rem' : '0.85rem 1.5rem',
-      background: 'rgba(255,186,9,0.09)',
-      borderBottom: '1px solid rgba(255,186,9,0.25)',
-    }}>
-      <ArrowDownToLine size={isMobile ? 17 : 18} color={GOUD} strokeWidth={2.6} style={{ flexShrink: 0 }} />
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, color: '#fff', lineHeight: 1.25 }}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Nieuwe versie"
+      onClick={sluit}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2147482000, background: 'rgba(0,0,0,0.75)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '24px 16px',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: isMobile ? 360 : 400, background: '#111',
+          border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20,
+          padding: '24px 20px 18px', textAlign: 'left',
+        }}
+      >
+        <div style={{
+          width: 48, height: 48, borderRadius: 14, background: 'rgba(255,186,9,0.12)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <ArrowDownToLine size={24} color={GOUD} strokeWidth={2.6} />
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginTop: 14, lineHeight: 1.2 }}>
           Nieuwe versie beschikbaar
         </div>
-        <div style={{ fontSize: isMobile ? '0.75rem' : '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-          Je hebt {APP_VERSIE} — versie {stand.nieuwe} staat klaar
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 6, lineHeight: 1.5 }}>
+          Je gebruikt versie {APP_VERSIE}. Update naar {stand.nieuwe} voor de nieuwste functies en verbeteringen.
         </div>
+        <button
+          onClick={() => openWinkel(stand.storeUrl)}
+          style={{
+            width: '100%', minHeight: 48, marginTop: 20, borderRadius: 12, border: 'none',
+            background: '#fff', color: '#0a0a0a', fontSize: 16, fontWeight: 900,
+            fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Nu updaten
+        </button>
+        <button
+          onClick={sluit}
+          style={{
+            width: '100%', minHeight: 44, marginTop: 6, borderRadius: 12, border: 'none',
+            background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 15, fontWeight: 800,
+            fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Later
+        </button>
       </div>
-
-      <button
-        onClick={() => openWinkel(stand.storeUrl)}
-        style={{
-          flexShrink: 0, minHeight: 36, padding: '0 0.9rem', borderRadius: 10, border: 'none',
-          background: '#fff', color: '#0a0a0a', fontSize: '0.85rem', fontWeight: 900,
-          fontFamily: 'inherit', cursor: 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        Updaten
-      </button>
-
-      <button
-        onClick={sluit}
-        aria-label="Later"
-        style={{
-          flexShrink: 0, width: 32, height: 32, borderRadius: 8, border: 'none',
-          background: 'transparent', color: 'rgba(255,255,255,0.45)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <X size={17} strokeWidth={2.8} />
-      </button>
     </div>
   )
 }

@@ -5,9 +5,10 @@
 // stuurt. Een eigen sterrenscherm mag dat niet; daarom tekent dit component
 // niets en vraagt het alleen op het juiste moment het systeemvenster aan.
 //
-// Wanneer: account minstens dertig dagen oud, minstens drie trainingen met
-// gelogde sets in de laatste dertig dagen, en niet binnen negentig dagen na
-// de vorige keer. Apple en Google beslissen zelf of ze het venster écht
+// Wanneer: account minstens zeven dagen oud, op minstens drie verschillende
+// dagen iets gelogd (maaltijd of training met sets) in de laatste veertien
+// dagen, en niet binnen negentig dagen na de vorige keer. (Tot 14 okt 2026
+// was het dertig dagen + drie trainingen; dat haalde maar de helft.) Apple en Google beslissen zelf of ze het venster écht
 // tonen (maximaal een paar keer per jaar per gebruiker); wij vragen alleen.
 // Op het web gebeurt er niets.
 
@@ -23,17 +24,26 @@ export default function ReviewPrompt({ db, client }) {
     const t = setTimeout(async () => {
       try {
         try { if (Number(localStorage.getItem('myarc_review_laatst') || 0) > Date.now() - 7 * DAG) return } catch { /* geen opslag */ }
-        if (client.created_at && Date.now() - new Date(client.created_at).getTime() < 30 * DAG) return
+        if (client.created_at && Date.now() - new Date(client.created_at).getTime() < 7 * DAG) return
         const { data: eerder } = await db.supabase.from('app_review_prompts').select('asked_at')
           .eq('client_id', client.id).order('asked_at', { ascending: false }).limit(1).then(r => r, () => ({ data: [] }))
         if (eerder?.[0] && Date.now() - new Date(eerder[0].asked_at).getTime() < 90 * DAG) return
-        const vanaf = new Date(Date.now() - 30 * DAG).toISOString().slice(0, 10)
-        const { data: sessies } = await db.supabase.from('workout_sessions').select('id').eq('client_id', client.id).gte('workout_date', vanaf)
-          .then(r => r, () => ({ data: [] }))
-        const ids = (sessies || []).map(s => s.id)
-        if (ids.length < 3) return
-        const { data: sets } = await db.supabase.from('workout_progress').select('session_id').in('session_id', ids).then(r => r, () => ({ data: [] }))
-        if (new Set((sets || []).map(x => x.session_id)).size < 3) return
+        const vanaf = new Date(Date.now() - 14 * DAG)
+        const dagen = new Set()
+        const { data: maaltijden } = await db.supabase.from('consumed_meals').select('consumed_at')
+          .eq('client_id', client.id).gte('consumed_at', vanaf.toISOString()).limit(500).then(r => r, () => ({ data: [] }))
+        for (const m of maaltijden || []) if (m.consumed_at) dagen.add(new Date(m.consumed_at).toLocaleDateString('sv-SE'))
+        if (dagen.size < 3) {
+          const { data: sessies } = await db.supabase.from('workout_sessions').select('id, workout_date')
+            .eq('client_id', client.id).gte('workout_date', vanaf.toISOString().slice(0, 10)).then(r => r, () => ({ data: [] }))
+          const ids = (sessies || []).map(x => x.id)
+          if (ids.length) {
+            const { data: sets } = await db.supabase.from('workout_progress').select('session_id').in('session_id', ids).then(r => r, () => ({ data: [] }))
+            const metSets = new Set((sets || []).map(x => x.session_id))
+            for (const x of sessies) if (metSets.has(x.id)) dagen.add(String(x.workout_date).slice(0, 10))
+          }
+        }
+        if (dagen.size < 3) return
         if (weg) return
         try { localStorage.setItem('myarc_review_laatst', String(Date.now())) } catch { /* geen opslag */ }
         await db.supabase.from('app_review_prompts').insert({ client_id: client.id, platform: Capacitor.getPlatform() }).then(r => r, () => null)
