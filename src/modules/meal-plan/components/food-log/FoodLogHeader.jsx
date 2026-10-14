@@ -6,11 +6,14 @@
 // eronder, en scannen was een losse knop die over de lijst zweefde.
 
 import React from 'react'
-import { Search, Scan } from 'lucide-react'
+import { Search, Scan, Zap } from 'lucide-react'
 
 const STANDEN = [
   { id: 'zoeken', label: 'Zoeken', Icon: Search },
   { id: 'scannen', label: 'Scannen', Icon: Scan },
+  // Snel invoeren (alleen kcal/macro's) staat hier sinds 14 okt 2026; zijn
+  // plek in de rij eronder is voor Coach maaltijden.
+  { id: 'snel', label: 'Snel', Icon: Zap },
 ]
 
 export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
@@ -40,8 +43,9 @@ export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
         }}>
           <div style={{
             position: 'absolute', top: 3, bottom: 3,
-            left: weergave === 'scannen' ? 'calc(50% + 1.5px)' : 3,
-            width: 'calc(50% - 4.5px)',
+            // Drie standen: het blokje is een derde breed en schuift per stand.
+            left: `calc(${Math.max(0, STANDEN.findIndex(st => st.id === weergave)) * (100 / STANDEN.length)}% + 3px)`,
+            width: `calc(${100 / STANDEN.length}% - 6px)`,
             background: '#fff', borderRadius: 999,
             transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           }} />

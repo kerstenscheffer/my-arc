@@ -58,7 +58,12 @@ export default function AIAlternativesModal({
   onSelectMeal,
   db,
   service,
-  client
+  client,
+  // Ingebouwd in het log-venster ("Coach maaltijden"): geen eigen overlay,
+  // titel of huidige maaltijd; een tik op een kaart kiest hem meteen via
+  // onKiesMaaltijd (de portie kies je daarna in het log-venster).
+  embedded = false,
+  onKiesMaaltijd,
 }) {
   const isMobile = window.innerWidth <= 768
   const [searchTerm, setSearchTerm] = useState('')
@@ -153,7 +158,7 @@ export default function AIAlternativesModal({
   ]
 
   useEffect(() => {
-    if (isOpen && currentMeal) {
+    if ((isOpen || embedded) && currentMeal) {
       loadAlternatives()
     }
     return () => {
@@ -590,13 +595,20 @@ export default function AIAlternativesModal({
 
   const filteredMeals = getFilteredMeals()
 
-  if (!isOpen) return null
+  if (!isOpen && !embedded) return null
+
+  // Kiezen: in het log-venster meteen door naar de portie, anders eerst het
+  // vergelijk-blad.
+  const kies = (meal) => {
+    if (embedded) { onKiesMaaltijd?.(meal); return }
+    setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)
+  }
 
   return (
     <>
     <div
-      onClick={onClose}
-      style={{
+      onClick={embedded ? undefined : onClose}
+      style={embedded ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : {
         position: 'fixed',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.9)',
@@ -611,9 +623,10 @@ export default function AIAlternativesModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           flex: 1,
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          maxWidth: isMobile ? '100%' : '600px',
+          maxWidth: embedded ? '100%' : (isMobile ? '100%' : '600px'),
           width: '100%',
           margin: '0 auto',
           background: '#0a0a0a',
@@ -622,10 +635,11 @@ export default function AIAlternativesModal({
       >
         {/* ── Header ── */}
         <div style={{
-          padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
+          padding: embedded ? (isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.75rem') : (isMobile ? '0.75rem 1rem' : '1rem 1.5rem'),
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
           flexShrink: 0
         }}>
+          {!embedded && (<>
           {/* Titel + sluiten */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -677,6 +691,7 @@ export default function AIAlternativesModal({
           }}>
             Wissel voor:
           </div>
+          </>)}
 
           {/* Search */}
           <div style={{ position: 'relative', marginBottom: '0.625rem' }}>
@@ -824,7 +839,8 @@ export default function AIAlternativesModal({
                 meal={meal}
                 currentMeal={currentMeal}
                 isSelected={selectedMeal?.id === meal.id}
-                onSelect={() => setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)}
+                onSelect={() => kies(meal)}
+                zonderVerschil={embedded}
                 isMobile={isMobile}
                 inMijnMaaltijden={meal._isCustom || staatInMijnMaaltijden(meal)}
                 onSter={() => setSterMeal(meal)}
@@ -1129,7 +1145,7 @@ export default function AIAlternativesModal({
 // eronder. Dat zijn de twee waarop je een maaltijd inruilt. Geen "Eigen"-label
 // meer voor eigen maaltijden: dat duwde het kcal-verschil van de foto af, en
 // die staan al onder hun eigen filter.
-function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inMijnMaaltijden, onSter, onInfo }) {
+function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inMijnMaaltijden, onSter, onInfo, zonderVerschil = false }) {
   const teken = (n) => `${n > 0 ? '+' : ''}${n}`
   const kcalOp = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
   const eiwitOp = Math.round((meal.protein || 0) - (currentMeal?.protein || 0))
@@ -1145,8 +1161,10 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inM
         calories: meal.calories, protein: meal.protein,
         carbs: meal.carbs, fat: meal.fat,
       }}
-      momentLabel={kcalLabel}
-      tijdLabel={eiwitLabel}
+      // Bij loggen is er geen maaltijd om mee te vergelijken: dan het moment
+      // op de foto in plaats van "+520 kcal".
+      momentLabel={zonderVerschil ? null : kcalLabel}
+      tijdLabel={zonderVerschil ? null : eiwitLabel}
       isMobile={isMobile}
       geselecteerd={isSelected}
       onCheck={onSelect}
@@ -1171,7 +1189,7 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inM
         { icon: <Info size={isMobile ? 11 : 12} />, label: 'Info', onClick: onInfo },
         {
           icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />,
-          label: isSelected ? 'Gekozen' : 'Kies',
+          label: zonderVerschil ? 'Loggen' : (isSelected ? 'Gekozen' : 'Kies'),
           onClick: onSelect,
           checked: isSelected,
         },

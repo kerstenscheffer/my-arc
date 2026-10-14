@@ -1,8 +1,8 @@
 // src/modules/meal-plan/components/food-log/FoodLogModal.jsx
 // 🎯 v3.1 — Edit flow race fix: useEffect deps gefixt + diagnostic log
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ArrowLeft, Check, AlertCircle, Star, Apple, UtensilsCrossed, Zap } from 'lucide-react'
+import { X, ArrowLeft, Check, AlertCircle, Star, Apple, UtensilsCrossed, ChefHat } from 'lucide-react'
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
@@ -12,6 +12,8 @@ import AmountPicker from './AmountPicker'
 import SmartLoggingService from './SmartLoggingService'
 import IngredientFeedbackModal from './IngredientFeedbackModal'
 import { enrichIngredientImage } from './enrichImageFromOFF'
+import AIAlternativesModal from '../AIAlternativesModal'
+import AIMealPlanService from '../../AIMealPlanService'
 
 export default function FoodLogModal({
   isOpen, onClose, client, db,
@@ -27,7 +29,7 @@ export default function FoodLogModal({
 }) {
   const isMobile = window.innerWidth <= 768
   // Twee dingen sturen het scherm: de schuifknop (zoeken of scannen) en de
-  // vier knoppen eronder (favorieten / producten / mijn maaltijden / snel).
+  // vier knoppen eronder (favorieten / producten / mijn maaltijden / coach).
   const [weergave, setWeergave] = useState('zoeken')
   const [filter, setFilter] = useState(startTab === 'meals' ? 'maaltijden' : 'producten')
   const [selectedItem, setSelectedItem] = useState(null)
@@ -36,6 +38,18 @@ export default function FoodLogModal({
   const [addIngredientCallback, setAddIngredientCallback] = useState(null)
   const [buildingMeal, setBuildingMeal] = useState(null)
   const [showFeedback, setShowFeedback] = useState(false)
+  // Coach maaltijden: dezelfde lijst als het wisselvenster, ingebouwd.
+  const [mealService] = useState(() => (db ? new AIMealPlanService(db) : null))
+  // Waarmee het wisselvenster vergelijkt. Bij loggen is er niets om te
+  // wisselen; alleen het moment telt, zodat de lijst op het juiste moment
+  // opent (gekozen moment, anders het uur van de dag).
+  const coachStartMaaltijd = useMemo(() => {
+    const u = new Date().getHours()
+    const nuMoment = u < 10 ? 'breakfast' : u < 14 ? 'lunch' : u < 17 ? 'snack' : u < 21 ? 'dinner' : 'snack'
+    const slot = ['breakfast', 'lunch', 'dinner', 'snack', 'pre_workout', 'post_workout'].includes(defaultMealMoment)
+      ? defaultMealMoment : nuMoment
+    return { id: null, name: '', slot, calories: 0, protein: 0, carbs: 0, fat: 0 }
+  }, [defaultMealMoment])
 
   useEffect(() => {
     if (db?.supabase && !loggingService) {
@@ -332,7 +346,13 @@ export default function FoodLogModal({
             <FilterKnoppen filter={filter} zet={setFilter} isMobile={isMobile} />
           )}
 
-          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* Coach maaltijden heeft een eigen vaste kop (zoeken + keuzes) en
+              een eigen scrollende lijst; dan scrolt deze laag zelf niet. */}
+          <div style={{
+            flex: 1, minHeight: 0, WebkitOverflowScrolling: 'touch',
+            overflowY: weergave === 'zoeken' && filter === 'coach' ? 'hidden' : 'auto',
+            display: 'flex', flexDirection: 'column',
+          }}>
             {weergave === 'scannen' ? (
               <ScanTab
                 db={db}
@@ -344,8 +364,29 @@ export default function FoodLogModal({
                 onClose={onClose}
                 isMobile={isMobile}
               />
-            ) : filter === 'snel' ? (
+            ) : weergave === 'snel' ? (
               <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} />
+            ) : filter === 'coach' ? (
+              <AIAlternativesModal
+                embedded
+                isOpen
+                currentMeal={coachStartMaaltijd}
+                db={db}
+                service={mealService}
+                client={client}
+                onClose={() => {}}
+                onSelectMeal={() => {}}
+                onKiesMaaltijd={(m) => handleSelectItem({
+                  id: m.id, name: m.name,
+                  calories: Math.round(m.calories || 0), protein: Math.round(m.protein || 0),
+                  carbs: Math.round(m.carbs || 0), fat: Math.round(m.fat || 0),
+                  image_url: m.image_url,
+                  type: m._isCustom ? 'custom_meal' : 'meal',
+                  source: m._isCustom ? 'custom' : 'myarc',
+                  sourceLabel: 'Coach', per100g: false,
+                  ingredients: Array.isArray(m.ingredients_list) ? m.ingredients_list : [],
+                })}
+              />
             ) : filter === 'maaltijden' ? (
               <MyMealsTab
                 client={client} db={db} onLog={handleLog} isMobile={isMobile}
@@ -390,13 +431,15 @@ export default function FoodLogModal({
 }
 
 // Vier knoppen die bepalen waar je zoekt: je favorieten, alle producten, je
-// eigen maaltijden of snel invoeren. Vervangt de drie tabbladen bovenaan.
+// eigen maaltijden of de maaltijden van je coach. Snel invoeren staat sinds
+// 14 okt 2026 bovenaan naast Scannen.
 function FilterKnoppen({ filter, zet, isMobile }) {
   const knoppen = [
     { id: 'favorieten', label: 'Favoriet', Icon: Star },
     { id: 'producten', label: 'Producten', Icon: Apple },
     { id: 'maaltijden', label: 'Mijn maaltijden', Icon: UtensilsCrossed },
-    { id: 'snel', label: 'Snel', Icon: Zap },
+    // Wat de coach voor je klaarzet: dezelfde lijst als bij wisselen.
+    { id: 'coach', label: 'Coach maaltijden', Icon: ChefHat },
   ]
   return (
     <div style={{
