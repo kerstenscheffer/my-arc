@@ -127,6 +127,25 @@ class WorkoutServiceNew {
     }
   }
 
+  // Een training kan vaker in de week staan (Push op maandag én donderdag).
+  // Een gewone override hangt aan de training en geldt dus voor alle keren;
+  // een wissel voor één dag krijgt de weekdag erbij: 'push@thursday'. De
+  // vlag _alleenDag in exercise_data houdt dat vast, zodat ook latere
+  // aanpassingen (sets, overslaan) van die oefening bij die ene dag blijven.
+  dagOverrideKey(dayKey, weekdag) {
+    return weekdag ? `${dayKey}@${String(weekdag).toLowerCase()}` : dayKey
+  }
+
+  // De training zelf plus elke dag-variant ervan.
+  alleKeysVan(dayKey) {
+    return [dayKey, ...['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(d => `${dayKey}@${d}`)]
+  }
+
+  // Hoort deze override-rij bij deze training (alle keren of één dag)?
+  hoortBijTraining(rijKey, dayKey) {
+    return rijKey === dayKey || String(rijKey || '').startsWith(`${dayKey}@`)
+  }
+
   async getWeeklyOverrides(clientId, schemaId, db) {
     if (!clientId || !schemaId) return []
     try {
@@ -156,7 +175,7 @@ class WorkoutServiceNew {
           client_id: clientId,
           schema_id: schemaId,
           week_start: weekStart,
-          day_key: dayKey,
+          day_key: this.dagOverrideKey(dayKey, exerciseData?._alleenDag),
           exercise_index: exerciseIndex,
           exercise_data: exerciseData
         }, { onConflict: 'client_id,schema_id,week_start,day_key,exercise_index' })
@@ -171,18 +190,23 @@ class WorkoutServiceNew {
     }
   }
 
-  async removeWeeklyOverride(clientId, schemaId, dayKey, exerciseIndex, db) {
+  // weekdag: alleen de override van die ene dag. alleDagen: ook alle
+  // dag-overrides van deze oefening (na een wissel voor alle keren).
+  async removeWeeklyOverride(clientId, schemaId, dayKey, exerciseIndex, db, { weekdag = null, alleDagen = false } = {}) {
     if (!clientId || !schemaId) return false
     try {
       const weekStart = this.getCurrentWeekStart()
-      const { error } = await this._client(db)
+      let q = this._client(db)
         .from('client_exercise_overrides')
         .delete()
         .eq('client_id', clientId)
         .eq('schema_id', schemaId)
         .eq('week_start', weekStart)
-        .eq('day_key', dayKey)
         .eq('exercise_index', exerciseIndex)
+      q = alleDagen
+        ? q.in('day_key', this.alleKeysVan(dayKey))
+        : q.eq('day_key', this.dagOverrideKey(dayKey, weekdag))
+      const { error } = await q
       if (error) throw error
       return true
     } catch (error) {
@@ -202,10 +226,10 @@ class WorkoutServiceNew {
       const client = this._client(db)
       const alle = await this.getWeeklyOverrides(clientId, schemaId, db)
       const teVerplaatsen = alle
-        .filter(o => o.day_key === dayKey && parseInt(o.exercise_index) > verwijderdeIndex)
+        .filter(o => this.hoortBijTraining(o.day_key, dayKey) && parseInt(o.exercise_index) > verwijderdeIndex)
         .map(o => ({
           client_id: clientId, schema_id: schemaId, week_start: weekStart,
-          day_key: dayKey,
+          day_key: o.day_key,
           exercise_index: parseInt(o.exercise_index) - 1,
           exercise_data: o.exercise_data
         }))
@@ -216,7 +240,7 @@ class WorkoutServiceNew {
         .eq('client_id', clientId)
         .eq('schema_id', schemaId)
         .eq('week_start', weekStart)
-        .eq('day_key', dayKey)
+        .in('day_key', this.alleKeysVan(dayKey))
         .gte('exercise_index', verwijderdeIndex)
       if (error) throw error
 
@@ -233,7 +257,10 @@ class WorkoutServiceNew {
     }
   }
 
-  applyOverridesToSchema(schema, overrides) {
+  // weekdag ('thursday'): de dag-overrides van die dag komen ná de gewone,
+  // dus een wissel voor alleen donderdag wint daar. Dag-overrides van andere
+  // dagen doen niets.
+  applyOverridesToSchema(schema, overrides, weekdag = null) {
     if (!schema?.week_structure || !overrides?.length) {
       console.log('⚠️ applyOverrides — leeg:', { hasWeekStructure: !!schema?.week_structure, overridesCount: overrides?.length })
       return schema
@@ -241,7 +268,13 @@ class WorkoutServiceNew {
     const weekStructure = JSON.parse(JSON.stringify(schema.week_structure))
     console.log('🔍 week_structure keys:', Object.keys(weekStructure))
 
-    overrides.forEach(override => {
+    const dag = weekdag ? String(weekdag).toLowerCase() : null
+    const gewoon = overrides.filter(o => !String(o.day_key).includes('@'))
+    const vanDag = dag ? overrides
+      .filter(o => String(o.day_key).endsWith(`@${dag}`))
+      .map(o => ({ ...o, day_key: String(o.day_key).slice(0, -(dag.length + 1)) })) : []
+
+    ;[...gewoon, ...vanDag].forEach(override => {
       const idx = parseInt(override.exercise_index)
       const day = weekStructure[override.day_key]
       console.log('🔄 Override:', {
@@ -266,13 +299,13 @@ class WorkoutServiceNew {
     return { ...schema, week_structure: weekStructure }
   }
 
-  async getSchemaWithOverrides(clientId, schema, db) {
+  async getSchemaWithOverrides(clientId, schema, db, weekdag = null) {
     if (!schema?.id) return schema
     try {
       console.log('🔍 getSchemaWithOverrides — clientId:', clientId, 'schemaId:', schema.id)
       const overrides = await this.getWeeklyOverrides(clientId, schema.id, db)
       console.log('🔍 Overrides raw:', JSON.stringify(overrides))
-      const metOverrides = this.applyOverridesToSchema(schema, overrides)
+      const metOverrides = this.applyOverridesToSchema(schema, overrides, weekdag)
       // Spiergroep en materiaal uit de exercises-tabel eroverheen: de kopieën
       // in het schema en in de overrides lopen achter zodra de bron wordt
       // gecorrigeerd. Zie utils/exerciseMeta.js.
@@ -294,7 +327,7 @@ class WorkoutServiceNew {
       const weekStart = this.getCurrentWeekStart()
       const client = this._client(db)
       const alle = await this.getWeeklyOverrides(clientId, schemaId, db)
-      const vanDeze = alle.filter(o => o.day_key === dayKey)
+      const vanDeze = alle.filter(o => this.hoortBijTraining(o.day_key, dayKey))
       if (!vanDeze.length) return true
 
       // oud → nieuw omkeren, zodat elke override zijn nieuwe plek krijgt.
@@ -307,7 +340,7 @@ class WorkoutServiceNew {
           if (nieuweIndex === undefined) return null
           return {
             client_id: clientId, schema_id: schemaId, week_start: weekStart,
-            day_key: dayKey,
+            day_key: o.day_key,
             exercise_index: nieuweIndex,
             exercise_data: o.exercise_data,
           }
@@ -320,7 +353,7 @@ class WorkoutServiceNew {
         .eq('client_id', clientId)
         .eq('schema_id', schemaId)
         .eq('week_start', weekStart)
-        .eq('day_key', dayKey)
+        .in('day_key', this.alleKeysVan(dayKey))
       if (error) throw error
 
       if (opnieuw.length) {

@@ -26,7 +26,7 @@ const groepVan = (ex) => {
 
 export default function ExerciseList({
   exercises, todaysLogs, onLogsUpdate,
-  client, schema, db, workoutDayKey
+  client, schema, db, workoutDayKey, weekdag, dagenMetTraining
 }) {
   const isMobile = window.innerWidth <= 768
   const [visibleExercises, setVisibleExercises] = useState([])
@@ -342,6 +342,8 @@ export default function ExerciseList({
                 schema={schema}
                 db={db}
                 workoutDayKey={workoutDayKey}
+                weekdag={weekdag}
+                dagenMetTraining={dagenMetTraining}
                 visible={visibleExercises.includes(index)}
                 delay={index * 120}
                 onMakePermanent={() => handleMakePermanent(index)}

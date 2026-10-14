@@ -133,6 +133,8 @@ export default function LogModal({
           schema={schema}
           db={db}
           workoutDayKey={workout.dayKey}
+          weekdag={workout.weekdag}
+          dagenMetTraining={workout.dagenMetTraining}
         />
 
         {/* "+ Eigen oefening" link weggehaald — vervangen door de floating FAB

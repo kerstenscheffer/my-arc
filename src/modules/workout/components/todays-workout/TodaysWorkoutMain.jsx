@@ -11,7 +11,7 @@ import WorkoutServiceNew from '../../services/WorkoutServiceNew'
 import { workoutFoto } from '../../utils/workoutFoto'
 import { isWorkoutFullyLogged, workoutCompletionPct } from '../../utils/exerciseCompletion'
 import { ontleedPlanKey } from '../../utils/planKey'
-import { trainingenVanDag } from '../../utils/extraTrainingen'
+import { trainingenVanDag, dagVanSleutel } from '../../utils/extraTrainingen'
 import CardioVandaag from './CardioVandaag'
 import { useCardioVanDag } from './useCardioVanDag'
 
@@ -212,12 +212,13 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
 
       console.log('🏋️ Week structure keys:', Object.keys(latestSchema.week_structure))
 
-      // Zonder opgeslagen plan (lege week) zijn er geen overrides om te laden.
-      const schemaWithOverrides = latestSchema?.id ? await WorkoutServiceNew.getSchemaWithOverrides(client.id, latestSchema, db) : latestSchema
-
       const savedSchedule = await db.getClientWorkoutSchedule(client.id)
       // selectedDay is een dag-key zoals 'monday'..'sunday' (of 'today'/null = vandaag).
       const dayKey = (selectedDay && selectedDay !== 'today') ? selectedDay : weekDays[todayIndex].toLowerCase()
+
+      // Zonder opgeslagen plan (lege week) zijn er geen overrides om te laden.
+      // De weekdag gaat mee: een wissel voor alleen deze dag geldt dan hier.
+      const schemaWithOverrides = latestSchema?.id ? await WorkoutServiceNew.getSchemaWithOverrides(client.id, latestSchema, db, dayKey) : latestSchema
       // Map naar het Schema-formaat (eerste hoofdletter), bv 'monday' → 'Monday'.
       const todayName = dayKey.charAt(0).toUpperCase() + dayKey.slice(1)
       // Alle trainingen van de dag (hoofd + extra's); de gekozen tegel wint.
@@ -226,6 +227,14 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       let workoutKey = (gekozenKey && sleutelsVanDag.includes(gekozenKey)) ? gekozenKey : (sleutelsVanDag[0] || null)
 
       console.log('🏋️ dag:', todayName, '| workoutKey:', workoutKey)
+
+      // Op welke weekdagen staat deze training? Staat hij er vaker, dan vraagt
+      // het wisselvenster of de wissel voor alle keren geldt of alleen vandaag.
+      const WEEKDAGEN = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+      const rooster = savedSchedule || {}
+      const dagenMetTraining = workoutKey
+        ? [...new Set(Object.keys(rooster).filter(k => rooster[k] === workoutKey).map(k => dagVanSleutel(k).toLowerCase()).filter(d => WEEKDAGEN.includes(d)))]
+        : []
 
       // Dag uit een ánder plan van de klant (plan_<schemaId>__<dag>). Dat
       // plan wordt dan ook het schema waar het log-scherm tegenaan werkt,
@@ -237,12 +246,13 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
         const { data: ander } = await db.supabase
           .from('workout_schemas').select('*').eq('id', pk.schemaId).maybeSingle()
         if (ander?.week_structure?.[pk.dagKey]) {
-          const anderMetOverrides = await WorkoutServiceNew.getSchemaWithOverrides(client.id, ander, db)
+          const anderMetOverrides = await WorkoutServiceNew.getSchemaWithOverrides(client.id, ander, db, dayKey)
           setFreshSchema(ander)
           const dayData = anderMetOverrides.week_structure[pk.dagKey]
           setTodaysWorkout({
             ...dayData,
             workoutKey: pk.dagKey, dayKey: pk.dagKey, dayName: todayName,
+            weekdag: dayKey, dagenMetTraining,
             isCustom: false, schemaId: ander.id, uitPlan: ander.name,
           })
         } else {
@@ -260,6 +270,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
           workoutKey,
           dayKey: workoutKey,
           dayName: todayName,
+          weekdag: dayKey,
+          dagenMetTraining,
           isCustom: false,
           schemaId: latestSchema.id
         })

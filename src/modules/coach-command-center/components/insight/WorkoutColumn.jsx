@@ -68,6 +68,7 @@ const SECTIEKOP = { padding: '0.3rem 0.9rem 0.45rem', fontSize: '0.86rem', fontW
 // het niet jouw plan meer is zoals jij het maakte (Kersten, 13 okt 2026).
 const SOORT = {
   wissel_week: { icoon: ArrowLeftRight, tekst: (r) => `${r.was || '?'} → ${r.oefening || '?'}`, sub: 'gewisseld voor deze week' },
+  wissel_dag: { icoon: ArrowLeftRight, tekst: (r) => `${r.was || '?'} → ${r.oefening || '?'}`, sub: 'gewisseld voor één dag' },
   wissel_permanent: { icoon: ArrowLeftRight, tekst: (r) => `${r.was || '?'} → ${r.oefening || '?'}`, sub: 'permanent gewisseld' },
   toegevoegd: { icoon: Plus, tekst: (r) => r.oefening || 'Oefening', sub: 'permanent in plan gezet' },
   toegevoegd_week: { icoon: Plus, tekst: (r) => r.oefening || 'Oefening', sub: 'toegevoegd' },
@@ -225,7 +226,8 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
     const uit = {}
     const week = maandagVan(w.workout_date)
     swappedExercises.forEach(r => {
-      if (r.day_key !== dag.key) return
+      // 'dag1@thursday' is een wissel voor één dag van training dag1.
+      if (String(r.day_key).split('@')[0] !== dag.key) return
       if (week && r.week_start && String(r.week_start).slice(0, 10) !== week) return
       uit[String(r.exercise_data.name || '').trim().toLowerCase()] = r.exercise_data._originalName
     })

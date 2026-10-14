@@ -12,7 +12,7 @@ import { plannedSetCount } from '../../../utils/exerciseCompletion'
 
 export default function ExerciseCard({
   exercise, index, totalExercises, isLogged, onLogsUpdate,
-  client, schema, db, workoutDayKey, visible, delay, onMakePermanent, onVerwijder
+  client, schema, db, workoutDayKey, weekdag, dagenMetTraining, visible, delay, onMakePermanent, onVerwijder
 }) {
   const isMobile = window.innerWidth <= 768
   const [localExercise, setLocalExercise] = useState(exercise)
@@ -404,7 +404,7 @@ export default function ExerciseCard({
           handleSwapComplete optimistisch localExercise, terwijl `exercise`
           (de prop) pas updatet als de parent het schema heeft herladen. De
           oude waarde gebruiken opende het log voor de pre-swap-oefening. */}
-      {showSwapModal && <SwapModal exercise={localExercise} exerciseIndex={index} workoutDayKey={workoutDayKey} schema={schema} onClose={() => setShowSwapModal(false)} onSwapComplete={handleSwapComplete} db={db} client={client} />}
+      {showSwapModal && <SwapModal exercise={localExercise} exerciseIndex={index} workoutDayKey={workoutDayKey} weekdag={weekdag} dagenMetTraining={dagenMetTraining} schema={schema} onClose={() => setShowSwapModal(false)} onSwapComplete={handleSwapComplete} db={db} client={client} />}
       {showLogModal && (
         <ExerciseLogModal
           db={db} client={client} exercise={localExercise}

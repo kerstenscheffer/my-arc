@@ -132,8 +132,19 @@ const zoekScore = (naam, zoek) => {
   return 0
 }
 
-export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, schema, onClose, onSwapComplete, db, client }) {
+const DAG_NL = { monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', thursday: 'donderdag', friday: 'vrijdag', saturday: 'zaterdag', sunday: 'zondag' }
+const DAG_KORT = { monday: 'ma', tuesday: 'di', wednesday: 'wo', thursday: 'do', friday: 'vr', saturday: 'za', sunday: 'zo' }
+const DAG_VOLGORDE = Object.keys(DAG_NL)
+
+export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, weekdag, dagenMetTraining = [], schema, onClose, onSwapComplete, db, client }) {
   const isMobile = window.innerWidth <= 768
+  // Staat deze training vaker in de week (Push op ma én do), dan kan de
+  // wissel voor alle keren gelden of alleen voor deze dag.
+  const dag = weekdag ? String(weekdag).toLowerCase() : null
+  const vaker = !!dag && dagenMetTraining.length > 1 && dagenMetTraining.includes(dag)
+  const vandaag = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+  const dezeDagLabel = dag === vandaag ? 'Alleen vandaag' : `Alleen ${DAG_NL[dag] || 'deze dag'}`
+  const alleDagenLabel = [...dagenMetTraining].sort((a, b) => DAG_VOLGORDE.indexOf(a) - DAG_VOLGORDE.indexOf(b)).map(d => DAG_KORT[d]).join(' + ')
   const [allExercises, setAllExercises] = useState([])
   const [filteredAlternatives, setFilteredAlternatives] = useState([])
   const [basis, setBasis] = useState(null)
@@ -233,7 +244,9 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
     setSelectedType(v === 'compound' || v === 'isolation' ? v : null)
   }
 
-  const handleSwap = async (newExercise) => {
+  // alleenDag: de wissel geldt alleen voor deze weekdag, niet voor de andere
+  // keren dat deze training in de week staat.
+  const handleSwap = async (newExercise, { alleenDag = false } = {}) => {
     if (!schema?.id || !workoutDayKey || swapping) return
     setSwapping(true)
     try {
@@ -253,12 +266,21 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
         _isWeeklyOverride: true,
         _originalName: exercise.name
       }
+      // Geen dag-vlag van de oude oefening laten meeliften: die bepaalt
+      // waar de override landt.
+      delete updatedExercise._alleenDag
+      if (alleenDag && dag) updatedExercise._alleenDag = dag
 
+      // Voor alle keren: eerst dag-wissels van deze oefening weg, anders
+      // wint die op zijn eigen dag nog van de nieuwe keuze.
+      if (!alleenDag && vaker) {
+        await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, exerciseIndex, db, { alleDagen: true })
+      }
       // Sla op als weekly override — NIET in het schema
       await WorkoutServiceNew.saveWeeklyOverride(
         client.id, schema.id, workoutDayKey, exerciseIndex, updatedExercise, db
       )
-      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'wissel_week', oefening: newExercise.name, was: exercise._originalName || exercise.name })
+      logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: alleenDag ? 'wissel_dag' : 'wissel_week', oefening: newExercise.name, was: exercise._originalName || exercise.name })
 
       const coachId = client?.coach_id || client?.trainer_id
       if (coachId) {
@@ -268,7 +290,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
           client_id: client.id,
           type: 'workout',
           priority: 'low',
-          title: `${clientName} heeft een oefening gewisseld`,
+          title: alleenDag ? `${clientName} heeft een oefening gewisseld voor ${DAG_NL[dag] || 'één dag'}` : `${clientName} heeft een oefening gewisseld`,
           message: `${exercise.name} → ${newExercise.name}`,
           read_status: false,
         }).then(r => r, err => console.error('❌ Swap notification failed:', err))
@@ -313,10 +335,12 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
         _swappedAt: new Date().toISOString(),
         _doorKlant: true,
       }
+      delete updatedExercise._alleenDag
+      delete updatedExercise._isWeeklyOverride
       // Schrijf permanent naar schema
       await db.updateExerciseInSchema(schema.id, workoutDayKey, exerciseIndex, updatedExercise)
-      // Verwijder de weekly override als die bestaat
-      await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, exerciseIndex, db)
+      // Verwijder de weekly overrides van deze oefening, ook die voor één dag
+      await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, exerciseIndex, db, { alleDagen: true })
       logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'wissel_permanent', oefening: newExercise.name, was: exercise.name })
 
       const coachId = client?.coach_id || client?.trainer_id
@@ -374,6 +398,8 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
       : { background: 'transparent', color: colors.textPrimary, border: `1px solid ${colors.borderSubtle}` }),
   })
 
+  const kopje = { fontSize: 13, fontWeight: 700, color: colors.textSecondary }
+
   return (
     <>
       <KiezerSchil
@@ -417,10 +443,21 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
                 rechts={<ChevronDown size={20} strokeWidth={2.6} color={open ? colors.textPrimary : colors.textMuted}
                   style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
               />
-              {open && (
+              {open && !vaker && (
                 <div style={{ display: 'flex', gap: space[2], padding: `0 ${space[4]}px ${space[3]}px` }}>
                   <button disabled={swapping} onClick={() => handleSwap(alt)} style={knop(true)}>Deze week</button>
                   <button disabled={swapping} onClick={() => handleMakePermanent(alt)} style={knop(false)}>Altijd</button>
+                </div>
+              )}
+              {open && vaker && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], padding: `0 ${space[4]}px ${space[4]}px` }}>
+                  <div style={kopje}>Elke keer · {alleDagenLabel}</div>
+                  <div style={{ display: 'flex', gap: space[2] }}>
+                    <button disabled={swapping} onClick={() => handleSwap(alt)} style={knop(true)}>Deze week</button>
+                    <button disabled={swapping} onClick={() => handleMakePermanent(alt)} style={knop(false)}>Altijd</button>
+                  </div>
+                  <div style={{ ...kopje, marginTop: space[2] }}>Alleen deze training</div>
+                  <button disabled={swapping} onClick={() => handleSwap(alt, { alleenDag: true })} style={{ ...knop(false), flex: 'none', width: '100%' }}>{dezeDagLabel}</button>
                 </div>
               )}
             </div>
