@@ -261,7 +261,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const loadPayouts = async () => {
     try {
       if (!leadService?.getPartnerPayouts) return
-      const p = await leadService.getPartnerPayouts(coachId, 5, 6, fixedCosts)
+      const p = await leadService.getPartnerPayouts(coachId, 36, 6, fixedCosts)
       setPayouts(p)
     } catch (e) {
       console.error('Partner-uitbetaling laden mislukt:', e)
@@ -274,7 +274,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     setRevLoading(true)
     try {
       const [r, doel] = await Promise.all([
-        leadService.getRevenueProjection(coachId, 12),
+        leadService.getRevenueProjection(coachId, 12, 36),
         leadService.getMaandOmzetDoel(coachId),
         loadPayouts(),
       ])

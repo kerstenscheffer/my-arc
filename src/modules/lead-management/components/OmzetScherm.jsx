@@ -48,6 +48,25 @@ const periodeTekst = (key) => {
   const tot = new Date(j, m - 1, 25)
   return `${datumKort(van.toISOString())} t/m ${datumKort(tot.toISOString())}`
 }
+// Maand, kwartaal of jaar: elke maand-sleutel (2026-10) hoort bij precies één
+// periode-sleutel van de gekozen stand.
+const MODI = [{ id: 'maand', label: 'Maand' }, { id: 'kwartaal', label: 'Kwartaal' }, { id: 'jaar', label: 'Jaar' }]
+const periodeVan = (key, modus) => {
+  const [j, m] = key.split('-').map(Number)
+  if (modus === 'jaar') return String(j)
+  if (modus === 'kwartaal') return `${j}-Q${Math.ceil(m / 3)}`
+  return key
+}
+const periodeNaam = (key, modus) => {
+  if (modus === 'jaar') return key
+  if (modus === 'kwartaal') { const [j, q] = key.split('-'); return `${q} ${j}` }
+  return maandNaam(key)
+}
+const periodeKort = (key, modus) => {
+  if (modus === 'jaar') return key
+  if (modus === 'kwartaal') { const [j, q] = key.split('-'); return `${q} '${j.slice(2)}` }
+  return maandNaam(key, false).slice(0, 3)
+}
 const tik = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit', cursor: 'pointer' }
 
 export default function OmzetScherm({
@@ -55,16 +74,51 @@ export default function OmzetScherm({
   onDoel, onSettle, payoutBusy, leadService, coachId, onHerlaad, isMobile,
 }) {
   const maanden = useMemo(() => revenue?.months || [], [revenue])
-  const huidig = maanden.find(m => m.isCurrent)?.key || maanden[0]?.key
-  const [gekozen, setGekozen] = useState(huidig)
+  const huidigeMaand = maanden.find(m => m.isCurrent)?.key || maanden[0]?.key
+  const [modus, setModus] = useState('maand')
+  const [gekozen, setGekozen] = useState(huidigeMaand)
   const [paneel, setPaneel] = useState(null) // 'partner' | 'jij' | null
-  const [lijst, setLijst] = useState(null)   // { bron, maand } → transactie-scherm
+  const [lijst, setLijst] = useState(null)   // { bron, maanden, label } → transactie-scherm
   const [challengesOpen, setChallengesOpen] = useState(false)
 
-  const idx = Math.max(0, maanden.findIndex(m => m.key === gekozen))
-  const maand = maanden[idx] || null
+  // De maanden samengevoegd tot perioden van de gekozen stand.
+  const perioden = useMemo(() => {
+    const per = new Map()
+    for (const m of maanden) {
+      const k = periodeVan(m.key, modus)
+      let p = per.get(k)
+      if (!p) { p = { key: k, maanden: [], amount: 0, binnen: 0, pendingAmount: 0, perBron: {}, isPast: true, isCurrent: false }; per.set(k, p) }
+      p.maanden.push(m.key)
+      p.amount += m.amount || 0
+      if (m.isPast || m.isCurrent) p.binnen += m.amount || 0
+      p.pendingAmount += m.pendingAmount || 0
+      for (const [b, v] of Object.entries(m.perBron || {})) p.perBron[b] = (p.perBron[b] || 0) + v
+      if (m.isCurrent) p.isCurrent = true
+      if (!m.isPast) p.isPast = false
+    }
+    return [...per.values()]
+  }, [maanden, modus])
+  const huidig = periodeVan(huidigeMaand || '2000-01', modus)
+  const kiesModus = (m) => { setModus(m); setGekozen(periodeVan(huidigeMaand, m)); setPaneel(null) }
+
+  const idx = Math.max(0, perioden.findIndex(p => p.key === gekozen))
+  const maand = perioden[idx] || null
   const isHuidig = maand?.isCurrent
-  const verdeling = (payouts?.months || []).find(m => m.key === gekozen) || null
+  // Uitbetaling: in de maandstand de maand zelf (met Betaald-knop), anders
+  // de som van de maanden in de periode.
+  const vMaanden = (payouts?.months || []).filter(m => maand?.maanden.includes(m.key))
+  const losseMaand = modus === 'maand' ? vMaanden[0] || null : null
+  const verdeling = !vMaanden.length ? null : losseMaand || {
+    revenue: vMaanden.reduce((t, m) => t + (m.revenue || 0), 0),
+    fixedCosts: vMaanden.reduce((t, m) => t + (m.fixedCosts || 0), 0),
+    earned: vMaanden.reduce((t, m) => t + (m.earned ?? m.owed ?? 0), 0),
+    netRevenue: vMaanden.reduce((t, m) => t + (m.netRevenue || 0), 0),
+    outstanding: vMaanden.reduce((t, m) => t + Math.max(0, m.outstanding || 0), 0),
+    settled: vMaanden.every(m => m.settled || (m.owed || 0) <= 0),
+    paidAt: null,
+    ontvangsten: vMaanden.flatMap(m => m.ontvangsten || []),
+  }
+  const doel = maandDoel ? maandDoel * (maand?.maanden.length || 1) : null
 
   if (!maand) {
     return <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Nog geen omzet vastgelegd.</div>
@@ -72,7 +126,8 @@ export default function OmzetScherm({
 
   const perBron = maand.perBron || {}
   const bronnen = BRONNEN.map(b => ({ ...b, bedrag: perBron[b.id] || 0 }))
-  const aantal = (bron) => (revenue?.boekingen || []).filter(x => x.maand === gekozen && x.bron === bron && !x.toegezegd).length
+  const aantal = (bron) => (revenue?.boekingen || []).filter(x => maand.maanden.includes(x.maand) && x.bron === bron && !x.toegezegd).length
+  const lijstVan = (bron) => ({ bron, maanden: maand.maanden, label: cap(periodeNaam(maand.key, modus)) })
 
   // Verdeling van deze periode.
   const ontvangen = verdeling?.revenue || 0
@@ -91,12 +146,21 @@ export default function OmzetScherm({
       {/* ── 1. Omzet links, waar het vandaan komt rechts ── */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '1.25rem' : '2.5rem', alignItems: 'stretch' }}>
         <div style={{ flex: isMobile ? 'none' : '0 0 320px', minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+            {MODI.map(m => (
+              <button key={m.id} onClick={() => kiesModus(m.id)} style={{
+                ...tik, padding: '2px 0', background: 'none', border: 'none',
+                borderBottom: `2px solid ${modus === m.id ? '#fff' : 'transparent'}`,
+                color: modus === m.id ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: '0.82rem', fontWeight: 900,
+              }}>{m.label}</button>
+            ))}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)', marginRight: 6 }}>
-              Omzet {maandNaam(gekozen)}
+              Omzet {periodeNaam(gekozen, modus)}
             </span>
-            <NavKnop richting="links" uit={idx <= 0} onClick={() => setGekozen(maanden[idx - 1].key)} />
-            <NavKnop richting="rechts" uit={idx >= maanden.length - 1} onClick={() => setGekozen(maanden[idx + 1].key)} />
+            <NavKnop richting="links" uit={idx <= 0} onClick={() => setGekozen(perioden[idx - 1].key)} />
+            <NavKnop richting="rechts" uit={idx >= perioden.length - 1} onClick={() => setGekozen(perioden[idx + 1].key)} />
           </div>
           <div style={{
             fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff',
@@ -105,25 +169,27 @@ export default function OmzetScherm({
             {eur(maand.amount)}
           </div>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-            {maand.isPast ? 'binnengekomen' : isHuidig ? 'binnengekomen deze maand' : 'verwacht op basis van termijnen'}
+            {maand.isPast ? 'binnengekomen'
+              : isHuidig && maand.binnen < maand.amount ? `${eur(maand.binnen)} binnen, ${eur(maand.amount - maand.binnen)} verwacht`
+              : isHuidig ? `binnengekomen deze ${modus}` : 'verwacht op basis van termijnen'}
             {maand.pendingAmount > 0 && <> · <span style={{ color: '#fff' }}>+{eur(maand.pendingAmount)}</span> toegezegd</>}
           </div>
           {!isHuidig && (
             <button onClick={() => setGekozen(huidig)} style={{ ...tik, background: 'none', border: 'none', padding: 0, marginTop: 8, color: KLEUR_JIJ, fontWeight: 900, fontSize: '0.82rem' }}>
-              Terug naar deze maand
+              Terug naar nu
             </button>
           )}
           {/* Doel als voortgangsbalk */}
           <div style={{ marginTop: 14 }}>
-            {maandDoel ? (
+            {doel ? (
               <>
                 <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, Math.round((maand.amount / maandDoel) * 100))}%`, height: '100%', background: KLEUR_JIJ, borderRadius: 999, transition: 'width 0.4s ease' }} />
+                  <div style={{ width: `${Math.min(100, Math.round((maand.amount / doel) * 100))}%`, height: '100%', background: KLEUR_JIJ, borderRadius: 999, transition: 'width 0.4s ease' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
-                  <span>{Math.round((maand.amount / maandDoel) * 100)}% van je doel</span>
+                  <span>{Math.round((maand.amount / doel) * 100)}% van je doel</span>
                   <button onClick={onDoel} style={{ ...tik, background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,0.6)', fontWeight: 800, fontSize: '0.78rem' }}>
-                    Doel {eur(maandDoel)}
+                    Doel {eur(doel)}
                   </button>
                 </div>
               </>
@@ -143,7 +209,7 @@ export default function OmzetScherm({
             {bronnen.map((b, i) => (
               <button
                 key={b.id}
-                onClick={() => (b.id === 'challenge' ? setChallengesOpen(true) : setLijst({ bron: b.id, maand: gekozen }))}
+                onClick={() => (b.id === 'challenge' ? setChallengesOpen(true) : setLijst(lijstVan(b.id)))}
                 style={{
                   ...tik, width: '100%', display: 'flex', alignItems: 'center', gap: 10, minHeight: 48,
                   padding: '0.5rem 0', background: 'none', border: 'none', textAlign: 'left',
@@ -171,7 +237,7 @@ export default function OmzetScherm({
       <div style={kaart}>
         <div style={{ ...kop, marginBottom: 2 }}>{isOwner ? `Verdeling jij en ${partnerName}` : 'Jouw aandeel'}</div>
         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
-          Uitbetaalperiode {periodeTekst(gekozen)} · ontvangen {eur(ontvangen)}
+          {modus === 'maand' ? `Uitbetaalperiode ${periodeTekst(gekozen)}` : `${maand.maanden.length} uitbetaalperiodes (26e t/m 25e)`} · ontvangen {eur(ontvangen)}
         </div>
         {!verdeling ? (
           <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>Nog niets te verdelen in deze periode.</div>
@@ -209,7 +275,7 @@ export default function OmzetScherm({
                 {(verdeling.ontvangsten || []).map((o, i) => (
                   <Regel key={i} label={<>{o.naam}<span style={{ color: 'rgba(255,255,255,0.4)' }}>{o.soort ? ` · ${o.soort}` : ''}</span></>} bedrag={o.bedrag} klein />
                 ))}
-                {isOwner && (
+                {isOwner && losseMaand && (
                   <button
                     onClick={() => onSettle?.(verdeling)}
                     disabled={payoutBusy === verdeling.key}
@@ -233,8 +299,14 @@ export default function OmzetScherm({
 
       {/* ── 4. Per maand ── */}
       <div style={kaart}>
-        <div style={kop}>Per maand</div>
-        <MaandGrafiek maanden={maanden} gekozen={gekozen} onKies={setGekozen} doel={maandDoel} isMobile={isMobile} />
+        <div style={kop}>Per {modus}</div>
+        <MaandGrafiek
+          // Maandstand: twaalf balken rond de gekozen maand; de rest past niet.
+          maanden={modus === 'maand' ? perioden.slice(Math.max(0, Math.min(idx - 6, perioden.length - 12)), Math.max(0, Math.min(idx - 6, perioden.length - 12)) + 12)
+            : modus === 'kwartaal' ? perioden.slice(Math.max(0, Math.min(idx - 4, perioden.length - 8)), Math.max(0, Math.min(idx - 4, perioden.length - 8)) + 8)
+            : perioden}
+          label={(k) => periodeKort(k, modus)} naam={(k) => periodeNaam(k, modus)}
+          gekozen={gekozen} onKies={setGekozen} doel={maandDoel && modus === 'maand' ? maandDoel : null} isMobile={isMobile} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 10 }}>
           {BRONNEN.map(b => (
             <span key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
@@ -246,7 +318,7 @@ export default function OmzetScherm({
 
       {/* ── 5. Alle transacties ── */}
       <button
-        onClick={() => setLijst({ bron: 'alle', maand: gekozen })}
+        onClick={() => setLijst(lijstVan('alle'))}
         style={{
           ...tik, display: 'flex', alignItems: 'center', gap: 10, color: '#fff', width: '100%',
           minHeight: 52, padding: '0.9rem 0', background: 'none', border: 'none',
@@ -363,7 +435,7 @@ function Openstaand({ payouts, isOwner, partnerName }) {
   )
 }
 
-function MaandGrafiek({ maanden, gekozen, onKies, doel, isMobile }) {
+function MaandGrafiek({ maanden, gekozen, onKies, doel, isMobile, label, naam }) {
   const H = isMobile ? 130 : 160
   const max = Math.max(1, doel || 0, ...maanden.map(m => (m.amount || 0) + (m.pendingAmount || 0)))
   return (
@@ -378,7 +450,7 @@ function MaandGrafiek({ maanden, gekozen, onKies, doel, isMobile }) {
           const hoogte = ((m.amount || 0) / max) * H
           const pending = ((m.pendingAmount || 0) / max) * H
           return (
-            <button key={m.key} onClick={() => onKies(m.key)} aria-label={maandNaam(m.key)} style={{
+            <button key={m.key} onClick={() => onKies(m.key)} aria-label={naam(m.key)} style={{
               ...tik, flex: 1, minWidth: 0, height: '100%', padding: 0, border: 'none', background: 'none',
               display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'stretch', position: 'relative',
             }}>
@@ -410,7 +482,7 @@ function MaandGrafiek({ maanden, gekozen, onKies, doel, isMobile }) {
             fontWeight: m.key === gekozen ? 900 : 700, color: m.key === gekozen ? '#fff' : 'rgba(255,255,255,0.4)',
             overflow: 'hidden', whiteSpace: 'nowrap',
           }}>
-            {maandNaam(m.key, false).slice(0, 3)}
+            {label(m.key)}
           </span>
         ))}
       </div>
@@ -447,9 +519,10 @@ function Blad({ titel, isMobile, onClose, kop, children }) {
 
 function Transacties({ boekingen, maanden, start, isMobile, onClose }) {
   const [bron, setBron] = useState(start.bron || 'alle')
-  const [maand, setMaand] = useState(start.maand || 'alle')
+  const meer = (start.maanden || []).length > 1
+  const [maand, setMaand] = useState(meer ? 'periode' : start.maanden?.[0] || 'alle')
   const zichtbaar = boekingen.filter(b =>
-    (maand === 'alle' || b.maand === maand) &&
+    (maand === 'alle' || (maand === 'periode' ? start.maanden.includes(b.maand) : b.maand === maand)) &&
     (bron === 'alle' ? !b.toegezegd : bron === 'toegezegd' ? b.toegezegd : (b.bron === bron && !b.toegezegd)))
   const totaal = zichtbaar.reduce((t, b) => t + b.bedrag, 0)
   const nu = new Date()
@@ -469,6 +542,7 @@ function Transacties({ boekingen, maanden, start, isMobile, onClose }) {
           </select>
           <select value={maand} onChange={e => setMaand(e.target.value)} style={select}>
             <option value="alle">Alle maanden</option>
+            {meer && <option value="periode">{start.label}</option>}
             {maanden.map(m => <option key={m.key} value={m.key}>{cap(maandNaam(m.key))}</option>)}
           </select>
         </div>
