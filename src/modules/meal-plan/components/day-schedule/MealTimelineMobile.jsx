@@ -31,7 +31,7 @@ export default function MealTimelineMobile({
   onOpenInfo,
   onOpenAlternatives,
   isToday,
-  isMobile,
+  isMobile: _isMobile,
   consumedMeals = [],
   onOpenFoodLog,
   onDeleteConsumedMeal,
@@ -156,7 +156,7 @@ export default function MealTimelineMobile({
               momentLabel={g.brand || MOMENT_LABEL[g.meal_type] || 'Gelogd'}
               tijdLabel={klok(item.min)}
               gegeten
-              isMobile={isMobile !== false}
+              isMobile={true}
               acties={[
                 { icon: <Edit3 size={11} />, label: 'Bewerken', onClick: () => onEditConsumedMeal?.(g) },
                 { icon: <Trash2 size={11} />, label: 'Verwijderen', onClick: () => onDeleteConsumedMeal?.(g.id), kleur: 'rgba(239,68,68,0.85)' },
@@ -177,7 +177,7 @@ export default function MealTimelineMobile({
             tijdLabel={Number.isFinite(item.min) ? klok(item.min) : null}
             ondertitel={sp.dosering || null}
             isChecked={afgevinkt}
-            isMobile={isMobile !== false}
+            isMobile={true}
             onCheck={() => onSupplementCheck?.(sp)}
             acties={[
               { icon: <Info size={11} />, label: 'Info', onClick: () => onSupplementInfo?.(sp) },

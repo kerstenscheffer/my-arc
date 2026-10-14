@@ -26,6 +26,8 @@ const SLOT_LABELS = {
   snack2:    'Snack 2',
   snack3:    'Snack 3',
   snack4:    'Snack 4',
+  pre_workout:  'Pre-workout',
+  post_workout: 'Post-workout',
 }
 // Toont de "soort maaltijd"-titel. Coach-titel (display_label, bv.
 // "Pre Workout Meal") wint; anders het standaard slot-label; anders de
@@ -34,7 +36,9 @@ const getMealTypeLabel = (meal) => {
   if (meal?.display_label) return meal.display_label
   const slot = meal?.slot
   if (slot && SLOT_LABELS[slot]) return SLOT_LABELS[slot]
-  return slot ? slot.charAt(0).toUpperCase() + slot.slice(1) : 'Maaltijd'
+  if (!slot) return 'Maaltijd'
+  const net = String(slot).replace(/_/g, ' ')
+  return net.charAt(0).toUpperCase() + net.slice(1)
 }
 
 export default function MealCard({
