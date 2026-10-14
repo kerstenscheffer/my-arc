@@ -32,6 +32,10 @@ const euro = (n) => `€${Math.round(n).toLocaleString('nl-NL')}`
 // in de funnel.
 const VERLENGING_TITEL = 'Verlenging 🔁'
 
+// Partner-aandeel (Marcel) voor een verlenging als de oorspronkelijke sale
+// niet terug te vinden is. Zelfde standaard als SaleForm en getPartnerPayouts.
+const STANDAARD_PARTNER_PCT = 50
+
 const MAANDEN = Array.from({ length: 24 }, (_, i) => i + 1)
 // Startdatum: half jaar terug tot twee maanden vooruit, als dag-offset.
 const START_OFFSETS = Array.from({ length: 241 }, (_, i) => i - 180)
@@ -139,7 +143,11 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
           order_value: totaalBedrag,
           payment_type: betaling,
           duration_months: betaling === 'monthly' ? maanden : 1,
-          partner_share_pct: vorige?.pct ?? null,
+          // Leads komen meestal binnen zonder e-mail, dus de oorspronkelijke
+          // sale wordt vaak niet gevonden. Dan viel het aandeel op null en telde
+          // de verlenging niet mee in de partner-uitbetaling. Zonder gevonden
+          // sale geldt het standaard-aandeel uit SaleForm (50%).
+          partner_share_pct: vorige?.pct ?? STANDAARD_PARTNER_PCT,
           payment_received: true,
           sale_kind: 'coaching',
         })

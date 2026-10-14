@@ -30,6 +30,10 @@ const lokaleDag = (d) => {
   return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}`
 }
 
+// Partner-aandeel (%) voor een verlenging die zonder percentage is geboekt.
+// Zelfde standaard als SaleForm en TrajectModal.
+const STANDAARD_PARTNER_PCT = 50
+
 class LeadManagementService {
   constructor() {
     this.db = DatabaseService
@@ -2734,7 +2738,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       const { data } = await this.db.supabase
         .from('lead_movements')
-        .select('order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, lead_name')
+        .select('order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, lead_name, outcome_type')
         .not('order_value', 'is', null)
         .is('reverted_at', null)
         // Teruggegeven challenge-geld is nooit binnengekomen; dat hoort niet in
@@ -2751,6 +2755,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         total: Number(r.order_value) || 0,
         betaald: r.payment_received === true || r.is_reservation === true,
         naam: r.lead_name || 'Lead',
+        // Soort voor de lijst "Recente betalingen": nieuw, verlenging of upsell.
+        soort: r.outcome_type === 'verlenging' ? 'verlenging' : r.outcome_type === 'upsell' ? 'upsell' : 'nieuw',
         // Challenge-geld dat nog terug kan: het staat op de rekening, maar is
         // nog niet van ons. In de grafiek krijgt dat deel een eigen kleur.
         challenge: r.sale_kind === 'challenge' && r.challenge_status !== 'behouden',
@@ -2865,6 +2871,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             type: s.type,
             maanden: s.months,
             challenge: !!s.challenge,
+            soort: s.soort,
+            reservering: s.reservering > 0,
           })),
       }
     } catch (error) {
@@ -3046,9 +3054,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const [{ data: saleRows }, { data: paidRows }] = await Promise.all([
         this.db.supabase
           .from('lead_movements')
-          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received')
+          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, outcome_type')
           .not('order_value', 'is', null)
-          .not('partner_share_pct', 'is', null)
+          // Geen filter op partner_share_pct meer: verlengingen werden vaak
+          // zonder percentage geboekt (oorspronkelijke lead niet gevonden) en
+          // vielen dan stil uit de uitbetaling. Zie `pct` hieronder.
           .is('reverted_at', null)
           // Challenge-geld dat nog terug kan: daar gaat geen commissie over.
           // Is de challenge afgerond als 'behouden', dan is het gewoon omzet en
@@ -3065,7 +3075,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         total: Number(r.order_value) || 0,
         type: r.payment_type || 'prepaid',
         months: Math.max(1, Number(r.duration_months) || 1),
-        pct: Number(r.partner_share_pct) || 0,
+        // Verlenging zonder percentage → standaard-aandeel (50%, zelfde als
+        // SaleForm). Andere sales zonder percentage blijven buiten de split.
+        pct: r.partner_share_pct != null
+          ? (Number(r.partner_share_pct) || 0)
+          : (r.outcome_type === 'verlenging' ? STANDAARD_PARTNER_PCT : 0),
+        verlenging: r.outcome_type === 'verlenging',
         date: new Date(r.moved_at),
         naam: r.lead_name || null,
         reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
@@ -3171,7 +3186,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: heeftRest ? 'Restbetaling' : 'Vooruitbetaald' }]
 
         delen.forEach(({ k, omzet, datum, soort }) => {
-          ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam, soort })
+          ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam, soort: s.verlenging ? `Verlenging · ${soort.toLowerCase()}` : soort })
         })
       })
 

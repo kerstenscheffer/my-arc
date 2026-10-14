@@ -107,7 +107,9 @@ const pct = (num, den) => {
   return Math.round((num / den) * 100)
 }
 
-export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, isMobile: propMobile, onTargetsSaved }) {
+// alleenOmzet: opent direct het omzet-scherm (vanaf het euro-icoon in de
+// stats-balk), zonder de statistieken eronder te laden. Sluiten = alles dicht.
+export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, isMobile: propMobile, onTargetsSaved, alleenOmzet = false }) {
   const modalHost = useModalHost()
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
   // periodMode bepaalt het venster rond anchorDate: dag, week (ma→zo), maand,
@@ -297,6 +299,18 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     }
   }
 
+  // Vanaf het euro-icoon: meteen het omzet-scherm openen.
+  useEffect(() => {
+    if (isOpen && alleenOmzet) openRevenuePanel()
+    if (!isOpen) setShowRevenue(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, alleenOmzet])
+
+  const sluitOmzet = () => {
+    setShowRevenue(false)
+    if (alleenOmzet) onClose?.()
+  }
+
   const settleMonth = async (m) => {
     if (!m || payoutBusy) return
     setPayoutBusy(m.key)
@@ -401,7 +415,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   })()
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || alleenOmzet) return
     if (!leadService || !coachId) return
     let cancelled = false
     const load = async () => {
@@ -456,7 +470,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     load()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, leadService, coachId, periodMode, +start, +end, reloadKey])
+  }, [isOpen, alleenOmzet, leadService, coachId, periodMode, +start, +end, reloadKey])
 
   // Presets laden zodra de tabel voor het eerst opengaat, en de laatst
   // gekozen preset terugzetten (die keuze is wel persoonlijk).
@@ -579,14 +593,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // Campagne-breakdown is all-time → alleen laden bij openen / reload, niet bij
   // periode-navigatie (scheelt onnodige queries).
   useEffect(() => {
-    if (!isOpen || !leadService || !coachId) return
+    if (!isOpen || alleenOmzet || !leadService || !coachId) return
     if (!leadService.getCampaignBreakdown) return
     let cancelled = false
     leadService.getCampaignBreakdown(coachId)
       .then(cb => { if (!cancelled) setCampaignBreakdown(cb) })
       .catch(() => { if (!cancelled) setCampaignBreakdown(null) })
     return () => { cancelled = true }
-  }, [isOpen, leadService, coachId, reloadKey])
+  }, [isOpen, alleenOmzet, leadService, coachId, reloadKey])
 
   if (!isOpen) return null
 
@@ -1402,7 +1416,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
   return createPortal(
     <>
-      {modal}
+      {!alleenOmzet && modal}
       {showKpi && (
         <div
           onClick={() => setShowKpi(false)}
@@ -1557,7 +1571,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   Wat er binnen is, wat er nog moet komen, en wat eruit gaat
                 </div>
               </div>
-              <button onClick={() => setShowRevenue(false)} title="Sluiten" aria-label="Sluiten" style={{
+              <button onClick={sluitOmzet} title="Sluiten" aria-label="Sluiten" style={{
                 width: 40, height: 40, flexShrink: 0, borderRadius: 12,
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
                 color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1711,30 +1725,65 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       </button>
                     </div>
 
-                    {salesOpen && (
-                      <div style={{ padding: '0.25rem 0 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                        {(revenue.sales || []).length === 0 ? (
-                          <div style={{ padding: '0.75rem 0', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-                            Nog geen betaalde sales.
+                    {/* Recente betalingen: wie, wat, wanneer en wat voor soort
+                        (nieuw / verlenging / upsell). Standaard de laatste vijf;
+                        via het totaal hierboven of de knop eronder zie je alles. */}
+                    {(() => {
+                      const lijst = revenue.sales || []
+                      const RECENT = 5
+                      const getoond = salesOpen ? lijst : lijst.slice(0, RECENT)
+                      const SOORT = { nieuw: 'Nieuwe klant', verlenging: 'Verlenging', upsell: 'Vervolgtraject' }
+                      return (
+                        <div style={{ padding: '0.25rem 0 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                          <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff', margin: '1.1rem 0 0.4rem' }}>
+                            Recente betalingen
                           </div>
-                        ) : (revenue.sales || []).map((v, i) => (
-                          <div key={`${v.naam}-${i}`} style={{
-                            display: 'flex', alignItems: 'baseline', gap: 12,
-                            padding: '0.65rem 0', borderTop: '1px solid rgba(255,255,255,0.07)',
-                          }}>
-                            <span style={{ flex: 1, minWidth: 0, fontSize: '1rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {v.naam}
-                            </span>
-                            <span style={{ flexShrink: 0, fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
-                              {new Date(v.datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                              {v.type === 'monthly' && v.maanden > 1 ? ` · ${v.maanden}× p/m` : ''}
-                              {v.challenge ? ' · challenge' : ''}
-                            </span>
-                            <span style={{ flexShrink: 0, fontSize: '1rem', fontWeight: 900, color: '#fff' }}>{eur(v.bedrag)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          {lijst.length === 0 ? (
+                            <div style={{ padding: '0.75rem 0', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+                              Nog geen betaalde sales.
+                            </div>
+                          ) : getoond.map((v, i) => {
+                            const termijn = v.type === 'monthly' && v.maanden > 1
+                            const extra = [
+                              new Date(v.datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+                              termijn ? `${v.maanden} termijnen van ${eur(v.bedrag / v.maanden)}` : (v.reservering ? 'met aanbetaling' : 'in één keer'),
+                            ].join(' · ')
+                            return (
+                              <div key={`${v.naam}-${i}`} style={{
+                                display: 'flex', alignItems: 'center', gap: 12,
+                                padding: '0.65rem 0', borderTop: '1px solid rgba(255,255,255,0.07)',
+                              }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {v.naam}
+                                  </div>
+                                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <span style={{ color: v.soort === 'verlenging' ? '#22c55e' : 'rgba(255,255,255,0.75)' }}>
+                                      {v.challenge ? 'Challenge' : (SOORT[v.soort] || 'Nieuwe klant')}
+                                    </span>
+                                    {' · '}{extra}
+                                  </div>
+                                </div>
+                                <span style={{ flexShrink: 0, fontSize: '1rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{eur(v.bedrag)}</span>
+                              </div>
+                            )
+                          })}
+                          {lijst.length > RECENT && (
+                            <button
+                              onClick={() => setSalesOpen(o => !o)}
+                              style={{
+                                marginTop: 6, minHeight: 36, padding: '0 0.2rem', background: 'transparent', border: 'none',
+                                color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit',
+                                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+                              }}
+                            >
+                              {salesOpen ? 'Minder tonen' : `Alle ${lijst.length} tonen`}
+                              <ChevronDown size={15} strokeWidth={3} style={{ transform: salesOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }} />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })()}
 
                     {/* Toegezegd, nog niet binnen — dichtgeklapt. Het bedrag is
                         het nieuws; wie het zijn lees je alleen als je 'm opent. */}

@@ -89,6 +89,8 @@ export default function PeriodStatsBar({
   const setCustomRange = onCustomRange || setCustomEigen
   const [open, setOpen] = useState(false)
   const [showWeekEigen, setShowWeekEigen] = useState(false)
+  // Euro-icoon in de balk → direct het omzet-scherm.
+  const [showOmzet, setShowOmzet] = useState(false)
   const showWeek = showWeekProp ?? showWeekEigen
   const setShowWeek = onShowWeek || setShowWeekEigen
   const [loading, setLoading] = useState(true)
@@ -228,7 +230,21 @@ export default function PeriodStatsBar({
           // erachter; het getal blijft altijd bold wit (geen kleur).
           const target = kpiTargetFor(targets, it.key, period)
           return (
-            <div key={it.label} title={target != null ? `${it.label} — doel ${fmtTarget(it.key, target)}` : it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <div key={it.label} title={it.key === 'omzet' ? 'Omzet & uitbetalen openen' : (target != null ? `${it.label} — doel ${fmtTarget(it.key, target)}` : it.label)}
+              // Het euro-icoon opent het omzet-scherm (recente betalingen +
+              // uitbetaling aan de partner).
+              {...(it.key === 'omzet' ? {
+                role: 'button', tabIndex: 0,
+                onClick: () => setShowOmzet(true),
+                onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowOmzet(true) } },
+              } : {})}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                ...(it.key === 'omzet' ? {
+                  cursor: 'pointer', padding: '0.25rem 0.45rem', margin: '-0.25rem -0.45rem', borderRadius: 8,
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                } : {}),
+              }}>
               <it.Icon size={15} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
               <span style={{ fontSize: isMobile ? '0.95rem' : '1.25rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: loading ? 0.45 : 1 }}>
                 {it.value}
@@ -244,6 +260,7 @@ export default function PeriodStatsBar({
       </div>
 
       <WeekStatsModal isOpen={showWeek} onClose={() => setShowWeek(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} onTargetsSaved={() => setTargetsKey(k => k + 1)} />
+      <WeekStatsModal isOpen={showOmzet} alleenOmzet onClose={() => setShowOmzet(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} />
     </div>
   )
 }
