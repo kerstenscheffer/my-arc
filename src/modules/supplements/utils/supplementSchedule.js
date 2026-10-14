@@ -97,6 +97,19 @@ export const doseringTekst = (supp) => {
   return [hoeveel, d.unit || ''].filter(Boolean).join(' ').trim()
 }
 
+// Supplementen waarvan de dosering per product verschilt. Bij pre-workout
+// zit er per merk iets heel anders in een schep, dus een vaste "1 scoop"
+// klopt vaak niet. De klant ziet daar geen dosering; het etiket geldt.
+// Bij creatine (5 gram) is er weinig variatie, die blijft staan.
+const WISSELENDE_DOSERING = /pre[\s_-]?workout/i
+
+/** Dosering zoals de klant hem ziet: leeg bij supplementen uit WISSELENDE_DOSERING. */
+export const klantDoseringTekst = (supp) => {
+  const sleutel = [supp?.template_id, supp?.supplement_id, supp?.name].filter(Boolean).join(' ')
+  if (WISSELENDE_DOSERING.test(sleutel)) return ''
+  return doseringTekst(supp)
+}
+
 /**
  * Het tijdstip van één supplement in minuten sinds middernacht, of null.
  * @param {object} supp

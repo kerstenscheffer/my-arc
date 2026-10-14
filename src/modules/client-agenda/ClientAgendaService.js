@@ -21,7 +21,7 @@
 //   work                   → alleen uit de intake; niets ingevuld = geen blok
 
 import { standaardWeekindeling, trainingsdagenUitIntake } from './standaardWeekindeling'
-import { laadSupplementen, groepeerPerMoment, doseringTekst, geldtOpDag } from '../supplements/utils/supplementSchedule'
+import { laadSupplementen, groepeerPerMoment, klantDoseringTekst, geldtOpDag } from '../supplements/utils/supplementSchedule'
 import { laadDagAanpassingen } from '../meal-plan/dagAanpassingen'
 
 export const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
@@ -829,7 +829,7 @@ export class ClientAgendaService {
                 id: x.template_id || x.supplement_id || x.id || x.name,
                 naam: x.name,
                 emoji: x.emoji || null,
-                dosering: doseringTekst(x),
+                dosering: klantDoseringTekst(x),
                 notitie: x.timing?.notes || null,
                 prioriteit: x.priority_level || null,
               })),

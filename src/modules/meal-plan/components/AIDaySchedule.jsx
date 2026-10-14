@@ -13,7 +13,7 @@ import MealTimelineMobile from './day-schedule/MealTimelineMobile'
 import DagBewaarBalk from './DagBewaarBalk'
 import FoodLogModal from './food-log/FoodLogModal'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
-import { laadSupplementen, geldtOpDag, momentVanSupplement, doseringTekst } from '../../supplements/utils/supplementSchedule'
+import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst } from '../../supplements/utils/supplementSchedule'
 import SupplementInfoModal from './SupplementInfoModal'
 
 const getTodayIndex = () => {
@@ -621,7 +621,7 @@ export default function AIDaySchedule({
         id: sp.template_id || sp.supplement_id || sp.id || sp.name,
         naam: sp.name,
         emoji: sp.emoji || '💊',
-        dosering: doseringTekst(sp),
+        dosering: klantDoseringTekst(sp),
         minuten: min,
         // Voor het info-scherm. Komt rechtstreeks uit het plan, dus wat de
         // coach heeft toegewezen is wat de klant leest.
