@@ -510,7 +510,7 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
                           <div style={{
                             position: 'relative', width: '100%', aspectRatio: '16 / 10',
                             background: productFotos[t.supplement_id]
-                              ? `#fff url(${productFotos[t.supplement_id]}) center/contain no-repeat`
+                              ? `url(${productFotos[t.supplement_id]}) center / auto 82% no-repeat, radial-gradient(circle at 50% 45%, #3a3a3a 0%, #121212 70%)`
                               : `#1a1a1a url(${supplementFoto(t, 320)}) center/cover`,
                           }}>
                             <span style={{
@@ -643,14 +643,14 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
   )
 }
 
-// Productfoto uit de catalogus (Big Buffalo eerst) op wit, anders de stockfoto
+// Productfoto uit de catalogus (Big Buffalo eerst) op zwart, anders de stockfoto
 // met de emoji als badge; valt terug op alleen de emoji als niets laadt.
 const Foto = ({ supp, maat, product }) => {
   const [kapot, setKapot] = useState(false)
   return (
     <div style={{
       position: 'relative', width: maat, height: maat, flexShrink: 0,
-      borderRadius: 11, overflow: 'hidden', background: product ? '#fff' : '#1f1f1f',
+      borderRadius: 11, overflow: 'hidden', background: product ? 'radial-gradient(circle at 50% 40%, #3a3a3a 0%, #121212 75%)' : '#1f1f1f',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {!kapot

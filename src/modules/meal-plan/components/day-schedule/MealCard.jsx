@@ -69,7 +69,8 @@ export default function MealCard({
   // Lagere kaart voor lijsten waar je er veel onder elkaar ziet (het
   // voedingspaneel van de coach): kleinere foto, minder ruimte eromheen.
   compact = false,
-  // Vrijstaande productfoto (een potje op transparant): op lichtgrijs, heel
+  // Vrijstaande productfoto (een potje op transparant): op zwart met een
+  // zachte lichtvlek erachter zodat een zwart potje toch loskomt, heel
   // in beeld, en alleen onderaan donker voor het moment en de tijd. Met de
   // gewone foto-opmaak viel een zwart potje weg in de donkere laag.
   productFoto = false,
@@ -107,7 +108,7 @@ export default function MealCard({
             width: photoSize, alignSelf: 'stretch',
             flexShrink: 0,
             background: productFoto
-              ? `#ececec url(${getMealImage(meal)}) center 30% / auto 72% no-repeat`
+              ? `url(${getMealImage(meal)}) center 30% / auto 72% no-repeat, radial-gradient(circle at 50% 32%, #3a3a3a 0%, #121212 70%)`
               : `url(${getMealImage(meal)}) center/cover`,
             position: 'relative', overflow: 'hidden',
             cursor: 'pointer',
