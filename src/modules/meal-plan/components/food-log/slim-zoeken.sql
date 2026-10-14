@@ -151,9 +151,11 @@ begin
   uniek as (
     -- Eén basisproduct per naam (drie keer "Kaas" met net andere kcal is
     -- ruis); merkproducten blijven per kcal-waarde apart.
-    select distinct on (g.zoek_kern, case when g.barcode is null then -1 else round(coalesce(g.calories_per_100g, 0)) end) g.*
+    -- Een merkproduct zonder merk in de naam ("Kaas") telt ook als die naam:
+    -- anders staat er twee keer exact hetzelfde woord bovenaan.
+    select distinct on (g.zoek_kern, case when g.barcode is null or g.name !~ '\(' then -1 else round(coalesce(g.calories_per_100g, 0)) end) g.*
     from gescoord g
-    order by g.zoek_kern, case when g.barcode is null then -1 else round(coalesce(g.calories_per_100g, 0)) end,
+    order by g.zoek_kern, case when g.barcode is null or g.name !~ '\(' then -1 else round(coalesce(g.calories_per_100g, 0)) end,
              (g.barcode is null) desc, g.sc desc
   ),
   gespreid as (
