@@ -205,7 +205,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {winkelVanCoach(p.url) && (
-                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#fff', marginBottom: 1 }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#FFD700', marginBottom: 1 }}>
                         Aangeraden door Kersten
                       </div>
                     )}
