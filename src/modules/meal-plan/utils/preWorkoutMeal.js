@@ -44,12 +44,22 @@ export const isTrainingsdag = (workoutSchedule, dagSleutel, dagData = null) => {
 }
 
 /**
+ * Heeft de klant de pre-workout op deze weekdag weggehaald ("elke week",
+ * prullenbakje)? Dat staat op de maaltijd zelf, in uit_dagen: hij heeft geen
+ * slot per dag in week_structure om uit te halen. Kiest de coach een nieuwe
+ * pre-workout, dan begint die weer schoon.
+ */
+export const preWorkoutUitDag = (maaltijd, dagSleutel) =>
+  Array.isArray(maaltijd?.uit_dagen) && maaltijd.uit_dagen.includes(String(dagSleutel).toLowerCase())
+
+/**
  * De pre-workout maaltijd voor één dag, of null.
  * Geeft alleen iets terug als het plan er een heeft én de dag een trainingsdag is.
  */
 export const preWorkoutVoorDag = (plan, workoutSchedule, dagSleutel, dagData = null) => {
   const maaltijd = plan?.pre_workout_meal
   if (!maaltijd || typeof maaltijd !== 'object') return null
+  if (preWorkoutUitDag(maaltijd, dagSleutel)) return null
   if (!isTrainingsdag(workoutSchedule, dagSleutel, dagData)) return null
   return maaltijd
 }

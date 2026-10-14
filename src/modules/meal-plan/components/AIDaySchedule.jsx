@@ -494,7 +494,7 @@ export default function AIDaySchedule({
       // verhuist deze maaltijd vanzelf mee.
       // Niet als de dag zelf al een pre-workout slot heeft: die is in de lus
       // hierboven al opgepikt en zou anders twee keer op de tijdlijn staan.
-      const preWorkoutPlan = dayPlan?.[PRE_WORKOUT_SLOT]
+      const preWorkoutPlan = dayPlan?.[PRE_WORKOUT_SLOT] || aangepast[PRE_WORKOUT_SLOT]?.verwijderd
         ? null
         : preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
       // Kopie, niet het object uit het plan zelf aanpassen.

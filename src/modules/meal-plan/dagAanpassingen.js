@@ -9,6 +9,8 @@
 //
 // Geeft { 'JJJJ-MM-DD': { slot: bewerkteMaaltijd } }. Mislukt het ophalen, dan
 // een leeg object: dan zie je het weekplan, net als voorheen.
+import { PRE_WORKOUT_SLOT } from './utils/preWorkoutMeal'
+
 export async function laadDagAanpassingen(supabase, clientId, vanIso, totIso = vanIso) {
   if (!supabase || !clientId || !vanIso) return {}
   const { data } = await supabase
@@ -114,12 +116,16 @@ export async function haalMaaltijdWegOpDagen(supabase, planId, dagen, slot) {
   if (!supabase || !planId || !slot || !dagen?.length) return
   const { data: plan, error: leesFout } = await supabase
     .from('client_meal_plans')
-    .select('week_structure')
+    .select('week_structure, pre_workout_meal')
     .eq('id', planId)
     .single()
   if (leesFout) throw leesFout
   const week = { ...(plan?.week_structure || {}) }
+  // De pre-workout van het plan (pre_workout_meal) staat niet per dag in
+  // week_structure; die dagen onthouden we op de maaltijd zelf.
+  const preUit = []
   dagen.forEach(dag => {
+    if (slot === PRE_WORKOUT_SLOT && plan?.pre_workout_meal && !week[dag]?.[slot]) { preUit.push(dag); return }
     if (!week[dag] || !(slot in week[dag])) return
     const dagPlan = { ...week[dag] }
     delete dagPlan[slot]
@@ -134,9 +140,14 @@ export async function haalMaaltijdWegOpDagen(supabase, planId, dagen, slot) {
     }
     week[dag] = dagPlan
   })
+  const wijziging = { week_structure: week, updated_at: new Date().toISOString() }
+  if (preUit.length) {
+    const pre = plan.pre_workout_meal
+    wijziging.pre_workout_meal = { ...pre, uit_dagen: [...new Set([...(pre.uit_dagen || []), ...preUit])] }
+  }
   const { error } = await supabase
     .from('client_meal_plans')
-    .update({ week_structure: week, updated_at: new Date().toISOString() })
+    .update(wijziging)
     .eq('id', planId)
   if (error) throw error
 }

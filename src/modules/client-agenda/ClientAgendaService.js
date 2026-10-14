@@ -23,6 +23,7 @@
 import { standaardWeekindeling, trainingsdagenUitIntake } from './standaardWeekindeling'
 import { laadSupplementen, groepeerPerMoment, klantDoseringTekst, geldtOpDag } from '../supplements/utils/supplementSchedule'
 import { laadDagAanpassingen } from '../meal-plan/dagAanpassingen'
+import { preWorkoutUitDag } from '../meal-plan/utils/preWorkoutMeal'
 
 export const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
@@ -747,11 +748,16 @@ export class ClientAgendaService {
     const preWorkoutVanPlan = mealPlan?.pre_workout_meal
     DAYS.forEach(day => {
       const uitSlot = preWorkoutUitPlan[day]
+      // Weggehaald met het prullenbakje: voor één datum (aanpassing) of elke
+      // week (uit_dagen op de maaltijd van het plan).
+      const aangepastPre = maaltijdAanpassingen?.[toIsoDate(dateForDay(anchor, day))]?.[PRE_WORKOUT_SLOT]
+      if (aangepastPre?.verwijderd) return
       // De losse kolom wint: die is de nieuwe plek en de coach zet 'm daar.
-      const maaltijd = (preWorkoutVanPlan && typeof preWorkoutVanPlan === 'object')
-        ? preWorkoutVanPlan
-        : uitSlot?.meal
+      const vanPlan = (preWorkoutVanPlan && typeof preWorkoutVanPlan === 'object') ? preWorkoutVanPlan : null
+      if (vanPlan && preWorkoutUitDag(vanPlan, day)) return
+      let maaltijd = vanPlan || uitSlot?.meal
       if (!maaltijd) return
+      if (vanPlan && aangepastPre) maaltijd = { ...vanPlan, ...aangepastPre, timing: vanPlan.timing }
 
       const trainStart = trainingStartByDay[day]
       const traint = Number.isFinite(trainStart)

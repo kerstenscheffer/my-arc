@@ -289,9 +289,15 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       // week_structure, dus de lus hierboven ziet 'm niet.
       // Alleen als de dag zelf geen pre-workout slot heeft — die is hierboven
       // al meegenomen en zou anders twee keer op het scherm staan.
-      const preWorkout = dayPlan[PRE_WORKOUT_SLOT]
+      // Weggehaald voor deze datum telt ook hier; gewisseld of aangepast
+      // neemt de inhoud over, de tijd blijft die van de training.
+      const preAanpassing = swaps[PRE_WORKOUT_SLOT]
+      const prePlan = dayPlan[PRE_WORKOUT_SLOT] || preAanpassing?.verwijderd
         ? null
         : preWorkoutVoorDag(plan, workoutSchedule, dayName, dayPlan)
+      const preWorkout = prePlan && preAanpassing?.was_swapped
+        ? { ...prePlan, ...(preAanpassing.edited_meal || await this.getMealById(preAanpassing.meal_id) || {}), timing: prePlan.timing }
+        : prePlan
       if (preWorkout) {
         const entry = buildMealEntry(
           preWorkout, preWorkout, PRE_WORKOUT_SLOT,
