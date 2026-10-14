@@ -65,6 +65,8 @@ begin
   else
     struct := case
       when k = any (array[q, s, s || 'en', s || 's', s || 'n', q || 'en', q || 's']) then 100
+      -- Schijn-samenstellingen: pindakaas is geen kaas, leverkaas ook niet.
+      when k ~ '(^| )(pindakaas|leverkaas|hagelslag|boterkoek|kokosmelk)' and k !~ ('(^| )' || s || '(en|s|n)?( |$)') and k !~ ('^' || s) then 30
       when length(s) >= 3 and k ~ ('[a-z]{2,}' || s || '(en|s|n)?( |$)') then 70
       when k ~ ('^' || s || '(en|s|n)? ') then 65
       when k ~ ('(^| )' || s || '(en|s|n)?( |$)') then 55
@@ -118,7 +120,10 @@ begin
     select i.id from ai_ingredients i where length(q) >= 5 and q <% i.zoek_naam
   ),
   rij as materialized (
-    select i.*, public.zoek_score(i.zoek_kern, q) as basis
+    -- Een merkproduct dat precies zo heet ("Kip (Cup A Soup)") is minder
+    -- zeker het ding zelf dan een basisproduct: 88 in plaats van 100.
+    select i.*, case when public.zoek_score(i.zoek_kern, q) = 100 and i.name ~ '\(' and i.barcode is not null then 88
+                     else public.zoek_score(i.zoek_kern, q) end as basis
     from ai_ingredients i join kand on kand.id = i.id
   ),
   pop as (
@@ -144,16 +149,26 @@ begin
     where rij.basis >= 35
   ),
   uniek as (
-    select distinct on (g.zoek_kern, round(coalesce(g.calories_per_100g, 0))) g.*
+    -- Eén basisproduct per naam (drie keer "Kaas" met net andere kcal is
+    -- ruis); merkproducten blijven per kcal-waarde apart.
+    select distinct on (g.zoek_kern, case when g.barcode is null then -1 else round(coalesce(g.calories_per_100g, 0)) end) g.*
     from gescoord g
-    order by g.zoek_kern, round(coalesce(g.calories_per_100g, 0)), g.sc desc
+    order by g.zoek_kern, case when g.barcode is null then -1 else round(coalesce(g.calories_per_100g, 0)) end,
+             (g.barcode is null) desc, g.sc desc
+  ),
+  gespreid as (
+    -- Variatie: elke volgende variant met dezelfde naam zakt 35 punten, zodat
+    -- "Kaas (merk)" na "Kaas (merk)" plaatsmaakt voor geraspte kaas, roomkaas,
+    -- 30+, enzovoort.
+    select u.*, u.sc - 35 * (row_number() over (partition by u.zoek_kern order by u.sc desc) - 1) as eind
+    from uniek u
   )
   select u.id, u.name, u.name_en, u.calories_per_100g, u.protein_per_100g,
          u.carbs_per_100g, u.fat_per_100g, u.default_portion_gram::numeric, u.category,
-         u.image_url, u.brand, u.log_count, u.barcode, u.source, round(u.sc, 1)
-  from uniek u
+         u.image_url, u.brand, u.log_count, u.barcode, u.source, round(u.eind, 1)
+  from gespreid u
   where u.sc >= 35
-  order by u.sc desc
+  order by u.eind desc
   limit p_limit;
 end $$;
 
