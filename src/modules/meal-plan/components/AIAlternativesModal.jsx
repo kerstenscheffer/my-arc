@@ -102,6 +102,9 @@ export default function AIAlternativesModal({
   // ingrediënten (die zijn in ai_meals alleen verwijzingen).
   const [infoMeal, setInfoMeal] = useState(null)
   const [infoIngredienten, setInfoIngredienten] = useState(null)
+  // Aangepaste hoeveelheden in het info-blad, per regel (index -> gram).
+  const [infoGram, setInfoGram] = useState({})
+  const [infoBezig, setInfoBezig] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
 
@@ -531,6 +534,7 @@ export default function AIAlternativesModal({
           name: bron.name,
           amount: gram,
           unit: r.unit || 'gram',
+          ingredient_id: r.ingredient_id,
           calories: Math.round((bron.calories_per_100g || 0) * deel),
           protein: Math.round((bron.protein_per_100g || 0) * deel * 10) / 10,
           carbs: Math.round((bron.carbs_per_100g || 0) * deel * 10) / 10,
@@ -576,11 +580,85 @@ export default function AIAlternativesModal({
     }
   }
 
+  // Kiezen: in het log-venster meteen door naar de portie, anders eerst het
+  // vergelijk-blad.
+  const kies = (meal) => {
+    if (embedded) { onKiesMaaltijd?.(meal); return }
+    setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)
+  }
+
   const openInfo = async (meal) => {
     setInfoMeal(meal)
     setInfoIngredienten(null)
+    setInfoGram({})
     const uit = await schrijfIngredientenUit(meal.ingredients_list)
     setInfoIngredienten(uit || [])
+  }
+
+  // Hoeveelheden aanpassen in het info-blad. Elke regel schaalt lineair mee
+  // met zijn oorspronkelijke hoeveelheid; de totalen bovenin rekenen live.
+  const infoRegels = (infoIngredienten || []).map((ing, i) => {
+    const orig = Number(ing.amount) || 0
+    const nu = infoGram[i] !== undefined ? Math.max(0, Number(infoGram[i]) || 0) : orig
+    const f = orig > 0 ? nu / orig : 0
+    const r1 = (x) => Math.round((Number(x) || 0) * f * 10) / 10
+    return {
+      ...ing, amount: nu,
+      calories: Math.round((Number(ing.calories) || 0) * f),
+      protein: r1(ing.protein), carbs: r1(ing.carbs), fat: r1(ing.fat),
+    }
+  })
+  const infoAangepast = Object.keys(infoGram).some(i =>
+    Number(infoGram[i]) !== Number(infoIngredienten?.[i]?.amount))
+  const infoTotaal = infoAangepast
+    ? infoRegels.reduce((t, r) => ({
+        calories: t.calories + r.calories, protein: t.protein + r.protein,
+        carbs: t.carbs + r.carbs, fat: t.fat + r.fat,
+      }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+    : infoMeal
+
+  // Aangepast? Dan een eigen kopie in Mijn maaltijden van deze klant, en die
+  // kiezen (loggen of wisselen). Het origineel van de coach blijft staan.
+  const kiesUitInfo = async () => {
+    if (!infoMeal) return
+    if (!infoAangepast) {
+      const m = infoMeal
+      setInfoMeal(null); setInfoIngredienten(null)
+      kies(m)
+      return
+    }
+    if (!client?.id || !db?.supabase) return
+    setInfoBezig(true)
+    try {
+      const naam = /\(aangepast\)$/.test(infoMeal.name || '') ? infoMeal.name : `${infoMeal.name} (aangepast)`
+      const sectie = MOMENT_NAAR_SECTIE[basisMoment(moment !== 'alles' ? moment : slotKey)] || null
+      const { data, error } = await db.supabase.from('ai_custom_meals').insert({
+        client_id: client.id,
+        name: naam,
+        calories: Math.round(infoTotaal.calories || 0),
+        protein: Math.round(infoTotaal.protein || 0),
+        carbs: Math.round(infoTotaal.carbs || 0),
+        fat: Math.round(infoTotaal.fat || 0),
+        fiber: 0,
+        ingredients_list: infoRegels.filter(r => r.amount > 0).map(r => ({
+          name: r.name, amount: r.amount, unit: r.unit || 'gram',
+          calories: r.calories, protein: r.protein, carbs: r.carbs, fat: r.fat,
+        })),
+        image_url: infoMeal.image_url || null,
+        section: sectie,
+        is_active: true,
+      }).select().single()
+      if (error) throw error
+      const nieuw = { ...data, _isCustom: true }
+      setCustomMeals(prev => [...prev, nieuw])
+      setInfoMeal(null); setInfoIngredienten(null); setInfoGram({})
+      kies(nieuw)
+    } catch (e) {
+      console.error('Aangepaste maaltijd opslaan mislukt:', e)
+      alert('Kon de aangepaste maaltijd niet opslaan.')
+    } finally {
+      setInfoBezig(false)
+    }
   }
 
   const staatInMijnMaaltijden = (meal) =>
@@ -596,13 +674,6 @@ export default function AIAlternativesModal({
   const filteredMeals = getFilteredMeals()
 
   if (!isOpen && !embedded) return null
-
-  // Kiezen: in het log-venster meteen door naar de portie, anders eerst het
-  // vergelijk-blad.
-  const kies = (meal) => {
-    if (embedded) { onKiesMaaltijd?.(meal); return }
-    setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)
-  }
 
   return (
     <>
@@ -924,10 +995,10 @@ export default function AIAlternativesModal({
           <>
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
               {[
-                { label: 'kcal', waarde: Math.round(infoMeal.calories || 0) },
-                { label: 'eiwit', waarde: `${Math.round(infoMeal.protein || 0)}g` },
-                { label: 'koolh', waarde: `${Math.round(infoMeal.carbs || 0)}g` },
-                { label: 'vet', waarde: `${Math.round(infoMeal.fat || 0)}g` },
+                { label: 'kcal', waarde: Math.round(infoTotaal?.calories || 0) },
+                { label: 'eiwit', waarde: `${Math.round(infoTotaal?.protein || 0)}g` },
+                { label: 'koolh', waarde: `${Math.round(infoTotaal?.carbs || 0)}g` },
+                { label: 'vet', waarde: `${Math.round(infoTotaal?.fat || 0)}g` },
               ].map(m => (
                 <div key={m.label} style={{
                   flex: 1, minWidth: 0, textAlign: 'center',
@@ -959,7 +1030,7 @@ export default function AIAlternativesModal({
               // Zelfde kaart als overal, ook voor de losse ingrediënten: je
               // ziet meteen wat het is en wat het bijdraagt.
               <div style={{ margin: '0 -1.25rem 1rem' }}>
-                {infoIngredienten.map((ing, i) => (
+                {infoRegels.map((ing, i) => (
                   <MealCard
                     key={`${ing.name}-${i}`}
                     meal={{
@@ -969,7 +1040,14 @@ export default function AIAlternativesModal({
                       carbs: ing.carbs, fat: ing.fat,
                     }}
                     momentLabel=""
-                    rechts={`${ing.amount}${ing.unit === 'gram' ? 'g' : ` ${ing.unit || ''}`}`}
+                    rechts={
+                      <GramInvoer
+                        waarde={ing.amount}
+                        eenheid={ing.unit === 'gram' || !ing.unit ? 'g' : ing.unit}
+                        stap={ing.unit === 'gram' || !ing.unit ? 10 : 1}
+                        zet={(v) => setInfoGram(prev => ({ ...prev, [i]: v }))}
+                      />
+                    }
                     isMobile={isMobile}
                     acties={[]}
                   />
@@ -977,10 +1055,16 @@ export default function AIAlternativesModal({
               </div>
             )}
 
+            {infoAangepast && (
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '0.6rem', lineHeight: 1.4 }}>
+                Aangepast: wordt opgeslagen als "{/\(aangepast\)$/.test(infoMeal.name || '') ? infoMeal.name : `${infoMeal.name} (aangepast)`}" in Mijn maaltijden.
+              </div>
+            )}
             <button
-              onClick={() => { setSelectedMeal(infoMeal); setInfoMeal(null); setInfoIngredienten(null) }}
+              onClick={kiesUitInfo}
+              disabled={infoBezig}
               style={{
-                width: '100%', minHeight: 48,
+                width: '100%', minHeight: 48, opacity: infoBezig ? 0.6 : 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                 background: '#fff', border: 'none', borderRadius: 12,
                 color: '#0a0a0a', fontSize: '0.9rem', fontWeight: 900,
@@ -988,7 +1072,8 @@ export default function AIAlternativesModal({
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Check size={15} strokeWidth={3} /> Kies deze
+              <Check size={15} strokeWidth={3} />
+              {infoBezig ? 'Opslaan…' : infoAangepast ? 'Opslaan in mijn maaltijden en kies' : (embedded ? 'Loggen' : 'Kies deze')}
             </button>
           </>
         )}
@@ -1195,5 +1280,40 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inM
         },
       ]}
     />
+  )
+}
+
+// Hoeveelheid aanpassen in het info-blad: min, getal, plus. Tikken op de kaart
+// zelf doet niets, dus de knoppen houden hun klik voor zich.
+function GramInvoer({ waarde, eenheid, stap, zet }) {
+  const knop = {
+    width: 26, height: 26, borderRadius: 8, padding: 0,
+    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)',
+    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+  const stop = (e) => e.stopPropagation()
+  return (
+    <div onClick={stop} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <button style={knop} aria-label="Minder" onClick={(e) => { stop(e); zet(Math.max(0, (Number(waarde) || 0) - stap)) }}>
+        <Minus size={13} strokeWidth={3} />
+      </button>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+        <input
+          type="number" inputMode="numeric" value={waarde}
+          onClick={stop}
+          onChange={(e) => zet(e.target.value === '' ? 0 : Number(e.target.value))}
+          style={{
+            width: 46, textAlign: 'right', background: 'transparent', border: 'none',
+            borderBottom: '1px solid rgba(255,255,255,0.25)', color: '#fff',
+            fontSize: '0.9rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none', padding: '2px 0',
+          }}
+        />
+        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>{eenheid}</span>
+      </div>
+      <button style={knop} aria-label="Meer" onClick={(e) => { stop(e); zet((Number(waarde) || 0) + stap) }}>
+        <Plus size={13} strokeWidth={3} />
+      </button>
+    </div>
   )
 }
