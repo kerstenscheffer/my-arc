@@ -8,6 +8,7 @@ import ClientMealEditModal from './ClientMealEditModal'
 import MealCard from './day-schedule/MealCard'
 import { foodImageFallback } from '../foodImageFallback'
 import MealPrepModal from './MealPrepModal'
+import PartnerBestellen from './PartnerBestellen'
 import SausBlok from './SausBlok'
 
 export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, datum, onSaved }) {
@@ -43,7 +44,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
       if (mealId) {
         const { data: mealRow, error: mealError } = await db.supabase
           .from('ai_meals')
-          .select('preparation_steps, tips, description, faq, prep_time_min, image_url')
+          .select('preparation_steps, tips, description, faq, prep_time_min, image_url, partner, partner_url, partner_prijs, labels')
           .eq('id', mealId)
           .single()
 
@@ -99,6 +100,12 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
     description: meal.description || dbMealData?.description || null,
     faq: (Array.isArray(meal.faq) && meal.faq.length) ? meal.faq : (dbMealData?.faq || []),
     prep_time_min: meal.prep_time_min || dbMealData?.prep_time_min || null,
+    // Partner (PrepMyMeal): uit de maaltijd zelf, anders uit de database
+    // (een maaltijd in het plan is een kopie die deze velden kan missen).
+    partner: meal.partner || dbMealData?.partner || null,
+    partner_url: meal.partner_url || dbMealData?.partner_url || null,
+    partner_prijs: meal.partner_prijs || dbMealData?.partner_prijs || null,
+    labels: (Array.isArray(meal.labels) && meal.labels.length) ? meal.labels : (dbMealData?.labels || []),
   }
 
 
@@ -260,6 +267,8 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
 function InfoTab({ meal, ingredients, loading, calcMacros, isMobile, db, clientId }) {
   return (
     <div>
+      {/* Kant-en-klaar te bestellen (PrepMyMeal): bovenaan, met de knop. */}
+      <PartnerBestellen meal={meal} isMobile={isMobile} style={{ margin: isMobile ? '0.8rem 1rem 0' : '1rem 1.5rem 0' }} />
       {/* Wat het is, in één alinea. Staat bovenaan: je leest dit voordat je
           naar de grammen kijkt. */}
       {meal.description && (

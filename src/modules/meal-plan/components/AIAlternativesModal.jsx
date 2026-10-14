@@ -7,6 +7,7 @@ import Keuze from './Keuze'
 import { foodImageFallback } from '../foodImageFallback'
 import { niveauVoorDoel, wisselNiveauVoorDoel } from '../DayTemplateService'
 import { stukVan, stukTekst } from './food-log/portionPresets'
+import PartnerBestellen, { PartnerLabel } from './PartnerBestellen'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
@@ -148,6 +149,8 @@ export default function AIAlternativesModal({
     ...(Object.keys(wisselPerMoment).length > 0 ? [{ id: 'wissel', label: 'Wisselopties' }] : []),
     ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Coach-suggesties' }] : []),
     ...(customMeals.length > 0 ? [{ id: 'mine', label: 'Mijn maaltijden' }] : []),
+    // Kant-en-klaar te bestellen (PrepMyMeal).
+    ...(allMeals.some(m => m.partner) ? [{ id: 'partner', label: 'Kant-en-klaar (PrepMyMeal)' }] : []),
     { id: 'db', label: 'Maaltijden-database' },
   ]
 
@@ -317,7 +320,8 @@ export default function AIAlternativesModal({
       } catch {}
 
       setAlternatives(smartAlts || [])
-      setAllMeals(meals || [])
+      // Partnergerechten die niet meer leverbaar zijn horen er niet tussen.
+      setAllMeals((meals || []).filter(m => !m.partner || m.partner_actief !== false))
       setCustomMeals(custom)
       setCoachOptions(curated)
       setCoachPerMoment(perMoment)
@@ -404,6 +408,7 @@ export default function AIAlternativesModal({
       }
     }
     else if (bron === 'mine') pool = customMeals.filter(nietZelf)
+    else if (bron === 'partner') pool = allMeals.filter(m => m.partner && nietZelf(m))
     else if (bron === 'db') pool = allMeals.filter(nietZelf)
     else {
       // Overal: coach eerst, dan eigen maaltijden, dan de database. Dubbele
@@ -1025,7 +1030,9 @@ export default function AIAlternativesModal({
               <div style={{ padding: '1rem 0', color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem' }}>Laden…</div>
             ) : infoIngredienten.length === 0 ? (
               <div style={{ padding: '0.5rem 0 1rem', color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', fontWeight: 700 }}>
-                Van deze maaltijd staan geen ingrediënten in de database.
+                {infoMeal.partner
+                  ? 'Kant-en-klaar gerecht: de samenstelling staat op de website van de maker.'
+                  : 'Van deze maaltijd staan geen ingrediënten in de database.'}
               </div>
             ) : (
               // Zelfde kaart als overal, ook voor de losse ingrediënten: je
@@ -1057,6 +1064,7 @@ export default function AIAlternativesModal({
               </div>
             )}
 
+            <PartnerBestellen meal={infoMeal} isMobile={isMobile} style={{ marginBottom: '0.75rem' }} />
             {infoAangepast && (
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '0.6rem', lineHeight: 1.4 }}>
                 Aangepast: wordt opgeslagen als "{/\(aangepast\)$/.test(infoMeal.name || '') ? infoMeal.name : `${infoMeal.name} (aangepast)`}" in Mijn maaltijden.
@@ -1250,6 +1258,7 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inM
       }}
       // Bij loggen is er geen maaltijd om mee te vergelijken: dan het moment
       // op de foto in plaats van "+520 kcal".
+      label={meal.partner ? <PartnerLabel meal={meal} /> : null}
       momentLabel={zonderVerschil ? null : kcalLabel}
       tijdLabel={zonderVerschil ? null : eiwitLabel}
       isMobile={isMobile}

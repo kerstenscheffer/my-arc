@@ -15,7 +15,9 @@ class AIMealPlanGeneratorService {
     try {
       let query = this.supabase
         .from('ai_meals')
-        .select('*');
+        .select('*')
+        // Partnermaaltijden (PrepMyMeal) kies je bewust, niet automatisch.
+        .is('partner', null);
 
       // Apply filters
       if (filters.timing) {
@@ -79,6 +81,7 @@ class AIMealPlanGeneratorService {
       let query = this.supabase
         .from('ai_meals')
         .select('*')
+        .is('partner', null)
         .contains('timing', [mealType]);
 
       // Apply calorie range (25% of daily for breakfast, 35% lunch/dinner, 5% snacks)

@@ -144,9 +144,13 @@ class AIMealPlanningService {
     }
 
     try {
+      // Kant-en-klare partnermaaltijden (PrepMyMeal) niet in automatische
+      // plannen: die kosten geld en kies je bewust. Handmatig toevoegen kan
+      // gewoon via wisselen en coach-maaltijden.
       const { data: meals, error } = await this.supabase
         .from('ai_meals')
         .select('*')
+        .is('partner', null)
         .order('name')
 
       if (error) throw error

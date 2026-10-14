@@ -349,7 +349,8 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             calories: Math.round(m.calories || 0), protein: Math.round(m.protein || 0),
             carbs: Math.round(m.carbs || 0), fat: Math.round(m.fat || 0),
             image_url: m.image_url, type: 'meal', source: 'myarc',
-            sourceLabel: timingLabel || 'Gerecht', per100g: false,
+            sourceLabel: m.partner ? 'PrepMyMeal' : (timingLabel || 'Gerecht'), per100g: false,
+            partner: m.partner || null, partner_url: m.partner_url || null, partner_prijs: m.partner_prijs || null,
             // Neem de ingrediënten mee zodat de picker de samenstelling kan tonen
             // (een vaste maaltijd bestaat uit meerdere ingrediënten, geen "100 g").
             ingredients: Array.isArray(m.ingredients_list) ? m.ingredients_list : []

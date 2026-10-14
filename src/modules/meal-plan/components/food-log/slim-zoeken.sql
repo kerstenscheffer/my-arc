@@ -186,14 +186,17 @@ begin
   return query
   with rij as materialized (
     select m.id, m.name, m.name_en, m.calories, m.protein, m.carbs, m.fat, m.image_url, m.timing, m.ingredients_list,
+           m.partner, m.partner_url, m.partner_prijs, m.labels,
            public.zoek_score(public.zoek_kern(m.name), q) as basis,
            public.zoek_kern(m.name) as k,
            (m.name_en is not null and lower(m.name_en) like '%' || q || '%') as en_treffer
     from ai_meals m
-    where public.zoek_norm(m.name) like '%' || split_part(public.zoek_stam(q), ' ', 1) || '%'
+    -- Partnergerechten alleen als ze leverbaar en gecontroleerd zijn.
+    where (m.partner is null or (m.partner_actief and not coalesce(m.needs_review, false)))
+      and (public.zoek_norm(m.name) like '%' || split_part(public.zoek_stam(q), ' ', 1) || '%'
        or (length(q) >= 5 and public.zoek_norm(m.name) % q)
        or (length(q) >= 4 and q <% public.zoek_norm(m.name))
-       or (m.name_en is not null and lower(m.name_en) like '%' || q || '%')
+       or (m.name_en is not null and lower(m.name_en) like '%' || q || '%'))
   ),
   pop as (
     select c.meal_id, count(*) as n, count(*) filter (where c.client_id = p_client) as eigen
@@ -216,7 +219,8 @@ begin
   )
   select jsonb_build_object('id', u.id, 'name', u.name, 'name_en', u.name_en, 'calories', u.calories,
            'protein', u.protein, 'carbs', u.carbs, 'fat', u.fat, 'image_url', u.image_url,
-           'timing', u.timing, 'ingredients_list', u.ingredients_list),
+           'timing', u.timing, 'ingredients_list', u.ingredients_list,
+           'partner', u.partner, 'partner_url', u.partner_url, 'partner_prijs', u.partner_prijs, 'labels', u.labels),
          round(u.sc, 1)
   from uniek u
   where u.sc >= 35
