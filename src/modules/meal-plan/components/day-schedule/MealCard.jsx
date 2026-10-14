@@ -7,15 +7,16 @@
 
 import React from 'react'
 import { Check, Info, RefreshCw, Trash2 } from 'lucide-react'
-import { foodImageFallback } from '../../foodImageFallback'
+import { resolveFoodImage } from '../../foodImageFallback'
 
 const DIVIDER = 'rgba(255,255,255,0.06)'
 
 // Foto: eigen image_url indien aanwezig, anders een titel-gebaseerde fallback
 // (kwark -> zuivel, kip -> kip, enz.) zodat er altijd een passende foto is.
 const getMealImage = (meal) => {
-  if (meal?.image_url) return meal.image_url
-  return foodImageFallback(meal?.name || meal?.title, meal?.slot, 200)
+  // Ook een foute opgeslagen foto (Google-link, verpakkingsfoto van een
+  // willekeurig merk op een basisproduct) valt terug op de eigen koppeling.
+  return resolveFoodImage(meal, { size: 200 })
 }
 
 const SLOT_LABELS = {
