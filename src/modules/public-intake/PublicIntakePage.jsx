@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import IntakePhase1 from './components/IntakePhase1'
 import IntakePhase3 from './components/IntakePhase3'
+import BetalingGelukt from '../../components/BetalingGelukt'
 import DatabaseService from '../../services/DatabaseService'
 import { findClient, updateClient, saveBaseline, ensureClient } from '../../lib/publicIntakeApi'
 
@@ -252,6 +253,22 @@ export default function PublicIntakePage() {
   })()
 
   const [phase, setPhase] = useState(initialPhase)
+  // De 6 Weken Challenge stuurt na betaling direct hierheen met
+  // ?session_id=cs_... Dan eerst duidelijk bevestigen dat de betaling gelukt
+  // is; zonder dit zag de klant alleen het intakeformulier.
+  const [toonBetaald, setToonBetaald] = useState(() => {
+    try { return !!new URLSearchParams(window.location.search).get('session_id') } catch { return false }
+  })
+  const startNaBetaling = () => {
+    setToonBetaald(false)
+    // session_id uit de URL halen, zodat verversen niet opnieuw de bevestiging toont.
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('session_id')
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+    } catch { /* geen URL-API: niet erg */ }
+    window.scrollTo(0, 0)
+  }
   const [personalData, setPersonalData] = useState({})
   const [workoutData, setWorkoutData] = useState({})
   const [saving, setSaving]     = useState(false)
@@ -592,6 +609,8 @@ export default function PublicIntakePage() {
     { id: 'workout',   label: 'TRAINING' },
     { id: 'done',      label: 'KLAAR' },
   ]
+
+  if (toonBetaald) return <BetalingGelukt onStart={startNaBetaling} />
 
   return (
     <div style={{ minHeight: '100vh', background: '#000' }}>
