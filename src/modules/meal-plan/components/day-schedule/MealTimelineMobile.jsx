@@ -31,7 +31,6 @@ export default function MealTimelineMobile({
   onOpenInfo,
   onOpenAlternatives,
   isToday,
-  isMobile: _isMobile,
   consumedMeals = [],
   onOpenFoodLog,
   onDeleteConsumedMeal,
