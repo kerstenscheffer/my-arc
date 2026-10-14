@@ -200,6 +200,12 @@ const PORTION_PRESETS = [
 
   // ═══ Protein (gram) ═══════════════════════════════════════════════
   // Specific eerst: gesneden / plakjes / ham — dunne plakjes (~15g)
+  // Vleeswaren als beleg: een plakje is zo'n 15 g.
+  { match: /\b(ham|achterham|schouderham|beenham|rookvlees|rosbief|fricandeau|pastrami|cervelaat|salami|boterhamworst|kipfilet\s*beleg)\b|\bkip\b.*\(beleg\)/i, presets: [
+    { label: '1 plakje',  grams: 15 },
+    { label: '2 plakjes', grams: 30 },
+    { label: '4 plakjes', grams: 60 },
+  ]},
   { match: /\b(kip|kalkoen)(filet)?\s*(plakjes|plakje|gesneden|sneetjes|sneetje)\b/i, presets: [
     { label: '1 plakje',  grams: 15 },
     { label: '3 plakjes', grams: 45 },
@@ -333,6 +339,44 @@ export const findPortionConfig = (foodName) => {
 export const findPortionPresets = (foodName) => {
   const cfg = findPortionConfig(foodName)
   return cfg ? cfg.presets : []
+}
+
+// Eén herkenbare eenheid voor een ingrediënt, om naast de grammen te tonen
+// ("175 g · 5 sneetjes") en om per stuk te verspringen. Alleen als er een
+// natuurlijke eenheid is; anders null en blijft het bij grammen.
+const MEERVOUD = {
+  plakje: 'plakjes', plak: 'plakken', sneetje: 'sneetjes', boterham: 'boterhammen',
+  broodje: 'broodjes', ei: 'eieren', banaan: 'bananen', appel: 'appels', peer: 'peren',
+  sinaasappel: 'sinaasappels', mandarijn: 'mandarijnen', kiwi: "kiwi's", avocado: "avocado's",
+  tomaat: 'tomaten', 'cherry-tomaat': 'cherrytomaatjes', paprika: "paprika's", wortel: 'wortels',
+  aardappel: 'aardappels', cracker: 'crackers', wrap: 'wraps', 'kleine wrap': 'kleine wraps',
+  filet: 'filets', blikje: 'blikjes', schaaltje: 'schaaltjes', handje: 'handjes',
+  theelepel: 'theelepels', eetlepel: 'eetlepels', mesje: 'mesjes', glas: 'glazen',
+  'klein glas': 'kleine glazen', kop: 'koppen', mok: 'mokken', stuk: 'stuks', portie: 'porties',
+  komkommer: 'komkommers', blokje: 'blokjes', aardbei: 'aardbeien',
+}
+export const stukVan = (foodName) => {
+  const cfg = findPortionConfig(foodName)
+  if (!cfg || cfg === DEFAULT_GRAM_PRESETS) return null
+  const enkele = (cfg.presets || []).filter(x => /^1 /.test(x.label) && !/\(/.test(x.label) && x.grams > 0)
+  // Liefst de eenheid die in de naam zelf staat ("Tomaat" -> 1 tomaat, niet
+  // 1 cherry-tomaat); anders de eerste.
+  const naam = String(foodName).toLowerCase()
+  const p = enkele.find(x => naam.includes(x.label.slice(2).trim().toLowerCase())) || enkele[0]
+  if (!p) return null
+  let enkel = p.label.slice(2).trim()
+  // Brood tel je in sneetjes, niet in plakjes.
+  if (/\bbrood\b/i.test(foodName) && enkel === 'plakje') enkel = 'sneetje'
+  return { grams: p.grams, enkel, meer: MEERVOUD[enkel] || enkel }
+}
+
+// "5 sneetjes", "1 plak", "1,5 schaaltje". Halve stuks waar het past.
+export const stukTekst = (gram, stuk) => {
+  if (!stuk || !(gram > 0)) return null
+  const n = Math.round((gram / stuk.grams) * 2) / 2
+  if (n <= 0) return null
+  const tal = String(n).replace('.', ',')
+  return `${tal} ${n === 1 ? stuk.enkel : stuk.meer}`
 }
 
 export default PORTION_PRESETS

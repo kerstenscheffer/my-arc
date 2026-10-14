@@ -6,6 +6,7 @@ import MealCard from './day-schedule/MealCard'
 import Keuze from './Keuze'
 import { foodImageFallback } from '../foodImageFallback'
 import { niveauVoorDoel, wisselNiveauVoorDoel } from '../DayTemplateService'
+import { stukVan, stukTekst } from './food-log/portionPresets'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
@@ -1044,7 +1045,8 @@ export default function AIAlternativesModal({
                       <GramInvoer
                         waarde={ing.amount}
                         eenheid={ing.unit === 'gram' || !ing.unit ? 'g' : ing.unit}
-                        stap={ing.unit === 'gram' || !ing.unit ? 10 : 1}
+                        stap={ing.unit === 'gram' || !ing.unit ? (stukVan(ing.name)?.grams || 10) : 1}
+                        stuk={ing.unit === 'gram' || !ing.unit ? stukVan(ing.name) : null}
                         zet={(v) => setInfoGram(prev => ({ ...prev, [i]: v }))}
                       />
                     }
@@ -1285,7 +1287,9 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inM
 
 // Hoeveelheid aanpassen in het info-blad: min, getal, plus. Tikken op de kaart
 // zelf doet niets, dus de knoppen houden hun klik voor zich.
-function GramInvoer({ waarde, eenheid, stap, zet }) {
+// Met `stuk` (1 sneetje = 35 g) verspringt hij per stuk en staat eronder
+// hoeveel stuks het is.
+function GramInvoer({ waarde, eenheid, stap, zet, stuk = null }) {
   const knop = {
     width: 26, height: 26, borderRadius: 8, padding: 0,
     background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)',
@@ -1293,8 +1297,10 @@ function GramInvoer({ waarde, eenheid, stap, zet }) {
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
   const stop = (e) => e.stopPropagation()
+  const stuks = stukTekst(Number(waarde) || 0, stuk)
   return (
-    <div onClick={stop} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+    <div onClick={stop} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
       <button style={knop} aria-label="Minder" onClick={(e) => { stop(e); zet(Math.max(0, (Number(waarde) || 0) - stap)) }}>
         <Minus size={13} strokeWidth={3} />
       </button>
@@ -1314,6 +1320,12 @@ function GramInvoer({ waarde, eenheid, stap, zet }) {
       <button style={knop} aria-label="Meer" onClick={(e) => { stop(e); zet((Number(waarde) || 0) + stap) }}>
         <Plus size={13} strokeWidth={3} />
       </button>
+    </div>
+    {stuks && (
+      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', paddingRight: 31 }}>
+        {stuks}
+      </div>
+    )}
     </div>
   )
 }
