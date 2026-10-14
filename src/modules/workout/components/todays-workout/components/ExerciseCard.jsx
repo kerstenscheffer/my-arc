@@ -97,6 +97,9 @@ export default function ExerciseCard({
         const ytThumb = deriveYoutubeThumb(ex?.video_url)
         if (ytThumb)            { setImageUrl(ytThumb);            setLoadingImage(false); return }
         if (ex?.image_url)      { setImageUrl(ex.image_url);       setLoadingImage(false); return }
+        // Externe uitlegvideo: altijd de juiste oefening, beter dan een stockfoto.
+        const uitlegThumb = deriveYoutubeThumb(ex?.fallback_video_url)
+        if (uitlegThumb)        { setImageUrl(uitlegThumb);        setLoadingImage(false); return }
       } catch {}
 
       const url = await ExerciseService.getExerciseImage(exercise.name)

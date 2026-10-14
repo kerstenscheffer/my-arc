@@ -68,12 +68,14 @@ export async function laadOefeningFoto(db, exercise, clientId = null) {
 
     if (db?.supabase) {
       const { data: ex } = await db.supabase
-        .from('exercises').select('thumbnail_url, video_url, image_url')
+        .from('exercises').select('thumbnail_url, video_url, image_url, fallback_video_url')
         .eq('name', naam).maybeSingle()
       if (ex?.thumbnail_url) return ex.thumbnail_url
       const thumb = youtubeThumb(ex?.video_url)
       if (thumb) return thumb
       if (ex?.image_url) return ex.image_url
+      const uitleg = youtubeThumb(ex?.fallback_video_url)
+      if (uitleg) return uitleg
     }
 
     const url = await ExerciseService.getExerciseImage(naam)
@@ -81,4 +83,34 @@ export async function laadOefeningFoto(db, exercise, clientId = null) {
   } catch {
     return getFallbackImage(exercise)
   }
+}
+
+// Synchrone variant voor lijsten: de foto uit een exercises-rij die de
+// media-kolommen al bij zich heeft. Zelfde volgorde als hierboven, met als
+// laatste de YouTube-thumb van de externe uitlegvideo (fallback_video_url):
+// die staat bij 212 van de 219 oefeningen en is altijd de juiste oefening,
+// in tegenstelling tot de stockfoto per spiergroep.
+export const fotoUitRij = (ex) =>
+  ex?.thumbnail_url || youtubeThumb(ex?.video_url) || ex?.image_url || youtubeThumb(ex?.fallback_video_url) || null
+
+// Media van alle actieve oefeningen in één query, één keer per sessie.
+// Het wissel- en toevoegvenster vroegen eerder per oefening de foto op
+// (219 losse verzoeken achter elkaar).
+let mediaBelofte = null
+export function laadOefeningMedia(db) {
+  if (!db?.supabase) return Promise.resolve(new Map())
+  if (!mediaBelofte) {
+    mediaBelofte = db.supabase
+      .from('exercises')
+      .select('name, thumbnail_url, video_url, fallback_video_url, image_url')
+      .eq('is_active', true)
+      .then(
+        ({ data, error }) => {
+          if (error) { mediaBelofte = null; return new Map() }
+          return new Map((data || []).map(r => [r.name, r]))
+        },
+        () => { mediaBelofte = null; return new Map() }
+      )
+  }
+  return mediaBelofte
 }
