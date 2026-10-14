@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart } from 'lucide-react'
+import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart, Info, ChevronDown } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
 import { useProductFotos } from '../../supplements/utils/productFoto'
 import { winkelUrl, winkelCode, winkelProcent, winkelVanCoach } from '../../supplements/utils/winkelKorting'
@@ -52,6 +52,9 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
     return () => { leeft = false }
   }, [db, sp?.id])
   const productFoto = useProductFotos()[sp?.id] || null
+  // Uitleg (hoe, waarvoor, let op, bronnen) zit achter één knop: bovenaan
+  // staat alleen wat je nodig hebt om het te nemen en te kopen.
+  const [infoOpen, setInfoOpen] = useState(false)
   const prijsTekst = (p) => p == null ? null : `€${Number(p).toFixed(2).replace('.', ',')}`
   // Eerst wat de coach zelf aanraadt (met kortingscode), daaronder de rest.
   // Zijn die allemaal goedkoper dan de goedkoopste aanrader (na korting), dan
@@ -85,7 +88,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                       {p.product_name}
                     </div>
                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {[p.brand, p.store].filter(Boolean).join(' · ')}{p.in_stock === false ? ' · uitverkocht' : ''}
+                      {[...new Set([p.brand, p.store].filter(Boolean))].join(' · ')}{p.in_stock === false ? ' · uitverkocht' : ''}
                     </div>
                     {winkelCode(p.url) && (
                       <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -197,46 +200,17 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem 1rem 1.1rem' }}>
-          {/* Dosering en tijdstip: het antwoord op "wat moet ik nu doen". */}
-          <div style={{
-            display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: '0.9rem',
-          }}>
-            {sp.dosering && (
-              <div style={{
-                padding: '0.45rem 0.7rem', background: 'rgba(255,215,0,0.08)',
-                border: '1px solid rgba(255,215,0,0.25)', borderRadius: 8,
-              }}>
-                <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>DOSERING</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#FFD700' }}>{sp.dosering}</div>
-              </div>
-            )}
-            {sp.tijdNotitie && (
-              <div style={{
-                flex: 1, minWidth: 140,
-                padding: '0.45rem 0.7rem', background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <Clock size={13} style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
-                  {sp.tijdNotitie}
+          {/* Wat moet ik nu doen: dosering en moment op één regel. */}
+          {(sp.dosering || sp.tijdNotitie) && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: '1rem' }}>
+              {sp.dosering && (
+                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{sp.dosering}</span>
+              )}
+              {sp.tijdNotitie && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
+                  <Clock size={12} style={{ flexShrink: 0 }} />{sp.tijdNotitie}
                 </span>
-              </div>
-            )}
-          </div>
-
-          {sp.doseringNotitie && (
-            <div style={{ marginBottom: '0.9rem', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-              {sp.doseringNotitie}
-            </div>
-          )}
-
-          {sp.instructies && (
-            <div style={{ marginBottom: '1rem' }}>
-              {kop('Hoe te nemen')}
-              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
-                {sp.instructies}
-              </div>
+              )}
             </div>
           )}
 
@@ -251,7 +225,41 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
               )}
               {overigeProducten.map(productRegel)}
               <div style={{ marginTop: 6, fontSize: '0.68rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
-                Gekozen door je coach. Prijzen{laatstGecontroleerd ? ` van ${new Date(laatstGecontroleerd).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}, de winkel kan afwijken.
+                Prijzen{laatstGecontroleerd ? ` van ${new Date(laatstGecontroleerd).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}, de winkel kan afwijken.
+              </div>
+            </div>
+          )}
+
+          {(sp.instructies || sp.doseringNotitie || voordelen.length > 0 || veiligheid.max_dose || waarschuwingen.length > 0 || interacties.length > 0 || (bronnen && bronnen.length > 0)) && (
+            <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button onClick={() => setInfoOpen(o => !o)} aria-expanded={infoOpen} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                padding: '0.8rem 0', background: 'none', border: 'none', cursor: 'pointer',
+                color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <Info size={15} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.6)' }} />
+                <span style={{ flex: 1, fontSize: '0.84rem', fontWeight: 900 }}>
+                  Info
+                  <span style={{ marginLeft: 6, fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                    hoe te nemen, waarvoor{(veiligheid.max_dose || waarschuwingen.length > 0 || interacties.length > 0) ? ', let op' : ''}
+                  </span>
+                </span>
+                <ChevronDown size={16} style={{ color: 'rgba(255,255,255,0.6)', transform: infoOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+              </button>
+              {infoOpen && (
+                <div style={{ paddingBottom: '0.25rem' }}>
+          {sp.doseringNotitie && (
+            <div style={{ marginBottom: '0.9rem', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+              {sp.doseringNotitie}
+            </div>
+          )}
+
+          {sp.instructies && (
+            <div style={{ marginBottom: '1rem' }}>
+              {kop('Hoe te nemen')}
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+                {sp.instructies}
               </div>
             </div>
           )}
@@ -336,6 +344,11 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
             }}>
               Bij dit supplement zijn nog geen bronnen vastgelegd. De punten
               hierboven komen uit het plan van je coach.
+            </div>
+          )}
+
+                </div>
+              )}
             </div>
           )}
 
