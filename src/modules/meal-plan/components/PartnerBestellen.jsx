@@ -20,7 +20,10 @@ export function PartnerLabel({ meal }) {
       borderRadius: 999, padding: '1px 7px', whiteSpace: 'nowrap',
     }}>
       <ShoppingBag size={10} strokeWidth={2.8} />
-      {p.naam}{p.prijs ? ` · ${p.prijs}` : ''}
+      {p.naam}
+      {p.prijsKorting
+        ? <> · <span style={{ textDecoration: 'line-through', opacity: 0.55, fontWeight: 700 }}>{p.prijs}</span> <span style={{ color: '#10b981' }}>{p.prijsKorting}</span></>
+        : (p.prijs ? ` · ${p.prijs}` : '')}
     </span>
   )
 }
@@ -42,11 +45,21 @@ export default function PartnerBestellen({ meal, isMobile, style }) {
         </div>
         {p.prijs && (
           <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>
-            {p.prijs}
+            {p.prijsKorting ? (
+              <>
+                <span style={{ textDecoration: 'line-through', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginRight: 6 }}>{p.prijs}</span>
+                <span style={{ color: '#10b981' }}>{p.prijsKorting}</span>
+              </>
+            ) : p.prijs}
             {p.porties === 2 && <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}> / 2 porties</span>}
           </div>
         )}
       </div>
+      {p.korting && (
+        <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap' }}>
+          {p.korting.procent}% korting · {p.korting.code}
+        </div>
+      )}
       <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
         Vers bereid en ingevroren, in 7-8 minuten warm.{p.porties === 2 ? ' De macro’s hier zijn per portie.' : ''}
       </div>
