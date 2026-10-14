@@ -54,3 +54,49 @@ export async function werkGelogdeMaaltijdBij(supabase, clientId, mealId, datum, 
     .then(r => r, e => ({ error: e }))
   if (error) console.error('Gelogde maaltijd bijwerken mislukt:', error)
 }
+
+// Zet één maaltijd blijvend op een moment (slot) op meerdere weekdagen. Eén
+// keer lezen en één keer schrijven, in plaats van per dag de hele week op te
+// halen en terug te zetten (dan kan de ene schrijfactie de andere wissen).
+//
+// De kloktijd en eigen titel horen bij het slot van díé dag, niet bij de
+// maaltijd: die blijven staan, net als bij swapMealInWeekStructure.
+export async function zetMaaltijdOpDagen(supabase, planId, dagen, slot, maaltijd) {
+  if (!supabase || !planId || !slot || !maaltijd || !dagen?.length) return
+  const { data: plan, error: leesFout } = await supabase
+    .from('client_meal_plans')
+    .select('week_structure')
+    .eq('id', planId)
+    .single()
+  if (leesFout) throw leesFout
+  const week = { ...(plan?.week_structure || {}) }
+  dagen.forEach(dag => {
+    const oud = week[dag]?.[slot]
+    const oudObject = (oud && typeof oud === 'object') ? oud : {}
+    const nieuw = {
+      ...maaltijd,
+      meal_id: maaltijd.meal_id || maaltijd.id,
+      meal_name: maaltijd.name || maaltijd.meal_name,
+      timing: oudObject.timing ?? maaltijd.timing ?? null,
+      display_label: oudObject.display_label ?? maaltijd.display_label ?? null,
+    }
+    // Weergave-velden van de dagweergave horen niet in het plan.
+    ;['slot', 'timeSlot', 'plannedTime', 'isConsumed', 'consumedAt', 'volgtTraining'].forEach(k => { delete nieuw[k] })
+    const dagPlan = { ...(week[dag] || {}), [slot]: nieuw }
+    const maaltijden = Object.entries(dagPlan)
+      .filter(([k, m]) => k !== 'totals' && m && typeof m === 'object' && m.calories)
+      .map(([, m]) => m)
+    dagPlan.totals = {
+      kcal: maaltijden.reduce((s, m) => s + (m.calories || 0), 0),
+      protein: maaltijden.reduce((s, m) => s + (m.protein || 0), 0),
+      carbs: maaltijden.reduce((s, m) => s + (m.carbs || 0), 0),
+      fat: maaltijden.reduce((s, m) => s + (m.fat || 0), 0),
+    }
+    week[dag] = dagPlan
+  })
+  const { error } = await supabase
+    .from('client_meal_plans')
+    .update({ week_structure: week, updated_at: new Date().toISOString() })
+    .eq('id', planId)
+  if (error) throw error
+}

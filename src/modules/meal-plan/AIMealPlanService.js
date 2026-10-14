@@ -1052,8 +1052,15 @@ async logAIMood(clientId, moodData) {
   // snapshot komt in ai_meal_progress.consumed_meals[slot].edited_meal en
   // wordt door getTodayFromWeekStructure boven het plan getoond.
   async overrideMealForToday(clientId, slot, editedMeal) {
+    return this.overrideMealForDate(clientId, slot, editedMeal, null)
+  }
+
+  // Zelfde als hierboven, maar voor een willekeurige datum ('JJJJ-MM-DD',
+  // lokale kalenderdag). Voor "alleen deze week" in de dagkiezer: verleden,
+  // vandaag of vooruit. Vandaag houdt de sleutel die de vandaag-weergave leest.
+  async overrideMealForDate(clientId, slot, editedMeal, datumIso) {
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = this.dagSleutel(datumIso)
       let progress = await this.getAIProgress(clientId, today)
       if (!progress.consumed_meals) progress.consumed_meals = {}
       progress.consumed_meals[slot] = {
@@ -1071,12 +1078,46 @@ async logAIMood(clientId, moodData) {
         .from('ai_meal_progress')
         .upsert({ ...progress, client_id: clientId, date: today, updated_at: new Date().toISOString() })
       if (error) throw error
-      console.log('✅ Meal override for today saved')
+      console.log('✅ Meal override saved for', today)
       return true
     } catch (error) {
-      console.error('❌ overrideMealForToday failed:', error)
+      console.error('❌ overrideMealForDate failed:', error)
       throw error
     }
+  }
+
+  // Haalt een eenmalige aanpassing op één datum weg, zodat het weekplan daar
+  // weer telt. Nodig na een blijvende wijziging: anders blijft een oudere
+  // "alleen vandaag"-versie de nieuwe overschaduwen.
+  async wisDagAanpassing(clientId, slot, datumIso) {
+    const sleutel = this.dagSleutel(datumIso)
+    const { data } = await this.supabase
+      .from('ai_meal_progress')
+      .select('id, consumed_meals')
+      .eq('client_id', clientId)
+      .eq('date', sleutel)
+      .maybeSingle()
+      .then(r => r, () => ({ data: null }))
+    const huidig = data?.consumed_meals?.[slot]
+    if (!data || !huidig?.was_swapped) return
+    const { error } = await this.supabase
+      .from('ai_meal_progress')
+      .update({
+        consumed_meals: { ...data.consumed_meals, [slot]: { ...huidig, was_swapped: false, edited_meal: null } },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', data.id)
+    if (error) console.error('Dag-aanpassing wissen mislukt:', error)
+  }
+
+  // Datumsleutel van ai_meal_progress. Vandaag (of geen datum) gebruikt de
+  // sleutel die de vandaag-weergave al leest; andere dagen hun lokale datum,
+  // zoals laadDagAanpassingen ze opzoekt.
+  dagSleutel(datumIso) {
+    const nu = new Date()
+    const lokaalVandaag = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, '0')}-${String(nu.getDate()).padStart(2, '0')}`
+    if (!datumIso || datumIso === lokaalVandaag) return nu.toISOString().split('T')[0]
+    return datumIso
   }
   // ========================================
   // FAVORITES

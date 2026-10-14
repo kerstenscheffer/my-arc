@@ -67,6 +67,8 @@ import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 
 // Modals
 import AIAlternativesModal from './components/AIAlternativesModal'
+import DagenKiezer from './components/DagenKiezer'
+import { zetMaaltijdOpDagen } from './dagAanpassingen'
 import AIMealInfoModal from './components/AIMealInfoModal'
 import AIFavoritesModal from './components/AIFavoritesModal'
 import AIMealHistoryModal from './components/AIMealHistoryModal'
@@ -128,7 +130,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   // Incremented when a meal is logged/deleted on a past day; causes MacroHero
   // to clear its day-cache and re-fetch fresh totals for that day.
   const [pastDayRefreshKey, setPastDayRefreshKey] = useState(0)
-  // Zie handleSwapMeal: een halve seconde niets doorlaten na het wisselen.
+  // Zie kiesWissel: een halve seconde niets doorlaten na het wisselen.
   const [naWisselSchild, setNaWisselSchild] = useState(false)
 
   // Meal view mode: standaard 'plan' (toont plan-slots). Als het meal-plan is
@@ -459,29 +461,48 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     }
   }
   
-  const handleSwapMeal = async (originalMeal, newMealId) => {
+  // Wissel uit het alternatieven-venster: eerst kiezen op welke dagen het
+  // geldt (DagenKiezer), dan pas opslaan via voerWisselUit.
+  const [wisselKeuze, setWisselKeuze] = useState(null) // { meal, nieuw }
+  const [wisselBezig, setWisselBezig] = useState(false)
+  const [wisselFout, setWisselFout] = useState(null)
+
+  const kiesWissel = async (originalMeal, newMealId) => {
+    setModals(prev => ({ ...prev, alternatives: null, favorites: false }))
+    setNaWisselSchild(true)
+    setTimeout(() => setNaWisselSchild(false), 500)
+    const nieuw = await service.getMealById(newMealId)
+    if (!nieuw) { console.error('Wissel: maaltijd niet gevonden', newMealId); return }
+    setWisselFout(null)
+    setWisselKeuze({ meal: originalMeal, nieuw })
+  }
+
+  const voerWisselUit = async (keuze) => {
+    if (!wisselKeuze) return
+    const { meal, nieuw } = wisselKeuze
+    const slot = meal.slot
+    setWisselBezig(true); setWisselFout(null)
     try {
-      // De dag waar de klant NAAR KIJKT, niet de dag van vandaag. Dit stond
-      // op dashboardData.dayName: wisselde je iets terwijl je donderdag open
-      // had, dan werd dat als "vandaag" weggeschreven.
-      const dagKey = DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key
-      await service.swapAIMeal(
-        client.id,
-        dashboardData.activePlan?.id,
-        dagKey,
-        originalMeal.slot,
-        newMealId
-      )
-      setModals(prev => ({ ...prev, alternatives: null, favorites: false }))
-      // Het wisselvenster verdwijnt onder je vinger vandaan, en de tik die
-      // erbij hoort komt daarna alsnog aan op wat eronder lag — meestal de
-      // ronde log-knop, waardoor je na het wisselen in het log-scherm stond.
-      // Een half seconde lang niets doorlaten vangt die na-tik op.
-      setNaWisselSchild(true)
-      setTimeout(() => setNaWisselSchild(false), 500)
+      const snap = { ...nieuw, meal_id: nieuw.id, meal_name: nieuw.name || nieuw.meal_name }
+      // Porties van de vorige maaltijd horen niet mee (zie swapMealInWeekStructure).
+      ;['original_calories', 'original_protein', 'original_carbs', 'original_fat', 'fitScore'].forEach(k => { delete snap[k] })
+      if (keuze.modus === 'altijd') {
+        await zetMaaltijdOpDagen(db.supabase, dashboardData.activePlan?.id, keuze.dagen, slot, snap)
+        // Een oudere eenmalige wissel op vandaag zou de blijvende verbergen.
+        if (keuze.dagen.includes(DAYS_OF_WEEK[getTodayIndex()]?.key)) {
+          await service.wisDagAanpassing(client.id, slot, null)
+        }
+      } else {
+        for (const d of keuze.datums) await service.overrideMealForDate(client.id, slot, snap, d)
+      }
+      setWisselKeuze(null)
+      setPastDayRefreshKey(k => k + 1)
       await loadDashboardData()
-    } catch (error) {
-      console.error('Failed to swap meal:', error)
+    } catch (e) {
+      console.error('Wissel opslaan mislukt:', e)
+      setWisselFout(e?.message || 'Opslaan mislukt')
+    } finally {
+      setWisselBezig(false)
     }
   }
 
@@ -812,7 +833,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           isOpen={!!modals.alternatives}
           onClose={() => setModals(prev => ({ ...prev, alternatives: null }))}
           currentMeal={modals.alternatives}
-          onSelectMeal={(newMealId) => handleSwapMeal(modals.alternatives, newMealId)}
+          onSelectMeal={(newMealId) => kiesWissel(modals.alternatives, newMealId)}
           onMaaltijdAanmaken={() => {
             setModals(prev => ({ ...prev, alternatives: null }))
             setFoodLogTab('meals')
@@ -824,6 +845,27 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         />
       )}
       
+      {wisselKeuze && createPortal(
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)',
+          zIndex: 11000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        }}>
+          <DagenKiezer
+            titel={`Wisselen naar ${wisselKeuze.nieuw.name || wisselKeuze.nieuw.meal_name}`}
+            subtitel={`in plaats van ${wisselKeuze.meal.name || wisselKeuze.meal.meal_name} · ${Math.round(wisselKeuze.nieuw.calories || 0)} kcal`}
+            datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
+            dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
+            slot={wisselKeuze.meal.slot}
+            bezig={wisselBezig}
+            fout={wisselFout}
+            isMobile={isMobile}
+            onKies={voerWisselUit}
+            onClose={() => !wisselBezig && setWisselKeuze(null)}
+          />
+        </div>,
+        document.body
+      )}
+
       {naWisselSchild && (
         <div
           onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
@@ -857,7 +899,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           onClose={() => setModals(prev => ({ ...prev, favorites: false }))}
           onSelectMeal={(mealId) => {
             if (dashboardData.nextMeal) {
-              handleSwapMeal(dashboardData.nextMeal, mealId)
+              kiesWissel(dashboardData.nextMeal, mealId)
             }
           }}
           currentMeal={dashboardData.nextMeal}
