@@ -42,7 +42,7 @@ const knop = (kleur, vol = false) => ({
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })
 
-function Regel({ ch, partnerName, onAfronden, onDoorzetten }) {
+function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald }) {
   const [vervolg, setVervolg] = useState(false)
   const [bedrag, setBedrag] = useState('')
   const [pct, setPct] = useState(String(ch.pct ?? 50))
@@ -65,7 +65,7 @@ function Regel({ ch, partnerName, onAfronden, onDoorzetten }) {
             {ch.leadName}
           </div>
           <div style={{ fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
-            {euro(ch.bedrag)} in bewaring
+            {euro(ch.bedrag)} {ch.betaald ? 'in bewaring' : 'toegezegd · nog niet betaald'}
             {ch.deadline && (
               <span style={{ color: ch.verlopen ? '#10b981' : 'rgba(255,255,255,0.35)' }}>
                 {' · '}{ch.verlopen ? 'termijn voorbij' : `terug te vragen tot ${new Date(ch.deadline).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
@@ -76,7 +76,18 @@ function Regel({ ch, partnerName, onAfronden, onDoorzetten }) {
         {ch.verlopen && <Clock size={13} color="#10b981" strokeWidth={3} style={{ flexShrink: 0 }} />}
       </div>
 
-      {!vervolg ? (
+      {!ch.betaald ? (
+        // Nog niet betaald: eerst moet het geld binnenkomen, pas dan valt er
+        // iets te behouden of terug te betalen.
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button style={knop('#fff', true)} disabled={bezig} onClick={() => doe(() => onBetaald(ch))}>
+            <Check size={12} strokeWidth={3.4} /> Betaald
+          </button>
+          <button style={knop('#ef4444')} disabled={bezig} onClick={() => doe(() => onAfronden(ch, 'terugbetaald'))}>
+            <Undo2 size={12} strokeWidth={3.4} /> Gaat niet door
+          </button>
+        </div>
+      ) : !vervolg ? (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={knop('#fff', true)} disabled={bezig} onClick={() => doe(() => onAfronden(ch, 'behouden'))}>
             <Check size={12} strokeWidth={3.4} /> Behouden
@@ -158,8 +169,29 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
     onGewijzigd?.()
   }
 
-  const totaal = lijst.reduce((s, c) => s + c.bedrag, 0)
-  const verlopen = lijst.filter(c => c.verlopen)
+  const betaald = async (ch) => {
+    const res = await leadService.markReservationPaid(ch.movementId)
+    if (res?.error) { console.error(res.error); return }
+    await laad()
+    onGewijzigd?.()
+  }
+
+  const inBewaring = lijst.filter(c => c.betaald)
+  const toegezegd = lijst.filter(c => !c.betaald)
+  const totaal = inBewaring.reduce((s, c) => s + c.bedrag, 0)
+  const totaalToegezegd = toegezegd.reduce((s, c) => s + c.bedrag, 0)
+  const verlopen = inBewaring.filter(c => c.verlopen)
+  const kopje = { fontSize: '0.95rem', fontWeight: 900, color: '#fff', margin: '1.25rem 0 0.25rem' }
+  const regel = (ch) => (
+    <Regel
+      key={ch.movementId}
+      ch={ch}
+      partnerName={partnerName}
+      onAfronden={afronden}
+      onDoorzetten={doorzetten}
+      onBetaald={betaald}
+    />
+  )
 
   if (laden) {
     return <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Laden…</div>
@@ -181,7 +213,8 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
         paddingBottom: '1.25rem', borderBottom: `1px solid ${LIJN}`, marginBottom: '1rem',
       }}>
         {[
-          { label: `In bewaring · ${lijst.length} challenge${lijst.length === 1 ? '' : 's'}`, waarde: euro(totaal) },
+          { label: `In bewaring · ${inBewaring.length} challenge${inBewaring.length === 1 ? '' : 's'}`, waarde: euro(totaal) },
+          ...(toegezegd.length ? [{ label: `Toegezegd · ${toegezegd.length} nog niet betaald`, waarde: euro(totaalToegezegd) }] : []),
           { label: verlopen.length ? 'Termijn voorbij · kun je afronden' : 'Termijn voorbij', waarde: String(verlopen.length) },
         ].map(k => (
           <div key={k.label}>
@@ -206,15 +239,18 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
         geen commissie overheen zolang de klant het kan terugvragen.
       </div>
 
-      {lijst.map(ch => (
-        <Regel
-          key={ch.movementId}
-          ch={ch}
-          partnerName={partnerName}
-          onAfronden={afronden}
-          onDoorzetten={doorzetten}
-        />
-      ))}
+      {toegezegd.length > 0 && (
+        <>
+          <div style={{ ...kopje, marginTop: 0 }}>Toegezegd, nog niet betaald</div>
+          {toegezegd.map(regel)}
+        </>
+      )}
+      {inBewaring.length > 0 && (
+        <>
+          <div style={{ ...kopje, marginTop: toegezegd.length ? '1.75rem' : 0 }}>In bewaring</div>
+          {inBewaring.map(regel)}
+        </>
+      )}
     </div>
   )
 }

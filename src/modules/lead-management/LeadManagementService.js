@@ -2975,7 +2975,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       let q = this.db.supabase
         .from('lead_movements')
-        .select('id, lead_id, lead_name, order_value, partner_share_pct, moved_at, challenge_status, challenge_deadline, to_section_id, to_section_title')
+        .select('id, lead_id, lead_name, order_value, partner_share_pct, moved_at, challenge_status, challenge_deadline, to_section_id, to_section_title, payment_received, is_reservation')
         .eq('sale_kind', 'challenge')
         .is('reverted_at', null)
         .order('challenge_deadline', { ascending: true, nullsFirst: false })
@@ -2997,6 +2997,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         sectionId: r.to_section_id,
         sectionTitle: r.to_section_title,
         gestart: r.moved_at,
+        // Toegezegd maar nog niet betaald: staat niet op de rekening, dus ook
+        // niet "in bewaring".
+        betaald: r.payment_received === true || r.is_reservation === true,
       }))
     } catch (e) {
       console.error('getChallenges failed:', e)
