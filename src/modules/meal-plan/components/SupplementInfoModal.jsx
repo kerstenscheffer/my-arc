@@ -203,14 +203,21 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                       {[p.brand, p.store].filter(Boolean).join(' · ')}{p.in_stock === false ? ' · uitverkocht' : ''}
                     </div>
                     {winkelCode(p.url) && (
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', marginTop: 1 }}>
-                        {winkelProcent(p.url) ? `${winkelProcent(p.url)}% korting` : 'Korting'} met code {winkelCode(p.url)}, gaat vanzelf via deze link
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {winkelProcent(p.url) ? `${winkelProcent(p.url)}% korting · ` : ''}{winkelCode(p.url)}
                       </div>
                     )}
                   </div>
-                  {prijsTekst(p.price) && (
+                  {prijsTekst(p.price) && (winkelProcent(p.url) ? (
+                    // Met korting: de prijs die de klant via deze link betaalt,
+                    // met de gewone prijs doorgestreept erboven.
+                    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, lineHeight: 1.15 }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through' }}>{prijsTekst(p.price)}</span>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#10b981' }}>{prijsTekst(p.price * (1 - winkelProcent(p.url) / 100))}</span>
+                    </span>
+                  ) : (
                     <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>{prijsTekst(p.price)}</span>
-                  )}
+                  ))}
                   <ExternalLink size={15} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
                 </a>
               ))}
