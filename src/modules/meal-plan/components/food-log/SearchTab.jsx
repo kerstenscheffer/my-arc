@@ -8,6 +8,7 @@ import MealCard from '../day-schedule/MealCard'
 import { Search, Loader, X, ChevronRight, Plus, Star } from 'lucide-react'
 import FatSecretService from './FatSecretService'
 import { resolveFoodImage } from '../../foodImageFallback'
+import { vulZoekFotos } from './enrichImageFromOFF'
 
 // Relevance score: lower = better.
 // 0  exact match
@@ -242,6 +243,10 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       }
       setResults(allResults)
       setLoading(false)
+      // Echte productfoto's ophalen voor wat bovenaan staat; niet wachten.
+      vulZoekFotos(db, allResults, (id, url) => {
+        setResults(prev => prev.map(r => (r.id === id ? { ...r, image_url: url } : r)))
+      })
 
       // Online (FatSecret) alleen als aanvulling: bij weinig eigen treffers,
       // en altijd onderaan. Eerder werd alles opnieuw gesorteerd en drong een

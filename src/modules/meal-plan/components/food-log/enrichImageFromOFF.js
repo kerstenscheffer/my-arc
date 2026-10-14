@@ -50,10 +50,10 @@ export const enrichIngredientImage = async (db, ingredientId) => {
       .select('id, barcode, image_url, image_url_checked_at')
       .eq('id', ingredientId)
       .maybeSingle()
-    if (!row) return
-    if (row.image_url) return                          // al een image
-    if (!row.barcode) return                            // geen barcode → niets om op te zoeken
-    if (wasRecentlyChecked(row.image_url_checked_at)) return  // al recent geprobeerd
+    if (!row) return null
+    if (row.image_url) return row.image_url            // al een image
+    if (!row.barcode) return null                       // geen barcode → niets om op te zoeken
+    if (wasRecentlyChecked(row.image_url_checked_at)) return null  // al recent geprobeerd
 
     const url = await fetchOffImage(row.barcode)
     const now = new Date().toISOString()
@@ -61,7 +61,26 @@ export const enrichIngredientImage = async (db, ingredientId) => {
       ? { image_url: url, image_url_checked_at: now }
       : { image_url_checked_at: now }
     await db.supabase.from('ai_ingredients').update(patch).eq('id', ingredientId)
+    return url
   } catch (e) {
     console.warn('enrichIngredientImage: failed', e)
+    return null
+  }
+}
+
+// Bij zoeken: de eerste paar merkproducten zonder foto krijgen alsnog de echte
+// verpakkingsfoto. Langzaam na elkaar (Open Food Facts weigert snelle reeksen)
+// en per sessie elk product maar één keer. Wat mensen echt zien, krijgt zo
+// als eerste een foto; de achtergrondtaak (productfotos_ophalen) doet de rest.
+const alGeprobeerd = new Set()
+export const vulZoekFotos = async (db, items, onFoto, max = 6) => {
+  const kandidaten = (items || [])
+    .filter(x => x?.id && x.barcode && !x.image_url && !alGeprobeerd.has(x.id))
+    .slice(0, max)
+  for (const x of kandidaten) {
+    alGeprobeerd.add(x.id)
+    const url = await enrichIngredientImage(db, x.id)
+    if (url) onFoto?.(x.id, url)
+    await new Promise(r => setTimeout(r, 1200))
   }
 }
