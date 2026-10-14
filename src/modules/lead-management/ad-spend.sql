@@ -1,0 +1,13 @@
+-- Adspend per uitbetaalperiode (26e vorige maand t/m 25e), staat in de DB
+-- sinds 14 okt 2026. Gaat in getPartnerPayouts net als de vaste lasten van de
+-- omzet af vóór de verdeling met de partner.
+--
+-- Automatisch: pg_cron 'meta-ad-spend' (elk uur, :17) draait
+-- public.sync_meta_ad_spend(). Die doet pas iets als Vault deze twee heeft:
+--   select vault.create_secret('<token met ads_read>', 'meta_ads_token');
+--   select vault.create_secret('<advertentieaccount-id, bv. act_123>', 'meta_ad_account_id');
+-- Handmatig ingevulde bedragen (bron 'handmatig') overschrijft hij niet.
+--
+-- Tabel: ad_spend (coach_id, period date, bedrag, bron 'handmatig'|'meta',
+-- unique coach_id+period). RLS als partner_payouts: team leest, owner schrijft.
+-- Volledige definitie: migratie ad_spend_per_uitbetaalperiode.

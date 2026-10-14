@@ -33,6 +33,7 @@ const BRON = Object.fromEntries(BRONNEN.map(b => [b.id, b]))
 const KLEUR_JIJ = '#10b981'
 const KLEUR_PARTNER = '#3b82f6'
 const KLEUR_LASTEN = '#6b7280'
+const KLEUR_ADS = '#ef4444'
 
 const eur = (n) => '€' + Math.round(n || 0).toLocaleString('nl-NL')
 const kort = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(Math.round(n)))
@@ -71,7 +72,7 @@ const tik = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent
 
 export default function OmzetScherm({
   revenue, payouts, isOwner = true, partnerName = 'Marcel', maandDoel = null,
-  onDoel, onSettle, payoutBusy, leadService, coachId, onHerlaad, isMobile,
+  onDoel, onSettle, payoutBusy, leadService, coachId, onHerlaad, onAdSpend, isMobile,
 }) {
   const maanden = useMemo(() => revenue?.months || [], [revenue])
   const huidigeMaand = maanden.find(m => m.isCurrent)?.key || maanden[0]?.key
@@ -80,6 +81,8 @@ export default function OmzetScherm({
   const [paneel, setPaneel] = useState(null) // 'partner' | 'jij' | null
   const [lijst, setLijst] = useState(null)   // { bron, maanden, label } → transactie-scherm
   const [challengesOpen, setChallengesOpen] = useState(false)
+  const [adInvoer, setAdInvoer] = useState('')
+  const [adBezig, setAdBezig] = useState(false)
 
   // De maanden samengevoegd tot perioden van de gekozen stand.
   const perioden = useMemo(() => {
@@ -111,6 +114,8 @@ export default function OmzetScherm({
   const verdeling = !vMaanden.length ? null : losseMaand || {
     revenue: vMaanden.reduce((t, m) => t + (m.revenue || 0), 0),
     fixedCosts: vMaanden.reduce((t, m) => t + (m.fixedCosts || 0), 0),
+    adSpend: vMaanden.reduce((t, m) => t + (m.adSpend || 0), 0),
+    adSpendBron: null,
     earned: vMaanden.reduce((t, m) => t + (m.earned ?? m.owed ?? 0), 0),
     netRevenue: vMaanden.reduce((t, m) => t + (m.netRevenue || 0), 0),
     outstanding: vMaanden.reduce((t, m) => t + Math.max(0, m.outstanding || 0), 0),
@@ -132,9 +137,18 @@ export default function OmzetScherm({
   // Verdeling van deze periode.
   const ontvangen = verdeling?.revenue || 0
   const lasten = verdeling?.fixedCosts || 0
+  const ads = verdeling?.adSpend || 0
+  const adsAanpasbaar = isOwner && modus === 'maand' && !!onAdSpend
+  const bewaarAds = async (waarde) => {
+    if (adBezig) return
+    setAdBezig(true)
+    await onAdSpend(gekozen, waarde)
+    setAdBezig(false)
+    setPaneel(null)
+  }
   const partner = verdeling ? (verdeling.earned ?? verdeling.owed ?? 0) : 0
   const jij = Math.max(0, (verdeling?.netRevenue || 0) - partner)
-  const verdeelTotaal = Math.max(1, lasten + partner + jij)
+  const verdeelTotaal = Math.max(1, lasten + ads + partner + jij)
 
   // Geen kaders: secties staan los op de achtergrond, gescheiden door een
   // haarlijn (14 okt 2026, op verzoek: minder containers, alles hoger).
@@ -246,11 +260,12 @@ export default function OmzetScherm({
             <StapelBalk hoog delen={[
               ...(isOwner ? [{ kleur: KLEUR_JIJ, waarde: jij }] : []),
               { kleur: KLEUR_PARTNER, waarde: partner },
+              { kleur: KLEUR_ADS, waarde: ads },
               { kleur: KLEUR_LASTEN, waarde: lasten },
             ]} totaal={verdeelTotaal} />
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isOwner ? 3 : 2}, minmax(0, 1fr))`, gap: isMobile ? 10 : 24, marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : isOwner ? 4 : 3}, minmax(0, 1fr))`, gap: isMobile ? 10 : 24, marginTop: 12 }}>
               {isOwner && (
-                <VerdeelVak kleur={KLEUR_JIJ} titel="Jij houdt" bedrag={jij} sub={`na ${eur(lasten)} vaste lasten`}
+                <VerdeelVak kleur={KLEUR_JIJ} titel="Jij houdt" bedrag={jij} sub={`na lasten${ads ? ' en adspend' : ''}`}
                   aan={paneel === 'jij'} onClick={() => setPaneel(p => (p === 'jij' ? null : 'jij'))} />
               )}
               <VerdeelVak kleur={KLEUR_PARTNER} titel={isOwner ? `Naar ${partnerName}` : 'Jij ontvangt'} bedrag={partner}
@@ -258,13 +273,46 @@ export default function OmzetScherm({
                 sub={verdeling.settled ? `op ${verdeling.paidAt ? datumKort(verdeling.paidAt) : 'tijd'}` : verdeling.outstanding > 0 && verdeling.outstanding < partner ? `${eur(verdeling.outstanding)} nog over te maken` : 'klik voor details'}
                 aan={paneel === 'partner'} onClick={() => setPaneel(p => (p === 'partner' ? null : 'partner'))} />
               {/* Het grijze stuk van de balk. */}
+              <VerdeelVak kleur={KLEUR_ADS} titel="Adspend" bedrag={ads}
+                sub={verdeling.adSpendBron === 'meta' ? 'automatisch uit Meta' : ads ? (adsAanpasbaar ? 'handmatig · aanpassen' : 'handmatig') : (adsAanpasbaar ? 'klik om in te vullen' : 'niet ingevuld')}
+                aan={paneel === 'ads'}
+                onClick={adsAanpasbaar ? () => { setAdInvoer(ads ? String(Math.round(ads)) : ''); setPaneel(p => (p === 'ads' ? null : 'ads')) } : undefined} />
               <VerdeelVak kleur={KLEUR_LASTEN} titel="Vaste lasten" bedrag={lasten} sub="gaat eerst van de omzet af" />
             </div>
+
+            {paneel === 'ads' && adsAanpasbaar && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.45 }}>
+                  Advertentiekosten van {periodeTekst(gekozen)}. Gaan net als de vaste lasten van de omzet af voordat jij en {partnerName} verdelen.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minHeight: 46, padding: '0 0.8rem', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)' }}>
+                    <span style={{ fontWeight: 900, color: 'rgba(255,255,255,0.4)' }}>€</span>
+                    <input
+                      type="text" inputMode="decimal" autoFocus value={adInvoer} placeholder="0"
+                      onChange={e => setAdInvoer(e.target.value.replace(/[^0-9.,]/g, ''))}
+                      onKeyDown={e => { if (e.key === 'Enter') bewaarAds(adInvoer.replace(',', '.')) }}
+                      style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '1.1rem', fontWeight: 900, fontFamily: 'inherit' }}
+                    />
+                  </div>
+                  <button onClick={() => bewaarAds(adInvoer.replace(',', '.'))} disabled={adBezig} style={{
+                    ...tik, minHeight: 46, padding: '0 1.1rem', borderRadius: 12, border: 'none',
+                    background: '#fff', color: '#000', fontWeight: 900, fontSize: '0.9rem', opacity: adBezig ? 0.5 : 1,
+                  }}>{adBezig ? '…' : 'Opslaan'}</button>
+                </div>
+                {verdeling.adSpendBron === 'handmatig' && (
+                  <button onClick={() => bewaarAds(null)} disabled={adBezig} style={{ ...tik, marginTop: 8, padding: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontWeight: 800, fontSize: '0.8rem' }}>
+                    Weghalen (automatisch uit Meta laten komen)
+                  </button>
+                )}
+              </div>
+            )}
 
             {paneel === 'jij' && (
               <div style={{ marginTop: 12 }}>
                 <Regel label="Ontvangen deze periode" bedrag={ontvangen} />
                 <Regel label="Vaste lasten" bedrag={-lasten} />
+                {ads > 0 && <Regel label="Adspend" bedrag={-ads} />}
                 <Regel label={`Naar ${partnerName}`} bedrag={-partner} />
                 <Regel label="Jij houdt" bedrag={jij} dik />
               </div>

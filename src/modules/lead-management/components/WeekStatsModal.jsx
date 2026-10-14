@@ -1588,6 +1588,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   leadService={leadService}
                   coachId={coachId}
                   onHerlaad={openRevenuePanel}
+                  onAdSpend={async (periode, bedrag) => {
+                    const res = await leadService.saveAdSpend(coachId, periode, bedrag)
+                    if (res?.error) { alert('Adspend opslaan mislukt'); return }
+                    await loadPayouts()
+                  }}
                   isMobile={isMobile}
                 />
               )}

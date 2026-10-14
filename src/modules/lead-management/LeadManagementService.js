@@ -3066,7 +3066,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       if (!coachId) return { months: [], totalOutstanding: 0 }
       const FIXED = Math.max(0, Number(fixedCosts) || 0)
-      const [{ data: saleRows }, { data: paidRows }] = await Promise.all([
+      const [{ data: saleRows }, { data: paidRows }, { data: adRows }] = await Promise.all([
         this.db.supabase
           .from('lead_movements')
           .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, outcome_type')
@@ -3084,7 +3084,20 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         this.db.supabase
           .from('partner_payouts')
           .select('period, amount_paid, paid_at'),
+        // Adspend per uitbetaalperiode: gaat net als de vaste lasten van de
+        // omzet af vóór de verdeling. Handmatig of automatisch uit Meta.
+        this.db.supabase
+          .from('ad_spend')
+          .select('period, bedrag, bron')
+          .then(r => r, () => ({ data: [] })),
       ])
+      const adSpend = {}
+      const adBron = {}
+      ;(adRows || []).forEach(r => {
+        const k = String(r.period).slice(0, 7)
+        adSpend[k] = (adSpend[k] || 0) + (Number(r.bedrag) || 0)
+        adBron[k] = r.bron
+      })
 
       const sales = (saleRows || []).map(r => ({
         total: Number(r.order_value) || 0,
@@ -3242,7 +3255,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const earned = {}
       Object.keys(porties).forEach(k => {
         const rij = porties[k].slice().sort((a, b) => a.datum - b.datum)
-        let restLasten = FIXED
+        let restLasten = FIXED + (adSpend[k] || 0)
         rij.forEach(p => {
           const aftrek = Math.min(restLasten, p.omzet)
           restLasten -= aftrek
@@ -3265,7 +3278,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const paidM = Math.round((paid[k] || 0) * 100) / 100
         const outstanding = Math.round((owedM - paidM) * 100) / 100
         // Alleen maanden met iets te verdelen tonen (owed > 0 of al betaald).
-        if (owedM <= 0 && paidM <= 0 && (earned[k] || 0) <= 0) continue
+        if (owedM <= 0 && paidM <= 0 && (earned[k] || 0) <= 0 && !(revenue[k] > 0) && !(adSpend[k] > 0)) continue
         if (i <= 0) totalOutstanding += Math.max(0, outstanding)
         const revM = Math.round((revenue[k] || 0) * 100) / 100
         months.push({
@@ -3292,7 +3305,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             })),
           orderRevenue: Math.round((orderOmzet[k] || 0) * 100) / 100, // omzet uit orders die maand
           fixedCosts: revM > 0 ? Math.min(FIXED, revM) : 0,    // afgetrokken vaste lasten
-          netRevenue: Math.max(0, Math.round((revM - FIXED) * 100) / 100), // te verdelen
+          adSpend: Math.round((adSpend[k] || 0) * 100) / 100,
+          adSpendBron: adBron[k] || null,
+          netRevenue: Math.max(0, Math.round((revM - FIXED - (adSpend[k] || 0)) * 100) / 100), // te verdelen
           isPast: i < 0,
           isCurrent: i === 0,
         })
@@ -3308,6 +3323,26 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // dat op dat moment openstaat (owedNow), zodat de maand op €0 openstaand komt.
   // Komt er later nog een sale in die maand bij, dan wordt owed > paid en
   // verschijnt alleen dat nieuwe stukje opnieuw als openstaand.
+  // Adspend van één uitbetaalperiode handmatig zetten. Leeg = weghalen, zodat
+  // de automatische Meta-koppeling het weer overneemt.
+  async saveAdSpend(coachId, periodKey, bedrag) {
+    try {
+      if (!coachId || !periodKey) return { error: 'coach/periode ontbreekt' }
+      const period = `${periodKey}-01`
+      if (bedrag == null || bedrag === '') {
+        const { error } = await this.db.supabase.from('ad_spend').delete().eq('coach_id', coachId).eq('period', period)
+        return { error }
+      }
+      const { error } = await this.db.supabase.from('ad_spend').upsert(
+        { coach_id: coachId, period, bedrag: Number(bedrag) || 0, bron: 'handmatig', updated_at: new Date().toISOString() },
+        { onConflict: 'coach_id,period' })
+      return { error }
+    } catch (error) {
+      console.error('❌ saveAdSpend failed:', error)
+      return { error }
+    }
+  }
+
   async settlePartnerMonth(coachId, periodKey, owedNow) {
     try {
       if (!coachId || !periodKey) return { error: 'coach/periode ontbreekt' }
