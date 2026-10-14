@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
+import { useProductFotos } from '../../supplements/utils/productFoto'
 import { winkelUrl, winkelCode, winkelProcent, winkelVanCoach } from '../../supplements/utils/winkelKorting'
 
 export default function SupplementInfoModal({ supplement, isMobile, onClose, db }) {
@@ -50,6 +51,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
             () => { if (leeft) setProducten([]) })
     return () => { leeft = false }
   }, [db, sp?.id])
+  const productFoto = useProductFotos()[sp?.id] || null
   const prijsTekst = (p) => p == null ? null : `€${Number(p).toFixed(2).replace('.', ',')}`
   const laatstGecontroleerd = producten.reduce((max, p) => (p.last_checked_at && (!max || p.last_checked_at > max) ? p.last_checked_at : max), null)
 
@@ -109,14 +111,20 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
-        {/* Foto met de naam eroverheen — zelfde beeldtaal als de kaart. */}
+        {/* Foto met de naam eroverheen — zelfde beeldtaal als de kaart. Is er
+            een product in de catalogus (Big Buffalo eerst), dan dat potje op
+            zwart; anders de stockfoto. */}
         <div style={{
-          position: 'relative', height: 120, flexShrink: 0,
-          background: `url(${supplementFoto(sp, 480)}) center/cover`,
+          position: 'relative', height: productFoto ? 190 : 120, flexShrink: 0,
+          background: productFoto
+            ? `url(${productFoto}) center 28% / auto 70% no-repeat, radial-gradient(circle at 50% 35%, #3a3a3a 0%, #0f0f0f 70%)`
+            : `url(${supplementFoto(sp, 480)}) center/cover`,
         }}>
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(to top, rgba(15,15,15,0.95), rgba(15,15,15,0.2))',
+            background: productFoto
+              ? 'linear-gradient(to top, rgba(15,15,15,0.95) 0%, rgba(15,15,15,0) 45%)'
+              : 'linear-gradient(to top, rgba(15,15,15,0.95), rgba(15,15,15,0.2))',
           }} />
           <button onClick={onClose} aria-label="Sluiten" style={{
             position: 'absolute', right: 10, top: 10, zIndex: 2,
@@ -201,7 +209,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                         display: 'inline-block', marginBottom: 2, padding: '1px 6px', borderRadius: 999,
                         background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)',
                         fontSize: '0.6rem', fontWeight: 900, color: '#10b981', letterSpacing: '0.02em',
-                      }}>Gebruikt door coach</span>
+                      }}>Favoriet van je coach</span>
                     )}
                     <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {p.product_name}
