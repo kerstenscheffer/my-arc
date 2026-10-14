@@ -189,7 +189,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
             background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.25)',
             color: '#fff', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}><X size={20} strokeWidth={2.8} /></button>
-          <div style={{ position: 'absolute', left: 14, bottom: 10, right: 50 }}>
+          <div style={{ position: 'absolute', left: 14, bottom: 6, right: 50 }}>
             <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               Supplement
             </div>
@@ -199,7 +199,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
           </div>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem 1rem 1.1rem' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.15rem 0.875rem 1.1rem' }}>
           {/* Wat moet ik nu doen: dosering en moment op één regel. */}
           {(sp.dosering || sp.tijdNotitie) && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: '1rem' }}>
