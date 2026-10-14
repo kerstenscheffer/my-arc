@@ -53,6 +53,59 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
   }, [db, sp?.id])
   const productFoto = useProductFotos()[sp?.id] || null
   const prijsTekst = (p) => p == null ? null : `€${Number(p).toFixed(2).replace('.', ',')}`
+  // Eerst wat de coach zelf aanraadt (met kortingscode), daaronder de rest.
+  // Zijn die allemaal goedkoper dan de goedkoopste aanrader (na korting), dan
+  // heet het kopje ook zo.
+  const coachProducten = producten.filter(p => winkelVanCoach(p.url))
+  const overigeProducten = producten.filter(p => !winkelVanCoach(p.url))
+  const naKorting = (p) => p.price == null ? null : Number(p.price) * (1 - (winkelProcent(p.url) || 0) / 100)
+  const goedkoopsteCoach = Math.min(...coachProducten.map(naKorting).filter(v => v != null))
+  const overigGoedkoper = overigeProducten.length > 0 &&
+    overigeProducten.every(p => p.price != null && Number(p.price) < goedkoopsteCoach)
+  const productRegel = (p) => (
+                <a key={p.id} href={winkelUrl(p.url)} target="_blank" rel="noopener noreferrer" style={{
+                  display: 'flex', alignItems: 'center', gap: 10, minHeight: 56,
+                  padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  textDecoration: 'none', color: 'inherit',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  {/* Productfoto's zijn vrijwel altijd op wit geschoten. */}
+                  <div style={{ width: 44, height: 44, borderRadius: 8, background: '#fff', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {p.image_url
+                      ? <img src={p.image_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      : <span style={{ fontSize: 18 }}>{sp.emoji || '💊'}</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {winkelVanCoach(p.url) && (
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#FFD700', marginBottom: 1 }}>
+                        Aangeraden door Kersten
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.product_name}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {[p.brand, p.store].filter(Boolean).join(' · ')}{p.in_stock === false ? ' · uitverkocht' : ''}
+                    </div>
+                    {winkelCode(p.url) && (
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {winkelProcent(p.url) ? `${winkelProcent(p.url)}% korting · ` : ''}{winkelCode(p.url)}
+                      </div>
+                    )}
+                  </div>
+                  {prijsTekst(p.price) && (winkelProcent(p.url) ? (
+                    // Met korting: de prijs die de klant via deze link betaalt,
+                    // met de gewone prijs doorgestreept erboven.
+                    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, lineHeight: 1.15 }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through' }}>{prijsTekst(p.price)}</span>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#10b981' }}>{prijsTekst(p.price * (1 - winkelProcent(p.url) / 100))}</span>
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>{prijsTekst(p.price)}</span>
+                  ))}
+                  <ExternalLink size={15} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
+                </a>
+  )
   const laatstGecontroleerd = producten.reduce((max, p) => (p.last_checked_at && (!max || p.last_checked_at > max) ? p.last_checked_at : max), null)
 
   const bronnen = sjabloon ? (Array.isArray(sjabloon.sources) ? sjabloon.sources : []) : null
@@ -190,50 +243,13 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
           {producten.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>
               {kop('Waar koop je het', <ShoppingCart size={11} />)}
-              {producten.map(p => (
-                <a key={p.id} href={winkelUrl(p.url)} target="_blank" rel="noopener noreferrer" style={{
-                  display: 'flex', alignItems: 'center', gap: 10, minHeight: 56,
-                  padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
-                  textDecoration: 'none', color: 'inherit',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>
-                  {/* Productfoto's zijn vrijwel altijd op wit geschoten. */}
-                  <div style={{ width: 44, height: 44, borderRadius: 8, background: '#fff', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {p.image_url
-                      ? <img src={p.image_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                      : <span style={{ fontSize: 18 }}>{sp.emoji || '💊'}</span>}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {winkelVanCoach(p.url) && (
-                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#FFD700', marginBottom: 1 }}>
-                        Aangeraden door Kersten
-                      </div>
-                    )}
-                    <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {p.product_name}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {[p.brand, p.store].filter(Boolean).join(' · ')}{p.in_stock === false ? ' · uitverkocht' : ''}
-                    </div>
-                    {winkelCode(p.url) && (
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {winkelProcent(p.url) ? `${winkelProcent(p.url)}% korting · ` : ''}{winkelCode(p.url)}
-                      </div>
-                    )}
-                  </div>
-                  {prijsTekst(p.price) && (winkelProcent(p.url) ? (
-                    // Met korting: de prijs die de klant via deze link betaalt,
-                    // met de gewone prijs doorgestreept erboven.
-                    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, lineHeight: 1.15 }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through' }}>{prijsTekst(p.price)}</span>
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#10b981' }}>{prijsTekst(p.price * (1 - winkelProcent(p.url) / 100))}</span>
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>{prijsTekst(p.price)}</span>
-                  ))}
-                  <ExternalLink size={15} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
-                </a>
-              ))}
+              {coachProducten.map(productRegel)}
+              {overigeProducten.length > 0 && coachProducten.length > 0 && (
+                <div style={{ marginTop: 12, marginBottom: 2, fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>
+                  {overigGoedkoper ? 'Goedkopere opties' : 'Andere opties'}
+                </div>
+              )}
+              {overigeProducten.map(productRegel)}
               <div style={{ marginTop: 6, fontSize: '0.68rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
                 Gekozen door je coach. Prijzen{laatstGecontroleerd ? ` van ${new Date(laatstGecontroleerd).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}, de winkel kan afwijken.
               </div>
