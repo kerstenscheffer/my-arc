@@ -68,7 +68,7 @@ import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 // Modals
 import AIAlternativesModal from './components/AIAlternativesModal'
 import DagenKiezer from './components/DagenKiezer'
-import { zetMaaltijdOpDagen } from './dagAanpassingen'
+import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen } from './dagAanpassingen'
 import AIMealInfoModal from './components/AIMealInfoModal'
 import AIFavoritesModal from './components/AIFavoritesModal'
 import AIMealHistoryModal from './components/AIMealHistoryModal'
@@ -477,6 +477,29 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     setWisselKeuze({ meal: originalMeal, nieuw })
   }
 
+  // Prullenbakje op een planmaaltijd: zelfde dagkiezer, dan weghalen.
+  const [verwijderMeal, setVerwijderMeal] = useState(null)
+  const voerVerwijderUit = async (keuze) => {
+    if (!verwijderMeal) return
+    const slot = verwijderMeal.slot
+    setWisselBezig(true); setWisselFout(null)
+    try {
+      if (keuze.modus === 'altijd') {
+        await haalMaaltijdWegOpDagen(db.supabase, dashboardData.activePlan?.id, keuze.dagen, slot)
+      } else {
+        for (const d of keuze.datums) await service.verwijderMealOpDatum(client.id, slot, d)
+      }
+      setVerwijderMeal(null)
+      setPastDayRefreshKey(k => k + 1)
+      await loadDashboardData()
+    } catch (e) {
+      console.error('Verwijderen mislukt:', e)
+      setWisselFout(e?.message || 'Verwijderen mislukt')
+    } finally {
+      setWisselBezig(false)
+    }
+  }
+
   const voerWisselUit = async (keuze) => {
     if (!wisselKeuze) return
     const { meal, nieuw } = wisselKeuze
@@ -730,6 +753,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         onUncheckMeal={handleUncheckMeal}
         onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
         onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
+        onVerwijderMeal={(meal) => { setWisselFout(null); setVerwijderMeal(meal) }}
         db={db}
         dailyTotals={dashboardData.dailyTotals || {
           targets: {
@@ -861,6 +885,30 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
             isMobile={isMobile}
             onKies={voerWisselUit}
             onClose={() => !wisselBezig && setWisselKeuze(null)}
+          />
+        </div>,
+        document.body
+      )}
+
+      {verwijderMeal && createPortal(
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)',
+          zIndex: 11000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        }}>
+          <DagenKiezer
+            titel={verwijderMeal.name || verwijderMeal.meal_name}
+            subtitel={`${Math.round(verwijderMeal.calories || 0)} kcal uit je plan halen`}
+            vraag="Waar haal je deze maaltijd weg?"
+            knopTekst="Verwijderen"
+            gevaar
+            datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
+            dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
+            slot={verwijderMeal.slot}
+            bezig={wisselBezig}
+            fout={wisselFout}
+            isMobile={isMobile}
+            onKies={voerVerwijderUit}
+            onClose={() => !wisselBezig && setVerwijderMeal(null)}
           />
         </div>,
         document.body

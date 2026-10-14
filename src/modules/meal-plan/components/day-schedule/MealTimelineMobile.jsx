@@ -31,6 +31,7 @@ export default function MealTimelineMobile({
   onMealCheck,
   onOpenInfo,
   onOpenAlternatives,
+  onVerwijderMeal = null,
   isToday,
   consumedMeals = [],
   onOpenFoodLog,
@@ -135,6 +136,7 @@ export default function MealTimelineMobile({
               onCheck={() => handlePlanCheck(meal)}
               onInfo={() => onOpenInfo(meal)}
               onAlternatives={() => onOpenAlternatives(meal)}
+              onVerwijder={onVerwijderMeal ? () => onVerwijderMeal(meal) : null}
               isMobile={true}
               isLast={false}
             />

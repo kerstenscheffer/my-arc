@@ -514,6 +514,8 @@ export class ClientAgendaService {
         Object.entries(dayData).forEach(([slot, planMeal]) => {
           if (slot === 'totals' || slot === 'is_training_day') return
           if (!planMeal || typeof planMeal !== 'object') return
+          // Eenmalig weggehaald op deze datum (prullenbakje, "één week").
+          if (aangepast[slot]?.verwijderd) return
           // Tijd en label blijven van het plan; inhoud en macro's van de aanpassing.
           const meal = aangepast[slot]
             ? { ...planMeal, ...aangepast[slot], timing: planMeal.timing, display_label: planMeal.display_label }

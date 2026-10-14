@@ -21,6 +21,13 @@ export async function laadDagAanpassingen(supabase, clientId, vanIso, totIso = v
   const uit = {}
   ;(data || []).forEach(rij => {
     Object.entries(rij.consumed_meals || {}).forEach(([slot, v]) => {
+      // Eenmalig weggehaald: een merkteken in plaats van een maaltijd. Wie
+      // dit leest slaat het slot die dag over.
+      if (v?.verwijderd) {
+        uit[rij.date] = uit[rij.date] || {}
+        uit[rij.date][slot] = { verwijderd: true }
+        return
+      }
       const m = v?.edited_meal
       if (!m || typeof m !== 'object') return
       uit[rij.date] = uit[rij.date] || {}
@@ -83,6 +90,39 @@ export async function zetMaaltijdOpDagen(supabase, planId, dagen, slot, maaltijd
     // Weergave-velden van de dagweergave horen niet in het plan.
     ;['slot', 'timeSlot', 'plannedTime', 'isConsumed', 'consumedAt', 'volgtTraining'].forEach(k => { delete nieuw[k] })
     const dagPlan = { ...(week[dag] || {}), [slot]: nieuw }
+    const maaltijden = Object.entries(dagPlan)
+      .filter(([k, m]) => k !== 'totals' && m && typeof m === 'object' && m.calories)
+      .map(([, m]) => m)
+    dagPlan.totals = {
+      kcal: maaltijden.reduce((s, m) => s + (m.calories || 0), 0),
+      protein: maaltijden.reduce((s, m) => s + (m.protein || 0), 0),
+      carbs: maaltijden.reduce((s, m) => s + (m.carbs || 0), 0),
+      fat: maaltijden.reduce((s, m) => s + (m.fat || 0), 0),
+    }
+    week[dag] = dagPlan
+  })
+  const { error } = await supabase
+    .from('client_meal_plans')
+    .update({ week_structure: week, updated_at: new Date().toISOString() })
+    .eq('id', planId)
+  if (error) throw error
+}
+
+// Haalt een moment (slot) blijvend uit het weekplan op de gekozen weekdagen.
+// Eén lees- en één schrijfactie; dagtotalen worden opnieuw opgeteld.
+export async function haalMaaltijdWegOpDagen(supabase, planId, dagen, slot) {
+  if (!supabase || !planId || !slot || !dagen?.length) return
+  const { data: plan, error: leesFout } = await supabase
+    .from('client_meal_plans')
+    .select('week_structure')
+    .eq('id', planId)
+    .single()
+  if (leesFout) throw leesFout
+  const week = { ...(plan?.week_structure || {}) }
+  dagen.forEach(dag => {
+    if (!week[dag] || !(slot in week[dag])) return
+    const dagPlan = { ...week[dag] }
+    delete dagPlan[slot]
     const maaltijden = Object.entries(dagPlan)
       .filter(([k, m]) => k !== 'totals' && m && typeof m === 'object' && m.calories)
       .map(([, m]) => m)

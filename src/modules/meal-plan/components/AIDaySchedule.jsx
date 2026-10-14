@@ -34,6 +34,8 @@ const daysOfWeek = [
 export default function AIDaySchedule({
   activePlan, todayMeals, todayProgress, selectedDay, onDayChange,
   onCheckMeal, onUncheckMeal, onOpenInfo, onOpenAlternatives,
+  // Prullenbakje op een planmaaltijd; de ouder vraagt op welke dagen.
+  onVerwijderMeal = null,
   db, dailyTotals,
   // ✅ FOOD LOG: New props from AIMealDashboard
   client, onMealLogged, targets,
@@ -457,6 +459,8 @@ export default function AIDaySchedule({
         const stored = dayPlan[slot]
         const displayLabel = (stored && typeof stored === 'object' && stored.display_label) || null
         const meta = SLOT_META[slot] || {}
+        // Eenmalig weggehaald op deze datum (prullenbakje).
+        if (aangepast[slot]?.verwijderd) continue
         const d = aangepast[slot] || await getMealData(stored)
         if (!d) continue
         const label = displayLabel || meta.label || pretty(slot)
@@ -797,6 +801,7 @@ export default function AIDaySchedule({
           onMealCheck={alleenKijken ? () => {} : handleMealCheck}
           onOpenInfo={onOpenInfo}
           onOpenAlternatives={onOpenAlternatives}
+          onVerwijderMeal={alleenKijken ? null : onVerwijderMeal}
           isToday={isVandaag()}
           isMobile={isMobile}
           consumedMeals={consumedMeals}

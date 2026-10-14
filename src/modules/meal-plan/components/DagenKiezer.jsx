@@ -38,6 +38,7 @@ const kortDatum = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 
 export default function DagenKiezer({
   titel, subtitel, datum, dagKey, slot, bezig = false, fout = null,
   isMobile, onKies, onTerug, terugTekst = '← Terug', onClose, extra = null,
+  vraag = 'Waar geldt deze wijziging?', knopTekst = 'Opslaan', gevaar = false,
 }) {
   const bekeken = datum ? new Date(datum) : new Date()
   const ditMaandag = maandagVan(new Date())
@@ -66,11 +67,11 @@ export default function DagenKiezer({
     if (!lijst.length) return 'Kies minstens één dag'
     if (modus === 'altijd') {
       const dagen = lijst.length === 7 ? 'elke dag' : `elke ${lijst.map(d => d.kort.toLowerCase()).join(', ')}`
-      return `${dagen} · ${moment}, blijvend in je weekplan`
+      return `${dagen} · ${moment}, blijvend in je weekplan${gevaar ? ' (wat daar staat gaat weg)' : ''}`
     }
     const datums = lijst.map(d => `${d.kort.toLowerCase()} ${kortDatum(datumVan(DAGEN.indexOf(d)))}`).join(', ')
     return `${datums} · ${moment}, daarna weer je gewone plan`
-  }, [modus, week, gekozen]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [modus, week, gekozen, gevaar]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const kies = () => {
     if (bezig || !lijst.length) return
@@ -98,7 +99,7 @@ export default function DagenKiezer({
 
       <div style={{ padding: '0.85rem 1rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto' }}>
         <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
-          Waar geldt deze wijziging?
+          {vraag}
         </div>
 
         {/* Elke week / alleen één week */}
@@ -185,13 +186,14 @@ export default function DagenKiezer({
 
         <button onClick={kies} disabled={bezig || !lijst.length} style={{
           padding: '0.8rem', borderRadius: 12, border: 'none', fontFamily: 'inherit',
-          background: lijst.length ? '#fff' : 'rgba(255,255,255,0.15)', color: '#000',
+          background: !lijst.length ? 'rgba(255,255,255,0.15)' : gevaar ? '#ef4444' : '#fff',
+          color: gevaar && lijst.length ? '#fff' : '#000',
           fontSize: '0.88rem', fontWeight: 900, cursor: bezig || !lijst.length ? 'default' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           touchAction: 'manipulation',
         }}>
           {bezig && <span style={{ width: 14, height: 14, border: '2px solid rgba(0,0,0,0.2)', borderTopColor: '#000', borderRadius: '50%', animation: 'cmeSpin 0.8s linear infinite' }} />}
-          Opslaan
+          {knopTekst}
         </button>
 
         {extra}

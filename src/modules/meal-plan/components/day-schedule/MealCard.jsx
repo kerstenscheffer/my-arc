@@ -6,7 +6,7 @@
 // de foto en niet meer over de hele breedte eronder.
 
 import React from 'react'
-import { Check, Info, RefreshCw } from 'lucide-react'
+import { Check, Info, RefreshCw, Trash2 } from 'lucide-react'
 import { foodImageFallback } from '../../foodImageFallback'
 
 const DIVIDER = 'rgba(255,255,255,0.06)'
@@ -78,6 +78,8 @@ export default function MealCard({
   onTik = null,
   // Klein label boven de naam: waar de log vandaan komt (Plan, Barcode…).
   label = null,
+  // Prullenbakje rechtsboven op een planmaaltijd: uit het plan halen.
+  onVerwijder = null,
 }) {
   const photoSize = compact ? (isMobile ? 60 : 66) : (isMobile ? 78 : 90)
   // Een lege string betekent bewust geen label op de foto (ingrediënten).
@@ -99,6 +101,20 @@ export default function MealCard({
     }}>
       {hoekKnop && (
         <div style={{ position: 'absolute', top: 2, right: 2, zIndex: 3 }}>{hoekKnop}</div>
+      )}
+      {onVerwijder && !hoekKnop && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onVerwijder() }}
+          title="Verwijderen" aria-label="Verwijderen"
+          style={{
+            position: 'absolute', top: 0, right: 0, zIndex: 3,
+            padding: isMobile ? '0.4rem 0.55rem' : '0.45rem 0.65rem',
+            background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer',
+            display: 'flex', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Trash2 size={isMobile ? 14 : 15} strokeWidth={2.6} />
+        </button>
       )}
       {/* Bovenste rij: kleine foto + info ernaast */}
       <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
@@ -166,7 +182,10 @@ export default function MealCard({
         <div style={{
           flex: 1, minWidth: 0,
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          padding: compact ? (isMobile ? '0.3rem 0.65rem 0.25rem' : '0.35rem 0.8rem 0.3rem') : (isMobile ? '0.45rem 0.7rem 0.35rem' : '0.55rem 0.95rem 0.45rem'),
+          // Compacter dan eerst: minder lucht boven de naam en onder de macro's.
+          padding: compact ? (isMobile ? '0.3rem 0.65rem 0.25rem' : '0.35rem 0.8rem 0.3rem') : (isMobile ? '0.3rem 0.7rem 0.2rem' : '0.4rem 0.95rem 0.3rem'),
+          // Ruimte voor het prullenbakje, anders loopt de naam eronder.
+          paddingRight: onVerwijder && !hoekKnop ? (isMobile ? '2rem' : '2.4rem') : undefined,
         }}>
           <div style={{
             fontSize: isMobile ? '0.9rem' : '0.98rem',
@@ -178,7 +197,7 @@ export default function MealCard({
             textOverflow: 'ellipsis',
             textDecoration: isChecked ? 'line-through' : 'none',
             letterSpacing: '-0.015em',
-            marginBottom: compact ? 2 : 4,
+            marginBottom: compact ? 2 : 1,
           }}>
             {meal.meal_name || meal.name || 'Maaltijd'}
           </div>

@@ -227,6 +227,8 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         if (typeof slotRef === 'object' && !slotRef.calories && !slotRef.meal_id && !slotRef.id) continue
 
         const swapData = swaps[slot]
+        // Vandaag weggehaald met het prullenbakje.
+        if (swapData?.verwijderd) continue
         const mealData = swapData?.was_swapped
           ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(slotRef)
@@ -262,6 +264,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
           // anders staat de snack er twee keer.
           if (dayPlan[slotName]) continue
           const swapData = swaps[slotName]
+          if (swapData?.verwijderd) continue
 
           const mealData = swapData?.was_swapped
             ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
@@ -1066,6 +1069,7 @@ async logAIMood(clientId, moodData) {
       progress.consumed_meals[slot] = {
         ...progress.consumed_meals[slot], // bewaar consumed/time als de meal al afgevinkt was
         was_swapped: true,
+        verwijderd: false,
         edited_meal: editedMeal,
         meal_id: editedMeal.meal_id || editedMeal.id,
         meal_name: editedMeal.name || editedMeal.meal_name,
@@ -1086,6 +1090,20 @@ async logAIMood(clientId, moodData) {
     }
   }
 
+  // Haalt een maaltijd alleen op één datum weg (prullenbakje, "één week").
+  // Het weekplan blijft staan; laadDagAanpassingen en de vandaag-weergave
+  // slaan het slot die dag over.
+  async verwijderMealOpDatum(clientId, slot, datumIso) {
+    const sleutel = this.dagSleutel(datumIso)
+    const progress = await this.getAIProgress(clientId, sleutel)
+    const consumed = { ...(progress.consumed_meals || {}) }
+    consumed[slot] = { ...(consumed[slot] || {}), was_swapped: true, verwijderd: true, edited_meal: null }
+    const { error } = await this.supabase
+      .from('ai_meal_progress')
+      .upsert({ ...progress, consumed_meals: consumed, client_id: clientId, date: sleutel, updated_at: new Date().toISOString() })
+    if (error) throw error
+  }
+
   // Haalt een eenmalige aanpassing op één datum weg, zodat het weekplan daar
   // weer telt. Nodig na een blijvende wijziging: anders blijft een oudere
   // "alleen vandaag"-versie de nieuwe overschaduwen.
@@ -1099,11 +1117,11 @@ async logAIMood(clientId, moodData) {
       .maybeSingle()
       .then(r => r, () => ({ data: null }))
     const huidig = data?.consumed_meals?.[slot]
-    if (!data || !huidig?.was_swapped) return
+    if (!data || !(huidig?.was_swapped || huidig?.verwijderd)) return
     const { error } = await this.supabase
       .from('ai_meal_progress')
       .update({
-        consumed_meals: { ...data.consumed_meals, [slot]: { ...huidig, was_swapped: false, edited_meal: null } },
+        consumed_meals: { ...data.consumed_meals, [slot]: { ...huidig, was_swapped: false, edited_meal: null, verwijderd: false } },
         updated_at: new Date().toISOString(),
       })
       .eq('id', data.id)
