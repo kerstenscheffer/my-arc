@@ -422,14 +422,33 @@ export default function AIAlternativesModal({
       })
     }
 
-    // 2. Zoekterm gaat vóór het moment-filter: typ je een naam, dan wil je
-    // 'm vinden, ook als die bij een ander moment hoort.
+    // 2. Zoekterm gaat vóór het moment-filter én vóór de bron: typ je iets,
+    // dan wil je het vinden, ook als het bij een ander moment of in een
+    // andere lijst staat. Zocht dit alleen binnen de gekozen bron, dan gaf
+    // "prepmymeal" onder Wisselopties niets. Ook de maker telt mee
+    // (prepmymeal, kant-en-klaar), en alle woorden moeten erin staan.
     if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      return pool.filter(m =>
-        m.name?.toLowerCase().includes(term) ||
-        m.name_en?.toLowerCase().includes(term)
-      )
+      const plat = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ')
+      const woorden = plat(searchTerm).split(' ').filter(Boolean)
+      const alles = bron === 'mine' ? pool : (() => {
+        const gezien = new Set()
+        return [...pool, ...Object.values(wisselPerMoment).flat(), ...coachOptions, ...customMeals, ...allMeals].filter(m => {
+          if (!nietZelf(m) || gezien.has(m.id)) return false
+          gezien.add(m.id)
+          return true
+        })
+      })()
+      const hooi = (m) => {
+        const t = `${plat(m.name)} ${plat(m.name_en)} ${m.partner ? `${plat(m.partner)} prep my meal kant en klaar` : ''}`
+        return { t, compact: t.replace(/ /g, '') }
+      }
+      const treffers = alles.filter(m => {
+        const h = hooi(m)
+        return woorden.every(w => h.t.includes(w) || h.compact.includes(w))
+      })
+      // Naam die met de zoekterm begint eerst.
+      const begin = plat(searchTerm).trim()
+      return treffers.sort((a, b) => (plat(b.name).startsWith(begin) ? 1 : 0) - (plat(a.name).startsWith(begin) ? 1 : 0))
     }
 
     // 3. Welk moment? Maaltijden zonder moment blijven staan — 19 van de 482
