@@ -91,11 +91,11 @@ export default function OmzetScherm({
       {/* ── 1. Omzet links, waar het vandaan komt rechts ── */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '1.25rem' : '2.5rem', alignItems: 'stretch' }}>
         <div style={{ flex: isMobile ? 'none' : '0 0 320px', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <NavKnop richting="links" uit={idx <= 0} onClick={() => setGekozen(maanden[idx - 1].key)} />
-            <div style={{ flex: 1, fontSize: '0.95rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)', textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)', marginRight: 6 }}>
               Omzet {maandNaam(gekozen)}
-            </div>
+            </span>
+            <NavKnop richting="links" uit={idx <= 0} onClick={() => setGekozen(maanden[idx - 1].key)} />
             <NavKnop richting="rechts" uit={idx >= maanden.length - 1} onClick={() => setGekozen(maanden[idx + 1].key)} />
           </div>
           <div style={{
@@ -280,8 +280,8 @@ function NavKnop({ richting, uit, onClick }) {
   const Icon = richting === 'links' ? ChevronLeft : ChevronRight
   return (
     <button onClick={onClick} disabled={uit} aria-label={richting === 'links' ? 'Vorige maand' : 'Volgende maand'} style={{
-      ...tik, width: 36, height: 36, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
-      background: 'rgba(255,255,255,0.04)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      ...tik, width: 32, height: 32, padding: 0, border: 'none',
+      background: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
       opacity: uit ? 0.25 : 1, cursor: uit ? 'default' : 'pointer',
     }}>
       <Icon size={18} strokeWidth={2.8} />
