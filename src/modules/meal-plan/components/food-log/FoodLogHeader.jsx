@@ -9,14 +9,18 @@ import React from 'react'
 import { Search, Scan, Zap } from 'lucide-react'
 
 const STANDEN = [
-  { id: 'zoeken', label: 'Zoeken', Icon: Search },
-  { id: 'scannen', label: 'Scannen', Icon: Scan },
+  { id: 'zoeken', label: 'Zoeken', Icon: Search, breedte: 1 },
+  { id: 'scannen', label: 'Scannen', Icon: Scan, breedte: 1 },
   // Snel invoeren (alleen kcal/macro's) staat hier sinds 14 okt 2026; zijn
   // plek in de rij eronder is voor Coach maaltijden.
-  { id: 'snel', label: 'Snel', Icon: Zap },
+  // Smaller: het is een bijzaak naast zoeken en scannen.
+  { id: 'snel', label: 'Snel', Icon: Zap, breedte: 0.55 },
 ]
+const TOTAAL = STANDEN.reduce((t, s) => t + s.breedte, 0)
+const LINKS = STANDEN.map((_, i) => STANDEN.slice(0, i).reduce((t, s) => t + s.breedte, 0) / TOTAAL * 100)
 
 export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
+  const actief = Math.max(0, STANDEN.findIndex(st => st.id === weergave))
   return (
     <div style={{ flexShrink: 0 }}>
       <div style={{
@@ -43,11 +47,12 @@ export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
         }}>
           <div style={{
             position: 'absolute', top: 3, bottom: 3,
-            // Drie standen: het blokje is een derde breed en schuift per stand.
-            left: `calc(${Math.max(0, STANDEN.findIndex(st => st.id === weergave)) * (100 / STANDEN.length)}% + 3px)`,
-            width: `calc(${100 / STANDEN.length}% - 6px)`,
+            // Het blokje volgt de breedte van de gekozen stand (binnen de
+            // 3px rand van de schuifknop).
+            left: `calc(3px + (100% - 6px) * ${LINKS[actief] / 100})`,
+            width: `calc((100% - 6px) * ${STANDEN[actief].breedte / TOTAAL})`,
             background: '#fff', borderRadius: 999,
-            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1), width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           }} />
           {STANDEN.map(stand => {
             const aan = weergave === stand.id
@@ -57,7 +62,7 @@ export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
                 onClick={() => onWeergave(stand.id)}
                 style={{
                   position: 'relative', zIndex: 1,
-                  flex: 1, minHeight: 36,
+                  flex: stand.breedte, minWidth: 0, minHeight: 36,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   background: 'transparent', border: 'none', borderRadius: 999,
                   color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
