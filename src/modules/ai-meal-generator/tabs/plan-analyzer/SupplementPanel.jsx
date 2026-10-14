@@ -28,6 +28,7 @@ import SupplementProductenModal from '../../../supplements/SupplementProductenMo
 // moet bouwen. Het is dezelfde singleton, dus dubbel importeren kost niets.
 import DatabaseService from '../../../supplements/SupplementPlanService'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
+import { useProductFotos } from '../../../supplements/utils/productFoto'
 import {
   doseringTekst, momentVanSupplement, minutenNaarKlok,
   DAG_SLEUTELS, DAG_KORT, dagenVanSupplement,
@@ -65,6 +66,7 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
     vasteTijd: '07:00', instructions: '',
   })
   const [maakBezig, setMaakBezig] = useState(false)
+  const productFotos = useProductFotos()
   const [bezig, setBezig] = useState(false)
   const [vuil, setVuil] = useState(false)
   const [fout, setFout] = useState(null)
@@ -344,7 +346,7 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
                 }}>
                   {/* Foto + naam + samenvatting */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '0.7rem 0.7rem 0.6rem' }}>
-                    <Foto supp={s} maat={52} />
+                    <Foto supp={s} maat={52} product={productFotos[s.template_id]} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
                         fontSize: m ? '0.88rem' : '0.94rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em',
@@ -507,7 +509,9 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
                         }}>
                           <div style={{
                             position: 'relative', width: '100%', aspectRatio: '16 / 10',
-                            background: `#1a1a1a url(${supplementFoto(t, 320)}) center/cover`,
+                            background: productFotos[t.supplement_id]
+                              ? `#fff url(${productFotos[t.supplement_id]}) center/contain no-repeat`
+                              : `#1a1a1a url(${supplementFoto(t, 320)}) center/cover`,
                           }}>
                             <span style={{
                               position: 'absolute', right: 6, top: 6, width: 24, height: 24, borderRadius: 7,
@@ -639,21 +643,21 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
   )
 }
 
-// Foto van het supplement met de emoji als klein badge erop; valt terug op
-// alleen de emoji als de foto niet laadt.
-const Foto = ({ supp, maat }) => {
+// Productfoto uit de catalogus (Big Buffalo eerst) op wit, anders de stockfoto
+// met de emoji als badge; valt terug op alleen de emoji als niets laadt.
+const Foto = ({ supp, maat, product }) => {
   const [kapot, setKapot] = useState(false)
   return (
     <div style={{
       position: 'relative', width: maat, height: maat, flexShrink: 0,
-      borderRadius: 11, overflow: 'hidden', background: '#1f1f1f',
+      borderRadius: 11, overflow: 'hidden', background: product ? '#fff' : '#1f1f1f',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {!kapot
-        ? <img src={supplementFoto(supp, maat * 2)} alt="" loading="lazy" onError={() => setKapot(true)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <img src={product || supplementFoto(supp, maat * 2)} alt="" loading="lazy" onError={() => setKapot(true)}
+            style={{ width: '100%', height: '100%', objectFit: product ? 'contain' : 'cover' }} />
         : <span style={{ fontSize: maat * 0.45 }}>{supp?.emoji || '💊'}</span>}
-      {!kapot && supp?.emoji && (
+      {!kapot && !product && supp?.emoji && (
         <span style={{
           position: 'absolute', right: 2, bottom: 2, width: 20, height: 20, borderRadius: 6,
           background: 'rgba(0,0,0,0.65)', fontSize: 11,

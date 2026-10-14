@@ -69,6 +69,10 @@ export default function MealCard({
   // Lagere kaart voor lijsten waar je er veel onder elkaar ziet (het
   // voedingspaneel van de coach): kleinere foto, minder ruimte eromheen.
   compact = false,
+  // Vrijstaande productfoto (een potje op transparant): op lichtgrijs, heel
+  // in beeld, en alleen onderaan donker voor het moment en de tijd. Met de
+  // gewone foto-opmaak viel een zwart potje weg in de donkere laag.
+  productFoto = false,
   // De hele kaart tikbaar maken (bijvoorbeeld: open de ingrediënten).
   onTik = null,
   // Klein label boven de naam: waar de log vandaan komt (Plan, Barcode…).
@@ -102,7 +106,9 @@ export default function MealCard({
           style={{
             width: photoSize, alignSelf: 'stretch',
             flexShrink: 0,
-            background: `url(${getMealImage(meal)}) center/cover`,
+            background: productFoto
+              ? `#ececec url(${getMealImage(meal)}) center 30% / auto 72% no-repeat`
+              : `url(${getMealImage(meal)}) center/cover`,
             position: 'relative', overflow: 'hidden',
             cursor: 'pointer',
             touchAction: 'manipulation',
@@ -113,7 +119,9 @@ export default function MealCard({
               dat je van elke foto de belichting hoeft te vertrouwen. */}
           <div style={{
             position: 'absolute', inset: 0, pointerEvents: 'none',
-            background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.8) 100%)',
+            background: productFoto
+              ? 'linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.75) 100%)'
+              : 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.8) 100%)',
           }} />
           <div style={{
             position: 'absolute', left: 0, right: 0, bottom: 0,

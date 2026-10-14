@@ -8,6 +8,7 @@ import React, { useState } from 'react'
 import MealCard from './MealCard'
 import { Trash2, Edit3, Info, Check } from 'lucide-react'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
+import { useProductFotos } from '../../../supplements/utils/productFoto'
 
 // Label van het moment waarop iets gelogd is, voor op de foto van de kaart.
 const MOMENT_LABEL = {
@@ -42,6 +43,7 @@ export default function MealTimelineMobile({
   onSupplementInfo,
 }) {
   const [showPlan, setShowPlan] = useState(true)
+  const productFotos = useProductFotos()
 
   // Eén lijst op kloktijd, geen groepen per moment.
   //
@@ -171,7 +173,8 @@ export default function MealTimelineMobile({
         return (
           <MealCard
             key={item.sleutel}
-            meal={{ name: sp.naam, image_url: supplementFoto(sp, 240) }}
+            meal={{ name: sp.naam, image_url: productFotos[sp.id] || supplementFoto(sp, 240) }}
+            productFoto={!!productFotos[sp.id]}
             momentLabel="Supplement"
             tijdLabel={Number.isFinite(item.min) ? klok(item.min) : null}
             ondertitel={sp.dosering || null}
