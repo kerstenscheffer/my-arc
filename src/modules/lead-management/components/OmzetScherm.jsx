@@ -81,90 +81,89 @@ export default function OmzetScherm({
   const jij = Math.max(0, (verdeling?.netRevenue || 0) - partner)
   const verdeelTotaal = Math.max(1, lasten + partner + jij)
 
-  const kaart = {
-    background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 16, padding: isMobile ? '1rem' : '1.15rem 1.25rem',
-  }
+  // Geen kaders: secties staan los op de achtergrond, gescheiden door een
+  // haarlijn (14 okt 2026, op verzoek: minder containers, alles hoger).
+  const kaart = { padding: '1.25rem 0 0.25rem', borderTop: '1px solid rgba(255,255,255,0.08)' }
   const kop = { fontSize: '0.95rem', fontWeight: 900, color: '#fff', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 8 }
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-      {/* ── 1. Omzet van de maand ── */}
-      <div style={{ ...kaart, padding: isMobile ? '1rem 1rem 1.15rem' : '1.25rem 1.5rem 1.4rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <NavKnop richting="links" uit={idx <= 0} onClick={() => setGekozen(maanden[idx - 1].key)} />
-          <div style={{ flex: 1, textAlign: 'center', fontSize: '0.95rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)' }}>
-            Omzet {maandNaam(gekozen)}
+    <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* ── 1. Omzet links, waar het vandaan komt rechts ── */}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '1.25rem' : '2.5rem', alignItems: 'stretch' }}>
+        <div style={{ flex: isMobile ? 'none' : '0 0 320px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <NavKnop richting="links" uit={idx <= 0} onClick={() => setGekozen(maanden[idx - 1].key)} />
+            <div style={{ flex: 1, fontSize: '0.95rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)', textAlign: 'center' }}>
+              Omzet {maandNaam(gekozen)}
+            </div>
+            <NavKnop richting="rechts" uit={idx >= maanden.length - 1} onClick={() => setGekozen(maanden[idx + 1].key)} />
           </div>
-          <NavKnop richting="rechts" uit={idx >= maanden.length - 1} onClick={() => setGekozen(maanden[idx + 1].key)} />
-        </div>
-        <div style={{
-          textAlign: 'center', fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff',
-          letterSpacing: '-0.04em', lineHeight: 1.05, marginTop: 6, fontVariantNumeric: 'tabular-nums',
-        }}>
-          {eur(maand.amount)}
-        </div>
-        <div style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-          {maand.isPast ? 'binnengekomen' : isHuidig ? 'binnengekomen deze maand' : 'verwacht op basis van termijnen'}
-          {maand.pendingAmount > 0 && <> · <span style={{ color: '#fff' }}>+{eur(maand.pendingAmount)}</span> toegezegd</>}
-        </div>
-        {!isHuidig && (
-          <div style={{ textAlign: 'center', marginTop: 8 }}>
-            <button onClick={() => setGekozen(huidig)} style={{ ...tik, background: 'none', border: 'none', color: KLEUR_JIJ, fontWeight: 900, fontSize: '0.82rem' }}>
+          <div style={{
+            fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff',
+            letterSpacing: '-0.04em', lineHeight: 1.05, marginTop: 10, fontVariantNumeric: 'tabular-nums',
+          }}>
+            {eur(maand.amount)}
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+            {maand.isPast ? 'binnengekomen' : isHuidig ? 'binnengekomen deze maand' : 'verwacht op basis van termijnen'}
+            {maand.pendingAmount > 0 && <> · <span style={{ color: '#fff' }}>+{eur(maand.pendingAmount)}</span> toegezegd</>}
+          </div>
+          {!isHuidig && (
+            <button onClick={() => setGekozen(huidig)} style={{ ...tik, background: 'none', border: 'none', padding: 0, marginTop: 8, color: KLEUR_JIJ, fontWeight: 900, fontSize: '0.82rem' }}>
               Terug naar deze maand
             </button>
-          </div>
-        )}
-        {/* Doel als voortgangsbalk */}
-        <div style={{ marginTop: 14 }}>
-          {maandDoel ? (
-            <>
-              <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, Math.round((maand.amount / maandDoel) * 100))}%`, height: '100%', background: KLEUR_JIJ, borderRadius: 999, transition: 'width 0.4s ease' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
-                <span>{Math.round((maand.amount / maandDoel) * 100)}% van je doel</span>
-                <button onClick={onDoel} style={{ ...tik, background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,0.6)', fontWeight: 800, fontSize: '0.78rem' }}>
-                  Doel {eur(maandDoel)}
-                </button>
-              </div>
-            </>
-          ) : (
-            <button onClick={onDoel} style={{ ...tik, display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontWeight: 800, fontSize: '0.82rem' }}>
-              <Target size={14} strokeWidth={2.6} /> Maanddoel instellen
-            </button>
           )}
+          {/* Doel als voortgangsbalk */}
+          <div style={{ marginTop: 14 }}>
+            {maandDoel ? (
+              <>
+                <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, Math.round((maand.amount / maandDoel) * 100))}%`, height: '100%', background: KLEUR_JIJ, borderRadius: 999, transition: 'width 0.4s ease' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+                  <span>{Math.round((maand.amount / maandDoel) * 100)}% van je doel</span>
+                  <button onClick={onDoel} style={{ ...tik, background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,0.6)', fontWeight: 800, fontSize: '0.78rem' }}>
+                    Doel {eur(maandDoel)}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button onClick={onDoel} style={{ ...tik, display: 'flex', alignItems: 'center', gap: 6, padding: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontWeight: 800, fontSize: '0.82rem' }}>
+                <Target size={14} strokeWidth={2.6} /> Maanddoel instellen
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* ── 2. Waar komt het vandaan ── */}
-      <div style={kaart}>
-        <div style={kop}>Waar komt het vandaan</div>
-        <StapelBalk delen={bronnen.map(b => ({ kleur: b.kleur, waarde: b.bedrag }))} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 12 }}>
-          {bronnen.map(b => (
-            <button
-              key={b.id}
-              onClick={() => (b.id === 'challenge' ? setChallengesOpen(true) : setLijst({ bron: b.id, maand: gekozen }))}
-              style={{
-                ...tik, textAlign: 'left', padding: '0.75rem 0.85rem', borderRadius: 12,
-                background: 'rgba(255,255,255,0.03)', border: `1px solid ${b.bedrag > 0 ? b.kleur + '55' : 'rgba(255,255,255,0.07)'}`,
-                display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)' }}>
-                <span style={{ width: 9, height: 9, borderRadius: 3, background: b.kleur, flexShrink: 0 }} />
-                {b.label}
-                <ChevronRight size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />
-              </span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 900, color: b.bedrag > 0 ? '#fff' : 'rgba(255,255,255,0.3)', fontVariantNumeric: 'tabular-nums' }}>
-                {eur(b.bedrag)}
-              </span>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
-                {b.id === 'challenge' ? 'deelnemers bekijken' : `${aantal(b.id)} betaling${aantal(b.id) === 1 ? '' : 'en'}`}
-              </span>
-            </button>
-          ))}
+        {/* Waar komt het vandaan: rijen, geen vakken. */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={kop}>Waar komt het vandaan</div>
+          <StapelBalk delen={bronnen.map(b => ({ kleur: b.kleur, waarde: b.bedrag }))} />
+          <div style={{ marginTop: 6 }}>
+            {bronnen.map((b, i) => (
+              <button
+                key={b.id}
+                onClick={() => (b.id === 'challenge' ? setChallengesOpen(true) : setLijst({ bron: b.id, maand: gekozen }))}
+                style={{
+                  ...tik, width: '100%', display: 'flex', alignItems: 'center', gap: 10, minHeight: 48,
+                  padding: '0.5rem 0', background: 'none', border: 'none', textAlign: 'left',
+                  borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                }}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: b.kleur, flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: '0.92rem', fontWeight: 900, color: '#fff' }}>{b.label}</span>
+                  <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                    {b.id === 'challenge' ? 'deelnemers bekijken' : `${aantal(b.id)} betaling${aantal(b.id) === 1 ? '' : 'en'}`}
+                  </span>
+                </span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 900, color: b.bedrag > 0 ? '#fff' : 'rgba(255,255,255,0.3)', fontVariantNumeric: 'tabular-nums' }}>
+                  {eur(b.bedrag)}
+                </span>
+                <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -246,7 +245,9 @@ export default function OmzetScherm({
       <button
         onClick={() => setLijst({ bron: 'alle', maand: gekozen })}
         style={{
-          ...tik, ...kaart, display: 'flex', alignItems: 'center', gap: 10, color: '#fff',
+          ...tik, display: 'flex', alignItems: 'center', gap: 10, color: '#fff', width: '100%',
+          minHeight: 52, padding: '0.9rem 0', background: 'none', border: 'none',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
           fontSize: '0.95rem', fontWeight: 900, textAlign: 'left',
         }}
       >
