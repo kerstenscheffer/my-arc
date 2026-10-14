@@ -209,7 +209,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                         display: 'inline-block', marginBottom: 2, padding: '1px 6px', borderRadius: 999,
                         background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)',
                         fontSize: '0.6rem', fontWeight: 900, color: '#10b981', letterSpacing: '0.02em',
-                      }}>Favoriet van je coach</span>
+                      }}>Aangeraden door Kersten</span>
                     )}
                     <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {p.product_name}
