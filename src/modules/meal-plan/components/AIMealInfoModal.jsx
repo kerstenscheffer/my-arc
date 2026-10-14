@@ -43,7 +43,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
       if (mealId) {
         const { data: mealRow, error: mealError } = await db.supabase
           .from('ai_meals')
-          .select('preparation_steps, tips, description, faq, prep_time_min')
+          .select('preparation_steps, tips, description, faq, prep_time_min, image_url')
           .eq('id', mealId)
           .single()
 
@@ -115,6 +115,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
 
   const getMealImage = () => {
     if (meal?.image_url) return meal.image_url
+    if (dbMealData?.image_url) return dbMealData.image_url
     const fallbacks = {
       breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&h=400&fit=crop&q=80',
       lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&h=400&fit=crop&q=80',
