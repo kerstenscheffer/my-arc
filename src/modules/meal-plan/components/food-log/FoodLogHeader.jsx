@@ -6,11 +6,14 @@
 // eronder, en scannen was een losse knop die over de lijst zweefde.
 
 import React from 'react'
-import { Search, Scan, Zap } from 'lucide-react'
+import { Search, Scan, Zap, Camera } from 'lucide-react'
 
 const STANDEN = [
   { id: 'zoeken', label: 'Zoeken', Icon: Search, breedte: 1 },
   { id: 'scannen', label: 'Scannen', Icon: Scan, breedte: 1 },
+  // Foto van je bord: AI herkent de onderdelen, de macro's komen uit onze
+  // eigen database (14 okt 2026).
+  { id: 'foto', label: 'Foto', Icon: Camera, breedte: 0.8 },
   // Snel invoeren (alleen kcal/macro's) staat hier sinds 14 okt 2026; zijn
   // plek in de rij eronder is voor Coach maaltijden.
   // Smaller: het is een bijzaak naast zoeken en scannen.

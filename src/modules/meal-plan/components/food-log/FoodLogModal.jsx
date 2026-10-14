@@ -8,6 +8,7 @@ import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
 import MyMealsTab from './MyMealsTab'
 import ScanTab from './ScanTab'
+import FotoTab from './FotoTab'
 import AmountPicker from './AmountPicker'
 import SmartLoggingService from './SmartLoggingService'
 import IngredientFeedbackModal from './IngredientFeedbackModal'
@@ -364,6 +365,8 @@ export default function FoodLogModal({
                 onClose={onClose}
                 isMobile={isMobile}
               />
+            ) : weergave === 'foto' ? (
+              <FotoTab db={db} client={client} onLog={handleLog} isMobile={isMobile} defaultMealMoment={defaultMealMoment} />
             ) : weergave === 'snel' ? (
               <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} />
             ) : filter === 'coach' ? (
