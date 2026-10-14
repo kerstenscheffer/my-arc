@@ -11,7 +11,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
-import { winkelUrl, winkelCode } from '../../supplements/utils/winkelKorting'
+import { winkelUrl, winkelCode, winkelProcent } from '../../supplements/utils/winkelKorting'
 
 export default function SupplementInfoModal({ supplement, isMobile, onClose, db }) {
   const m = isMobile
@@ -204,7 +204,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
                     </div>
                     {winkelCode(p.url) && (
                       <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', marginTop: 1 }}>
-                        Korting met code {winkelCode(p.url)}, gaat vanzelf via deze link
+                        {winkelProcent(p.url) ? `${winkelProcent(p.url)}% korting` : 'Korting'} met code {winkelCode(p.url)}, gaat vanzelf via deze link
                       </div>
                     )}
                   </div>
