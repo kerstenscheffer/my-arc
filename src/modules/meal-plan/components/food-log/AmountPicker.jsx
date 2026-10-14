@@ -6,7 +6,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
 import { resolveFoodImage } from '../../foodImageFallback'
 import { Check } from 'lucide-react'
-import { findPortionConfig } from './portionPresets'
+import { findPortionConfig, stukVan } from './portionPresets'
+import GramInvoer from '../GramInvoer'
 
 // ═══════════════════════════════════════════
 // SCROLL PICKER MODAL (MFP style)
@@ -226,6 +227,9 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   // amount}. Die laatste toonde hier vijf regels "Ingrediënt" zonder waarden;
   // daarom zoeken we de namen en macro's erbij op.
   const [ingredientRegels, setIngredientRegels] = useState([])
+  // Eenmalig aangepaste hoeveelheden per ingrediënt (index -> gram), alleen
+  // voor deze log. De vaste maaltijd zelf blijft zoals hij is.
+  const [ingGram, setIngGram] = useState({})
   useEffect(() => {
     const ruw = Array.isArray(item?.ingredients) ? item.ingredients : []
     const basis = ruw.map(ing => ({
@@ -235,6 +239,8 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
       unit: ing?.unit || (ing?.amount_gram != null ? 'gram' : 'g'),
     }))
     setIngredientRegels(basis.map(i => ({ ...i, name: i.name || 'Ingrediënt' })))
+    // Ander item: eigen aanpassingen van het vorige horen er niet bij.
+    setIngGram({})
 
     const ids = [...new Set(basis.filter(i => !i.name && i.ingredient_id).map(i => i.ingredient_id))]
     if (ids.length === 0 || !db?.supabase) return
@@ -357,12 +363,38 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     carbs: item.carbs || 0,
     fat: item.fat || 0,
   }
-  const macros = {
+  const standaardMacros = {
     calories: Math.round((macroBase.calories || 0) * factor),
     protein: Math.round((macroBase.protein || 0) * factor * 10) / 10,
     carbs: Math.round((macroBase.carbs || 0) * factor * 10) / 10,
     fat: Math.round((macroBase.fat || 0) * factor * 10) / 10
   }
+
+  // Samenstelling voor deze log: elk ingrediënt op zijn geschaalde hoeveelheid,
+  // of op wat je er zelf van maakte. Is er iets aangepast, dan tellen de
+  // macro's op uit de ingrediënten in plaats van uit het maaltijdtotaal.
+  const heeftSamenstelling = !isPer100g && ingredientRegels.length > 0
+  const samenstelling = ingredientRegels.map((ing, i) => {
+    const baseAmt = Number(ing.amount) || 0
+    const geschaald = baseAmt > 0 ? Math.round(baseAmt * (factor || 1)) : 0
+    const nu = ingGram[i] !== undefined ? Math.max(0, Number(ingGram[i]) || 0) : geschaald
+    const deel = baseAmt > 0 ? nu / baseAmt : 1
+    return {
+      ...ing,
+      amount: nu,
+      calories: Math.round((Number(ing.calories) || 0) * deel),
+      protein: Math.round((Number(ing.protein) || 0) * deel * 10) / 10,
+      carbs: Math.round((Number(ing.carbs) || 0) * deel * 10) / 10,
+      fat: Math.round((Number(ing.fat) || 0) * deel * 10) / 10,
+    }
+  })
+  const ingAangepast = heeftSamenstelling && Object.keys(ingGram).length > 0
+  const macros = ingAangepast
+    ? samenstelling.reduce((t, r) => ({
+        calories: t.calories + r.calories, protein: t.protein + r.protein,
+        carbs: t.carbs + r.carbs, fat: t.fat + r.fat,
+      }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+    : standaardMacros
 
 
   const handleLog = async () => {
@@ -398,7 +430,14 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
         protein: Math.round(macros.protein),
         carbs: Math.round(macros.carbs),
         fat: Math.round(macros.fat),
-        ingredients: item.ingredients || [],
+        // Aangepast? Dan de samenstelling zoals gelogd, zodat je hem bij
+        // opnieuw bewerken terugziet. De vaste maaltijd blijft ongewijzigd.
+        ingredients: ingAangepast
+          ? samenstelling.map(({ name, amount, unit, calories, protein, carbs, fat, ingredient_id }) => ({
+              name, amount, unit: unit || 'gram', calories, protein, carbs, fat,
+              ...(ingredient_id ? { ingredient_id } : {}),
+            }))
+          : (item.ingredients || []),
         source: item.source || 'manual_log',
         image_url: item.image_url,
         amount: amountToSave,
@@ -693,26 +732,49 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
             textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.5rem'
           }}>
             Samenstelling ({item.ingredients.length})
+            {ingAangepast && (
+              <button
+                onClick={() => setIngGram({})}
+                style={{
+                  marginLeft: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  color: '#fff', fontSize: '0.62rem', fontWeight: 800, textTransform: 'none', letterSpacing: 0,
+                  fontFamily: 'inherit', textDecoration: 'underline',
+                }}
+              >
+                Herstel
+              </button>
+            )}
           </div>
+          {ingAangepast && (
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: '-0.2rem 0 0.5rem' }}>
+              Alleen voor deze keer; je vaste maaltijd blijft hetzelfde.
+            </div>
+          )}
           <div style={{ margin: isMobile ? '0 -1rem' : '0 -1.5rem' }}>
-            {ingredientRegels.map((ing, i) => {
-              const baseAmt = Number(ing.amount) || 0
-              const scaled = baseAmt > 0 ? Math.round(baseAmt * (factor || 1)) : 0
-              const unit = ing.unit || 'g'
-              const deel = baseAmt > 0 ? (scaled / baseAmt) : 1
+            {samenstelling.map((ing, i) => {
+              const eenheid = ing.unit === 'gram' || ing.unit === 'g' || !ing.unit ? 'g' : ing.unit
+              const stuk = eenheid === 'g' ? stukVan(ing.name) : null
               return (
                 <MealCard
                   key={i}
                   meal={{
                     name: ing.name,
                     image_url: resolveFoodImage(ing),
-                    calories: Math.round((ing.calories || 0) * deel),
-                    protein: Math.round((ing.protein || 0) * deel),
-                    carbs: Math.round((ing.carbs || 0) * deel),
-                    fat: Math.round((ing.fat || 0) * deel),
+                    calories: Math.round(ing.calories || 0),
+                    protein: Math.round(ing.protein || 0),
+                    carbs: Math.round(ing.carbs || 0),
+                    fat: Math.round(ing.fat || 0),
                   }}
                   momentLabel=""
-                  rechts={scaled > 0 ? `${scaled}${unit === 'gram' ? 'g' : ` ${unit}`}` : null}
+                  rechts={
+                    <GramInvoer
+                      waarde={ing.amount}
+                      eenheid={eenheid}
+                      stap={stuk?.grams || (eenheid === 'g' ? 10 : 1)}
+                      stuk={stuk}
+                      zet={(v) => setIngGram(prev => ({ ...prev, [i]: v }))}
+                    />
+                  }
                   isMobile={isMobile}
                   acties={[]}
                 />
