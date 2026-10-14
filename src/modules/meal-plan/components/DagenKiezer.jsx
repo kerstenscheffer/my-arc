@@ -45,7 +45,9 @@ export default function DagenKiezer({
   // Welke week bekijkt de klant nu? Die staat voorgeselecteerd bij "Alleen".
   const startWeek = Math.max(0, Math.min(2, Math.round((maandagVan(bekeken) - ditMaandag) / (7 * 864e5))))
 
-  const [modus, setModus] = useState('altijd')
+  // Verwijderen begint op "Eén week" met alleen de bekeken dag: wie snel
+  // doortikt, haalt anders de maaltijd voor altijd uit het weekplan.
+  const [modus, setModus] = useState(gevaar ? 'week' : 'altijd')
   const [week, setWeek] = useState(startWeek)
   const [gekozen, setGekozen] = useState(() => new Set(dagKey ? [dagKey] : []))
 
