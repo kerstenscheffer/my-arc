@@ -29,7 +29,9 @@ Regels:
 - "gram": het eetbare gewicht zoals het op het bord ligt (gekookte rijst, gebakken vlees). Schat met referenties: een bord is ~26 cm, een eetlepel ~15 g, een sneetje brood ~35 g, een ei ~55 g.
 - Dranken in ml als gram.
 - "zekerheid": hoog, middel of laag.
-- Staat er geen eten op de foto, geef dan een lege lijst.`
+- Staat er geen eten op de foto, geef dan een lege lijst.
+
+Geef je antwoord altijd via de tool maaltijd_onderdelen.`
 
 const TOOL = {
   name: 'maaltijd_onderdelen',
@@ -83,7 +85,9 @@ Deno.serve(async (req) => {
         model: MODEL,
         max_tokens: 1024,
         tools: [TOOL],
-        tool_choice: { type: 'tool', name: TOOL.name },
+        // Een vaste tool afdwingen kan dit model niet; 'auto' plus de
+        // instructie in de prompt, en hieronder een terugval op JSON in tekst.
+        tool_choice: { type: 'auto' },
         messages: [{
           role: 'user',
           content: [
@@ -100,7 +104,12 @@ Deno.serve(async (req) => {
       return json({ error: 'Herkennen mislukt, probeer opnieuw.' }, 502)
     }
     const blok = (data?.content || []).find((b: any) => b.type === 'tool_use')
-    const uit = blok?.input || {}
+    let uit = blok?.input || null
+    if (!uit) {
+      const tekst = (data?.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
+      const m = tekst.match(/\{[\s\S]*\}/)
+      try { uit = m ? JSON.parse(m[0]) : {} } catch { uit = {} }
+    }
     const onderdelen = (Array.isArray(uit.onderdelen) ? uit.onderdelen : [])
       .map((o: any) => ({
         naam: String(o.naam || '').trim(),

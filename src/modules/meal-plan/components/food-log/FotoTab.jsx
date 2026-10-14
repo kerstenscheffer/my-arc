@@ -77,16 +77,34 @@ export default function FotoTab({ db, client, onLog, isMobile, defaultMealMoment
 
   const pad = isMobile ? '0 16px' : '0 24px'
 
-  const zoekProducten = async (term) => {
+  const zoekEen = async (term) => {
     const { data, error } = await db.supabase
       .rpc('zoek_ingredienten', { p_q: term, p_client: client?.id || null, p_limit: 8 })
     if (error || !Array.isArray(data)) return []
-    const lijst = data.filter(d => Number(d.calories_per_100g) > 0 || Number(d.protein_per_100g) > 0).map(naarProduct)
-    // Een basisproduct (zonder barcode) is voor een foto bijna altijd beter
-    // dan een toevallig merkproduct dat bovenaan scoort.
-    const eersteBasis = lijst.findIndex(p => p.basis)
-    if (eersteBasis > 0) lijst.unshift(lijst.splice(eersteBasis, 1)[0])
-    return lijst.slice(0, 6)
+    return data.filter(d => Number(d.calories_per_100g) > 0 || Number(d.protein_per_100g) > 0).map(naarProduct)
+  }
+
+  // Zoekterm van het model → producten uit onze database. Vindt de term
+  // niets ("kwarteleieren"), dan nog eens op de naam en op het laatste
+  // woord ("eieren").
+  const zoekProducten = async (term, naam) => {
+    const pogingen = [term, naam, String(term).split(/[\s-]+/).pop()].filter((t, i, a) => t && t.length > 2 && a.indexOf(t) === i)
+    let lijst = []
+    for (const t of pogingen) {
+      lijst = await zoekEen(t)
+      if (lijst.length) break
+    }
+    // Volgorde voor een foto: een naam die met de term begint, en daarbinnen
+    // een basisproduct (zonder barcode). Anders wint bij "lente-ui" een
+    // sandwichspread met "lente ui" in de naam.
+    const norm = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+    const kern = norm(term)
+    const punten = (p) => (norm(p.name).startsWith(kern) ? 2 : 0) + (p.basis ? 1 : 0)
+    return lijst
+      .map((p, i) => ({ p, i, s: punten(p) }))
+      .sort((a, b) => b.s - a.s || a.i - b.i)
+      .map(x => x.p)
+      .slice(0, 6)
   }
 
   const verwerk = async (bestand) => {
@@ -107,7 +125,7 @@ export default function FotoTab({ db, client, onLog, isMobile, defaultMealMoment
         return
       }
       const gevonden = await Promise.all(onderdelen.map(async (o, i) => {
-        const opties = await zoekProducten(o.zoekterm)
+        const opties = await zoekProducten(o.zoekterm, o.naam)
         return {
           sleutel: `${i}-${o.zoekterm}`, gezien: o.naam, zekerheid: o.zekerheid,
           gram: o.gram, opties, keuze: opties[0]?.id || null, aan: opties.length > 0,
