@@ -8,8 +8,8 @@ import { Check, X, ImageOff } from 'lucide-react'
 const MEAL_MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
   { id: 'lunch', label: 'Lunch' },
-  { id: 'dinner', label: 'Avondeten' },
-  { id: 'snack', label: 'Tussendoortjes' }
+  { id: 'dinner', label: 'Diner' },
+  { id: 'snack', label: 'Snack' }
 ]
 
 const getDefaultMoment = () => {
@@ -20,45 +20,36 @@ const getDefaultMoment = () => {
   return 'snack'
 }
 
-// ⚠️ Defined OUTSIDE the component on purpose — defining it inside causes
-// React to remount the <input> on every keystroke (because Row is a new
-// reference each render), which kills focus and dismisses the mobile keyboard.
-const Row = ({ label, value, onChange, placeholder, autoFocus, isMobile }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-    minHeight: '48px'
+// ⚠️ Buiten het component gedefinieerd: binnenin zou React het <input> bij
+// elke toetsaanslag opnieuw opbouwen, waardoor de focus en het toetsenbord
+// op mobiel wegvallen.
+const Veld = ({ label, kleur, value, onChange, placeholder, eenheid, groot = false }) => (
+  <label style={{
+    flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4,
+    padding: groot ? '0.8rem 0.9rem' : '0.6rem 0.7rem',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 12, cursor: 'text',
   }}>
-    <div style={{
-      fontSize: isMobile ? '0.85rem' : '0.9rem',
-      fontWeight: '500', color: 'rgba(255, 255, 255, 0.6)'
-    }}>
+    <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
+      {kleur && <span style={{ width: 7, height: 7, borderRadius: 999, background: kleur, flexShrink: 0 }} />}
       {label}
-    </div>
-    <input
-      type={label === 'Naam' ? 'text' : 'number'}
-      inputMode={label === 'Naam' ? 'text' : 'numeric'}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onFocus={(e) => { if (label !== 'Naam') e.target.select() }}
-      placeholder={placeholder}
-      autoFocus={autoFocus}
-      style={{
-        width: label === 'Naam' ? '180px' : '80px',
-        padding: '0.5rem',
-        background: 'transparent',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '8px',
-        color: '#fff',
-        fontSize: isMobile ? '0.9rem' : '0.95rem',
-        fontWeight: '600',
-        textAlign: label === 'Naam' ? 'left' : 'right',
-        outline: 'none',
-        minHeight: '36px'
-      }}
-    />
-  </div>
+    </span>
+    <span style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+      <input
+        type="number" inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        placeholder={placeholder}
+        style={{
+          width: '100%', minWidth: 0, background: 'transparent', border: 'none', outline: 'none', padding: 0,
+          color: '#fff', fontFamily: 'inherit', fontWeight: 900, letterSpacing: '-0.02em',
+          fontSize: groot ? '1.9rem' : '1.2rem',
+        }}
+      />
+      <span style={{ fontSize: groot ? '0.85rem' : '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>{eenheid}</span>
+    </span>
+  </label>
 )
 
 export default function QuickAddTab({ onLog, isMobile, db }) {
@@ -137,8 +128,12 @@ export default function QuickAddTab({ onLog, isMobile, db }) {
     if (name.trim().length === 0) setMatchDismissed(false)
   }, [name])
 
-  const cal = parseInt(calories) || 0
-  const canSave = cal > 0 || (parseInt(protein) || 0) > 0
+  // Geen kcal ingevuld maar wel macro's? Dan rekenen we ze uit (4/4/9).
+  const p = parseFloat(protein) || 0, k = parseFloat(carbs) || 0, v = parseFloat(fat) || 0
+  const berekend = Math.round(p * 4 + k * 4 + v * 9)
+  const cal = parseInt(calories) || berekend
+  const kcalBerekend = !(parseInt(calories) > 0) && berekend > 0
+  const canSave = cal > 0 || p > 0
 
   const handleLog = async () => {
     if (!canSave) return
@@ -146,7 +141,7 @@ export default function QuickAddTab({ onLog, isMobile, db }) {
     try {
       await onLog({
         name: name.trim() || matchedProduct?.name || 'Snel toevoegen',
-        calories: parseInt(calories) || 0,
+        calories: cal,
         protein: parseInt(protein) || 0,
         carbs: parseInt(carbs) || 0,
         fat: parseInt(fat) || 0,
@@ -165,157 +160,126 @@ export default function QuickAddTab({ onLog, isMobile, db }) {
     }
   }
 
-  const currentMealLabel = MEAL_MOMENTS.find(m => m.id === mealMoment)?.label
+  const pad = isMobile ? '0 1rem' : '0 1.25rem'
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: `0.25rem 0 1.25rem` }}>
       {/* Naam */}
-      <Row label="Naam" value={name} onChange={setName} placeholder="Optioneel" isMobile={isMobile} />
+      <div style={{ padding: pad }}>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Wat heb je gegeten? (optioneel)"
+          style={{
+            width: '100%', boxSizing: 'border-box', minHeight: 48, padding: '0 0.9rem',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12, color: '#fff', fontSize: '0.92rem', fontWeight: 800,
+            fontFamily: 'inherit', outline: 'none',
+          }}
+        />
+      </div>
 
-      {/* Matched product preview — auto-found while typing */}
+      {/* Gevonden product: alleen voor de foto bij de log. */}
       {matchedProduct && (
-        <div style={{
-          display: 'flex', alignItems: 'center',
-          gap: '0.625rem',
-          padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.5rem',
-          background: 'rgba(255, 215, 0, 0.05)',
-          borderBottom: '1px solid rgba(255, 215, 0, 0.15)',
-          minHeight: '52px',
-        }}>
-          {matchedProduct.image_url ? (
-            <div
+        <div style={{ padding: pad }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.65rem',
+            padding: '0.5rem 0.6rem', borderRadius: 12,
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+          }}>
+            {matchedProduct.image_url ? (
+              <div style={{ width: 38, height: 38, borderRadius: 9, background: `url(${matchedProduct.image_url}) center/cover`, flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: 38, height: 38, borderRadius: 9, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+                <ImageOff size={15} />
+              </div>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>Foto van</div>
+              <div style={{ fontSize: '0.84rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {matchedProduct.name}
+                {matchedProduct.brand && <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>{' · '}{matchedProduct.brand}</span>}
+              </div>
+            </div>
+            <button
+              onClick={() => { setMatchedProduct(null); setMatchDismissed(true) }}
+              aria-label="Wis product-koppeling"
               style={{
-                width: '36px', height: '36px',
-                borderRadius: '8px',
-                background: `url(${matchedProduct.image_url}) center/cover`,
-                border: '1px solid rgba(255, 215, 0, 0.25)',
-                flexShrink: 0,
+                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', flexShrink: 0,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
-            />
-          ) : (
-            <div style={{
-              width: '36px', height: '36px',
-              borderRadius: '8px',
-              background: 'rgba(255, 215, 0, 0.06)',
-              border: '1px solid rgba(255, 215, 0, 0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'rgba(255, 215, 0, 0.4)',
-              flexShrink: 0,
-            }}>
-              <ImageOff size={14} />
-            </div>
-          )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: isMobile ? '0.5rem' : '0.55rem',
-              fontWeight: '800', color: 'rgba(255, 215, 0, 0.7)',
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-              lineHeight: 1, marginBottom: '0.2rem',
-            }}>
-              Product gevonden
-            </div>
-            <div style={{
-              fontSize: isMobile ? '0.78rem' : '0.85rem',
-              fontWeight: '700', color: '#fff',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              lineHeight: 1.2,
-            }}>
-              {matchedProduct.name}
-              {matchedProduct.brand && (
-                <span style={{ color: 'rgba(255, 255, 255, 0.4)', fontWeight: 500 }}>
-                  {' · '}{matchedProduct.brand}
-                </span>
-              )}
-            </div>
+            >
+              <X size={15} />
+            </button>
           </div>
-          <button
-            onClick={() => { setMatchedProduct(null); setMatchDismissed(true) }}
-            aria-label="Wis product-koppeling"
-            title="Verwijder product-koppeling"
-            style={{
-              width: '30px', height: '30px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'transparent',
-              border: 'none', borderRadius: '6px',
-              color: 'rgba(255, 255, 255, 0.4)',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              flexShrink: 0,
-            }}
-          >
-            <X size={14} />
-          </button>
         </div>
       )}
 
-      {/* Macros */}
-      <Row label="Calorieën"        value={calories} onChange={setCalories} placeholder="0" isMobile={isMobile} />
-      <Row label="Eiwit (g)"        value={protein}  onChange={setProtein}  placeholder="0" isMobile={isMobile} />
-      <Row label="Koolhydraten (g)" value={carbs}    onChange={setCarbs}    placeholder="0" isMobile={isMobile} />
-      <Row label="Vetten (g)"       value={fat}      onChange={setFat}      placeholder="0" isMobile={isMobile} />
+      {/* Calorieën groot, macro's eronder in drie vakken. */}
+      <div style={{ padding: pad }}>
+        <Veld
+          groot label="Calorieën" eenheid="kcal"
+          value={calories} onChange={setCalories}
+          placeholder={kcalBerekend ? String(berekend) : '0'}
+        />
+        {kcalBerekend && (
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 5 }}>
+            {berekend} kcal berekend uit je macro's
+          </div>
+        )}
+      </div>
+      <div style={{ padding: pad, display: 'flex', gap: 8 }}>
+        <Veld label="Eiwit" kleur="#3b82f6" eenheid="g" value={protein} onChange={setProtein} placeholder="0" />
+        <Veld label="Koolh" kleur="#ec4899" eenheid="g" value={carbs} onChange={setCarbs} placeholder="0" />
+        <Veld label="Vet" kleur="#f59e0b" eenheid="g" value={fat} onChange={setFat} placeholder="0" />
+      </div>
 
-      {/* Maaltijd */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-        minHeight: '48px'
-      }}>
-        <div style={{
-          fontSize: isMobile ? '0.85rem' : '0.9rem',
-          fontWeight: '500', color: 'rgba(255, 255, 255, 0.6)'
-        }}>
-          Maaltijd
-        </div>
-        <div style={{ display: 'flex', gap: '0.25rem' }}>
-          {MEAL_MOMENTS.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setMealMoment(m.id)}
-              style={{
-                padding: isMobile ? '0.35rem 0.5rem' : '0.4rem 0.625rem',
-                background: mealMoment === m.id ? 'rgba(255, 215, 0, 0.1)' : 'transparent',
-                border: mealMoment === m.id
-                  ? '1px solid rgba(255, 215, 0, 0.25)'
-                  : '1px solid rgba(255, 255, 255, 0.06)',
-                borderRadius: '6px',
-                color: mealMoment === m.id ? '#FFD700' : 'rgba(255, 255, 255, 0.3)',
-                fontSize: isMobile ? '0.55rem' : '0.6rem',
-                fontWeight: mealMoment === m.id ? '700' : '500',
-                cursor: 'pointer', minHeight: '28px',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              {m.label}
-            </button>
-          ))}
+      {/* Moment */}
+      <div style={{ padding: pad }}>
+        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>Moment</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+          {MEAL_MOMENTS.map(m => {
+            const aan = mealMoment === m.id
+            return (
+              <button
+                key={m.id}
+                onClick={() => setMealMoment(m.id)}
+                style={{
+                  minHeight: 38, padding: '0 0.2rem', borderRadius: 10,
+                  background: aan ? '#fff' : 'transparent',
+                  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
+                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.65)',
+                  fontSize: '0.74rem', fontWeight: aan ? 900 : 800, fontFamily: 'inherit',
+                  cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {m.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* Registreer */}
-      <div style={{
-        padding: isMobile ? '1rem' : '1.25rem 1.5rem'
-      }}>
+      {/* Loggen */}
+      <div style={{ padding: pad, marginTop: 4 }}>
         <button
           onClick={handleLog}
           disabled={saving || !canSave}
           style={{
-            width: '100%', padding: isMobile ? '0.875rem' : '1rem',
-            background: (saving || !canSave) ? 'rgba(255, 215, 0, 0.05)' : 'rgba(255, 215, 0, 0.12)',
-            border: '1px solid rgba(255, 215, 0, 0.3)',
-            borderRadius: isMobile ? '10px' : '12px',
-            color: '#FFD700',
-            fontSize: isMobile ? '0.85rem' : '0.95rem',
-            fontWeight: '800', cursor: (saving || !canSave) ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '0.5rem', minHeight: '48px',
+            width: '100%', minHeight: 52, borderRadius: 14, border: 'none',
+            background: canSave ? '#fff' : 'rgba(255,255,255,0.1)',
+            color: canSave ? '#0a0a0a' : 'rgba(255,255,255,0.35)',
+            fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit',
+            cursor: (saving || !canSave) ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            opacity: (saving || !canSave) ? 0.4 : 1
           }}
         >
-          <Check size={16} strokeWidth={2.5} />
-          {saving ? 'Opslaan...' : `Registreer${cal > 0 ? ` — ${cal} kcal` : ''}`}
+          <Check size={17} strokeWidth={3} />
+          {saving ? 'Opslaan…' : `Loggen${cal > 0 ? ` · ${cal} kcal` : ''}`}
         </button>
       </div>
     </div>
