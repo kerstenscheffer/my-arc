@@ -1,6 +1,7 @@
 // src/client/pages/ClientProfile.jsx
 import { useState, useEffect } from 'react'
-import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, Weight, Camera } from 'lucide-react'
+import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, Weight, Camera, Star } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import DatabaseService from '../../services/DatabaseService'
 import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/arc-ui'
 import FotoCredits from '../../modules/ingredient-photos/FotoCredits'
@@ -389,6 +390,20 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
                     redirectTo: 'https://myarcfitness.com/reset-password',
                   })
                   alert('Reset link verstuurd naar ' + client.email)
+                },
+              },
+              {
+                // Altijd beschikbaar, ook als Apple/Google het sterrenvenster
+                // dit jaar al genoeg getoond hebben (max 3x per jaar).
+                Icon: Star, label: 'Beoordeel MY ARC',
+                onClick: () => {
+                  const p = Capacitor.getPlatform()
+                  const url = p === 'android'
+                    ? 'https://play.google.com/store/apps/details?id=com.myarcfitness.app&showAllReviews=true'
+                    : p === 'ios'
+                      ? 'itms-apps://itunes.apple.com/app/id6764539959?action=write-review'
+                      : 'https://apps.apple.com/app/id6764539959?action=write-review'
+                  window.open(url, '_blank')
                 },
               },
               {

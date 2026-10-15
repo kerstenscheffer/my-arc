@@ -11,9 +11,15 @@
 // was het dertig dagen + drie trainingen; dat haalde maar de helft.) Apple en Google beslissen zelf of ze het venster écht
 // tonen (maximaal een paar keer per jaar per gebruiker); wij vragen alleen.
 // Op het web gebeurt er niets.
+//
+// Moment (15 okt 2026): niet meer 6 s na het openen, maar vlak na iets wat
+// goed ging: een maaltijd gelogd/afgerond, supplement ingenomen, training
+// klaar. Die plekken roepen meldSucces() aan. Apple raadt precies dit aan,
+// en wie net iets bereikt heeft geeft vaker vijf sterren.
 
 import { useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { SUCCES_EVENT } from './reviewMoment'
 
 const DAG = 86400000
 
@@ -21,7 +27,8 @@ export default function ReviewPrompt({ db, client }) {
   useEffect(() => {
     if (!client?.id || !db?.supabase || !Capacitor.isNativePlatform()) return
     let weg = false
-    const t = setTimeout(async () => {
+    let t = null
+    const vraag = async () => {
       try {
         try { if (Number(localStorage.getItem('myarc_review_laatst') || 0) > Date.now() - 7 * DAG) return } catch { /* geen opslag */ }
         if (client.created_at && Date.now() - new Date(client.created_at).getTime() < 7 * DAG) return
@@ -50,8 +57,11 @@ export default function ReviewPrompt({ db, client }) {
         const { AppReview } = await import('@capawesome/capacitor-app-review')
         await AppReview.requestReview()
       } catch (e) { console.warn('winkelbeoordeling niet gevraagd:', e?.message) }
-    }, 6000)
-    return () => { weg = true; clearTimeout(t) }
+    }
+    // Na het succes-scherm (1,4 s) nog even wachten, dan pas vragen.
+    const opSucces = () => { clearTimeout(t); t = setTimeout(vraag, 2000) }
+    window.addEventListener(SUCCES_EVENT, opSucces)
+    return () => { weg = true; clearTimeout(t); window.removeEventListener(SUCCES_EVENT, opSucces) }
   }, [client?.id, client?.created_at, db])
   return null
 }

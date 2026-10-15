@@ -7,8 +7,10 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import GelogdAnimatie from './food-log/GelogdAnimatie'
+import { meldSucces } from '../../app-review/reviewMoment'
 
 export default function GelogdOverlay({ naam, kcal, sub = null, label = 'Gelogd!', Icoon, isMobile, onKlaar }) {
+  useEffect(() => { meldSucces('afgerond') }, [])
   useEffect(() => {
     const t = setTimeout(() => onKlaar?.(), 1400)
     return () => clearTimeout(t)

@@ -10,6 +10,7 @@ import MyMealsTab from './MyMealsTab'
 import ScanTab from './ScanTab'
 import FotoTab from './FotoTab'
 import GelogdAnimatie from './GelogdAnimatie'
+import { meldSucces } from '../../../app-review/reviewMoment'
 import AmountPicker from './AmountPicker'
 import SmartLoggingService from './SmartLoggingService'
 import IngredientFeedbackModal from './IngredientFeedbackModal'
@@ -221,6 +222,7 @@ export default function FoodLogModal({
         isEdit: !!selectedItem?._editId
       })
 
+      meldSucces('gelogd')
       setTimeout(() => {
         setSuccessData(null)
         setSelectedItem(null)

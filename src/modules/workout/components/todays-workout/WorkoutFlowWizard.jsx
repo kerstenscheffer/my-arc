@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { X, ChevronRight, ChevronLeft, Check, Timer, Play, Pause, SkipForward, Dumbbell } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import ExerciseService from '../../../../services/ExerciseService'
+import { meldSucces } from '../../../app-review/reviewMoment'
 
 const getFallbackImage = (exercise) => {
   const combined = (exercise?.name || '').toLowerCase()
@@ -143,7 +144,7 @@ export default function WorkoutFlowWizard({ exercises, client, db, onComplete, o
   }
 
   const handleClose = () => { setVisible(false); setTimeout(() => onClose(), 300) }
-  const handleComplete = () => { setVisible(false); setTimeout(() => onComplete(), 300) }
+  const handleComplete = () => { meldSucces('training'); setVisible(false); setTimeout(() => onComplete(), 300) }
 
   const restPct = restTotal > 0 ? ((restTotal - restSeconds) / restTotal) * 100 : 0
 
