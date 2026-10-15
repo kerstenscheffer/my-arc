@@ -15,6 +15,7 @@ import FoodLogModal from './food-log/FoodLogModal'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
 import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst } from '../../supplements/utils/supplementSchedule'
 import SupplementInfoModal from './SupplementInfoModal'
+import GelogdOverlay from './GelogdOverlay'
 
 const getTodayIndex = () => {
   const day = new Date().getDay()
@@ -70,6 +71,9 @@ export default function AIDaySchedule({
 }) {
   const isFreeMode = mode === 'free'
   const isMobile = window.innerWidth <= 768
+  // Gelogd-animatie na Afronden (zelfde als in het log-venster).
+  const [afgerond, setAfgerond] = useState(null)
+  const sluitAfgerond = useCallback(() => setAfgerond(null), [])
   const [currentDay, setCurrentDay] = useState(getTodayIndex())
   const [displayMeals, setDisplayMeals] = useState([])
   const [loading, setLoading] = useState(false)
@@ -756,6 +760,9 @@ export default function AIDaySchedule({
       // wrapper hoeft geen frame meer te zijn.
       paddingTop: 4,
     }}>
+      {afgerond && (
+        <GelogdOverlay naam={afgerond.naam} kcal={afgerond.kcal} isMobile={isMobile} onKlaar={sluitAfgerond} />
+      )}
       {/* DayScheduleHeader (titel/datum/Template-knop) en de MA-ZO
           DaySelector zijn verwijderd: navigatie en dagweergave zitten nu
           in MealDayNavHeader bovenaan AIMealDashboard. Het oude
@@ -955,6 +962,7 @@ export default function AIDaySchedule({
                 } else if (onPastDayUpdate) {
                   onPastDayUpdate()
                 }
+                setAfgerond({ naam: meal.name || meal.meal_name, kcal: meal.calories || 0 })
                 console.log('✅ Plan meal auto-logged:', meal.name)
               }
             } catch (err) {
