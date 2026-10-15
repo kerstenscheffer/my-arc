@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
 import { resolveFoodImage } from '../../foodImageFallback'
-import { Check } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import { findPortionConfig, stukVan, stukTekst, meervoud } from './portionPresets'
 import GramInvoer from '../GramInvoer'
 
@@ -112,7 +112,7 @@ const getDefaultMoment = () => {
 const VASTE_GRAM = [30, 50, 100]
 const VASTE_ML = [50, 100]
 
-const buildGramOptions = (learnedGrams = [], naam = '') => {
+const buildGramOptions = (naam = '') => {
   const cfg = findPortionConfig(naam)
   const ml = cfg?.displayUnit === 'ml'
   const u = ml ? 'ml' : 'g'
@@ -122,18 +122,12 @@ const buildGramOptions = (learnedGrams = [], naam = '') => {
   natuurlijk.forEach((p, i) => {
     const enkel = p.label.replace(/^1\s+/, '')
     result.push({
-      id: `n${i}`, label: `${p.label} · ${p.grams} ${u}`, knop: enkel, grams: p.grams, unit: u,
+      id: `n${i}`, label: p.label, sub: `${p.grams} ${u}`, knop: enkel, grams: p.grams, unit: u,
       natuurlijk: true, enkel, meer: meervoud(enkel), override: p.override || null,
     })
   })
-  const vast = []
-  for (const g of learnedGrams) {
-    const n = Math.round(Number(g))
-    if (!Number.isFinite(n) || n <= 1) continue
-    if (!vast.includes(n)) vast.push(n)
-    if (vast.length >= 2) break
-  }
-  for (const g of (ml ? VASTE_ML : VASTE_GRAM)) if (!vast.includes(g)) vast.push(g)
+  // Alleen de vaste stappen; eigen logs (40 g, 75 g) maakten de lijst druk.
+  const vast = [...(ml ? VASTE_ML : VASTE_GRAM)]
   vast
     .filter(g => !natuurlijk.some(p => p.grams === g))
     .sort((x, y) => x - y)
@@ -149,14 +143,14 @@ const MEAL_OPTIONS = [
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
 
-export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment, db, client, loggingService }) {
+export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment, db }) {
   // Geen vroege return vóór de hooks: React eist dat elke render dezelfde
   // hooks in dezelfde volgorde draait, en met `if (!item) return null` bovenaan
   // stond dit hele bestand in de linter als fout. De hooks gaan uit van een
   // ontbrekend item; de render stopt eronder alsnog.
   const isPer100g = item?.per100g === true
 
-  const [gramOptions, setGramOptions] = useState(() => buildGramOptions([], item?.name))
+  const [gramOptions] = useState(() => buildGramOptions(item?.name))
   const servingOptions = isPer100g ? gramOptions : MEAL_OPTIONS
 
   // Nieuw product met een natuurlijke portie: begin op "1 ei" / "1 snee" in
@@ -223,19 +217,6 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     return () => { afgebroken = true }
   }, [item, db])
 
-  // Load learned portion sizes per ingredient and rebuild dropdown
-  useEffect(() => {
-    if (!isPer100g || !loggingService || !client?.id || !item?.name) return
-    let cancelled = false
-    loggingService.getPortionHistory(client.id, item.name, 4).then(learned => {
-      if (cancelled) return
-      const next = buildGramOptions(learned, item.name)
-      setGramOptions(next)
-      // De gekozen portie blijft staan als hij er nog in zit.
-      setSelectedServing(prev => next.find(o => o.id === prev.id) || next.find(o => o.grams === prev.grams) || next[0])
-    })
-    return () => { cancelled = true }
-  }, [item?.name, client?.id, loggingService, isPer100g])
 
   // 🎯 BELANGRIJK: gebruik opgeslagen amount uit recent als die er is
   // Anders: default 100g voor per100g, 1 portie voor meal
@@ -437,9 +418,9 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   }
 
   const plusMin = {
-    width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
-    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
-    color: '#fff', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1, fontFamily: 'inherit',
+    width: 40, height: 52, flexShrink: 0, padding: 0,
+    background: 'none', border: 'none',
+    color: 'rgba(255,255,255,0.85)', fontSize: '2.2rem', fontWeight: 800, lineHeight: 1, fontFamily: 'inherit',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
@@ -474,27 +455,29 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
       </div>
 
       {/* Hoeveelheid: groot getal met − en + */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 12 : 22, marginTop: isMobile ? '1.4rem' : '1.75rem', padding: '0 1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 6 : 10, marginTop: isMobile ? '1.4rem' : '1.75rem', padding: '0 1rem' }}>
         {isPer100g && (
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button onClick={() => setPortieOpen(o => !o)} aria-label="Portiegrootte" style={{
-              minHeight: 52, padding: '0 0.75rem', borderRadius: 14,
-              background: portieOpen ? '#fff' : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${portieOpen ? '#fff' : 'rgba(255,255,255,0.14)'}`,
-              color: portieOpen ? '#0a0a0a' : '#fff', fontFamily: 'inherit', cursor: 'pointer',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+              minHeight: 44, padding: '0 0.25rem', marginRight: isMobile ? 6 : 12,
+              background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              <span style={{ fontSize: '0.92rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
-                {selectedServing.knop || `${selectedServing.grams} g`} <span style={{ fontSize: '0.7rem' }}>▾</span>
+              <span style={{
+                fontSize: '1rem', fontWeight: 900, whiteSpace: 'nowrap', maxWidth: 110,
+                overflow: 'hidden', textOverflow: 'ellipsis',
+                borderBottom: '2px solid rgba(255,255,255,0.35)', paddingBottom: 2,
+              }}>
+                {selectedServing.knop || `${selectedServing.grams} g`}
               </span>
-              <span style={{ fontSize: '0.58rem', fontWeight: 800, opacity: 0.55, textTransform: 'uppercase', letterSpacing: '0.05em' }}>portie</span>
+              <ChevronDown size={16} strokeWidth={3} style={{ opacity: 0.7, transform: portieOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
             </button>
             {portieOpen && (
               <>
                 <div onClick={() => setPortieOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
                 <div style={{
-                  position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 21, minWidth: 130,
+                  position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 21, minWidth: 170,
                   background: '#141414', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
                   padding: 4, boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
                 }}>
@@ -502,11 +485,15 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
                     const aan = opt.id === selectedServing.id
                     return (
                       <button key={opt.id} onClick={() => kies(() => kiesPortie(opt))} style={{
-                        display: 'block', width: '100%', minHeight: 42, padding: '0 0.8rem', borderRadius: 10,
+                        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12,
+                        width: '100%', minHeight: 38, padding: '0 0.75rem', borderRadius: 10,
                         background: aan ? '#fff' : 'transparent', border: 'none', textAlign: 'left',
-                        color: aan ? '#0a0a0a' : '#fff', fontSize: '0.9rem', fontWeight: aan ? 900 : 700,
-                        fontFamily: 'inherit', cursor: 'pointer',
-                      }}>{opt.label}</button>
+                        color: aan ? '#0a0a0a' : '#fff', fontSize: '0.85rem', fontWeight: aan ? 900 : 700,
+                        fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}>
+                        <span>{opt.label}</span>
+                        {opt.sub && <span style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.5 }}>{opt.sub}</span>}
+                      </button>
                     )
                   })}
                 </div>
