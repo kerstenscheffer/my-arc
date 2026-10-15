@@ -92,6 +92,12 @@ export default function AIDaySchedule({
   // onderweg, dan vindt hij de oude rij en springt het vinkje terug op
   // "Gelogd". Deze lijst houdt dat tegen tot het verwijderen rond is.
   const netUitgevinkt = useRef(new Set())
+  // Bij een aangepaste maaltijd verschillen meal.id en meal.meal_id. Opslaan
+  // gebruikte id, terugzetten zocht op meal_id: de rij werd niet gevonden en
+  // het vinkje sprong terug (15 okt 2026). Overal beide proberen.
+  // Alleen echte uuid's: meal_id is een uuid-kolom, en een id als "x_large"
+  // laat de hele vraag mislukken.
+  const idsVan = (m) => [...new Set([m?.meal_id, m?.id].filter(v => typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v)))]
   // Welke maaltijd stond er de vorige keer op dit slot? Verandert die —
   // bijvoorbeeld doordat je een dagtemplate toepast of een maaltijd wisselt —
   // dan hoort het vinkje van de oude maaltijd niet mee te verhuizen naar de
@@ -295,7 +301,7 @@ export default function AIDaySchedule({
           // anders als ontbijt had gelogd — een vinkje bij eten dat je nooit
           // op hebt gehad. Alleen een rij zonder meal_id (ouder, of
           // handmatig gelogd) valt nog terug op het moment.
-          let m = row.meal_id ? displayMeals.find(dm => (dm.meal_id || dm.id) === row.meal_id) : null
+          let m = row.meal_id ? displayMeals.find(dm => idsVan(dm).includes(row.meal_id)) : null
           if (!m && !row.meal_id && row.meal_type) m = displayMeals.find(dm => dm.slot === row.meal_type)
           // Net uitgevinkt? Dan is deze rij op weg naar de prullenbak; hem nu
           // terugzetten zou het vinkje laten opspringen.
@@ -673,9 +679,10 @@ export default function AIDaySchedule({
       // De plan_check-rij weghalen. Blijft die staan, dan blijft MacroHero de
       // calorieën tellen en zet het herstel-effect het vinkje bij de volgende
       // render gewoon weer aan.
-      const mealId = meal.meal_id || meal.id
+      const mealIds = idsVan(meal)
+      const mealId = mealIds[0]
       const planCheckRecord = mealId
-        ? consumedMeals.find(m => m.source === 'plan_check' && m.meal_id === mealId)
+        ? consumedMeals.find(m => m.source === 'plan_check' && mealIds.includes(m.meal_id))
         : consumedMeals.find(m => m.source === 'plan_check' && m.meal_type === meal.slot?.replace(/\d+$/, ''))
 
       if (db?.supabase) {
@@ -694,7 +701,7 @@ export default function AIDaySchedule({
           .lt('consumed_at', tot)
         vraag = planCheckRecord
           ? vraag.eq('id', planCheckRecord.id)
-          : (mealId ? vraag.eq('meal_id', mealId) : vraag.eq('meal_type', meal.slot?.replace(/\d+$/, '')))
+          : (mealId ? vraag.in('meal_id', mealIds) : vraag.eq('meal_type', meal.slot?.replace(/\d+$/, '')))
 
         vraag.then(({ error }) => {
           // Rond: het herstel-effect mag deze slot weer normaal behandelen.
@@ -859,9 +866,9 @@ export default function AIDaySchedule({
 
               const { data: existing, error: leesFout } = await db.supabase
                 .from('consumed_meals')
-                .select('id')
+                .select('id, meal_id')
                 .eq('client_id', client.id)
-                .eq('meal_id', meal.id)
+                .in('meal_id', idsVan(meal).length ? idsVan(meal) : ['00000000-0000-0000-0000-000000000000'])
                 .eq('source', 'plan_check')
                 .gte('consumed_at', vanaf)
                 .lt('consumed_at', tot)
@@ -886,7 +893,7 @@ export default function AIDaySchedule({
                   prev.some(m => m.id === existing[0].id)
                     ? prev
                     : [...prev, {
-                      id: existing[0].id, meal_id: meal.id, source: 'plan_check',
+                      id: existing[0].id, meal_id: existing[0].meal_id, source: 'plan_check',
                       meal_type: meal.slot?.replace(/\d+$/, ''),
                       calories: Math.round(meal.calories || 0),
                       protein: Math.round(meal.protein || 0),
