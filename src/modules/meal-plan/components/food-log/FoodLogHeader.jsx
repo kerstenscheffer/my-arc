@@ -8,12 +8,17 @@
 import React from 'react'
 import { Search, Scan, Zap, Camera } from 'lucide-react'
 
+// Foto-scanner tijdelijk uit (15 okt 2026, Kersten: "nog niet helemaal top").
+// Alles staat er nog: FotoTab, de edge function maaltijd-foto-scan en de
+// weergave in FoodLogModal. Op true zetten en hij is terug.
+const FOTO_SCAN_AAN = false
+
 const STANDEN = [
   { id: 'zoeken', label: 'Zoeken', Icon: Search, breedte: 1 },
   { id: 'scannen', label: 'Scannen', Icon: Scan, breedte: 1 },
   // Foto van je bord: AI herkent de onderdelen, de macro's komen uit onze
   // eigen database (14 okt 2026).
-  { id: 'foto', label: 'Foto', Icon: Camera, breedte: 0.8 },
+  ...(FOTO_SCAN_AAN ? [{ id: 'foto', label: 'Foto', Icon: Camera, breedte: 0.8 }] : []),
   // Snel invoeren (alleen kcal/macro's) staat hier sinds 14 okt 2026; zijn
   // plek in de rij eronder is voor Coach maaltijden.
   // Smaller: het is een bijzaak naast zoeken en scannen.
