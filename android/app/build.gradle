@@ -26,7 +26,7 @@ android {
         // versionCode moet bij elke Play-upload omhoog; versionName is wat de
         // gebruiker ziet en loopt gelijk met de iOS-versie.
         versionCode 6
-        versionName "1.7"
+        versionName "1.8"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
