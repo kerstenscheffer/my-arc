@@ -418,8 +418,8 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   }
 
   const plusMin = {
-    width: 40, height: 52, flexShrink: 0, padding: 0,
-    background: 'none', border: 'none',
+    width: 44, height: 52, flexShrink: 0, padding: 0,
+    background: 'none', border: 'none', outline: 'none',
     color: 'rgba(255,255,255,0.85)', fontSize: '2.2rem', fontWeight: 800, lineHeight: 1, fontFamily: 'inherit',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -454,42 +454,54 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
         )}
       </div>
 
-      {/* Hoeveelheid: groot getal met − en + */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 6 : 10, marginTop: isMobile ? '1.4rem' : '1.75rem', padding: '0 1rem' }}>
-        {isPer100g && (
-          <div style={{ position: 'relative', flexShrink: 0 }}>
+      {/* Hoeveelheid: − getal + strak naast elkaar; de eenheid eronder is
+          zelf de portie-kiezer ("gram ▾", "theelepels ▾"). */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 14 : 20, marginTop: isMobile ? '1.4rem' : '1.75rem', padding: '0 1rem' }}>
+        <button aria-label="Minder" style={plusMin}
+          onClick={() => kies(() => setQuantity(q => Math.max(stap, Math.round((q - stap) * 100) / 100)))}>−</button>
+        <button onClick={() => setShowQuantityPicker(true)} style={{
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
+          fontSize: isMobile ? '3.4rem' : '3.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em',
+          lineHeight: 1, fontVariantNumeric: 'tabular-nums', minWidth: '1.6ch', textAlign: 'center',
+          WebkitTapHighlightColor: 'transparent',
+        }}>
+          {displayQuantity(quantity)}
+        </button>
+        <button aria-label="Meer" style={plusMin}
+          onClick={() => kies(() => setQuantity(q => Math.round((q + stap) * 100) / 100))}>+</button>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
+        {isPer100g ? (
+          <div style={{ position: 'relative' }}>
             <button onClick={() => setPortieOpen(o => !o)} aria-label="Portiegrootte" style={{
-              minHeight: 44, padding: '0 0.25rem', marginRight: isMobile ? 6 : 12,
-              background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 4,
+              display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px', minHeight: 32,
+              background: 'none', border: 'none', outline: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              <span style={{
-                fontSize: '1rem', fontWeight: 900, whiteSpace: 'nowrap', maxWidth: 110,
-                overflow: 'hidden', textOverflow: 'ellipsis',
-                borderBottom: '2px solid rgba(255,255,255,0.35)', paddingBottom: 2,
-              }}>
-                {selectedServing.knop || `${selectedServing.grams} g`}
+              <span style={{ fontSize: '0.95rem', fontWeight: 800, borderBottom: '2px solid rgba(255,255,255,0.3)', paddingBottom: 1, whiteSpace: 'nowrap' }}>
+                {eenheidTekst}
               </span>
-              <ChevronDown size={16} strokeWidth={3} style={{ opacity: 0.7, transform: portieOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+              <ChevronDown size={15} strokeWidth={3} style={{ opacity: 0.6, transform: portieOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
             </button>
             {portieOpen && (
               <>
                 <div onClick={() => setPortieOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
                 <div style={{
-                  position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 21, minWidth: 170,
-                  background: '#141414', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
-                  padding: 4, boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+                  position: 'absolute', top: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', zIndex: 21,
+                  minWidth: 190, background: '#141414', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
+                  padding: 4, boxShadow: '0 16px 40px rgba(0,0,0,0.7)',
                 }}>
                   {servingOptions.map(opt => {
                     const aan = opt.id === selectedServing.id
                     return (
                       <button key={opt.id} onClick={() => kies(() => kiesPortie(opt))} style={{
-                        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12,
-                        width: '100%', minHeight: 38, padding: '0 0.75rem', borderRadius: 10,
-                        background: aan ? '#fff' : 'transparent', border: 'none', textAlign: 'left',
-                        color: aan ? '#0a0a0a' : '#fff', fontSize: '0.85rem', fontWeight: aan ? 900 : 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14,
+                        width: '100%', height: 38, padding: '0 0.75rem', borderRadius: 10,
+                        background: aan ? '#fff' : 'transparent', border: 'none', outline: 'none', textAlign: 'left',
+                        color: aan ? '#0a0a0a' : '#fff', fontSize: '0.86rem', fontWeight: aan ? 900 : 700,
                         fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                        WebkitTapHighlightColor: 'transparent',
                       }}>
                         <span>{opt.label}</span>
                         {opt.sub && <span style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.5 }}>{opt.sub}</span>}
@@ -500,25 +512,12 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
               </>
             )}
           </div>
+        ) : (
+          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{eenheidTekst}</span>
         )}
-        <button aria-label="Minder" style={plusMin}
-          onClick={() => kies(() => setQuantity(q => Math.max(stap, Math.round((q - stap) * 100) / 100)))}>−</button>
-        <button onClick={() => setShowQuantityPicker(true)} style={{
-          background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
-          minWidth: isMobile ? 96 : 120, textAlign: 'center',
-        }}>
-          <div style={{ fontSize: isMobile ? '3.2rem' : '3.6rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-            {displayQuantity(quantity)}
-          </div>
-          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-            {eenheidTekst}
-          </div>
-        </button>
-        <button aria-label="Meer" style={plusMin}
-          onClick={() => kies(() => setQuantity(q => Math.round((q + stap) * 100) / 100))}>+</button>
       </div>
       {(gramStand && stuk && u === 'g' && quantity > 0) || (!gramStand && isPer100g) ? (
-        <div style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
+        <div style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
           {gramStand ? stukTekst(quantity, stuk) : `${Math.round(totalGrams)} ${u === 'ml' ? 'ml' : 'gram'}`}
         </div>
       ) : null}
