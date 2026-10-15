@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
 import { resolveFoodImage } from '../../foodImageFallback'
 import { Check } from 'lucide-react'
-import { findPortionConfig, stukVan, stukTekst } from './portionPresets'
+import { findPortionConfig, stukVan, stukTekst, meervoud } from './portionPresets'
 import GramInvoer from '../GramInvoer'
 
 // ═══════════════════════════════════════════
@@ -103,32 +103,43 @@ const getDefaultMoment = () => {
   return 'snack'
 }
 
-const DEFAULT_GRAM_PRESETS = [1, 30, 50, 100]
+// Portie-opties per product (15 okt 2026). Volgorde in de kiezer:
+//   1. de basiseenheid: 1 gram, of 1 ml bij drinken
+//   2. natuurlijke porties uit portionPresets: 1 ei, 1 snee, 1 eetlepel, 1 glas
+//   3. vaste hoeveelheden: wat de klant vaak logt, aangevuld met 30/50/100 g
+//      of 50/100 ml
+// Meervouden ("2 eieren") staan er niet in: dat is aantal × 1 ei.
+const VASTE_GRAM = [30, 50, 100]
+const VASTE_ML = [50, 100]
 
-const buildGramOptions = (learnedGrams = []) => {
-  // Always keep "1 gram" as the exact option, then fill remaining 3 slots
-  // first from learned values (sorted by use_count via order they're loaded),
-  // then from defaults.
-  const result = [{ id: 'gram', label: '1 gram', grams: 1 }]
-  const others = []
+const buildGramOptions = (learnedGrams = [], naam = '') => {
+  const cfg = findPortionConfig(naam)
+  const ml = cfg?.displayUnit === 'ml'
+  const u = ml ? 'ml' : 'g'
+  const result = [{ id: 'gram', label: ml ? '1 ml' : '1 gram', knop: `1 ${u}`, grams: 1, unit: u }]
+  const natuurlijk = (cfg?.presets || []).filter(p =>
+    p.grams > 1 && !/^(?!1\s)(\d|½)/.test(p.label) && !/^\d+\s?(g|ml)\b/i.test(p.label))
+  natuurlijk.forEach((p, i) => {
+    const enkel = p.label.replace(/^1\s+/, '')
+    result.push({
+      id: `n${i}`, label: `${p.label} · ${p.grams} ${u}`, knop: enkel, grams: p.grams, unit: u,
+      natuurlijk: true, enkel, meer: meervoud(enkel), override: p.override || null,
+    })
+  })
+  const vast = []
   for (const g of learnedGrams) {
     const n = Math.round(Number(g))
-    if (!Number.isFinite(n) || n <= 0 || n === 1) continue
-    if (!others.includes(n)) others.push(n)
-    if (others.length >= 3) break
+    if (!Number.isFinite(n) || n <= 1) continue
+    if (!vast.includes(n)) vast.push(n)
+    if (vast.length >= 2) break
   }
-  for (const g of DEFAULT_GRAM_PRESETS) {
-    if (others.length >= 3) break
-    if (g === 1) continue
-    if (!others.includes(g)) others.push(g)
-  }
-  for (const g of others) {
-    result.push({ id: `g${g}`, label: `${g} gram`, grams: g })
-  }
+  for (const g of (ml ? VASTE_ML : VASTE_GRAM)) if (!vast.includes(g)) vast.push(g)
+  vast
+    .filter(g => !natuurlijk.some(p => p.grams === g))
+    .sort((x, y) => x - y)
+    .forEach(g => result.push({ id: `g${g}`, label: `${g} ${ml ? 'ml' : 'gram'}`, knop: `${g} ${u}`, grams: g, unit: u }))
   return result
 }
-
-const GRAM_OPTIONS = buildGramOptions()
 
 const MEAL_OPTIONS = [
   { id: 'portion', label: '1 portie', grams: 1, isMultiplier: true }
@@ -145,17 +156,24 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   // ontbrekend item; de render stopt eronder alsnog.
   const isPer100g = item?.per100g === true
 
-  const [gramOptions, setGramOptions] = useState(GRAM_OPTIONS)
+  const [gramOptions, setGramOptions] = useState(() => buildGramOptions([], item?.name))
   const servingOptions = isPer100g ? gramOptions : MEAL_OPTIONS
 
+  // Nieuw product met een natuurlijke portie: begin op "1 ei" / "1 snee" in
+  // plaats van 100 gram. Een eerder gelogd item houdt zijn grammen.
+  const startNatuurlijk = isPer100g && !(item?._savedAmount > 0)
+    ? (servingOptions.find(o => o.natuurlijk && String(item?.name || '').toLowerCase().includes(o.enkel.toLowerCase()))
+      || servingOptions.find(o => o.natuurlijk) || null)
+    : null
+
   // Initial state
-  const [selectedServing, setSelectedServing] = useState(servingOptions[0])
+  const [selectedServing, setSelectedServing] = useState(startNatuurlijk || servingOptions[0])
   // Wanneer een portie-preset z'n eigen macros heeft (bv. "1 eiwit (los)"
   // gebruikt egg-white macros ipv het gemiddelde hele-ei profiel), zetten
   // we die hier neer. Math gebruikt deze macros als per-100g-basis ipv de
   // item-macros. Wordt geleegd zodra de gebruiker via de dropdown een
   // andere portie kiest.
-  const [baseMacrosOverride, setBaseMacrosOverride] = useState(null)
+  const [baseMacrosOverride, setBaseMacrosOverride] = useState(startNatuurlijk?.override || null)
 
   // De samenstelling komt in drie vormen binnen: met naam en macro's, met
   // ingredient_name/amount_gram, of als kale verwijzing {ingredient_id,
@@ -211,14 +229,10 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     let cancelled = false
     loggingService.getPortionHistory(client.id, item.name, 4).then(learned => {
       if (cancelled) return
-      const next = buildGramOptions(learned)
+      const next = buildGramOptions(learned, item.name)
       setGramOptions(next)
-      // Keep currently-selected grams if it's still in the list, else fall back
-      // to the matching option or first.
-      setSelectedServing(prev => {
-        const stillThere = next.find(o => o.grams === prev.grams)
-        return stillThere || next[0]
-      })
+      // De gekozen portie blijft staan als hij er nog in zit.
+      setSelectedServing(prev => next.find(o => o.id === prev.id) || next.find(o => o.grams === prev.grams) || next[0])
     })
     return () => { cancelled = true }
   }, [item?.name, client?.id, loggingService, isPer100g])
@@ -229,7 +243,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     ? item._savedAmount
     : (isPer100g ? (item?.defaultPortion || 100) : 1)
 
-  const [quantity, setQuantity] = useState(initialQuantity)
+  const [quantity, setQuantity] = useState(startNatuurlijk ? 1 : initialQuantity)
   const [showQuantityPicker, setShowQuantityPicker] = useState(false)
   const [portieOpen, setPortieOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -401,45 +415,27 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   }
 
   // ── Weergave (15 okt 2026: alles gecentreerd, geen uitklaplijsten) ──
-  const gramStand = isPer100g && (selectedServing.id === 'gram' || selectedServing.grams === 1)
-  const gramOpt = gramOptions.find(o => o.id === 'gram') || gramOptions[0]
+  const gramStand = isPer100g && selectedServing.id === 'gram'
+  const u = isPer100g ? (gramOptions[0]?.unit || 'g') : 'g'
   const stuk = isPer100g ? stukVan(item.name) : null
-  const stap = gramStand ? (stuk?.grams || 10) : (isPer100g ? 1 : 0.5)
-  const zetGram = (g) => { setSelectedServing(gramOpt); setBaseMacrosOverride(null); setQuantity(g) }
+  const stap = gramStand ? (u === 'ml' ? 50 : (stuk?.grams || 10)) : (isPer100g ? 1 : 0.5)
   const kies = (fn) => { fn(); if (navigator.vibrate) navigator.vibrate(12) }
   const eenheidTekst = gramStand
-    ? 'gram'
-    : isPer100g ? `× ${selectedServing.grams} gram` : (quantity === 1 ? 'portie' : 'porties')
+    ? (u === 'ml' ? 'ml' : 'gram')
+    : selectedServing.natuurlijk ? (quantity === 1 ? selectedServing.enkel : selectedServing.meer)
+    : isPer100g ? `× ${selectedServing.grams} ${u}` : (quantity === 1 ? 'portie' : 'porties')
   // Portiegrootte links van het aantal: 1 gram (dan is het aantal in grammen)
   // of een vaste portie van 30/50/100 g (dan is het aantal porties).
   const kiesPortie = (opt) => {
     const totaal = Math.round(totalGrams) || 0
     setSelectedServing(opt)
     setBaseMacrosOverride(null)
+    setBaseMacrosOverride(opt.override || null)
     if (opt.id === 'gram') setQuantity(totaal > 0 ? totaal : (item.defaultPortion || 100))
     else setQuantity(1)
     setPortieOpen(false)
   }
 
-  // Snelle porties: natuurlijke porties (1 ei, 1 sneetje) en daarna de
-  // gram-voorkeuren. Bewerkte producten (jam, sap, yoghurt) krijgen geen
-  // "stuks" van het losse fruit: "Aardbeien Jam" kreeg "5 stuks · 75g".
-  const cfg = isPer100g ? findPortionConfig(item.name) : null
-  const bewerkt = /\b(jam|confituur|sap|siroop|limonade|yoghurt|kwark|smoothie|drink|saus|thee|ijs|taart|vla|pudding)\b/i.test(item.name || '')
-  const presets = bewerkt && cfg?.displayUnit === 'stuks' ? [] : (cfg?.presets || [])
-  const gramChips = isPer100g
-    ? gramOptions.filter(o => o.id !== 'gram' && !presets.some(p => p.grams === o.grams)).map(o => o.grams)
-    : []
-
-  const chip = (aan) => ({
-    padding: '0 0.85rem', minHeight: 36, borderRadius: 999,
-    background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
-    border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-    color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
-    fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800, fontFamily: 'inherit',
-    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-    whiteSpace: 'nowrap', flexShrink: 0,
-  })
   const plusMin = {
     width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
     background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
@@ -490,7 +486,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
               <span style={{ fontSize: '0.92rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
-                {selectedServing.grams} g <span style={{ fontSize: '0.7rem' }}>▾</span>
+                {selectedServing.knop || `${selectedServing.grams} g`} <span style={{ fontSize: '0.7rem' }}>▾</span>
               </span>
               <span style={{ fontSize: '0.58rem', fontWeight: 800, opacity: 0.55, textTransform: 'uppercase', letterSpacing: '0.05em' }}>portie</span>
             </button>
@@ -534,35 +530,11 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
         <button aria-label="Meer" style={plusMin}
           onClick={() => kies(() => setQuantity(q => Math.round((q + stap) * 100) / 100))}>+</button>
       </div>
-      {(gramStand && stuk && quantity > 0) || (!gramStand && isPer100g) ? (
+      {(gramStand && stuk && u === 'g' && quantity > 0) || (!gramStand && isPer100g) ? (
         <div style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
-          {gramStand ? stukTekst(quantity, stuk) : `${Math.round(totalGrams)} gram`}
+          {gramStand ? stukTekst(quantity, stuk) : `${Math.round(totalGrams)} ${u === 'ml' ? 'ml' : 'gram'}`}
         </div>
       ) : null}
-
-      {/* Snelle porties */}
-      {isPer100g && (presets.length > 0 || gramChips.length > 0) && (
-        <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
-          <div style={kopje}>Snelle portie</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', padding: '0 1rem' }}>
-            {presets.map((p, i) => {
-              const aan = gramStand && Math.abs(quantity - p.grams) < 0.5
-              return (
-                <button key={`p${i}`} style={chip(aan)} onClick={() => kies(() => {
-                  setSelectedServing(gramOpt); setQuantity(p.grams); setBaseMacrosOverride(p.override || null)
-                })}>
-                  {p.label}<span style={{ opacity: 0.55, fontWeight: 700 }}> · {p.grams}{cfg?.displayUnit === 'ml' ? 'ml' : 'g'}</span>
-                </button>
-              )
-            })}
-            {gramChips.map(g => (
-              <button key={`g${g}`} style={chip(gramStand && quantity === g)} onClick={() => kies(() => zetGram(g))}>
-                {g} g
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Moment */}
       <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>

@@ -12,6 +12,41 @@
 // Note: grain weights (rijst, pasta) are DRY weights.
 
 const PORTION_PRESETS = [
+  { match: /^eiwit\b(?!.*(poeder|shake|reep|drank|pudding|bar))|eiwit\s*\(los\)|egg white|eiwitten\b/i, displayUnit: 'stuks', presets: [{ label: '1 eiwit', grams: 33 }] },
+  { match: /\bfeta\b|geitenkaas|parmezaan|parmigiano|geraspte kaas|kaas geraspt|\bgeraspt/i, presets: [{ label: '1 eetlepel', grams: 10 }, { label: '1 portie', grams: 30 }] },
+  { match: /schnitzel|cordon bleu/i, displayUnit: 'stuks', presets: [{ label: '1 schnitzel', grams: 150 }] },
+  { match: /sashimi|nigiri|maki\b/i, displayUnit: 'stuks', presets: [{ label: '1 stuk', grams: 15 }, { label: '1 portie', grams: 100 }] },
+  { match: /ketchup|curryketchup|(tamarinde|curry|tom yum|miso|chili)\s?pasta/i, presets: [{ label: '1 theelepel', grams: 5 }, { label: '1 eetlepel', grams: 15 }] },
+  { match: /huttekase|hüttenkäse/i, presets: [{ label: '1 eetlepel', grams: 30 }, { label: '1 bakje', grams: 200 }] },
+  { match: /mueslireep|granolareep|ontbijtreep|graanreep/i, displayUnit: 'stuks', presets: [{ label: '1 reep', grams: 25 }] },
+  // Namen die door een woord in de naam bij de verkeerde soort belandden
+  // (dekking-check 15 okt 2026): "Tonijn in water" kreeg glazen water,
+  // "Chips paprika" een paprika, "Bolletje knäckebröd" een broodje.
+  { match: /\btonijn\b|\btuna\b/i, presets: [{ label: '1 blikje (uitgelekt)', grams: 120 }, { label: '1 portie', grams: 100 }] },
+  { match: /\b(chips|crisps|nachos|tortillachips|pringles|doritos|zoutjes)\b|\blay'?s\b/i, presets: [{ label: '1 handje', grams: 15 }, { label: '1 zakje', grams: 25 }, { label: '1 schaaltje', grams: 50 }] },
+  { match: /rijstwafel|maiswafel|rice cake/i, displayUnit: 'stuks', presets: [{ label: '1 wafel', grams: 8 }] },
+  { match: /rice paper|rijstpapier/i, displayUnit: 'stuks', presets: [{ label: '1 vel', grams: 9 }] },
+  { match: /knäckebröd|knackebrod|knackbrod|crackers?\b|cracker|rasker|beschuit/i, displayUnit: 'stuks', presets: [{ label: '1 cracker', grams: 12 }] },
+  { match: /cottage cheese|hüttenkäse|huttenkase/i, presets: [{ label: '1 eetlepel', grams: 30 }, { label: '1 bakje', grams: 200 }] },
+  { match: /(kip|kalkoen)\w*.*\b(plakken|plakjes|beleg)\b|\b(plakken|plakjes)\b.*(kip|kalkoen)/i, presets: [{ label: '1 plakje', grams: 15 }] },
+  { match: /\b(gel|energy gel|energiegel)\b/i, presets: [{ label: '1 gel', grams: 40 }] },
+  { match: /\b(breaker|optimel|vifit|yoghurtdrink|drinkontbijt|milkshake)\b/i, displayUnit: 'ml', presets: [{ label: '1 glas', grams: 250 }, { label: '1 flesje', grams: 330 }] },
+  { match: /\b(kvarg|quark)\b/i, presets: [{ label: '1 bakje', grams: 150 }, { label: '1 schaaltje', grams: 200 }] },
+  { match: /\bdessert\b|toetje/i, presets: [{ label: '1 bakje', grams: 125 }] },
+  { match: /\bsalade\b|salad\b/i, presets: [{ label: '1 bakje', grams: 150 }, { label: '1 portie', grams: 200 }] },
+  { match: /pastasaus|pasta saus|bolognesesaus|tomatensaus|passata|pizzasaus/i, presets: [{ label: '1 eetlepel', grams: 15 }, { label: '1 portie', grams: 125 }] },
+  { match: /frites\s?saus|fritessaus|frietsaus|tomato frito|tomatensaus|saus\b|sauce\b/i, presets: [{ label: '1 eetlepel', grams: 15 }, { label: '1 portie', grams: 25 }] },
+  { match: /nectar\b|\bsap\b|juice/i, displayUnit: 'ml', presets: [{ label: '1 klein glas', grams: 150 }, { label: '1 glas', grams: 200 }, { label: '1 pakje', grams: 200 }] },
+  { match: /à la crème|a la creme|ala creme/i, presets: [{ label: '1 portie', grams: 150 }] },
+  { match: /\bolijven\b|\bolijf\b(?!olie)/i, presets: [{ label: '1 olijf', grams: 4 }, { label: '1 handje', grams: 30 }] },
+  { match: /\brozijnen\b|krenten\b|cranberries gedroogd/i, presets: [{ label: '1 eetlepel', grams: 10 }, { label: '1 handje', grams: 25 }] },
+  { match: /zoete aardappel|bataat|sweet potato/i, displayUnit: 'stuks', presets: [{ label: '1 zoete aardappel', grams: 250 }, { label: '1 portie', grams: 200 }] },
+  { match: /^(?!.*(jam|confituur|fruitspread|yoghurt|skyr|kwark|drink|smaak|whey|shake|siroop|sap)).*\baardbei(en)?\b/i, displayUnit: 'stuks', presets: [{ label: '1 aardbei', grams: 15 }, { label: '1 handje', grams: 75 }, { label: '1 schaaltje', grams: 150 }] },
+  // Specifieke namen die anders bij een algemenere soort belanden.
+  { match: /citroensap|limoensap/i, displayUnit: 'ml', presets: [{ label: '1 scheutje', grams: 10 }, { label: '1 eetlepel', grams: 15 }] },
+  { match: /\b(caprisun|capri-sun|wicky|appelsientje pakje)\b/i, displayUnit: 'ml', presets: [{ label: '1 pakje', grams: 200 }] },
+  { match: /bananenbrood|cake\b|appeltaart|taart\b|brownie|sponge cake|muffin|cupcake|donut|vetekaka/i, displayUnit: 'stuks', presets: [{ label: '1 plak', grams: 50 }, { label: '1 punt', grams: 100 }] },
+  { match: /\b(wafel|wafels|eierwafel|eierwafels)\b|eierwafel/i, displayUnit: 'stuks', presets: [{ label: '1 wafel', grams: 25 }] },
   // ═══ Bewerkte producten vóór hun grondstof ═══════════════════════════
   // Anders krijgt "Aardbeien jam" de stuks van losse aardbeien en
   // "Chocolademelk" niets. (15 okt 2026)
@@ -631,6 +666,54 @@ const PORTION_PRESETS = [
     { label: '1 eetlepel', grams: 10 },
     { label: '1 portie',   grams: 30 },
   ]},
+  // ═══ Aanvullingen na dekking-check op echte logs (15 okt 2026) ════════
+  { match: /\bkip\b.*\bfilet\b|kip - filet|gerookte.*kip|rökt (kalkon|kylling)|rookvlees|runderrookvlees/i, presets: [
+    { label: '1 plakje', grams: 15 },
+    { label: '1 filet',  grams: 150 },
+  ]},
+  { match: /\b(pink lady|elstar|jonagold|granny smith|braeburn|gala|apples)\b/i, displayUnit: 'stuks', presets: [{ label: '1 appel', grams: 180 }] },
+  { match: /\bmandarijnen\b/i, displayUnit: 'stuks', presets: [{ label: '1 mandarijn', grams: 70 }] },
+  { match: /\bbananen\b/i, displayUnit: 'stuks', presets: [{ label: '1 banaan', grams: 120 }] },
+  { match: /\baardappelen\b/i, displayUnit: 'stuks', presets: [{ label: '1 aardappel', grams: 100 }, { label: '1 portie', grams: 250 }] },
+  { match: /brood\b/i, presets: [{ label: '1 snee', grams: 35 }] },
+  { match: /triangel|triangles|puntjes|\bbollen\b|\bbol\b|pita|turkse broodjes|turks brood|flatbread|focaccia|foccacia/i, displayUnit: 'stuks', presets: [{ label: '1 broodje', grams: 60 }] },
+  { match: /tortilla/i, displayUnit: 'stuks', presets: [{ label: '1 wrap', grams: 60 }] },
+  { match: /knäckebröd|knackbrod|rasker|fullkorn|crackers?\b/i, displayUnit: 'stuks', presets: [{ label: '1 cracker', grams: 12 }] },
+  { match: /\b(emmental|emmentaler|gouda|edam|jong|belegen|oud)\b.*\d{2}\s?\+|\d{2}\s?\+/i, presets: [{ label: '1 plak', grams: 20 }, { label: '1 blokje', grams: 10 }] },
+  { match: /\b(fusilli|penne|spaghetti|macaroni|tagliatelle|farfalle|rigatoni|linguine|orzo)\b/i, presets: [{ label: '1 portie (droog)', grams: 75 }] },
+  { match: /\b(nootjes|borrelnootjes|pinda's|pindas|pinda)\b/i, presets: [{ label: '1 handje', grams: 25 }] },
+  { match: /friet|patat/i, presets: [{ label: '1 portie', grams: 150 }] },
+  { match: /kidney\s?bonen|kikkererwten|linzen|bonen\b/i, presets: [{ label: '1 eetlepel', grams: 20 }, { label: '1 portie', grams: 100 }] },
+  { match: /\b(pinot|chardonnay|merlot|sauvignon|cabernet|prosecco|cava|champagne|rosé|rose wijn)\b/i, displayUnit: 'ml', presets: [{ label: '1 glas', grams: 125 }, { label: '1 fles', grams: 750 }] },
+  { match: /tripel|trappist|dubbel\b|ipa\b|weizen|westmalle|leffe|hertog jan|heineken|grolsch|amstel|bavaria/i, displayUnit: 'ml', presets: [{ label: '1 glas', grams: 250 }, { label: '1 flesje', grams: 330 }, { label: '1 blikje', grams: 330 }] },
+  { match: /crème fraiche|creme fraiche|crème fraîche/i, presets: [{ label: '1 eetlepel', grams: 15 }] },
+  { match: /\bkvarg\b|\bquark\b/i, presets: [{ label: '1 bakje', grams: 150 }, { label: '1 schaaltje', grams: 200 }] },
+  { match: /\baugurk|augurken|augurkjes|dwarsliggers/i, displayUnit: 'stuks', presets: [{ label: '1 augurk', grams: 20 }] },
+  { match: /bleekselderij|selderij/i, displayUnit: 'stuks', presets: [{ label: '1 stengel', grams: 40 }] },
+  { match: /\bsushi\b/i, displayUnit: 'stuks', presets: [{ label: '1 stuk', grams: 30 }] },
+  { match: /\blay'?s\b|\bchips\b/i, presets: [{ label: '1 handje', grams: 15 }, { label: '1 zakje', grams: 25 }] },
+  { match: /\bbar\b|\breep\b/i, displayUnit: 'stuks', presets: [{ label: '1 reep', grams: 50 }] },
+  { match: /groente|groenten/i, presets: [{ label: '1 portie', grams: 150 }] },
+  { match: /avoine|havervlokken|oats\b/i, presets: [{ label: '1 portie', grams: 40 }, { label: '1 eetlepel', grams: 10 }] },
+  { match: /\b(soupe|zuppa)\b/i, displayUnit: 'ml', presets: [{ label: '1 kom', grams: 300 }] },
+  { match: /\btomaten\b|cherry\s?tomaten|cherrytomaten|trostomaten/i, displayUnit: 'stuks', presets: [{ label: '1 tomaat', grams: 100 }, { label: '1 cherrytomaatje', grams: 15 }] },
+  { match: /blueberr|bosbes/i, presets: [{ label: '1 handje', grams: 50 }, { label: '1 schaaltje', grams: 125 }] },
+  { match: /pecan|macadamia|hazelno|paranoten|walno/i, presets: [{ label: '1 handje', grams: 25 }] },
+  { match: /olie\b|\boil\b/i, presets: [{ label: '1 theelepel', grams: 5 }, { label: '1 eetlepel', grams: 13 }] },
+  { match: /kookspray|bakspray|cooking spray/i, presets: [{ label: '1 spray', grams: 1 }, { label: '1 seconde spuiten', grams: 2 }] },
+  { match: /\bpapaja\b|\bpapaya\b/i, displayUnit: 'stuks', presets: [{ label: '1 halve papaya', grams: 150 }] },
+  { match: /krieltjes|krielaardappel/i, presets: [{ label: '1 portie', grams: 200 }] },
+  { match: /gegrilde kip|kip \(winkel\)|grillkip|rotisserie/i, presets: [{ label: '1 portie', grams: 150 }, { label: '1 poot', grams: 250 }] },
+  { match: /falafel/i, displayUnit: 'stuks', presets: [{ label: '1 balletje', grams: 20 }] },
+  { match: /bloemkoolrijst|broccolirijst|groenterijst/i, presets: [{ label: '1 portie', grams: 150 }] },
+  { match: /taugé|tauge|taugeh/i, presets: [{ label: '1 handje', grams: 25 }, { label: '1 portie', grams: 100 }] },
+  { match: /peterselie|munt|basilicum|koriander|bieslook|dille|verse kruiden/i, presets: [{ label: '1 eetlepel', grams: 3 }, { label: '1 handje', grams: 10 }] },
+  { match: /kappertjes/i, presets: [{ label: '1 theelepel', grams: 5 }, { label: '1 eetlepel', grams: 15 }] },
+  { match: /ricotta|mascarpone/i, presets: [{ label: '1 eetlepel', grams: 30 }] },
+  { match: /mass gainer|gainer/i, presets: [{ label: '1 schep', grams: 100 }] },
+  { match: /electrolyte|elektrolyt|glutamine|zma|bcaa|eaa|pre.?workout|collageen|collagen|flavor powder|smaakpoeder/i, presets: [{ label: '1 schep', grams: 5 }, { label: '1 portie', grams: 10 }] },
+  { match: /plant.?based protein|vegan protein|erwteneiwit|pea protein|soja eiwit/i, presets: [{ label: '1 schep', grams: 30 }] },
+  { match: /\bfruit\b|fruitmix|fruitsalade/i, presets: [{ label: '1 schaaltje', grams: 125 }, { label: '1 portie', grams: 150 }] },
 ]
 
 // Generic gram fallback shown for any food that has no specific category
@@ -687,15 +770,28 @@ const MEERVOUD = {
   filet: 'filets', blikje: 'blikjes', schaaltje: 'schaaltjes', handje: 'handjes',
   theelepel: 'theelepels', eetlepel: 'eetlepels', mesje: 'mesjes', glas: 'glazen',
   'klein glas': 'kleine glazen', kop: 'koppen', mok: 'mokken', stuk: 'stuks', portie: 'porties',
-  komkommer: 'komkommers', blokje: 'blokjes', aardbei: 'aardbeien', snee: 'sneeën',
+  komkommer: 'komkommers', blokje: 'blokjes', aardbei: 'aardbeien', snee: 'sneeën', stengel: 'stengels', schnitzel: 'schnitzels', cherrytomaatje: 'cherrytomaatjes', balletje: 'balletjes', spray: 'sprays', poot: 'poten', vel: 'vellen', augurk: 'augurken', wafel: 'wafels',
   schep: 'scheppen', reep: 'repen', bol: 'bollen', beschuit: 'beschuiten', rijstwafel: 'rijstwafels',
   croissant: 'croissants', bagel: 'bagels', pannenkoek: 'pannenkoeken', stroopwafel: 'stroopwafels',
   koekje: 'koekjes', druif: 'druiven', teentje: 'teentjes', champignon: 'champignons', ui: 'uien',
   olijf: 'olijven', burger: 'burgers', gehaktbal: 'gehaktballen', kroket: 'kroketten',
   frikandel: 'frikandellen', bitterbal: 'bitterballen', flesje: 'flesjes', pakje: 'pakjes', fles: 'flessen',
-  kom: 'kommen', bakje: 'bakjes', bolletje: 'bolletjes', punt: 'punten', handje: 'handjes',
-  klontje: 'klontjes', nestje: 'nestjes', dijfilet: 'dijfilets', plak: 'plakken', part: 'parten',
+  kom: 'kommen', bakje: 'bakjes', bolletje: 'bolletjes', punt: 'punten',
+  klontje: 'klontjes', nestje: 'nestjes', dijfilet: 'dijfilets', part: 'parten', beker: 'bekers', dooier: 'dooiers', vleestomaat: 'vleestomaten',
+  moot: 'moten', zak: 'zakken', zakje: 'zakjes', schaal: 'schalen', schijf: 'schijven', tros: 'trossen',
+  opscheplepel: 'opscheplepels', toef: 'toeven', scheutje: 'scheutjes', rij: 'rijen', snoepje: 'snoepjes',
 }
+export const meervoud = (enkel) => {
+  if (!enkel) return enkel
+  if (MEERVOUD[enkel]) return MEERVOUD[enkel]
+  // "eetlepel" -> "eetlepels", "kleine portie" -> "kleine porties",
+  // "portie (droog)" -> "porties (droog)"
+  const m = String(enkel).match(/^(.*?)(\s*\(.*\))?$/)
+  const delen = m[1].split(' ')
+  const laatste = delen.pop()
+  return [...delen, MEERVOUD[laatste] || laatste].join(' ') + (m[2] || '')
+}
+
 export const stukVan = (foodName) => {
   const cfg = findPortionConfig(foodName)
   if (!cfg || cfg === DEFAULT_GRAM_PRESETS) return null
