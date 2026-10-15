@@ -10,6 +10,41 @@ if (!supabaseUrl || !supabaseKey) {
 
 
 
+// ── Databasevragen met een tijdslimiet en één herkansing ──
+// Zonder limiet wacht een vraag eindeloos als de database hapert, en draait
+// een laadscherm voor altijd ("hij blijft laden"; 14 okt 2026 lag de database
+// een uur plat). Nu geeft een vraag na 30 s een fout, zodat het scherm iets
+// kan tonen. Leesvragen (GET) krijgen bij een netwerkfout, time-out of 502/
+// 503/504 één tweede poging; schrijfvragen niet, die kunnen al gelukt zijn.
+// Alleen /rest/v1 (tabellen en rpc); inloggen, opslag en functies blijven
+// zoals ze waren.
+const TIJDSLIMIET_MS = 30000
+const wacht = (ms) => new Promise(r => setTimeout(r, ms))
+const fetchMetLimiet = async (input, init = {}) => {
+  const url = typeof input === 'string' ? input : input?.url || ''
+  if (!url.includes('/rest/v1/')) return fetch(input, init)
+  const methode = String(init.method || 'GET').toUpperCase()
+  const pogingen = methode === 'GET' || methode === 'HEAD' ? 2 : 1
+  const extern = init.signal
+  for (let poging = 1; ; poging++) {
+    const ctrl = new AbortController()
+    const stop = () => ctrl.abort()
+    if (extern) { if (extern.aborted) ctrl.abort(); else extern.addEventListener('abort', stop, { once: true }) }
+    const timer = setTimeout(stop, TIJDSLIMIET_MS)
+    try {
+      const res = await fetch(input, { ...init, signal: ctrl.signal })
+      if (poging < pogingen && [502, 503, 504].includes(res.status)) { await wacht(1000); continue }
+      return res
+    } catch (e) {
+      if (extern?.aborted || poging >= pogingen) throw e
+      await wacht(1000)
+    } finally {
+      clearTimeout(timer)
+      extern?.removeEventListener?.('abort', stop)
+    }
+  }
+}
+
 // SINGLETON PATTERN - voorkomt meerdere instances
 let supabaseInstance = null;
 
@@ -22,7 +57,8 @@ export const supabase = (() => {
         detectSessionInUrl: true,
         storage: window.localStorage,
         storageKey: `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`
-      }
+      },
+      global: { fetch: fetchMetLimiet },
     })
   }
   return supabaseInstance

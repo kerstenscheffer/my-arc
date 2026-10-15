@@ -1,6 +1,6 @@
 // src/client/ClientDashboard.jsx - CLEAN VERSION v2.0
 // ✅ ONLY STYLING CHANGED - All logic, state, routing, auth IDENTICAL
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
 import LaadScherm from '../components/LaadScherm'
 // Klein en niet lazy: dit is juist wat je ziet terwijl de workout-code laadt.
@@ -175,10 +175,19 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   
   useEffect(() => { loadClientData() }, [previewClientId])
 
+  // Is er al een klant geladen? Dan is dit een verversing op de achtergrond
+  // (na een token-refresh). Mislukt die, dan houden we wat er staat: eerder
+  // verving een haperende database dan de hele werkende app door een
+  // foutscherm of "account niet gevonden".
+  const geladenRef = useRef(false)
   const loadClientData = async () => {
+    const opAchtergrond = geladenRef.current
     try {
       const authUser = await db.getCurrentUser()
-      if (!authUser?.email) { setError('Geen gebruiker gevonden'); setLoading(false); return }
+      if (!authUser?.email) {
+        if (opAchtergrond) return
+        setError('Geen gebruiker gevonden'); setLoading(false); return
+      }
       setUser(authUser)
 
       // Drie wegen naar "welke klant tonen we":
@@ -197,17 +206,23 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         clientData = await db.getClientByEmail(authUser.email)
       }
 
-      if (!clientData) { setError('Client account niet gevonden voor: ' + authUser.email); setLoading(false); return }
+      if (!clientData) {
+        if (opAchtergrond) { console.warn('Klant verversen gaf niets terug; oude gegevens blijven staan'); return }
+        setError('Client account niet gevonden voor: ' + authUser.email); setLoading(false); return
+      }
       // Op slot geldt alleen voor de klant zelf; de coach die meekijkt ziet
       // gewoon zijn app.
       setOpSlot(!!clientData.account_locked_at && !previewClientId && !uitSleutel)
       setClient(clientData)
+      geladenRef.current = true
+      setError(null)
       if (clientData.assigned_schema_id) {
         try { const schemaData = await db.getClientSchema(clientData.id); setSchema(schemaData) }
         catch (schemaError) { console.warn('Could not load schema:', schemaError); setSchema(null) }
       }
     } catch (error) {
       console.error('Error loading client data:', error)
+      if (opAchtergrond) return
       setError('Fout bij laden van gegevens: ' + error.message)
     } finally { setLoading(false) }
   }
@@ -245,6 +260,20 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // Foutscherm na een storing: zodra de app weer op de voorgrond komt, zelf
+  // opnieuw proberen, zodat de klant niet hoeft af te sluiten of te herstarten.
+  useEffect(() => {
+    if (!error) return
+    const opVoorgrond = () => { if (document.visibilityState === 'visible') loadClientData() }
+    document.addEventListener('visibilitychange', opVoorgrond)
+    window.addEventListener('online', opVoorgrond)
+    return () => {
+      document.removeEventListener('visibilitychange', opVoorgrond)
+      window.removeEventListener('online', opVoorgrond)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error])
 
   const handleClientUpdate = (updatedClient) => {
     setClient(prev => ({ ...prev, ...updatedClient }))
