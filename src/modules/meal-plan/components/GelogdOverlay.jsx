@@ -8,7 +8,7 @@ import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import GelogdAnimatie from './food-log/GelogdAnimatie'
 
-export default function GelogdOverlay({ naam, kcal, label = 'Gelogd!', isMobile, onKlaar }) {
+export default function GelogdOverlay({ naam, kcal, sub = null, label = 'Gelogd!', Icoon, isMobile, onKlaar }) {
   useEffect(() => {
     const t = setTimeout(() => onKlaar?.(), 1400)
     return () => clearTimeout(t)
@@ -25,7 +25,7 @@ export default function GelogdOverlay({ naam, kcal, label = 'Gelogd!', isMobile,
     >
       <style>{'@keyframes goIn { from { opacity: 0; } to { opacity: 1; } }'}</style>
       <div style={{ marginBottom: '1.25rem' }}>
-        <GelogdAnimatie grootte={isMobile ? 104 : 120} />
+        <GelogdAnimatie grootte={isMobile ? 104 : 120} {...(Icoon ? { Icoon } : {})} />
       </div>
       <div style={{ fontSize: isMobile ? '1.5rem' : '1.7rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', marginBottom: '0.3rem', animation: 'goIn 0.3s ease 0.35s both' }}>
         {label}
@@ -33,6 +33,11 @@ export default function GelogdOverlay({ naam, kcal, label = 'Gelogd!', isMobile,
       {naam && (
         <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', textAlign: 'center', maxWidth: 260, animation: 'goIn 0.3s ease 0.45s both' }}>
           {naam}
+        </div>
+      )}
+      {sub && (
+        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', color: '#fff', fontWeight: 900, marginTop: '0.5rem', animation: 'goIn 0.3s ease 0.55s both' }}>
+          {sub}
         </div>
       )}
       {kcal > 0 && (

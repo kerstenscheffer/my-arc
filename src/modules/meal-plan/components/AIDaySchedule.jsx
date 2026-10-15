@@ -16,6 +16,7 @@ import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
 import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst } from '../../supplements/utils/supplementSchedule'
 import SupplementInfoModal from './SupplementInfoModal'
 import GelogdOverlay from './GelogdOverlay'
+import { PillBottle } from 'lucide-react'
 
 const getTodayIndex = () => {
   const day = new Date().getDay()
@@ -587,6 +588,7 @@ export default function AIDaySchedule({
         // 23505 = de unieke sleutel: stond er al. Geen fout, precies de
         // bedoeling — het vinkje mag gewoon blijven staan.
         if (error && error.code !== '23505') throw error
+        setAfgerond({ naam: sp.naam, sub: sp.dosering || null, label: 'Ingenomen!', supplement: true })
       }
     } catch (e) {
       console.error('Supplement afvinken mislukt:', e)
@@ -783,7 +785,11 @@ export default function AIDaySchedule({
       paddingTop: 4,
     }}>
       {afgerond && (
-        <GelogdOverlay naam={afgerond.naam} kcal={afgerond.kcal} isMobile={isMobile} onKlaar={sluitAfgerond} />
+        <GelogdOverlay
+          naam={afgerond.naam} kcal={afgerond.kcal} sub={afgerond.sub}
+          label={afgerond.label} Icoon={afgerond.supplement ? PillBottle : undefined}
+          isMobile={isMobile} onKlaar={sluitAfgerond}
+        />
       )}
       {/* DayScheduleHeader (titel/datum/Template-knop) en de MA-ZO
           DaySelector zijn verwijderd: navigatie en dagweergave zitten nu

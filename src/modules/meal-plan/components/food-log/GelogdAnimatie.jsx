@@ -4,11 +4,13 @@
 // icoon draait één keer rond terwijl er een witte ring omheen getekend wordt,
 // daarna een korte puls. Duurt ~0,9 s, past binnen de 1,5 s van het scherm.
 
+import { createElement } from 'react'
 import { UtensilsCrossed } from 'lucide-react'
 
 const OMTREK = 2 * Math.PI * 44
 
-export default function GelogdAnimatie({ grootte = 112 }) {
+export default function GelogdAnimatie({ grootte = 112, Icoon = UtensilsCrossed }) {
+  const icoon = createElement(Icoon, { size: grootte * 0.38, color: '#fff', strokeWidth: 2.4 })
   return (
     <div style={{ position: 'relative', width: grootte, height: grootte }}>
       <style>{`
@@ -41,7 +43,7 @@ export default function GelogdAnimatie({ grootte = 112 }) {
         position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
         animation: 'glDraai 0.8s cubic-bezier(0.34, 1.3, 0.64, 1) both',
       }}>
-        <UtensilsCrossed size={grootte * 0.38} color="#fff" strokeWidth={2.4} />
+        {icoon}
       </div>
     </div>
   )
