@@ -6,7 +6,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
 import { resolveFoodImage } from '../../foodImageFallback'
 import { Check } from 'lucide-react'
-import { findPortionConfig, stukVan } from './portionPresets'
+import { findPortionConfig, stukVan, stukTekst } from './portionPresets'
 import GramInvoer from '../GramInvoer'
 
 // ═══════════════════════════════════════════
@@ -156,8 +156,8 @@ function ScrollPickerModal({ value, onConfirm, onClose, isMobile }) {
 const MEAL_MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
   { id: 'lunch', label: 'Lunch' },
-  { id: 'dinner', label: 'Avondeten' },
-  { id: 'snack', label: 'Tussendoortjes' }
+  { id: 'dinner', label: 'Avondeten', kort: 'Diner' },
+  { id: 'snack', label: 'Tussendoortjes', kort: 'Snack' }
 ]
 
 const getDefaultMoment = () => {
@@ -295,8 +295,6 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     : (isPer100g ? (item?.defaultPortion || 100) : 1)
 
   const [quantity, setQuantity] = useState(initialQuantity)
-  const [showServingDropdown, setShowServingDropdown] = useState(false)
-  const [showMealDropdown, setShowMealDropdown] = useState(false)
   const [showQuantityPicker, setShowQuantityPicker] = useState(false)
   const [saving, setSaving] = useState(false)
   const [mealMoment, setMealMoment] = useState(defaultMealMoment || getDefaultMoment())
@@ -466,254 +464,151 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     return `${val}`
   }
 
-  const currentMealLabel = MEAL_MOMENTS.find(m => m.id === mealMoment)?.label || 'Ontbijt'
+  // ── Weergave (15 okt 2026: alles gecentreerd, geen uitklaplijsten) ──
+  const gramStand = isPer100g && (selectedServing.id === 'gram' || selectedServing.grams === 1)
+  const gramOpt = gramOptions.find(o => o.id === 'gram') || gramOptions[0]
+  const stuk = isPer100g ? stukVan(item.name) : null
+  const stap = gramStand ? (stuk?.grams || 10) : (isPer100g ? 1 : 0.5)
+  const zetGram = (g) => { setSelectedServing(gramOpt); setBaseMacrosOverride(null); setQuantity(g) }
+  const kies = (fn) => { fn(); if (navigator.vibrate) navigator.vibrate(12) }
+  const eenheidTekst = gramStand
+    ? 'gram'
+    : isPer100g ? `× ${selectedServing.label}` : (quantity === 1 ? 'portie' : 'porties')
 
-  // ── Row ──
-  const Row = ({ label, children }) => (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-      minHeight: '48px'
-    }}>
-      <div style={{
-        fontSize: isMobile ? '0.85rem' : '0.9rem',
-        fontWeight: '500', color: 'rgba(255, 255, 255, 0.6)'
-      }}>{label}</div>
-      {children}
-    </div>
-  )
+  // Snelle porties: natuurlijke porties (1 ei, 1 sneetje) en daarna de
+  // gram-voorkeuren. Bewerkte producten (jam, sap, yoghurt) krijgen geen
+  // "stuks" van het losse fruit: "Aardbeien Jam" kreeg "5 stuks · 75g".
+  const cfg = isPer100g ? findPortionConfig(item.name) : null
+  const bewerkt = /\b(jam|confituur|sap|siroop|limonade|yoghurt|kwark|smoothie|drink|saus|thee|ijs|taart|vla|pudding)\b/i.test(item.name || '')
+  const presets = bewerkt && cfg?.displayUnit === 'stuks' ? [] : (cfg?.presets || [])
+  const gramChips = isPer100g
+    ? gramOptions.filter(o => o.id !== 'gram' && !presets.some(p => p.grams === o.grams)).map(o => o.grams)
+    : []
 
-  const DropdownBtn = ({ label, onClick, active }) => (
-    <button onClick={onClick} style={{
-      padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 0.875rem',
-      background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
-      border: `1px solid ${active ? '#fff' : 'rgba(255, 255, 255, 0.18)'}`,
-      borderRadius: '10px',
-      color: '#fff',
-      fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800,
-      cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      minHeight: '36px'
-    }}>{label}</button>
-  )
-
-  const DropdownMenu = ({ options, selected, onSelect, onClose: closeMenu }) => (
-    <>
-      <div onClick={closeMenu} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
-      <div style={{
-        position: 'absolute', top: '100%', right: 0,
-        marginTop: '0.25rem', zIndex: 100,
-        background: '#111', border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '8px', overflow: 'hidden', minWidth: '160px',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)'
-      }}>
-        {options.map((opt, i) => (
-          <button key={opt.id} onClick={() => onSelect(opt)} style={{
-            display: 'block', width: '100%',
-            padding: isMobile ? '0.75rem' : '0.625rem 0.75rem',
-            background: selected === opt.id ? 'rgba(255, 215, 0, 0.08)' : 'transparent',
-            border: 'none',
-            borderBottom: i < options.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-            color: selected === opt.id ? '#fff' : 'rgba(255, 255, 255, 0.6)',
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            fontWeight: selected === opt.id ? '700' : '500',
-            cursor: 'pointer', textAlign: 'left',
-            touchAction: 'manipulation', minHeight: '44px'
-          }}>{opt.label}</button>
-        ))}
-      </div>
-    </>
-  )
+  const chip = (aan) => ({
+    padding: '0 0.85rem', minHeight: 36, borderRadius: 999,
+    background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
+    border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+    color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
+    fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800, fontFamily: 'inherit',
+    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    whiteSpace: 'nowrap', flexShrink: 0,
+  })
+  const plusMin = {
+    width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+    color: '#fff', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1, fontFamily: 'inherit',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+  const kopje = {
+    fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+    letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', marginBottom: '0.55rem',
+  }
+  const foto = resolveFoodImage(item)
 
   return (
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column',
       paddingTop: isMobile ? '3.5rem' : '4rem'
     }}>
-      <div style={{
-        padding: isMobile ? '1rem 1rem 0.25rem' : '1.25rem 1.5rem 0.375rem',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-      }}>
+      {/* Product */}
+      <div style={{ textAlign: 'center', padding: isMobile ? '0.5rem 1rem 0' : '0.75rem 1.5rem 0' }}>
+        {foto && (
+          <img src={foto} alt="" style={{
+            width: 76, height: 76, borderRadius: '50%', objectFit: 'cover',
+            border: '1px solid rgba(255,255,255,0.12)', display: 'block', margin: '0 auto 0.7rem',
+          }} />
+        )}
         <div style={{
-          fontSize: isMobile ? '1.25rem' : '1.4rem',
-          fontWeight: '800', color: '#fff', letterSpacing: '-0.02em'
+          fontSize: isMobile ? '1.35rem' : '1.5rem', fontWeight: 900, color: '#fff',
+          letterSpacing: '-0.025em', lineHeight: 1.2, maxWidth: 420, margin: '0 auto',
         }}>{item.name}</div>
         {item.brand && (
-          <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', color: 'rgba(255, 255, 255, 0.3)', marginTop: '0.15rem' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
             {item.brand}
           </div>
         )}
       </div>
 
-      {/* Portiegrootte — dropdown ook voor recents */}
-      <Row label="Portiegrootte">
-        <div style={{ position: 'relative' }}>
-          <DropdownBtn
-            label={selectedServing.label}
-            onClick={() => setShowServingDropdown(!showServingDropdown)}
-            active={showServingDropdown}
-          />
-          {showServingDropdown && (
-            <DropdownMenu
-              options={servingOptions}
-              selected={selectedServing.id}
-              onSelect={(opt) => {
-                setSelectedServing(opt)
-                setShowServingDropdown(false)
-                // Dropdown-keuze betekent dat de gebruiker bewust van een
-                // preset-shortcut wegnavigeert — overrider macro-basis
-                // legen zodat we weer met de gewone item-macros rekenen.
-                setBaseMacrosOverride(null)
-                if (opt.id === 'gram') setQuantity(item.defaultPortion || 100)
-                else setQuantity(1)
-              }}
-              onClose={() => setShowServingDropdown(false)}
-            />
-          )}
-        </div>
-      </Row>
-
-      {/* Aantal — unit zit nu in Portiegrootte, dus dit is gewoon de multiplier */}
-      {(() => {
-        const aantalLabel = isPer100g ? 'Aantal' : 'Aantal porties'
-        return (
-          <Row label={aantalLabel}>
-            <button onClick={() => setShowQuantityPicker(true)} style={{
-              padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 0.875rem',
-              background: 'transparent',
-              border: '1.5px solid rgba(255,255,255,0.3)',
-              borderRadius: '10px', color: '#fff',
-              fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: 900,
-              cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              minHeight: '36px', minWidth: '60px', textAlign: 'center'
-            }}>
-              {displayQuantity(quantity)}
-            </button>
-          </Row>
-        )
-      })()}
-
-      {/* Quick-pick portion presets — toon natuurlijke porties voor bekende
-          ingrediënten (1 ei, 2 eieren, 1 schaaltje kwark, 1 glas melk, …).
-          Tapping zet de portiegrootte op gram en stelt het juiste aantal in.
-          Alleen voor per100g ingrediënten — meals (porties) volgen een eigen
-          schaal en hebben hier geen baat bij. */}
-      {isPer100g && (() => {
-        const cfg = findPortionConfig(item.name)
-        const presets = cfg?.presets || []
-        if (presets.length === 0) return null
-        const isPresetActive = (preset) =>
-          selectedServing.id === 'gram' && Math.abs(quantity - preset.grams) < 0.5
-        return (
-          <div style={{
-            padding: isMobile ? '0.625rem 1rem 0.75rem' : '0.75rem 1.5rem 0.875rem',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-          }}>
-            <div style={{
-              fontSize: '0.55rem', fontWeight: 800,
-              color: 'rgba(255,255,255,0.35)',
-              letterSpacing: '0.06em', textTransform: 'uppercase',
-              marginBottom: '0.4rem',
-            }}>
-              Snelle portie
-            </div>
-            <div style={{
-              display: 'flex', gap: '0.4rem',
-              flexWrap: 'wrap',
-              paddingBottom: 2,
-            }}>
-              {presets.map((p, i) => {
-                const active = isPresetActive(p)
-                return (
-                  <button
-                    key={`${p.label}-${i}`}
-                    onClick={() => {
-                      // Force gram-serving (id 'gram', grams 1) so quantity = grams.
-                      const gramOpt = gramOptions.find(o => o.id === 'gram') || gramOptions[0]
-                      setSelectedServing(gramOpt)
-                      setQuantity(p.grams)
-                      // Pas de per-100g basis aan als de preset een eigen
-                      // macro-profiel heeft (bv. eigeel/eiwit los), anders
-                      // val terug op de standaard item-macros.
-                      setBaseMacrosOverride(p.override || null)
-                      if (navigator.vibrate) navigator.vibrate(15)
-                    }}
-                    style={{
-                      padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.8rem',
-                      background: active ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.1)'}`,
-                      borderRadius: 999,
-                      color: active ? '#fff' : 'rgba(255,255,255,0.6)',
-                      fontSize: isMobile ? '0.72rem' : '0.78rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      whiteSpace: 'nowrap',
-                      minHeight: 30,
-                    }}
-                  >
-                    {p.label}
-                    <span style={{
-                      marginLeft: 4, opacity: 0.55,
-                      fontSize: isMobile ? '0.62rem' : '0.68rem',
-                      fontWeight: 600,
-                    }}>
-                      · {p.grams}{cfg.displayUnit === 'ml' ? 'ml' : 'g'}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+      {/* Hoeveelheid: groot getal met − en + */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 18 : 26, marginTop: isMobile ? '1.4rem' : '1.75rem' }}>
+        <button aria-label="Minder" style={plusMin}
+          onClick={() => kies(() => setQuantity(q => Math.max(stap, Math.round((q - stap) * 100) / 100)))}>−</button>
+        <button onClick={() => setShowQuantityPicker(true)} style={{
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+          minWidth: 120, textAlign: 'center',
+        }}>
+          <div style={{ fontSize: isMobile ? '3.2rem' : '3.6rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {displayQuantity(quantity)}
           </div>
-        )
-      })()}
-
-      {/* Maaltijd */}
-      <Row label="Maaltijd">
-        <div style={{ position: 'relative' }}>
-          <DropdownBtn
-            label={currentMealLabel}
-            onClick={() => setShowMealDropdown(!showMealDropdown)}
-            active={showMealDropdown}
-          />
-          {showMealDropdown && (
-            <DropdownMenu
-              options={MEAL_MOMENTS}
-              selected={mealMoment}
-              onSelect={(opt) => { setMealMoment(opt.id); setShowMealDropdown(false) }}
-              onClose={() => setShowMealDropdown(false)}
-            />
-          )}
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+            {eenheidTekst}
+          </div>
+        </button>
+        <button aria-label="Meer" style={plusMin}
+          onClick={() => kies(() => setQuantity(q => Math.round((q + stap) * 100) / 100))}>+</button>
+      </div>
+      {(gramStand && stuk && quantity > 0) || (!gramStand && isPer100g) ? (
+        <div style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
+          {gramStand ? stukTekst(quantity, stuk) : `${Math.round(totalGrams)} gram`}
         </div>
-      </Row>
+      ) : null}
 
-      {/* Macro's in vier vakjes, zoals in de andere voedingsschermen. De
-          donut liet percentages zien terwijl je hier op de getallen let. */}
+      {/* Snelle porties */}
+      {isPer100g && (presets.length > 0 || gramChips.length > 0) && (
+        <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
+          <div style={kopje}>Snelle portie</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', padding: '0 1rem' }}>
+            {presets.map((p, i) => {
+              const aan = gramStand && Math.abs(quantity - p.grams) < 0.5
+              return (
+                <button key={`p${i}`} style={chip(aan)} onClick={() => kies(() => {
+                  setSelectedServing(gramOpt); setQuantity(p.grams); setBaseMacrosOverride(p.override || null)
+                })}>
+                  {p.label}<span style={{ opacity: 0.55, fontWeight: 700 }}> · {p.grams}{cfg?.displayUnit === 'ml' ? 'ml' : 'g'}</span>
+                </button>
+              )
+            })}
+            {gramChips.map(g => (
+              <button key={`g${g}`} style={chip(gramStand && quantity === g)} onClick={() => kies(() => zetGram(g))}>
+                {g} g
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Moment */}
+      <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
+        <div style={kopje}>Moment</div>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', padding: '0 1rem' }}>
+          {MEAL_MOMENTS.map(m => (
+            <button key={m.id} style={chip(mealMoment === m.id)} onClick={() => kies(() => setMealMoment(m.id))}>
+              {m.kort || m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Macro's: vier getallen, geen vakken */}
       <div style={{
-        display: 'flex', gap: '0.5rem',
-        padding: isMobile ? '1rem' : '1.25rem 1.5rem',
+        display: 'flex', justifyContent: 'center', gap: isMobile ? 22 : 34,
+        margin: isMobile ? '1.5rem 1rem 1.25rem' : '1.75rem 1.5rem 1.5rem',
+        paddingTop: isMobile ? '1.1rem' : '1.25rem', borderTop: '1px solid rgba(255,255,255,0.07)',
       }}>
         {[
-          { label: 'kcal', waarde: macros.calories },
-          { label: 'eiwit', waarde: `${macros.protein}g` },
-          { label: 'koolh', waarde: `${macros.carbs}g` },
-          { label: 'vet', waarde: `${macros.fat}g` },
+          { label: 'kcal', waarde: macros.calories, kleur: '#10b981' },
+          { label: 'eiwit', waarde: `${Math.round(macros.protein)}g`, kleur: '#3b82f6' },
+          { label: 'koolh', waarde: `${Math.round(macros.carbs)}g`, kleur: '#ec4899' },
+          { label: 'vet', waarde: `${Math.round(macros.fat)}g`, kleur: '#f59e0b' },
         ].map(m => (
-          <div key={m.label} style={{
-            flex: 1, minWidth: 0, textAlign: 'center',
-            padding: '0.6rem 0.25rem',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
-          }}>
-            <div style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>
+          <div key={m.label} style={{ textAlign: 'center', minWidth: 0 }}>
+            <div style={{ fontSize: isMobile ? '1.3rem' : '1.45rem', fontWeight: 900, color: '#fff', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
               {m.waarde}
             </div>
-            <div style={{
-              fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
-              textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2,
-            }}>
-              {m.label}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 4, fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.kleur }} />{m.label}
             </div>
           </div>
         ))}
