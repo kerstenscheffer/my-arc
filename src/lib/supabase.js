@@ -16,15 +16,18 @@ if (!supabaseUrl || !supabaseKey) {
 // een uur plat). Nu geeft een vraag na 30 s een fout, zodat het scherm iets
 // kan tonen. Leesvragen (GET) krijgen bij een netwerkfout, time-out of 502/
 // 503/504 één tweede poging; schrijfvragen niet, die kunnen al gelukt zijn.
-// Alleen /rest/v1 (tabellen en rpc); inloggen, opslag en functies blijven
-// zoals ze waren.
+// /rest/v1 (tabellen en rpc) en /auth/v1 (alleen de tijdslimiet); opslag
+// en functies blijven zoals ze waren.
 const TIJDSLIMIET_MS = 30000
 const wacht = (ms) => new Promise(r => setTimeout(r, ms))
 const fetchMetLimiet = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input?.url || ''
-  if (!url.includes('/rest/v1/')) return fetch(input, init)
+  // Inloggen/verversen van de sessie: ook een limiet (geen herkansing, dat
+  // doet auth-js zelf). Hing dat verzoek, dan wachtte elke databasevraag mee.
+  const isAuth = url.includes('/auth/v1/')
+  if (!url.includes('/rest/v1/') && !isAuth) return fetch(input, init)
   const methode = String(init.method || 'GET').toUpperCase()
-  const pogingen = methode === 'GET' || methode === 'HEAD' ? 2 : 1
+  const pogingen = !isAuth && (methode === 'GET' || methode === 'HEAD') ? 2 : 1
   const extern = init.signal
   for (let poging = 1; ; poging++) {
     const ctrl = new AbortController()
