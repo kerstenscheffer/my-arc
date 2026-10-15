@@ -2,7 +2,7 @@
 // 🎯 v7.0 — Geeft amount + per_unit door bij onLog zodat re-open op juiste portie kan
 // Behoudt MFP scroll picker + dropdown UI
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
 import { resolveFoodImage } from '../../foodImageFallback'
 import { Check } from 'lucide-react'
@@ -10,148 +10,83 @@ import { findPortionConfig, stukVan, stukTekst } from './portionPresets'
 import GramInvoer from '../GramInvoer'
 
 // ═══════════════════════════════════════════
-// SCROLL PICKER MODAL (MFP style)
+// HOEVEELHEID INTYPEN (15 okt 2026; was een draaiwiel met breuken)
 // ═══════════════════════════════════════════
+// Eén groot invoerveld met het numerieke toetsenbord. Bij porties staan er
+// knopjes voor halve en kwart porties; bij grammen niet, die tik je in.
 
-function ScrollPickerModal({ value, onConfirm, onClose, isMobile }) {
-  const wholeRef = useRef(null)
-  const fracRef = useRef(null)
-
-  const initWhole = Math.floor(value)
-  const initFrac = value - initWhole
-
-  const [whole, setWhole] = useState(initWhole)
-  const [fracIndex, setFracIndex] = useState(0)
-
-  const fractions = [
-    { label: '-', value: 0 },
-    { label: '⅛', value: 0.125 },
-    { label: '¼', value: 0.25 },
-    { label: '⅓', value: 0.333 },
-    { label: '½', value: 0.5 },
-    { label: '⅔', value: 0.667 },
-    { label: '¾', value: 0.75 }
-  ]
-
-  useEffect(() => {
-    const closest = fractions.reduce((prev, curr, idx) =>
-      Math.abs(curr.value - initFrac) < Math.abs(fractions[prev].value - initFrac) ? idx : prev, 0)
-    setFracIndex(closest)
-  }, [])
-
-  useEffect(() => {
-    const itemH = 48
-    if (wholeRef.current) {
-      wholeRef.current.scrollTop = whole * itemH - (wholeRef.current.clientHeight / 2) + (itemH / 2)
-    }
-    if (fracRef.current) {
-      fracRef.current.scrollTop = fracIndex * itemH - (fracRef.current.clientHeight / 2) + (itemH / 2)
-    }
-  }, [])
-
-  const wholeNumbers = Array.from({ length: 1000 }, (_, i) => i)
-
-  const combined = whole + fractions[fracIndex].value
-  const displayValue = fractions[fracIndex].value > 0
-    ? `${whole > 0 ? whole : ''}${fractions[fracIndex].label}`
-    : `${whole}`
+function HoeveelheidInvoer({ value, eenheid, porties = false, onConfirm, onClose, isMobile }) {
+  const [tekst, setTekst] = useState(String(value ?? ''))
+  const getal = parseFloat(String(tekst).replace(',', '.'))
+  const geldig = Number.isFinite(getal) && getal > 0
+  const bevestig = () => { if (geldig) onConfirm(Math.round(getal * 100) / 100) }
+  const snel = porties ? [0.25, 0.5, 0.75, 1, 1.5, 2] : []
+  const breuk = (v) => ({ 0.25: '¼', 0.5: '½', 0.75: '¾', 1.5: '1½' }[v] || String(v))
 
   return (
     <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.7)',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
       zIndex: 10010, display: 'flex', flexDirection: 'column',
-      justifyContent: 'flex-end', animation: 'apFadeIn 0.15s ease'
+      justifyContent: isMobile ? 'flex-end' : 'center', alignItems: 'center',
+      animation: 'apFadeIn 0.15s ease',
     }}>
+      <style>{'@keyframes apFadeIn { from { opacity: 0 } to { opacity: 1 } } @keyframes apSlideUp { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }'}</style>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: '#111', borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '16px 16px 0 0', overflow: 'hidden',
-        animation: 'apSlideUp 0.2s ease'
+        width: '100%', maxWidth: 440, background: '#0f0f0f',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: isMobile ? '20px 20px 0 0' : 20,
+        padding: isMobile ? '1.25rem 1rem calc(1.25rem + env(safe-area-inset-bottom, 0px))' : '1.5rem',
+        animation: 'apSlideUp 0.2s ease', textAlign: 'center',
       }}>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-        }}>
+        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>Hoeveelheid</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 8, margin: '1rem 0 0.25rem' }}>
+          <input
+            type="text" inputMode="decimal" autoFocus value={tekst}
+            onFocus={e => e.target.select()}
+            onChange={e => setTekst(e.target.value.replace(/[^0-9.,]/g, ''))}
+            onKeyDown={e => { if (e.key === 'Enter') bevestig() }}
+            style={{
+              width: `${Math.max(2, String(tekst).length + 0.5)}ch`, minWidth: '2.5ch', maxWidth: '70%',
+              background: 'none', border: 'none', outline: 'none', padding: 0,
+              color: '#fff', fontSize: '3.4rem', fontWeight: 900, letterSpacing: '-0.04em',
+              textAlign: 'center', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums',
+              borderBottom: '2px solid rgba(255,255,255,0.25)',
+            }}
+          />
+          <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>{eenheid}</span>
+        </div>
+        {snel.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.9rem' }}>
+            {snel.map(v => {
+              const aan = geldig && Math.abs(getal - v) < 0.01
+              return (
+                <button key={v} onClick={() => setTekst(String(v))} style={{
+                  minWidth: 46, minHeight: 38, padding: '0 0.7rem', borderRadius: 999,
+                  background: aan ? '#fff' : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                  color: aan ? '#0a0a0a' : '#fff', fontSize: '0.95rem', fontWeight: 900,
+                  fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation',
+                }}>{breuk(v)}</button>
+              )
+            })}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, marginTop: '1.25rem' }}>
           <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)',
-            fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '600',
-            cursor: 'pointer', touchAction: 'manipulation'
-          }}>
-            Annuleren
-          </button>
-          <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: '800', color: '#fff' }}>
-            {displayValue}
-          </div>
-          <button onClick={() => onConfirm(combined)} style={{
-            background: 'none', border: 'none', color: '#fff',
-            fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 900,
-            cursor: 'pointer', touchAction: 'manipulation'
-          }}>
-            OK
-          </button>
+            flex: 1, minHeight: 50, borderRadius: 14, background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.7)',
+            fontSize: '0.95rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+          }}>Annuleren</button>
+          <button onClick={bevestig} disabled={!geldig} style={{
+            flex: 2, minHeight: 50, borderRadius: 14, border: 'none',
+            background: '#fff', color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900,
+            fontFamily: 'inherit', cursor: geldig ? 'pointer' : 'default', opacity: geldig ? 1 : 0.4,
+          }}>Klaar</button>
         </div>
-
-        <div style={{
-          display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-          padding: '0.3rem 0'
-        }}>
-          <div style={{
-            flex: 1, textAlign: 'center', fontSize: '0.5rem', fontWeight: '700',
-            color: 'rgba(255, 255, 255, 0.2)', textTransform: 'uppercase', letterSpacing: '0.06em'
-          }}>Getal</div>
-          <div style={{
-            flex: 1, textAlign: 'center', fontSize: '0.5rem', fontWeight: '700',
-            color: 'rgba(255, 255, 255, 0.2)', textTransform: 'uppercase', letterSpacing: '0.06em'
-          }}>Breuk</div>
-        </div>
-
-        <div style={{ display: 'flex', height: isMobile ? '220px' : '260px' }}>
-          <div ref={wholeRef} style={{
-            flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-            borderRight: '1px solid rgba(255, 255, 255, 0.04)'
-          }}>
-            {wholeNumbers.map(n => (
-              <div key={n} onClick={() => { setWhole(n); if (navigator.vibrate) navigator.vibrate(8) }} style={{
-                height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: n === whole ? (isMobile ? '1.25rem' : '1.4rem') : (isMobile ? '0.85rem' : '0.95rem'),
-                fontWeight: n === whole ? '800' : '500',
-                color: n === whole ? '#fff' : 'rgba(255, 255, 255, 0.2)',
-                background: n === whole ? 'rgba(255, 215, 0, 0.06)' : 'transparent',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-              }}>{n}</div>
-            ))}
-          </div>
-
-          <div ref={fracRef} style={{
-            flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch'
-          }}>
-            {fractions.map((f, idx) => (
-              <div key={f.label} onClick={() => { setFracIndex(idx); if (navigator.vibrate) navigator.vibrate(8) }} style={{
-                height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: idx === fracIndex ? (isMobile ? '1.25rem' : '1.4rem') : (isMobile ? '0.85rem' : '0.95rem'),
-                fontWeight: idx === fracIndex ? '800' : '500',
-                color: idx === fracIndex ? '#fff' : 'rgba(255, 255, 255, 0.2)',
-                background: idx === fracIndex ? 'rgba(255, 215, 0, 0.06)' : 'transparent',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-              }}>{f.label}</div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ height: isMobile ? '1.5rem' : '0.5rem' }} />
       </div>
-
-      <style>{`
-        @keyframes apFadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes apSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-      `}</style>
     </div>
   )
 }
-
-// ═══════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════
 
 const MEAL_MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
@@ -708,8 +643,10 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
       </div>
 
       {showQuantityPicker && (
-        <ScrollPickerModal
+        <HoeveelheidInvoer
           value={quantity}
+          eenheid={eenheidTekst}
+          porties={!gramStand}
           onConfirm={(val) => { setQuantity(val); setShowQuantityPicker(false) }}
           onClose={() => setShowQuantityPicker(false)}
           isMobile={isMobile}
