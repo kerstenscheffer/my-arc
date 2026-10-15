@@ -517,13 +517,43 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
       {/* Moment */}
       <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
         <div style={kopje}>Moment</div>
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', padding: '0 1rem' }}>
-          {MEAL_MOMENTS.map(m => (
-            <button key={m.id} style={chip(mealMoment === m.id)} onClick={() => kies(() => setMealMoment(m.id))}>
-              {m.kort || m.label}
-            </button>
-          ))}
-        </div>
+        {/* Eén schuifbalk, zoals Zoeken / Scannen bovenin: het witte blokje
+            schuift naar het gekozen moment. */}
+        {(() => {
+          const idx = Math.max(0, MEAL_MOMENTS.findIndex(m => m.id === mealMoment))
+          const n = MEAL_MOMENTS.length
+          return (
+            <div style={{ padding: '0 1rem', display: 'flex', justifyContent: 'center' }}>
+              <div style={{
+                position: 'relative', display: 'flex', width: '100%', maxWidth: 420,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 999, padding: 3,
+              }}>
+                <div style={{
+                  position: 'absolute', top: 3, bottom: 3,
+                  left: `calc(3px + (100% - 6px) * ${idx / n})`, width: `calc((100% - 6px) / ${n})`,
+                  background: '#fff', borderRadius: 999,
+                  transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                }} />
+                {MEAL_MOMENTS.map(m => {
+                  const aan = mealMoment === m.id
+                  return (
+                    <button key={m.id} onClick={() => kies(() => setMealMoment(m.id))} style={{
+                      position: 'relative', zIndex: 1, flex: 1, minWidth: 0, minHeight: 38,
+                      background: 'transparent', border: 'none', borderRadius: 999,
+                      color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                      fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: aan ? 900 : 800,
+                      fontFamily: 'inherit', cursor: 'pointer', transition: 'color 0.15s ease',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      {m.kort || m.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Macro's: vier getallen, geen vakken */}
