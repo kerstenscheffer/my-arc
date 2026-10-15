@@ -138,10 +138,67 @@ export default function AppVersiesPaneel({ db }) {
 
       {melding && <div style={{ fontSize: 14, fontWeight: 700, color: melding.startsWith('Opslaan mislukt') ? '#ef4444' : '#22c55e' }}>{melding}</div>}
 
+      <LiveUpdates db={db} />
+
       <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', marginTop: 24, lineHeight: 1.5 }}>
         De versie van een build komt uit het Xcode-project (MARKETING_VERSION) en build.gradle (versionName).
         Houd die twee gelijk bij een release, anders klopt de vergelijking op één platform niet.
       </div>
+    </div>
+  )
+}
+
+// Live updates: webcode die zonder App Store-release naar de app gaat
+// (zie liveUpdate.js). Hier zie je wat er klaarstaat en zet je een bundel
+// uit als hij niet goed is.
+function LiveUpdates({ db }) {
+  const [lijst, setLijst] = useState(null)
+  const [bezig, setBezig] = useState(null)
+  const laad = () => db.supabase.from('app_live_bundle')
+    .select('id, version, min_native, notitie, actief, created_at')
+    .order('version', { ascending: false }).limit(10)
+    .then(({ data }) => setLijst(data || []), () => setLijst([]))
+  useEffect(() => { laad() }, [db]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const wissel = async (b) => {
+    setBezig(b.id)
+    await db.supabase.from('app_live_bundle').update({ actief: !b.actief }).eq('id', b.id).then(r => r, () => null)
+    setBezig(null)
+    laad()
+  }
+  const tijd = (iso) => { try { return new Date(iso).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
+
+  return (
+    <div style={{ marginTop: 8, marginBottom: 24 }}>
+      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Live updates</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: '#9ca3af', lineHeight: 1.5, marginBottom: 12 }}>
+        Nieuwe code die zonder App Store naar de app gaat. De app haalt de nieuwste actieve versie op en
+        schakelt over als de klant de app wegklikt. Uploaden: <code style={{ color: '#fff' }}>npm run live-update -- "notitie"</code>.
+      </div>
+      {lijst === null ? (
+        <div style={{ color: '#9ca3af', fontWeight: 700 }}>Laden…</div>
+      ) : lijst.length === 0 ? (
+        <div style={{ color: '#6b7280', fontWeight: 700 }}>Nog geen live updates.</div>
+      ) : lijst.map((b, i) => (
+        <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: b.actief ? '#fff' : '#6b7280' }}>
+              {tijd(b.created_at)}{i === 0 && b.actief ? ' · nieuwste' : ''}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', marginTop: 2 }}>
+              {b.notitie || 'Geen notitie'} · app {b.min_native}+
+            </div>
+          </div>
+          <button onClick={() => wissel(b)} disabled={bezig === b.id} style={{
+            minHeight: 36, padding: '0 14px', borderRadius: 10, fontFamily: 'inherit', cursor: 'pointer',
+            fontSize: 13, fontWeight: 800, opacity: bezig === b.id ? 0.5 : 1,
+            background: b.actief ? 'transparent' : '#fff', color: b.actief ? '#ef4444' : '#0a0a0a',
+            border: b.actief ? '1px solid rgba(239,68,68,0.5)' : 'none',
+          }}>
+            {b.actief ? 'Uitzetten' : 'Aanzetten'}
+          </button>
+        </div>
+      ))}
     </div>
   )
 }

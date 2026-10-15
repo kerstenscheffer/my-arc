@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "postinstall": "patch-package",
     "cap:sync": "npm run build && npx cap sync && node scripts/app-assets-opschonen.mjs",
-    "android:bundle": "npm run cap:sync && cd android && ./gradlew bundleRelease"
+    "android:bundle": "npm run cap:sync && cd android && ./gradlew bundleRelease",
+    "live-update": "node scripts/live-update.mjs"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",

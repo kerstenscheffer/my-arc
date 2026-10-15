@@ -27,6 +27,14 @@ if ('serviceWorker' in navigator) {
 
 installeerTerugknop()
 
+// Live updates in de native app (zie modules/app-update/liveUpdate.js). Na de
+// eerste render, zodat het opstarten er niet op wacht.
+setTimeout(() => {
+  Promise.all([import('./lib/supabase'), import('./modules/app-update/liveUpdate')])
+    .then(([{ supabase }, { startLiveUpdate }]) => startLiveUpdate(supabase))
+    .catch(e => console.warn('Live update start mislukt:', e?.message))
+}, 0)
+
 // Mount application
 const container = document.getElementById('root');
 const root = createRoot(container);

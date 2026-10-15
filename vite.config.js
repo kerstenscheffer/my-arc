@@ -46,6 +46,10 @@ export default defineConfig(({ command }) => ({
   define: {
     __APP_VERSIE__: JSON.stringify(marketingVersie()),
     __APP_VERSIE_ANDROID__: JSON.stringify(androidVersie()),
+    // Bouwtijd (UTC, JJJJMMDDUUMM) = de versie van deze webbundel voor live
+    // updates. scripts/live-update.mjs zet BUILD_TIJD zodat de zip en de rij
+    // in app_live_bundle hetzelfde getal dragen.
+    __BUILD_TIJD__: JSON.stringify(process.env.BUILD_TIJD || new Date().toISOString().replace(/\D/g, '').slice(0, 12)),
   },
   build: {
     minify: 'esbuild',
