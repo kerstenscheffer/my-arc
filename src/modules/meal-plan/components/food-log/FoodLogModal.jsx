@@ -2,13 +2,14 @@
 // 🎯 v3.1 — Edit flow race fix: useEffect deps gefixt + diagnostic log
 import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ArrowLeft, Check, AlertCircle, Star, Apple, UtensilsCrossed, ChefHat } from 'lucide-react'
+import { X, ArrowLeft, AlertCircle, Star, Apple, UtensilsCrossed, ChefHat } from 'lucide-react'
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
 import MyMealsTab from './MyMealsTab'
 import ScanTab from './ScanTab'
 import FotoTab from './FotoTab'
+import GelogdAnimatie from './GelogdAnimatie'
 import AmountPicker from './AmountPicker'
 import SmartLoggingService from './SmartLoggingService'
 import IngredientFeedbackModal from './IngredientFeedbackModal'
@@ -250,23 +251,16 @@ export default function FoodLogModal({
           alignItems: 'center', justifyContent: 'center',
           animation: 'flmFadeIn 0.2s ease'
         }}>
-          <div style={{
-            width: '64px', height: '64px', borderRadius: '50%',
-            background: 'rgba(16,185,129,0.15)',
-            border: '2px solid rgba(16,185,129,0.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: '1rem',
-            animation: 'flmPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
-          }}>
-            <Check size={28} color="#10b981" strokeWidth={3} />
+          <div style={{ marginBottom: '1.25rem' }}>
+            <GelogdAnimatie grootte={isMobile ? 104 : 120} />
           </div>
-          <div style={{ fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>
+          <div style={{ fontSize: isMobile ? '1.5rem' : '1.7rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', marginBottom: '0.3rem', animation: 'flmFadeIn 0.3s ease 0.35s both' }}>
             {successData.isEdit ? 'Bijgewerkt!' : 'Gelogd!'}
           </div>
-          <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', color: 'rgba(255, 255, 255, 0.5)', textAlign: 'center', maxWidth: '250px' }}>
+          <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.55)', textAlign: 'center', maxWidth: '260px', animation: 'flmFadeIn 0.3s ease 0.45s both' }}>
             {successData.name}
           </div>
-          <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', color: '#fff', fontWeight: 900, marginTop: '0.375rem' }}>
+          <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', color: '#fff', fontWeight: 900, marginTop: '0.5rem', animation: 'flmFadeIn 0.3s ease 0.55s both' }}>
             +{successData.calories} kcal → {MOMENT_LABELS[successData.meal_type] || 'Gelogd'}
           </div>
         </div>
