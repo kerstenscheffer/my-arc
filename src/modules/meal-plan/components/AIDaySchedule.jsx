@@ -679,14 +679,23 @@ export default function AIDaySchedule({
       // De plan_check-rij weghalen. Blijft die staan, dan blijft MacroHero de
       // calorieën tellen en zet het herstel-effect het vinkje bij de volgende
       // render gewoon weer aan.
-      const mealIds = idsVan(meal)
-      const mealId = mealIds[0]
+      // Staat dezelfde maaltijd vandaag nog op een ander, afgerond moment
+      // (bv. twee keer dezelfde snack)? Dan op id verwijderen, anders gaan
+      // beide weg.
+      const ookElders = displayMeals.some(dm => dm.slot !== meal.slot && checkedMeals[dm.slot]
+        && idsVan(dm).some(i => idsVan(meal).includes(i)))
+      const mealIds = ookElders ? [] : idsVan(meal)
+      const mealId = idsVan(meal)[0]
       const planCheckRecord = mealId
-        ? consumedMeals.find(m => m.source === 'plan_check' && mealIds.includes(m.meal_id))
+        ? consumedMeals.find(m => m.source === 'plan_check' && idsVan(meal).includes(m.meal_id))
         : consumedMeals.find(m => m.source === 'plan_check' && m.meal_type === meal.slot?.replace(/\d+$/, ''))
 
       if (db?.supabase) {
-        if (planCheckRecord) setConsumedMeals(prev => prev.filter(m => m.id !== planCheckRecord.id))
+        // Alle afgerond-rijen van deze maaltijd uit de lokale lijst, niet één
+        // op id: die lijst kan intussen herladen zijn met een oude rij erin.
+        setConsumedMeals(prev => prev.filter(m => !(m.source === 'plan_check' && (
+          (planCheckRecord && m.id === planCheckRecord.id) || (mealIds.length && mealIds.includes(m.meal_id))
+        ))))
 
         // Op id als we 'm kennen, anders op de maaltijd binnen deze dag. Dat
         // tweede pad is er voor de klik die net te snel komt: dan is de rij al
@@ -699,9 +708,15 @@ export default function AIDaySchedule({
           .eq('source', 'plan_check')
           .gte('consumed_at', vanaf)
           .lt('consumed_at', tot)
-        vraag = planCheckRecord
-          ? vraag.eq('id', planCheckRecord.id)
-          : (mealId ? vraag.in('meal_id', mealIds) : vraag.eq('meal_type', meal.slot?.replace(/\d+$/, '')))
+        // Op maaltijd binnen deze dag, niet op één id. Op id ging het mis bij
+        // de tweede keer: de lokale lijst was herladen terwijl het eerste
+        // verwijderen nog liep, gaf het id van de al verwijderde rij, en de
+        // nieuwe bleef staan (15 okt 2026, gezien in de API-logs).
+        vraag = mealIds.length
+          ? vraag.in('meal_id', mealIds)
+          : planCheckRecord
+            ? vraag.eq('id', planCheckRecord.id)
+            : vraag.eq('meal_type', meal.slot?.replace(/\d+$/, ''))
 
         vraag.then(({ error }) => {
           // Rond: het herstel-effect mag deze slot weer normaal behandelen.
