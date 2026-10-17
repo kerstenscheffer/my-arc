@@ -2238,7 +2238,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         callScheduled: { count: 0, happenedCount: 0, leads: [] },
         callBooked:    { count: 0, leads: [] },
         callHeld:      { count: 0, leads: [] },
-        sale:          { count: 0, leads: [], omzet: 0, toegezegd: 0 },
+        sale:          { count: 0, leads: [], omzet: 0, toegezegd: 0, posten: [] },
         noShow:        { count: 0, leads: [] },
         callRejected:  { count: 0, leads: [], reasons: {} },
         saleLost:      { count: 0, leads: [], reasons: {} },
@@ -2303,6 +2303,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // Wat je wél verkocht maar nog niet ontving: de ja's die op betaling
         // wachten. Apart geteld, zodat je ziet wat er nog op te halen valt.
         if (mov.order_value != null && !geldBinnen) funnel.sale.toegezegd += Number(mov.order_value) || 0
+        // De losse sales achter Orderwaarde en Toegezegd, voor het uitlegvenster.
+        if (mov.order_value != null && funnel.sale.posten) {
+          funnel.sale.posten.push({ naam: mov.lead_name || 'Onbekend', bedrag: Number(mov.order_value) || 0, datum: mov.moved_at, binnen: geldBinnen })
+        }
         const leadInfo = {
           id: mov.id,  // movement-id → nodig om deze stat-regel terug te kunnen draaien
           leadId: mov.lead_id,
@@ -2472,7 +2476,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
         callBooked: { count: 0, leads: [] },
         callHeld: { count: 0, leads: [] },
-        sale: { count: 0, leads: [], omzet: 0, toegezegd: 0 }, noShow: { count: 0, leads: [] },
+        sale: { count: 0, leads: [], omzet: 0, toegezegd: 0, posten: [] }, noShow: { count: 0, leads: [] },
         callRejected: { count: 0, leads: [], reasons: {} },
         saleLost: { count: 0, leads: [], reasons: {} },
         notSuitable: { count: 0, leads: [] },
@@ -2724,6 +2728,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       return {
         bedrag: regels.reduce((som, r) => som + (Number(r.bedrag) || 0), 0),
         aantal: regels.length,
+        // De losse betalingen, voor het uitlegvenster bij Binnengekomen.
+        posten: regels.map(r => ({ naam: r.lead_name || 'Onbekend', bedrag: Number(r.bedrag) || 0, datum: r.datum, soort: r.soort || null })),
         // Wat er in dit venster nog moet komen; handig voor de tooltip.
         verwacht: (data || []).filter(r => r.komt_nog)
           .reduce((som, r) => som + (Number(r.bedrag) || 0), 0),

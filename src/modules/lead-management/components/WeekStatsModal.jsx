@@ -118,6 +118,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // datumvelden en doet anchorDate niet mee).
   const [periodMode, setPeriodMode] = useState('week')
   const [periodeMenu, setPeriodeMenu] = useState(false)
+  // Welk getal z'n uitlegvenster open heeft (klik op een stat).
+  const [uitlegStat, setUitlegStat] = useState(null)
   const [anchorDate, setAnchorDate] = useState(() => new Date())
   // Handmatige periode. Start op deze maand, zodat er meteen iets staat als je
   // 'm kiest in plaats van een leeg scherm.
@@ -216,7 +218,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     return () => { alive = false }
   }, [isOpen, coachId, leadService])
   // Welke funnel-stap staat open in de drill-down (voor terugdraaien/verwijderen).
-  const [drillStage, setDrillStage] = useState(null)
   // Welke onderste secties (grafiek/calls/campagnes/bron/verplaatsingen) open
   // staan — bediend via de vierkante tab-vakjes op één rij.
   const [openTabs, setOpenTabs] = useState({})
@@ -909,6 +910,82 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           </div>
         </div>
 
+        {uitlegStat && (() => {
+          const it = uitlegStat
+          const eurS = (n) => '€' + Math.round(Number(n) || 0).toLocaleString('nl-NL')
+          const dag = (d) => { try { return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) } catch { return '' } }
+          const posten = it.label === 'Orderwaarde' ? (funnel?.sale?.posten || []).filter(p => p.binnen)
+            : it.label === 'Toegezegd' ? (funnel?.sale?.posten || []).filter(p => !p.binnen)
+            : it.label === 'Binnengekomen' ? (cash?.posten || [])
+            : null
+          return (
+            <div onClick={(e) => { if (e.target === e.currentTarget) setUitlegStat(null) }} style={{
+              position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.8)',
+              display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem',
+            }}>
+              <div style={{
+                width: '100%', maxWidth: 620, maxHeight: isMobile ? '92vh' : '86vh', background: '#0a0a0a',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: isMobile ? '18px 18px 0 0' : 18,
+                display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '1rem 1.1rem 0.8rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <it.Icon size={20} color={it.color} strokeWidth={2.6} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 900 }}>{it.label} · {it.value}</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{periodeBereik}{it.sub ? ` · ${it.sub}` : ''}</div>
+                  </div>
+                  <button onClick={() => setUitlegStat(null)} aria-label="Sluiten" style={{
+                    width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: 'none', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}><X size={18} strokeWidth={2.8} /></button>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '0.9rem 1.1rem calc(1.2rem + env(safe-area-inset-bottom, 0px))' }}>
+                  {it.info && (
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                      <b style={{ color: '#fff' }}>Hoe berekend:</b> {it.info}
+                    </div>
+                  )}
+                  {it.stage && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <DrillPanel
+                        leads={funnel?.[it.stage]?.leads}
+                        accent={STAGE_ACCENT[it.stage]}
+                        reasons={it.stage === 'callRejected' ? funnel?.callRejected?.reasons : it.stage === 'saleLost' ? funnel?.saleLost?.reasons : null}
+                        onVraag={setBevestig} revertingId={revertingId} deletingId={deletingId}
+                        statLabel={it.label}
+                      />
+                    </div>
+                  )}
+                  {posten && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 900, marginBottom: 4 }}>
+                        <span>{posten.length} {it.label === 'Binnengekomen' ? 'betalingen' : 'sales'}</span>
+                        <span>{eurS(posten.reduce((t, p) => t + p.bedrag, 0))}</span>
+                      </div>
+                      {posten.length === 0 ? (
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Niets in deze periode.</div>
+                      ) : posten.slice().sort((a, b) => new Date(b.datum) - new Date(a.datum)).map((p, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.naam}</span>
+                            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{[dag(p.datum), p.soort].filter(Boolean).join(' · ')}</span>
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{eurS(p.bedrag)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!it.stage && !posten && (
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: '0.9rem' }}>
+                      Dit is een telling, geen lijst van leads.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Body */}
         <div style={{
           flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
@@ -1132,20 +1209,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   {/* Aantallen — strakke rij zoals de stats-bar (klik funnel-stap
                       voor de drill-down met terugdraaien/verwijderen). */}
                   <SectionTitle icon={<BarChart3 size={13} color={GOLD} />} title="Aantallen" />
-                  <StatFlow items={countItems} activeStage={drillStage} onToggle={(st) => setDrillStage(prev => prev === st ? null : st)} />
-                  {drillStage && (
-                    <DrillPanel
-                      leads={funnel?.[drillStage]?.leads}
-                      accent={STAGE_ACCENT[drillStage]}
-                      reasons={drillStage === 'callRejected' ? funnel?.callRejected?.reasons : drillStage === 'saleLost' ? funnel?.saleLost?.reasons : null}
-                      onVraag={setBevestig} revertingId={revertingId} deletingId={deletingId}
-                      statLabel={countItems.find(it => it.stage === drillStage)?.label || ''}
-                    />
-                  )}
+                  <StatFlow items={countItems} onKies={setUitlegStat} />
 
                   {/* Percentages — tweede strakke rij. */}
                   <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
-                  <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
+                  <StatFlow items={pctItems} onKies={setUitlegStat} />
 
                   {/* Waar komen leads en omzet vandaan; getallen klikbaar. */}
                   <div style={{ marginTop: '1.5rem' }}>
@@ -2079,55 +2147,32 @@ function CampaignStatCard({ campaign: c, isMobile, onVraag, revertingId, deletin
   )
 }
 
-function StatFlow({ items, activeStage, onToggle }) {
-  // Welke stat z'n uitleg-box getoond wordt (klik op het ⓘ-icoon).
-  const [openInfo, setOpenInfo] = useState(null)
-  const active = openInfo != null ? items.find(x => x.label === openInfo) : null
+function StatFlow({ items, onKies, activeStage = null, onToggle = null }) {
+  // Elk getal is klikbaar (17 okt 2026): het opent een venster met de uitleg
+  // en de leads of betalingen erachter. De ⓘ-knopjes en de uitklaplijst
+  // eronder zijn daarmee vervallen.
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 8px' }}>
-        {items.map(it => {
-          const clickable = !!it.stage
-          const on = clickable && activeStage === it.stage
-          const infoOn = openInfo === it.label
-          return (
-            <div key={it.label} style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
-              <div onClick={clickable ? () => onToggle(it.stage) : undefined} title={it.label}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: clickable ? 'pointer' : 'default' }}>
-                <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{it.value}</span>
-                {clickable && <ChevronDown size={12} color={on ? '#FFD700' : 'rgba(255,255,255,0.35)'} style={{ transform: on ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
-              </div>
-              {/* Titel + ⓘ-uitlegknop. */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <span style={{ fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: on ? '#FFD700' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>{it.label}</span>
-                {it.info && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setOpenInfo(p => p === it.label ? null : it.label) }}
-                    title="Wat betekent dit?"
-                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, width: 13, height: 13, borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: infoOn ? '#FFD700' : 'rgba(255,255,255,0.3)', flexShrink: 0 }}
-                  >
-                    <Info size={11} />
-                  </button>
-                )}
-              </div>
-              {/* Echte breuk onder een percentage (bv. "45 van 310"). */}
-              {it.sub && <span style={{ fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255,255,255,0.28)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{it.sub}</span>}
-            </div>
-          )
-        })}
-      </div>
-      {/* Uitleg-box — verschijnt onder de rij bij klik op ⓘ. */}
-      {active && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, margin: '0 0 0.7rem', padding: '0.5rem 0.65rem', background: `${active.color}12`, border: `1px solid ${active.color}33`, borderRadius: 8 }}>
-          <Info size={13} color={active.color} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#fff', marginBottom: 1 }}>{active.label}{active.sub ? ` · ${active.sub}` : ''}</div>
-            <div style={{ fontSize: '0.66rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>{active.info}</div>
-          </div>
-          <button onClick={() => setOpenInfo(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 2, flexShrink: 0 }}><X size={12} /></button>
-        </div>
-      )}
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 8px' }}>
+      {items.map(it => {
+        // Bovenin de modal: elk getal opent het uitlegvenster (onKies). In de
+        // bron-/campagnerijen werkt het nog als uitklap per stap (onToggle).
+        const klik = onKies ? () => onKies(it) : (it.stage && onToggle ? () => onToggle(it.stage) : null)
+        const aan = !onKies && it.stage && activeStage === it.stage
+        return (
+        <button key={it.label} onClick={klik || undefined} disabled={!klik} title={onKies ? `${it.label}: hoe is dit berekend?` : it.label} style={{
+          display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0, background: 'none', border: 'none', padding: 0,
+          textAlign: 'left', color: '#fff', fontFamily: 'inherit', cursor: klik ? 'pointer' : 'default',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, borderBottom: klik ? '1.5px dotted rgba(255,255,255,0.25)' : 'none', paddingBottom: 1 }}>{it.value}</span>
+          </span>
+          <span style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: aan ? '#FFD700' : 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>{it.label}</span>
+          {it.sub && <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{it.sub}</span>}
+        </button>
+        )
+      })}
     </div>
   )
 }
