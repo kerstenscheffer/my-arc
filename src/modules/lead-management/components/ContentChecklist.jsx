@@ -9,7 +9,7 @@
 // gesplitst (content_metricool_posts): staat er Reageer "WOORD" in de caption,
 // dan is het een magnet, anders een gewone reel.
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Clapperboard, Image, Circle, Magnet, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clapperboard, Image, Circle, Magnet, Check, Youtube } from 'lucide-react'
 import { Venster, VensterKop } from '../../../components/arc-ui'
 
 const SOORTEN = [
@@ -17,7 +17,14 @@ const SOORTEN = [
   { id: 'foto', label: 'Foto', Icon: Image, kleur: '#3b82f6', doel: 1 },
   { id: 'story', label: 'Stories', Icon: Circle, kleur: '#E1306C', doel: 3 },
   { id: 'magnet', label: 'Magnets', Icon: Magnet, kleur: '#a855f7', doel: 8 },
+  // Weekdoel: je vinkt de dag aan waarop hij online ging; de hele week kleurt
+  // mee zodra het doel gehaald is. Telt niet mee in de dagring. Metricool
+  // ziet geen verschil tussen shorts en een lange video, dus altijd zelf.
+  { id: 'youtube', label: 'YouTube', Icon: Youtube, kleur: '#ff0033', doel: 1, week: true },
 ]
+const maandagVan = (dag) => { const d = new Date(dag + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return dagStr(d) }
+const weekDagen = (dag) => { const m = new Date(maandagVan(dag) + 'T12:00:00'); return Array.from({ length: 7 }, (_, i) => { const d = new Date(m); d.setDate(m.getDate() + i); return dagStr(d) }) }
+const weekSom = (dag, soort, telling) => weekDagen(dag).reduce((t, d) => t + (telling[sleutel(d, soort)] || 0), 0)
 const GROEN = '#10b981'
 
 const dagStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -30,7 +37,7 @@ function dagScore(dag, telling, doelen) {
   let klaar = 0, totaal = 0
   for (const s of SOORTEN) {
     const doel = doelen[s.id] ?? s.doel
-    if (!doel) continue
+    if (!doel || s.week) continue
     totaal += doel
     klaar += Math.min(telling[sleutel(dag, s.id)] || 0, doel)
   }
@@ -63,8 +70,9 @@ function useContent(supabase, maand) {
 
   const laad = useCallback(async () => {
     if (!supabase) return
-    const van = dagStr(new Date(maand.getFullYear(), maand.getMonth(), 1))
-    const tot = dagStr(new Date(maand.getFullYear(), maand.getMonth() + 1, 0))
+    // Hele weken eromheen, zodat een weekdoel over de maandgrens klopt.
+    const van = maandagVan(dagStr(new Date(maand.getFullYear(), maand.getMonth(), 1)))
+    const tot = weekDagen(dagStr(new Date(maand.getFullYear(), maand.getMonth() + 1, 0)))[6]
     const [e, c, d, m, p] = await Promise.all([
       supabase.rpc('content_eigenaar'),
       supabase.from('content_checklist').select('dag, soort, aantal').gte('dag', van).lte('dag', tot),
@@ -121,7 +129,7 @@ function useContent(supabase, maand) {
   }
   // Per post gesplitst: gewone reels en magnets. Dagen zonder postdata houden
   // het dagtotaal als reels en de zelf ingevulde magnets.
-  for (const [k, v] of Object.entries(telling)) if (k.endsWith('|magnet')) mcTelling[k] = v
+  for (const [k, v] of Object.entries(telling)) if (k.endsWith('|magnet') || k.endsWith('|youtube')) mcTelling[k] = v
   for (const [dag, lijst] of Object.entries(posts)) {
     mcTelling[sleutel(dag, 'reel')] = lijst.filter(x => x.soort === 'reel').length
     mcTelling[sleutel(dag, 'magnet')] = lijst.filter(x => x.soort === 'magnet').length
@@ -180,10 +188,11 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
 
   // Tik = één erbij; bij het doel weer naar nul.
   const tik = (dag, s) => {
-    if (isMc) { setDetailDag(dag === detailDag ? null : dag); return }
+    if (isMc && !s.week) { setDetailDag(dag === detailDag ? null : dag); return }
     if (!eigenaar) return
     const doel = doelen[s.id] ?? s.doel
     const nu = zelf[sleutel(dag, s.id)] || 0
+    if (s.week) { zetAantal(dag, s.id, nu > 0 ? 0 : 1); return }
     zetAantal(dag, s.id, nu >= Math.max(doel, 1) ? 0 : nu + 1)
   }
 
@@ -217,7 +226,9 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
             <div>
               <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>Vandaag</div>
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-                {SOORTEN.map(s => `${telling[sleutel(vandaag, s.id)] || 0}/${doelen[s.id] ?? s.doel} ${s.label.toLowerCase()}`).join(' · ')}
+                {SOORTEN.map(s => s.week
+                  ? `${weekSom(vandaag, s.id, telling)}/${doelen[s.id] ?? s.doel} ${s.label} deze week`
+                  : `${telling[sleutel(vandaag, s.id)] || 0}/${doelen[s.id] ?? s.doel} ${s.label.toLowerCase()}`).join(' · ')}
               </div>
             </div>
           </div>
@@ -228,6 +239,12 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
               <button style={pijl} onClick={() => setMaand(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}><ChevronRight size={18} strokeWidth={3} /></button>
             </div>
             <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>{Math.round(maandScore * 100)}% van de doelen gehaald</div>
+            {SOORTEN.filter(s => s.week).map(s => {
+              // Weken van deze maand die al begonnen zijn.
+              const weken = [...new Set(verstreken.map(maandagVan))]
+              const gehaald = weken.filter(m => weekSom(m, s.id, telling) >= (doelen[s.id] ?? s.doel)).length
+              return <div key={s.id} style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>{s.label}: {gehaald} van {weken.length} weken</div>
+            })}
           </div>
         </div>
 
@@ -266,7 +283,7 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
                         ) : (
                           <button onClick={() => setDoelBewerk(s.id)} title="Doel per dag aanpassen"
                             style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,0.45)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
-                            doel {doel}
+                            doel {doel}{s.week ? ' p/w' : ''}
                           </button>
                         )}
                       </div>
@@ -275,19 +292,22 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
                       const n = telling[sleutel(d, s.id)] || 0
                       const klaar = doel > 0 && n >= doel
                       const deels = n > 0 && !klaar
-                      const vast = isMc
+                      const vast = isMc && !s.week
+                      // Weekdoel: de dag zelf groen, de rest van een gehaalde week licht.
+                      const weekKlaar = s.week && doel > 0 && weekSom(d, s.id, telling) >= doel
                       return (
                         <td key={d} style={{ padding: 0 }}>
                           <button onClick={() => tik(d, s)} disabled={!eigenaar && !vast}
                             style={{
                               width: cel, height: cel, borderRadius: 8, padding: 0, fontFamily: 'inherit',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              background: klaar ? GROEN : deels ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.04)',
+                              background: s.week ? (n > 0 ? GROEN : weekKlaar ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.04)')
+                                : klaar ? GROEN : deels ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.04)',
                               border: d === vandaag ? '1.5px solid rgba(255,255,255,0.6)' : '1px solid rgba(255,255,255,0.07)',
                               color: '#fff', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer',
                               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                             }}>
-                            {vast ? (n || '') : klaar ? <Check size={15} strokeWidth={3.5} /> : deels ? `${n}/${doel}` : ''}
+                            {vast ? (n || '') : s.week ? (n > 0 ? <Check size={15} strokeWidth={3.5} /> : '') : klaar ? <Check size={15} strokeWidth={3.5} /> : deels ? `${n}/${doel}` : ''}
                           </button>
                         </td>
                       )
