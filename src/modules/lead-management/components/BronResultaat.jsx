@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Megaphone, Magnet, Send, HelpCircle, X } from 'lucide-react'
+import { Megaphone, Magnet, Send, HelpCircle, X, ChevronDown } from 'lucide-react'
 
 const SOORTEN = [
   { id: 'ads', label: 'Ads', Icon: Megaphone, kleur: '#f59e0b' },
@@ -21,6 +21,11 @@ const eur = (n) => '€' + Math.round(Number(n) || 0).toLocaleString('nl-NL')
 export default function BronResultaat({ supabase, van, tot, isMobile, periode }) {
   const [rijen, setRijen] = useState(null)
   const [uitleg, setUitleg] = useState(null) // { soort, naam, titel }
+  const [dicht, setDicht] = useState(() => { try { return localStorage.getItem('stats_bron_dicht') === '1' } catch { return false } })
+  const wissel = () => setDicht(d => {
+    try { localStorage.setItem('stats_bron_dicht', d ? '0' : '1') } catch { /* geen opslag */ }
+    return !d
+  })
 
   useEffect(() => {
     if (!supabase || !van || !tot) return
@@ -45,11 +50,19 @@ export default function BronResultaat({ supabase, van, tot, isMobile, periode })
 
   return (
     <div style={{ marginBottom: '1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>Waar komt het vandaan</div>
-        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>{eur(totaal)} orderwaarde</div>
-      </div>
+      <button onClick={wissel} style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: dicht ? 0 : 10,
+        background: 'none', border: 'none', padding: 0, color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+        cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.95rem', fontWeight: 900 }}>
+          Waar komt het vandaan
+          <ChevronDown size={16} strokeWidth={2.8} color="rgba(255,255,255,0.5)" style={{ transform: dicht ? 'rotate(-90deg)' : 'none', transition: 'transform 0.2s' }} />
+        </span>
+        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>{eur(totaal)} orderwaarde</span>
+      </button>
 
+      {!dicht && (<>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 4}, minmax(0, 1fr))`, gap: isMobile ? 14 : 24 }}>
         {perSoort.map(s => (
           <button key={s.id} onClick={() => setUitleg({ soort: s.id, naam: null, titel: s.label })} style={{
@@ -98,6 +111,7 @@ export default function BronResultaat({ supabase, van, tot, isMobile, periode })
           })}
         </div>
       )}
+      </>)}
 
       {uitleg && (
         <BronUitleg supabase={supabase} van={van} tot={tot} periode={periode} {...uitleg}
