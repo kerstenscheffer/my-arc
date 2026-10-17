@@ -117,6 +117,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // kwartaal, jaar, of een zelfgekozen periode ('custom', dan tellen de twee
   // datumvelden en doet anchorDate niet mee).
   const [periodMode, setPeriodMode] = useState('week')
+  const [periodeMenu, setPeriodeMenu] = useState(false)
   const [anchorDate, setAnchorDate] = useState(() => new Date())
   // Handmatige periode. Start op deze maand, zodat er meteen iets staat als je
   // 'm kiest in plaats van een leeg scherm.
@@ -760,87 +761,79 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           display: 'flex', flexDirection: 'column',
         }}
       >
-        {/* Header — titel, Dag/Week/Maand én de actie-knoppen op één regel */}
+        {/* Kop (17 okt 2026): in het midden ‹ periode ▾ ›, de periode zelf is
+            de keuze voor dag/week/maand/...; rechts de acties. Geen titel. */}
         <div style={{
-          flexShrink: 0,
-          padding: isMobile ? 'calc(0.9rem + env(safe-area-inset-top, 0px)) 1rem 0.8rem' : '1.1rem 1.5rem 0.9rem',
-          display: 'flex', alignItems: 'center', gap: 8,
+          flexShrink: 0, position: 'relative', zIndex: 5,
+          padding: isMobile ? 'calc(0.7rem + env(safe-area-inset-top, 0px)) 0.75rem 0.7rem' : '0.85rem 1.5rem 0.8rem',
+          display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 8,
           borderBottom: '1px solid rgba(255,255,255,0.08)',
-          background: 'rgba(10,10,10,0.94)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-          overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+          // Effen, geen blur: backdrop-filter maakt van de kop het kader voor
+          // position:fixed, en dan sluit het periode-menu niet bij tikken ernaast.
+          background: '#0a0a0a',
         }}>
-          <BarChart3 size={20} color="#fff" strokeWidth={2.8} style={{ flexShrink: 0 }} />
-          <div style={{ flexShrink: 0, color: '#fff', fontWeight: 900, fontSize: isMobile ? '1.05rem' : '1.25rem', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-            Stats
-          </div>
-          {/* Periode-keuze. Was een segment-rij met drie knoppen; met zes
-              periodes past dat niet meer op een telefoon, en een dropdown
-              houdt de kop rustig. */}
-          <select
-            value={periodMode}
-            onChange={(e) => setPeriodMode(e.target.value)}
-            style={{
-              flexShrink: 0, marginLeft: 10, minHeight: 38,
-              padding: '0 1.3rem 0 0',
-              backgroundColor: 'transparent',
-              border: 'none', borderRadius: 0,
-              color: '#fff', fontSize: isMobile ? '0.95rem' : '1.02rem', fontWeight: 900,
-              fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
-              appearance: 'none', WebkitAppearance: 'none',
-              // Eigen pijltje: zonder appearance:none tekent Safari een grijze
-              // knop die niet bij de rest past.
-              backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'><path d=\'M1 1l4 4 4-4\' stroke=\'white\' stroke-width=\'2\' fill=\'none\' stroke-linecap=\'round\'/></svg>")',
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 0.15rem center',
-            }}
-          >
-            {PERIODE_OPTIES.map(o => (
-              <option key={o.id} value={o.id} style={{ background: '#0a0a0a', color: '#fff' }}>{o.label}</option>
-            ))}
-          </select>
-
-          {/* Datumvelden, alleen bij een handmatige periode. Beide datums
-              tellen mee — kies je 1 t/m 30 sep, dan hoort 30 sep erbij. */}
-          {periodMode === 'custom' && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-              {[[customStart, setCustomStart], [customEnd, setCustomEnd]].map(([waarde, zet], i) => (
-                <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  {i === 1 && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.75rem' }}>–</span>}
-                  <input
-                    type="date" value={waarde} max={isoDatum(new Date())}
-                    onChange={(e) => zet(e.target.value)}
-                    style={{
-                      minHeight: 32, padding: '0 0.5rem',
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
-                      color: '#fff', fontSize: isMobile ? '0.7rem' : '0.74rem', fontWeight: 700,
-                      fontFamily: 'inherit', outline: 'none', colorScheme: 'dark',
-                    }}
-                  />
-                </span>
-              ))}
-            </div>
-          )}
-          {/* Pijlen direct naast de periode (17 okt 2026: was een losse balk). */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 6, flexShrink: 0 }}>
+          <div />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'center', minWidth: 0 }}>
             <button onClick={goPrev} disabled={isCustom} title={`Vorige ${periodeWoord}`} aria-label="Vorige" style={{
-              width: 34, height: 34, background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36, background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
               opacity: isCustom ? 0.3 : 1, cursor: isCustom ? 'not-allowed' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              <ChevronLeft size={19} strokeWidth={2.8} />
+              <ChevronLeft size={20} strokeWidth={2.8} />
             </button>
-            <div style={{ minWidth: 0, textAlign: 'center' }}>
-              <div style={{ fontSize: isMobile ? '0.88rem' : '0.98rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{periodeTitel}</div>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>{periodeBereik}</div>
+            <div style={{ position: 'relative', minWidth: 0 }}>
+              <button onClick={() => setPeriodeMenu(o => !o)} style={{
+                background: 'none', border: 'none', padding: '2px 6px', color: '#fff', fontFamily: 'inherit', cursor: 'pointer',
+                textAlign: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>
+                  {periodeTitel}
+                  <ChevronDown size={15} strokeWidth={3} style={{ opacity: 0.7, transform: periodeMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </span>
+                <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 1, whiteSpace: 'nowrap' }}>{periodeBereik}</span>
+              </button>
+              {periodeMenu && (
+                <>
+                  <div onClick={() => setPeriodeMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 30 }} />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)', zIndex: 31,
+                    minWidth: 180, background: '#141414', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
+                    padding: 4, boxShadow: '0 16px 40px rgba(0,0,0,0.7)',
+                  }}>
+                    {PERIODE_OPTIES.map(o => {
+                      const aan = periodMode === o.id
+                      return (
+                        <button key={o.id} onClick={() => { setPeriodMode(o.id); setPeriodeMenu(false) }} style={{
+                          display: 'block', width: '100%', height: 40, padding: '0 0.85rem', borderRadius: 10, textAlign: 'left',
+                          background: aan ? '#fff' : 'transparent', border: 'none', color: aan ? '#0a0a0a' : '#fff',
+                          fontSize: '0.9rem', fontWeight: aan ? 900 : 700, fontFamily: 'inherit', cursor: 'pointer',
+                        }}>{o.label}</button>
+                      )
+                    })}
+                    {periodMode === 'custom' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 6px 4px' }}>
+                        {[[customStart, setCustomStart], [customEnd, setCustomEnd]].map(([waarde, zet], i) => (
+                          <input key={i} type="date" value={waarde} max={isoDatum(new Date())}
+                            onChange={(e) => zet(e.target.value)}
+                            style={{
+                              flex: 1, minWidth: 0, minHeight: 34, padding: '0 0.4rem', background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff',
+                              fontSize: '0.75rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark',
+                            }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             <button onClick={goNext} title={`Volgende ${periodeWoord}`} aria-label="Volgende" disabled={isFuturePeriod} style={{
-              width: 34, height: 34, background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36, background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
               opacity: isFuturePeriod ? 0.3 : 1, cursor: isFuturePeriod ? 'not-allowed' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              <ChevronRight size={19} strokeWidth={2.8} />
+              <ChevronRight size={20} strokeWidth={2.8} />
             </button>
           </div>
-          <div style={{ flex: 1, minWidth: 8 }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: isMobile ? 0 : 4, minWidth: 0 }}>
           <button
             onClick={openRevenuePanel}
             title="Terugkerende omzet & cashflow"
@@ -913,6 +906,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           }}>
             <X size={19} strokeWidth={2.8} />
           </button>
+          </div>
         </div>
 
         {/* Body */}
