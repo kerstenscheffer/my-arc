@@ -19,6 +19,7 @@ import { Venster, VensterKop, VensterVoet, Knop } from '../../../components/arc-
 import GrowthChart from './GrowthChart'
 import OmzetScherm from './OmzetScherm'
 import BronResultaat from './BronResultaat'
+import StatWeekGrafiek from './StatWeekGrafiek'
 import { KPI_STATS, kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
 
 const GOLD = '#FFD700'
@@ -945,6 +946,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       <b style={{ color: '#fff' }}>Hoe berekend:</b> {it.info}
                     </div>
                   )}
+                  <StatWeekGrafiek leadService={leadService} coachId={coachId} label={it.label} eindDatum={end} isMobile={isMobile} />
                   {it.stage && (
                     <div style={{ marginTop: '1rem' }}>
                       <DrillPanel
