@@ -151,7 +151,8 @@ export default function StappenInsight({ db, client, isMobile, alleenDoel = fals
         </div>
       </div>
 
-      {!alleenDoel && koppeling && koppeling.stappen_status !== 'gekoppeld' && (
+      {/* Zonder melding maar mét stappen deze week loopt het gewoon. */}
+      {!alleenDoel && koppeling && koppeling.stappen_status !== 'gekoppeld' && !(koppeling.stappen_status == null && gelogd.length > 0) && (
         <StappenKoppeling koppeling={koppeling} gevraagd={gevraagd} onVraag={vraagOmStappen} />
       )}
 
