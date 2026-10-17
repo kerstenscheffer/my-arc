@@ -25,6 +25,7 @@ import {
   ArrowUpRight, ArrowDownRight, Gauge, Activity, MousePointerClick, Play, PenLine, ClipboardCheck,
   UserCheck, CalendarCheck, Sparkles,
 } from 'lucide-react'
+import PrequalAfhaken from './PrequalAfhaken'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const PERIODES = [
@@ -325,6 +326,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     return nieuw
   })
 
+  const [venster, setVenster] = useState(null)
   const laad = async () => {
     setLaden(true); setFout('')
     try {
@@ -342,6 +344,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         db.supabase.rpc('get_challenge_ad_daily', { p_van: van.toISOString(), p_tot: totEx.toISOString() }),
       ])
       if (nu.error) throw nu.error
+      setVenster({ van: van.toISOString(), tot: totEx.toISOString() })
       setRijen(nu.data || [])
       setVorigeRijen(vorig.error ? null : (vorig.data || []))
       setPerDag((dag.data || []).map(d => ({ ...d, dag: String(d.dag).slice(0, 10) })))
@@ -569,6 +572,9 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           )}
         </div>
       </div>
+
+      {/* ═══ Afhaken per vraag + wie afhaakte na zijn nummer ═══ */}
+      <PrequalAfhaken venster={venster} m={m} />
 
       {/* ═══ RIJ 4: advertenties ═══ */}
       <div style={{ ...kaart, marginBottom: m ? 28 : 40 }}>

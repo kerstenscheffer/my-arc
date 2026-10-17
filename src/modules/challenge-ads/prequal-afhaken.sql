@@ -1,0 +1,10 @@
+-- Prekwalificatie: voortgang en afhaken per vraag (17 okt 2026). Staat in de
+-- DB als migratie prequal_voortgang_en_afhaken.
+--   challenge_prequal_voortgang  per sessie: voornaam, telefoon, e-mail,
+--                                laatste_vraag, lead_id (gevuld bij indienen)
+--   save_prequal_voortgang(...)  anon, vanuit het formulier na elke vraag
+--                                zodra er een telefoon + akkoord is
+--   get_prequal_afhaken(van,tot) coach: per vraag gezien/beantwoord/afgewezen
+--                                uit challenge_events (form_vraag, form_stap,
+--                                form_klaar met meta.vraag)
+--   get_prequal_onafgemaakt(...) coach: wel nummer, geen ingediend formulier
