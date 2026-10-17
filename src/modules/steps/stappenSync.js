@@ -8,9 +8,12 @@
 // niets te weten van de stappen-pil die ergens op een pagina staat.
 
 import StappenService, { vandaagIso } from './StappenService'
-import { stappenBijOpstart, stappenVanVandaag, stappenPerDag, isGekoppeld } from './telefoonStappen'
+import { stappenBijOpstart, stappenVanVandaag, stappenPerDag, isGekoppeld, stappenStatus, platform, isNative } from './telefoonStappen'
 
 export const STAPPEN_EVENT = 'myarc:stappen-bijgewerkt'
+// De coach vroeg opnieuw om toestemming; StappenVerzoek luistert hiernaar.
+export const STAPPEN_VERZOEK_EVENT = 'myarc:stappen-verzoek'
+const VERZOEK_GEZIEN = 'myarc_stappen_verzoek_gezien'
 
 // Niet vaker dan dit opnieuw langs HealthKit, hoe vaak je ook wisselt.
 const RUST_MS = 5 * 60 * 1000
@@ -30,8 +33,14 @@ export async function syncStappen(db, clientId, { bijOpstart = false } = {}) {
   if (!bijOpstart && nu - laatste < RUST_MS) return null
   laatste = nu
 
+  // Vroeg de coach opnieuw om toestemming? Zonder erop te wachten.
+  if (bijOpstart) controleerVerzoek(db, clientId)
+
   try {
     const n = bijOpstart ? await stappenBijOpstart() : await stappenVanVandaag()
+    // Pas ná het uitlezen: de eerste keer staat hierboven nog het
+    // toestemmingsscherm open, en dan zou de status 'geweigerd' zijn.
+    if (bijOpstart) meldStappenStatus(db, clientId)
     if (n == null) return null
     await StappenService.bewaar(db, clientId, n, { source: 'telefoon' })
     window.dispatchEvent(new CustomEvent(STAPPEN_EVENT, { detail: { steps: n } }))
@@ -78,4 +87,54 @@ async function haalAchterstandIn(db, clientId) {
   } catch (e) {
     console.warn('Stappen inhalen mislukt:', e?.message || e)
   }
+}
+
+// Laat de coach weten waarom er wel of geen stappen binnenkomen. Een melding
+// uit de browser overschrijft geen recente melding van de telefoon: wie zijn
+// stappen via de app deelt en af en toe op de laptop kijkt, is niet "web".
+export async function meldStappenStatus(db, clientId) {
+  if (!db?.supabase || !clientId) return
+  try {
+    const status = await stappenStatus()
+    if (!isNative()) {
+      const { data } = await db.supabase.from('clients')
+        .select('stappen_platform, stappen_status_at').eq('id', clientId).maybeSingle()
+      const recent = data?.stappen_status_at && (Date.now() - new Date(data.stappen_status_at).getTime()) < 3 * 86400000
+      if (recent && data.stappen_platform && data.stappen_platform !== 'web') return
+    }
+    await db.supabase.from('clients').update({
+      stappen_status: status,
+      stappen_platform: platform(),
+      stappen_status_at: new Date().toISOString(),
+    }).eq('id', clientId)
+  } catch (e) {
+    console.warn('Stappen-status melden mislukt:', e?.message || e)
+  }
+}
+
+// Vroeg de coach opnieuw om toestemming sinds de klant dat laatst zag?
+export async function controleerVerzoek(db, clientId) {
+  if (!db?.supabase || !clientId) return
+  try {
+    const { data } = await db.supabase.from('clients')
+      .select('stappen_verzoek_at').eq('id', clientId).maybeSingle()
+    const verzoek = data?.stappen_verzoek_at
+    if (!verzoek) return
+    let gezien = null
+    try { gezien = localStorage.getItem(VERZOEK_GEZIEN) } catch { /* private mode */ }
+    if (gezien && new Date(gezien) >= new Date(verzoek)) return
+    openVerzoek = verzoek
+    window.dispatchEvent(new CustomEvent(STAPPEN_VERZOEK_EVENT, { detail: { verzoek } }))
+  } catch (e) {
+    console.warn('Stappen-verzoek controleren mislukt:', e?.message || e)
+  }
+}
+
+// Voor een sheet die pas ná het event mount (dashboard nog aan het laden).
+let openVerzoek = null
+export const openStaandVerzoek = () => openVerzoek
+
+export function markeerVerzoekGezien(verzoek) {
+  openVerzoek = null
+  try { localStorage.setItem(VERZOEK_GEZIEN, verzoek || new Date().toISOString()) } catch { /* private mode */ }
 }

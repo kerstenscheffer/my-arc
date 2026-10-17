@@ -45,6 +45,46 @@ export default function StappenInsight({ db, client, isMobile, alleenDoel = fals
 
   useEffect(() => { laad() }, [laad])
 
+  // Waarom komen er (geen) stappen binnen? Meldt de app zelf bij het openen,
+  // zie meldStappenStatus in stappenSync.js.
+  const [koppeling, setKoppeling] = useState(null)
+  const [gevraagd, setGevraagd] = useState(false)
+  useEffect(() => {
+    let weg = false
+    setKoppeling(null); setGevraagd(false)
+    if (!client?.id || !db?.supabase) return undefined
+    db.supabase.from('clients')
+      .select('stappen_status, stappen_status_at, stappen_platform, stappen_verzoek_at')
+      .eq('id', client.id).maybeSingle()
+      .then(({ data }) => { if (!weg) setKoppeling(data || {}) }, () => {})
+    return () => { weg = true }
+  }, [db, client?.id])
+
+  // Vraag de klant opnieuw om toestemming: de app toont bij het volgende
+  // openen een sheet, en via de melding krijgt hij ook een push.
+  const vraagOmStappen = async () => {
+    const nu = new Date().toISOString()
+    setGevraagd(true)
+    try {
+      await db.supabase.from('clients').update({ stappen_verzoek_at: nu }).eq('id', client.id)
+      const { data: { user } } = await db.supabase.auth.getUser()
+      await db.supabase.from('notifications').insert({
+        client_id: client.id,
+        coach_id: user?.id || null,
+        type: 'coach_message',
+        title: 'Deel je stappen',
+        message: 'Je coach wil je stappen kunnen zien. Open de app en tik op "Stappen delen".',
+        priority: 'normal',
+        status: 'active',
+        read: false,
+      })
+      setKoppeling(k => ({ ...(k || {}), stappen_verzoek_at: nu }))
+    } catch (e) {
+      console.error('Stappen-verzoek versturen mislukt:', e)
+      setGevraagd(false)
+    }
+  }
+
   const veeg = {
     onTouchStart: (e) => { veegStart.current = e.touches[0].clientX },
     onTouchEnd: (e) => {
@@ -111,6 +151,10 @@ export default function StappenInsight({ db, client, isMobile, alleenDoel = fals
         </div>
       </div>
 
+      {!alleenDoel && koppeling && koppeling.stappen_status !== 'gekoppeld' && (
+        <StappenKoppeling koppeling={koppeling} gevraagd={gevraagd} onVraag={vraagOmStappen} />
+      )}
+
       {!alleenDoel && (<>
       {/* Week kiezen: pijlen naast de periode, of vegen over de balkjes. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, marginTop: '0.45rem' }}>
@@ -156,6 +200,41 @@ export default function StappenInsight({ db, client, isMobile, alleenDoel = fals
         })}
       </div>
       </>)}
+    </div>
+  )
+}
+
+const REDEN = {
+  web: 'Gebruikt de app in de browser; daar telt de telefoon niet mee',
+  oude_app: 'Oude app-versie zonder stappenkoppeling; moet de app bijwerken',
+  geen_bron: 'Android zonder Health Connect',
+  geweigerd: 'Gaf geen toestemming voor stappen',
+  geen_data: 'Gekoppeld, maar een week lang nul stappen; meestal toestemming uit',
+}
+
+const kortDag = (iso) => new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+
+function StappenKoppeling({ koppeling, gevraagd, onVraag }) {
+  const reden = REDEN[koppeling.stappen_status] || 'De app heeft nog niets gemeld (nog niet geopend sinds deze update)'
+  const verzoek = koppeling.stappen_verzoek_at
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '0.45rem' }}>
+      <div style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35 }}>
+        {reden}
+        {verzoek && <span style={{ color: 'rgba(255,255,255,0.35)' }}>{` · gevraagd ${kortDag(verzoek)}`}</span>}
+      </div>
+      <button
+        type="button" onClick={onVraag} disabled={gevraagd}
+        style={{
+          flexShrink: 0, minHeight: 32, padding: '0 12px', borderRadius: 8,
+          background: gevraagd ? 'transparent' : '#fff', color: gevraagd ? '#10b981' : '#0a0a0a',
+          border: gevraagd ? '1px solid rgba(16,185,129,0.4)' : 'none',
+          fontSize: '0.72rem', fontWeight: 900, fontFamily: 'inherit', cursor: gevraagd ? 'default' : 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {gevraagd ? 'Gevraagd' : 'Vraag om stappen'}
+      </button>
     </div>
   )
 }

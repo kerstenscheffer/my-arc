@@ -21,6 +21,7 @@ import VideoTeaser from './components/VideoTeaser'
 import BelangrijkeVideo from './components/BelangrijkeVideo'
 import WaterFles from './components/WaterFles'
 import { syncStappen, resetStappenCooldown } from '../modules/steps/stappenSync'
+import StappenVerzoek from '../modules/steps/StappenVerzoek'
 import { supabase } from '../lib/supabase'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
 import VideoReminderPopup from './components/VideoReminderPopup'
@@ -676,6 +677,10 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           de klant toevallig op de bijbehorende pagina stond; meldingen met een
           context die geen enkele view heeft (bv. 'progress', 'quick_message')
           waren zelfs nooit te zien. page_context blijft als metadata bestaan. */}
+      {/* Vraag van de coach om stappen te delen (verschijnt alleen na een
+          verzoek uit Coach Inzicht). */}
+      {client?.id && <StappenVerzoek db={db} clientId={client.id} isMobile={isMobile} />}
+
       <NotificationWidget
         db={db} clientId={client?.id} currentPage="all"
         open={widgetOpen === 'notifications'}

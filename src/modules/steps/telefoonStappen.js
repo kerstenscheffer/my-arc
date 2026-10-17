@@ -172,3 +172,58 @@ export async function stappenVanVandaag() {
     return null
   }
 }
+
+// ── Waarom komen er wel of geen stappen binnen? ──
+//
+// De coach ziet bij een klant zonder stappen anders alleen een lege balk, en
+// weet niet of de klant nee zei, de app in de browser gebruikt, of een oude
+// app heeft zonder stappenkoppeling. De app meldt het daarom zelf (zie
+// meldStappenStatus in stappenSync.js).
+//
+//   web       — geopend in de browser, daar is geen Health
+//   oude_app  — native app van vóór de Health-plugin; live updates brengen
+//               geen native code mee, alleen een store-update helpt
+//   geen_bron — Android zonder Health Connect
+//   geweigerd — toestemming gevraagd, geen koppeling
+//   geen_data — gekoppeld maar een hele week nul stappen; op iOS is dat
+//               meestal een stille weigering (HealthKit zegt het niet)
+//   gekoppeld — er komen stappen binnen
+export const platform = () => {
+  try { return window?.Capacitor?.getPlatform?.() || 'web' } catch { return 'web' }
+}
+
+export async function stappenStatus() {
+  if (!isNative()) return 'web'
+  try {
+    const { available } = await Health.isHealthAvailable()
+    if (!available) return 'geen_bron'
+  } catch (e) {
+    const tekst = String(e?.message || e || '').toLowerCase()
+    return tekst.includes('not implemented') || tekst.includes('unimplemented') ? 'oude_app' : 'geen_bron'
+  }
+  if (!isGekoppeld()) return 'geweigerd'
+  const dagen = await stappenPerDag(7)
+  if (dagen == null) return 'geweigerd'
+  return dagen.some(d => d.steps > 0) ? 'gekoppeld' : 'geen_data'
+}
+
+// Opnieuw vragen, ook als we het eerder al eens vroegen. Op Android verschijnt
+// het toestemmingsscherm dan opnieuw; iOS toont het maar één keer per app en
+// geeft daarna stil terug, dan helpt alleen de instellingen openen.
+export async function vraagOpnieuw() {
+  try { localStorage.removeItem(GEVRAAGD_SLEUTEL) } catch { /* private mode */ }
+  noteerGevraagd()
+  return koppel()
+}
+
+// De plek waar de klant het zelf aan kan zetten.
+export async function openStappenInstellingen() {
+  try {
+    if (platform() === 'ios') await Health.openAppleHealthSettings()
+    else await Health.openHealthConnectSettings()
+    return true
+  } catch (e) {
+    console.warn('Instellingen openen mislukt:', e?.message || e)
+    return false
+  }
+}
