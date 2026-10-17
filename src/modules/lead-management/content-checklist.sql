@@ -6,3 +6,11 @@
 -- Soorten: reel, foto, story, magnet (standaarddoel 1/1/3/8 staat in
 -- ContentChecklist.jsx; een rij in content_doelen overschrijft dat).
 -- RLS: alles waar eigenaar = content_eigenaar().
+--
+-- content_metricool (eigenaar, dag, reels, fotos, stories, bereik,
+-- nieuwe_volgers) pk eigenaar+dag; team leest (RLS select), schrijven alleen
+-- via service/SQL. Bron: Metricool brand 6149311 (Instagram kerstenscheffer),
+-- velden IGEV22 reels, IGEV04 posts, IGEV16 stories, IGEV06 bereik,
+-- IGEV43 volgers erbij. Eenmalig gevuld 1 sep t/m 16 okt 2026 via de
+-- Metricool-koppeling van Claude; een automatische sync vraagt een
+-- Metricool API-token (nog niet in Vault).

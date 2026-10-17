@@ -4,6 +4,8 @@
 // maandtabel. Kersten en Marcel vullen dezelfde lijst in: alles hangt aan de
 // team-eigenaar (content_eigenaar()), RLS regelt de rest.
 // Tabellen: content_checklist (dag, soort, aantal) + content_doelen (soort, doel).
+// Schakelaar Zelf / Metricool: Metricool vult reels, foto's en stories per dag
+// uit content_metricool (plus bereik en nieuwe volgers); magnets blijven zelf.
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Clapperboard, Image, Circle, Magnet, Check } from 'lucide-react'
 import { Venster, VensterKop } from '../../../components/arc-ui'
@@ -18,6 +20,8 @@ const GROEN = '#10b981'
 
 const dagStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const sleutel = (dag, soort) => `${dag}|${soort}`
+const MC_KOLOM = { reel: 'reels', foto: 'fotos', story: 'stories' }
+const kort = (n) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(n)
 
 // Hoeveel procent van de doelen op één dag gehaald is (teveel telt niet mee).
 function dagScore(dag, telling, doelen) {
@@ -52,16 +56,21 @@ function useContent(supabase, maand) {
   const [eigenaar, setEigenaar] = useState(null)
   const [telling, setTelling] = useState({})
   const [doelen, setDoelen] = useState({})
+  const [mc, setMc] = useState({}) // dag -> rij uit content_metricool
 
   const laad = useCallback(async () => {
     if (!supabase) return
     const van = dagStr(new Date(maand.getFullYear(), maand.getMonth(), 1))
     const tot = dagStr(new Date(maand.getFullYear(), maand.getMonth() + 1, 0))
-    const [e, c, d] = await Promise.all([
+    const [e, c, d, m] = await Promise.all([
       supabase.rpc('content_eigenaar'),
       supabase.from('content_checklist').select('dag, soort, aantal').gte('dag', van).lte('dag', tot),
       supabase.from('content_doelen').select('soort, doel'),
+      supabase.from('content_metricool').select('dag, reels, fotos, stories, bereik, nieuwe_volgers, updated_at').gte('dag', van).lte('dag', tot),
     ])
+    const mm = {}
+    for (const r of m.data || []) mm[r.dag] = r
+    setMc(mm)
     if (e.data) setEigenaar(e.data)
     const t = {}
     for (const r of c.data || []) t[sleutel(r.dag, r.soort)] = r.aantal
@@ -98,7 +107,17 @@ function useContent(supabase, maand) {
     if (error) { console.error('content_doelen', error); setDoelen(d => ({ ...d, [soort]: oud })) }
   }
 
-  return { eigenaar, telling, doelen, zetAantal, zetDoel, laad }
+  // Metricool-telling: reels/foto's/stories uit Metricool, magnets zelf.
+  const mcTelling = {}
+  for (const [dag, r] of Object.entries(mc)) {
+    for (const [soort, kol] of Object.entries(MC_KOLOM)) if (r[kol]) mcTelling[sleutel(dag, soort)] = r[kol]
+  }
+  for (const [k, v] of Object.entries(telling)) if (k.endsWith('|magnet')) mcTelling[k] = v
+  // Voor de ring: per vakje het hoogste van zelf en Metricool.
+  const samen = { ...mcTelling }
+  for (const [k, v] of Object.entries(telling)) samen[k] = Math.max(v, samen[k] || 0)
+
+  return { eigenaar, telling, mcTelling, samen, mc, doelen, zetAantal, zetDoel, laad }
 }
 
 // Knop voor in de leadbalk: ring van vandaag, opent de maandtabel.
@@ -110,7 +129,7 @@ export default function ContentChecklist({ supabase, isMobile }) {
   const ditMaand = maand.getMonth() === new Date().getMonth() && maand.getFullYear() === new Date().getFullYear()
   // De ring toont vandaag. Bladert de tabel naar een andere maand, dan staat
   // vandaag niet in de geladen data; openen zet de maand terug.
-  const score = ditMaand ? dagScore(vandaag, data.telling, data.doelen) : 0
+  const score = ditMaand ? dagScore(vandaag, data.samen, data.doelen) : 0
 
   return (
     <>
@@ -130,8 +149,13 @@ export default function ContentChecklist({ supabase, isMobile }) {
   )
 }
 
-function ContentVenster({ telling, doelen, zetAantal, zetDoel, eigenaar, maand, setMaand, vandaag, isMobile, onClose }) {
+function ContentVenster({ telling: zelf, mcTelling, mc, doelen, zetAantal, zetDoel, eigenaar, maand, setMaand, vandaag, isMobile, onClose }) {
   const [doelBewerk, setDoelBewerk] = useState(null) // soort-id
+  const [modus, setModus] = useState(() => { try { return localStorage.getItem('content_modus') || 'zelf' } catch { return 'zelf' } })
+  const kiesModus = (m) => { setModus(m); try { localStorage.setItem('content_modus', m) } catch { /* geen opslag */ } }
+  const isMc = modus === 'mc'
+  const telling = isMc ? mcTelling : zelf
+  const laatst = Object.values(mc).reduce((t, r) => (r.updated_at > t ? r.updated_at : t), '')
   const aantalDagen = new Date(maand.getFullYear(), maand.getMonth() + 1, 0).getDate()
   const dagen = Array.from({ length: aantalDagen }, (_, i) => dagStr(new Date(maand.getFullYear(), maand.getMonth(), i + 1)))
   // Tot en met vandaag tellen voor het maandpercentage; toekomst telt niet.
@@ -142,9 +166,9 @@ function ContentVenster({ telling, doelen, zetAantal, zetDoel, eigenaar, maand, 
 
   // Tik = één erbij; bij het doel weer naar nul.
   const tik = (dag, s) => {
-    if (!eigenaar) return
+    if (!eigenaar || (isMc && s.id !== 'magnet')) return
     const doel = doelen[s.id] ?? s.doel
-    const nu = telling[sleutel(dag, s.id)] || 0
+    const nu = zelf[sleutel(dag, s.id)] || 0
     zetAantal(dag, s.id, nu >= Math.max(doel, 1) ? 0 : nu + 1)
   }
 
@@ -153,7 +177,21 @@ function ContentVenster({ telling, doelen, zetAantal, zetDoel, eigenaar, maand, 
 
   return (
     <Venster isMobile={isMobile} onClose={onClose} maxWidth={1100}>
-      <VensterKop isMobile={isMobile} titel="Content" sub="Tik een vakje: één erbij, bij het doel weer leeg" onClose={onClose} />
+      <VensterKop isMobile={isMobile} titel="Content" onClose={onClose}
+        sub={isMc
+          ? `Uit Metricool${laatst ? `, bijgewerkt ${new Date(laatst).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''} · magnets vul je zelf in`
+          : 'Tik een vakje: één erbij, bij het doel weer leeg'}
+        rechts={
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 9, padding: 2, flexShrink: 0 }}>
+            {[{ id: 'zelf', label: 'Zelf' }, { id: 'mc', label: 'Metricool' }].map(o => (
+              <button key={o.id} onClick={() => kiesModus(o.id)} style={{
+                border: 'none', borderRadius: 7, padding: '0.35rem 0.7rem', fontFamily: 'inherit',
+                fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation',
+                background: modus === o.id ? '#fff' : 'transparent', color: modus === o.id ? '#000' : 'rgba(255,255,255,0.6)',
+              }}>{o.label}</button>
+            ))}
+          </div>
+        } />
       <div style={{ overflowY: 'auto', padding: isMobile ? '1rem' : '1.15rem' }}>
         {/* Vandaag + maand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 18 : 28, marginBottom: 18 }}>
@@ -222,18 +260,19 @@ function ContentVenster({ telling, doelen, zetAantal, zetDoel, eigenaar, maand, 
                       const n = telling[sleutel(d, s.id)] || 0
                       const klaar = doel > 0 && n >= doel
                       const deels = n > 0 && !klaar
+                      const vast = isMc && s.id !== 'magnet'
                       return (
                         <td key={d} style={{ padding: 0 }}>
-                          <button onClick={() => tik(d, s)} disabled={!eigenaar}
+                          <button onClick={() => tik(d, s)} disabled={!eigenaar || vast}
                             style={{
                               width: cel, height: cel, borderRadius: 8, padding: 0, fontFamily: 'inherit',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               background: klaar ? GROEN : deels ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.04)',
                               border: d === vandaag ? '1.5px solid rgba(255,255,255,0.6)' : '1px solid rgba(255,255,255,0.07)',
-                              color: '#fff', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer',
+                              color: '#fff', fontSize: '0.72rem', fontWeight: 900, cursor: vast ? 'default' : 'pointer',
                               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                             }}>
-                            {klaar ? <Check size={15} strokeWidth={3.5} /> : deels ? `${n}/${doel}` : ''}
+                            {vast ? (n || '') : klaar ? <Check size={15} strokeWidth={3.5} /> : deels ? `${n}/${doel}` : ''}
                           </button>
                         </td>
                       )
@@ -241,6 +280,20 @@ function ContentVenster({ telling, doelen, zetAantal, zetDoel, eigenaar, maand, 
                   </tr>
                 )
               })}
+              {/* Metricool: bereik en nieuwe volgers per dag */}
+              {isMc && [{ k: 'bereik', label: 'Bereik', f: kort }, { k: 'nieuwe_volgers', label: 'Nieuwe volgers', f: (n) => `+${n}` }].map(r => (
+                <tr key={r.k}>
+                  <td style={{ position: 'sticky', left: 0, zIndex: 1, background: '#0a0a0a', fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', paddingRight: 8 }}>{r.label}</td>
+                  {dagen.map(d => {
+                    const v = mc[d]?.[r.k]
+                    return (
+                      <td key={d} style={{ textAlign: 'center', fontSize: '0.66rem', fontWeight: 800, color: v ? '#fff' : 'rgba(255,255,255,0.2)', fontVariantNumeric: 'tabular-nums', padding: '4px 0' }}>
+                        {v ? r.f(v) : '·'}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
               {/* Dagscore als klein ringetje onder elke dag */}
               <tr>
                 <td style={{ position: 'sticky', left: 0, zIndex: 1, background: '#0a0a0a', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>Dag</td>
