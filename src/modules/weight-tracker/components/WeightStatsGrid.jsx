@@ -405,7 +405,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
     // De eerste faseweek rekent vanaf het startgewicht, zie startInWeek.
     const start = faseStart && faseStartGewicht != null ? { datum: faseStart, gewicht: faseStartGewicht } : null
     const nu = dagenSinds > 0 ? vensterGemiddelde(binnenFase, isoVandaag, dagenSinds) : { gemiddelde: null, metingen: 0 }
-    const vorig = startInWeek(start, isoVandaag, za)
+    const vorig = startInWeek(start, isoVandaag, za, binnenFase)
       ? { gemiddelde: faseStartGewicht, metingen: 0, vanStart: true }
       : vensterGemiddelde(binnenFase, za)
     const lopend = []

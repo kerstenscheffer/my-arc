@@ -184,7 +184,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   // Begon de fase deze week, dan is het startgewicht het vergelijkpunt.
   const faseStartPunt = client?.fase?.started_on && client?.fase?.start_gewicht != null
     ? { datum: client.fase.started_on, gewicht: client.fase.start_gewicht } : null
-  const lopendVorig = startInWeek(faseStartPunt, isoVandaag, zaIso)
+  const lopendVorig = startInWeek(faseStartPunt, isoVandaag, zaIso, history)
     ? { gemiddelde: parseFloat(faseStartPunt.gewicht), metingen: 0, vanStart: true }
     : vensterGemiddelde(history, zaIso)
   const weekDiff = (lopendNu.gemiddelde != null && lopendVorig.gemiddelde != null)

@@ -503,17 +503,28 @@ export function vensterGemiddelde(history, eindIso, dagen = STANDAARD.venster_da
 // ervoor maar met het startgewicht. Anders telde de eerste week nergens mee en
 // kwamen de weektempo's opgeteld lang niet uit op 'Sinds fase' (Kersten,
 // 10 okt 2026).
-export function startInWeek(start, za, vorigeZa) {
+//
+// Met `history` erbij ook als de fase eerder begon maar er tussen de start en
+// de vorige zaterdag niet gewogen is: dan is het startgewicht het enige
+// vergelijkpunt. Anders kreeg de eerste week mét wegingen geen getal, omdat de
+// week ervoor leeg was (Joris, fase 29 sep, eerste weging 8 okt; 17 okt 2026).
+export function startInWeek(start, za, vorigeZa, history = null) {
   const datum = start?.datum ? String(start.datum).slice(0, 10) : null
   const gewicht = start?.gewicht != null ? parseFloat(start.gewicht) : NaN
-  return !!datum && Number.isFinite(gewicht) && datum > vorigeZa && datum <= za
+  if (!datum || !Number.isFinite(gewicht) || datum > za) return false
+  if (datum > vorigeZa) return true
+  if (!history) return false
+  return !history.some(e => {
+    const dag = e?.date ? String(e.date).slice(0, 10) : null
+    return dag && Number.isFinite(parseFloat(e.weight)) && dag >= datum && dag <= vorigeZa
+  })
 }
 
 export function zaterdagTempo(history, anker = new Date(), dagen = STANDAARD.venster_dagen, start = null) {
   const za = laatsteZaterdag(anker)
   const vorigeZa = iso(new Date(new Date(`${za}T00:00:00`).getTime() - 7 * dagInMs))
   const nu = vensterGemiddelde(history, za, dagen)
-  const vorige = startInWeek(start, za, vorigeZa)
+  const vorige = startInWeek(start, za, vorigeZa, history)
     ? { gemiddelde: parseFloat(start.gewicht), metingen: 0, vanStart: true }
     : vensterGemiddelde(history, vorigeZa, dagen)
   const verschil = (nu.gemiddelde != null && vorige.gemiddelde != null)
