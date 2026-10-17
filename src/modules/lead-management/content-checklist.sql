@@ -14,3 +14,11 @@
 -- IGEV43 volgers erbij. Eenmalig gevuld 1 sep t/m 16 okt 2026 via de
 -- Metricool-koppeling van Claude; een automatische sync vraagt een
 -- Metricool API-token (nog niet in Vault).
+--
+-- content_metricool_posts (eigenaar, tijd, dag, soort 'reel'|'magnet', woord,
+-- views, tekst) pk eigenaar+tijd, team leest. Eén rij per reel uit Metricool
+-- (IGRE02 tijd, IGRE23 views, IGRE03 caption). Magnet = caption met een
+-- comment- of DM-trigger (Reageer "LIDL", DM 80/20); woord = dat trefwoord.
+-- tekst = begin van de caption, alleen bij gewone reels. Gevuld 1 sep t/m
+-- 16 okt 2026 (289 reels, 222 magnets). content_metricool.magnets is het
+-- dagtotaal daarvan; de UI telt per dag uit de posts zelf.
