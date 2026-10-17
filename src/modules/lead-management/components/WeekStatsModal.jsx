@@ -928,7 +928,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
           {!loading && activity && (
             <>
-              <BronResultaat supabase={leadService?.db?.supabase} van={start.toISOString()} tot={end.toISOString()} isMobile={isMobile} />
               {/* Schakelaar tussen de tegels en een tabel met de vorige
                   periode ernaast. */}
               <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.25rem' }}>
@@ -1153,6 +1152,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   {/* Percentages — tweede strakke rij. */}
                   <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
                   <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
+
+                  {/* Waar komen leads en omzet vandaan; getallen klikbaar. */}
+                  <div style={{ marginTop: '1.5rem' }}>
+                    <BronResultaat supabase={leadService?.db?.supabase} van={start.toISOString()} tot={end.toISOString()} isMobile={isMobile} periode={periodeBereik} />
+                  </div>
                 </>
               )}
 
