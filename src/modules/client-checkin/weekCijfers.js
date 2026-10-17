@@ -44,7 +44,7 @@ export async function laadWeekCijfers(db, client) {
   // Let op: een query-builder heeft geen .catch(). Het tweede argument van
   // .then() vangt de afwijzing; anders sloopt één mislukte query de Promise.all
   // en krijgt de klant een leeg formulier.
-  const [stand, wegingen, fases] = await Promise.all([
+  const [stand, wegingen, fases, stappen] = await Promise.all([
     db.supabase.rpc('get_challenge_stand', {
       p_client_id: client.id,
       p_start: isoDag(start),
@@ -63,6 +63,13 @@ export async function laadWeekCijfers(db, client) {
       .eq('client_id', client.id)
       .order('started_on', { ascending: false })
       .limit(1)
+      .then(r => r, () => ({ data: [] })),
+
+    db.supabase.from('client_step_logs')
+      .select('date, steps')
+      .eq('client_id', client.id)
+      .gte('date', isoDag(start))
+      .lte('date', isoDag(eind))
       .then(r => r, () => ({ data: [] })),
   ])
 
@@ -105,6 +112,14 @@ export async function laadWeekCijfers(db, client) {
     },
     wegingen: { gedaan: s.wegingen ?? null, van: 7 },
     voeding: { dagen: s.voeding?.geldige_dagen ?? null, van: 7 },
+    stappen: (() => {
+      const dagen = (stappen.data || []).map(r => ({ datum: String(r.date).slice(0, 10), steps: Number(r.steps) || 0 }))
+      const met = dagen.filter(d => d.steps > 0)
+      return {
+        dagen,
+        gemiddelde: met.length ? Math.round(met.reduce((t, d) => t + d.steps, 0) / met.length) : null,
+      }
+    })(),
     gewicht: {
       nu: laatste?.trend ?? null,
       weekTerug: weekTerug?.trend ?? null,

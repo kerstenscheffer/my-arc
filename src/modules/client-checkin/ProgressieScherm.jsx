@@ -219,8 +219,8 @@ export default function ProgressieScherm({ progressie, isMobile, db, clientId })
           rechts={<InfoKnop open={gewichtUit} onClick={() => setGewichtUit(v => !v)} label="Hoe is dit berekend?" />}
         >
           <div style={BODY}>
-            <span style={{ color: gewicht.oordeel ? OORDEEL_KLEUR[gewicht.oordeel] : colors.textPrimary }}>
-              {metTeken(gewicht.verschil)} kg
+            <span style={{ color: gewicht.kleur || colors.textPrimary }}>
+              {metTeken(gewicht.verschil)} kg{gewicht.tempo && ` · ${gewicht.tempo}`}
             </span>
             {gewicht.doelBereik && <span style={BODY_ZACHT}>{' · doel '}{gewicht.doelBereik}</span>}
           </div>

@@ -3,7 +3,7 @@
 // Features: View scores, edit coach notes, export PDF, export coach notes
 
 import { useState } from 'react'
-import { doelTekst, kleurVoorBehaald, scoreVanDoelen } from '../doelen'
+import { doelTekst, kleurVoorBehaald, scoreVanDoelen, gemetenRegel } from '../doelen'
 import {
   ArrowLeft,
   User,
@@ -419,9 +419,9 @@ export default function CheckinDetailView({
                 <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
                   {doelTekst(d)}
                 </span>
-                {d.gemeten != null && (
+                {gemetenRegel(d) && (
                   <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
-                    gemeten {d.gemeten}
+                    {gemetenRegel(d)}
                   </span>
                 )}
                 <span style={{ fontSize: '0.75rem', fontWeight: 900, color: kleurVoorBehaald(d.behaald), minWidth: 44, textAlign: 'right' }}>

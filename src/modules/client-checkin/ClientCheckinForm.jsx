@@ -19,7 +19,7 @@ import { laadProgressie, haalFase } from './progressieWeek'
 import ProgressieScherm from './ProgressieScherm'
 import { TEVREDEN_OPTIES, SECTIES, COACHING_SECTIE } from './checkinVragen'
 import {
-  DOEL_TYPES, typeVan, doelTekst, bereidTerugkoppelingVoor,
+  DOEL_TYPES, typeVan, doelTekst, bereidTerugkoppelingVoor, gemetenRegel, kleurVoorBehaald,
   BEHAALD_OPTIES, leegDoel,
 } from './doelen'
 
@@ -543,16 +543,16 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                   padding: '12px 14px', marginBottom: 8,
                   background: KAART, border: `1px solid ${RAND}`, borderRadius: 12,
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    <span style={{ flex: 1, fontSize: 15, fontWeight: 900, color: '#fff' }}>
-                      {doelTekst(d)}
-                    </span>
-                    {d.gemeten != null && (
-                      <span style={{ fontSize: 13, fontWeight: 800, color: GRIJS, fontVariantNumeric: 'tabular-nums' }}>
-                        gemeten: {d.gemeten}
-                      </span>
-                    )}
+                  <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                    {doelTekst(d)}
                   </div>
+                  {/* Wat de app zag, in de kleur van het voorstel: "4 van 7
+                      dagen gehaald" zegt meer dan een kaal getal. */}
+                  {gemetenRegel(d) && (
+                    <div style={{ marginTop: 4, fontSize: 14, fontWeight: 800, color: d.behaald ? kleurVoorBehaald(d.behaald) : GRIJS, fontVariantNumeric: 'tabular-nums' }}>
+                      {gemetenRegel(d)}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                     {BEHAALD_OPTIES.map(o => {
                       const aan = d.behaald === o.key
@@ -744,8 +744,11 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
                 onClick={open}
                 style={gekozen.length > 0
                   ? {
-                      marginTop: 6, padding: 0, background: 'none', border: 'none',
-                      color: '#fff', fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                      // Een echte knop met rand: als losse witte tekst las
+                      // het niet als iets om op te tikken (17 okt 2026).
+                      marginTop: 10, minHeight: 44, padding: '0 20px', borderRadius: 12,
+                      background: 'transparent', border: '1.5px solid rgba(255,255,255,0.85)',
+                      color: '#fff', fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }
                   : {

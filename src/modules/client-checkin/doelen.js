@@ -4,7 +4,7 @@
 // de werkelijkheid legt.
 //
 // Vier van de vijf soorten zijn meetbaar uit de app: trainen, wegen, voeding
-// bijhouden en stappen. Voor die vier kan het formulier zelf al invullen of het
+// bijhouden en stappen (client_step_logs). Voor die vier kan het formulier zelf al invullen of het
 // doel gehaald is, en hoeft de klant alleen te bevestigen. Het vijfde soort is
 // vrije tekst ("om 23:00 in bed") — daar kan alleen de klant zelf iets over
 // zeggen.
@@ -20,24 +20,39 @@ export const DOEL_TYPES = [
     // Uit week_cijfers zoals weekCijfers.js die oplevert.
     meet: (c) => c?.trainingen?.gedaan ?? null,
     zin: (n) => `${n}× trainen`,
+    meetTekst: (m, doel) => `${m} van ${doel.doel_getal}× getraind`,
   },
   {
     key: 'wegen', label: 'Wegen', eenheid: 'dagen',
     standaard: 5, max: 7,
     meet: (c) => c?.wegingen?.gedaan ?? null,
     zin: (n) => `${n} dagen wegen`,
+    meetTekst: (m, doel) => `${m} van ${doel.doel_getal} dagen gewogen`,
   },
   {
     key: 'voeding', label: 'Voeding bijhouden', eenheid: 'dagen',
     standaard: 5, max: 7,
     meet: (c) => c?.voeding?.dagen ?? null,
     zin: (n) => `${n} dagen voeding bijhouden`,
+    meetTekst: (m, doel) => `${m} van ${doel.doel_getal} dagen bijgehouden`,
   },
   {
     key: 'stappen', label: 'Stappen', eenheid: 'per dag',
     standaard: 8000, max: 30000, stap: 500,
-    // Stappen zitten (nog) niet in week_cijfers; die vult de klant zelf in.
-    meet: () => null,
+    // Hoeveel dagen het stappendoel gehaald is, uit client_step_logs. Zonder
+    // een enkele stappenrij in de week weten we het niet (null), en dat is
+    // iets anders dan nul dagen gehaald.
+    meet: (c, doel) => {
+      const dagen = c?.stappen?.dagen
+      if (!Array.isArray(dagen) || !dagen.some(d => d.steps > 0)) return null
+      return dagen.filter(d => d.steps >= Number(doel?.doel_getal || 0)).length
+    },
+    // Het voorstel gaat over dagen, niet over het stappengetal zelf.
+    voorstelDoel: () => 7,
+    meetTekst: (m, _doel, c) => {
+      const gem = c?.stappen?.gemiddelde
+      return `${m} van 7 dagen gehaald${gem ? ` · gem. ${gem.toLocaleString('nl-NL')}` : ''}`
+    },
     zin: (n) => `${Number(n).toLocaleString('nl-NL')} stappen per dag`,
   },
   {
@@ -62,9 +77,21 @@ export function doelTekst(doel) {
 export function meetDoel(doel, weekCijfers) {
   const t = typeVan(doel?.type)
   if (!t || !weekCijfers) return null
-  const n = t.meet(weekCijfers)
+  const n = t.meet(weekCijfers, doel)
   return Number.isFinite(n) ? n : null
 }
+
+// Wat de klant en de coach naast het doel lezen: "4 van 5 dagen gewogen" in
+// plaats van een kaal getal.
+export function meetTekst(doel, gemeten, weekCijfers) {
+  const t = typeVan(doel?.type)
+  if (gemeten == null || !t?.meetTekst) return null
+  return t.meetTekst(gemeten, doel, weekCijfers)
+}
+
+// Oudere check-ins hebben alleen het getal bewaard.
+export const gemetenRegel = (d) =>
+  d?.gemeten_tekst || (d?.gemeten != null ? `gemeten ${d.gemeten}` : null)
 
 // Het voorstel dat het formulier klaarzet. De klant mag het altijd omzetten:
 // "ik was ziek" is een goede reden waar geen teller iets van weet.
@@ -73,8 +100,9 @@ export function meetDoel(doel, weekCijfers) {
 // de vier wel.
 export function voorstelBehaald(doel, gemeten) {
   if (gemeten == null || !doel?.doel_getal) return null
-  if (gemeten >= doel.doel_getal) return 'ja'
-  if (gemeten >= doel.doel_getal / 2) return 'deels'
+  const nodig = typeVan(doel.type)?.voorstelDoel?.(doel) ?? doel.doel_getal
+  if (gemeten >= nodig) return 'ja'
+  if (gemeten >= nodig / 2) return 'deels'
   return 'nee'
 }
 
@@ -103,7 +131,12 @@ export function scoreVanDoelen(doelen) {
 export function bereidTerugkoppelingVoor(vorigeDoelen, weekCijfers) {
   return (Array.isArray(vorigeDoelen) ? vorigeDoelen : []).map(d => {
     const gemeten = meetDoel(d, weekCijfers)
-    return { ...d, gemeten, behaald: voorstelBehaald(d, gemeten) }
+    return {
+      ...d,
+      gemeten,
+      gemeten_tekst: meetTekst(d, gemeten, weekCijfers),
+      behaald: voorstelBehaald(d, gemeten),
+    }
   })
 }
 

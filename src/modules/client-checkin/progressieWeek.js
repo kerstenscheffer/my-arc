@@ -21,8 +21,7 @@
 //   de gewicht-header in coach insight.
 
 import { est8Rep } from '../coach-command-center/components/insight/workoutChartUtils'
-import { gewichtOordeel } from './weekCijfers'
-import { zaterdagTempo, laatsteZaterdag, vensterGemiddelde, maakConfig, bereikTekst } from '../weight-tracker/utils/coachingBand'
+import { zaterdagTempo, laatsteZaterdag, vensterGemiddelde, maakConfig, bereikTekst, tempoOordeel, tempoKleurVanDoel } from '../weight-tracker/utils/coachingBand'
 import { lokaleDatum } from '../../utils/tijd'
 
 const dagInMs = 86400000
@@ -143,8 +142,10 @@ export async function laadProgressie(db, client) {
       .eq('client_id', client.id)
       .gte('workout_date', vorigeWeekStart)
       .lte('workout_date', zaterdag)),
+    // Alle kolommen: maakConfig heeft ook de bijsturingen en tempogrenzen
+    // nodig, anders klopt de band niet met wat de coach ziet.
     vang(sb.from('client_phases')
-      .select('started_on, start_gewicht, week_doel_kg, doel')
+      .select('*')
       .eq('client_id', client.id)
       .order('started_on', { ascending: false })
       .limit(1)),
@@ -248,17 +249,28 @@ function bouwVoeding(stand, maaltijden, plan) {
 // Eerst zaterdag tegen vorige zaterdag. Lukt dat niet — te weinig weken, of
 // vorige zaterdag niets gemeten — dan tegen de start van de fase. Lukt dat ook
 // niet, dan geven we null terug en verdwijnt de regel.
-// Welke kant hoort het op? Zonder fase weten we het niet, en dan kleuren we
-// het verschil ook niet: 0,4 kg eraf is goed in een cut en fout in een bulk.
-function richtingVan(fase) {
-  if (fase?.doel === 'cut') return 'afvallen'
-  if (fase?.doel === 'build') return 'aankomen'
-  return 'stabiel'
+// De kleur en het woord komen uit dezelfde band als de weektegels in de app:
+// binnen de band groen, erbuiten via oranje naar rood. Zonder richting
+// (onderhoud, geen fase) kleuren we niet: 0,4 kg eraf is goed in een cut en
+// fout in een bulk.
+const TEMPO_TEKST = {
+  OP_KOERS: 'goed tempo',
+  TE_SNEL: 'te snel',
+  TE_LANGZAAM: 'te langzaam',
+}
+
+// Te langzaam en de verkeerde kant op zijn twee verschillende gesprekken.
+function tempoWoord(verschil, config) {
+  const o = tempoOordeel(verschil, config)
+  if (o === 'TE_LANGZAAM') {
+    const teken = config.richting === 'aankomen' ? 1 : -1
+    if (verschil * teken < 0) return 'verkeerde kant op'
+  }
+  return TEMPO_TEKST[o] || null
 }
 
 function bouwGewicht(wegingen, fase, client) {
   if (!wegingen.length) return null
-  const doel = fase?.week_doel_kg != null ? Number(fase.week_doel_kg) : null
 
   // De losse wegingen binnen een venster, voor het uitlegvenster: welke
   // getallen zitten er in dit gemiddelde?
@@ -274,6 +286,7 @@ function bouwGewicht(wegingen, fase, client) {
   }
 
   const tempo = zaterdagTempo(wegingen)
+  const config = maakConfig(client, fase)
   if (tempo.verschil !== null) {
     return {
       soort: 'week',
@@ -288,10 +301,12 @@ function bouwGewicht(wegingen, fase, client) {
       // Niet één afgesproken getal maar de band eromheen: tussen te langzaam
       // en te snel. Een concreet doel van -0,5 laat -0,45 als mislukking
       // ogen, terwijl dat precies goed is.
-      doelBereik: bereikTekst(maakConfig(client, fase)),
-      // Hetzelfde oordeel als de coach-kant gebruikt, zodat de kleur die de
-      // klant ziet niet af kan wijken van wat in coach insight staat.
-      oordeel: gewichtOordeel(tempo.verschil, doel, richtingVan(fase)),
+      doelBereik: bereikTekst(config),
+      // Dezelfde band en kleur als de weektegels in de app en coach insight.
+      // Het oude oordeel keek alleen of het de goede kant op ging, waardoor
+      // +1,2 kg bij een doel van +0,02 / +0,05 groen werd (17 okt 2026).
+      kleur: tempoKleurVanDoel(tempo.verschil, config, null),
+      tempo: tempoWoord(tempo.verschil, config),
     }
   }
 

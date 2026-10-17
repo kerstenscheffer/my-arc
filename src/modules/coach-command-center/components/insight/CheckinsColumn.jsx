@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import CheckinService from '../../../client-checkin/CheckinService'
 import { antwoordenVan } from '../../../client-checkin/checkinVragen'
-import { doelTekst, kleurVoorBehaald } from '../../../client-checkin/doelen'
+import { doelTekst, kleurVoorBehaald, gemetenRegel } from '../../../client-checkin/doelen'
 import ProgressieScherm from '../../../client-checkin/ProgressieScherm'
 import { laadProgressie } from '../../../client-checkin/progressieWeek'
 
@@ -392,8 +392,8 @@ const DoelenBlok = ({ vraag, doelen, terug }) => (
           <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: kleurVoorBehaald(d.behaald) }} />
         )}
         <span style={{ flex: 1, fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{doelTekst(d)}</span>
-        {terug && d.gemeten != null && (
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: G.textDim, fontVariantNumeric: 'tabular-nums' }}>gemeten {d.gemeten}</span>
+        {terug && gemetenRegel(d) && (
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: G.textDim, fontVariantNumeric: 'tabular-nums' }}>{gemetenRegel(d)}</span>
         )}
         {terug && (
           <span style={{ fontSize: '0.7rem', fontWeight: 900, color: kleurVoorBehaald(d.behaald), minWidth: 36, textAlign: 'right' }}>
