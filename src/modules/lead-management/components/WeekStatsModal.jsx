@@ -766,9 +766,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           padding: isMobile ? 'calc(0.9rem + env(safe-area-inset-top, 0px)) 1rem 0.8rem' : '1.1rem 1.5rem 0.9rem',
           display: 'flex', alignItems: 'center', gap: 8,
           borderBottom: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(10,10,10,0.94)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
           overflowX: 'auto', WebkitOverflowScrolling: 'touch',
         }}>
-          <BarChart3 size={20} color={GOLD} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+          <BarChart3 size={20} color="#fff" strokeWidth={2.8} style={{ flexShrink: 0 }} />
           <div style={{ flexShrink: 0, color: '#fff', fontWeight: 900, fontSize: isMobile ? '1.05rem' : '1.25rem', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
             Stats
           </div>
@@ -779,18 +780,18 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             value={periodMode}
             onChange={(e) => setPeriodMode(e.target.value)}
             style={{
-              flexShrink: 0, marginLeft: 6, minHeight: 38,
-              padding: isMobile ? '0 1.7rem 0 0.7rem' : '0 1.9rem 0 0.9rem',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.12)', borderRadius: 11,
-              color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800,
+              flexShrink: 0, marginLeft: 10, minHeight: 38,
+              padding: '0 1.3rem 0 0',
+              backgroundColor: 'transparent',
+              border: 'none', borderRadius: 0,
+              color: '#fff', fontSize: isMobile ? '0.95rem' : '1.02rem', fontWeight: 900,
               fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
               appearance: 'none', WebkitAppearance: 'none',
               // Eigen pijltje: zonder appearance:none tekent Safari een grijze
               // knop die niet bij de rest past.
-              backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'><path d=\'M1 1l4 4 4-4\' stroke=\'rgba(255,255,255,0.5)\' stroke-width=\'1.5\' fill=\'none\' stroke-linecap=\'round\'/></svg>")',
+              backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'><path d=\'M1 1l4 4 4-4\' stroke=\'white\' stroke-width=\'2\' fill=\'none\' stroke-linecap=\'round\'/></svg>")',
               backgroundRepeat: 'no-repeat',
-              backgroundPosition: `right ${isMobile ? '0.5rem' : '0.6rem'} center`,
+              backgroundPosition: 'right 0.15rem center',
             }}
           >
             {PERIODE_OPTIES.map(o => (
@@ -844,9 +845,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             onClick={openRevenuePanel}
             title="Terugkerende omzet & cashflow"
             style={{
-              width: 40, height: 40, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
-              color: '#22c55e', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              width: 38, height: 38, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', borderRadius: 10,
+              color: '#fff', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
             <TrendingUp size={18} strokeWidth={2.6} />
@@ -856,9 +857,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             disabled={loading}
             title="KPI-doelen instellen (dag/week)"
             style={{
-              width: 40, height: 40, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
-              color: GOLD, opacity: loading ? 0.4 : 1,
+              width: 38, height: 38, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', borderRadius: 10,
+              color: '#fff', opacity: loading ? 0.4 : 1,
               cursor: loading ? 'not-allowed' : 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
@@ -895,9 +896,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             disabled={loading || pdfBusy}
             title={pdfBusy ? 'Bezig…' : 'Download als PDF'}
             style={{
-              width: 40, height: 40, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
-              color: 'rgba(255,255,255,0.7)',
+              width: 38, height: 38, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', borderRadius: 10,
+              color: '#fff',
               opacity: (loading || pdfBusy) ? 0.4 : 1,
               cursor: (loading || pdfBusy) ? 'not-allowed' : 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -906,8 +907,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             <Download size={18} strokeWidth={2.6} />
           </button>
           <button onClick={onClose} title="Sluiten" style={{
-            width: 40, height: 40, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
+            width: 38, height: 38, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10, marginLeft: 4,
             color: '#fff', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
             <X size={19} strokeWidth={2.8} />
