@@ -118,6 +118,13 @@ function CheckinCard({ checkin, isMobile, voornaam, client, db }) {
             }}>
               {fmtDate(checkin.checkin_date)}
             </span>
+            {/* Tijdstip van invullen. De check-in wordt in één keer
+                opgeslagen, dus created_at is het moment van versturen. */}
+            {checkin.created_at && (
+              <span style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700, color: G.textDim, fontVariantNumeric: 'tabular-nums' }}>
+                {new Date(checkin.created_at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
             {reviewed && (
               <span style={{
                 fontSize: '0.72rem', fontWeight: 800,
