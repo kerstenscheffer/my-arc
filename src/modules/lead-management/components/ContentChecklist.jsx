@@ -5,7 +5,9 @@
 // team-eigenaar (content_eigenaar()), RLS regelt de rest.
 // Tabellen: content_checklist (dag, soort, aantal) + content_doelen (soort, doel).
 // Schakelaar Zelf / Metricool: Metricool vult reels, foto's en stories per dag
-// uit content_metricool (plus bereik en nieuwe volgers); magnets blijven zelf.
+// uit content_metricool (plus bereik en nieuwe volgers). Reels worden per post
+// gesplitst (content_metricool_posts): staat er Reageer "WOORD" in de caption,
+// dan is het een magnet, anders een gewone reel.
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Clapperboard, Image, Circle, Magnet, Check } from 'lucide-react'
 import { Venster, VensterKop } from '../../../components/arc-ui'
@@ -57,17 +59,22 @@ function useContent(supabase, maand) {
   const [telling, setTelling] = useState({})
   const [doelen, setDoelen] = useState({})
   const [mc, setMc] = useState({}) // dag -> rij uit content_metricool
+  const [posts, setPosts] = useState({}) // dag -> reels uit content_metricool_posts
 
   const laad = useCallback(async () => {
     if (!supabase) return
     const van = dagStr(new Date(maand.getFullYear(), maand.getMonth(), 1))
     const tot = dagStr(new Date(maand.getFullYear(), maand.getMonth() + 1, 0))
-    const [e, c, d, m] = await Promise.all([
+    const [e, c, d, m, p] = await Promise.all([
       supabase.rpc('content_eigenaar'),
       supabase.from('content_checklist').select('dag, soort, aantal').gte('dag', van).lte('dag', tot),
       supabase.from('content_doelen').select('soort, doel'),
       supabase.from('content_metricool').select('dag, reels, fotos, stories, bereik, nieuwe_volgers, updated_at').gte('dag', van).lte('dag', tot),
+      supabase.from('content_metricool_posts').select('tijd, dag, soort, woord, views, tekst').gte('dag', van).lte('dag', tot).order('tijd'),
     ])
+    const pp = {}
+    for (const r of p.data || []) (pp[r.dag] ||= []).push(r)
+    setPosts(pp)
     const mm = {}
     for (const r of m.data || []) mm[r.dag] = r
     setMc(mm)
@@ -112,12 +119,18 @@ function useContent(supabase, maand) {
   for (const [dag, r] of Object.entries(mc)) {
     for (const [soort, kol] of Object.entries(MC_KOLOM)) if (r[kol]) mcTelling[sleutel(dag, soort)] = r[kol]
   }
+  // Per post gesplitst: gewone reels en magnets. Dagen zonder postdata houden
+  // het dagtotaal als reels en de zelf ingevulde magnets.
   for (const [k, v] of Object.entries(telling)) if (k.endsWith('|magnet')) mcTelling[k] = v
+  for (const [dag, lijst] of Object.entries(posts)) {
+    mcTelling[sleutel(dag, 'reel')] = lijst.filter(x => x.soort === 'reel').length
+    mcTelling[sleutel(dag, 'magnet')] = lijst.filter(x => x.soort === 'magnet').length
+  }
   // Voor de ring: per vakje het hoogste van zelf en Metricool.
   const samen = { ...mcTelling }
   for (const [k, v] of Object.entries(telling)) samen[k] = Math.max(v, samen[k] || 0)
 
-  return { eigenaar, telling, mcTelling, samen, mc, doelen, zetAantal, zetDoel, laad }
+  return { eigenaar, telling, mcTelling, samen, mc, posts, doelen, zetAantal, zetDoel, laad }
 }
 
 // Knop voor in de leadbalk: ring van vandaag, opent de maandtabel.
@@ -149,11 +162,12 @@ export default function ContentChecklist({ supabase, isMobile }) {
   )
 }
 
-function ContentVenster({ telling: zelf, mcTelling, mc, doelen, zetAantal, zetDoel, eigenaar, maand, setMaand, vandaag, isMobile, onClose }) {
+function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal, zetDoel, eigenaar, maand, setMaand, vandaag, isMobile, onClose }) {
   const [doelBewerk, setDoelBewerk] = useState(null) // soort-id
   const [modus, setModus] = useState(() => { try { return localStorage.getItem('content_modus') || 'zelf' } catch { return 'zelf' } })
   const kiesModus = (m) => { setModus(m); try { localStorage.setItem('content_modus', m) } catch { /* geen opslag */ } }
   const isMc = modus === 'mc'
+  const [detailDag, setDetailDag] = useState(null)
   const telling = isMc ? mcTelling : zelf
   const laatst = Object.values(mc).reduce((t, r) => (r.updated_at > t ? r.updated_at : t), '')
   const aantalDagen = new Date(maand.getFullYear(), maand.getMonth() + 1, 0).getDate()
@@ -166,7 +180,8 @@ function ContentVenster({ telling: zelf, mcTelling, mc, doelen, zetAantal, zetDo
 
   // Tik = één erbij; bij het doel weer naar nul.
   const tik = (dag, s) => {
-    if (!eigenaar || (isMc && s.id !== 'magnet')) return
+    if (isMc) { setDetailDag(dag === detailDag ? null : dag); return }
+    if (!eigenaar) return
     const doel = doelen[s.id] ?? s.doel
     const nu = zelf[sleutel(dag, s.id)] || 0
     zetAantal(dag, s.id, nu >= Math.max(doel, 1) ? 0 : nu + 1)
@@ -179,7 +194,7 @@ function ContentVenster({ telling: zelf, mcTelling, mc, doelen, zetAantal, zetDo
     <Venster isMobile={isMobile} onClose={onClose} maxWidth={1100}>
       <VensterKop isMobile={isMobile} titel="Content" onClose={onClose}
         sub={isMc
-          ? `Uit Metricool${laatst ? `, bijgewerkt ${new Date(laatst).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''} · magnets vul je zelf in`
+          ? `Uit Metricool${laatst ? `, bijgewerkt ${new Date(laatst).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''} · tik een dag voor de posts`
           : 'Tik een vakje: één erbij, bij het doel weer leeg'}
         rechts={
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 9, padding: 2, flexShrink: 0 }}>
@@ -260,16 +275,16 @@ function ContentVenster({ telling: zelf, mcTelling, mc, doelen, zetAantal, zetDo
                       const n = telling[sleutel(d, s.id)] || 0
                       const klaar = doel > 0 && n >= doel
                       const deels = n > 0 && !klaar
-                      const vast = isMc && s.id !== 'magnet'
+                      const vast = isMc
                       return (
                         <td key={d} style={{ padding: 0 }}>
-                          <button onClick={() => tik(d, s)} disabled={!eigenaar || vast}
+                          <button onClick={() => tik(d, s)} disabled={!eigenaar && !vast}
                             style={{
                               width: cel, height: cel, borderRadius: 8, padding: 0, fontFamily: 'inherit',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               background: klaar ? GROEN : deels ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.04)',
                               border: d === vandaag ? '1.5px solid rgba(255,255,255,0.6)' : '1px solid rgba(255,255,255,0.07)',
-                              color: '#fff', fontSize: '0.72rem', fontWeight: 900, cursor: vast ? 'default' : 'pointer',
+                              color: '#fff', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer',
                               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                             }}>
                             {vast ? (n || '') : klaar ? <Check size={15} strokeWidth={3.5} /> : deels ? `${n}/${doel}` : ''}
@@ -308,7 +323,60 @@ function ContentVenster({ telling: zelf, mcTelling, mc, doelen, zetAantal, zetDo
             </tbody>
           </table>
         </div>
+
+        {isMc && detailDag && <DagPosts dag={detailDag} lijst={posts[detailDag] || []} />}
+        {isMc && <PerWoord posts={posts} />}
       </div>
     </Venster>
+  )
+}
+
+const tijdVan = (t) => String(t).slice(11, 16)
+
+// De reels van één dag: tijd, magnet-woord of begin van de tekst, views.
+function DagPosts({ dag, lijst }) {
+  const titel = new Date(dag + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: 6, textTransform: 'capitalize' }}>{titel}</div>
+      {lijst.length === 0 && <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Geen reels per post bekend voor deze dag.</div>}
+      {lijst.map(p => (
+        <div key={p.tijd} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>{tijdVan(p.tijd)}</span>
+          {p.soort === 'magnet'
+            ? <Magnet size={13} strokeWidth={2.6} color="#a855f7" />
+            : <Clapperboard size={13} strokeWidth={2.6} color="#ef4444" />}
+          <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {p.soort === 'magnet' ? p.woord : (p.tekst || 'Reel')}
+          </span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{kort(p.views || 0)} views</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Welke magnet-woorden deze maand draaien: aantal posts en gemiddelde views.
+function PerWoord({ posts }) {
+  const per = {}
+  for (const lijst of Object.values(posts)) for (const p of lijst) {
+    if (p.soort !== 'magnet' || !p.woord) continue
+    const w = (per[p.woord] ||= { woord: p.woord, n: 0, views: 0 })
+    w.n += 1; w.views += p.views || 0
+  }
+  const rijen = Object.values(per).sort((a, b) => b.views / b.n - a.views / a.n)
+  if (!rijen.length) return null
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: 6 }}>Magnets per woord</div>
+      {rijen.map(r => (
+        <div key={r.woord} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <Magnet size={13} strokeWidth={2.6} color="#a855f7" />
+          <span style={{ flex: 1, fontSize: '0.84rem', fontWeight: 900, color: '#fff' }}>{r.woord}</span>
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{r.n} posts</span>
+          <span style={{ minWidth: 92, textAlign: 'right', fontSize: '0.84rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{kort(Math.round(r.views / r.n))} gem. views</span>
+        </div>
+      ))}
+    </div>
   )
 }
