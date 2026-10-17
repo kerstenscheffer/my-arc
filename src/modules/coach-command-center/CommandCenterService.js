@@ -144,7 +144,7 @@ export default class CommandCenterService {
       const [workoutsResult, clientsResult] = await Promise.all([
         this.supabase
           .from('workout_sessions')
-          .select('id, client_id, workout_date, day_name, day_display_name, is_completed, exercises_completed, completed_at, notes')
+          .select('id, client_id, workout_date, day_name, day_display_name, is_completed, exercises_completed, completed_at, duration_minutes, notes')
           .in('client_id', clientIds)
           .gte('workout_date', ninetyDaysAgo.toISOString().split('T')[0])
           .order('workout_date', { ascending: false }),

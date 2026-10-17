@@ -18,6 +18,15 @@ import KrachtBlad from '../../../workout/components/KrachtBlad'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
+// Wanneer de klant de training opsloeg (completed_at wordt bij het opslaan
+// gezet), in lokale tijd. Met de duur erbij als die gemeten is.
+const logTijd = (w) => {
+  if (!w?.completed_at) return null
+  const t = new Date(w.completed_at)
+  if (Number.isNaN(t.getTime())) return null
+  return t.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+}
+const duurTekst = (w) => (Number(w?.duration_minutes) > 0 ? `${w.duration_minutes} min` : null)
 const WEEKDAG_NL = { monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', thursday: 'donderdag', friday: 'vrijdag', saturday: 'zaterdag', sunday: 'zondag' }
 
 // Mirror of the feelings list in LogModal — client picks one of these +
@@ -443,7 +452,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                       </span>
                     )}
                     <span style={{ flexShrink: 0, fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums', textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
-                      {formatDate(w.workout_date)}
+                      {formatDate(w.workout_date)}{logTijd(w) ? ` · ${logTijd(w)}` : ''}
                     </span>
                   </div>
                   <span style={{
@@ -453,7 +462,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                     textShadow: '0 1px 6px rgba(0,0,0,0.9)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
-                    {w.is_completed ? 'Voltooid' : 'Training'}{trainingNaam && weekdag ? ` · ${weekdag}` : ''}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}
+                    {w.is_completed ? 'Voltooid' : 'Training'}{trainingNaam && weekdag ? ` · ${weekdag}` : ''}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}{duurTekst(w) ? ` · ${duurTekst(w)}` : ''}
                   </span>
                 </div>
               </button>
@@ -495,7 +504,11 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <button onClick={onBack} aria-label="Terug" style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, minWidth: 28, minHeight: 28, touchAction: 'manipulation' }}><ArrowLeft size={16} /></button>
           <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{(selectedSession.workout_naam || '').trim() || WEEKDAG_NL[String(selectedSession.day_name || '').toLowerCase()] || selectedSession.day_name || 'Training'}</span>
-          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{formatDate(selectedSession.workout_date)}</span>
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+            {formatDate(selectedSession.workout_date)}
+            {logTijd(selectedSession) ? ` · gelogd ${logTijd(selectedSession)}` : ''}
+            {duurTekst(selectedSession) ? ` · ${duurTekst(selectedSession)}` : ''}
+          </span>
         </div>
 
         {/* Client-notitie blok — toon feeling-pill + note tekst zoals de client
