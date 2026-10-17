@@ -1,0 +1,8 @@
+-- Content-checklist (17 okt 2026). Staat in de DB via migratie content_checklist.
+-- content_eigenaar(): team-eigenaar van de ingelogde coach (of zichzelf zonder
+-- team), zodat Kersten en Marcel dezelfde lijst invullen.
+-- content_checklist (eigenaar, dag, soort, aantal, door) pk eigenaar+dag+soort
+-- content_doelen    (eigenaar, soort, doel)          pk eigenaar+soort
+-- Soorten: reel, foto, story, magnet (standaarddoel 1/1/3/8 staat in
+-- ContentChecklist.jsx; een rij in content_doelen overschrijft dat).
+-- RLS: alles waar eigenaar = content_eigenaar().

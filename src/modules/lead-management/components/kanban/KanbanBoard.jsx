@@ -31,6 +31,7 @@ import CallProposalModal from './CallProposalModal'
 import DMBibleModal from '../DMBibleModal'
 import StartCampaignModal from '../StartCampaignModal'
 import WeekStatsModal from '../WeekStatsModal'
+import ContentChecklist from '../ContentChecklist'
 
 
 // "Nieuwe volgers"-kolom — hier krijgt elke card een DM-Run knop (75 volgers
@@ -1967,6 +1968,9 @@ export default function KanbanBoard({
               border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 10, overflow: 'hidden',
             }}>
+            {/* Content van vandaag (reel, foto, stories, magnets) als ring. */}
+            <ContentChecklist supabase={leadService?.db?.supabase} isMobile={isMobile} />
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
             <DMBibleModal triggerVariant="inline" isMobile={isMobile} db={db} coachId={coachId} />
             <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
 
