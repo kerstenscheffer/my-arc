@@ -21,7 +21,7 @@ function weekLabel(terug, dagen) {
   return `${kortDatum(dagen[0].iso)} – ${kortDatum(dagen[6].iso)}`
 }
 
-export default function StappenInsight({ db, client, isMobile }) {
+export default function StappenInsight({ db, client, isMobile, alleenDoel = false }) {
   const [dagen, setDagen] = useState([])
   const [doel, setDoel] = useState(STANDAARD_DOEL)
   const [bezig, setBezig] = useState(false)
@@ -88,13 +88,13 @@ export default function StappenInsight({ db, client, isMobile }) {
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
             Stappen · doel per dag
           </div>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#fff', marginTop: 1 }}>
+          {!alleenDoel && <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#fff', marginTop: 1 }}>
             {totaal ? `Totaal ${nl(totaal)}` : 'Nog niets gelogd'}
             <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
               {gemiddeld ? ` · gem. ${nl(gemiddeld)} · ${doelDagen}/${gelogd.length} op doel` : ''}
               {terug === 0 && vandaag ? ` · vandaag ${vandaag.steps ? nl(vandaag.steps) : 'nog niets'}` : ''}
             </span>
-          </div>
+          </div>}
           {bewaard && (
             <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#10b981', marginTop: 1 }}>Doel bewaard</div>
           )}
@@ -111,6 +111,7 @@ export default function StappenInsight({ db, client, isMobile }) {
         </div>
       </div>
 
+      {!alleenDoel && (<>
       {/* Week kiezen: pijlen naast de periode, of vegen over de balkjes. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, marginTop: '0.45rem' }}>
         <button onClick={() => setTerug(t => Math.min(t + 1, 52))} aria-label="Week terug" style={pijl}>
@@ -154,6 +155,7 @@ export default function StappenInsight({ db, client, isMobile }) {
           )
         })}
       </div>
+      </>)}
     </div>
   )
 }

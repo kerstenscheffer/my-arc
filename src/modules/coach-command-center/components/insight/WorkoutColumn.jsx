@@ -8,6 +8,7 @@ import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLi
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
+import KlantWeekrooster from '../../../manual-workout-builder/components/KlantWeekrooster'
 import ExerciseProgressChart from '../../../workout/components/todays-workout/components/ExerciseProgressChart'
 import { workoutFoto } from '../../../../client/components/workoutFoto'
 import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
@@ -352,8 +353,13 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
         )}
 
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {/* Stappen: het dagdoel dat de coach zet plus de week van de klant */}
-          <StappenInsight db={db} client={client} isMobile={isMobile} />
+          {/* De agenda van de klant zoals hij die zelf ziet: trainingen, cardio
+              en stappen per dag, met pijlen naar eerdere weken. */}
+          <div style={{ padding: isMobile ? '0.5rem 0.25rem 0' : '0.6rem 0.5rem 0', overflowX: 'auto' }}>
+            <KlantWeekrooster client={client} db={db} isMobile={isMobile} />
+          </div>
+          {/* Stappen: alleen het dagdoel zetten, de week staat al in de agenda */}
+          <StappenInsight db={db} client={client} isMobile={isMobile} alleenDoel />
           {/* Cardio die de client zelf logt (cardio_logs) — read-only voor coach */}
           <CardioInsightBlock db={db} client={client} isMobile={isMobile} />
           {/* Wat de klant zelf aan het plan veranderde, met "door klant" erbij. */}
