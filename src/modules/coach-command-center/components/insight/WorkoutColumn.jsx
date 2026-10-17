@@ -26,7 +26,41 @@ const logTijd = (w) => {
   if (Number.isNaN(t.getTime())) return null
   return t.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 }
-const duurTekst = (w) => (Number(w?.duration_minutes) > 0 ? `${w.duration_minutes} min` : null)
+
+// Hoe lang duurde de training? De sessie ontstaat bij de eerste gelogde
+// oefening en elke oefening krijgt een eigen rij met tijdstip, dus van de
+// sessie tot de laatste oefening is de echte duur (zonder die laatste
+// oefening zelf). De timer in de app (duration_minutes) gebruikt maar een
+// kwart van de klanten en blijft vaak doorlopen (153 min bij 55 min
+// loggen), dus die is alleen de terugval als alles in één keer is ingevuld.
+function useSessieDuur(db, sessie) {
+  const [laatste, setLaatste] = useState(null)
+  useEffect(() => {
+    let weg = false
+    setLaatste(null)
+    if (!sessie?.id || !db?.supabase) return undefined
+    db.supabase.from('workout_progress').select('created_at').eq('session_id', sessie.id)
+      .then(({ data }) => {
+        if (weg) return
+        const max = (data || []).reduce((m, r) => Math.max(m, new Date(r.created_at).getTime() || 0), 0)
+        setLaatste(max || null)
+      }, () => {})
+    return () => { weg = true }
+  }, [db, sessie?.id])
+
+  const start = sessie?.completed_at ? new Date(sessie.completed_at).getTime() : null
+  const timer = Number(sessie?.duration_minutes) > 0 ? Number(sessie.duration_minutes) : null
+  const spreiding = start && laatste ? Math.round((laatste - start) / 60000) : null
+  const minuten = spreiding != null && spreiding >= 5 ? spreiding : timer
+  const tijd = (ms) => new Date(ms).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+  return {
+    van: start ? tijd(start) : null,
+    tot: spreiding != null && spreiding >= 5 ? tijd(laatste) : null,
+    minuten,
+  }
+}
+
+const minTekst = (m) => (m >= 60 ? `${Math.floor(m / 60)}u ${String(m % 60).padStart(2, '0')}` : `${m} min`)
 const WEEKDAG_NL = { monday: 'maandag', tuesday: 'dinsdag', wednesday: 'woensdag', thursday: 'donderdag', friday: 'vrijdag', saturday: 'zaterdag', sunday: 'zondag' }
 
 // Mirror of the feelings list in LogModal — client picks one of these +
@@ -462,7 +496,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                     textShadow: '0 1px 6px rgba(0,0,0,0.9)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
-                    {w.is_completed ? 'Voltooid' : 'Training'}{trainingNaam && weekdag ? ` · ${weekdag}` : ''}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}{duurTekst(w) ? ` · ${duurTekst(w)}` : ''}
+                    {w.is_completed ? 'Voltooid' : 'Training'}{trainingNaam && weekdag ? ` · ${weekdag}` : ''}{aantalOef > 0 ? ` · ${aantalOef} oefeningen` : ''}
                   </span>
                 </div>
               </button>
@@ -495,6 +529,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
 function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }) {
   const fotoVan = useOefeningFotos(db, exs.map(e => e.name).filter(Boolean))
   const photoSize = isMobile ? 62 : 72
+  const duur = useSessieDuur(db, selectedSession)
   {
     const parsed = parseSessionNote(selectedSession.notes)
     const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
@@ -506,9 +541,13 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
           <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>{(selectedSession.workout_naam || '').trim() || WEEKDAG_NL[String(selectedSession.day_name || '').toLowerCase()] || selectedSession.day_name || 'Training'}</span>
           <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
             {formatDate(selectedSession.workout_date)}
-            {logTijd(selectedSession) ? ` · gelogd ${logTijd(selectedSession)}` : ''}
-            {duurTekst(selectedSession) ? ` · ${duurTekst(selectedSession)}` : ''}
+            {duur.van ? ` · ${duur.van}${duur.tot ? `–${duur.tot}` : ''}` : ''}
           </span>
+          {duur.minuten > 0 && (
+            <span style={{ marginLeft: 'auto', fontSize: '0.74rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+              {minTekst(duur.minuten)}
+            </span>
+          )}
         </div>
 
         {/* Client-notitie blok — toon feeling-pill + note tekst zoals de client
