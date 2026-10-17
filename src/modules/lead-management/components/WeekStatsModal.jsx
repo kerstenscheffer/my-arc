@@ -18,6 +18,7 @@ import CallProposalsModal from './CallProposalsModal'
 import { Venster, VensterKop, VensterVoet, Knop } from '../../../components/arc-ui'
 import GrowthChart from './GrowthChart'
 import OmzetScherm from './OmzetScherm'
+import BronResultaat from './BronResultaat'
 import { KPI_STATS, kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
 
 const GOLD = '#FFD700'
@@ -819,6 +820,25 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               ))}
             </div>
           )}
+          {/* Pijlen direct naast de periode (17 okt 2026: was een losse balk). */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 6, flexShrink: 0 }}>
+            <button onClick={goPrev} disabled={isCustom} title={`Vorige ${periodeWoord}`} aria-label="Vorige" style={{
+              width: 34, height: 34, background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: isCustom ? 0.3 : 1, cursor: isCustom ? 'not-allowed' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <ChevronLeft size={19} strokeWidth={2.8} />
+            </button>
+            <div style={{ minWidth: 0, textAlign: 'center' }}>
+              <div style={{ fontSize: isMobile ? '0.88rem' : '0.98rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{periodeTitel}</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>{periodeBereik}</div>
+            </div>
+            <button onClick={goNext} title={`Volgende ${periodeWoord}`} aria-label="Volgende" disabled={isFuturePeriod} style={{
+              width: 34, height: 34, background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: isFuturePeriod ? 0.3 : 1, cursor: isFuturePeriod ? 'not-allowed' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <ChevronRight size={19} strokeWidth={2.8} />
+            </button>
+          </div>
           <div style={{ flex: 1, minWidth: 8 }} />
           <button
             onClick={openRevenuePanel}
@@ -894,28 +914,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           </button>
         </div>
 
-        {/* Period navigator */}
-        <div style={{
-          flexShrink: 0, padding: isMobile ? '0.75rem 1rem' : '0.9rem 1.5rem',
-          display: 'flex', alignItems: 'center', gap: '0.6rem',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-        }}>
-          <button onClick={goPrev} disabled={isCustom} title={`Vorige ${periodeWoord}`} style={{ ...navBtn, opacity: isCustom ? 0.3 : 1, cursor: isCustom ? 'not-allowed' : 'pointer' }}>
-            <ChevronLeft size={19} strokeWidth={2.8} />
-          </button>
-          <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
-              {periodeTitel}
-            </div>
-            <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-              {periodeBereik}
-            </div>
-          </div>
-          <button onClick={goNext} title={`Volgende ${periodeWoord}`} disabled={isFuturePeriod} style={{ ...navBtn, opacity: isFuturePeriod ? 0.3 : 1, cursor: isFuturePeriod ? 'not-allowed' : 'pointer' }}>
-            <ChevronRight size={19} strokeWidth={2.8} />
-          </button>
-        </div>
-
         {/* Body */}
         <div style={{
           flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
@@ -929,6 +927,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
           {!loading && activity && (
             <>
+              <BronResultaat supabase={leadService?.db?.supabase} van={start.toISOString()} tot={end.toISOString()} isMobile={isMobile} />
               {/* Schakelaar tussen de tegels en een tabel met de vorige
                   periode ernaast. */}
               <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.25rem' }}>
@@ -1738,12 +1737,6 @@ const iconBtn = {
   width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'rgba(255,255,255,0.06)', border: 'none',
   borderRadius: 8, color: '#fff', cursor: 'pointer', touchAction: 'manipulation',
-}
-const navBtn = {
-  width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'transparent', border: '1px solid rgba(255,255,255,0.14)',
-  borderRadius: 12, color: '#fff', cursor: 'pointer', touchAction: 'manipulation',
-  WebkitTapHighlightColor: 'transparent',
 }
 
 function SectionTitle({ icon, title }) {
