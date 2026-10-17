@@ -26,6 +26,7 @@ import {
   UserCheck, CalendarCheck, Sparkles,
 } from 'lucide-react'
 import PrequalAfhaken from './PrequalAfhaken'
+import PrequalAfgewezen from './PrequalAfgewezen'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const PERIODES = [
@@ -575,6 +576,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
 
       {/* ═══ Afhaken per vraag + wie afhaakte na zijn nummer ═══ */}
       <PrequalAfhaken venster={venster} m={m} />
+      <PrequalAfgewezen venster={venster} />
 
       {/* ═══ RIJ 4: advertenties ═══ */}
       <div style={{ ...kaart, marginBottom: m ? 28 : 40 }}>
