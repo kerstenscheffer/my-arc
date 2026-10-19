@@ -9,7 +9,8 @@
 // gesplitst (content_metricool_posts): staat er Reageer "WOORD" in de caption,
 // dan is het een magnet, anders een gewone reel.
 // Outreach en follow-ups komen uit het leadbord (RPC content_lead_stats):
-// outreach = nieuwe leads die dag, follow-ups = laatste opvolging die dag.
+// de rij met doel = follow-ups die dag (elke klik, lead_followup_events),
+// eronder ter info het aantal nieuwe leads.
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Clapperboard, Image, Circle, Magnet, Check, Youtube, Send } from 'lucide-react'
 import { Venster, VensterKop } from '../../../components/arc-ui'
@@ -24,7 +25,7 @@ const SOORTEN = [
   // ziet geen verschil tussen shorts en een lange video, dus altijd zelf.
   { id: 'youtube', label: 'YouTube', Icon: Youtube, kleur: '#ff0033', doel: 1, week: true },
   // Automatisch uit het leadbord, niet aan te tikken.
-  { id: 'outreach', label: 'Outreach', Icon: Send, kleur: '#f59e0b', doel: 100, auto: true },
+  { id: 'outreach', label: 'Follow-ups', Icon: Send, kleur: '#f59e0b', doel: 100, auto: true },
 ]
 const maandagVan = (dag) => { const d = new Date(dag + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return dagStr(d) }
 const weekDagen = (dag) => { const m = new Date(maandagVan(dag) + 'T12:00:00'); return Array.from({ length: 7 }, (_, i) => { const d = new Date(m); d.setDate(m.getDate() + i); return dagStr(d) }) }
@@ -131,9 +132,9 @@ function useContent(supabase, maand) {
     if (error) { console.error('content_doelen', error); setDoelen(d => ({ ...d, [soort]: oud })) }
   }
 
-  // Outreach staat in beide standen, uit het leadbord.
+  // Follow-ups staan in beide standen, uit het leadbord.
   const zelf = { ...telling }
-  for (const [dag, r] of Object.entries(leads)) if (r.outreach) zelf[sleutel(dag, 'outreach')] = r.outreach
+  for (const [dag, r] of Object.entries(leads)) if (r.followups) zelf[sleutel(dag, 'outreach')] = r.followups
 
   // Metricool-telling: reels/foto's/stories uit Metricool, magnets zelf.
   const mcTelling = {}
@@ -329,11 +330,11 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, leads, doelen, ze
                   </tr>
                 )
               })}
-              {/* Follow-ups uit het leadbord, ter info (geen doel) */}
+              {/* Nieuwe leads uit het leadbord, ter info (geen doel) */}
               <tr>
-                <td style={{ position: 'sticky', left: 0, zIndex: 1, background: '#0a0a0a', fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', paddingRight: 8 }}>Follow-ups</td>
+                <td style={{ position: 'sticky', left: 0, zIndex: 1, background: '#0a0a0a', fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', paddingRight: 8 }}>Nieuwe leads</td>
                 {dagen.map(d => {
-                  const v = leads[d]?.followups
+                  const v = leads[d]?.outreach
                   return (
                     <td key={d} style={{ textAlign: 'center', fontSize: '0.66rem', fontWeight: 800, color: v ? '#fff' : 'rgba(255,255,255,0.2)', fontVariantNumeric: 'tabular-nums', padding: '4px 0' }}>
                       {v || '·'}
