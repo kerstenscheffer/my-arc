@@ -48,3 +48,34 @@ language sql stable security definer set search_path to 'public' as $$
 $$;
 revoke all on function public.content_lead_stats(date, date) from public, anon;
 grant execute on function public.content_lead_stats(date, date) to authenticated;
+
+-- 19 okt 2026 (2): follow-ups telden te laag. call_leads houdt alleen de
+-- laatste opvolging bij (last_followup_sent_at wordt overschreven en door een
+-- reactie gewist). Nu logt een trigger elke verhoging van followup_count.
+create table if not exists public.lead_followup_events (
+  id bigint generated always as identity primary key,
+  lead_id uuid not null,
+  coach_id uuid,
+  aantal int not null default 1,
+  created_at timestamptz not null default now()
+);
+create index if not exists lead_followup_events_coach_tijd on public.lead_followup_events (coach_id, created_at);
+alter table public.lead_followup_events enable row level security;
+create policy lfe_select on public.lead_followup_events for select to authenticated
+  using (coach_id = auth.uid() or coach_id in (
+    select o.coach_id from coach_team_members m join coach_team_members o on o.team_id = m.team_id where m.coach_id = auth.uid()));
+
+create or replace function public.log_lead_followup() returns trigger
+language plpgsql security definer set search_path to 'public' as $$
+begin
+  if coalesce(new.followup_count, 0) > coalesce(old.followup_count, 0) then
+    insert into lead_followup_events (lead_id, coach_id, aantal)
+    values (new.id, new.coach_id, new.followup_count - coalesce(old.followup_count, 0));
+  end if;
+  return new;
+end $$;
+create trigger trg_log_lead_followup after update of followup_count on public.call_leads
+  for each row execute function public.log_lead_followup();
+
+-- content_lead_stats: followups = greatest(som uit het log, oude telling op
+-- last_followup_sent_at). Vóór 19 okt is alleen de oude telling er.
