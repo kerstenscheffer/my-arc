@@ -22,3 +22,29 @@
 -- tekst = begin van de caption, alleen bij gewone reels. Gevuld 1 sep t/m
 -- 16 okt 2026 (289 reels, 222 magnets). content_metricool.magnets is het
 -- dagtotaal daarvan; de UI telt per dag uit de posts zelf.
+
+-- 19 okt 2026: outreach (doel 100) + follow-ups per dag uit het leadbord.
+-- Doel mag tot 500. Team = alle coach_ids in het team van auth.uid().
+alter table content_doelen drop constraint if exists content_doelen_doel_check;
+alter table content_doelen add constraint content_doelen_doel_check check (doel between 0 and 500);
+
+create or replace function public.content_lead_stats(van date, tot date)
+returns table(dag date, outreach int, followups int)
+language sql stable security definer set search_path to 'public' as $$
+  with team as (
+    select coalesce(
+      (select array_agg(o.coach_id) from coach_team_members m
+         join coach_team_members o on o.team_id = m.team_id
+        where m.coach_id = auth.uid()),
+      array[auth.uid()]) ids
+  ), dagen as (select generate_series(van, tot, interval '1 day')::date dag)
+  select d.dag,
+    (select count(*)::int from call_leads l, team t where l.coach_id = any(t.ids) and l.deleted_at is null
+       and (l.created_at at time zone 'Europe/Amsterdam')::date = d.dag),
+    (select count(*)::int from call_leads l, team t where l.coach_id = any(t.ids) and l.deleted_at is null
+       and (l.last_followup_sent_at at time zone 'Europe/Amsterdam')::date = d.dag)
+  from dagen d
+  where auth.uid() is not null and tot - van <= 62;
+$$;
+revoke all on function public.content_lead_stats(date, date) from public, anon;
+grant execute on function public.content_lead_stats(date, date) to authenticated;

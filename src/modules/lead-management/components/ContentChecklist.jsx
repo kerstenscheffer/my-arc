@@ -8,8 +8,10 @@
 // uit content_metricool (plus bereik en nieuwe volgers). Reels worden per post
 // gesplitst (content_metricool_posts): staat er Reageer "WOORD" in de caption,
 // dan is het een magnet, anders een gewone reel.
+// Outreach en follow-ups komen uit het leadbord (RPC content_lead_stats):
+// outreach = nieuwe leads die dag, follow-ups = laatste opvolging die dag.
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Clapperboard, Image, Circle, Magnet, Check, Youtube } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clapperboard, Image, Circle, Magnet, Check, Youtube, Send } from 'lucide-react'
 import { Venster, VensterKop } from '../../../components/arc-ui'
 
 const SOORTEN = [
@@ -21,6 +23,8 @@ const SOORTEN = [
   // mee zodra het doel gehaald is. Telt niet mee in de dagring. Metricool
   // ziet geen verschil tussen shorts en een lange video, dus altijd zelf.
   { id: 'youtube', label: 'YouTube', Icon: Youtube, kleur: '#ff0033', doel: 1, week: true },
+  // Automatisch uit het leadbord, niet aan te tikken.
+  { id: 'outreach', label: 'Outreach', Icon: Send, kleur: '#f59e0b', doel: 100, auto: true },
 ]
 const maandagVan = (dag) => { const d = new Date(dag + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return dagStr(d) }
 const weekDagen = (dag) => { const m = new Date(maandagVan(dag) + 'T12:00:00'); return Array.from({ length: 7 }, (_, i) => { const d = new Date(m); d.setDate(m.getDate() + i); return dagStr(d) }) }
@@ -67,19 +71,24 @@ function useContent(supabase, maand) {
   const [doelen, setDoelen] = useState({})
   const [mc, setMc] = useState({}) // dag -> rij uit content_metricool
   const [posts, setPosts] = useState({}) // dag -> reels uit content_metricool_posts
+  const [leads, setLeads] = useState({}) // dag -> { outreach, followups }
 
   const laad = useCallback(async () => {
     if (!supabase) return
     // Hele weken eromheen, zodat een weekdoel over de maandgrens klopt.
     const van = maandagVan(dagStr(new Date(maand.getFullYear(), maand.getMonth(), 1)))
     const tot = weekDagen(dagStr(new Date(maand.getFullYear(), maand.getMonth() + 1, 0)))[6]
-    const [e, c, d, m, p] = await Promise.all([
+    const [e, c, d, m, p, l] = await Promise.all([
       supabase.rpc('content_eigenaar'),
       supabase.from('content_checklist').select('dag, soort, aantal').gte('dag', van).lte('dag', tot),
       supabase.from('content_doelen').select('soort, doel'),
       supabase.from('content_metricool').select('dag, reels, fotos, stories, bereik, nieuwe_volgers, updated_at').gte('dag', van).lte('dag', tot),
       supabase.from('content_metricool_posts').select('tijd, dag, soort, woord, views, tekst').gte('dag', van).lte('dag', tot).order('tijd'),
+      supabase.rpc('content_lead_stats', { van, tot }),
     ])
+    const ll = {}
+    for (const r of l.data || []) ll[r.dag] = r
+    setLeads(ll)
     const pp = {}
     for (const r of p.data || []) (pp[r.dag] ||= []).push(r)
     setPosts(pp)
@@ -122,6 +131,10 @@ function useContent(supabase, maand) {
     if (error) { console.error('content_doelen', error); setDoelen(d => ({ ...d, [soort]: oud })) }
   }
 
+  // Outreach staat in beide standen, uit het leadbord.
+  const zelf = { ...telling }
+  for (const [dag, r] of Object.entries(leads)) if (r.outreach) zelf[sleutel(dag, 'outreach')] = r.outreach
+
   // Metricool-telling: reels/foto's/stories uit Metricool, magnets zelf.
   const mcTelling = {}
   for (const [dag, r] of Object.entries(mc)) {
@@ -129,16 +142,16 @@ function useContent(supabase, maand) {
   }
   // Per post gesplitst: gewone reels en magnets. Dagen zonder postdata houden
   // het dagtotaal als reels en de zelf ingevulde magnets.
-  for (const [k, v] of Object.entries(telling)) if (k.endsWith('|magnet') || k.endsWith('|youtube')) mcTelling[k] = v
+  for (const [k, v] of Object.entries(zelf)) if (/\|(magnet|youtube|outreach)$/.test(k)) mcTelling[k] = v
   for (const [dag, lijst] of Object.entries(posts)) {
     mcTelling[sleutel(dag, 'reel')] = lijst.filter(x => x.soort === 'reel').length
     mcTelling[sleutel(dag, 'magnet')] = lijst.filter(x => x.soort === 'magnet').length
   }
   // Voor de ring: per vakje het hoogste van zelf en Metricool.
   const samen = { ...mcTelling }
-  for (const [k, v] of Object.entries(telling)) samen[k] = Math.max(v, samen[k] || 0)
+  for (const [k, v] of Object.entries(zelf)) samen[k] = Math.max(v, samen[k] || 0)
 
-  return { eigenaar, telling, mcTelling, samen, mc, posts, doelen, zetAantal, zetDoel, laad }
+  return { eigenaar, telling: zelf, mcTelling, samen, mc, posts, leads, doelen, zetAantal, zetDoel, laad }
 }
 
 // Knop voor in de leadbalk: ring van vandaag, opent de maandtabel.
@@ -170,7 +183,7 @@ export default function ContentChecklist({ supabase, isMobile }) {
   )
 }
 
-function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal, zetDoel, eigenaar, maand, setMaand, vandaag, isMobile, onClose }) {
+function ContentVenster({ telling: zelf, mcTelling, mc, posts, leads, doelen, zetAantal, zetDoel, eigenaar, maand, setMaand, vandaag, isMobile, onClose }) {
   const [doelBewerk, setDoelBewerk] = useState(null) // soort-id
   const [modus, setModus] = useState(() => { try { return localStorage.getItem('content_modus') || 'zelf' } catch { return 'zelf' } })
   const kiesModus = (m) => { setModus(m); try { localStorage.setItem('content_modus', m) } catch { /* geen opslag */ } }
@@ -188,6 +201,7 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
 
   // Tik = één erbij; bij het doel weer naar nul.
   const tik = (dag, s) => {
+    if (s.auto) return
     if (isMc && !s.week) { setDetailDag(dag === detailDag ? null : dag); return }
     if (!eigenaar) return
     const doel = doelen[s.id] ?? s.doel
@@ -276,8 +290,8 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
                         <s.Icon size={14} strokeWidth={2.6} color={s.kleur} />
                         <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fff' }}>{s.label}</span>
                         {doelBewerk === s.id ? (
-                          <input type="number" inputMode="numeric" min={0} max={50} autoFocus defaultValue={doel}
-                            onBlur={(e) => { const v = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0)); if (v !== doel) zetDoel(s.id, v); setDoelBewerk(null) }}
+                          <input type="number" inputMode="numeric" min={0} max={500} autoFocus defaultValue={doel}
+                            onBlur={(e) => { const v = Math.max(0, Math.min(500, parseInt(e.target.value, 10) || 0)); if (v !== doel) zetDoel(s.id, v); setDoelBewerk(null) }}
                             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setDoelBewerk(null) }}
                             style={{ width: 42, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: '#fff', fontSize: '0.78rem', fontWeight: 800, padding: '2px 4px', fontFamily: 'inherit', outline: 'none' }} />
                         ) : (
@@ -292,19 +306,19 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
                       const n = telling[sleutel(d, s.id)] || 0
                       const klaar = doel > 0 && n >= doel
                       const deels = n > 0 && !klaar
-                      const vast = isMc && !s.week
+                      const vast = s.auto || (isMc && !s.week)
                       // Weekdoel: de dag zelf groen, de rest van een gehaalde week licht.
                       const weekKlaar = s.week && doel > 0 && weekSom(d, s.id, telling) >= doel
                       return (
                         <td key={d} style={{ padding: 0 }}>
-                          <button onClick={() => tik(d, s)} disabled={!eigenaar && !vast}
+                          <button onClick={() => tik(d, s)} disabled={s.auto || (!eigenaar && !vast)}
                             style={{
                               width: cel, height: cel, borderRadius: 8, padding: 0, fontFamily: 'inherit',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               background: s.week ? (n > 0 ? GROEN : weekKlaar ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.04)')
                                 : klaar ? GROEN : deels ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.04)',
                               border: d === vandaag ? '1.5px solid rgba(255,255,255,0.6)' : '1px solid rgba(255,255,255,0.07)',
-                              color: '#fff', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer',
+                              color: '#fff', fontSize: '0.72rem', fontWeight: 900, cursor: s.auto ? 'default' : 'pointer',
                               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                             }}>
                             {vast ? (n || '') : s.week ? (n > 0 ? <Check size={15} strokeWidth={3.5} /> : '') : klaar ? <Check size={15} strokeWidth={3.5} /> : deels ? `${n}/${doel}` : ''}
@@ -315,6 +329,18 @@ function ContentVenster({ telling: zelf, mcTelling, mc, posts, doelen, zetAantal
                   </tr>
                 )
               })}
+              {/* Follow-ups uit het leadbord, ter info (geen doel) */}
+              <tr>
+                <td style={{ position: 'sticky', left: 0, zIndex: 1, background: '#0a0a0a', fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', paddingRight: 8 }}>Follow-ups</td>
+                {dagen.map(d => {
+                  const v = leads[d]?.followups
+                  return (
+                    <td key={d} style={{ textAlign: 'center', fontSize: '0.66rem', fontWeight: 800, color: v ? '#fff' : 'rgba(255,255,255,0.2)', fontVariantNumeric: 'tabular-nums', padding: '4px 0' }}>
+                      {v || '·'}
+                    </td>
+                  )
+                })}
+              </tr>
               {/* Metricool: bereik en nieuwe volgers per dag */}
               {isMc && [{ k: 'bereik', label: 'Bereik', f: kort }, { k: 'nieuwe_volgers', label: 'Nieuwe volgers', f: (n) => `+${n}` }].map(r => (
                 <tr key={r.k}>
