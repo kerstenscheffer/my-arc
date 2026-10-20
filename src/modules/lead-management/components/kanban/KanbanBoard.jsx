@@ -2734,6 +2734,7 @@ export default function KanbanBoard({
         <DueCallsModal
           dueCalls={dueCalls}
           wachtBetaling={wachtBetaling}
+          mijnId={coachId}
           onOutcome={handleDueCallOutcome}
           onBetaling={handleBetalingBinnen}
           onTerugdraaien={handleSaleTerugdraaien}

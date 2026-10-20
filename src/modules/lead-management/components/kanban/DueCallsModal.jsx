@@ -203,7 +203,11 @@ function CallRegel({ dc, onOutcome }) {
 // Een close die nog op geld wacht. Dichtgeklapt zie je wie en wanneer; open
 // staat hetzelfde sale-formulier als bij het afhandelen van de call, zodat de
 // bedragen op één manier gevraagd worden.
-function BetaalRegel({ rij, onBetaling, onTerugdraaien }) {
+function BetaalRegel({ rij, mijnId, onBetaling, onTerugdraaien }) {
+  // Het tabblad toont de openstaande betalingen van het hele team. Geld
+  // afvinken mag iedereen; terugdraaien verplaatst de lead op het bord van de
+  // eigenaar, dus dat laten we bij hem.
+  const vanAnder = !!(rij.coach_id && mijnId && rij.coach_id !== mijnId)
   const [open, setOpen] = useState(false)
   // Soms zegt een klant tóch af voordat er betaald is. Dan is de close geen
   // close meer: sale terugdraaien en als verloren boeken, mét objectie.
@@ -249,6 +253,7 @@ function BetaalRegel({ rij, onBetaling, onTerugdraaien }) {
               ? `€${Number(rij.order_value).toLocaleString('nl-NL')} afgesproken`
               : 'Bedrag nog niet ingevuld'}
             {dagen != null && ` · ${dagen === 0 ? 'vandaag' : `${dagen} dag${dagen === 1 ? '' : 'en'} geleden`}`}
+            {vanAnder && ' · lead van je teamgenoot'}
           </div>
         </div>
         <ChevronRight
@@ -291,7 +296,7 @@ function BetaalRegel({ rij, onBetaling, onTerugdraaien }) {
         />
       )}
 
-      {open && !verloren && (
+      {open && !verloren && !vanAnder && (
         <button
           style={{ ...knop('#ef4444'), width: '100%', minHeight: 34, marginTop: 6, fontSize: '0.74rem' }}
           onClick={() => setVerloren(true)}
@@ -317,7 +322,7 @@ function Kop({ tekst, aantal }) {
   )
 }
 
-export default function DueCallsModal({ dueCalls, wachtBetaling, onOutcome, onBetaling, onTerugdraaien, onClose }) {
+export default function DueCallsModal({ dueCalls, wachtBetaling, mijnId, onOutcome, onBetaling, onTerugdraaien, onClose }) {
   const modalHost = useModalHost()
   const lijst = dueCalls || []
   const betalingen = wachtBetaling || []
@@ -415,7 +420,7 @@ export default function DueCallsModal({ dueCalls, wachtBetaling, onOutcome, onBe
               </div>
             ) : (
               betalingen.map(rij => (
-                <BetaalRegel key={rij.movement_id} rij={rij} onBetaling={onBetaling} onTerugdraaien={onTerugdraaien} />
+                <BetaalRegel key={rij.movement_id} rij={rij} mijnId={mijnId} onBetaling={onBetaling} onTerugdraaien={onTerugdraaien} />
               ))
             )
           ) : lijst.length === 0 ? (

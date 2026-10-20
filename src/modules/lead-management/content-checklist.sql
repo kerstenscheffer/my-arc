@@ -79,3 +79,43 @@ create trigger trg_log_lead_followup after update of followup_count on public.ca
 
 -- content_lead_stats: followups = greatest(som uit het log, oude telling op
 -- last_followup_sent_at). Vóór 19 okt is alleen de oude telling er.
+
+-- ── 20 okt 2026: outreach en follow-ups gesplitst ─────────────────────────
+-- Marcel: "99 follow-ups" op 19 okt waren zijn ochtendronde campagne-DM's
+-- (die knop doet ook followup_count +1), en "nieuwe leads" waren een bulk-
+-- import. Het event-log krijgt nu een soort: zet dezelfde update ook
+-- campaign_message_sent_at of last_contacted_at, dan is het outreach.
+alter table lead_followup_events add column if not exists soort text not null default 'followup'
+  check (soort in ('outreach','followup'));
+
+create or replace function public.log_lead_followup()
+returns trigger language plpgsql security definer set search_path to 'public' as $function$
+begin
+  if coalesce(new.followup_count, 0) > coalesce(old.followup_count, 0) then
+    insert into lead_followup_events (lead_id, coach_id, aantal, soort)
+    values (new.id, new.coach_id, new.followup_count - coalesce(old.followup_count, 0),
+      case when new.campaign_message_sent_at is distinct from old.campaign_message_sent_at
+             or new.last_contacted_at is distinct from old.last_contacted_at
+           then 'outreach' else 'followup' end);
+  end if;
+  return new;
+end $function$;
+
+-- content_lead_stats geeft nu (dag, outreach, followups, nieuwe_leads).
+-- Vanaf 21 okt uit het log per soort; daarvoor uit de stempels op de lead
+-- (campaign_message_sent_at = outreach; last_followup_sent_at zonder
+-- campagne-bericht in dezelfde minuut = follow-up). Live definitie:
+--   select pg_get_functiondef('public.content_lead_stats'::regproc);
+
+-- ── 20 okt 2026: openstaande betalingen team-breed ───────────────────────
+-- get_awaiting_payment en get_open_reservations filteren nu op
+-- team_coach_ids(p_coach_id) in plaats van alleen de eigen coach_id, zodat
+-- Kersten en Marcel dezelfde lijst zien. Rijen hebben nu ook coach_id.
+create or replace function public.team_coach_ids(p_coach_id uuid)
+returns uuid[] language sql stable as $$
+  select coalesce(
+    (select array_agg(distinct o.coach_id) from coach_team_members m
+       join coach_team_members o on o.team_id = m.team_id
+      where m.coach_id = p_coach_id),
+    array[p_coach_id])
+$$;
