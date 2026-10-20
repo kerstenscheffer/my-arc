@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import zichtbaarPollen from '../../utils/zichtbaarPollen';
+
+// Meldingen die al eens vanzelf openklapten (deze sessie).
+const autoGeopend = new Set();
 import { Bell, X, TrendingUp, Award, Utensils, AlertCircle, Sparkles, CheckCircle } from 'lucide-react';
 
 export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange }) {
@@ -21,11 +25,9 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
   useEffect(() => {
     if (clientId && db?.notifications) {
       loadNotifications();
-      
-      const interval = setInterval(() => {
-        loadNotifications();
-      }, 30000);
-      return () => clearInterval(interval);
+      // Elke 2 min, en alleen terwijl de app in beeld is (was elke 30 s,
+      // ook op de achtergrond).
+      return zichtbaarPollen(loadNotifications, 120000);
     }
   }, [clientId, currentPage, db]);
 
@@ -62,8 +64,12 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
         const unreadCount = data.filter(n => n.status === 'active').length;
         setHasUnread(unreadCount > 0);
         
-        // Auto-show for high priority with animation
-        if (data.some(n => (n.priority === 'high' || n.priority === 'urgent') && n.status === 'active')) {
+        // Belangrijke melding klapt het paneel open, maar elke melding maar
+        // één keer. Voorheen bij elke poll opnieuw: elke 30 s de hele app
+        // opnieuw opgebouwd.
+        const nieuw = data.filter(n => (n.priority === 'high' || n.priority === 'urgent') && n.status === 'active' && !autoGeopend.has(n.id));
+        if (nieuw.length) {
+          nieuw.forEach(n => autoGeopend.add(n.id));
           setTimeout(() => setIsExpanded(true), 500);
         }
       }

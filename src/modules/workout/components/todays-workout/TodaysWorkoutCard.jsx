@@ -17,7 +17,7 @@ export default function TodaysWorkoutCard({
   client, db, isExpanded, zonderFoto = false,
   // De workout-timer hoort bij de kop: die blijft staan terwijl je door de
   // oefeningen scrolt. Zweefde eerder los over de pagina.
-  timerElapsedSec = 0, timerRunning = false, timerStarted = false,
+  timerAccumulatedSec = 0, timerStartedAt = null, timerRunning = false, timerStarted = false,
   timerFinished = false, onTimerToggle, onTimerReset,
 }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
@@ -125,7 +125,7 @@ export default function TodaysWorkoutCard({
             color: timerFinished ? '#0a0a0a' : timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.5)',
             fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', lineHeight: 1,
           }}>
-            {timerStarted ? formatElapsed(timerElapsedSec) : '0:00'}
+            {timerStarted ? <TimerGetal opgebouwd={timerAccumulatedSec} startedAt={timerStartedAt} format={formatElapsed} /> : '0:00'}
           </span>
         </div>
 
@@ -380,4 +380,16 @@ function Stat({ val, label, isMobile, color }) {
       }}>{label}</span>
     </div>
   )
+}
+
+// Alleen dit getal ververst elke seconde, niet de hele workout eromheen.
+function TimerGetal({ opgebouwd, startedAt, format }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!startedAt) return
+    const id = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+  const live = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0
+  return format(opgebouwd + live)
 }

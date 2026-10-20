@@ -197,8 +197,7 @@ export default function VideoTeaser({
           // Hoger dan een regel tekst nodig heeft: een 16:9-beeld in een lage
           // balk wordt anders tot een uitsnede van het midden.
           minHeight: 70,
-          background: 'rgba(10,10,10,0.92)',
-          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          background: 'rgba(10,10,10,0.96)',
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: 16,
           boxShadow: '0 14px 40px rgba(0,0,0,0.6)',

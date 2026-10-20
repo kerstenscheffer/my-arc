@@ -12,7 +12,10 @@
     <link rel="manifest" href="/manifest.json" />
     
     <!-- Meta Pixel Code -->
+    <!-- Niet in de native app: daar komt geen advertentieverkeer binnen en
+         het script kost bij elke start laadtijd. -->
     <script>
+    if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) && location.protocol !== 'capacitor:')
     !function(f,b,e,v,n,t,s)
     {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
     n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -21,8 +24,10 @@
     t.src=v;s=b.getElementsByTagName(e)[0];
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
+    if (window.fbq) {
     fbq('init', '1651499006027796');
     fbq('track', 'PageView');
+    }
     </script>
     <!-- End Meta Pixel Code -->
 

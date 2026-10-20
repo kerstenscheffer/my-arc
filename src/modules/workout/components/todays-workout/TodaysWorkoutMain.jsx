@@ -80,16 +80,9 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       }
     } catch { /* localStorage niet beschikbaar — geen probleem */ }
   }, [timer, timerStorageKey])
-  // Tick — forceer re-render per seconde zolang timer loopt.
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    if (!timer.running) return
-    const id = setInterval(() => setTick(t => (t + 1) % 1000000), 1000)
-    return () => clearInterval(id)
-  }, [timer.running])
-  // Afgeleide waarden voor consumenten (LogModal).
-  const liveRunSec = timer.running && timer.startedAt ? Math.floor((Date.now() - timer.startedAt) / 1000) : 0
-  const timerElapsedSec = timer.accumulatedSec + liveRunSec
+  // Geen tik per seconde hier: dat bouwde elke seconde de hele workout
+  // (alle oefeningen + foto's) opnieuw op. Het lopende getal tikt zelf in
+  // TimerGetal (TodaysWorkoutCard); hier alleen start + opgebouwde tijd.
   const timerRunning = !!timer.running
   const timerStarted = timer.running || timer.accumulatedSec > 0
   const timerFinished = !!timer.finished
@@ -449,7 +442,8 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       db={db}
       isExpanded={expanded}
       zonderFoto
-      timerElapsedSec={timerElapsedSec}
+      timerAccumulatedSec={timer.accumulatedSec}
+      timerStartedAt={timer.running ? timer.startedAt : null}
       timerRunning={timerRunning}
       timerStarted={timerStarted}
       timerFinished={timerFinished}

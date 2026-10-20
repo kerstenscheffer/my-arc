@@ -1,5 +1,6 @@
 // src/client/components/WorkoutChallengeSidebar.jsx
 import { useState, useEffect } from 'react'
+import zichtbaarPollen from '../../utils/zichtbaarPollen'
 import { Dumbbell, X, Trophy, TrendingUp, Calendar, CheckCircle, Target, AlertCircle, Clock, Flame, Zap } from 'lucide-react'
 
 export default function WorkoutChallengeSidebar({ client, db }) {
@@ -20,9 +21,13 @@ export default function WorkoutChallengeSidebar({ client, db }) {
   })
 
   useEffect(() => {
-    checkChallengeAndProgress()
-    const interval = setInterval(checkChallengeAndProgress, 30000)
-    return () => clearInterval(interval)
+    // Zonder challenge geeft de check false en stopt het pollen; met een
+    // challenge elke 2 min, alleen terwijl de app in beeld is.
+    let stop = null
+    Promise.resolve(checkChallengeAndProgress()).then(door => {
+      if (door !== false && stop === null) stop = zichtbaarPollen(checkChallengeAndProgress, 120000)
+    })
+    return () => { if (stop) stop(); stop = false }
   }, [client?.id])
 
   const checkChallengeAndProgress = async () => {
@@ -41,7 +46,7 @@ export default function WorkoutChallengeSidebar({ client, db }) {
       if (error || !challenge) {
         setShowBadge(false)
         setLoading(false)
-        return
+        return false
       }
 
       // Calculate dates

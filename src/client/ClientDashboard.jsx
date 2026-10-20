@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
 import LaadScherm from '../components/LaadScherm'
+import PaginaLader from '../ui/PaginaLader'
 // Klein en niet lazy: dit is juist wat je ziet terwijl de workout-code laadt.
 import { WorkoutPaginaSkelet } from '../modules/workout/components/WorkoutSkelet'
 import DatabaseService from '../services/DatabaseService'
@@ -83,7 +84,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   // onderbalk opent hem, en toont de bibliotheek als er niets klaarstaat.
   const [videoTeaser, setVideoTeaser] = useState({ aantal: 0, open: false })
   useEffect(() => {
-    const stand = (e) => setVideoTeaser({ aantal: e.detail?.aantal || 0, open: !!e.detail?.open })
+    // Zelfde stand → zelfde object, anders bouwt elk in- en uitschuiven het
+    // hele dashboard opnieuw op.
+    const stand = (e) => {
+      const aantal = e.detail?.aantal || 0, open = !!e.detail?.open
+      setVideoTeaser(v => v.aantal === aantal && v.open === open ? v : { aantal, open })
+    }
     window.addEventListener('myarc:video-teaser-state', stand)
     return () => window.removeEventListener('myarc:video-teaser-state', stand)
   }, [])
@@ -214,11 +220,17 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       // Op slot geldt alleen voor de klant zelf; de coach die meekijkt ziet
       // gewoon zijn app.
       setOpSlot(!!clientData.account_locked_at && !previewClientId && !uitSleutel)
-      setClient(clientData)
+      // Zelfde gegevens als we al hebben (bv. na de token-verversing elk uur):
+      // het oude object houden, anders draaien alle effecten op [client]
+      // opnieuw en haalt elk scherm alles nog eens op.
+      setClient(prev => prev && JSON.stringify(prev) === JSON.stringify(clientData) ? prev : clientData)
       geladenRef.current = true
       setError(null)
       if (clientData.assigned_schema_id) {
-        try { const schemaData = await db.getClientSchema(clientData.id); setSchema(schemaData) }
+        try {
+          const schemaData = await db.getClientSchema(clientData.id)
+          setSchema(prev => prev && JSON.stringify(prev) === JSON.stringify(schemaData) ? prev : schemaData)
+        }
         catch (schemaError) { console.warn('Could not load schema:', schemaError); setSchema(null) }
       }
     } catch (error) {
@@ -419,11 +431,11 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             {!focusMode && !['meal', 'workout', 'home'].includes(currentView) && (
               <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
             )}
-            {/* Workout laadt in de vorm van de pagina (skelet), net als Meal;
-                de andere schermen houden voorlopig de spinner. */}
+            {/* Workout laadt in de vorm van de pagina (skelet); de andere
+                schermen tonen hun eigen icoon (PaginaLader). */}
             <Suspense fallback={currentView === 'workout'
               ? <WorkoutPaginaSkelet isMobile={isMobile} />
-              : <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}><div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} /></div>}>
+              : <PaginaLader pagina={currentView} />}>
             {currentView === 'home' && (
               <ClientHome client={client} db={db} setCurrentView={setCurrentView} />
             )}
@@ -501,9 +513,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         right: isMobile ? 10 : 'auto',
         transform: isMobile ? 'none' : 'translateX(-50%)',
         width: isMobile ? 'auto' : 'min(680px, calc(100vw - 32px))',
-        background: 'rgba(10, 10, 10, 0.88)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        // Geen backdrop-blur: een vaste vervaagde balk kost bij elke scrollframe
+        // rekenwerk op de telefoon. Bijna-dekkend zwart ziet er hetzelfde uit.
+        background: 'rgba(10, 10, 10, 0.96)',
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 18,
         boxShadow: '0 14px 40px rgba(0,0,0,0.6)',

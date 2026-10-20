@@ -7,6 +7,7 @@ import AIMealDashboard from './AIMealDashboard'
 import VoedingsGids from './VoedingsGids'
 import GelegenhedenHub from './GelegenhedenHub'
 import NutritionChoiceTrainer from '../lab/experiments/NutritionChoiceTrainer'
+import PaginaLader from '../../ui/PaginaLader'
 
 export default function MealPlanMain({ client, onNavigate, db }) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
@@ -43,27 +44,7 @@ export default function MealPlanMain({ client, onNavigate, db }) {
   }
   
   // Loading state
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#0a0a0a',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          width: '60px',
-          height: '60px',
-          border: '3px solid rgba(255, 215, 0, 0.2)',
-          borderTopColor: '#FFD700',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
-      </div>
-    )
-  }
+  if (loading) return <PaginaLader pagina="meal" hoogte="100vh" />
   
   // Altijd het dashboard, ook zonder plan: dan draait het in de vrije stand
   // (eten loggen, water, macro's uit het profiel). De oude melding "vraag je
