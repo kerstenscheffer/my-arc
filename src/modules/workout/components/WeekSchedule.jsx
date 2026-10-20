@@ -1,7 +1,7 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
 import { AlertCircle, RefreshCw, Plus } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Trash2, Lock } from 'lucide-react'
 import WeekGrid from './week-schedule/WeekGrid'
@@ -128,6 +128,7 @@ export default function WeekSchedule({
     return { name: naam, sets: sets.length || 3, reps: sets[0]?.reps || 10 }
   }
   const [sessieVersie, setSessieVersie] = useState(0)
+  const plannenRef = useRef({ clientId: null, plans: [] })
   useEffect(() => {
     const bump = () => setSessieVersie(v => v + 1)
     window.addEventListener('myarc:workout-changed', bump)
@@ -159,7 +160,12 @@ export default function WeekSchedule({
       // Alle plannen van de klant (ook het vorige, na een wissel): een sessie
       // zonder eigen naam ("Quick Log") krijgt de naam van de dag waarvan de
       // oefeningen het best overeenkomen, bv. 'Push'.
-      const { plans: allePlannen } = db.getClientWorkoutPlans ? await db.getClientWorkoutPlans(clientId).then(r => r, () => ({ plans: [] })) : { plans: [] }
+      // Eén keer per klant: dit draaide voorheen na elke gelogde set opnieuw.
+      if (plannenRef.current.clientId !== clientId) {
+        const { plans } = db.getClientWorkoutPlans ? await db.getClientWorkoutPlans(clientId).then(r => r, () => ({ plans: [] })) : { plans: [] }
+        plannenRef.current = { clientId, plans: plans || [] }
+      }
+      const allePlannen = plannenRef.current.plans
       const naamUitOefeningen = (oef) => {
         if (!oef || oef.size === 0) return null
         let beste = null, besteScore = 0

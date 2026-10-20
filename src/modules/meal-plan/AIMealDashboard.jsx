@@ -165,7 +165,8 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     if (client?.id) {
       loadDashboardData()
     }
-  }, [client])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id])
 
   // Past de coach de macro's aan terwijl dit scherm openstaat, dan hoort dit
   // mee te bewegen. De targets worden hier vers uit de database gehaald, maar
@@ -189,7 +190,16 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     if (!dashboardData) setLoading(true)
     
     try {
-      const data = await service.loadAIDashboardData(client.id)
+      // Dashboard, verse macrodoelen en wat er vandaag gegeten is tegelijk
+      // ophalen; die laatste twee wachtten eerst op het dashboard.
+      const [data, versDoel, realConsumed] = await Promise.all([
+        service.loadAIDashboardData(client.id),
+        db.supabase.from('clients')
+          .select('target_calories, target_protein, target_carbs, target_fat')
+          .eq('id', client.id).single()
+          .then(r => r, () => ({ data: null })),
+        calculateConsumedFromDB(),
+      ])
       
       if (data.dailyTotals) {
         // Fresh targets from DB — not cached client prop
@@ -199,25 +209,17 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           carbs: client.target_carbs || 0,
           fat: client.target_fat || 0
         }
-        try {
-          const { data: fc } = await db.supabase
-            .from('clients')
-            .select('target_calories, target_protein, target_carbs, target_fat')
-            .eq('id', client.id)
-            .single()
-          if (fc) {
-            planTargets = {
-              calories: fc.target_calories || planTargets.calories,
-              protein: fc.target_protein || planTargets.protein,
-              carbs: fc.target_carbs || planTargets.carbs,
-              fat: fc.target_fat || planTargets.fat
-            }
+        const fc = versDoel?.data
+        if (fc) {
+          planTargets = {
+            calories: fc.target_calories || planTargets.calories,
+            protein: fc.target_protein || planTargets.protein,
+            carbs: fc.target_carbs || planTargets.carbs,
+            fat: fc.target_fat || planTargets.fat
           }
-        } catch (e) { console.warn('Fresh targets fetch failed') }
+        }
         
         data.dailyTotals.targets = planTargets
-        
-        const realConsumed = await calculateConsumedFromDB(data)
         data.dailyTotals.consumed = realConsumed
         
         data.dailyTotals.percentages = {

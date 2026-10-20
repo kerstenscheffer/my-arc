@@ -54,17 +54,30 @@ function BoodschappenSkelet({ isMobile }) {
   )
 }
 
+// Blijft bewaard tussen tabbladwissels: terugkomen toont de lijst meteen
+// (en ververst op de achtergrond). Een uit het weekschema berekende lijst
+// wordt per plan + wijzigingsmoment bewaard, zodat die niet elke keer opnieuw
+// wordt opgebouwd.
+let laatsteStand = null // { clientId, data }
+const berekendeLijsten = new Map()
+
 export default function ShoppingHub({ client, db, onNavigate }) {
   const [service] = useState(() => new ShoppingService(db))
   const isMobile = window.innerWidth <= 768
-  const [loading, setLoading] = useState(true)
-  const [shoppingData, setShoppingData] = useState(null)
+  const uitCache = laatsteStand?.clientId === client?.id ? laatsteStand.data : null
+  const [loading, setLoading] = useState(!uitCache)
+  const [shoppingData, setShoppingDataState] = useState(uitCache)
+  const setShoppingData = (data) => {
+    laatsteStand = { clientId: client?.id, data }
+    setShoppingDataState(data)
+  }
   
   useEffect(() => {
     if (client?.id) {
       loadShoppingData()
     }
-  }, [client])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id])
   
   // Auto-refresh when meal plan changes
   useEffect(() => {
@@ -94,7 +107,7 @@ export default function ShoppingHub({ client, db, onNavigate }) {
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [client])
+  }, [client?.id])
   
   // Alleen de eerste keer het skelet. Verversen (na een planwijziging of
   // via onRefresh) laat de lijst staan tot de nieuwe er is, in plaats van
@@ -111,8 +124,12 @@ export default function ShoppingHub({ client, db, onNavigate }) {
       }
       
       if (!shoppingList && activePlan?.week_structure) {
-        console.log('🛒 No saved shopping list found, generating from week_structure...')
-        shoppingList = await service.generateShoppingList(activePlan.week_structure)
+        const sleutel = `${activePlan.id}:${activePlan.updated_at || ''}`
+        shoppingList = berekendeLijsten.get(sleutel)
+        if (!shoppingList) {
+          shoppingList = await service.generateShoppingList(activePlan.week_structure)
+          if (shoppingList) berekendeLijsten.set(sleutel, shoppingList)
+        }
       }
       
       const progress = await service.getShoppingProgress(client.id, activePlan?.id)

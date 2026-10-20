@@ -1,5 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ExerciseCard.jsx
 import { useState, useEffect } from 'react'
+import { oefeningInfo, laatsteFeedback } from '../../../utils/oefeningBatch'
 import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare, Trash2 } from 'lucide-react'
 import SwapModal from './SwapModal'
 import ExerciseLogModal from './ExerciseLogModal'
@@ -83,11 +84,8 @@ export default function ExerciseCard({
       // De video zelf zit alleen nog in het log-scherm; hier gebruiken we 'm
       // hooguit om een thumbnail uit af te leiden.
       try {
-        const { data: ex } = await db.supabase
-          .from('exercises')
-          .select('thumbnail_url, video_url, fallback_video_url, image_url')
-          .eq('name', exercise.name)
-          .maybeSingle()
+        // Gebundeld met de andere kaarten tot één query (oefeningBatch).
+        const ex = await oefeningInfo(db, exercise.name)
         // Onthoud de fallback URL op het localExercise; het log-scherm speelt
         // 'm af als de coach nog geen eigen video heeft.
         if (ex?.fallback_video_url && !exercise.video_url) {
@@ -110,9 +108,9 @@ export default function ExerciseCard({
   }
 
   const checkFeedback = async () => {
-    if (!client?.id || !db?.getExerciseSubmission) return
+    if (!client?.id || !db?.supabase) return
     try {
-      const sub = await db.getExerciseSubmission(client.id, exercise.name)
+      const sub = await laatsteFeedback(db, client.id, exercise.name)
       setHasFeedback(!!sub?.coach_feedback && sub.status !== 'seen')
     } catch { setHasFeedback(false) }
   }

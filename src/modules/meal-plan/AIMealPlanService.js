@@ -2,6 +2,14 @@ import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd } from './utils/pre
 import { ClientAgendaService } from '../client-agenda/ClientAgendaService'
 // src/modules/meal-plan/AIMealPlanService.js
 // Complete service layer voor AI Meal Dashboard - WATER TRACKING FIXED
+
+const MAALTIJD_TTL = 5 * 60 * 1000
+const maaltijdCache = new Map() // id → { t, m }
+const maaltijdUitCache = (id) => {
+  const c = maaltijdCache.get(id)
+  return c && Date.now() - c.t < MAALTIJD_TTL ? c.m : null
+}
+const maaltijdInCache = (id, m) => { if (id && m) maaltijdCache.set(id, { t: Date.now(), m }) }
 export default class AIMealPlanService {
   constructor(db) {
     this.db = db
@@ -24,7 +32,9 @@ async loadAIDashboardData(clientId) {
       todayMood,  
       favorites,
       customMeals,
-      recentHistory
+      recentHistory,
+      { data: klant },
+      trainingStart,
     ] = await Promise.all([
       this.getActiveAIPlan(clientId),
       this.getAIProgress(clientId, todayStr),
@@ -32,16 +42,14 @@ async loadAIDashboardData(clientId) {
       this.getAIMoodToday(clientId, todayStr),  
       this.getAIFavorites(clientId),
       this.getAICustomMeals(clientId),
-      this.getAIRecentHistory(clientId, 7)
+      this.getAIRecentHistory(clientId, 7),
+      // workout_schedule van de klant: bepaalt of de pre-workout maaltijd
+      // vandaag meedoet. Hoe laat hij traint bepaalt de tijd ervan. Beide
+      // tegelijk met de rest i.p.v. erna.
+      this.supabase.from('clients').select('workout_schedule').eq('id', clientId).maybeSingle()
+        .then(r => r, () => ({ data: null })),
+      this.getTrainingStartVandaag(clientId),
     ])
-      
-    // workout_schedule van de klant erbij: bepaalt of de pre-workout maaltijd
-    // vandaag meedoet.
-    const { data: klant } = await this.supabase
-      .from('clients').select('workout_schedule').eq('id', clientId).maybeSingle()
-    // Hoe laat traint hij vandaag? De pre-workout maaltijd hangt daaraan, niet
-    // aan de kloktijd die in het maaltijd-slot staat.
-    const trainingStart = await this.getTrainingStartVandaag(clientId)
     // Koos de klant voor vandaag een dagtemplate "alleen deze week", dan wint
     // die van het weekplan. Hier afhandelen en niet alleen in de dagweergave:
     // "je volgende maaltijd" en de dagtotalen komen uit dezelfde bron, en die
@@ -219,6 +227,15 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       const NIET_MAALTIJD = new Set(['totals', 'is_training_day', 'dayId', 'scaling', 'snacks', 'meals'])
       const leesbaar = (slot) => slot.charAt(0).toUpperCase() + slot.slice(1).replace(/_/g, ' ')
 
+      // Eerst alle maaltijd-id's van vandaag in één keer ophalen; de lussen
+      // hieronder lezen ze daarna uit de cache.
+      const refId = (r) => typeof r === 'string' ? r : (r && typeof r === 'object' && !r.calories ? r.meal_id : null)
+      const teLaden = []
+      Object.keys(dayPlan).forEach(slot => { if (!NIET_MAALTIJD.has(slot)) teLaden.push(refId(dayPlan[slot])) })
+      if (Array.isArray(dayPlan.snacks)) dayPlan.snacks.forEach(sn => teLaden.push(refId(sn)))
+      Object.values(swaps).forEach(sw => { if (sw?.was_swapped && !sw.edited_meal) teLaden.push(sw.meal_id) })
+      await this.voorlaadMaaltijden(teLaden)
+
       for (const slot of Object.keys(dayPlan)) {
         if (NIET_MAALTIJD.has(slot) || !dayPlan[slot]) continue
         const slotRef = dayPlan[slot]
@@ -339,14 +356,34 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
     }
   }
 
+  // Maaltijden veranderen zelden; 5 min bewaren scheelt een query per slot
+  // bij elk herladen van het dagoverzicht (na elke log of wissel).
+  schoonMealId(mealId) {
+    return String(mealId).replace('_small', '').replace('_large', '').replace('_xl', '').replace('_medium', '')
+  }
+
+  // Alle maaltijden van een dag in één keer (.in()) i.p.v. per slot na elkaar.
+  async voorlaadMaaltijden(ids) {
+    const isUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+    const nodig = [...new Set(ids.filter(Boolean).map(i => this.schoonMealId(i)))]
+      .filter(id => isUuid(id) && !maaltijdUitCache(id))
+    if (!nodig.length) return
+    try {
+      const { data } = await this.supabase.from('ai_meals').select('*').in('id', nodig)
+      ;(data || []).forEach(m => maaltijdInCache(m.id, m))
+      const rest = nodig.filter(id => !maaltijdUitCache(id))
+      if (rest.length) {
+        const { data: eigen } = await this.supabase.from('ai_custom_meals').select('*').in('id', rest)
+        ;(eigen || []).forEach(m => maaltijdInCache(m.id, m))
+      }
+    } catch { /* getMealById valt terug op losse queries */ }
+  }
+
   async getMealById(mealId) {
     try {
-      // Clean all possible suffixes
-      const cleanId = String(mealId)
-        .replace('_small', '')
-        .replace('_large', '')
-        .replace('_xl', '')
-        .replace('_medium', '')
+      const cleanId = this.schoonMealId(mealId)
+      const bewaard = maaltijdUitCache(cleanId)
+      if (bewaard) return bewaard
       
       // Try ai_meals table
       const { data: aiMeal, error: aiError } = await this.supabase
@@ -356,7 +393,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         .single()
       
       if (aiMeal && !aiError) {
-        console.log('✅ Found meal:', aiMeal.name, 'Calories:', aiMeal.calories)
+        maaltijdInCache(cleanId, aiMeal)
         return aiMeal
       }
       
@@ -368,7 +405,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         .single()
       
       if (customMeal && !customError) {
-        console.log('✅ Found custom meal:', customMeal.name)
+        maaltijdInCache(cleanId, customMeal)
         return customMeal
       }
       

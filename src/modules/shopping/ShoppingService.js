@@ -196,8 +196,41 @@ export default class ShoppingService {
   }
   
   // Generate shopping list from week structure
+  // Haal alle maaltijden en ingrediënten van de week in twee keer op
+  // (.in()) in plaats van één query per maaltijd en per ingrediënt na elkaar.
+  // Dat waren er 35–150, samen 10–30 s. De lus in generateShoppingList leest
+  // daarna uit deze caches via getMealWithIngredients / getIngredientDetails.
+  async voorlaad(weekStructure) {
+    const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+    this._maaltijden = new Map()
+    this._ingredienten = new Map()
+    const items = []
+    Object.values(weekStructure || {}).forEach(dag => {
+      if (!dag || typeof dag !== 'object') return
+      Object.values(dag).forEach(v => (Array.isArray(v) ? v : [v]).forEach(m => { if (m) items.push(m) }))
+    })
+    const mealIds = new Set()
+    const ingIds = new Set()
+    const voegIngToe = (lijst) => (Array.isArray(lijst) ? lijst : []).forEach(i => { if (isUuid(i?.ingredient_id)) ingIds.add(i.ingredient_id) })
+    items.forEach(m => {
+      const raw = typeof m === 'string' ? m : (m?.meal_id || m?.id)
+      const id = typeof raw === 'string' ? raw.split('_')[0].trim() : null
+      if (isUuid(id)) mealIds.add(id)
+      if (typeof m === 'object') voegIngToe(m.ingredients_list)
+    })
+    if (mealIds.size) {
+      const { data } = await this.supabase.from('ai_meals').select('*').in('id', [...mealIds])
+      ;(data || []).forEach(m => { this._maaltijden.set(m.id, m); voegIngToe(m.ingredients_list) })
+    }
+    if (ingIds.size) {
+      const { data } = await this.supabase.from('ai_ingredients').select('*').in('id', [...ingIds])
+      ;(data || []).forEach(i => this._ingredienten.set(i.id, i))
+    }
+  }
+
   async generateShoppingList(weekStructure) {
     try {
+      try { await this.voorlaad(weekStructure) } catch (e) { console.warn('Voorladen boodschappen mislukt, val terug op losse queries', e) }
       const ingredientMap = {}
       const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
       
@@ -205,7 +238,6 @@ export default class ShoppingService {
         const dayMeals = weekStructure[day]
         if (!dayMeals) continue
         
-        console.log(`🔍 Processing ${day}`)
         const slots = ['breakfast', 'lunch', 'dinner', 'snack1', 'snack2', 'snack3', 'snacks']
         
         for (const slot of slots) {
@@ -225,7 +257,6 @@ export default class ShoppingService {
             
             if (!mealId) continue
             
-            console.log(`📦 Loading meal with ID: ${mealId}`)
             
             const inlineIngredients = (typeof mealItem === 'object' && mealItem?.ingredients_list) 
               ? mealItem.ingredients_list : null
@@ -237,11 +268,9 @@ export default class ShoppingService {
                 name: dbMeal?.name || mealItem?.meal_name || mealItem?.name || 'Unknown',
                 ingredients_list: inlineIngredients
               }
-              console.log(`✅ Using scaled ingredients from plan: ${fullMealData.name}, Ingredients:`, inlineIngredients.length)
             } else {
               fullMealData = await this.getMealWithIngredients(mealId)
               if (!fullMealData) continue
-              console.log(`✅ Loaded from DB: ${fullMealData.name}, Ingredients:`, fullMealData.ingredients_list?.length || 0)
             }
             
             if (fullMealData.ingredients_list && Array.isArray(fullMealData.ingredients_list)) {
@@ -313,7 +342,6 @@ export default class ShoppingService {
             estimatedCost = this.calculateCost(item.totalGrams, item.pricePerUnit, item.originalUnit, item.unitType)
           }
           
-          console.log(`🔄 Converted: ${item.name} ${item.totalGrams}g → ${pieces} ${unit} (€${estimatedCost.toFixed(2)})`)
         } else {
           // NORMAL: keep in grams/ml, apply realistic purchase rounding
           const purchaseAmount = this.calculateRealisticPurchase(item)
@@ -417,6 +445,9 @@ export default class ShoppingService {
   
   // Get meal with ingredients
   async getMealWithIngredients(mealId) {
+    const uitCache = this._maaltijden?.get(String(mealId).trim())
+    if (uitCache) return uitCache
+    if (this._maaltijden?.size) return null // voorgeladen en niet gevonden
     try {
       const { data, error } = await this.supabase
         .from('ai_meals')
@@ -475,6 +506,9 @@ export default class ShoppingService {
     if (this.isPlaceholderId(ingredientId)) {
       return this.resolvePlaceholder(ingredientId)
     }
+    const uitCache = this._ingredienten?.get(ingredientId)
+    if (uitCache) return uitCache
+    if (this._ingredienten?.size) return null // voorgeladen en niet gevonden
     try {
       const { data, error } = await this.supabase
         .from('ai_ingredients')
