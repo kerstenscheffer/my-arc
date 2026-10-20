@@ -119,3 +119,7 @@ returns uuid[] language sql stable as $$
       where m.coach_id = p_coach_id),
     array[p_coach_id])
 $$;
+-- Let op: m.coach_id = any(team_coach_ids(...)) werd per rij berekend (5,7 s,
+-- PostgREST gaf 500 → leeg Betaling-tabblad). Nu: team één keer in een
+-- materialized CTE, en get_awaiting_payment is security definer met het team
+-- van auth.uid() als grens (RLS per rij kostte de rest). ~270 ms.
