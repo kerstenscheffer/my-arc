@@ -62,7 +62,10 @@ begin
     if v_soort in ('reel', 'magnet') then
       -- Metricool-rij van dezelfde reel (zelfde moment, paar seconden verschil) vervangen.
       delete from content_metricool_posts where eigenaar = p_eigenaar and tijd <> v_lokaal
-        and tijd between v_lokaal - interval '2 minutes' and v_lokaal + interval '2 minutes';
+        and tijd between v_lokaal - interval '2 minutes' and v_lokaal + interval '2 minutes'
+        -- nooit een andere Instagram-post weggooien (twee reels kort na elkaar)
+        and not exists (select 1 from content_ig_media i where i.eigenaar = p_eigenaar
+          and (i.tijd at time zone 'Europe/Amsterdam') = content_metricool_posts.tijd);
       insert into content_metricool_posts (eigenaar, tijd, dag, soort, woord, views, tekst)
       values (p_eigenaar, v_lokaal, v_dag, v_soort, v_woord, (m->>'views')::int, case when v_soort = 'reel' then left(m->>'caption', 200) end)
       on conflict (eigenaar, tijd) do update set soort = excluded.soort, woord = excluded.woord,
@@ -106,7 +109,8 @@ declare
 begin
   select id, decrypted_secret, updated_at into v_secret_id, v_tok, v_secret_tijd
     from vault.decrypted_secrets where name = 'meta_ig_token' order by created_at desc limit 1;
-  if v_tok is null then return 'geen token'; end if;
+  v_tok := regexp_replace(v_tok, '\s', '', 'g'); -- geplakt token: spaties/enters weg
+  if v_tok is null or v_tok = '' then return 'geen token'; end if;
 
   -- Token verlengen (60 dagen geldig; kan pas na 24 uur).
   if v_secret_tijd < now() - interval '7 days' then
@@ -146,3 +150,7 @@ end $$;
 revoke all on function public.sync_instagram() from public, anon, authenticated;
 
 select cron.schedule('instagram-sync', '23 * * * *', 'select public.sync_instagram()');
+
+-- 20 okt 2026, eenmalig uitgevoerd: de Metricool-rijen in content_metricool_posts
+-- stonden in UTC (2 uur te vroeg). Dubbelen met Instagram verwijderd, de rest
+-- omgezet naar Europe/Amsterdam (tijd en dag).
