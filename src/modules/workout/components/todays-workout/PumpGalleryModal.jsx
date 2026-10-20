@@ -7,6 +7,7 @@
 //
 // Na opslaan van een nieuwe foto wordt de lijst hier automatisch herladen.
 
+import { fotoWeergaveUrl } from '../../../progress/fotoWeergave'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Camera, ImageOff, Loader2 } from 'lucide-react'
@@ -175,7 +176,7 @@ export default function PumpGalleryModal({ isOpen, onClose, client, db, stats })
                 onClick={() => setViewingPhoto(p)}
               >
                 <img
-                  src={p.photo_url}
+                  src={fotoWeergaveUrl(p.photo_url, { breedte: 400 })}
                   alt={p.caption || 'Pump'}
                   loading="lazy"
                   style={{
@@ -261,7 +262,7 @@ export default function PumpGalleryModal({ isOpen, onClose, client, db, stats })
             <X size={22} strokeWidth={2.4} />
           </button>
           <img
-            src={viewingPhoto.photo_url}
+            src={fotoWeergaveUrl(viewingPhoto.photo_url, { breedte: 1200, kwaliteit: 82 })}
             alt={viewingPhoto.caption || 'Pump'}
             onClick={(e) => e.stopPropagation()}
             style={{

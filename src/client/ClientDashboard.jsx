@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
 import LaadScherm from '../components/LaadScherm'
 import PaginaLader from '../ui/PaginaLader'
+import ruimOpslagOp from '../utils/opruimenOpslag'
 // Klein en niet lazy: dit is juist wat je ziet terwijl de workout-code laadt.
 import { WorkoutPaginaSkelet } from '../modules/workout/components/WorkoutSkelet'
 import DatabaseService from '../services/DatabaseService'
@@ -28,7 +29,6 @@ import CheckinReminderPopup from './components/CheckinReminderPopup'
 import VideoReminderPopup from './components/VideoReminderPopup'
 import CheckinModal from './components/CheckinModal'
 import AccountOpSlot from './components/AccountOpSlot'
-import ClientAgendaView from '../modules/client-agenda/ClientAgendaView'
 
 // Lucide Icons
 import {
@@ -53,6 +53,7 @@ const ClientCalls = lazy(() => import('../modules/call-planning/ClientCalls'))
 const ProgressMain = lazy(() => import('../modules/progress/ProgressMain'))
 const ClientProfile = lazy(() => import('./pages/ClientProfile'))
 const ShoppingHub = lazy(() => import('../modules/shopping/ShoppingHub'))
+const ClientAgendaView = lazy(() => import('../modules/client-agenda/ClientAgendaView'))
 
 // Initialize database
 const db = DatabaseService
@@ -258,6 +259,12 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
     document.addEventListener('visibilitychange', opVoorgrond)
     return () => document.removeEventListener('visibilitychange', opVoorgrond)
   }, [client?.id, opSlot])
+
+  // Oude wegwerp-sleutels in localStorage opruimen, even na het opstarten.
+  useEffect(() => {
+    const t = setTimeout(ruimOpslagOp, 5000)
+    return () => clearTimeout(t)
+  }, [])
 
   // ── Auth-refresh na login op ander apparaat ──
   // Na een TOKEN_REFRESHED-event is de sessie op dit apparaat bijgewerkt maar

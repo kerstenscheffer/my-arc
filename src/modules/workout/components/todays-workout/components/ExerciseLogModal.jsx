@@ -1,10 +1,13 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import lazy from '../../../../../lazyMetHerlaad'
 import { vanKg, naarKg, eenheidLabel, haalGyms } from '../../../gym/GymService'
 import { createPortal } from 'react-dom'
 import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
-import ExerciseProgressChart from './ExerciseProgressChart'
+// Grafiek (recharts, ~300 KB) pas laden als het logscherm opengaat, niet
+// met de hele workoutpagina mee.
+const ExerciseProgressChart = lazy(() => import('./ExerciseProgressChart'))
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
 import BladModal from './BladModal'
@@ -1286,13 +1289,15 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             {/* Krachtverloop van deze oefening: de beste set per training.
                 Staat onder de pillen, want het is context bij het loggen —
                 je ziet meteen of het zwaarder mag. */}
-            <ExerciseProgressChart
-              db={db}
-              client={client}
-              exerciseName={exercise.name}
-              isMobile={isMobile}
-              herlaadSleutel={grafiekVersie}
-            />
+            <Suspense fallback={<div style={{ minHeight: 160 }} />}>
+              <ExerciseProgressChart
+                db={db}
+                client={client}
+                exerciseName={exercise.name}
+                isMobile={isMobile}
+                herlaadSleutel={grafiekVersie}
+              />
+            </Suspense>
 
             {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} eenheid={eenheid} />}
 

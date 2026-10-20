@@ -445,6 +445,9 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   // `photoPreview` is what's shown in the UI (object URL or saved image_url).
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(meal.image_url || null)
+  // Tijdelijke blob-URL van de vorige/laatste foto vrijgeven (anders blijft
+  // de hele foto in het geheugen tot de app sluit).
+  useEffect(() => () => { if (typeof photoPreview === 'string' && photoPreview.startsWith('blob:')) URL.revokeObjectURL(photoPreview) }, [photoPreview])
   const [photoUploading, setPhotoUploading] = useState(false)
 
   const handlePhotoSelect = (e) => {

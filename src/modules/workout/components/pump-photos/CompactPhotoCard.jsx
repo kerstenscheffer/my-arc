@@ -1,4 +1,5 @@
 // src/modules/workout/components/pump-photos/CompactPhotoCard.jsx
+import { fotoWeergaveUrl } from '../../../progress/fotoWeergave'
 import { useState, useEffect } from 'react'
 import { Heart, Flame, Zap, Crown, Star, Trash2, User, MessageCircle, BarChart3 } from 'lucide-react'
 import PhotoCommentsSection from './PhotoCommentsSection'
@@ -276,7 +277,8 @@ export default function CompactPhotoCard({ photo, currentUser, db, onUpdate, del
         }}
       >
         <img
-          src={photo.photo_url}
+          src={fotoWeergaveUrl(photo.photo_url, { breedte: 500 })}
+          loading="lazy"
           alt="Pump photo"
           style={{
             width: '100%',

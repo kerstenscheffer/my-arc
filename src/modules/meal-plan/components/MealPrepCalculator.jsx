@@ -28,6 +28,9 @@ export default function MealPrepCalculator({ client, db, onClose, onSaved }) {
   const [showPhotoStep, setShowPhotoStep] = useState(false)
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
+  // Tijdelijke blob-URL van de vorige/laatste foto vrijgeven (anders blijft
+  // de hele foto in het geheugen tot de app sluit).
+  useEffect(() => () => { if (typeof photoPreview === 'string' && photoPreview.startsWith('blob:')) URL.revokeObjectURL(photoPreview) }, [photoPreview])
   const [photoUploading, setPhotoUploading] = useState(false)
 
   // Ingrediënten zoeken (coach-set, zelfde bron als de Voedingsgids).

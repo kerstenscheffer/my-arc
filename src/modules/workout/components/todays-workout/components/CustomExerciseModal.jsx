@@ -19,6 +19,9 @@ export default function CustomExerciseModal({ onClose, onSave, client, db, schem
   const [primairSpieren, setPrimairSpieren] = useState('chest')
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
+  // Tijdelijke blob-URL van de vorige/laatste foto vrijgeven (anders blijft
+  // de hele foto in het geheugen tot de app sluit).
+  useEffect(() => () => { if (typeof photoPreview === 'string' && photoPreview.startsWith('blob:')) URL.revokeObjectURL(photoPreview) }, [photoPreview])
   const [uploading, setUploading] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)

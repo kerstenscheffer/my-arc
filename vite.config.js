@@ -76,6 +76,9 @@ export default defineConfig(({ command }) => ({
           if (id.includes('/recharts/') || id.includes('/d3-') || id.includes('/victory-')) return 'vendor-charts'
           if (id.includes('/jspdf') || id.includes('/html2canvas/')) return 'vendor-pdf'
           if (id.includes('@zxing')) return 'vendor-scanner'
+          // pdf-lezer: alleen dynamisch geladen (FileService); zonder eigen stuk
+          // belandde hij in 'vendor' en laadde hij bij elke app-start mee.
+          if (id.includes('pdfjs-dist')) return 'vendor-pdfjs'
           if (id.includes('/lucide-react/')) return 'vendor-icons'
           return 'vendor'
         }

@@ -43,6 +43,7 @@ async function verklein(bestand, max = 1024) {
     c.height = Math.round(img.naturalHeight * schaal)
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
     const dataUrl = c.toDataURL('image/jpeg', 0.82)
+    c.width = 0; c.height = 0 // canvasgeheugen meteen vrij
     return { dataUrl, base64: dataUrl.split(',')[1] }
   } finally {
     URL.revokeObjectURL(url)

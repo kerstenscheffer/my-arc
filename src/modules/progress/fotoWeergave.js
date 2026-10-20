@@ -49,14 +49,15 @@ export async function naarJpeg(file, { maxZijde = 2000, kwaliteit = 0.88 } = {})
   const isHeic = HEIC.test(file.type || '') || HEIC.test(file.name || '')
   if (!isHeic) return file
   try {
-    let bitmap
+    let bitmap, url = null
     if (typeof createImageBitmap === 'function') {
       bitmap = await createImageBitmap(file)
     } else {
+      url = URL.createObjectURL(file)
       bitmap = await new Promise((ok, nee) => {
         const img = new Image()
         img.onload = () => ok(img); img.onerror = nee
-        img.src = URL.createObjectURL(file)
+        img.src = url
       })
     }
     const schaal = Math.min(1, maxZijde / Math.max(bitmap.width, bitmap.height))
@@ -65,6 +66,10 @@ export async function naarJpeg(file, { maxZijde = 2000, kwaliteit = 0.88 } = {})
     canvas.height = Math.round(bitmap.height * schaal)
     canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
     const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', kwaliteit))
+    // Geheugen direct vrijgeven: een iPhone-foto is ontcijferd ~48 MB.
+    if (typeof bitmap.close === 'function') bitmap.close()
+    if (url) URL.revokeObjectURL(url)
+    canvas.width = 0; canvas.height = 0
     if (!blob) return file
     const naam = String(file.name || 'foto').replace(/\.(heic|heif)$/i, '') + '.jpg'
     return new File([blob], naam, { type: 'image/jpeg', lastModified: Date.now() })

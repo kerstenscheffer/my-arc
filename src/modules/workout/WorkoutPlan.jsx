@@ -1,7 +1,10 @@
 // src/modules/workout/WorkoutPlan.jsx
 import useIsMobile from '../../hooks/useIsMobile'
-import KrachtBlad from './components/KrachtBlad'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import lazy from '../../lazyMetHerlaad'
+import PaginaLader from '../../ui/PaginaLader'
+// Pas laden bij openen: trekt de grafiekbibliotheek mee.
+const KrachtBlad = lazy(() => import('./components/KrachtBlad'))
 import { Clock, ChevronLeft, ChevronRight, ChevronDown, RefreshCw, TrendingUp, History } from 'lucide-react'
 import PlanSwitchModal from './components/PlanSwitchModal'
 
@@ -66,6 +69,8 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
   // onFocusChange (door-bubbled naar ClientDashboard) ook de bottom-nav.
   const [workoutOpen, setWorkoutOpen] = useState(false)
   useEffect(() => { if (onFocusChange) onFocusChange(workoutOpen) }, [workoutOpen, onFocusChange])
+  // Weg van de workout-pagina: onderbalk terug, anders bleef hij verborgen.
+  useEffect(() => () => { if (onFocusChange) onFocusChange(false) }, [onFocusChange])
   // Plan-wissel: modal met alle door de coach toegewezen plannen.
   const [showPlanSwitch, setShowPlanSwitch] = useState(false)
   const [weekOffset, setWeekOffset] = useState(0)
@@ -286,7 +291,9 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
       {/* Krachtoverzicht en geschiedenis in hetzelfde blad als de historie in
           het log-scherm, zodat die drie zich hetzelfde gedragen. */}
       <BladModal open={krachtOpen} titel="Kracht" onClose={() => setKrachtOpen(false)}>
-        <KrachtBlad db={db} client={client} isMobile={isMobile} />
+        <Suspense fallback={<PaginaLader pagina="workout" hoogte="40vh" />}>
+          <KrachtBlad db={db} client={client} isMobile={isMobile} />
+        </Suspense>
       </BladModal>
       <BladModal open={historyOpen} titel="Historie" onClose={() => setHistoryOpen(false)}>
         <HistorieBlad db={db} clientId={client?.id} client={client} isMobile={isMobile} />
