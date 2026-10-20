@@ -24,6 +24,7 @@ import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 import { schrijfIngredientenUit, eenheidKort as eenheid } from '../../../meal-plan/utils/ingredientenUitschrijven'
 import ClientDocumentsSection from './ClientDocumentsSection'
 import SupplementTrouw from './SupplementTrouw'
+import KlantPlanTerugzetten from './KlantPlanTerugzetten'
 
 // Het waterblok: wat de klant drinkt, en het doel dat jij daarvoor zet.
 // Losse component zodat de kolom zelf niet nog meer state krijgt.
@@ -611,6 +612,9 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
               fles op de maaltijdpagina rekent daarmee; 3 liter is de standaard
               als je niets invult. */}
           <WaterDoel client={client} db={db} isMobile={isMobile} />
+
+          {/* Blijvende wijzigingen die de klant zelf in het plan zette, met terugzetten. */}
+          <KlantPlanTerugzetten db={db} client={client} soort="meal" isMobile={isMobile} />
 
           {days.length === 0 && !laden ? (
             <div style={{ padding: pad, fontSize: '0.8rem', fontWeight: 700, color: colors.textMuted, lineHeight: 1.45 }}>

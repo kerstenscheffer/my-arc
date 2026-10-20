@@ -16,6 +16,7 @@ import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
 // oefening de stand op 8 reps tegen de band van de fase, met grafiek.
 import KrachtBlad from '../../../workout/components/KrachtBlad'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
+import KlantPlanTerugzetten from './KlantPlanTerugzetten'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 // Wanneer de klant de training opsloeg (completed_at wordt bij het opslaan
@@ -407,6 +408,8 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <CardioInsightBlock db={db} client={client} isMobile={isMobile} />
           {/* Wat de klant zelf aan het plan veranderde, met "door klant" erbij. */}
           <PlanWijzigingen db={db} client={client} isMobile={isMobile} />
+          {/* Blijvende wijzigingen door de klant, met terugzetten. */}
+          <KlantPlanTerugzetten db={db} client={client} soort="workout" isMobile={isMobile} />
           {workouts.length > 0 && <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Sessies</div>}
           {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => {
             const parsed = parseSessionNote(w.notes)
