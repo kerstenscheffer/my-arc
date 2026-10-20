@@ -10,6 +10,8 @@ const maaltijdUitCache = (id) => {
   return c && Date.now() - c.t < MAALTIJD_TTL ? c.m : null
 }
 const maaltijdInCache = (id, m) => { if (id && m) maaltijdCache.set(id, { t: Date.now(), m }) }
+// Na het bewerken van een eigen maaltijd: niet de oude versie blijven tonen.
+export const vergeetMaaltijd = (id) => { if (id) maaltijdCache.delete(String(id)) }
 export default class AIMealPlanService {
   constructor(db) {
     this.db = db

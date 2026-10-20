@@ -270,7 +270,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     }
   }
   
-  const calculateConsumedFromDB = async (data) => {
+  const calculateConsumedFromDB = async () => {
     // Lokale dag, zelfde venster als de tijdlijn (zie utils/dagVenster).
     const { vanaf, tot } = dagVenster(new Date())
    

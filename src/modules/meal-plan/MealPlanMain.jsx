@@ -9,18 +9,25 @@ import GelegenhedenHub from './GelegenhedenHub'
 import NutritionChoiceTrainer from '../lab/experiments/NutritionChoiceTrainer'
 import PaginaLader from '../../ui/PaginaLader'
 
+// Laatste uitkomst bewaard: terug naar Voeding toont het scherm meteen in
+// plaats van eerst te wachten op deze check (en daarna pas het dashboard).
+let bekendPlan = null // { clientId, heeft }
+
 export default function MealPlanMain({ client, onNavigate, db }) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
   const [service] = useState(() => new MealPlanService(db))
-  const [loading, setLoading] = useState(true)
-  const [hasAIPlan, setHasAIPlan] = useState(false)
+  const bekend = bekendPlan?.clientId === client?.id ? bekendPlan : null
+  const [loading, setLoading] = useState(!bekend)
+  const [hasAIPlan, setHasAIPlanState] = useState(bekend?.heeft || false)
+  const setHasAIPlan = (heeft) => { bekendPlan = { clientId: client?.id, heeft }; setHasAIPlanState(heeft) }
   // 'plan' = bestaand meal-plan, 'gids' = Voedingsgids (issue 19ee0bf7).
   const [tab, setTab] = useState('plan')
   
   // Check for AI plan
   useEffect(() => {
     checkForAIPlan()
-  }, [client])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id])
   
   const checkForAIPlan = async () => {
     if (!client?.id) return

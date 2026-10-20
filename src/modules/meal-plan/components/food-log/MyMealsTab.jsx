@@ -1,5 +1,6 @@
 // src/modules/meal-plan/components/food-log/MyMealsTab.jsx
 // 🎯 v3.0 - Uses parent buildingMeal state to survive tab switches
+import { vergeetMaaltijd } from '../../AIMealPlanService'
 import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator, Sunrise, Salad, Zap, Apple, Utensils, Package, Search } from 'lucide-react'
 import MealPrepCalculator from '../MealPrepCalculator'
@@ -539,6 +540,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
       }
       if (meal.id) {
         await db.supabase.from('ai_custom_meals').update(mealData).eq('id', meal.id)
+        vergeetMaaltijd(meal.id)
       } else {
         await db.supabase.from('ai_custom_meals').insert(mealData)
       }
@@ -567,6 +569,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
       }
       if (meal.id) {
         await db.supabase.from('ai_custom_meals').update(mealData).eq('id', meal.id)
+        vergeetMaaltijd(meal.id)
       } else {
         await db.supabase.from('ai_custom_meals').insert(mealData)
       }
