@@ -36,6 +36,7 @@ const formatDate = (iso) => {
 
 // Bereken: eind-datum, weken-gedaan, weken-totaal, weken-resterend, percentage
 import { computePeriod } from './trajectPeriode'
+import BetaalPauze from './BetaalPauze'
 
 export default function CoachingPeriodPanel({ client, coachId, isMobile, onClientUpdate, onTraject }) {
   const modalHost = useModalHost()
@@ -394,6 +395,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
             <span>{client.coaching_pause_reason}</span>
           </div>
         )}
+        <BetaalPauze client={client} status={status} />
       </div>
 
       {/* PAUSE MODAL */}
@@ -423,7 +425,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
             </div>
             <div style={{ padding: '1rem' }}>
               <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', marginBottom: '0.6rem', lineHeight: 1.5 }}>
-                De gepauzeerde dagen worden bovenop de eind-datum opgeteld zodra je hervat.
+                De gepauzeerde dagen worden bovenop de eind-datum opgeteld zodra je hervat. Is de sale gekoppeld, dan staan de termijnen ook stil en schuiven ze mee op.
               </div>
               <FieldLabel>Reden (optioneel)</FieldLabel>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.4rem' }}>

@@ -3,6 +3,7 @@
 // FIXED: Stale section detection now properly identifies all 3 stale sections
 // v7.1: Expanded stale exclusions — sale, ghost, snooze sections all excluded
 import DatabaseService from '../../services/DatabaseService'
+import { pauzeSchuif } from './betaalPauze'
 
 // "Dead" outcome sections — when a lead lands here, it does NOT count as a
 // funnel progression in any of the stats endpoints. Without this list, a
@@ -2740,11 +2741,18 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Pauzes per sale (movement id → pauzes), voor cashflow en uitbetaling.
+  async laadSalePauzes() {
+    const { data } = await this.db.supabase.rpc('sale_pauzes_team').then(r => r, () => ({ data: [] }))
+    return Object.fromEntries((data || []).map(r => [r.movement_id, r.pauzes]))
+  }
+
   async getRevenueProjection(coachId, monthsAhead = 12, monthsBehind = 5) {
     try {
+      const pauzesVan = await this.laadSalePauzes()
       const { data } = await this.db.supabase
         .from('lead_movements')
-        .select('order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, lead_name, outcome_type')
+        .select('id, order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, lead_name, outcome_type')
         .not('order_value', 'is', null)
         .is('reverted_at', null)
         // Teruggegeven challenge-geld is nooit binnengekomen; dat hoort niet in
@@ -2780,6 +2788,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // sale-datum tellen; dat is bewust, zie SaleValueModal.)
         reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
         restDatum: (r.is_reservation && r.payment_due_date) ? new Date(r.payment_due_date) : null,
+        pauzes: pauzesVan[r.id] || null,
       })).filter(s => s.total > 0 && !isNaN(s.date?.getTime?.()))
 
       const sales = alles.filter(s => s.betaald)
@@ -2812,10 +2821,14 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           const per = restBedrag / s.months
           for (let i = 0; i < s.months; i++) {
             const d = new Date(restStart.getFullYear(), restStart.getMonth() + i, Math.min(restStart.getDate(), 28))
-            boek(monthKey(startOfMonth(restStart, i)), per, `Termijn ${i + 1} van ${s.months}`, i === 0 ? restStart : d)
+            // Gepauzeerde termijn: telt niet tot de klant hervat.
+            const nd = pauzeSchuif(i === 0 ? restStart : d, s.pauzes)
+            if (!nd) continue
+            boek(monthKey(nd), per, `Termijn ${i + 1} van ${s.months}`, nd)
           }
         } else {
-          boek(monthKey(restStart), restBedrag, heeftRest ? 'Restbetaling' : 'In één keer', restStart)
+          const nd = pauzeSchuif(restStart, s.pauzes)
+          if (nd) boek(monthKey(nd), restBedrag, heeftRest ? 'Restbetaling' : 'In één keer', nd)
         }
       }
 
@@ -2840,6 +2853,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const curMonth = startOfMonth(now)
       let mrr = 0, activeMonthly = 0
       sales.forEach(s => {
+        // Lopende betaalpauze: levert nu geen maandbedrag op.
+        if (s.pauzes?.some(p => !p.tot)) return
         if (s.type === 'monthly' && s.months > 1) {
           const start = startOfMonth(s.date)
           const end = startOfMonth(s.date, s.months) // exclusief
@@ -3075,10 +3090,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       if (!coachId) return { months: [], totalOutstanding: 0 }
       const FIXED = Math.max(0, Number(fixedCosts) || 0)
-      const [{ data: saleRows }, { data: paidRows }, { data: adRows }] = await Promise.all([
+      const [{ data: saleRows }, { data: paidRows }, { data: adRows }, pauzesVan] = await Promise.all([
         this.db.supabase
           .from('lead_movements')
-          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, outcome_type')
+          .select('id, order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date, sale_kind, challenge_status, payment_received, outcome_type')
           .not('order_value', 'is', null)
           // Geen filter op partner_share_pct meer: verlengingen werden vaak
           // zonder percentage geboekt (oorspronkelijke lead niet gevonden) en
@@ -3099,6 +3114,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .from('ad_spend')
           .select('period, bedrag, bron')
           .then(r => r, () => ({ data: [] })),
+        this.laadSalePauzes(),
       ])
       const adSpend = {}
       const adBron = {}
@@ -3126,6 +3142,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // reken je geen commissie af. Komt de betaling binnen, dan verschijnt
         // hij vanzelf in de maand waarin dat gebeurde.
         betaald: r.payment_received === true || r.is_reservation === true,
+        pauzes: pauzesVan[r.id] || null,
       })).filter(s => s.total > 0 && s.pct > 0 && s.betaald && !isNaN(s.date?.getTime?.()))
 
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -3222,7 +3239,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             }))
           : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: heeftRest ? 'Restbetaling' : 'Vooruitbetaald' }]
 
-        delen.forEach(({ k, omzet, datum, soort }) => {
+        // Betaalpauze: termijnen die stilstaan vallen weg, na hervatten
+        // landen ze in de periode van hun nieuwe datum.
+        delen.forEach(({ k: oudeK, omzet, datum: oudeDatum, soort }) => {
+          const datum = pauzeSchuif(oudeDatum, s.pauzes)
+          if (!datum) return
+          const k = s.pauzes ? periodeKey(datum) : oudeK
           ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam, soort: s.verlenging ? `Verlenging · ${soort.toLowerCase()}` : soort })
         })
       })
