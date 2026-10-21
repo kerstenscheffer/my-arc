@@ -1013,9 +1013,9 @@ export default function ChallengeVslPage() {
 
       {/* ══ Slot: de laatste knop ══ */}
       <Sectie m={m} style={{ paddingBottom: m ? '7rem' : '8rem', background: ZWART_MIDDEN }}>
-        <Kop m={m} center>Klaar om te starten?</Kop>
+        <Kop m={m} center>Klaar om te starten of heb je nog vragen?</Kop>
         <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>
-          Een half uur kennismaken: je doel, je week en of het past.
+          Plan hieronder je vrijblijvende kennismaking. We kijken samen naar je huidige situatie, je doelen en of de challenge bij jou past.
         </Tekst>
         <Cta m={m} style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
 
