@@ -96,35 +96,12 @@ const GESCHIKT = [
 ]
 
 
+// Kort (21 okt 2026): één of twee zinnen per antwoord.
 const VRAGEN = [
-  {
-    vraag: 'Moet ik na zes weken doorgaan?',
-    antwoord: [
-      'Nee. Mijn bedoeling is dat je ervaart wat coaching voor je kan betekenen. Als je daarna verder wilt werken aan je langetermijndoel, kunnen we de volgende stappen bespreken.',
-      'Je beslist zelf of je daarmee verder wilt.',
-    ],
-  },
-  {
-    vraag: 'Past dit bij een drukke baan en een gezin?',
-    antwoord: [
-      'Daar houden we rekening mee bij het maken van je plan. We kijken naar je beschikbare tijd, je maaltijden en de momenten waarop het meestal lastig wordt.',
-      'Je zult wel ruimte moeten maken om te trainen en je afspraken uit te voeren. Tijdens de kennismaking bespreken we of dat nu haalbaar is.',
-    ],
-  },
-  {
-    vraag: 'Hoeveel begeleiding krijg ik?',
-    antwoord: [
-      'Je krijgt toegang tot de app, persoonlijke plannen, check-ins en WhatsApp-support.',
-      'We bespreken je voortgang en kijken welke ondersteuning nodig is. Soms vraagt dat om een gesprek; wanneer alles goed loopt, kan contact via WhatsApp voldoende zijn. Vooraf leggen we de contactafspraken en verplichte calls vast.',
-    ],
-  },
-  {
-    vraag: 'Welk resultaat kan ik verwachten?',
-    antwoord: [
-      'Dat hangt onder andere af van je startpunt, doel en hoe je het plan uitvoert.',
-      'Bij vetverlies volgen we onder andere je gewicht. Bij spieropbouw kijken we naar je trainingsprestaties en foto’s. Tijdens de kennismaking bespreken we waar jij je de komende zes weken op gaat richten.',
-    ],
-  },
+  { vraag: 'Moet ik na zes weken doorgaan?', antwoord: ['Nee. Wil je daarna verder, dan bespreken we dat. Jij beslist.'] },
+  { vraag: 'Past dit bij een drukke baan en gezin?', antwoord: ['Ja, je plan past zich aan je week aan. Trainen en je afspraken nakomen doe je wel zelf.'] },
+  { vraag: 'Hoeveel begeleiding krijg ik?', antwoord: ['De app, je plannen, wekelijkse check-ins en WhatsApp. Waar nodig een call.'] },
+  { vraag: 'Welk resultaat kan ik verwachten?', antwoord: ['Dat hangt af van je startpunt en inzet. In de kennismaking zetten we een haalbaar doel.'] },
 ]
 
 // ── Bouwstenen ──────────────────────────────────────────────────────────────
@@ -790,7 +767,6 @@ export default function ChallengeVslPage() {
   // De zwevende knop komt pas als de knop bovenaan uit beeld is.
   const [zwevend, setZwevend] = useState(false)
   const heroCtaRef = useRef(null)
-  const reviewsRef = useRef(null)
 
   useEffect(() => {
     const check = () => setM(window.innerWidth <= 768)
@@ -813,30 +789,7 @@ export default function ChallengeVslPage() {
     return () => obs.disconnect()
   }, [])
 
-  // Reviews schuiven vanzelf door, zoals op de challenge-pagina.
-  useEffect(() => {
-    const el = reviewsRef.current
-    if (!el) return
-    let animId, pos = 0
-    const scroll = () => {
-      pos += 0.4
-      if (pos >= el.scrollWidth / 2) pos = 0
-      el.scrollLeft = pos
-      animId = requestAnimationFrame(scroll)
-    }
-    const pause = () => cancelAnimationFrame(animId)
-    const resume = () => { animId = requestAnimationFrame(scroll) }
-    animId = requestAnimationFrame(scroll)
-    el.addEventListener('mouseenter', pause); el.addEventListener('mouseleave', resume)
-    el.addEventListener('touchstart', pause, { passive: true }); el.addEventListener('touchend', resume)
-    return () => {
-      cancelAnimationFrame(animId)
-      el.removeEventListener('mouseenter', pause); el.removeEventListener('mouseleave', resume)
-      el.removeEventListener('touchstart', pause); el.removeEventListener('touchend', resume)
-    }
-  }, [])
 
-  const reviewsDubbel = [...REVIEWS, ...REVIEWS]
 
   return (
     <OpenKalenderCtx.Provider value={openKalender}>
@@ -1046,8 +999,7 @@ export default function ChallengeVslPage() {
 
       {/* ══ 7. Vragen ══ */}
       <Sectie m={m} smal thema="wit">
-        <Label m={m}>Veelgestelde vragen</Label>
-        <Kop m={m}>Dit wil je waarschijnlijk nog weten.</Kop>
+        <Kop m={m}>Vragen</Kop>
         <div style={{ marginTop: m ? '1.2rem' : '1.6rem', borderTop: `1px solid ${THEMAS.wit.randZacht}` }}>
           {VRAGEN.map((v, i) => (
             <Vraag key={v.vraag} item={v} m={m} open={openVraag === i} onToggle={() => setOpenVraag(openVraag === i ? -1 : i)} />
@@ -1055,48 +1007,13 @@ export default function ChallengeVslPage() {
         </div>
       </Sectie>
 
-      {/* ══ Slot: reviews en de laatste knop ══ */}
+      {/* ══ Slot: de laatste knop ══ */}
       <Sectie m={m} style={{ paddingBottom: m ? '7rem' : '8rem' }}>
-        <Kop m={m} center>Plan je kennismaking.</Kop>
+        <Kop m={m} center>Klaar om te starten?</Kop>
         <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>
-          Een gesprek van een half uur. We bespreken je doel, waar je nu vastloopt en of de challenge bij je past.
+          Een half uur kennismaken: je doel, je week en of het past.
         </Tekst>
-        <Cta m={m} style={{ marginTop: m ? '2rem' : '2.6rem' }} />
-
-        <div
-          ref={reviewsRef}
-          style={{
-            marginTop: m ? '2rem' : '2.8rem',
-            display: 'flex', gap: m ? '0.75rem' : '1rem', overflow: 'hidden', cursor: 'grab',
-            marginLeft: m ? '-1.25rem' : '-3rem', marginRight: m ? '-1.25rem' : '-3rem',
-            paddingLeft: m ? '1.25rem' : '3rem', paddingRight: m ? '1.25rem' : '3rem',
-          }}
-        >
-          {reviewsDubbel.map((r, idx) => (
-            <div key={idx} style={{
-              minWidth: m ? 240 : 300, maxWidth: m ? 240 : 300, flexShrink: 0,
-              padding: m ? '0.85rem 1rem' : '1rem 1.15rem', borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)',
-              display: 'flex', flexDirection: 'column',
-            }}>
-              <div style={{ display: 'flex', gap: 2, marginBottom: '0.5rem' }}>
-                {[1,2,3,4,5].map(s => <Star key={s} size={11} fill={TP_GREEN} color={TP_GREEN} strokeWidth={0} />)}
-              </div>
-              <p style={{
-                fontSize: m ? '0.7rem' : '0.75rem', color: 'rgba(255,255,255,0.45)', fontWeight: 500,
-                lineHeight: 1.5, marginBottom: '0.6rem', marginTop: 0,
-                display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-              }}>{r.text}</p>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#fff', border: `1px solid ${TP_GREEN}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, color: TP_GREEN }}>{r.name.charAt(0)}</div>
-                  <span style={{ fontSize: m ? '0.65rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{r.name}</span>
-                </div>
-                <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>{r.date}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <Cta m={m} style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
 
         <div style={{ marginTop: m ? '2.5rem' : '3rem', textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
           <a href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy</a>
