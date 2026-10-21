@@ -303,20 +303,29 @@ export function PrequalFlow({ m = false, compact = false }) {
   const totaal = pad.length
   const nummer = stap + 1
   const meteenDoor = vraag.soort === 'keuze'
+  // Oranje (begin) naar groen (laatste stap).
+  const deel = totaal > 1 ? (nummer - 1) / (totaal - 1) : 1
+  const voortgangKleur = `hsl(${Math.round(32 + deel * (142 - 32))}, ${Math.round(92 - deel * 21)}%, ${Math.round(52 - deel * 7)}%)`
 
   return (
     <div style={buitenkant}>
       <div ref={bovenRef} />
       <div style={midden}>
-        {/* Voortgang direct boven de vraag: terug, balk, en hoeveel er nog komt. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: m ? '1.4rem' : '1.8rem' }}>
-          <button onClick={terug} aria-label="Terug" disabled={stap === 0} style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: WIT, cursor: stap === 0 ? 'default' : 'pointer', opacity: stap === 0 ? 0 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <ArrowLeft size={18} strokeWidth={2.8} />
-          </button>
-          <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
-            <div style={{ width: `${(nummer / totaal) * 100}%`, height: '100%', background: WIT, borderRadius: 3, transition: 'width 0.35s ease' }} />
+        {/* Voortgang direct boven de vraag, even breed als de antwoorden:
+            erboven terug en de teller, eronder één balk. Kleur loopt van
+            oranje naar groen naarmate je verder komt (21 okt 2026). */}
+        <div style={{ marginBottom: m ? '1.4rem' : '1.8rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 28, marginBottom: 8 }}>
+            <button onClick={terug} aria-label="Vorige vraag" disabled={stap === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 0', background: 'none', border: 'none', color: ZWAK, fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', cursor: stap === 0 ? 'default' : 'pointer', visibility: stap === 0 ? 'hidden' : 'visible', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <ArrowLeft size={16} strokeWidth={2.8} /> Terug
+            </button>
+            <span style={{ fontSize: '0.85rem', fontWeight: 900, color: voortgangKleur, fontVariantNumeric: 'tabular-nums', transition: 'color 0.35s ease' }}>
+              Stap {nummer} van {totaal}
+            </span>
           </div>
-          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: WIT, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{nummer}/{totaal}</span>
+          <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            <div style={{ width: `${(nummer / totaal) * 100}%`, height: '100%', background: voortgangKleur, borderRadius: 4, transition: 'width 0.35s ease, background-color 0.35s ease' }} />
+          </div>
         </div>
         {/* Alleen de vraag schuift in; de balk blijft staan en loopt vloeiend op. */}
         <div key={vraag.id} style={{ animation: 'prequalIn 0.25s ease' }}>
