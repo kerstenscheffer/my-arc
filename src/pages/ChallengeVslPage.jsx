@@ -52,11 +52,17 @@ const TRANSFORMATIES = [
   { src: '/transformatie-nitish.jpg', naam: 'Nitish', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
+// Alle reviews van Trustpilot (overgenomen 21 okt 2026), nieuwste eerst.
+// Letterlijk zoals geplaatst; alleen alinea's samengevoegd.
 const REVIEWS = [
-  { name: 'Hessel', date: 'dec 2025', text: 'Kersten begreep het meteen! Na een uitgebreide 0-meting kreeg ik een plan op maat. Van 79,8 naar 74,4 in 8 weken. Als jij je aan het plan houdt geeft Kersten altijd de volle 100%!' },
-  { name: 'Indi', date: 'dec 2025', text: 'Myarc is super! Kersten helpt me iedere week met mijn maaltijden. Professioneel, persoonlijk, betrouwbaar. Ik kan Myarc aan iedereen aanraden!' },
-  { name: 'Toon', date: 'nov 2025', text: 'Super Coach, leuke gesprekken en altijd enthousiast. Heeft me goed geholpen in mijn traject. Zeker een aanrader!' },
-  { name: 'Sassus', date: 'nov 2025', text: 'Na 100 mislukte pogingen is het mij met Kersten gelukt een routine te creëren die ik kan continueren. Hij laat je jezelf verbazen over wat je kan bereiken.' },
+  { name: 'Nitish Soundalgekar', date: '12 jul 2026', titel: 'Absoluut aanrader!', text: 'De afgelopen 3 maanden onder begeleiding van Kersten hebben mij op fysiek en mentaal niveau enorm onder de indruk gebracht van hoeveel mijn lichaam kan doen met de juiste kennis van voeding, denkwijze en oefeningen. Kersten heeft mij wekelijks heel professioneel begeleid. Het is mij eerder nooit gelukt om sterk en lean tegelijkertijd te worden, en ik ben ontzettend tevreden dat het mij gelukt is. Nu kan ik zonder hemdje over het strand lopen. En ik heb een gevoel dat ik na de 3 maanden zelfstandig deze conditie kan behouden en blijven ontwikkelen, dat is geweldig. Minder klagen, meer werk doen levert prachtige resultaten op. Ik zal iedere jongen die serieus aan zichzelf wil werken het traject van Kersten aanraden. Heel erg bedankt voor alles!' },
+  { name: 'Finn', date: '9 mrt 2026', titel: 'Kersten heeft mij uitstekend geholpen…', text: 'Kersten heeft mij uitstekend geholpen met het process van 8 weken, ben hierin goed aangekomen en heb discipline om consistent te blijven gymmen' },
+  { name: 'Hessel', date: '20 feb 2026', titel: 'Fijn en succesvol traject', text: 'Ik was al lang van plan om wat af te vallen en wat fitter te worden, gespierd was voor mij niet nodig. Kersten begreep het meteen! Na een week lange 0-meting kreeg ik een uitgebreid plan. iedere week wegen, videobellen en daarin mijn voortgang bespreken. Kersten geeft niet alleen om jouw fysieke vooruitgangen. Het is vooral de kennis en info die mij aanspreekt waardoor ik nu zonder teveel na te denken stabiel blijf in gewicht. Ik ben van 79,8 naar 74,4 gegaan tijdens dit traject van 8 weken. Het doel was 75kg en dat is door een gebalanceerd plan goed gelukt. Geen vaste gerechten die je moet eten. Alleen wel een duw in de goeie richting, je krijgt gerechten die je kan proberen maar niks is verplicht, als jij je aan het plan houd zal Kersten altijd de volle 100% geven!' },
+  { name: 'Me', date: '2 dec 2025', titel: 'Als je hulp nodig hebt met sporten raad…', text: 'Als je hulp nodig hebt met sporten raad ik Myarc echt aan. Je krijgt een goed schema om je doel te halen en je hebt wekelijkse calls om te kijken hoe je er nu voor staat. Ook kan je makkelijk contact opnemen als je ergens tegen aan loopt of als je vragen hebt.' },
+  { name: 'Indi Scheffer', date: '1 dec 2025', titel: 'Myarc', text: 'Myarc is super! Kersten helpt me iedere week met mijn maaltijden en zorgt ervoor dat ik precies krijg wat ik nodig heb. Daarnaast motiveert hij me heel erg bij het sporten, en hebben we afspraken gemaakt waardoor ik het makkelijk kan volhouden en me fitter voel. Zijn begeleiding is professioneel, persoonlijk, betrouwbaar en veel lachen natuurlijk (wanneer dat kan) bijv. in de wekelijkse calls. Ik ben echt tevreden en kan Myarc aan iedereen aanraden die op zoek is naar goede en leuke ondersteuning op het gebied van voeding en sport.' },
+  { name: 'Toon', date: '5 nov 2025', titel: 'Super Coach', text: 'Super Coach, leuke gesprekken en altijd enthousiast. Heeft me goed geholpen in mijn traject. Zeker een aanrader!' },
+  { name: 'SASSUS', date: '5 nov 2025', titel: 'Na 100 mislukte pogingen van…', text: 'Na 100 mislukte pogingen van "crash"dieten, maandag begin ik echt, na de vakantie ga ik het echt volhouden tot aan de eerste week 1000% ervoor gaan en ik kan het wel alleen, wilde ik mijzelf nog 1 kans geven. Dit keer met hulp van iemand die er verstand van heeft en mij kan blijven motiveren in de moeilijke situaties. Met de energie die ik krijg van Kersten, zijn enthousiasme en motiverende gesprekken is het mij gelukt om een routine te creeeren waarbij ik krachttrainingen en een voedingschema kan inpassen waar ik mij goed bij voel en die ik kan continueren. Niet alleen bij het fysieke gedeelte maar ook het mentale stukje heeft Kersten mij goed geholpen. Kersten is een gespecialiseerde coach die je jezelf laat verbazen over wat je kan bereiken.' },
+  { name: 'Consumer', date: '3 nov 2025', titel: 'MY ARC', text: 'Zeer professionele aanpak! Kersten geeft alles duidelijk en gestructureerd weer in een overzichtelijke app, waarin je niet alleen je voeding, maar ook je slaap, trainingen en algemene voortgang kunt bijhouden. Hij volgt je progressie actief op en biedt waardevolle feedback en motivatie op de juiste momenten. Dankzij zijn persoonlijke begeleiding en deskundige aanpak blijf je gemotiveerd en zie je echt resultaat. Een absolute aanrader voor wie op een duurzame en verantwoorde manier fitter wil worden!' },
 ]
 
 const HERKENNING = [
@@ -253,11 +259,17 @@ function TrustpilotBadge({ style, licht }) {
 }
 
 // Reviews als slider op een licht vlak: één kaart tegelijk in beeld (op de
-// telefoon met een stukje van de volgende), vegen of pijltjes, bolletjes
-// eronder. Dezelfde reviews als onderaan de pagina (21 okt 2026).
+// telefoon met een stukje van de volgende). Schuift elke 5 s vanzelf door;
+// raakt iemand hem aan (vegen, pijltje, bolletje), dan wacht hij 10 s.
+// Lange reviews ingekort met 'Lees meer' (21 okt 2026).
 function ReviewSlider({ m }) {
   const baan = useRef(null)
   const [actief, setActief] = useState(0)
+  const [open, setOpen] = useState({})
+  const rustTot = useRef(0)
+  const actiefRef = useRef(0)
+  actiefRef.current = actief
+  const raak = () => { rustTot.current = Date.now() + 10000 }
   const opScroll = () => {
     const el = baan.current
     if (!el) return
@@ -270,6 +282,15 @@ function ReviewSlider({ m }) {
     const kaart = el?.children[i]
     if (el && kaart) el.scrollTo({ left: kaart.offsetLeft - el.firstElementChild.offsetLeft, behavior: 'smooth' })
   }
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (Date.now() < rustTot.current || document.hidden) return
+      const el = baan.current
+      if (!el || el.getBoundingClientRect().bottom < 0 || el.getBoundingClientRect().top > window.innerHeight) return
+      naar((actiefRef.current + 1) % REVIEWS.length)
+    }, 5000)
+    return () => clearInterval(t)
+  }, [])
   const pijl = (links) => ({
     position: 'absolute', top: '50%', [links ? 'left' : 'right']: -18, transform: 'translateY(-50%)',
     width: 40, height: 40, borderRadius: '50%', border: '1px solid rgba(0,0,0,0.12)', background: '#fff',
@@ -282,6 +303,7 @@ function ReviewSlider({ m }) {
       <div style={{ position: 'relative' }}>
         <div
           ref={baan} onScroll={opScroll}
+          onTouchStart={raak} onMouseEnter={raak} onWheel={raak}
           style={{
             display: 'flex', gap: 12, overflowX: 'auto', scrollSnapType: 'x mandatory',
             WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
@@ -304,9 +326,20 @@ function ReviewSlider({ m }) {
                   </span>
                 ))}
               </div>
-              <p style={{ margin: 0, fontSize: m ? '1rem' : '1.08rem', fontWeight: 700, lineHeight: 1.5, color: '#111', letterSpacing: '-0.01em' }}>
-                {r.text}
-              </p>
+              <div>
+                <div style={{ fontSize: m ? '1.05rem' : '1.12rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', lineHeight: 1.3 }}>{r.titel}</div>
+                <p style={{
+                  margin: '0.4rem 0 0', fontSize: m ? '0.95rem' : '1rem', fontWeight: 600, lineHeight: 1.5, color: '#222', letterSpacing: '-0.01em',
+                  ...(open[r.name] ? {} : { display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
+                }}>
+                  {r.text}
+                </p>
+                {r.text.length > 220 && (
+                  <button onClick={() => { raak(); setOpen(o => ({ ...o, [r.name]: !o[r.name] })) }} style={{ marginTop: 4, padding: 0, background: 'none', border: 'none', fontFamily: 'inherit', fontSize: '0.88rem', fontWeight: 900, color: '#000', textDecoration: 'underline', cursor: 'pointer' }}>
+                    {open[r.name] ? 'Minder' : 'Lees meer'}
+                  </button>
+                )}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 900 }}>{r.name.charAt(0)}</div>
@@ -318,15 +351,15 @@ function ReviewSlider({ m }) {
           ))}
         </div>
         {!m && actief > 0 && (
-          <button onClick={() => naar(actief - 1)} aria-label="Vorige review" style={pijl(true)}><ChevronLeft size={20} strokeWidth={2.8} /></button>
+          <button onClick={() => { raak(); naar(actief - 1) }} aria-label="Vorige review" style={pijl(true)}><ChevronLeft size={20} strokeWidth={2.8} /></button>
         )}
         {!m && actief < REVIEWS.length - 1 && (
-          <button onClick={() => naar(actief + 1)} aria-label="Volgende review" style={pijl(false)}><ChevronRight size={20} strokeWidth={2.8} /></button>
+          <button onClick={() => { raak(); naar(actief + 1) }} aria-label="Volgende review" style={pijl(false)}><ChevronRight size={20} strokeWidth={2.8} /></button>
         )}
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: '1rem' }}>
         {REVIEWS.map((r, i) => (
-          <button key={r.name} onClick={() => naar(i)} aria-label={`Review ${i + 1}`} style={{
+          <button key={r.name} onClick={() => { raak(); naar(i) }} aria-label={`Review ${i + 1}`} style={{
             width: i === actief ? 22 : 8, height: 8, borderRadius: 4, border: 'none', padding: 0, cursor: 'pointer',
             background: i === actief ? '#000' : 'rgba(0,0,0,0.2)', transition: 'width 0.25s ease, background 0.25s ease',
           }} />
