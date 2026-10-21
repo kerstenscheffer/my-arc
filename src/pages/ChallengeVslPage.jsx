@@ -467,7 +467,8 @@ const knopIcoon = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
-// Het blad: schuift van onderaf omhoog (op de telefoon schermvullend).
+// Het formulier als modal, met de transformaties bovenin en logo en kruisje
+// eroverheen.
 // Meteen de eerste vraag van de prekwalificatie, en wie zelf wil inplannen
 // krijgt Calendly als laatste stap van datzelfde formulier.
 function KalenderBlad({ open, onClose, m }) {
@@ -488,43 +489,41 @@ function KalenderBlad({ open, onClose, m }) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'absolute', left: 0, right: 0, bottom: 0,
-          // Op de telefoon het hele scherm: de vragen staan dan echt in het
-          // midden, zoals in de app (21 okt 2026).
-          top: m ? 0 : 'auto',
-          height: m ? '100dvh' : 'min(92vh, 900px)',
-          maxWidth: m ? '100%' : 1000, margin: '0 auto',
-          background: '#0a0a0a', borderRadius: m ? 0 : '20px 20px 0 0',
-          paddingTop: m ? 'env(safe-area-inset-top, 0px)' : 0, boxSizing: 'border-box',
-          border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',
+          // Een modal met wat lucht links en rechts en meer boven en onder,
+          // in plaats van schermvullend (21 okt 2026).
+          position: 'absolute', left: 0, right: 0, margin: '0 auto',
+          top: m ? 'calc(env(safe-area-inset-top, 0px) + 2.2rem)' : '5vh',
+          bottom: m ? 'calc(env(safe-area-inset-bottom, 0px) + 2.2rem)' : '5vh',
+          width: m ? 'calc(100% - 1.5rem)' : 'min(640px, calc(100% - 2rem))',
+          background: '#0a0a0a', borderRadius: 22, boxSizing: 'border-box',
+          border: '1px solid rgba(255,255,255,0.1)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          animation: 'bladOmhoog 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+          animation: 'modalIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)',
         }}
       >
+        {/* Logo en kruisje zweven over de foto's heen. */}
         <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 3,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          // Zwevend, zonder rand of vakken: één geheel met de vragen eronder.
-          padding: m ? '0.9rem 1.1rem 0.4rem' : '1.1rem 1.5rem 0.4rem',
-          flexShrink: 0,
+          padding: m ? '0.7rem 0.6rem 1.4rem 0.95rem' : '0.9rem 0.9rem 1.8rem 1.2rem',
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)',
+          pointerEvents: 'none',
         }}>
-          {/* Alleen het MY ARC-logo; de naam van de challenge staat in het
-              formulier, direct boven de voortgangsbalk (21 okt 2026). */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 16, minWidth: 0 }}>
-            <img
-              src="/ma-logo-header.png" alt="MY ARC"
-              style={{ width: m ? 84 : 104, height: 'auto', display: 'block', flexShrink: 0 }}
-            />
-          </div>
+          <img
+            src="/ma-logo-header.png" alt="MY ARC"
+            style={{ width: m ? 72 : 90, height: 'auto', display: 'block', flexShrink: 0, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.5))' }}
+          />
           <button
             onClick={onClose} aria-label="Sluiten"
             style={{
-              width: 40, height: 40, flexShrink: 0, marginRight: -8,
+              width: 40, height: 40, flexShrink: 0, pointerEvents: 'auto',
               background: 'none', border: 'none',
-              color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.6))',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <X size={24} strokeWidth={2.6} />
+            <X size={24} strokeWidth={2.8} />
           </button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
@@ -947,6 +946,7 @@ export default function ChallengeVslPage() {
         html { scroll-behavior: smooth; }
         body { background: #000; margin: 0; }
         @keyframes bladWaas { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes modalIn { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }
         @keyframes bladOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
     </div>
