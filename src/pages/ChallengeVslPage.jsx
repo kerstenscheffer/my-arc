@@ -52,8 +52,8 @@ const RESULTATEN = [
 ]
 
 const TRANSFORMATIES = [
-  { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
-  { src: '/transformatie-nitish.jpg', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
+  { src: '/review-transformatie-1.png', naam: 'Kersten', caption: 'Kersten: van zachte buik naar sixpack.' },
+  { src: '/transformatie-nitish.jpg', naam: 'Nitish', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
 const REVIEWS = [
@@ -528,6 +528,21 @@ function KalenderBlad({ open, onClose, m }) {
           </button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
+          {/* Bovenin het blad de transformaties van Kersten en Nitish: zo zie
+              je tijdens de vragen waar je het voor doet (21 okt 2026).
+              Bijgesneden op het bovenlijf, zodat de vragen eronder passen. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: m ? 8 : 12, width: '100%', maxWidth: 560, margin: '0 auto', boxSizing: 'border-box', padding: m ? '0.5rem 1.25rem 0' : '0.8rem 2rem 0', flexShrink: 0 }}>
+            {TRANSFORMATIES.map(t => (
+              <div key={t.src} style={{ position: 'relative', height: m ? 150 : 210, borderRadius: 14, overflow: 'hidden', background: '#141414' }}>
+                <img src={t.src} alt={t.caption} draggable={false}
+                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 42%', display: 'block' }} />
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '1.4rem 0.6rem 0.45rem', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)', fontSize: m ? '0.72rem' : '0.8rem', fontWeight: 900, color: '#fff', textAlign: 'center' }}>
+                  {t.naam} · 3 maanden
+                </div>
+              </div>
+            ))}
+          </div>
           <PrequalFlow m={m} compact />
         </div>
       </div>
