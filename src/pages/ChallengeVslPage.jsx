@@ -484,28 +484,32 @@ function KalenderBlad({ open, onClose, m }) {
   return (
     <div
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', animation: 'bladWaas 0.2s ease' }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', animation: 'bladWaas 0.2s ease',
+        // De modal hangt bovenaan en is zo hoog als zijn inhoud: geen lege
+        // zwarte ruimte onder de vraag. Boven vast, zodat de foto's niet
+        // verspringen als een volgende vraag korter of langer is.
+        display: 'flex', justifyContent: 'center', alignItems: 'flex-start', boxSizing: 'border-box',
+        padding: m ? 'calc(env(safe-area-inset-top, 0px) + 2.2rem) 0.75rem calc(env(safe-area-inset-bottom, 0px) + 2.2rem)' : '5vh 1rem',
+      }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           // Een modal met wat lucht links en rechts en meer boven en onder,
           // in plaats van schermvullend (21 okt 2026).
-          position: 'absolute', left: 0, right: 0, margin: '0 auto',
-          top: m ? 'calc(env(safe-area-inset-top, 0px) + 2.2rem)' : '5vh',
-          bottom: m ? 'calc(env(safe-area-inset-bottom, 0px) + 2.2rem)' : '5vh',
-          width: m ? 'calc(100% - 1.5rem)' : 'min(640px, calc(100% - 2rem))',
+          position: 'relative', width: '100%', maxWidth: 640, maxHeight: '100%',
           background: '#0a0a0a', borderRadius: 22, boxSizing: 'border-box',
           border: '1px solid rgba(255,255,255,0.1)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
           animation: 'modalIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)',
         }}
       >
-        {/* Logo en kruisje zweven over de foto's heen. */}
+        {/* Logo (midden) en kruisje (rechts) zweven over de foto's heen. */}
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 3,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: m ? '0.7rem 0.6rem 1.4rem 0.95rem' : '0.9rem 0.9rem 1.8rem 1.2rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: m ? '0.7rem 0.6rem 1.4rem' : '0.9rem 0.9rem 1.8rem',
           background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)',
           pointerEvents: 'none',
         }}>
@@ -516,6 +520,7 @@ function KalenderBlad({ open, onClose, m }) {
           <button
             onClick={onClose} aria-label="Sluiten"
             style={{
+              position: 'absolute', top: m ? '0.6rem' : '0.8rem', right: m ? '0.5rem' : '0.8rem',
               width: 40, height: 40, flexShrink: 0, pointerEvents: 'auto',
               background: 'none', border: 'none',
               color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -526,7 +531,7 @@ function KalenderBlad({ open, onClose, m }) {
             <X size={24} strokeWidth={2.8} />
           </button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: '0 1 auto', minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
           {/* Bovenin het blad de transformaties van Kersten en Nitish: zo zie
               je tijdens de vragen waar je het voor doet (21 okt 2026).
               Volle breedte, tegen elkaar aan; bijgesneden op het bovenlijf. */}

@@ -224,10 +224,10 @@ export function PrequalFlow({ m = false, compact = false }) {
     maxWidth: 560, margin: '0 auto', width: '100%', boxSizing: 'border-box',
     ...(compact ? { flex: '1 0 auto' } : { minHeight: 'calc(100dvh - 60px)' }),
     display: 'flex', flexDirection: 'column',
-    padding: m ? '1rem 1.25rem 2rem' : '1.5rem 2rem 3rem',
+    padding: compact ? (m ? '1.1rem 1.1rem 1.3rem' : '1.4rem 1.6rem 1.6rem') : (m ? '1rem 1.25rem 2rem' : '1.5rem 2rem 3rem'),
     color: WIT, fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   }
-  const midden = { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: m ? '2rem' : '3rem' }
+  const midden = { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: compact ? 0 : (m ? '2rem' : '3rem') }
 
   // De gratis waarde: video ingesloten, met een knop naar YouTube eronder.
   const gratisVideo = (
