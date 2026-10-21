@@ -678,7 +678,7 @@ export default function ChallengeVslPage() {
           door het beeld en trekt je oog naar de video en de knop eronder. */}
       <section style={{ background: HERO_BG, padding: `${m ? '5.4rem' : '7.5rem'} ${m ? '1.25rem' : '3rem'} 0` }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
-          <Kop m={m} center groot>Wil jij strakker en sterker worden naast je baan, gezin en sociale leven?</Kop>
+          <Kop m={m} center groot>In shape komen naast je drukke leven, zonder als bodybuilder te eten of te trainen.</Kop>
           <Tekst m={m} center style={{ marginTop: m ? '1.3rem' : '1.7rem', fontSize: m ? '1.08rem' : '1.22rem', color: '#fff' }}>
             Bekijk de video en ontdek hoe de challenge werkt, wat je krijgt en welke inzet we van je verwachten.
           </Tekst>
