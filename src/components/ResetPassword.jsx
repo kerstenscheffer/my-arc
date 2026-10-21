@@ -20,6 +20,16 @@ export default function ResetPassword() {
   useEffect(() => { checkResetToken() }, [])
 
   const checkResetToken = async () => {
+    // Een gebruikte of verlopen link komt terug als #error_code=otp_expired.
+    // Vaak heeft de mailapp de link al eens geopend (voorvertoning), dus zeg
+    // gewoon wat er moet gebeuren.
+    const hash = new URLSearchParams(window.location.hash.slice(1))
+    if (hash.get('error_code') || hash.get('error')) {
+      setMessage({ ok: false, text: 'Deze link is al gebruikt of verlopen. Vraag in de app een nieuwe resetmail aan en open alleen de nieuwste link.' })
+      setIsValidToken(false)
+      setCheckingToken(false)
+      return
+    }
     try {
       const result = await passwordReset.verifyResetToken()
       setIsValidToken(result.valid)
@@ -42,7 +52,6 @@ export default function ResetPassword() {
     const result = await passwordReset.updatePassword(newPassword)
     if (result.success) {
       setDone(true)
-      setTimeout(() => window.location.href = '/', 2500)
     } else {
       setMessage({ ok: false, text: result.error || 'Kon wachtwoord niet bijwerken' })
     }
@@ -105,8 +114,8 @@ export default function ResetPassword() {
         <h2 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#fff', margin: '0 0 0.5rem', letterSpacing: '-0.02em' }}>
           Wachtwoord bijgewerkt
         </h2>
-        <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-          Je wordt doorgestuurd naar de login...
+        <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.7)', margin: 0 }}>
+          Log nu in de MY ARC-app in met je nieuwe wachtwoord.
         </p>
       </div>
     </div>

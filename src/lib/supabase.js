@@ -769,10 +769,20 @@ export async function activateClientAfterReset(email, newPassword) {
   }
 }
 
+// Waar de link in de resetmail naartoe gaat. Altijd het echte webadres: in de
+// app is window.location 'localhost' (Android) of 'capacitor://' (iOS), en een
+// link daarheen opent op de telefoon niets. Alleen de Vite-devserver op je Mac
+// gebruikt zijn eigen adres. https://myarcfitness.com staat in de Supabase
+// redirect-lijst (bewezen werkend via Profiel → Wachtwoord wijzigen).
+export function resetRedirectUrl() {
+  if (import.meta.env.DEV && window.location.port === '5173') return `${window.location.origin}/reset-password`
+  return 'https://myarcfitness.com/reset-password'
+}
+
 export async function requestPasswordReset(email) {
   try {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: resetRedirectUrl(),
     })
     
     if (error) throw error

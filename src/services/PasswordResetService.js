@@ -1,7 +1,7 @@
 // src/services/PasswordResetService.js
 // Complete Password Reset Service - Fixed Version
 
-import { supabase } from '../lib/supabase'
+import { supabase, resetRedirectUrl } from '../lib/supabase'
 
 class PasswordResetService {
   constructor() {
@@ -120,15 +120,7 @@ class PasswordResetService {
    * Helper: Get correct redirect URL
    */
   getRedirectUrl() {
-    const isLocalhost = window.location.hostname === 'localhost' || 
-                       window.location.hostname === '127.0.0.1'
-    
-    if (isLocalhost) {
-      return 'http://localhost:5173/reset-password'
-    }
-    
-    // Production URL
-    return `${window.location.origin}/reset-password`
+    return resetRedirectUrl()
   }
 
   /**

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, Weight, Camera, Star } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import DatabaseService from '../../services/DatabaseService'
+import { resetRedirectUrl } from '../../lib/supabase'
 import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/arc-ui'
 import FotoCredits from '../../modules/ingredient-photos/FotoCredits'
 import { isOpwarmPromptAan, zetOpwarmPrompt } from '../../modules/workout/components/todays-workout/opwarmen'
@@ -389,7 +390,7 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
                 Icon: Shield, label: 'Wachtwoord wijzigen',
                 onClick: async () => {
                   await db.supabase.auth.resetPasswordForEmail(client.email, {
-                    redirectTo: 'https://myarcfitness.com/reset-password',
+                    redirectTo: resetRedirectUrl(),
                   })
                   alert('Reset link verstuurd naar ' + client.email)
                 },

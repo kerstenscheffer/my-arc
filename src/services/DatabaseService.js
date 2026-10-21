@@ -1,7 +1,7 @@
 // src/services/DatabaseService.js
 // 🔧 FIXED VERSION - Met correcte tabel namen en error handling
 
-import { supabase, signUpNewClient } from '../lib/supabase'
+import { supabase, signUpNewClient, resetRedirectUrl } from '../lib/supabase'
 import { KLASSIEKE_SJABLONEN_FILTER } from '../lib/mealTemplateTypes'
 import { standaardWeekindeling } from '../modules/client-agenda/standaardWeekindeling'
 import { extendDatabaseService } from './DatabaseServiceOptimized'
@@ -249,7 +249,7 @@ async resetPassword(email, redirectTo = null) {
     if (redirectTo) {
       options.redirectTo = redirectTo
     } else {
-      options.redirectTo = `${window.location.origin}/reset-password`
+      options.redirectTo = resetRedirectUrl()
     }
     
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, options)
