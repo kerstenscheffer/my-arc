@@ -39,6 +39,10 @@ const useThema = () => useContext(ThemaCtx)
 // De hero is net iets lichter dan de vaste balk erboven, zodat je de twee
 // vlakken van elkaar ziet.
 const HERO_BG = '#161616'
+// De donkere vlakken wisselen af tussen iets grijzer en dieper zwart
+// (21 okt 2026), zodat de pagina niet één zwarte lap is.
+const ZWART_GRIJS = '#141414'
+const ZWART_MIDDEN = '#0b0b0b'
 
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const VIDEO_ID = '41Hfc2YVBAA'
@@ -904,7 +908,7 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* ══ 3. Herkenning ══ */}
-      <Sectie m={m} smal>
+      <Sectie m={m} smal style={{ background: ZWART_GRIJS }}>
         <Kop m={m}>Je weet wat je moet doen. Alleen niet hoe je het volhoudt.</Kop>
         <div style={{ display: 'flex', flexDirection: 'column', gap: m ? '0.6rem' : '0.8rem', marginTop: m ? '1.4rem' : '1.9rem' }}>
           {HERKENNING.map((t, i) => (
@@ -950,7 +954,7 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* ══ 5. De coach ══ */}
-      <Sectie m={m}>
+      <Sectie m={m} style={{ background: BG }}>
         <div style={{
           display: 'grid', gridTemplateColumns: m ? '1fr' : '1.15fr 0.85fr',
           gap: m ? '1.4rem' : '3rem', alignItems: 'center',
@@ -1008,7 +1012,7 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* ══ Slot: de laatste knop ══ */}
-      <Sectie m={m} style={{ paddingBottom: m ? '7rem' : '8rem' }}>
+      <Sectie m={m} style={{ paddingBottom: m ? '7rem' : '8rem', background: ZWART_MIDDEN }}>
         <Kop m={m} center>Klaar om te starten?</Kop>
         <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>
           Een half uur kennismaken: je doel, je week en of het past.
