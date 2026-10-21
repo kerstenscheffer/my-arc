@@ -303,9 +303,9 @@ export function PrequalFlow({ m = false, compact = false }) {
   const totaal = pad.length
   const nummer = stap + 1
   const meteenDoor = vraag.soort === 'keuze'
-  // Oranje (begin) naar groen (laatste stap).
+  // Licht groen (begin) naar vol groen (laatste stap).
   const deel = totaal > 1 ? (nummer - 1) / (totaal - 1) : 1
-  const voortgangKleur = `hsl(${Math.round(32 + deel * (142 - 32))}, ${Math.round(92 - deel * 21)}%, ${Math.round(52 - deel * 7)}%)`
+  const voortgangKleur = `hsl(${Math.round(110 + deel * 32)}, ${Math.round(50 + deel * 30)}%, ${Math.round(64 - deel * 20)}%)`
 
   return (
     <div style={buitenkant}>
@@ -313,7 +313,7 @@ export function PrequalFlow({ m = false, compact = false }) {
       <div style={midden}>
         {/* Voortgang direct boven de vraag, even breed als de antwoorden:
             erboven terug en de teller, eronder één balk. Kleur loopt van
-            oranje naar groen naarmate je verder komt (21 okt 2026). */}
+            licht naar vol groen naarmate je verder komt (21 okt 2026). */}
         <div style={{ marginBottom: m ? '1.4rem' : '1.8rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 28, marginBottom: 8 }}>
             <button onClick={terug} aria-label="Vorige vraag" disabled={stap === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 0', background: 'none', border: 'none', color: ZWAK, fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', cursor: stap === 0 ? 'default' : 'pointer', visibility: stap === 0 ? 'hidden' : 'visible', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
