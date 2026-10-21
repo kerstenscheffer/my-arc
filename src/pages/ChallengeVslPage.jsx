@@ -45,12 +45,6 @@ const VIDEO_ID = '41Hfc2YVBAA'
 
 const CTA_TEKST = 'Start mijn challenge'
 
-const RESULTATEN = [
-  { kg: '4,5', weken: 4 },
-  { kg: '3,5', weken: 3 },
-  { kg: '2,5', weken: 2 },
-]
-
 const HERO_PUNTEN = ['Persoonlijk voedingsplan', 'Persoonlijk trainingsplan', '1-op-1 begeleiding', 'Stok achter de deur', 'Alles in 1 app']
 
 const TRANSFORMATIES = [
