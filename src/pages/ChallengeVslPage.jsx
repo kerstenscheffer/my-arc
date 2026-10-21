@@ -23,13 +23,13 @@ const TP_GREEN = '#00B67A'
 const BG = '#000000'
 
 // Drie vlakken wisselen elkaar af, zoals op de acquisition.com-pagina: zwart,
-// wit en lichtgrijs. Elke Sectie zet zijn thema; Kop, Tekst en Label
+// grafiet en antraciet, allemaal tinten zwart. Elke Sectie zet zijn thema; Kop, Tekst en Label
 // lezen het mee zodat de kleuren per vlak kloppen.
 const THEMAS = {
   zwart: { bg: BG,        tekst: '#fff', tekst85: 'rgba(255,255,255,0.85)', dim: 'rgba(255,255,255,0.55)', rand: 'rgba(255,255,255,0.1)',  randZacht: 'rgba(255,255,255,0.08)', kaart: 'rgba(255,255,255,0.03)', label: 'rgba(255,255,255,0.55)', icoon: '#fff' },
-  wit:   { bg: '#ffffff', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.12)',       randZacht: 'rgba(0,0,0,0.1)',        kaart: 'rgba(0,0,0,0.03)',       label: 'rgba(0,0,0,0.5)', icoon: '#000' },
-  // 'goud' heet nog zo, maar is sinds 21 okt 2026 lichtgrijs: geen geel meer op de pagina.
-  goud:  { bg: '#f2f2f2', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.1)',        randZacht: 'rgba(0,0,0,0.1)',        kaart: '#ffffff',                label: 'rgba(0,0,0,0.5)', icoon: '#000' },
+  grafiet: { bg: '#111111', tekst: '#fff', tekst85: 'rgba(255,255,255,0.85)', dim: 'rgba(255,255,255,0.55)', rand: 'rgba(255,255,255,0.1)',  randZacht: 'rgba(255,255,255,0.08)', kaart: 'rgba(255,255,255,0.04)', label: 'rgba(255,255,255,0.55)', icoon: '#fff' },
+  // Alles in tinten zwart (21 okt 2026): zwart, grafiet en antraciet wisselen elkaar af.
+  antraciet: { bg: '#1a1a1a', tekst: '#fff', tekst85: 'rgba(255,255,255,0.85)', dim: 'rgba(255,255,255,0.55)', rand: 'rgba(255,255,255,0.1)',  randZacht: 'rgba(255,255,255,0.08)', kaart: 'rgba(255,255,255,0.05)', label: 'rgba(255,255,255,0.55)', icoon: '#fff' },
 }
 const ThemaCtx = createContext(THEMAS.zwart)
 // Elke knop opent het kalenderblad; de functie komt via context zodat de
@@ -39,6 +39,8 @@ const useThema = () => useContext(ThemaCtx)
 // De hero is net iets lichter dan de vaste balk erboven, zodat je de twee
 // vlakken van elkaar ziet.
 const HERO_BG = '#161616'
+// Onder de video: een tint donkerder dan de hero.
+const HERO_ONDER = '#0d0d0d'
 
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const VIDEO_ID = '41Hfc2YVBAA'
@@ -223,7 +225,7 @@ function TrustpilotBadge({ style, licht }) {
   )
 }
 
-// Reviews als slider op een licht vlak: één kaart tegelijk in beeld (op de
+// Reviews als slider op een donker vlak: één kaart tegelijk in beeld (op de
 // telefoon met een stukje van de volgende). Schuift elke 5 s vanzelf door;
 // raakt iemand hem aan (vegen, pijltje, bolletje), dan wacht hij 10 s.
 // Lange reviews ingekort met 'Lees meer' (21 okt 2026).
@@ -258,13 +260,13 @@ function ReviewSlider({ m }) {
   }, [])
   const pijl = (links) => ({
     position: 'absolute', top: '50%', [links ? 'left' : 'right']: -18, transform: 'translateY(-50%)',
-    width: 40, height: 40, borderRadius: '50%', border: '1px solid rgba(0,0,0,0.12)', background: '#fff',
-    color: '#000', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.08)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    width: 40, height: 40, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.15)', background: '#1f1f1f',
+    color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.4)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
   return (
     <div style={{ marginTop: m ? '1.4rem' : '2rem' }}>
-      <TrustpilotBadge licht style={{ marginBottom: m ? '1rem' : '1.3rem' }} />
+      <TrustpilotBadge style={{ marginBottom: m ? '1rem' : '1.3rem' }} />
       <div style={{ position: 'relative' }}>
         <div
           ref={baan} onScroll={opScroll}
@@ -281,7 +283,7 @@ function ReviewSlider({ m }) {
             <div key={r.name} style={{
               flex: `0 0 ${m ? '86%' : '100%'}`, scrollSnapAlign: 'start', boxSizing: 'border-box',
               padding: m ? '1.2rem 1.2rem 1.1rem' : '1.6rem 1.7rem 1.4rem', borderRadius: 16,
-              background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
               display: 'flex', flexDirection: 'column', gap: '0.8rem',
             }}>
               <div style={{ display: 'flex', gap: 3 }}>
@@ -292,25 +294,25 @@ function ReviewSlider({ m }) {
                 ))}
               </div>
               <div>
-                <div style={{ fontSize: m ? '1.05rem' : '1.12rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', lineHeight: 1.3 }}>{r.titel}</div>
+                <div style={{ fontSize: m ? '1.05rem' : '1.12rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.3 }}>{r.titel}</div>
                 <p style={{
-                  margin: '0.4rem 0 0', fontSize: m ? '0.95rem' : '1rem', fontWeight: 600, lineHeight: 1.5, color: '#222', letterSpacing: '-0.01em',
+                  margin: '0.4rem 0 0', fontSize: m ? '0.95rem' : '1rem', fontWeight: 600, lineHeight: 1.5, color: 'rgba(255,255,255,0.8)', letterSpacing: '-0.01em',
                   ...(open[r.name] ? {} : { display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
                 }}>
                   {r.text}
                 </p>
                 {r.text.length > 220 && (
-                  <button onClick={() => { raak(); setOpen(o => ({ ...o, [r.name]: !o[r.name] })) }} style={{ marginTop: 4, padding: 0, background: 'none', border: 'none', fontFamily: 'inherit', fontSize: '0.88rem', fontWeight: 900, color: '#000', textDecoration: 'underline', cursor: 'pointer' }}>
+                  <button onClick={() => { raak(); setOpen(o => ({ ...o, [r.name]: !o[r.name] })) }} style={{ marginTop: 4, padding: 0, background: 'none', border: 'none', fontFamily: 'inherit', fontSize: '0.88rem', fontWeight: 900, color: '#fff', textDecoration: 'underline', cursor: 'pointer' }}>
                     {open[r.name] ? 'Minder' : 'Lees meer'}
                   </button>
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 900 }}>{r.name.charAt(0)}</div>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#000' }}>{r.name}</span>
+                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#fff', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 900 }}>{r.name.charAt(0)}</div>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{r.name}</span>
                 </div>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(0,0,0,0.45)' }}>{r.date}</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{r.date}</span>
               </div>
             </div>
           ))}
@@ -326,7 +328,7 @@ function ReviewSlider({ m }) {
         {REVIEWS.map((r, i) => (
           <button key={r.name} onClick={() => { raak(); naar(i) }} aria-label={`Review ${i + 1}`} style={{
             width: i === actief ? 22 : 8, height: 8, borderRadius: 4, border: 'none', padding: 0, cursor: 'pointer',
-            background: i === actief ? '#000' : 'rgba(0,0,0,0.2)', transition: 'width 0.25s ease, background 0.25s ease',
+            background: i === actief ? '#fff' : 'rgba(255,255,255,0.25)', transition: 'width 0.25s ease, background 0.25s ease',
           }} />
         ))}
       </div>
@@ -840,26 +842,26 @@ export default function ChallengeVslPage() {
           het vlak is precies zo hoog als de video, dus de grens ligt op de
           helft. */}
       <div style={{
-        background: `linear-gradient(180deg, ${HERO_BG} 0%, ${HERO_BG} 50%, #fff 50%, #fff 100%)`,
+        background: `linear-gradient(180deg, ${HERO_BG} 0%, ${HERO_BG} 50%, ${HERO_ONDER} 50%, ${HERO_ONDER} 100%)`,
         padding: `${m ? '2.2rem' : '3rem'} ${m ? '1.25rem' : '3rem'} 0`,
       }}>
         <div style={{ maxWidth: 880, margin: '0 auto' }}>
           <Video m={m} />
         </div>
       </div>
-      <section style={{ background: '#fff', color: '#000', padding: `${m ? '2rem' : '2.8rem'} ${m ? '1.25rem' : '3rem'} ${m ? '3.2rem' : '4.5rem'}` }}>
+      <section style={{ background: HERO_ONDER, color: '#fff', padding: `${m ? '2rem' : '2.8rem'} ${m ? '1.25rem' : '3rem'} ${m ? '3.2rem' : '4.5rem'}` }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div ref={heroCtaRef}>
-            <Cta m={m} licht />
+            <Cta m={m} />
           </div>
           {/* Wat je krijgt, onder elkaar met een vinkje (21 okt 2026). */}
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: m ? '1.6rem' : '2.2rem' }}>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: m ? 10 : 12 }}>
               {HERO_PUNTEN.map(p => {
-                const regel = { display: 'flex', alignItems: 'center', gap: 12, fontSize: m ? '1.08rem' : '1.22rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em' }
+                const regel = { display: 'flex', alignItems: 'center', gap: 12, fontSize: m ? '1.08rem' : '1.22rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }
                 const vink = (
-                  <span style={{ width: m ? 26 : 30, height: m ? 26 : 30, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Check size={m ? 16 : 18} strokeWidth={3.4} color="#fff" />
+                  <span style={{ width: m ? 26 : 30, height: m ? 26 : 30, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Check size={m ? 16 : 18} strokeWidth={3.4} color="#000" />
                   </span>
                 )
                 return (
@@ -867,7 +869,7 @@ export default function ChallengeVslPage() {
                     {p.pijler ? (
                       <button onClick={() => { setPijler(p.pijler); meet('pijler', { meta: { pijler: p.pijler } }) }} style={{ ...regel, padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                         {vink}
-                        <span style={{ textDecoration: 'underline', textDecorationThickness: 2, textUnderlineOffset: 4, textDecorationColor: 'rgba(0,0,0,0.25)' }}>{p.tekst}</span>
+                        <span style={{ textDecoration: 'underline', textDecorationThickness: 2, textUnderlineOffset: 4, textDecorationColor: 'rgba(255,255,255,0.3)' }}>{p.tekst}</span>
                         <ChevronRight size={m ? 18 : 20} strokeWidth={3} style={{ flexShrink: 0, marginLeft: -4 }} />
                       </button>
                     ) : (<>{vink}{p.tekst}</>)}
@@ -881,12 +883,12 @@ export default function ChallengeVslPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: m ? '0.6rem' : '1rem', marginTop: m ? '1.8rem' : '2.4rem' }}>
             {TRANSFORMATIES.map(t => (
               <div key={t.src}>
-                <div style={{ borderRadius: 12, overflow: 'hidden', background: '#f2f2f2' }}>
+                <div style={{ borderRadius: 12, overflow: 'hidden', background: '#1a1a1a' }}>
                   <img src={t.src} alt={t.caption} draggable={false}
                     onError={(e) => { e.currentTarget.style.opacity = 0 }}
                     style={{ width: '100%', height: 'auto', display: 'block' }} />
                 </div>
-                <p style={{ margin: '0.5rem 0 0', fontSize: m ? '0.74rem' : '0.88rem', fontWeight: 800, color: 'rgba(0,0,0,0.6)', textAlign: 'center', lineHeight: 1.3 }}>
+                <p style={{ margin: '0.5rem 0 0', fontSize: m ? '0.74rem' : '0.88rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textAlign: 'center', lineHeight: 1.3 }}>
                   {t.caption}
                 </p>
               </div>
@@ -896,7 +898,7 @@ export default function ChallengeVslPage() {
       </section>
 
       {/* ══ 2. Resultaten ══ */}
-      <Sectie m={m} lijn={false} thema="goud">
+      <Sectie m={m} lijn={false} thema="antraciet">
         <Kop m={m} center>Deze mannen zetten de eerste stap al.</Kop>
         <ReviewSlider m={m} />
 
@@ -924,7 +926,7 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* ══ 4. De aanpak ══ */}
-      <Sectie m={m} thema="wit">
+      <Sectie m={m} thema="grafiet">
         <Kop m={m} center>Eten, trainen en iemand die meekijkt.</Kop>
         <div style={{
           display: 'grid', gridTemplateColumns: m ? '1fr' : 'repeat(3, 1fr)',
@@ -933,15 +935,15 @@ export default function ChallengeVslPage() {
           {AANPAK.map(a => (
             <div key={a.kop} style={{
               padding: m ? '0.95rem 1rem' : '1.3rem 1.3rem', borderRadius: 16,
-              border: `1px solid ${THEMAS.wit.rand}`, background: THEMAS.wit.kaart,
+              border: `1px solid ${THEMAS.grafiet.rand}`, background: THEMAS.grafiet.kaart,
               display: 'flex', alignItems: m ? 'center' : 'flex-start', flexDirection: m ? 'row' : 'column', gap: m ? 14 : 12,
             }}>
-              <span style={{ width: 44, height: 44, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <a.Icon size={22} strokeWidth={2.6} color="#fff" />
+              <span style={{ width: 44, height: 44, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <a.Icon size={22} strokeWidth={2.6} color="#000" />
               </span>
               <div style={{ minWidth: 0 }}>
-                <h3 style={{ margin: 0, fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: THEMAS.wit.tekst }}>{a.kop}</h3>
-                <div style={{ marginTop: 4, fontSize: m ? '0.9rem' : '0.98rem', fontWeight: 700, lineHeight: 1.4, color: THEMAS.wit.dim }}>{a.zin}</div>
+                <h3 style={{ margin: 0, fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: THEMAS.grafiet.tekst }}>{a.kop}</h3>
+                <div style={{ marginTop: 4, fontSize: m ? '0.9rem' : '0.98rem', fontWeight: 700, lineHeight: 1.4, color: THEMAS.grafiet.dim }}>{a.zin}</div>
               </div>
             </div>
           ))}
@@ -977,30 +979,30 @@ export default function ChallengeVslPage() {
       </Sectie>
 
       {/* ══ 6. Geschiktheid ══ */}
-      <Sectie m={m} smal thema="goud">
+      <Sectie m={m} smal thema="antraciet">
         <Kop m={m}>Past dit bij jou?</Kop>
         <div style={{ marginTop: m ? '1.1rem' : '1.4rem' }}>
           {GESCHIKT.map((t, i) => (
             <div key={t} style={{
               display: 'flex', gap: '0.8rem', alignItems: 'center',
               padding: m ? '0.75rem 0' : '0.95rem 0',
-              borderTop: i === 0 ? `1px solid ${THEMAS.goud.randZacht}` : 'none',
-              borderBottom: `1px solid ${THEMAS.goud.randZacht}`,
+              borderTop: i === 0 ? `1px solid ${THEMAS.antraciet.randZacht}` : 'none',
+              borderBottom: `1px solid ${THEMAS.antraciet.randZacht}`,
             }}>
-              <Check size={m ? 22 : 26} strokeWidth={3} color={THEMAS.goud.icoon} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: THEMAS.goud.tekst }}>{t}</span>
+              <Check size={m ? 22 : 26} strokeWidth={3} color={THEMAS.antraciet.icoon} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: THEMAS.antraciet.tekst }}>{t}</span>
             </div>
           ))}
         </div>
-        <p style={{ margin: `${m ? '1.2rem' : '1.5rem'} 0 0`, fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.35, color: THEMAS.goud.tekst }}>
+        <p style={{ margin: `${m ? '1.2rem' : '1.5rem'} 0 0`, fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.35, color: THEMAS.antraciet.tekst }}>
           Perfect hoeft niet. Inzet wel.
         </p>
       </Sectie>
 
       {/* ══ 7. Vragen ══ */}
-      <Sectie m={m} smal thema="wit">
+      <Sectie m={m} smal thema="grafiet">
         <Kop m={m}>Vragen</Kop>
-        <div style={{ marginTop: m ? '1.2rem' : '1.6rem', borderTop: `1px solid ${THEMAS.wit.randZacht}` }}>
+        <div style={{ marginTop: m ? '1.2rem' : '1.6rem', borderTop: `1px solid ${THEMAS.grafiet.randZacht}` }}>
           {VRAGEN.map((v, i) => (
             <Vraag key={v.vraag} item={v} m={m} open={openVraag === i} onToggle={() => setOpenVraag(openVraag === i ? -1 : i)} />
           ))}
