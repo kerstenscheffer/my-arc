@@ -307,18 +307,17 @@ export function PrequalFlow({ m = false, compact = false }) {
   return (
     <div style={buitenkant}>
       <div ref={bovenRef} />
-      {/* Voortgang: terug, balk, en hoeveel er nog komt. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={terug} aria-label="Terug" disabled={stap === 0} style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: WIT, cursor: stap === 0 ? 'default' : 'pointer', opacity: stap === 0 ? 0 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-          <ArrowLeft size={18} strokeWidth={2.8} />
-        </button>
-        <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
-          <div style={{ width: `${(nummer / totaal) * 100}%`, height: '100%', background: WIT, borderRadius: 3, transition: 'width 0.35s ease' }} />
-        </div>
-        <span style={{ fontSize: '0.8rem', fontWeight: 900, color: WIT, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{nummer}/{totaal}</span>
-      </div>
-
       <div key={vraag.id} style={{ ...midden, animation: 'prequalIn 0.25s ease' }}>
+        {/* Voortgang direct boven de vraag: terug, balk, en hoeveel er nog komt. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: m ? '1.4rem' : '1.8rem' }}>
+          <button onClick={terug} aria-label="Terug" disabled={stap === 0} style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: WIT, cursor: stap === 0 ? 'default' : 'pointer', opacity: stap === 0 ? 0 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            <ArrowLeft size={18} strokeWidth={2.8} />
+          </button>
+          <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
+            <div style={{ width: `${(nummer / totaal) * 100}%`, height: '100%', background: WIT, borderRadius: 3, transition: 'width 0.35s ease' }} />
+          </div>
+          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: WIT, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{nummer}/{totaal}</span>
+        </div>
         {vraag.soort === 'info' ? (
           <>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: WIT, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.2rem' }}>
