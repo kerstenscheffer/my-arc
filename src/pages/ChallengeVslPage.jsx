@@ -179,9 +179,15 @@ function Tekst({ children, m, center, dim, style }) {
   )
 }
 
-// De knop: wit vlak, zwarte tekst, zoals op de challenge-pagina.
-function Cta({ m, sub, style }) {
+// De knop in MY ARC-stijl (21 okt 2026, eerst goud): op een donker vlak wit
+// met zwarte tekst, op een licht vlak zwart met witte tekst. `licht` voor
+// een vlak zonder eigen Sectie-thema (de witte strook onder de video).
+function Cta({ m, sub, style, licht }) {
   const openKalender = useContext(OpenKalenderCtx)
+  const t = useThema()
+  const opLicht = licht ?? t.tekst === '#000'
+  const vlak = opLicht ? '#000' : '#fff'
+  const letter = opLicht ? '#fff' : '#000'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, ...style }}>
       <button
@@ -191,12 +197,12 @@ function Cta({ m, sub, style }) {
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           minHeight: m ? 68 : 76, padding: m ? '0 1rem' : '0 2.6rem',
           width: m ? '100%' : 'auto', minWidth: m ? 0 : 380,
-          borderRadius: 14, background: GOLD, color: '#000',
+          borderRadius: 14, background: vlak, color: letter,
           // Eén regel op de telefoon: kleiner lettertype en nooit afbreken.
           // Dikker dan 900 bestaat niet in het lettertype; een dunne zwarte
           // contour maakt de letters zwaarder.
           fontSize: m ? '1.12rem' : '1.45rem', fontWeight: 900, letterSpacing: '0.03em',
-          whiteSpace: 'nowrap', WebkitTextStroke: m ? '0.5px #000' : '0.7px #000',
+          whiteSpace: 'nowrap', WebkitTextStroke: `${m ? '0.5px' : '0.7px'} ${letter}`,
           textTransform: 'uppercase', textDecoration: 'none', boxSizing: 'border-box',
           boxShadow: 'none',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -382,9 +388,9 @@ function Video({ m }) {
           }}
         >
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} />
-          {/* Los gouden driehoekje, geen cirkel eromheen. */}
+          {/* Los wit driehoekje, geen cirkel eromheen. */}
           <Play
-            size={m ? 64 : 84} fill={GOLD} color={GOLD} strokeWidth={1}
+            size={m ? 64 : 84} fill="#fff" color="#fff" strokeWidth={1}
             style={{ position: 'relative', filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }}
           />
         </button>
@@ -426,7 +432,7 @@ function Video({ m }) {
       />
       {!speelt && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          <Play size={m ? 56 : 72} fill={GOLD} color={GOLD} strokeWidth={1} style={{ filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }} />
+          <Play size={m ? 56 : 72} fill="#fff" color="#fff" strokeWidth={1} style={{ filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }} />
         </div>
       )}
       {/* Eigen bediening onderin: play/pauze, geluid, voortgang. */}
@@ -451,7 +457,7 @@ function Video({ m }) {
         <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.25)', overflow: 'hidden' }}>
           <div style={{
             width: `${TOON_VOORTGANG(voortgang) * 100}%`, height: '100%',
-            background: GOUD_KNOP, borderRadius: 3,
+            background: '#fff', borderRadius: 3,
             transition: 'width 0.25s linear',
           }} />
         </div>
@@ -698,7 +704,7 @@ export default function ChallengeVslPage() {
       <section style={{ background: '#fff', color: '#000', padding: `${m ? '2rem' : '2.8rem'} ${m ? '1.25rem' : '3rem'} ${m ? '3.2rem' : '4.5rem'}` }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div ref={heroCtaRef}>
-            <Cta m={m} />
+            <Cta m={m} licht />
           </div>
           <Tekst m={m} center style={{ marginTop: m ? '1.8rem' : '2.4rem', color: '#111', fontWeight: 700 }}>
             Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
@@ -934,7 +940,7 @@ export default function ChallengeVslPage() {
           transition: 'opacity 0.25s ease',
           display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
           padding: m ? '0.85rem 1.6rem' : '0.95rem 2rem', borderRadius: 999,
-          background: GOLD, color: '#000', textDecoration: 'none',
+          background: '#fff', color: '#000', textDecoration: 'none',
           fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 900, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.03em',
           boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
