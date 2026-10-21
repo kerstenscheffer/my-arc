@@ -4,7 +4,7 @@
 // dagkiezer toe: elke week op de gekozen dagen, of één week op die datums.
 // "Overal waar dit gerecht staat" blijft als snelkeuze onderaan.
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { Repeat } from 'lucide-react'
 import MealEditModal from '../../ai-meal-generator/tabs/plan-analyzer/MealEditModal'
 import { werkGelogdeMaaltijdBij, zetMaaltijdOpDagen } from '../dagAanpassingen'

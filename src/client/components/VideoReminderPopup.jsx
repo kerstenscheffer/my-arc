@@ -26,7 +26,7 @@
 // verplaatst de herinnering naar de pill, hij verdwijnt pas als alles bekeken is.
 
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../paginaPortal'
 import { PlayCircle, X, ArrowRight, Check, Play } from 'lucide-react'
 import videoService from '../../modules/videos/VideoService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'

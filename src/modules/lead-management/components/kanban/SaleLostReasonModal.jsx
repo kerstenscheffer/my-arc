@@ -4,7 +4,7 @@
 // Kloon van RejectionReasonModal — reden landt op de laatste lead_movements-rij
 // via leadService.setMovementRejectionReason.
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, XCircle } from 'lucide-react'
 

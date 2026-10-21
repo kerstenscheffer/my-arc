@@ -4,7 +4,7 @@
 // lead-kanban goals are recomputed for the selected week's date range.
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import {
   X, Target, ChevronLeft, ChevronRight, Calendar, CheckCircle2, AlertCircle, Loader2,
 } from 'lucide-react'

@@ -13,7 +13,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { fotoWeergaveUrl } from '../fotoWeergave'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, ArrowRight, Download, ArrowLeftRight } from 'lucide-react'
 
 const angleOf = (p) => (p?.metadata?.subtype || 'overig')

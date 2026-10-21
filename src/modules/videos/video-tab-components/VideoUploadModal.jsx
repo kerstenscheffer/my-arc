@@ -1,7 +1,7 @@
 // src/modules/videos/video-tab-components/VideoUploadModal.jsx
 // v2.0 — Brand styling (flush/goud) + mijn categorie dropdown + category_id support
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { Upload, X, Youtube, Camera, Image as ImageIcon, Globe, Check, Home, Dumbbell, Utensils, ShoppingCart, Phone, User } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'

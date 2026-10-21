@@ -7,7 +7,7 @@ import AIMealDashboard from './AIMealDashboard'
 import VoedingsGids from './VoedingsGids'
 import GelegenhedenHub from './GelegenhedenHub'
 import NutritionChoiceTrainer from '../lab/experiments/NutritionChoiceTrainer'
-import PaginaLader from '../../ui/PaginaLader'
+import { MaaltijdSkelet } from '../../client/PaginaSkeletten'
 
 // Laatste uitkomst bewaard: terug naar Voeding toont het scherm meteen in
 // plaats van eerst te wachten op deze check (en daarna pas het dashboard).
@@ -51,7 +51,7 @@ export default function MealPlanMain({ client, onNavigate, db }) {
   }
   
   // Loading state
-  if (loading) return <PaginaLader pagina="meal" hoogte="100vh" />
+  if (loading) return <MaaltijdSkelet isMobile={isMobile} />
   
   // Altijd het dashboard, ook zonder plan: dan draait het in de vrije stand
   // (eten loggen, water, macro's uit het profiel). De oude melding "vraag je

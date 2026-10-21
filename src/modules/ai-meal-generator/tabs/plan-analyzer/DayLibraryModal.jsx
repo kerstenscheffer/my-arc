@@ -12,7 +12,7 @@
 // pakken is.
 
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { SJABLOON_DAG } from '../../../../lib/mealTemplateTypes'
 import { X, CalendarDays, Trash2, Loader, Check, Bookmark, UserCheck } from 'lucide-react'

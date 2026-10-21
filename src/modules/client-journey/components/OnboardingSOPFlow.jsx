@@ -1,6 +1,6 @@
 // src/modules/client-journey/components/OnboardingSOPFlow.jsx
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { Check, Copy, ChevronRight, ChevronDown, AlertTriangle, X, ExternalLink, Pencil, RotateCcw } from 'lucide-react'
 import IntakeCallPanel from './calls/IntakeCallPanel'

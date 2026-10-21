@@ -6,7 +6,7 @@
 // allemaal mee. Daarom eerst tonen wát er verdwijnt, en pas verwijderen als de
 // coach de voornaam overtypt — één misklik in een menu mag dit nooit doen.
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, AlertTriangle, Trash2, Loader2 } from 'lucide-react'
 

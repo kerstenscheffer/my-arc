@@ -2,7 +2,7 @@
 // HOI KERSTEN - PREMIUM STYLING UPGRADE 🔥
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, Calendar, Save } from 'lucide-react'
 import PlanningDayRow from './PlanningDayRow'
 

@@ -15,7 +15,7 @@
 //   - blokken lezen als kaarten: bold wit, tijd rechts, kleur alleen als streep
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../paginaPortal'
 import {
   Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, List,
   CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal, Scale,
@@ -27,6 +27,7 @@ import { resolveFoodImage, foodImageFallback } from '../../modules/meal-plan/foo
 import { workoutFoto } from './workoutFoto'
 import { verzetDag as verzetDagHelper } from './dagNavigatie'
 import MacroBoxes from './MacroBoxes'
+import usePaginaTerug from '../usePaginaTerug'
 import BlokTijdSheet from './BlokTijdSheet'
 import DagindelingModal from './DagindelingModal'
 import { SlaapLogBlad } from '../../modules/progress/SlaapKnop'
@@ -142,17 +143,25 @@ export default function DagAgenda({
   const [dagindeling, setDagindeling] = useState(false)
   const [versie, setVersie] = useState(0)
   const roosterRef = useRef(null)
+  // Terug op Home (de pagina bleef verborgen staan): alles stil opnieuw
+  // ophalen, want op Voeding of Workout kan intussen iets zijn afgevinkt of
+  // gewisseld. Stil = zonder laadstand, de dag blijft staan.
+  const [terug, setTerug] = useState(0)
+  const stilTerug = useRef(false)
+  usePaginaTerug('home', () => { stilTerug.current = true; setTerug(t => t + 1) })
 
   useEffect(() => {
     if (!client?.id) return
     let weg = false
-    setLaden(true)
+    const stil = stilTerug.current
+    stilTerug.current = false
+    if (!stil) setLaden(true)
     service.loadWeek(client.id, weekAnker)
       .then(d => { if (!weg) setData(d) })
       .catch(e => console.error('Dagagenda laden mislukt:', e))
       .finally(() => { if (!weg) setLaden(false) })
     return () => { weg = true }
-  }, [service, client?.id, weekAnker, versie])
+  }, [service, client?.id, weekAnker, versie, terug])
 
   // Doelen staan op de klant en veranderen niet per dag.
   useEffect(() => {
@@ -252,7 +261,7 @@ export default function DagAgenda({
         setSlaapLogs(uit)
       }, () => { if (!weg) setSlaapLogs({}) })
     return () => { weg = true }
-  }, [client?.id, db, slaapDagIso, morgenIso, versie])
+  }, [client?.id, db, slaapDagIso, morgenIso, versie, terug])
   const [gewogenOp, setGewogenOp] = useState(null) // kg of null
   const [wegenBlad, setWegenBlad] = useState(false)
   useEffect(() => {
@@ -263,7 +272,7 @@ export default function DagAgenda({
     laadWeging()
     window.addEventListener('myarc:gewicht-gelogd', laadWeging)
     return () => { weg = true; window.removeEventListener('myarc:gewicht-gelogd', laadWeging) }
-  }, [client?.id, db, slaapDagIso, versie])
+  }, [client?.id, db, slaapDagIso, versie, terug])
   // Training: zelfde percentage als de workoutpagina (sets gedaan / sets
   // gepland), over de oefeningen die deze week echt meetellen: met de
   // week-overrides erop en zonder overgeslagen oefeningen. Vanaf 50% telt hij
@@ -296,7 +305,7 @@ export default function DagAgenda({
     laad()
     window.addEventListener('myarc:workout-changed', laad)
     return () => { weg = true; window.removeEventListener('myarc:workout-changed', laad) }
-  }, [client?.id, db, slaapDagIso, versie])
+  }, [client?.id, db, slaapDagIso, versie, terug])
   const trainingGedaan = (b) => b.type === 'training' && trainingPct >= 50
 
   // Supplementen afvinken: supplement_logs per supplement per dag, dezelfde
@@ -310,7 +319,7 @@ export default function DagAgenda({
     db.supabase.from('supplement_logs').select('supplement_id').eq('client_id', client.id).eq('log_date', slaapDagIso)
       .then(({ data }) => { if (!weg) setSuppGelogd(new Set((data || []).map(r => r.supplement_id))) }, () => {})
     return () => { weg = true }
-  }, [client?.id, db, slaapDagIso, versie])
+  }, [client?.id, db, slaapDagIso, versie, terug])
   const suppIds = (b) => (b.meta?.items || []).map(x => x.id).filter(Boolean)
   const supplementGedaan = (b) => { const ids = suppIds(b); return ids.length > 0 && ids.every(id => suppGelogd.has(id)) }
   const wisselSupplementen = async (b) => {
@@ -399,7 +408,7 @@ export default function DagAgenda({
         zetGelogd(data || [])
       })
     return () => { weg = true }
-  }, [db, client?.id, dagIso])
+  }, [db, client?.id, dagIso, terug])
 
   const zetGelogd = (rijen) => {
     const som = { calories: 0, protein: 0, carbs: 0, fat: 0 }

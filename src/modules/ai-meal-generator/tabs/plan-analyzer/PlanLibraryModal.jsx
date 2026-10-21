@@ -4,7 +4,7 @@
 // naam bewaart en later voor een andere client kan hergebruiken.
 
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Bookmark, Trash2, Download, Check } from 'lucide-react'
 import { Placeholder, Meta, PrimairKnop, SecundairKnop, IconKnop } from './PlanSwitcherModal'

@@ -2,7 +2,7 @@
 // Fullscreen portal modal — YouTube player + description + rating
 
 import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { X, Star, Play, ExternalLink, ListVideo } from 'lucide-react'
 import clientVideoService from './ClientVideoService'

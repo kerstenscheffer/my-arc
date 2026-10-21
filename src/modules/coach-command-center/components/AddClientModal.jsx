@@ -6,7 +6,7 @@
 // coach_id van de huidige coach.
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, UserPlus, Loader2, Eye, EyeOff, AlertCircle, Check } from 'lucide-react'
 import { signUpNewClient } from '../../../lib/supabase'

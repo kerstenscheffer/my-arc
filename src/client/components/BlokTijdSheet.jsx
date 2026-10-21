@@ -19,7 +19,7 @@
 //                         training/slaap/werk in client_agenda_blocks.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../paginaPortal'
 import { X, CalendarOff, RotateCcw, ChevronLeft, ChevronRight, Check, Moon, Sun, Briefcase, Flag } from 'lucide-react'
 import { recurringIdFor, DAY_LABELS_NL_LONG } from '../../modules/client-agenda/ClientAgendaService'
 import TijdWiel from './TijdWiel'

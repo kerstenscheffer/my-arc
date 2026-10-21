@@ -2,7 +2,7 @@
 // v1.0 — Coach kan PDF uploaden, client kan bekijken
 
 import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { Upload, FileText, Trash2, ExternalLink, Loader, X } from 'lucide-react'
 

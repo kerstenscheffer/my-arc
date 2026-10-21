@@ -5,7 +5,7 @@
 // maar op één manier gesteld wordt en er maar één plek is om te wijzigen.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X } from 'lucide-react'
 import SaleForm from './SaleForm'

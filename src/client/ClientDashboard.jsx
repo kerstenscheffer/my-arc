@@ -1,12 +1,13 @@
 // src/client/ClientDashboard.jsx - CLEAN VERSION v2.0
 // ✅ ONLY STYLING CHANGED - All logic, state, routing, auth IDENTICAL
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
 import LaadScherm from '../components/LaadScherm'
-import PaginaLader from '../ui/PaginaLader'
 import ruimOpslagOp from '../utils/opruimenOpslag'
-// Klein en niet lazy: dit is juist wat je ziet terwijl de workout-code laadt.
-import { WorkoutPaginaSkelet } from '../modules/workout/components/WorkoutSkelet'
+// Klein en niet lazy: dit is juist wat je ziet terwijl de code van een pagina laadt.
+import { PaginaSkelet } from './PaginaSkeletten'
+import { PAGINA_TERUG, PAGINA_GEWISSELD } from './usePaginaTerug'
+import { PaginaZichtbaar } from './paginaPortal'
 import DatabaseService from '../services/DatabaseService'
 import { useLanguage } from '../contexts/LanguageContext'
 
@@ -54,6 +55,7 @@ const ProgressMain = lazy(() => import('../modules/progress/ProgressMain'))
 const ClientProfile = lazy(() => import('./pages/ClientProfile'))
 const ShoppingHub = lazy(() => import('../modules/shopping/ShoppingHub'))
 const ClientAgendaView = lazy(() => import('../modules/client-agenda/ClientAgendaView'))
+const PAGINAS = ['home', 'workout', 'meal', 'agenda', 'boodschappen', 'tracking', 'calls', 'profile']
 
 // Initialize database
 const db = DatabaseService
@@ -81,6 +83,42 @@ const pageThemes = {
  */
 export default function ClientDashboard({ previewClientId = null, ingebed = false } = {}) {
   const [currentView, setCurrentView] = useState('home')
+  // Pagina's blijven staan nadat je ze een keer geopend hebt: wisselen
+  // verbergt ze alleen, zoals in Calendly. Terug op een pagina staat hij er
+  // dus meteen, op dezelfde plek, en ververst hij stil wat er elders
+  // veranderd kan zijn (usePaginaTerug). Eerst bouwde elke wissel de hele
+  // pagina opnieuw op, met laadscherm en al (Kersten, 21 okt 2026).
+  const bezocht = useRef(new Set())
+  bezocht.current.add(currentView)
+  const getoond = useRef(new Set(['home']))
+  const scrollPerPagina = useRef({})
+  const zichtbarePagina = useRef(currentView)
+  useEffect(() => {
+    if (ingebed) return
+    const bewaar = () => { scrollPerPagina.current[zichtbarePagina.current] = window.scrollY }
+    window.addEventListener('scroll', bewaar, { passive: true })
+    return () => window.removeEventListener('scroll', bewaar)
+  }, [ingebed])
+  useLayoutEffect(() => {
+    if (zichtbarePagina.current === currentView) return
+    zichtbarePagina.current = currentView
+    // Een blad dat de pagina vastzette (body fixed) blijft verborgen open
+    // staan als je wegging via de terugknop; dan zou de volgende pagina niet
+    // meer scrollen.
+    const b = document.body.style
+    if (b.position === 'fixed') {
+      b.position = ''; b.top = ''; b.width = ''; b.overflow = ''
+      document.documentElement.style.overflow = ''; document.documentElement.style.height = ''
+    }
+    if (!ingebed) window.scrollTo(0, scrollPerPagina.current[currentView] || 0)
+  }, [currentView, ingebed])
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(PAGINA_GEWISSELD, { detail: { pagina: currentView } }))
+    if (getoond.current.has(currentView)) {
+      window.dispatchEvent(new CustomEvent(PAGINA_TERUG, { detail: { pagina: currentView } }))
+    }
+    getoond.current.add(currentView)
+  }, [currentView])
   // Stand van de video-teaser (de balk met de coachvideo): de knop in de
   // onderbalk opent hem, en toont de bibliotheek als er niets klaarstaat.
   const [videoTeaser, setVideoTeaser] = useState({ aantal: 0, open: false })
@@ -123,7 +161,10 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
 
   // Focus-mode: actieve pagina (zoals workout) kan via callback signalen
   // dat de bottom-nav en widgetbar verborgen moet worden voor maximale focus.
-  const [focusMode, setFocusMode] = useState(false)
+  // Alleen de workout zet hem aan; die pagina blijft verborgen staan als je
+  // weggaat, dus telt zijn stand alleen zolang hij in beeld is.
+  const [workoutFocus, setWorkoutFocus] = useState(false)
+  const focusMode = currentView === 'workout' && workoutFocus
   
   const { t, language, toggleLanguage } = useLanguage()
   const currentTheme = pageThemes[currentView] || pageThemes.home
@@ -438,36 +479,26 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             {!focusMode && !['meal', 'workout', 'home'].includes(currentView) && (
               <BelangrijkeVideo client={client} pagina={currentView} isMobile={isMobile} />
             )}
-            {/* Workout laadt in de vorm van de pagina (skelet); de andere
-                schermen tonen hun eigen icoon (PaginaLader). */}
-            <Suspense fallback={currentView === 'workout'
-              ? <WorkoutPaginaSkelet isMobile={isMobile} />
-              : <PaginaLader pagina={currentView} />}>
-            {currentView === 'home' && (
-              <ClientHome client={client} db={db} setCurrentView={setCurrentView} />
-            )}
-            {currentView === 'workout' && (
-              <ClientWorkoutPlan client={client} schema={schema} db={db} onFocusChange={setFocusMode} onClientUpdate={loadClientData} />
-            )}
-            {currentView === 'meal' && (
-              <MealPlanMain client={client} db={db} onNavigate={setCurrentView} />
-            )}
-            {currentView === 'agenda' && (
-              <ClientAgendaView client={client} db={db} viewerRole="client" />
-            )}
-            {currentView === 'boodschappen' && (
-              <ShoppingHub client={client} db={db} onNavigate={setCurrentView} />
-            )}
-            {currentView === 'tracking' && (
-              <ProgressMain db={db} client={client} />
-            )}
-            {currentView === 'calls' && (
-              <ClientCalls db={db} clientInfo={client} />
-            )}
-            {currentView === 'profile' && (
-              <ClientProfile client={client} user={user} db={db} onClientUpdate={handleClientUpdate} />
-            )}
-            </Suspense>
+            {/* Elke pagina die je al open had blijft staan, verborgen; alleen
+                de huidige is zichtbaar. Eigen Suspense per pagina: laadt de
+                code van een nieuwe pagina nog, dan blijven de andere staan.
+                Tijdens het laden de vorm van die pagina (skelet), geen icoon. */}
+            {PAGINAS.filter(id => bezocht.current.has(id)).map(id => (
+              <div key={id} style={id === currentView ? undefined : { display: 'none' }}>
+                <PaginaZichtbaar.Provider value={id === currentView}>
+                <Suspense fallback={<PaginaSkelet pagina={id} isMobile={isMobile} />}>
+                  {id === 'home' && <ClientHome client={client} db={db} setCurrentView={setCurrentView} />}
+                  {id === 'workout' && <ClientWorkoutPlan client={client} schema={schema} db={db} onFocusChange={setWorkoutFocus} onClientUpdate={loadClientData} />}
+                  {id === 'meal' && <MealPlanMain client={client} db={db} onNavigate={setCurrentView} />}
+                  {id === 'agenda' && <ClientAgendaView client={client} db={db} viewerRole="client" />}
+                  {id === 'boodschappen' && <ShoppingHub client={client} db={db} onNavigate={setCurrentView} />}
+                  {id === 'tracking' && <ProgressMain db={db} client={client} />}
+                  {id === 'calls' && <ClientCalls db={db} clientInfo={client} />}
+                  {id === 'profile' && <ClientProfile client={client} user={user} db={db} onClientUpdate={handleClientUpdate} />}
+                </Suspense>
+                </PaginaZichtbaar.Provider>
+              </div>
+            ))}
           </div>
         </div>
       </main>

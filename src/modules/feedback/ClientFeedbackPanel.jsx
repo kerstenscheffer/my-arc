@@ -1,6 +1,6 @@
 // src/modules/feedback/ClientFeedbackPanel.jsx
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { MessageSquare, HelpCircle, Lightbulb, X, Send, ChevronRight, Check, Clock, Bell } from 'lucide-react'
 

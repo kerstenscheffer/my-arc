@@ -1,7 +1,7 @@
 // src/modules/coach-command-center/components/CoachingLogModal.jsx
 // v1.1 — Categorieën: algemeen, status, whatsapp, call_prep
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import CheckinFlow from './CheckinFlow'
 import OnboardingFlow from './OnboardingFlow'

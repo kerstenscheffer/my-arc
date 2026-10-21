@@ -8,7 +8,7 @@
 // van een lege kop te tonen.
 
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen, ShoppingCart, Info, ChevronDown } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
 import { useProductFotos } from '../../supplements/utils/productFoto'

@@ -19,7 +19,7 @@
 // pagina wegduwt, en dan scrol je er juist langs.
 
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../paginaPortal'
 import { Play, Check, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import videoService from '../../modules/videos/VideoService'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'

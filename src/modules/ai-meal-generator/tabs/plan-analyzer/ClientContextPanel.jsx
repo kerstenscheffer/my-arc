@@ -2,7 +2,7 @@
 // v3.0 — Tabs: Gegevens | Meal Plan SOP + onClose prop
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { User, ChevronDown, ChevronRight, X, Minus, Maximize2, GripVertical, Check } from 'lucide-react'
 

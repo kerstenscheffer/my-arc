@@ -4,7 +4,7 @@
 // in the `ingredient_feedback` table for the coach to review.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, Send, AlertCircle, CheckCircle } from 'lucide-react'
 
 const GOLD = '#FFD700'

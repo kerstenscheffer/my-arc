@@ -6,7 +6,7 @@
 // pikt'm direct op.
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import {
   Send, X, Check, AlertCircle, Bell, Clock, Loader2,

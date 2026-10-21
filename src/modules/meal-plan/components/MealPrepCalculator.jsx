@@ -4,7 +4,7 @@
 // het verdeelt. De calculator laat de macro's PER BAKJE zien en slaat dat als
 // maaltijd op in je Quick log (ai_custom_meals), zodat je 1 bakje makkelijk logt.
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Search, Plus, Trash2, Check, Image as ImageIcon } from 'lucide-react'
 import { resolveFoodImage } from '../foodImageFallback'
 

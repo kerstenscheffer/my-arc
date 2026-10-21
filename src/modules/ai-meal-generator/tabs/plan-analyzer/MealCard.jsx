@@ -6,7 +6,7 @@
 // expand) blijven achter dezelfde card.
 
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X } from 'lucide-react'
 import { portieInfo, stapPortie, portieLabel, portieUitleg } from './portie'

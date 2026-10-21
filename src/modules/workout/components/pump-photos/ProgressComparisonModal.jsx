@@ -1,6 +1,6 @@
 // src/modules/workout/components/pump-photos/ProgressComparisonModal.jsx
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, ChevronLeft, ChevronRight, TrendingDown, TrendingUp, Calendar } from 'lucide-react'
 
 export default function ProgressComparisonModal({ client, currentPhoto, db, onClose }) {

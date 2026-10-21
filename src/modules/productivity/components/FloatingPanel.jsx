@@ -6,7 +6,7 @@
 // panel is collapsed.
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { ChevronDown, X, GripHorizontal } from 'lucide-react'
 
 export default function FloatingPanel({

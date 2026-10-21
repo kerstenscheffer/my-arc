@@ -4,7 +4,7 @@
 // STYLING: Compact headers, flush rows, no gradients, no glow, no boxShadow animations
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3, Megaphone, Eye, EyeOff } from 'lucide-react'
 import KanbanCard from './KanbanCard'

@@ -1,9 +1,10 @@
 // src/modules/progress/ProgressMain.jsx
 // v6.2 - overflow hidden fix
 
-import React, { useState, useEffect } from 'react'
-import { SkeletStijl, SkeletBlok, SkeletKaart, SkeletGrafiek } from '../../ui/Skelet'
-import { createPortal } from 'react-dom'
+import React, { useState, useEffect, useRef } from 'react'
+import { VoortgangSkelet } from '../../client/PaginaSkeletten'
+import usePaginaTerug from '../../client/usePaginaTerug'
+import { createPortal } from '../../client/paginaPortal'
 import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X } from 'lucide-react'
 
 import ProgressPhotos from '../progress-photos/ProgressPhotos'
@@ -97,10 +98,15 @@ export default function ProgressMain({ db, client }) {
   const dateString = today.toISOString().split('T')[0]
 
   useEffect(() => { if (client?.id) loadAllData() }, [client?.id])
+  // Terug op Voortgang: op Home kan intussen een weging gelogd zijn.
+  usePaginaTerug('tracking', () => loadAllData())
 
+  // Alleen de eerste keer het skelet; verversen (terug op deze pagina) laat
+  // staan wat er al is tot de nieuwe cijfers binnen zijn.
+  const ooitGeladen = useRef(false)
   const loadAllData = async () => {
     if (!client?.id) return
-    setLoading(true)
+    if (!ooitGeladen.current) setLoading(true)
     try {
       const [stats, friday, history, entry, photos, recent, faseLijst] = await Promise.all([
         weightService.getWeightStats(client.id),
@@ -121,7 +127,7 @@ export default function ProgressMain({ db, client }) {
       if (stats?.current) setWeight(stats.current)
       else if (client?.current_weight) setWeight(client.current_weight)
     } catch (e) { console.error('Error:', e); showMessage('Fout bij laden', 'error') }
-    finally { setLoading(false) }
+    finally { setLoading(false); ooitGeladen.current = true }
   }
 
   // Let op: een Supabase query-builder heeft geen .catch(), dus de fout vangen
@@ -208,18 +214,7 @@ export default function ProgressMain({ db, client }) {
     ? Math.round((weightStats.current / parseFloat(client.target_weight)) * 100) : 0
 
   // Skelet in de vorm van de pagina: groot getal, grafiek, twee kaarten.
-  if (loading) {
-    return (
-      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: isMobile ? '1rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <SkeletStijl />
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, animation: 'skeletPuls 1.4s ease-in-out infinite' }}>
-          <SkeletBlok breedte={120} hoogte={44} radius={8} /><SkeletBlok breedte={80} hoogte={18} />
-        </div>
-        <SkeletGrafiek hoogte={isMobile ? 180 : 220} />
-        <SkeletKaart hoogte={88} foto={0} /><SkeletKaart hoogte={88} foto={0} />
-      </div>
-    )
-  }
+  if (loading) return <VoortgangSkelet isMobile={isMobile} />
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', overflow: 'hidden', paddingBottom: isMobile ? '5rem' : '2rem' }}>

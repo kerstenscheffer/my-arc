@@ -3,7 +3,7 @@
 // Patroon exact gebaseerd op ClientContextPanel draggable widget
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, CheckCircle, Pause, Play, GripVertical, Minus, Maximize2, Timer } from 'lucide-react'
 
 const DEFAULT_POS = { x: window.innerWidth - 300, y: 80 }

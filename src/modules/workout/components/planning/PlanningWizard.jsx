@@ -1,6 +1,6 @@
 // src/modules/workout/components/planning/PlanningWizard.jsx
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, Zap, Check, ChevronRight, ChevronLeft, Edit2, Trash2 } from 'lucide-react'
 
 export default function PlanningWizard({ workoutService, clientId, schema, onComplete, onClose }) {

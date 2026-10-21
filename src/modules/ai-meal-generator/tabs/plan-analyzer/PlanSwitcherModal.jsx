@@ -1,7 +1,7 @@
 // src/modules/ai-meal-generator/tabs/plan-analyzer/PlanSwitcherModal.jsx
 
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Trash2, Pencil, Check, ChevronRight, Copy, AlertTriangle, Bookmark } from 'lucide-react'
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'

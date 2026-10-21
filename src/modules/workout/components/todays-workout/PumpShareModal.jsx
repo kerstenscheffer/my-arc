@@ -12,7 +12,7 @@
 // CSS so it feels natural, but we snap from the un-mirrored video frame.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import {
   X, Camera, RefreshCw, Download, Share2, Save, CheckCircle,
   Loader2, Circle, ArrowLeft,

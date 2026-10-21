@@ -2,7 +2,7 @@
 // v3.0 — Label filters + fuzzy search via pg_trgm
 
 import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, ChevronRight, Zap, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
 

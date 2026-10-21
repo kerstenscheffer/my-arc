@@ -9,7 +9,7 @@
 
 import { fotoWeergaveUrl } from '../../../progress/fotoWeergave'
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, Camera, ImageOff, Loader2 } from 'lucide-react'
 import PumpShareModal from './PumpShareModal'
 

@@ -1,7 +1,7 @@
 // src/modules/nutrition-intake/components/nutrition-flow/EatPatternFlow.jsx
 // Stap 1-4: Eetpatroon drill-down — 2 kolommen via flex, lijst klapt uit onder card
 import React, { useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { Q, Hint, NextBtn, BigOption } from '../../../public-intake/components/phase1/FlowStep'
 
 // Minimum aantal "dingen" dat per maaltijd ingevuld moet zijn vóór doorgaan.

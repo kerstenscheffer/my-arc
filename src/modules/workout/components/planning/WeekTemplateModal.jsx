@@ -3,7 +3,7 @@
 
 import { X, Save, Calendar, Trash2, Download } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 
 export default function WeekTemplateModal({
   workoutService,

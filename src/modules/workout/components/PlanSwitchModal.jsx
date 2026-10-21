@@ -3,7 +3,7 @@
 // er één. Het actieve plan staat bovenaan; andere plannen kun je inzien
 // (dagen + oefeningen) en met één tik activeren.
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, ChevronDown, Dumbbell, Calendar } from 'lucide-react'
 
 // Foto per plan: donkere sportfoto's, thuisplannen een thuis-trainingsfoto en

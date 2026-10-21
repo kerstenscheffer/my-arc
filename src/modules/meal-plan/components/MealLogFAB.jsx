@@ -5,7 +5,7 @@
 // AIDaySchedule zodat er één duidelijke log-actie per pagina overblijft.
 
 import React from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { Plus } from 'lucide-react'
 import { useOnderMarge } from '../../../client/components/videoBalkHoogte'
 

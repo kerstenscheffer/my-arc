@@ -3,7 +3,7 @@
 // (naam, doel, gewicht+datum, gewicht-progressie, notitie-log, insight-knop,
 // deactiveer). Gradients eruit → solide #0a0a0a.
 import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { PRIVE, PRIVE_FOTO } from '../utils/privacyModus'
 // In split screen mag een modal niet het hele scherm afdekken maar alleen de
 // helft waar de tab in staat. useModalHost geeft die helft terug; buiten split

@@ -5,7 +5,7 @@
 //   - Alleen aan PERSONEN       -> per-client video_assignments (aanvinken)
 // Plus een globale zichtbaar/verborgen schakelaar (is_active).
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, Globe, Check, PlayCircle, Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User, Eye, EyeOff, Users, AlertCircle } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'

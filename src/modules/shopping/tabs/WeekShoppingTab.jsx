@@ -4,7 +4,7 @@
 // secties subtiel in te faden, klein gouden section-label boven elke blok.
 import React, { useState, useEffect } from 'react'
 import { AlertCircle, Wallet, Lightbulb, X, ChevronRight } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 
 // Layout components
 import CompactShoppingCategory from './components/CompactShoppingCategory'
@@ -16,10 +16,13 @@ import { categorizeIngredient } from '../constants/shoppingConstants'
 // Budget components
 import BudgetTab from '../components/BudgetTab'
 import BudgetService from '../BudgetService'
+import { SHOPPING_BANNER_URL } from '../../../client/PaginaSkeletten'
 
 // Foto boven de pagina — dezelfde opbouw als de Meal-pagina: compacte foto,
 // de dag met de pijlen eroverheen, daaronder de rest.
-export const SHOPPING_BANNER_URL = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=700&fit=crop&q=80'
+// De bannerfoto staat bij de paginaskeletten, zodat het laadscherm dezelfde
+// foto toont zonder deze code mee te laden.
+export { SHOPPING_BANNER_URL }
 
 const WEEK_OPTIES = [
   { id: 1, label: '1 week' },

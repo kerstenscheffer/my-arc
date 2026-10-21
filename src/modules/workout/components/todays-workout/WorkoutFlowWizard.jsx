@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/WorkoutFlowWizard.jsx
 import { useState, useEffect, useRef } from 'react'
 import { X, ChevronRight, ChevronLeft, Check, Timer, Play, Pause, SkipForward, Dumbbell } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import ExerciseService from '../../../../services/ExerciseService'
 import { meldSucces } from '../../../app-review/reviewMoment'
 

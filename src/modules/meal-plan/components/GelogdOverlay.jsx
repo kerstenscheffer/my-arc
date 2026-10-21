@@ -5,7 +5,7 @@
 // Verdwijnt na 1,4 s vanzelf; tikken sluit hem meteen.
 
 import { useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import GelogdAnimatie from './food-log/GelogdAnimatie'
 import { meldSucces } from '../../app-review/reviewMoment'
 

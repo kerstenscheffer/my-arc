@@ -3,7 +3,7 @@
 // v2.0
 
 import React, { useState, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Zap, Check, AlertTriangle, ChevronRight, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 

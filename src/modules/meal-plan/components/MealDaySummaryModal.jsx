@@ -16,7 +16,7 @@
 // maaltijd na 22:00 bij de volgende dag telde en de stipjes verschoven.
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays } from 'lucide-react'
 import { foodImageFallback } from '../foodImageFallback'
 import { kcalKleur } from '../utils/kcalKleur'

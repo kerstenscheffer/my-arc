@@ -3,7 +3,7 @@
 // kiest de reden van afwijzing (voor de stats-breakdown). Portal + hoge z-index
 // + korte guard tegen mobiele click-through (zelfde patroon als SaleValueModal).
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, PhoneOff } from 'lucide-react'
 

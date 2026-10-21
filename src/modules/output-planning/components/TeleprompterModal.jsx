@@ -13,7 +13,7 @@
 //   down when the modal closes and on browser unload to avoid orphan tracks.
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, Play, Pause, RotateCcw, Minus, Plus,

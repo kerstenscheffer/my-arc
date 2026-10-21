@@ -10,7 +10,7 @@
 // op leunen. Zonder die synchronisatie zou je twee waarheden hebben.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { Flag, Plus, Check, X, ChevronLeft, Info, Flame, Egg, Wheat, Droplet } from 'lucide-react'
 import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/utils/fase'
 import { maakConfig, kcalPerWeektempo } from '../../../weight-tracker/utils/coachingBand'

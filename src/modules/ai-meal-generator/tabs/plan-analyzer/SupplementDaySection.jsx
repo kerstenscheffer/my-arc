@@ -7,7 +7,7 @@
 // supplementenplan (supplement_plans.supplements), net als de maaltijden.
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { Shuffle, Pencil, CalendarDays, Trash2, X } from 'lucide-react'
 import { useModalHost } from '../../../../coach/ModalHost'
 import DatabaseService from '../../../supplements/SupplementPlanService'

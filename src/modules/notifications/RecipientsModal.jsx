@@ -4,7 +4,7 @@
 //   scheduleId → get_schedule_recipients      (verzendlog van een regel)
 //   fixedKey   → get_fixed_notification_recipients (afgeleid uit de meldingen)
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { X, User } from 'lucide-react'
 

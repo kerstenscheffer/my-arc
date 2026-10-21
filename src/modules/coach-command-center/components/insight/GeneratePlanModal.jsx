@@ -3,7 +3,7 @@
 // v2.0 — gebruikt GuidedPlanFlow stap-voor-stap configurator
 
 import React from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X } from 'lucide-react'
 import GuidedPlanFlow from './GuidedPlanFlow'

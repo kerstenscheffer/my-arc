@@ -6,7 +6,7 @@
 // download via long-press of via expliciete download-knop.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { FileText, Download, X } from 'lucide-react'
 import fileService from './FileService'

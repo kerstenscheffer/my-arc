@@ -20,7 +20,7 @@
 // onderbalk.
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, ChevronDown, Clock } from 'lucide-react'
 import { foodImageFallback } from '../foodImageFallback'
 

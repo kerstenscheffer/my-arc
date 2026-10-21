@@ -1,6 +1,6 @@
 // src/modules/faq/CoachFAQManager.jsx
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { HelpCircle, Plus, Trash2, Edit2, Save, X, ChevronRight } from 'lucide-react'
 import FAQService from './FAQService'

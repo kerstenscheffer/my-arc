@@ -7,7 +7,7 @@
 // Vervangt de oude ShoppingWeekHeader + WeekMultiplierTabs + ShoppingTabButtons.
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { ShoppingBasket, Calendar, X, Check, ChevronDown } from 'lucide-react'
 
 // Banner-foto voor de selector — verse boodschappen / markt-feel.

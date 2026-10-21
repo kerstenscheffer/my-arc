@@ -2,7 +2,7 @@
 // ⭐ PORTAL VERSION - Renders outside parent modal DOM tree
 
 import React, { useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, UtensilsCrossed } from 'lucide-react'
 

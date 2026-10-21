@@ -1,7 +1,7 @@
 // src/modules/meal-plan/components/food-log/FoodLogModal.jsx
 // 🎯 v3.1 — Edit flow race fix: useEffect deps gefixt + diagnostic log
 import React, { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, ArrowLeft, AlertCircle, Star, Apple, UtensilsCrossed, ChefHat } from 'lucide-react'
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'

@@ -2,7 +2,7 @@
 // Instellingen vóór het genereren van de plan-PDF: wat exporteren (hele week /
 // alleen weekschema / één dag), swaps meenemen en een eigen titel.
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, FileDown, Calendar, LayoutGrid, CalendarDays } from 'lucide-react'
 import { DAYS } from './DayNavigator'

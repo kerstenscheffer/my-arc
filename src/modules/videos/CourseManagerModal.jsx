@@ -2,7 +2,7 @@
 // Cursus aanmaken/bewerken: titel + beschrijving + selecteer welke video's erin zitten.
 // Toewijzing gebeurt apart via de bestaande VideoAssignModal (hergebruik).
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { X, Check, GraduationCap, Search } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'

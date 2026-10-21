@@ -18,7 +18,7 @@
 //   • 3+ dagen te laat       → rood (dwingend, sneller schudden)
 
 import React, { useEffect, useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../paginaPortal'
 import { ClipboardCheck, X, ArrowRight, AlertCircle } from 'lucide-react'
 import CheckinService from '../../modules/client-checkin/CheckinService'
 import { trajectLoopt } from '../../modules/client-checkin/trajectStatus'

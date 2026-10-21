@@ -12,7 +12,7 @@
 //                     cashflow en de partner-uitbetaling.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, ChevronLeft, CalendarPlus, Clock } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import HorizontaleSlider from '../../../client/components/HorizontaleSlider'

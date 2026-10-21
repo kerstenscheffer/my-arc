@@ -2,7 +2,7 @@
 // 🎯 Weekoverzicht voeding — fullscreen modal
 // 7 dagen, per dag: totalen vs doel + gelogde meals per moment
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
 import { dagVenster, lokaleIso } from '../../utils/dagVenster'
 

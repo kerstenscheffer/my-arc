@@ -4,7 +4,7 @@
 // previous weeks. Mounts via portal so it sits above the kanban board.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp, Info,

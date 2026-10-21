@@ -2,7 +2,7 @@
 // v2.0 — Volledige editor (titel, beschrijving, URL, categorie, thumbnail, default_pages)
 // Brand styling, createPortal, correcte page_context keys
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   Edit, X, Globe, Camera, Image as ImageIcon, Check, Youtube,

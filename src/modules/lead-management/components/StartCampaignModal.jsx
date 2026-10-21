@@ -13,7 +13,7 @@
 // campagnes op. Eén klik toont ze dus overal, en zolang je ze niet opvraagt
 // blijft het openen van dit scherm licht.
 import { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, Megaphone, Send, Plus, Pencil, Search, BarChart2 } from 'lucide-react'
 

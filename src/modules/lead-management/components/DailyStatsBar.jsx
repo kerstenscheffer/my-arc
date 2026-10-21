@@ -3,7 +3,7 @@
 // Added: SOP panel (DM routine + warm-up + outreach)
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { Activity, Target, Clock, TrendingUp, MessageCircle, Users, Calendar, FileText, Zap, ChevronDown, ChevronUp, Flame, BookOpen, X, CheckCircle, BarChart3, Send } from 'lucide-react'
 import { exportDailyReport } from '../utils/exportDailyReport'

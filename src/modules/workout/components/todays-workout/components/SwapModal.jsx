@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/SwapModal.jsx
 import { Plus, ChevronDown } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../../client/paginaPortal'
 import CustomExerciseModal from './CustomExerciseModal'
 import ExerciseService from '../../../../../services/ExerciseService'
 import WorkoutServiceNew from '../../../services/WorkoutServiceNew'

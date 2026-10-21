@@ -3,7 +3,7 @@
 // waren (lead bereikte de Sales Call-fase na het voorstel). Toont de berichttekst
 // met kopieer-knop zodat de coach de succesvolle voorstellen kan hergebruiken.
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, PhoneCall, Check, Copy } from 'lucide-react'
 

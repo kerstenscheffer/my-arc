@@ -12,7 +12,7 @@
 // Deze knop hoort alleen in CoachHub. Zet 'm nooit in de client-UI.
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../client/paginaPortal'
 import { Repeat, X } from 'lucide-react'
 
 export default function PortalSwitchButton({

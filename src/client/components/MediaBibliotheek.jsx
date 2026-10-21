@@ -17,7 +17,7 @@
 // speler, een PDF in een nieuw tabblad.
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../paginaPortal'
 import { X, Search, Play, FileText, Video as VideoIcon, Layers, ArrowLeft, ChevronRight } from 'lucide-react'
 import { useModalHost } from '../../coach/ModalHost'
 import VideoPlayerModal from '../../modules/videos/VideoPlayerModal'

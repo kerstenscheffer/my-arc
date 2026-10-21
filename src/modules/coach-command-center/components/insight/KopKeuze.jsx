@@ -13,7 +13,7 @@
 // binnen een blok met overflow: hidden.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { ChevronDown, Check } from 'lucide-react'
 
 export default function KopKeuze({ waarde, opties, onKies, groot = false, kleur = '#fff' }) {

@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/InfoModal.jsx
 import { X, Play, Info, Zap } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../../client/paginaPortal'
 import ExerciseService from '../../../../../services/ExerciseService'
 import { appSafeEmbedUrl } from '../../../../videos/utils/youtubeHelpers'
 

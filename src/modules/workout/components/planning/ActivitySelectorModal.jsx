@@ -3,7 +3,7 @@
 
 import { X, Dumbbell, Moon, Heart, Waves, Search, Plus, Star } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 
 export default function ActivitySelectorModal({
   selectedValue,

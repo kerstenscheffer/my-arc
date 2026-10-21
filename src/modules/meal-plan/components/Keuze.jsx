@@ -4,7 +4,7 @@
 // tekst met een pijltje, en een eigen menu eronder. Zat eerst in
 // AIAlternativesModal; het log-venster gebruikt dezelfde vorm.
 import React, { useState, useRef, useLayoutEffect, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { ChevronDown, Check } from 'lucide-react'
 
 // Eén keuze: de gekozen waarde als losse tekst met een pijltje. Eigen menu in

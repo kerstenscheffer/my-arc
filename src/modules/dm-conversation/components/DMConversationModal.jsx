@@ -3,7 +3,7 @@
 // PRESERVED: All v3.0 logic (conversation loading, navigation, auto-move)
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, MessageCircle } from 'lucide-react'
 import ConversationNavigator from '../utils/ConversationNavigator'

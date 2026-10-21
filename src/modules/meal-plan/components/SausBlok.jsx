@@ -11,7 +11,7 @@
 // opnieuw gekozen hoeft te worden.
 
 import { useState, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { Plus, X, Check, ChefHat, Trash2 } from 'lucide-react'
 import {
   haalSausIdeeen, haalSauzenVoorMaaltijd, voegSausToe, verwijderSaus, sausMacros,

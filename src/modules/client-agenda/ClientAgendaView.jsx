@@ -9,6 +9,8 @@ import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus,
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 import { meldMaaltijdTijd, luisterMaaltijdTijd, luisterPlanGewijzigd, meldPlanGewijzigd } from '../meal-plan/utils/mealSync'
 import WeekBudgetPaneel from './WeekBudgetPaneel'
+import usePaginaTerug from '../../client/usePaginaTerug'
+import { LijstSkelet } from '../../client/PaginaSkeletten'
 import RealiteitBlad from './RealiteitBlad'
 import { resolveFoodImage, foodImageFallback } from '../meal-plan/foodImageFallback'
 import { workoutFoto } from '../../client/components/workoutFoto'
@@ -1346,6 +1348,10 @@ export default function ClientAgendaView({
   // laadtekst ertussen werd de hele agenda even weggehaald, en daarmee ook
   // het weekbudget-venster dat je juist open had om het effect te zien.
   const eerderGeladen = useRef(null)
+  // Terug op de agenda in de klantapp (de pagina bleef staan): stil herladen,
+  // op Home of Voeding kan het plan intussen veranderd zijn.
+  const [terug, setTerug] = useState(0)
+  usePaginaTerug('agenda', () => setTerug(t => t + 1))
   useEffect(() => {
     if (!service || !client?.id) return
     let cancelled = false
@@ -1357,7 +1363,7 @@ export default function ClientAgendaView({
       .then(res => { if (!cancelled) { setData(res); setLoading(false); eerderGeladen.current = sleutel } })
       .catch(e => { if (!cancelled) { console.error(e); setError(e); setLoading(false) } })
     return () => { cancelled = true }
-  }, [service, client?.id, weekAnchor, refreshKey, forcedMealPlanId])
+  }, [service, client?.id, weekAnchor, refreshKey, forcedMealPlanId, terug])
 
   // Datums voor de week (ma..zo) — voor headers + override-prompts
   const weekDates = useMemo(() => {
@@ -2012,13 +2018,7 @@ export default function ClientAgendaView({
     )
   }
 
-  if (loading) {
-    return (
-      <div style={{ padding: '2rem', color: COLORS.text50, textAlign: 'center' }}>
-        Agenda laden…
-      </div>
-    )
-  }
+  if (loading) return <LijstSkelet isMobile={isMobile} />
 
   if (error) {
     return (

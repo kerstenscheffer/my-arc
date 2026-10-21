@@ -2,7 +2,7 @@
 // VERSION 3.0 - Doel-subtasks + kanban flow + rapport sync
 
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { Trophy, Plus, Calendar, Star, CheckCircle, Trash2, FileText, ChevronDown, ChevronUp, Target, Sparkles, X, Check, ArrowRight, Zap, Hammer, Users, Megaphone, Layers } from 'lucide-react'
 
 const ICON_MAP = { Hammer, Users, Megaphone, Layers }

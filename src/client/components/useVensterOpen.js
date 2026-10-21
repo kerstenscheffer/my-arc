@@ -18,6 +18,7 @@
 // Eén gedeelde observer voor alle gebruikers van de hook.
 
 import { useEffect, useState } from 'react'
+import { PAGINA_GEWISSELD } from '../usePaginaTerug'
 
 const isVenster = (el) => {
   if (!(el instanceof HTMLElement)) return false
@@ -42,16 +43,22 @@ const verwerk = () => {
   frame = 0
   const nieuw = toegevoegd
   toegevoegd = []
-  nieuw.forEach(n => {
+  const bekijk = (n) => {
     if (!(n instanceof HTMLElement) || !n.isConnected) return
+    // Portal van een klantpagina (paginaPortal): het eigenlijke venster zit
+    // één laag dieper, in die wikkel.
+    if (n.hasAttribute('data-pagina-portal')) { for (const c of n.children) bekijk(c); return }
     if (isVenster(n)) vensters.add(n)
     for (const c of n.children) if (isVenster(c)) vensters.add(c)
-  })
+  }
+  nieuw.forEach(bekijk)
   if (verwijderd) {
     verwijderd = false
     vensters.forEach(el => { if (!el.isConnected) vensters.delete(el) })
   }
-  const open = vensters.size > 0
+  // Alleen wat echt in beeld is: een venster op een verborgen pagina (de
+  // klantpagina's blijven staan als je wisselt) telt niet.
+  const open = [...vensters].some(el => el.getClientRects().length > 0)
   if (open !== laatst) {
     laatst = open
     luisteraars.forEach(f => f(open))
@@ -67,7 +74,11 @@ const start = () => {
     if (!frame && (toegevoegd.length || verwijderd)) frame = requestAnimationFrame(verwerk)
   })
   mo.observe(document.body, { childList: true, subtree: true })
+  // Ander tabblad = andere pagina in beeld, zonder dat er iets aan de DOM
+  // wordt toegevoegd of weggehaald; dan zelf opnieuw kijken.
+  window.addEventListener(PAGINA_GEWISSELD, opnieuw)
 }
+const opnieuw = () => { if (!frame) frame = requestAnimationFrame(verwerk) }
 
 export default function useVensterOpen() {
   const [open, setOpen] = useState(laatst)
@@ -79,6 +90,7 @@ export default function useVensterOpen() {
       luisteraars.delete(setOpen)
       if (!luisteraars.size && mo) {
         mo.disconnect(); mo = null
+        window.removeEventListener(PAGINA_GEWISSELD, opnieuw)
         if (frame) cancelAnimationFrame(frame)
         frame = 0; toegevoegd = []; verwijderd = false; vensters.clear(); laatst = false
       }

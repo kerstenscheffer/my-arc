@@ -5,7 +5,7 @@
 //  - Mobiel: bottom sheet (van onderen). Desktop: gecentreerd.
 //  - Portal naar document.body zodat geen enkele ouder 'm kan vangen.
 import { useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../client/paginaPortal'
 import { X } from 'lucide-react'
 import { colors, radius, space, overlay } from './tokens'
 

@@ -6,7 +6,7 @@
 // dagen. Allebei eindigen met: standaard in je plan, of eenmalig deze week.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, ChevronLeft, Check, Dumbbell, HeartPulse, Plus, Footprints, Bike, Waves, Timer, Wind, Activity, TrendingUp, Zap, Repeat, CalendarDays, Info, Pencil, Trash2 } from 'lucide-react'
 import CustomWorkoutModal from './planning/CustomWorkoutModal'
 import { locatieVan, spiergroepenVan, SPIERGROEPEN } from '../utils/trainingFilters'

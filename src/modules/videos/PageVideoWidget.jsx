@@ -3,7 +3,7 @@
 // FIX: onWatched reload verwijderd (veroorzaakte infinite open/close loop)
 
 import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { Play, X, Video, CheckCircle2, ChevronLeft, GraduationCap, Eye, ExternalLink } from 'lucide-react'
 import videoService from './VideoService'

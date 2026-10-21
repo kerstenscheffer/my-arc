@@ -16,7 +16,7 @@
 // antwoord kunnen geven over hetzelfde geld.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { Trophy, Activity, Utensils, Weight, Camera, Phone, ClipboardCheck, X, Info } from 'lucide-react'
 import {
   EISEN, WEEK_EISEN, WEEK_LOOPT_DOOR, ALGEMENE_UITLEG,

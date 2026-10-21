@@ -8,7 +8,7 @@
 // Waarom niet inline in het log-scherm: die panelen duwden de gelogde sets
 // naar beneden, precies waar je tijdens het loggen naar kijkt.
 
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../../client/paginaPortal'
 import { X } from 'lucide-react'
 
 export default function BladModal({ open, titel, onClose, children, zIndex = 10001 }) {

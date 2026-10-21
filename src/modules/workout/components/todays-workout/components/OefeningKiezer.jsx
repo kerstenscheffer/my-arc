@@ -5,7 +5,7 @@
 // (zoek een oefening, kies er één), dus ze delen de schil, de zoekbalk en de
 // rij. Alles uit src/ui/tokens volgens DESIGN-CONTRACT.md.
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../../client/paginaPortal'
 import { X, Search } from 'lucide-react'
 import { colors, radius, space, overlay, gradientImage } from '../../../../../ui/tokens'
 import { getFallbackImage } from '../../../utils/oefeningFoto'

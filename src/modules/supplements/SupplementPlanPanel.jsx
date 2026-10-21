@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { winkelUrl } from './utils/winkelKorting'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import DatabaseService from '../../services/DatabaseService'
 import { 
   X, Pill, Sun, Moon, Info, ShoppingCart, 

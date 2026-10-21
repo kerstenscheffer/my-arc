@@ -12,7 +12,7 @@
 // de hoek en inklappen tot alleen de balk. Zelfde gedrag als het logboek in
 // Coach Command — je zet je to-do's er vaak náást, niet ervoor.
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../client/paginaPortal'
 import { useModalHost } from '../coach/ModalHost'
 import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Minus, Maximize2 } from 'lucide-react'
 import useZwevendVenster from './useZwevendVenster'

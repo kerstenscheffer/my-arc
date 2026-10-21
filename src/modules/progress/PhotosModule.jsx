@@ -2,7 +2,7 @@
 import { fotoWeergaveUrl } from './fotoWeergave'
 import useIsMobile from '../../hooks/useIsMobile'
 import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { 
   Camera, Plus, Calendar, Lock,
   ChevronLeft, ChevronRight, Grid, List, Upload,

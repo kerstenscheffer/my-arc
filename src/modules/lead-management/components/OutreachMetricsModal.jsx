@@ -7,7 +7,7 @@
 // werken als de coach z'n sections hernoemt.
 
 import { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, BarChart3, Send, MessageCircle, PhoneCall, Trophy, ArrowUpDown,

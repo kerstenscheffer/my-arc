@@ -1,6 +1,6 @@
 // src/modules/workout/components/ClientPlanEditor.jsx
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Trash2, Plus, Search, Check, AlertCircle, Copy, Edit2, ChevronDown, ChevronUp, Moon } from 'lucide-react'
 import ClientPlanEditorService from '../services/ClientPlanEditorService'
 

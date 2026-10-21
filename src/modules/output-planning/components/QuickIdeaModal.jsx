@@ -4,7 +4,7 @@
 // notities. New ideas land in `content_items` with status='idea'.
 
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, Save, Video, Plus, Trash2, Check } from 'lucide-react'
 

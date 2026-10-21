@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../client/paginaPortal'
 import DatabaseService from '../services/DatabaseService'
 import useIsMobile from '../hooks/useIsMobile'
 import { ModalHostProvider } from './ModalHost'

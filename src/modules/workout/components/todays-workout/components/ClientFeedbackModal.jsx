@@ -1,6 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ClientFeedbackModal.jsx
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../../client/paginaPortal'
 import { X, Send, CheckCircle, Clock, MessageSquare, Camera, Upload, AlertTriangle, ThumbsUp, Scissors } from 'lucide-react'
 
 export default function ClientFeedbackModal({ exercise, client, db, onClose }) {

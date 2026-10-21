@@ -21,7 +21,7 @@
 // precies zoals in de uitlegvideo.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../../client/paginaPortal'
 import { Flame, Check, Play, ArrowRight } from 'lucide-react'
 import { opwarmSets, zetOpwarmPrompt } from '../opwarmen'
 import { getThumbnailFromUrl } from '../../../../videos/utils/youtubeHelpers'

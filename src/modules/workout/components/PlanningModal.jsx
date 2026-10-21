@@ -1,6 +1,6 @@
 // src/modules/workout/components/PlanningModal.jsx
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Calendar, Save, Dumbbell, Moon, Waves, Heart } from 'lucide-react'
 
 export default function PlanningModal({ 

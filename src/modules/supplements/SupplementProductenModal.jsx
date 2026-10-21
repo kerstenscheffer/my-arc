@@ -10,7 +10,7 @@
 // Bol weert verzoeken vanaf de server; een Bol-link plakken geeft dan geen
 // gegevens terug. Vul in dat geval zelf naam en prijs in.
 import React, { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { X, Search, Trash2, RefreshCw, ExternalLink, Plus, Check, Loader } from 'lucide-react'
 

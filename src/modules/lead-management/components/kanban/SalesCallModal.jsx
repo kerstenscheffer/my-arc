@@ -3,7 +3,7 @@
 // Opent wanneer lead in "Sales Call" sectie zit
 
 import { useState, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import {
   X, PhoneCall, Target, AlertCircle, Zap, Heart, Flag,

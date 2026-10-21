@@ -4,7 +4,7 @@
 // lijst flexibel wisselen en toch op macro blijven. Opslag: client_swap_options
 // (één rij per client + slot, meal_ids als uuid-array). Issue b6c60c21.
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, Check, Plus, Loader2, ChevronDown } from 'lucide-react'
 import Keuze from '../../../meal-plan/components/Keuze'

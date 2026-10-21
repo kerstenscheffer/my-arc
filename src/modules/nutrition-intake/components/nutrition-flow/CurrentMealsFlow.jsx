@@ -2,7 +2,7 @@
 // Stap 0: Huidige eetgewoonten — wat eet je op een typische dag?
 // Vaste structuur (4 slots) met toevoeg-optie, vrije tekst + suggesties
 import React, { useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { Q, Hint, NextBtn } from '../../../public-intake/components/phase1/FlowStep'
 
 const vrijVeld = (isMobile) => ({

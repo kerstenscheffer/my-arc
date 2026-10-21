@@ -15,7 +15,7 @@
 // meer dan zeven uur goed.
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { Moon, X, Check, Trash2, Lightbulb, ChevronLeft, Scale, History } from 'lucide-react'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
 import HorizontaleSlider from '../../client/components/HorizontaleSlider'

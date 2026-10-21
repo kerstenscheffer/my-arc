@@ -19,7 +19,7 @@
 // onvindbaar zijn.
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass, ChevronRight, Euro, Pencil } from 'lucide-react'
 import SaleForm from './SaleForm'

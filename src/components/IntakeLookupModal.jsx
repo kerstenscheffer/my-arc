@@ -10,7 +10,7 @@
 // Bewust geen eigen weergave van de intake-antwoorden: dan zouden er twee
 // plekken zijn die hetzelfde tonen en uit elkaar gaan lopen.
 import { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../client/paginaPortal'
 import { useModalHost } from '../coach/ModalHost'
 import { Search, X, User, ClipboardCheck } from 'lucide-react'
 import IntakeSummaryModal from '../coach/tabs/client-info/IntakeSummaryModal'

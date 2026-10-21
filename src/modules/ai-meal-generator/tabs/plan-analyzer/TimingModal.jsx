@@ -2,7 +2,7 @@
 // v1.0 — Maaltijdtijden instellen voor de hele week in één keer
 
 import React, { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Clock, Check } from 'lucide-react'
 

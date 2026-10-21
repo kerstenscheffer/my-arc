@@ -1,7 +1,7 @@
 // src/modules/manual-workout-builder/ManualWorkoutBuilder.jsx
 import { useState, useEffect } from 'react'
 import { voorstelPlan } from './dagTitel'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import useHistoryState from './hooks/useHistoryState'
 import { Undo2, Redo2 } from 'lucide-react'
 import DayBuilder from './components/DayBuilder'

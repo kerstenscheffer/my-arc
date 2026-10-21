@@ -9,7 +9,7 @@
 // onClientUpdate zodat de modal direct ververst.
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   Clock, Play, Pause, Square, Settings, Check, X, AlertCircle,

@@ -11,7 +11,7 @@
 // tik je hem in. Voor de klant is het één getal, niet twee systemen.
 
 import { useCallback, useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../paginaPortal'
 import { Footprints, X, Pencil, Smartphone, Check } from 'lucide-react'
 import StappenService, { STANDAARD_DOEL, vandaagIso } from '../../modules/steps/StappenService'
 import { heeftTelefoonBron, isGekoppeld, koppel } from '../../modules/steps/telefoonStappen'

@@ -2,7 +2,7 @@
 // VERSION 2.0 - Logt verstreken tijd bij afronden/stoppen
 
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, CheckCircle, Pause, Play } from 'lucide-react'
 
 export default function TaskTimer({ task, onComplete, onStop, isMobile, productivityService, coachId }) {

@@ -3,7 +3,7 @@
 // v1.2 — fix: scale op original_calories, clamp 3.0, all-mode rawScaleFactor
 
 import React, { useState, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Zap, ArrowRight, Check } from 'lucide-react'
 

@@ -2,7 +2,7 @@
 // Coach-side plan-manager: kies een klant → zie z'n actieve plan + reserve-
 // plannen → activeer/verwijder, of wijs een extra plan toe vanuit je templates.
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, Search, ChevronLeft, ChevronRight, Plus, Trash2, Dumbbell, Star, Pencil } from 'lucide-react'
 

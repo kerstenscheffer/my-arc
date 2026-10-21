@@ -2,7 +2,7 @@
 // v1.1 — preparation_steps preserved bij opslaan + recipe editor tab
 
 import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, Plus, Trash2, Save, Copy, Zap, ChefHat, Check } from 'lucide-react'
 import { resolveFoodImage } from '../../../meal-plan/foodImageFallback'

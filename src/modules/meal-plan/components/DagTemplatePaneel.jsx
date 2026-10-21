@@ -14,7 +14,7 @@
 // verdwijnt vanzelf, de tweede blijft staan.
 
 import { useState, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { CalendarDays, X, ChevronRight, Check, Loader, Trash2, Info } from 'lucide-react'
 import MealCard from './day-schedule/MealCard'
 import { foodImageFallback } from '../foodImageFallback'

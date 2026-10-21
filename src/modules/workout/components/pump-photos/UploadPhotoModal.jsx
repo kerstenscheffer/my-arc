@@ -1,6 +1,6 @@
 // src/modules/workout/components/pump-photos/UploadPhotoModal.jsx
 import { useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, Camera, Upload, Image as ImageIcon, Sparkles, Crop } from 'lucide-react'
 
 export default function UploadPhotoModal({ client, db, onClose, onSuccess }) {

@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/CustomExerciseModal.jsx
 import { X, Search, AlertCircle, CheckCircle, Camera, Image, BookmarkPlus, Zap } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../../client/paginaPortal'
 import ExerciseService from '../../../../../services/ExerciseService'
 import { logPlanWijziging } from '../../../services/planWijzigingLog'
 

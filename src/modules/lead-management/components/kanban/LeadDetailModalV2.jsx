@@ -13,7 +13,7 @@
 // KanbanBoard state-machine stays in charge.
 
 import { useState, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import {
   X, Trash2, User, Target, Phone as PhoneCall, Magnet, FileText,

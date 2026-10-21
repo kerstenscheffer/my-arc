@@ -2,7 +2,8 @@
 import useIsMobile from '../../hooks/useIsMobile'
 import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../../lazyMetHerlaad'
-import PaginaLader from '../../ui/PaginaLader'
+import { SkeletStijl, SkeletGrafiek } from '../../ui/Skelet'
+import usePaginaTerug from '../../client/usePaginaTerug'
 // Pas laden bij openen: trekt de grafiekbibliotheek mee.
 const KrachtBlad = lazy(() => import('./components/KrachtBlad'))
 import { Clock, ChevronLeft, ChevronRight, ChevronDown, RefreshCw, TrendingUp, History } from 'lucide-react'
@@ -112,16 +113,24 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
 
   // Vanuit de agenda op home ('Push' → play): meteen het logscherm van
   // die dag openen (seintje = dagsleutel, '1' = vandaag). Home zet een seintje in sessionStorage en wisselt naar
-  // deze pagina; hier pakken we het één keer op.
-  useEffect(() => {
+  // deze pagina; hier pakken we het op. De pagina blijft staan als je
+  // wisselt, dus ook bij terugkomen kijken, niet alleen bij de eerste keer.
+  const pakSeintje = () => {
     let seintje = null
     try { seintje = sessionStorage.getItem('myarc_open_workout'); sessionStorage.removeItem('myarc_open_workout') } catch { /* geen opslag */ }
     if (!seintje) return
     const dagIdx = DAY_KEYS.indexOf(seintje)
     setSelectedDayIdx(dagIdx >= 0 ? dagIdx : todayIndex)
     setWorkoutOpen(true)
+  }
+  useEffect(() => {
+    pakSeintje()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  usePaginaTerug('workout', () => {
+    pakSeintje()
+    if (client?.id) loadWeeklyProgress()
+  })
 
   // Klik op een week-day-card: selecteer die dag, open de inline-dropdown
   // van TodaysWorkoutMain en scroll erheen. Geen aparte modal meer — de
@@ -291,7 +300,7 @@ export default function WorkoutPlan({ client, schema: schemaProp, db, onFocusCha
       {/* Krachtoverzicht en geschiedenis in hetzelfde blad als de historie in
           het log-scherm, zodat die drie zich hetzelfde gedragen. */}
       <BladModal open={krachtOpen} titel="Kracht" onClose={() => setKrachtOpen(false)}>
-        <Suspense fallback={<PaginaLader pagina="workout" hoogte="40vh" />}>
+        <Suspense fallback={<div style={{ padding: '1rem' }}><SkeletStijl /><SkeletGrafiek hoogte={220} /></div>}>
           <KrachtBlad db={db} client={client} isMobile={isMobile} />
         </Suspense>
       </BladModal>

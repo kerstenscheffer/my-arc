@@ -4,7 +4,7 @@
 // (plan bewerken via week planner, coach strategy wizard).
 
 import React, { useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { Pill, FileText, Calendar, Wand2, ChevronRight, X } from 'lucide-react'
 
 const G = {

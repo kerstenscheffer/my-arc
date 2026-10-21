@@ -8,7 +8,7 @@
 // 'elke week' ook client_cardio_plan. Herbouwd 9 okt 2026.
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Plus, Trash2, Heart, Check, Pencil } from 'lucide-react'
 import CardioService from '../../workout/services/CardioService'
 import { CARDIO_SOORTEN, DAGEN_WEEK } from '../../workout/cardioSoorten'

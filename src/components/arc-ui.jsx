@@ -8,7 +8,7 @@
 // Stond eerst in modules/productivity; nu app-breed, want ook schermen buiten
 // de kanban en agenda gebruiken deze stijl.
 
-import { createPortal } from 'react-dom'
+import { createPortal } from '../client/paginaPortal'
 import { ChevronDown, X } from 'lucide-react'
 import { LIJN, LIJN_ZACHT, ZWART, KNOP_STIJL } from './arc-tokens'
 

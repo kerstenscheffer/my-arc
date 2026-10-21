@@ -4,7 +4,7 @@
 // that expands to show all section scores + notes + coach fields.
 
 import React, { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import {
   ClipboardCheck, ChevronDown, ChevronRight,
   Utensils, Beer, Moon, Dumbbell, Heart, Zap, Trophy, AlertTriangle,

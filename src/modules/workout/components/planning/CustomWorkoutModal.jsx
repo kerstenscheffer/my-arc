@@ -9,7 +9,7 @@
 // pagina (9 okt 2026). Verving het oude venster met cardio-types en duur.
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, Search, Plus, Minus, ChevronUp, ChevronDown, Trash2, Check, ChevronLeft } from 'lucide-react'
 import ExerciseService from '../../../../services/ExerciseService'
 import useOefeningFotos from '../../utils/useOefeningFotos'

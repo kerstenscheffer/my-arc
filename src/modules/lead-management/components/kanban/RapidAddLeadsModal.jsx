@@ -9,7 +9,7 @@
 // laatst toegevoegde lead verwijdert en de naam terugzet om te corrigeren.
 
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Send, FileText, Zap, RotateCcw, ArrowRight, CornerDownLeft, Check, ChevronDown, Plus } from 'lucide-react'
 

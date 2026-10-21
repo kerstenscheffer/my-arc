@@ -2,7 +2,7 @@
 // v7 — Volledig herbouwd: data brief + lineaire 6-staps flow
 import React, { useCallback, useEffect, useState } from 'react'
 import { Target, Dumbbell, Utensils, FileText, CheckSquare } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 
 import IntakeDataBrief from './brief/IntakeDataBrief'
 import IntakeStepDoel from './steps/IntakeStepDoel'

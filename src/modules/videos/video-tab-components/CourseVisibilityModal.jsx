@@ -7,7 +7,7 @@
 // Bewust getrimde variant van VideoVisibilityModal: geen per-persoon lijst —
 // cursussen aan losse personen toewijzen gebeurt via de "Toewijzen"-knop.
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, Globe, Check, PlayCircle, Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User, GraduationCap } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'

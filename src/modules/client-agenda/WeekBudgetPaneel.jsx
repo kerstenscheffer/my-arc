@@ -13,7 +13,7 @@
 // verwerkt via activity_level.
 
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { ChevronDown, ChevronRight, Flame, GripVertical, Minus, Maximize2, X, Plus, Trash2 } from 'lucide-react'
 import { balkVak, balkVakActief } from './werkbalkStijl'
 import useZwevendVenster from '../../components/useZwevendVenster'

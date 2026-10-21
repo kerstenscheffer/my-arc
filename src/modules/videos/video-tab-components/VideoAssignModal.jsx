@@ -1,7 +1,7 @@
 // src/modules/videos/video-tab-components/VideoAssignModal.jsx
 // v2.0 — Brand styling + page_context keys matchen ClientDashboard
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { 
   Send, X, Users, FileVideo, Calendar,

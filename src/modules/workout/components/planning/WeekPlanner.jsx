@@ -13,7 +13,7 @@
 // dag is het startpunt en geen uitzondering.
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { X, ChevronLeft, ChevronRight, Check, Loader2, Moon } from 'lucide-react'
 
 const DAGEN = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']

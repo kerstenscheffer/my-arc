@@ -6,7 +6,7 @@
 // een nieuw leeg plan bouwen dat bij opslaan als extra plan wordt bewaard.
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Plus, Calendar, Check } from 'lucide-react'
 
 export default function PlanToevoegenModal({ client, templates = [], db, isMobile = false, onClose, onNieuw, onToegevoegd }) {

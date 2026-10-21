@@ -10,7 +10,7 @@
 
 import useIsMobile from '../../hooks/useIsMobile'
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { Calendar, X, ExternalLink, Clock, Video, ArrowRight, Zap, MessageSquare } from 'lucide-react'
 
 const LIJN = 'rgba(255,255,255,0.08)'

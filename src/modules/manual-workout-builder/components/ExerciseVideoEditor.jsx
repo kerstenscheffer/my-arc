@@ -10,7 +10,7 @@
 // layered on later without changing this UI.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, Video, Image as ImageIcon, Trash2, Save, ExternalLink } from 'lucide-react'
 import ExerciseService from '../../../services/ExerciseService'

@@ -1,7 +1,7 @@
 // src/modules/client-journey/components/EvaluationModal.jsx
 // v7.1 — client.target_calories als enige bron voor macro targets
 import React, { useState, useMemo, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, Activity, Sliders, Check, AlertTriangle, Scale, Utensils, Dumbbell, ChevronDown, ChevronUp, Save, Camera, Flame, Plus, Minus } from 'lucide-react'
 

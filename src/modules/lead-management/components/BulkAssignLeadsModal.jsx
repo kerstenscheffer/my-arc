@@ -12,7 +12,7 @@
 // UI: per groep een card met checkboxes en een grote "Allemaal koppelen" knop.
 
 import { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, Link2, Check, Calendar, Send, ChevronDown, ChevronUp, AlertCircle,

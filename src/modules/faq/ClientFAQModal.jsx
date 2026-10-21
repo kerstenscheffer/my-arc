@@ -1,6 +1,6 @@
 // src/modules/faq/ClientFAQModal.jsx
 import React, { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import {
   HelpCircle, X, ArrowRight, MessageCircle, ChevronRight, Search,
   Smartphone, Dumbbell, Utensils, UtensilsCrossed, Moon, Pill, Scale,

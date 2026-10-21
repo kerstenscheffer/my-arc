@@ -1,7 +1,7 @@
 // src/modules/videos/CategoryManagerModal.jsx
 // Beheer video categorieën — aanmaken, bewerken, verwijderen
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import { X, Plus, Edit2, Trash2, Check, AlertTriangle } from 'lucide-react'
 import videoService from './VideoService'

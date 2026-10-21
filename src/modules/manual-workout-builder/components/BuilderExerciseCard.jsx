@@ -3,7 +3,7 @@
 // één "Bewerken"-knop. Alle bewerking (sets/reps/rust/RIR/apparaat/notitie,
 // of cardio-velden) gebeurt in een groter modal — zo blijft de pagina rustig.
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'

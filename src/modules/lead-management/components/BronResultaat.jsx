@@ -6,7 +6,7 @@
 // Bron: RPC get_bron_resultaat (RLS van de coach, dus het hele team).
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { Megaphone, Magnet, Send, HelpCircle, X, ChevronDown } from 'lucide-react'
 
 const SOORTEN = [

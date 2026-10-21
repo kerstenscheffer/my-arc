@@ -3,7 +3,7 @@
 // Opent in het dock-vak vanaf de "Dagen"-knop op een meal-card.
 
 import React, { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { X, CalendarDays, Check } from 'lucide-react'
 

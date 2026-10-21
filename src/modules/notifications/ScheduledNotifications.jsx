@@ -6,7 +6,7 @@
 //
 // Een nieuwe regel staat bewust UIT — hij stuurt pas iets nadat je 'm aanzet.
 import { useState, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import {
   Plus, X, Trash2, Clock, Users, Scale, UtensilsCrossed, Dumbbell,

@@ -11,7 +11,7 @@
 // dat blok voorkomt. De uitzondering van vandaag blijft in de agenda zelf.
 
 import { useCallback, useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../paginaPortal'
 import { X, Moon, Briefcase, Dumbbell, Utensils, ChevronRight, Trash2, Plus, Calendar } from 'lucide-react'
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf,

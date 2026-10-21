@@ -5,7 +5,7 @@
 // balk en op volledig scherm te zetten. Dezelfde vensterlogica als het
 // intake-venster (useZwevendVenster), zodat je ze naast elkaar kunt hebben.
 
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useEffect, useState } from 'react'
 import { X, GripVertical, Minus, Maximize2, Minimize2, CalendarDays, UtensilsCrossed } from 'lucide-react'
 import { useModalHost } from '../../../coach/ModalHost'

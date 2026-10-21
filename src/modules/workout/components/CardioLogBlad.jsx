@@ -6,7 +6,7 @@
 // dan wint het horloge en bewaren we dat als bron.
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { X, Check, ChevronLeft, Watch } from 'lucide-react'
 
 // Zelfde MET-tabel als het weekbudget van de coach (Compendium 2011).

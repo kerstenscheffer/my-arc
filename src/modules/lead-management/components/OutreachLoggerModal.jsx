@@ -5,7 +5,7 @@
 // understands the loop "ik stuur → dit komt eruit".
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, Plus, Send, Trash2, Archive, ArchiveRestore, MessageSquare,

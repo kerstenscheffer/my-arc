@@ -2,7 +2,7 @@
 import useIsMobile from '../../../hooks/useIsMobile'
 import { AlertCircle, RefreshCw, Plus } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { Trash2, Lock } from 'lucide-react'
 import WeekGrid from './week-schedule/WeekGrid'
 import WorkoutServiceNew from '../services/WorkoutServiceNew'

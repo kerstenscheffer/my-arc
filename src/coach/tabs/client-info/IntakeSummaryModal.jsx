@@ -11,7 +11,7 @@
 // verslepen, vergroten en inklappen. Je leest een intake naast je werk, niet
 // in plaats daarvan.
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../../../client/paginaPortal'
 import { BASELINE_VRAGEN } from '../../../modules/public-intake/baselineVragen'
 import { X, User, Utensils, Dumbbell, Clock, CalendarDays, ExternalLink, FileText, GripVertical, Minus, Maximize2, ChevronDown } from 'lucide-react'
 import { useModalHost } from '../../ModalHost'
