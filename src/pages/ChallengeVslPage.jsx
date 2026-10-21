@@ -212,6 +212,8 @@ function Cta({ m, sub, style, licht }) {
       >
         <CalendarCheck size={m ? 22 : 26} strokeWidth={3} style={{ flexShrink: 0 }} /> {CTA_TEKST}
       </button>
+      {/* Trustpilot direct onder elke startknop (21 okt 2026). */}
+      <TrustpilotBadge licht={opLicht} style={{ marginTop: 4 }} />
       {sub && (
         <div style={{ fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.4 }}>
           {sub}
@@ -982,10 +984,10 @@ export default function ChallengeVslPage() {
         </Tekst>
         <Cta m={m} style={{ marginTop: m ? '2rem' : '2.6rem' }} />
 
-        <TrustpilotBadge style={{ margin: `${m ? '2rem' : '2.8rem'} 0 1rem` }} />
         <div
           ref={reviewsRef}
           style={{
+            marginTop: m ? '2rem' : '2.8rem',
             display: 'flex', gap: m ? '0.75rem' : '1rem', overflow: 'hidden', cursor: 'grab',
             marginLeft: m ? '-1.25rem' : '-3rem', marginRight: m ? '-1.25rem' : '-3rem',
             paddingLeft: m ? '1.25rem' : '3rem', paddingRight: m ? '1.25rem' : '3rem',
