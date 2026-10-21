@@ -9,6 +9,7 @@ import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phon
 import WeekStatsModal from './WeekStatsModal'
 import GrowthChart from './GrowthChart'
 import { kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
+import zichtbaarPollen from '../../../utils/zichtbaarPollen'
 
 const GOLD = '#FFD700'
 
@@ -95,7 +96,6 @@ export default function PeriodStatsBar({
   const setShowWeek = onShowWeek || setShowWeekEigen
   const [loading, setLoading] = useState(true)
   const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, callGevoerd: 0, sales: 0, omzet: 0, noshow: 0, afgewezen: 0, saleVerloren: 0, nietGeschikt: 0 })
-  const [timeSeries, setTimeSeries] = useState([])
   const [chartOpen, setChartOpen] = useState(false)
   // KPI-doelen (per coach) + een key om ze te herladen na opslaan in de modal.
   const [targets, setTargets] = useState({})
@@ -108,18 +108,13 @@ export default function PeriodStatsBar({
       if (!silent) setLoading(true)
       try {
         const { start, end } = rangeFor(period, customRange)
-        // Grafiek volgt de gekozen periode — behalve "Vandaag" (1 dag = 1 punt),
-        // dan tonen we de hele maand zodat er een zinvolle trendlijn is.
-        const chartRange = rangeFor(period === 'day' ? 'month' : period, customRange)
-        const [funnel, react, ts, kpiT] = await Promise.all([
+        const [funnel, react, kpiT] = await Promise.all([
           leadService.getRangeFunnelStats(coachId, start, end),
           leadService.getRangeReactionStats ? leadService.getRangeReactionStats(coachId, start, end) : Promise.resolve(null),
-          leadService.getDailyTimeSeries ? leadService.getDailyTimeSeries(coachId, chartRange.start, chartRange.end) : Promise.resolve([]),
           leadService.getKpiTargets ? leadService.getKpiTargets(coachId) : Promise.resolve({}),
         ])
         if (!alive) return
         setTargets(kpiT || {})
-        setTimeSeries(Array.isArray(ts) ? ts : [])
         const next = {
           nieuw: react?.newLeads || 0,
           follow: react?.followupsInWindow || 0,
@@ -143,14 +138,19 @@ export default function PeriodStatsBar({
       finally { if (alive && !silent) setLoading(false) }
     }
     load()
-    // Auto-refresh elke 60s (stil) zodat een nieuw aangemaakte lead vanzelf
-    // binnenkomt — dan veroorzaakt een +1 reactie nooit meer een "sprong" in
-    // de Nieuwe-leads-teller (die liep alleen achter, telde de reactie niet).
-    const id = setInterval(() => load(true), 60000)
-    return () => { alive = false; clearInterval(id) }
+    // Stil verversen zodat een nieuw aangemaakte lead vanzelf binnenkomt.
+    // Elke 2 min en alleen als het tabblad in beeld is: het bord stond de hele
+    // dag open en dit was de zwaarste query op de database (Disk IO-mail
+    // Supabase, 21 okt 2026).
+    const stop = zichtbaarPollen(() => load(true), 120000)
+    return () => { alive = false; stop() }
     // refreshKey verandert bij elke reactie/DM/lead-mutatie in het bord, zodat
     // de bovenste stat-bar direct meeloopt (i.p.v. pas bij periode-wissel).
   }, [period, customRange, coachId, leadService, refreshKey, targetsKey])
+
+  // (De groeigrafiek-data werd hier elke minuut opgehaald maar nergens
+  // getoond — zwaarste query op de database. Weggehaald 21 okt 2026; de
+  // grafiek in WeekStatsModal haalt zijn eigen data.)
 
   // Elke stat een eigen lucide-icoon + kleur, zodat je zonder label ziet welke
   // het is (label blijft als tooltip). Zo passen ze compact op één rij.

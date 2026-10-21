@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import WeekGoalsService from '../../modules/productivity/WeekGoalsService'
 import LeadManagementService from '../../modules/lead-management/LeadManagementService'
+import zichtbaarPollen from '../../utils/zichtbaarPollen'
 
 const GOLD = '#FFD700'
 const GREEN = '#10b981'
@@ -126,11 +127,11 @@ export default function WeekGoalsBar({ db, coachId, isMobile: propMobile, onVisi
   // stay live without thrashing the DB.
   useEffect(() => {
     if (!coachId || goals.length === 0) return
-    const t = setInterval(async () => {
+    // Alleen verversen als het tabblad in beeld is (Disk IO, 21 okt 2026).
+    return zichtbaarPollen(async () => {
       const prog = await fetchProgress({ coachId, goals, leadService })
       setProgress(prog)
-    }, 90 * 1000)
-    return () => clearInterval(t)
+    }, 120 * 1000)
   }, [coachId, goals, leadService])
 
   const handleManual = async (goal, delta) => {

@@ -8,6 +8,7 @@ import { useModalHost } from '../../../coach/ModalHost'
 import { Activity, Target, Clock, TrendingUp, MessageCircle, Users, Calendar, FileText, Zap, ChevronDown, ChevronUp, Flame, BookOpen, X, CheckCircle, BarChart3, Send } from 'lucide-react'
 import { exportDailyReport } from '../utils/exportDailyReport'
 import WeekStatsModal from './WeekStatsModal'
+import zichtbaarPollen from '../../../utils/zichtbaarPollen'
 
 // GOLD THEME (consistent)
 const G = {
@@ -87,8 +88,8 @@ export default function DailyStatsBar({
 
   useEffect(() => {
     loadStats()
-    const interval = setInterval(loadStats, 60000)
-    return () => clearInterval(interval)
+    // Alleen verversen als het tabblad in beeld is (Disk IO, 21 okt 2026).
+    return zichtbaarPollen(loadStats, 120000)
   }, [leadService, coachId, sections])
 
   const loadStats = async () => {
