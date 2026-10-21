@@ -721,6 +721,22 @@ export default function ChallengeVslPage() {
               ))}
             </ul>
           </div>
+          {/* Direct onder de punten de transformaties van Kersten en Nitish
+              (21 okt 2026; stonden eerst verderop bij de resultaten). */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: m ? '0.6rem' : '1rem', marginTop: m ? '1.8rem' : '2.4rem' }}>
+            {TRANSFORMATIES.map(t => (
+              <div key={t.src}>
+                <div style={{ borderRadius: 12, overflow: 'hidden', background: '#f2f2f2' }}>
+                  <img src={t.src} alt={t.caption} draggable={false}
+                    onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                    style={{ width: '100%', height: 'auto', display: 'block' }} />
+                </div>
+                <p style={{ margin: '0.5rem 0 0', fontSize: m ? '0.74rem' : '0.88rem', fontWeight: 800, color: 'rgba(0,0,0,0.6)', textAlign: 'center', lineHeight: 1.3 }}>
+                  {t.caption}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -748,28 +764,6 @@ export default function ChallengeVslPage() {
         <Tekst m={m} center style={{ marginTop: m ? '1.4rem' : '1.8rem' }}>
           Mannen die volgens hun eigen plan werken aan hun doel, terwijl er ook ruimte blijft voor hun sociale leven.
         </Tekst>
-
-        {/* De transformaties van Kersten en Nitish, zoals op de andere pagina's. */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: m ? '0.6rem' : '1.2rem', marginTop: m ? '1.6rem' : '2.4rem',
-        }}>
-          {TRANSFORMATIES.map(t => (
-            <div key={t.src} style={{
-              padding: m ? '0.4rem' : '0.8rem', borderRadius: 14,
-              border: `1px solid ${THEMAS.goud.rand}`, background: THEMAS.goud.kaart,
-            }}>
-              <div style={{ borderRadius: 10, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
-                <img src={t.src} alt={t.caption} draggable={false}
-                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                  style={{ maxWidth: '100%', width: 'auto', height: 'auto', display: 'block' }} />
-              </div>
-              <p style={{ margin: '0.5rem 0 0.2rem', fontSize: m ? '0.7rem' : '0.86rem', fontWeight: 800, color: THEMAS.goud.dim, textAlign: 'center', lineHeight: 1.3 }}>
-                {t.caption}
-              </p>
-            </div>
-          ))}
-        </div>
 
         <Tekst m={m} center dim style={{ marginTop: m ? '1.2rem' : '1.6rem', fontSize: m ? '0.82rem' : '0.88rem' }}>
           Dit zijn individuele veranderingen in lichaamsgewicht, geen belofte voor jouw resultaat. Tijdens de kennismaking bespreken we je startpunt en wat voor jou een passende doelstelling is.
