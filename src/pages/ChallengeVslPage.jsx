@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import {
   Star, ChevronDown, ChevronLeft, ChevronRight, Utensils, Dumbbell, MessageCircle,
   Check, CalendarCheck, Play, Pause, Volume2, VolumeX, X,
+  ClipboardList, ClipboardCheck, PartyPopper, ShieldCheck, Crosshair, TrendingUp, LineChart, SlidersHorizontal, Video as VideoIcoon,
 } from 'lucide-react'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 import { PrequalFlow } from './ChallengePrequalPage'
@@ -45,7 +46,15 @@ const VIDEO_ID = '41Hfc2YVBAA'
 
 const CTA_TEKST = 'Start mijn challenge'
 
-const HERO_PUNTEN = ['Persoonlijk voedingsplan', 'Persoonlijk trainingsplan', '1-op-1 begeleiding', 'Stok achter de deur', 'Alles in 1 app']
+// Punten onder de bovenste knop. Met `pijler` is het punt klikbaar en opent
+// het de uitleg van die pijler (PijlerModal).
+const HERO_PUNTEN = [
+  { tekst: 'Persoonlijk voedingsplan', pijler: 'voeding' },
+  { tekst: 'Persoonlijk trainingsplan', pijler: 'training' },
+  { tekst: '1-op-1 begeleiding', pijler: 'begeleiding' },
+  { tekst: 'Stok achter de deur' },
+  { tekst: 'Alles in 1 app' },
+]
 
 const TRANSFORMATIES = [
   { src: '/review-transformatie-1.png', naam: 'Kersten', caption: 'Kersten: van zachte buik naar sixpack.' },
@@ -592,7 +601,9 @@ const knopIcoon = {
 // eroverheen.
 // Meteen de eerste vraag van de prekwalificatie, en wie zelf wil inplannen
 // krijgt Calendly als laatste stap van datzelfde formulier.
-function KalenderBlad({ open, onClose, m }) {
+// De omlijsting van alle modals op deze pagina: midden op het scherm, zo
+// hoog als de inhoud, logo en kruisje zwevend bovenin (21 okt 2026).
+function ModalKader({ open, onClose, m, children }) {
   useEffect(() => {
     if (!open) return
     const vorige = document.body.style.overflow
@@ -652,25 +663,107 @@ function KalenderBlad({ open, onClose, m }) {
           </button>
         </div>
         <div style={{ flex: '0 1 auto', minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
-          {/* Bovenin het blad de transformaties van Kersten en Nitish: zo zie
-              je tijdens de vragen waar je het voor doet (21 okt 2026).
-              Volle breedte, tegen elkaar aan; bijgesneden op het bovenlijf. */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, width: '100%', flexShrink: 0 }}>
-            {TRANSFORMATIES.map(t => (
-              <div key={t.src} style={{ position: 'relative', height: m ? 170 : 240, overflow: 'hidden', background: '#141414' }}>
-                <img src={t.src} alt={t.caption} draggable={false}
-                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 42%', display: 'block' }} />
-                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '1.4rem 0.6rem 0.45rem', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)', fontSize: m ? '0.72rem' : '0.8rem', fontWeight: 900, color: '#fff', textAlign: 'center' }}>
-                  {t.naam} · 3 maanden
-                </div>
-              </div>
-            ))}
-          </div>
-          <PrequalFlow m={m} compact />
+          {children}
         </div>
       </div>
     </div>
+  )
+}
+
+function KalenderBlad({ open, onClose, m }) {
+  return (
+    <ModalKader open={open} onClose={onClose} m={m}>
+      {/* Bovenin het blad de transformaties van Kersten en Nitish: zo zie
+          je tijdens de vragen waar je het voor doet (21 okt 2026).
+          Volle breedte, tegen elkaar aan; bijgesneden op het bovenlijf. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, width: '100%', flexShrink: 0 }}>
+        {TRANSFORMATIES.map(t => (
+          <div key={t.src} style={{ position: 'relative', height: m ? 170 : 240, overflow: 'hidden', background: '#141414' }}>
+            <img src={t.src} alt={t.caption} draggable={false}
+              onError={(e) => { e.currentTarget.style.opacity = 0 }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 42%', display: 'block' }} />
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '1.4rem 0.6rem 0.45rem', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)', fontSize: m ? '0.72rem' : '0.8rem', fontWeight: 900, color: '#fff', textAlign: 'center' }}>
+              {t.naam} · 3 maanden
+            </div>
+          </div>
+        ))}
+      </div>
+      <PrequalFlow m={m} compact />
+    </ModalKader>
+  )
+}
+
+// De drie pijlers van de aanpak, zoals op de 6-weken-pagina: banner met de
+// titel erin, één zin, vier punten. Opent vanaf de punten onder de knop.
+const PIJLERS = {
+  voeding: {
+    foto: '/methode/voeding-slide.jpg', kop: 'Weet wat je eet',
+    zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
+    doen: [
+      { Icon: ClipboardList, kop: 'Structuur', tekst: 'Plan staat klaar. Nul denkwerk.' },
+      { Icon: Utensils, kop: 'Keuze', tekst: '500 gerechten in jouw plan.' },
+      { Icon: PartyPopper, kop: 'Flexibiliteit', tekst: 'Etentjes leren we mee omgaan.' },
+      { Icon: ShieldCheck, kop: 'Zekerheid', tekst: 'Weten dat het klopt.' },
+    ],
+  },
+  training: {
+    foto: '/methode/training-slide.jpg', kop: 'Elke training telt',
+    zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
+    doen: [
+      { Icon: ClipboardList, kop: 'Schema', tekst: 'Jouw dagen, locatie, niveau.' },
+      { Icon: Crosshair, kop: 'Focus', tekst: 'Alleen wat telt.' },
+      { Icon: TrendingUp, kop: 'Resultaatgericht', tekst: 'Zie dat het werkt.' },
+      { Icon: ShieldCheck, kop: 'Zekerheid', tekst: 'Hoe, hoeveel, welke. Nooit twijfelen.' },
+    ],
+  },
+  begeleiding: {
+    foto: '/methode/begeleiding-slide.jpg', kop: 'Coach in jouw corner',
+    zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
+    doen: [
+      { Icon: LineChart, kop: 'Cijfers', tekst: 'Kijk dagelijks mee, stuur op data.' },
+      { Icon: SlidersHorizontal, kop: 'Bijsturen', tekst: 'Stilstaan is geen optie.' },
+      { Icon: ClipboardCheck, kop: 'Check-in', tekst: 'Wat liep vast, wat gaat anders.' },
+      { Icon: VideoIcoon, kop: 'Weekcall', tekst: 'Wat werkt, wat niet.' },
+    ],
+  },
+}
+
+function PijlerModal({ pijler, onClose, onStart, m }) {
+  const p = PIJLERS[pijler]
+  return (
+    <ModalKader open={!!p} onClose={onClose} m={m}>
+      {p && (
+        <>
+          <img src={p.foto} alt={p.kop} draggable={false}
+            style={{ width: '100%', aspectRatio: '1960 / 600', objectFit: 'cover', display: 'block', flexShrink: 0, background: '#141414' }} />
+          <div style={{ padding: m ? '1.2rem 1.15rem 1.3rem' : '1.6rem 1.7rem 1.7rem', fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
+            <p style={{ margin: 0, fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 800, lineHeight: 1.45, color: '#fff', textAlign: 'center', letterSpacing: '-0.01em' }}>{p.zin}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: m ? '1.2rem' : '1.5rem' }}>
+              {p.doen.map(d => (
+                <div key={d.kop} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: m ? '0.8rem 0.95rem' : '0.95rem 1.15rem', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.12)' }}>
+                  <span style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <d.Icon size={20} strokeWidth={2.6} color="#000" />
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: m ? '1rem' : '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{d.kop}</div>
+                    <div style={{ fontSize: m ? '0.88rem' : '0.94rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{d.tekst}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={onStart} style={{
+              marginTop: m ? '1.3rem' : '1.6rem', width: '100%', minHeight: m ? 58 : 64, borderRadius: 14, border: 'none',
+              background: '#fff', color: '#000', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, fontFamily: 'inherit',
+              letterSpacing: '0.03em', textTransform: 'uppercase', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <CalendarCheck size={22} strokeWidth={3} /> {CTA_TEKST}
+            </button>
+          </div>
+        </>
+      )}
+    </ModalKader>
   )
 }
 
@@ -714,6 +807,8 @@ export default function ChallengeVslPage() {
   const [m, setM] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [openVraag, setOpenVraag] = useState(0)
   const [kalenderOpen, setKalenderOpen] = useState(false)
+  // Welke pijler-uitleg open staat (voeding, training, begeleiding) of null.
+  const [pijler, setPijler] = useState(null)
   const openKalender = () => { setKalenderOpen(true); meet('knop') }
   // De zwevende knop komt pas als de knop bovenaan uit beeld is.
   const [zwevend, setZwevend] = useState(false)
@@ -824,14 +919,25 @@ export default function ChallengeVslPage() {
           {/* Wat je krijgt, onder elkaar met een vinkje (21 okt 2026). */}
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: m ? '1.6rem' : '2.2rem' }}>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: m ? 10 : 12 }}>
-              {HERO_PUNTEN.map(p => (
-                <li key={p} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: m ? '1.08rem' : '1.22rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em' }}>
+              {HERO_PUNTEN.map(p => {
+                const regel = { display: 'flex', alignItems: 'center', gap: 12, fontSize: m ? '1.08rem' : '1.22rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em' }
+                const vink = (
                   <span style={{ width: m ? 26 : 30, height: m ? 26 : 30, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Check size={m ? 16 : 18} strokeWidth={3.4} color="#fff" />
                   </span>
-                  {p}
-                </li>
-              ))}
+                )
+                return (
+                  <li key={p.tekst} style={regel}>
+                    {p.pijler ? (
+                      <button onClick={() => { setPijler(p.pijler); meet('pijler', { meta: { pijler: p.pijler } }) }} style={{ ...regel, padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                        {vink}
+                        <span style={{ textDecoration: 'underline', textDecorationThickness: 2, textUnderlineOffset: 4, textDecorationColor: 'rgba(0,0,0,0.25)' }}>{p.tekst}</span>
+                        <ChevronRight size={m ? 18 : 20} strokeWidth={3} style={{ flexShrink: 0, marginLeft: -4 }} />
+                      </button>
+                    ) : (<>{vink}{p.tekst}</>)}
+                  </li>
+                )
+              })}
             </ul>
           </div>
           {/* Direct onder de punten de transformaties van Kersten en Nitish
@@ -1046,6 +1152,7 @@ export default function ChallengeVslPage() {
       </button>
 
       <KalenderBlad open={kalenderOpen} onClose={() => setKalenderOpen(false)} m={m} />
+      <PijlerModal pijler={pijler} m={m} onClose={() => setPijler(null)} onStart={() => { setPijler(null); openKalender() }} />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
