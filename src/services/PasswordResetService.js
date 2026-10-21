@@ -165,11 +165,12 @@ class PasswordResetService {
       }
     }
     
-    // Rate limiting
-    if (errorMessage.includes('rate limit')) {
+    // Per adres mag er één resetmail per minuut uit (429 "you can only request
+    // this after N seconds"). Meestal is de vorige mail dus al onderweg.
+    if (error.status === 429 || error.code === 'over_email_send_rate_limit' || errorMessage.includes('rate limit') || errorMessage.includes('only request this after')) {
       return {
         success: false,
-        error: 'Te veel reset pogingen. Probeer over 1 uur opnieuw.'
+        error: 'Je hebt net al een resetmail aangevraagd. Kijk in je inbox (en spam), of probeer het over een minuut opnieuw.'
       }
     }
     
