@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import {
-  Star, ChevronDown, ChevronRight, Utensils, Dumbbell, MessageCircle,
+  Star, ChevronDown, ChevronLeft, ChevronRight, Utensils, Dumbbell, MessageCircle,
   Check, CalendarCheck, Play, Pause, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
@@ -51,7 +51,7 @@ const RESULTATEN = [
   { kg: '2,5', weken: 2 },
 ]
 
-const HERO_PUNTEN = ['Persoonlijk voedingsplan', 'Persoonlijk trainingsplan', '1-op-1 begeleiding', 'Stok achter de deur']
+const HERO_PUNTEN = ['Persoonlijk voedingsplan', 'Persoonlijk trainingsplan', '1-op-1 begeleiding', 'Stok achter de deur', 'Alles in 1 app']
 
 const TRANSFORMATIES = [
   { src: '/review-transformatie-1.png', naam: 'Kersten', caption: 'Kersten: van zachte buik naar sixpack.' },
@@ -239,19 +239,103 @@ function Sectie({ children, m, smal, lijn = true, thema = 'zwart', style }) {
   )
 }
 
-function TrustpilotBadge({ style }) {
+function TrustpilotBadge({ style, licht }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', ...style }}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={TP_GREEN}/>
       </svg>
-      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em' }}>TRUSTPILOT</span>
-      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fff' }}>4.8</span>
+      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: licht ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)', letterSpacing: '0.04em' }}>TRUSTPILOT</span>
+      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: licht ? '#000' : '#fff' }}>4.8</span>
       <div style={{ display: 'flex', gap: '2px' }}>
         {[1,2,3,4,5].map(s => (
           <svg key={s} width={11} height={11} viewBox="0 0 24 24" fill={TP_GREEN}>
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
           </svg>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Reviews als slider op een licht vlak: één kaart tegelijk in beeld (op de
+// telefoon met een stukje van de volgende), vegen of pijltjes, bolletjes
+// eronder. Dezelfde reviews als onderaan de pagina (21 okt 2026).
+function ReviewSlider({ m }) {
+  const baan = useRef(null)
+  const [actief, setActief] = useState(0)
+  const opScroll = () => {
+    const el = baan.current
+    if (!el) return
+    const kaart = el.firstElementChild
+    const stap = kaart ? kaart.getBoundingClientRect().width + 12 : el.clientWidth
+    setActief(Math.max(0, Math.min(REVIEWS.length - 1, Math.round(el.scrollLeft / stap))))
+  }
+  const naar = (i) => {
+    const el = baan.current
+    const kaart = el?.children[i]
+    if (el && kaart) el.scrollTo({ left: kaart.offsetLeft - el.firstElementChild.offsetLeft, behavior: 'smooth' })
+  }
+  const pijl = (links) => ({
+    position: 'absolute', top: '50%', [links ? 'left' : 'right']: -18, transform: 'translateY(-50%)',
+    width: 40, height: 40, borderRadius: '50%', border: '1px solid rgba(0,0,0,0.12)', background: '#fff',
+    color: '#000', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.08)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
+  return (
+    <div style={{ marginTop: m ? '1.4rem' : '2rem' }}>
+      <TrustpilotBadge licht style={{ marginBottom: m ? '1rem' : '1.3rem' }} />
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={baan} onScroll={opScroll}
+          style={{
+            display: 'flex', gap: 12, overflowX: 'auto', scrollSnapType: 'x mandatory',
+            WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+            marginLeft: m ? '-1.25rem' : 0, marginRight: m ? '-1.25rem' : 0,
+            paddingLeft: m ? '1.25rem' : 0, paddingRight: m ? '1.25rem' : 0,
+            scrollPaddingLeft: m ? '1.25rem' : 0,
+          }}
+        >
+          {REVIEWS.map(r => (
+            <div key={r.name} style={{
+              flex: `0 0 ${m ? '86%' : '100%'}`, scrollSnapAlign: 'start', boxSizing: 'border-box',
+              padding: m ? '1.2rem 1.2rem 1.1rem' : '1.6rem 1.7rem 1.4rem', borderRadius: 16,
+              background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+              display: 'flex', flexDirection: 'column', gap: '0.8rem',
+            }}>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <span key={n} style={{ width: m ? 22 : 24, height: m ? 22 : 24, background: TP_GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Star size={m ? 14 : 15} fill="#fff" color="#fff" strokeWidth={0} />
+                  </span>
+                ))}
+              </div>
+              <p style={{ margin: 0, fontSize: m ? '1rem' : '1.08rem', fontWeight: 700, lineHeight: 1.5, color: '#111', letterSpacing: '-0.01em' }}>
+                {r.text}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 900 }}>{r.name.charAt(0)}</div>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#000' }}>{r.name}</span>
+                </div>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(0,0,0,0.45)' }}>{r.date}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        {!m && actief > 0 && (
+          <button onClick={() => naar(actief - 1)} aria-label="Vorige review" style={pijl(true)}><ChevronLeft size={20} strokeWidth={2.8} /></button>
+        )}
+        {!m && actief < REVIEWS.length - 1 && (
+          <button onClick={() => naar(actief + 1)} aria-label="Volgende review" style={pijl(false)}><ChevronRight size={20} strokeWidth={2.8} /></button>
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: '1rem' }}>
+        {REVIEWS.map((r, i) => (
+          <button key={r.name} onClick={() => naar(i)} aria-label={`Review ${i + 1}`} style={{
+            width: i === actief ? 22 : 8, height: 8, borderRadius: 4, border: 'none', padding: 0, cursor: 'pointer',
+            background: i === actief ? '#000' : 'rgba(0,0,0,0.2)', transition: 'width 0.25s ease, background 0.25s ease',
+          }} />
         ))}
       </div>
     </div>
@@ -743,31 +827,8 @@ export default function ChallengeVslPage() {
       {/* ══ 2. Resultaten ══ */}
       <Sectie m={m} lijn={false} thema="goud">
         <Kop m={m} center>Deze mannen zetten de eerste stap al.</Kop>
-        <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>In de video laat ik de voortgang van drie deelnemers zien:</Tekst>
+        <ReviewSlider m={m} />
 
-        <div style={{
-          display: 'grid', gridTemplateColumns: m ? '1fr' : 'repeat(3, 1fr)',
-          gap: m ? '0.6rem' : '1rem', marginTop: m ? '1.4rem' : '2rem',
-        }}>
-          {RESULTATEN.map(r => (
-            <div key={r.kg} style={{
-              padding: m ? '1rem 1.1rem' : '1.4rem 1.2rem', borderRadius: 14,
-              border: `1px solid ${THEMAS.goud.rand}`, background: THEMAS.goud.kaart,
-              display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.5rem',
-            }}>
-              <span style={{ fontSize: m ? '2rem' : '2.6rem', fontWeight: 900, letterSpacing: '-0.04em', color: THEMAS.goud.tekst, lineHeight: 1 }}>{r.kg}</span>
-              <span style={{ fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 800, color: THEMAS.goud.dim }}>kilo lichter in {r.weken} weken</span>
-            </div>
-          ))}
-        </div>
-
-        <Tekst m={m} center style={{ marginTop: m ? '1.4rem' : '1.8rem' }}>
-          Mannen die volgens hun eigen plan werken aan hun doel, terwijl er ook ruimte blijft voor hun sociale leven.
-        </Tekst>
-
-        <Tekst m={m} center dim style={{ marginTop: m ? '1.2rem' : '1.6rem', fontSize: m ? '0.82rem' : '0.88rem' }}>
-          Dit zijn individuele veranderingen in lichaamsgewicht, geen belofte voor jouw resultaat. Tijdens de kennismaking bespreken we je startpunt en wat voor jou een passende doelstelling is.
-        </Tekst>
         <Cta m={m} style={{ marginTop: m ? '2.2rem' : '3rem' }} />
       </Sectie>
 
