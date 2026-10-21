@@ -74,10 +74,11 @@ const REVIEWS = [
   { name: 'Consumer', date: '3 nov 2025', titel: 'MY ARC', text: 'Zeer professionele aanpak! Kersten geeft alles duidelijk en gestructureerd weer in een overzichtelijke app, waarin je niet alleen je voeding, maar ook je slaap, trainingen en algemene voortgang kunt bijhouden. Hij volgt je progressie actief op en biedt waardevolle feedback en motivatie op de juiste momenten. Dankzij zijn persoonlijke begeleiding en deskundige aanpak blijf je gemotiveerd en zie je echt resultaat. Een absolute aanrader voor wie op een duurzame en verantwoorde manier fitter wil worden!' },
 ]
 
+// Kort en krachtig (21 okt 2026): één zin per punt.
 const HERKENNING = [
-  'Je probeert op je voeding te letten. Maar hoeveel je precies moet eten, weet je eigenlijk niet. Overdag gaat het prima, totdat je ’s avonds op de bank zit en alsnog een zak chips opentrekt.',
-  'Of je gaat al naar de sportschool. Je doet je oefeningen, maakt je trainingen af en vraagt je na een paar weken af: ga ik hier eigenlijk wel van vooruit?',
-  'Misschien weet je best wat je zou moeten doen. Alleen lukt het je steeds een paar weken, waarna een drukke periode je ritme weer onderuit haalt.',
+  "Overdag gaat het goed. 's Avonds gaat de zak chips open.",
+  'Je traint, maar ziet geen vooruitgang.',
+  'Na een paar weken haalt een drukke periode je weer onderuit.',
 ]
 
 const AANPAK = [
@@ -969,27 +970,22 @@ export default function ChallengeVslPage() {
 
       {/* ══ 3. Herkenning ══ */}
       <Sectie m={m} smal>
-        <Label m={m}>Herkenning</Label>
-        <Kop m={m}>Je weet dat er iets moet veranderen. Maar hoe krijg je het passend in je week?</Kop>
-        <Tekst m={m} dim style={{ marginTop: '0.9rem' }}>Misschien herken je dit.</Tekst>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: m ? '0.7rem' : '0.9rem', marginTop: m ? '1.3rem' : '1.8rem' }}>
+        <Kop m={m}>Je weet wat je moet doen. Alleen niet hoe je het volhoudt.</Kop>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: m ? '0.6rem' : '0.8rem', marginTop: m ? '1.4rem' : '1.9rem' }}>
           {HERKENNING.map((t, i) => (
             <div key={i} style={{
-              display: 'flex', gap: '0.9rem', alignItems: 'flex-start',
+              display: 'flex', gap: '0.9rem', alignItems: 'center',
               padding: m ? '1rem 1.1rem' : '1.2rem 1.4rem', borderRadius: 14,
               border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)',
             }}>
-              <span style={{ flexShrink: 0, fontSize: m ? '1rem' : '1.1rem', fontWeight: 900, color: GOLD, lineHeight: 1.5 }}>{i + 1}.</span>
-              <Tekst m={m}>{t}</Tekst>
+              <span style={{ flexShrink: 0, fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff' }}>{i + 1}.</span>
+              <span style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 800, color: '#fff', lineHeight: 1.35, letterSpacing: '-0.01em' }}>{t}</span>
             </div>
           ))}
         </div>
         <p style={{ margin: `${m ? '1.5rem' : '2rem'} 0 0`, fontSize: m ? '1.15rem' : '1.35rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: '#fff' }}>
-          Dan moet je plan ook werken op de dagen waarop je weinig tijd en energie hebt.
+          Je plan moet ook werken op je drukste dagen. Daar zorgen we samen voor.
         </p>
-        <Tekst m={m} style={{ marginTop: '0.9rem' }}>
-          Daar kijken we samen naar. Wat past bij jouw doel? Wat kun je daadwerkelijk uitvoeren? En wat moet er veranderen om dat vol te houden?
-        </Tekst>
       </Sectie>
 
       {/* ══ 4. De aanpak ══ */}
