@@ -87,12 +87,12 @@ const AANPAK = [
   { Icon: MessageCircle, kop: 'Begeleiding bij het volhouden', zin: 'Check-ins en WhatsApp: ik kijk mee en we sturen samen bij.' },
 ]
 
+// Kort (21 okt 2026): vier punten van een paar woorden.
 const GESCHIKT = [
-  'Vet wilt verliezen of spieren wilt opbouwen.',
-  'Duidelijkheid zoekt over wat je moet eten en hoe je moet trainen.',
-  'Moeite hebt om je aanpak consequent vol te houden.',
-  'Begeleiding wilt die rekening houdt met je werk, gezin en sociale leven.',
-  'Bereid bent te trainen, afspraken na te komen en je voortgang bij te houden.',
+  'Je wilt vet kwijt of spieren erbij.',
+  'Je wilt weten wat je eet en hoe je traint.',
+  'Je hebt een druk leven.',
+  'Je bent bereid om ervoor te gaan.',
 ]
 
 
@@ -1025,25 +1025,23 @@ export default function ChallengeVslPage() {
 
       {/* ══ 6. Geschiktheid ══ */}
       <Sectie m={m} smal thema="goud">
-        <Label m={m}>Geschiktheid</Label>
-        <Kop m={m}>Past de 6 Weken Challenge bij jou?</Kop>
-        <Tekst m={m} dim style={{ marginTop: '0.9rem' }}>Deze challenge sluit aan als je:</Tekst>
+        <Kop m={m}>Past dit bij jou?</Kop>
         <div style={{ marginTop: m ? '1.1rem' : '1.4rem' }}>
           {GESCHIKT.map((t, i) => (
             <div key={t} style={{
               display: 'flex', gap: '0.8rem', alignItems: 'center',
-              padding: m ? '0.8rem 0' : '1rem 0',
+              padding: m ? '0.75rem 0' : '0.95rem 0',
               borderTop: i === 0 ? `1px solid ${THEMAS.goud.randZacht}` : 'none',
               borderBottom: `1px solid ${THEMAS.goud.randZacht}`,
             }}>
               <Check size={m ? 22 : 26} strokeWidth={3} color={THEMAS.goud.icoon} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: m ? '1.02rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: THEMAS.goud.tekst }}>{t}</span>
+              <span style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: THEMAS.goud.tekst }}>{t}</span>
             </div>
           ))}
         </div>
-        <Tekst m={m} style={{ marginTop: m ? '1.2rem' : '1.5rem' }}>
-          Je hoeft vooraf niet alles te weten of al een perfect ritme te hebben. Wel moet je bereid zijn om aan de slag te gaan en open te bespreken wat je lastig vindt.
-        </Tekst>
+        <p style={{ margin: `${m ? '1.2rem' : '1.5rem'} 0 0`, fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.35, color: THEMAS.goud.tekst }}>
+          Perfect hoeft niet. Inzet wel.
+        </p>
       </Sectie>
 
       {/* ══ 7. Vragen ══ */}
