@@ -872,13 +872,18 @@ export default function ChallengeVslPage() {
       {/* ══ 1. Bovenaan: label, korte kop, video, één alinea, knop ══
           Alles op het eerste scherm van een telefoon. De lange uitleg staat
           onder de video, niet erboven: de video is waar je voor komt. */}
-      {/* Vaste balk bovenaan met het label als witte pil, rood bolletje ervoor. */}
+      {/* Vaste balk bovenaan: logo links, het label als witte pil in het midden. */}
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
         background: BG, borderBottom: '1px solid rgba(255,255,255,0.08)',
         display: 'flex', justifyContent: 'center', alignItems: 'center',
         padding: `calc(env(safe-area-inset-top, 0px) + ${m ? '0.6rem' : '0.75rem'}) 1rem ${m ? '0.6rem' : '0.75rem'}`,
       }}>
+        {/* MY ARC-logo linksboven; de pil blijft in het midden (21 okt 2026). */}
+        <img
+          src="/ma-logo-header.png" alt="MY ARC"
+          style={{ position: 'absolute', left: m ? '0.75rem' : '1.5rem', bottom: m ? '0.55rem' : '0.7rem', width: m ? 40 : 64, height: 'auto', display: 'block' }}
+        />
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: m ? '0.45rem 0.85rem' : '0.5rem 1.1rem', borderRadius: 6,
