@@ -68,6 +68,8 @@ export default function ResetPassword() {
     const result = await passwordReset.updatePassword(newPassword)
     if (result.success) {
       setDone(true)
+      // Even laten zien dat het gelukt is, dan door naar de login.
+      setTimeout(() => { window.location.href = '/' }, 3000)
     } else {
       setMessage({ ok: false, text: result.error || 'Kon wachtwoord niet bijwerken' })
     }
@@ -77,6 +79,8 @@ export default function ResetPassword() {
   // Strak: zwart met wit, echt MA-logo, drie tekstmaten (24 / 16 / 13).
   const sterkte = !newPassword ? 0 : newPassword.length < 6 ? 1 : newPassword.length < 9 ? 2 : newPassword.length < 12 ? 3 : 4
   const sterkteLabel = ['', 'Te kort', 'Zwak', 'Redelijk', 'Sterk'][sterkte]
+  // Rood → oranje → geel → groen; de balk kleurt mee met het label.
+  const sterkteKleur = ['transparent', '#ef4444', '#f97316', '#eab308', '#22c55e'][sterkte]
   const verschilt = confirmPassword && confirmPassword !== newPassword
   const kanOpslaan = !loading && newPassword && confirmPassword
 
@@ -133,7 +137,8 @@ export default function ResetPassword() {
       <div style={{ ...kolom, textAlign: 'center' }}>
         <Logo />
         <h1 style={titel}>Wachtwoord opgeslagen</h1>
-        <p style={tekst}>Log nu in de MY ARC-app in met je nieuwe wachtwoord.</p>
+        <p style={tekst}>Je gaat zo door naar inloggen. Gebruik je de app? Open MY ARC en log in met je nieuwe wachtwoord.</p>
+        <button type="button" style={{ ...knop, marginTop: 24 }} onClick={() => window.location.href = '/'}>Naar inloggen</button>
       </div>
     </div>
   )
@@ -173,10 +178,10 @@ export default function ResetPassword() {
                 <div style={{ marginTop: 8 }}>
                   <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
                     {[1, 2, 3, 4].map(l => (
-                      <div key={l} style={{ flex: 1, height: 3, borderRadius: 2, background: sterkte >= l ? '#fff' : 'rgba(255,255,255,0.12)' }} />
+                      <div key={l} style={{ flex: 1, height: 3, borderRadius: 2, background: sterkte >= l ? sterkteKleur : 'rgba(255,255,255,0.12)' }} />
                     ))}
                   </div>
-                  <div style={klein}>{sterkteLabel}</div>
+                  <div style={{ ...klein, color: sterkteKleur }}>{sterkteLabel}</div>
                 </div>
               )}
             </div>
