@@ -467,9 +467,9 @@ const knopIcoon = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
-// Het blad: schuift van onderaf omhoog. Eerst de tien vragen
-// (prekwalificatie), en past het, dan Calendly als laatste stap van
-// datzelfde formulier.
+// Het blad: schuift van onderaf omhoog (op de telefoon schermvullend).
+// Meteen de eerste vraag van de prekwalificatie, en wie zelf wil inplannen
+// krijgt Calendly als laatste stap van datzelfde formulier.
 function KalenderBlad({ open, onClose, m }) {
   useEffect(() => {
     if (!open) return
@@ -489,9 +489,13 @@ function KalenderBlad({ open, onClose, m }) {
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'absolute', left: 0, right: 0, bottom: 0,
-          height: m ? '92dvh' : 'min(92vh, 900px)',
+          // Op de telefoon het hele scherm: de vragen staan dan echt in het
+          // midden, zoals in de app (21 okt 2026).
+          top: m ? 0 : 'auto',
+          height: m ? '100dvh' : 'min(92vh, 900px)',
           maxWidth: m ? '100%' : 1000, margin: '0 auto',
-          background: '#0a0a0a', borderRadius: '20px 20px 0 0',
+          background: '#0a0a0a', borderRadius: m ? 0 : '20px 20px 0 0',
+          paddingTop: m ? 'env(safe-area-inset-top, 0px)' : 0, boxSizing: 'border-box',
           border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
           animation: 'bladOmhoog 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
@@ -525,7 +529,7 @@ function KalenderBlad({ open, onClose, m }) {
             <X size={18} strokeWidth={2.6} />
           </button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
           <PrequalFlow m={m} compact />
         </div>
       </div>

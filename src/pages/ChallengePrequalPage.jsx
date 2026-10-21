@@ -1,30 +1,28 @@
 // src/pages/ChallengePrequalPage.jsx
 //
-// Prekwalificatie voor de 6 Weken Challenge: korte vragen, één per
-// scherm, vóór iemand een kennismaking inplant. Drie uitkomsten:
-//   A  past          -> Calendly, met naam en e-mail al ingevuld
-//   B  nog niet      -> gratis video (10 kg in 16 weken) en Instagram
-//   C  past niet     -> vriendelijk afgewezen, dezelfde gratis video
+// Prekwalificatie voor de 6 Weken Challenge: één vraag per scherm, midden in
+// beeld. Vier vragen (doel, vastlopen, geprobeerd, leeftijd), dan "je bent
+// geschikt", dan kiezen: zelf inplannen of contact (WhatsApp, bellen, mail).
+// De gegevens komen pas aan het eind, op één scherm. Uitkomsten:
+//   A  past, zelf inplannen -> Calendly, met naam en e-mail al ingevuld
+//   A  past, contact        -> bevestiging "binnen 24 uur app/bel/mail ik je"
+//   C  onder 18             -> vriendelijk afgewezen, gratis video
 //
 // Elke inzending wordt een lead op het bord van Kersten via de
-// database-functie submit_challenge_prequal: A in "Call voorgesteld", B en
-// C in "Niet geschikt". De antwoorden landen in de kwalificatievelden
-// (Doel, Pijn, Urgentie, Open) en als samenvatting in de notities. Boekt
-// iemand daarna in Calendly, dan koppelt api/calendly-webhook.js die
-// afspraak via utm_content=lead_<id> aan dezelfde lead en schuift hem
-// naar "Sales Call".
+// database-functie submit_challenge_prequal: A in "🎯 Ad lead", C in "Niet
+// geschikt". De voorkeur (zelf inplannen of hoe benaderen) staat in de
+// kwalificatie Open en in de notities. Boekt iemand in Calendly, dan koppelt
+// de Calendly-sync die afspraak via utm_content=lead_<id> aan dezelfde lead.
 //
 // Werkt los op /challenge/start én in het blad van de VSL (/challenge).
 
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, ArrowRight, Check, Instagram, Play } from 'lucide-react'
 import db from '../services/DatabaseService'
-import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies, sessieId } from './challengeTracking'
-import { VRAGEN } from './challengeVragen'
+import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies } from './challengeTracking'
+import { VRAGEN, ROUTE_ZELF, ROUTE_CONTACT, vraagtTelefoon } from './challengeVragen'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
-const GOLD = '#FFD700'
-const GOUD_KNOP = 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const INSTAGRAM = 'https://instagram.com/myarc.nl'
 // Gratis waarde aan het eind: de video waarin Kersten uitlegt hoe je 10 kg
@@ -49,20 +47,21 @@ const telOk = (t) => String(t || '').replace(/[^0-9+]/g, '').length >= 8
 // Antwoorden omzetten naar wat het bord nodig heeft.
 function bouwPayload(antw, uitkomst, afwijsreden, utm) {
   const lijst = (v) => (Array.isArray(v) ? v.join(', ') : (v || ''))
+  const voorkeur = antw.route === ROUTE_CONTACT ? `Wil benaderd worden via ${antw.kanaal || '-'}` : 'Plant zelf in'
   const regels = [
     `Prekwalificatie 6 Weken Challenge (${uitkomst === 'A' ? 'past' : uitkomst === 'B' ? 'nog niet het moment' : 'past niet'})`,
     `Leeftijd: ${antw.leeftijd || '-'}`,
-    `Doel: ${antw.doel || '-'} · Kilo's kwijt: ${antw.kilos || '-'}`,
+    `Doel: ${antw.doel || '-'}`,
     `Loopt vast op: ${lijst(antw.vastlopen) || '-'}`,
     `Al geprobeerd: ${lijst(antw.geprobeerd) || '-'}`,
-    `Waarom nu: ${antw.waarom_nu || '-'}`,
-    `Belang (1-10): ${antw.belang || '-'} · Trainen: ${antw.trainen || '-'} · Borg: ${antw.borg || '-'}`,
   ]
+  if (uitkomst === 'A') regels.push(voorkeur)
   if (afwijsreden) regels.push(`Afgewezen: ${afwijsreden}`)
   // Alle vragen met hun antwoord, in volgorde: de lead-modal toont dit in
   // de tab Vragen. Niet beantwoord (afgewezen vóór die vraag) = weggelaten.
   const antwoorden = VRAGEN.map(q => {
-    const v = q.soort === 'contact' ? antw.telefoon : antw[q.id]
+    if (q.soort === 'info') return null
+    const v = q.soort === 'gegevens' ? [antw.voornaam, antw.telefoon, antw.email].filter(Boolean) : antw[q.id]
     const tekst = Array.isArray(v) ? v.join(', ') : (v == null ? '' : String(v)).trim()
     return tekst ? { vraag: q.vraag, antwoord: tekst } : null
   }).filter(Boolean)
@@ -70,34 +69,35 @@ function bouwPayload(antw, uitkomst, afwijsreden, utm) {
     antwoorden,
     uitkomst, afwijsreden: afwijsreden || '',
     voornaam: antw.voornaam || '', email: antw.email || '', telefoon: antw.telefoon || '',
-    qual_goal: [antw.doel, antw.kilos ? `${antw.kilos} kg kwijt` : null].filter(Boolean).join(' · '),
+    qual_goal: antw.doel || '',
     qual_pain: [lijst(antw.vastlopen), antw.geprobeerd?.length ? `al geprobeerd: ${lijst(antw.geprobeerd)}` : null].filter(Boolean).join(' · '),
-    qual_urgency: [antw.waarom_nu, antw.belang ? `belang ${antw.belang}/10` : null].filter(Boolean).join(' · '),
-    qual_open: [antw.borg ? `borg: ${antw.borg}` : null, antw.trainen ? `trainen: ${antw.trainen}` : null].filter(Boolean).join(' · '),
+    qual_open: uitkomst === 'A' ? voorkeur : '',
     lead_goal: antw.doel || '', lead_struggle: lijst(antw.vastlopen),
-    waarom_nu: antw.waarom_nu || '',
     samenvatting: regels.join('\n'),
     ...utm,
   }
 }
 
 // ── Bouwstenen ──────────────────────────────────────────────────────────────
+// MY ARC-stijl: dik wit op zwart, geen goud (Kersten, 21 okt 2026).
 
-const knopGoud = (m, uit = false) => ({
+const WIT = '#fff'
+const ZWAK = 'rgba(255,255,255,0.55)'
+
+const knopWit = (m, uit = false) => ({
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
   minHeight: m ? 58 : 64, padding: m ? '0 1.4rem' : '0 2rem', width: '100%',
-  borderRadius: 14, border: 'none', background: GOLD, color: '#000',
-  fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase',
-  whiteSpace: 'nowrap', WebkitTextStroke: '0.5px #000',
-  cursor: uit ? 'default' : 'pointer', opacity: uit ? 0.45 : 1, fontFamily: 'inherit',
-  boxShadow: 'none',
-  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  borderRadius: 14, border: 'none', background: uit ? 'rgba(255,255,255,0.12)' : WIT, color: uit ? ZWAK : '#000',
+  fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.01em',
+  whiteSpace: 'nowrap', cursor: uit ? 'default' : 'pointer', fontFamily: 'inherit',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'background 0.15s',
 })
+const knopZacht = (m) => ({ ...knopWit(m), background: 'rgba(255,255,255,0.08)', color: WIT, border: '1px solid rgba(255,255,255,0.2)', textDecoration: 'none' })
 
 const invoer = (m) => ({
-  width: '100%', boxSizing: 'border-box', padding: m ? '0.95rem 1rem' : '1.05rem 1.15rem',
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12,
-  color: '#fff', fontSize: m ? '1.05rem' : '1.1rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none',
+  width: '100%', boxSizing: 'border-box', padding: m ? '1rem 1rem' : '1.1rem 1.15rem',
+  background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: 12,
+  color: WIT, fontSize: m ? '1.05rem' : '1.1rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none',
 })
 
 function Optie({ tekst, aan, onClick, m, meer }) {
@@ -106,17 +106,17 @@ function Optie({ tekst, aan, onClick, m, meer }) {
       onClick={onClick}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-        padding: m ? '0.9rem 1rem' : '1rem 1.2rem', borderRadius: 12, textAlign: 'left',
-        background: aan ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.04)',
-        border: `1.5px solid ${aan ? GOLD : 'rgba(255,255,255,0.15)'}`,
-        color: '#fff', fontSize: m ? '1rem' : '1.05rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+        minHeight: m ? 58 : 62, padding: m ? '0.85rem 1rem' : '0.95rem 1.2rem', borderRadius: 14, textAlign: 'left',
+        background: aan ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+        border: `1.5px solid ${aan ? WIT : 'rgba(255,255,255,0.15)'}`,
+        color: WIT, fontSize: m ? '1.02rem' : '1.08rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'border-color 0.15s, background 0.15s',
       }}
     >
       {tekst}
       <span style={{
-        width: 24, height: 24, flexShrink: 0, borderRadius: meer ? 6 : '50%',
-        border: `2px solid ${aan ? GOLD : 'rgba(255,255,255,0.3)'}`, background: aan ? GOLD : 'transparent',
+        width: 24, height: 24, flexShrink: 0, borderRadius: meer ? 7 : '50%',
+        border: `2px solid ${aan ? WIT : 'rgba(255,255,255,0.3)'}`, background: aan ? WIT : 'transparent',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {aan && <Check size={15} strokeWidth={3.5} color="#000" />}
@@ -126,39 +126,46 @@ function Optie({ tekst, aan, onClick, m, meer }) {
 }
 
 // ── Het formulier ───────────────────────────────────────────────────────────
+// Eén vraag per scherm, midden in beeld, zoals slaap loggen in de app. Geen
+// startscherm meer: wie op de knop drukt zit meteen in vraag 1. Eén keuze =
+// meteen door; bij meerkeuze en bij de gegevens een knop.
 
 export function PrequalFlow({ m = false, compact = false }) {
-  const [stap, setStap] = useState(-1)           // -1 = welkom, 0..n = vraag, 'klaar'
+  const [stap, setStap] = useState(0)            // index in `pad`, of 'klaar'
   const [antw, setAntw] = useState({})
   const [einde, setEinde] = useState(null)       // { uitkomst, reden, leadId }
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState('')
   const utm = useRef({ ...utmUitUrl(), ...herkomst() })
   const bovenRef = useRef(null)
+  const doorTimer = useRef(null)
 
-  useEffect(() => { bovenRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }) }, [stap])
+  // De schermen die voor deze persoon gelden (kanaal alleen bij contact).
+  const pad = VRAGEN.filter(q => !q.alleen || q.alleen(antw))
+  const vraag = typeof stap === 'number' ? pad[stap] : null
+
+  useEffect(() => { meet('form_start') }, [])
+  useEffect(() => () => clearTimeout(doorTimer.current), [])
+  useEffect(() => { bovenRef.current?.scrollIntoView?.({ block: 'start' }) }, [stap])
   // Elke vraag die in beeld komt: "gezien". Met "beantwoord" (form_stap)
   // erbij ziet het Ads-scherm per vraag hoeveel mensen afhaken.
   useEffect(() => {
-    if (typeof stap === 'number' && stap >= 0 && VRAGEN[stap]) meet('form_vraag', { meta: { stap: stap + 1, vraag: VRAGEN[stap].id } })
-  }, [stap])
-  const bewaarVoortgang = (laatste, extra = {}) => {
-    db.supabase.rpc('save_prequal_voortgang', {
-      p_sessie: sessieId(), p_voornaam: antw.voornaam || null, p_telefoon: antw.telefoon || null,
-      p_email: emailOk(antw.email) ? antw.email : null, p_laatste_vraag: laatste, p_utm: utm.current, ...extra,
-    }).then(r => r, () => null)
-  }
+    if (vraag) meet('form_vraag', { meta: { stap: stap + 1, vraag: vraag.id } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stap, vraag?.id])
 
-  const vraag = stap >= 0 && stap < VRAGEN.length ? VRAGEN[stap] : null
   const zet = (id, v) => setAntw(a => ({ ...a, [id]: v }))
+  const telefoon = vraagtTelefoon(antw)
 
-  const ingevuld = (q) => {
-    const v = antw[q.id]
-    if (q.soort === 'tekst' || q.soort === 'lang') return String(v || '').trim().length > 0
-    if (q.soort === 'keuze' || q.soort === 'schaal') return v != null && v !== ''
+  const ingevuld = (q, a = antw) => {
+    const v = a[q.id]
+    if (q.soort === 'keuze') return v != null && v !== ''
     if (q.soort === 'meerkeuze') return Array.isArray(v) && v.length > 0
-    if (q.soort === 'email') return emailOk(antw.email)
-    if (q.soort === 'contact') return telOk(antw.telefoon) && antw.akkoord === true
+    if (q.soort === 'info') return true
+    if (q.soort === 'gegevens') {
+      if (!String(a.voornaam || '').trim()) return false
+      return vraagtTelefoon(a) ? telOk(a.telefoon) : emailOk(a.email)
+    }
     return false
   }
 
@@ -166,13 +173,15 @@ export function PrequalFlow({ m = false, compact = false }) {
     setBezig(true); setFout('')
     try {
       const payload = { ...bouwPayload(antw, uitkomst, reden, utm.current), ...metaCookies() }
+      // De database wil een voornaam; wie vóór de gegevens wordt afgewezen
+      // heeft die nog niet gegeven.
+      if (!payload.voornaam) payload.voornaam = 'Onbekend'
       const { data, error } = await db.supabase.rpc('submit_challenge_prequal', { p: payload })
       if (error) throw error
       setEinde({ uitkomst, reden, leadId: data })
       if (emailOk(antw.email)) db.supabase.rpc('save_prequal_email', { p_email: antw.email, p_lead_id: data, p_uitkomst: uitkomst }).then(r => r, () => null)
       setStap('klaar')
-      if (antw.telefoon) bewaarVoortgang(vraag?.id || null, { p_lead_id: data })
-      meet('form_klaar', { meta: { uitkomst, reden: reden || null, vraag: vraag?.id || null }, lead_id: data })
+      meet('form_klaar', { meta: { uitkomst, reden: reden || null, vraag: vraag?.id || null, route: antw.route || null, kanaal: antw.kanaal || null }, lead_id: data })
       // Zelfde event_id als de server (Conversions API): Meta telt hem één keer.
       if (uitkomst === 'A') pixel('Lead', { content_name: '6 weken challenge prequal' }, `lead_${data}`)
     } catch (e) {
@@ -181,60 +190,44 @@ export function PrequalFlow({ m = false, compact = false }) {
     } finally { setBezig(false) }
   }
 
-  const verder = () => {
-    if (!vraag || !ingevuld(vraag)) return
-    if (vraag.id === 'email') {
-      // Niet wachten: het formulier gaat door, ook als dit even niet lukt.
-      db.supabase.rpc('save_prequal_email', { p_email: antw.email, p_voornaam: antw.voornaam || null, p_utm: utm.current })
-        .then(r => r, () => null)
-    }
-    // Vanaf het telefoonnummer: na elke vraag de voortgang bewaren, zodat
-    // wie afhaakt met nummer en laatste vraag in het Ads-scherm staat.
-    if (antw.telefoon && telOk(antw.telefoon) && antw.akkoord === true) bewaarVoortgang(vraag.id)
-    const uitkomst = vraag.afwijzen?.(antw[vraag.id])
-    if (uitkomst) {
-      return verstuur(uitkomst, vraag.afwijsTekst || `${vraag.vraag} → ${antw[vraag.id]}`)
-    }
+  const verder = (a = antw) => {
+    if (!vraag || !ingevuld(vraag, a) || bezig) return
+    const uitkomst = vraag.afwijzen?.(a[vraag.id])
+    if (uitkomst) return verstuur(uitkomst, vraag.afwijsTekst || `${vraag.vraag} → ${a[vraag.id]}`)
     meet('form_stap', { meta: { stap: stap + 1, vraag: vraag.id } })
-    if (stap === VRAGEN.length - 1) return verstuur('A', null)
+    if (vraag.soort === 'gegevens') return verstuur('A', null)
     setStap(stap + 1)
   }
-  const terug = () => setStap(stap <= 0 ? -1 : stap - 1)
+  // Eén keuze: even laten zien dat hij aanstaat, dan door.
+  const kies = (o) => {
+    const nieuw = { ...antw, [vraag.id]: o }
+    setAntw(nieuw)
+    clearTimeout(doorTimer.current)
+    doorTimer.current = setTimeout(() => verder(nieuw), 220)
+  }
+  const terug = () => { clearTimeout(doorTimer.current); if (typeof stap === 'number' && stap > 0) setStap(stap - 1) }
 
   const kop = (tekst) => (
-    <h2 style={{ margin: 0, fontSize: m ? '1.35rem' : '1.7rem', fontWeight: 900, lineHeight: 1.15, letterSpacing: '-0.02em', color: '#fff', textTransform: 'uppercase' }}>{tekst}</h2>
+    <h2 style={{ margin: 0, fontSize: m ? '1.6rem' : '2rem', fontWeight: 900, lineHeight: 1.12, letterSpacing: '-0.03em', color: WIT, textAlign: 'center' }}>{tekst}</h2>
   )
   const sub = (tekst) => (
-    <p style={{ margin: '0.6rem 0 0', fontSize: m ? '0.95rem' : '1.02rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>{tekst}</p>
+    <p style={{ margin: '0.7rem 0 0', fontSize: m ? '0.98rem' : '1.05rem', fontWeight: 700, color: ZWAK, lineHeight: 1.5, textAlign: 'center' }}>{tekst}</p>
   )
 
+  // Midden in beeld: in het blad de volle hoogte ervan, los de hele pagina.
   const buitenkant = {
-    maxWidth: 640, margin: '0 auto', width: '100%',
-    padding: compact ? (m ? '1.2rem 1.1rem 2rem' : '1.6rem 1.6rem 2.4rem') : (m ? '1.5rem 1.25rem 4rem' : '3rem 2rem 5rem'),
-    color: '#fff', fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    maxWidth: 560, margin: '0 auto', width: '100%', boxSizing: 'border-box',
+    ...(compact ? { flex: '1 0 auto' } : { minHeight: 'calc(100dvh - 60px)' }),
+    display: 'flex', flexDirection: 'column',
+    padding: m ? '1rem 1.25rem 2rem' : '1.5rem 2rem 3rem',
+    color: WIT, fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   }
-
-  // ── Welkom ──
-  if (stap === -1) {
-    return (
-      <div style={buitenkant}>
-        <div ref={bovenRef} />
-        <div style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.15em', color: GOLD, textTransform: 'uppercase', marginBottom: '0.8rem' }}>Gratis 6 Weken Challenge</div>
-        {kop('Past de 6 Weken Challenge bij jou?')}
-        {sub(`Beantwoord ${VRAGEN.length} korte vragen (2 minuten). Past het, dan plan je direct je kennismaking met mij in.`)}
-        <button onClick={() => { setStap(0); meet('form_start') }} style={{ ...knopGoud(m), marginTop: '1.6rem' }}>
-          Start de vragen <ArrowRight size={22} strokeWidth={2.6} />
-        </button>
-      </div>
-    )
-  }
-
+  const midden = { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: m ? '2rem' : '3rem' }
 
   // De gratis waarde: video ingesloten, met een knop naar YouTube eronder.
   const gratisVideo = (
     <>
-      <div style={{ marginTop: '1.4rem', fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.15em', color: GOLD, textTransform: 'uppercase' }}>Gratis voor jou</div>
-      <div style={{ marginTop: '0.4rem', fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, color: '#fff', lineHeight: 1.2 }}>Zo verlies je 10 kg in 16 weken</div>
+      <div style={{ marginTop: '1.6rem', fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, color: WIT, lineHeight: 1.2, textAlign: 'center' }}>Zo verlies je 10 kg in 16 weken</div>
       <div style={{ marginTop: '0.8rem', position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#000' }}>
         <iframe
           src={appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${GRATIS_VIDEO_ID}?rel=0&playsinline=1`)}
@@ -244,17 +237,18 @@ export function PrequalFlow({ m = false, compact = false }) {
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
         />
       </div>
-      <a href={GRATIS_VIDEO_URL} target="_blank" rel="noopener noreferrer" onClick={() => meet('gratis_video', { meta: { uitkomst: einde?.uitkomst || null } })} style={{ ...knopGoud(m), marginTop: '1rem', textDecoration: 'none' }}>
+      <a href={GRATIS_VIDEO_URL} target="_blank" rel="noopener noreferrer" onClick={() => meet('gratis_video', { meta: { uitkomst: einde?.uitkomst || null } })} style={{ ...knopWit(m), marginTop: '1rem', textDecoration: 'none' }}>
         <Play size={22} strokeWidth={2.6} /> Bekijk op YouTube
       </a>
+      <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopZacht(m), marginTop: '0.7rem' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
     </>
   )
 
   // ── Eindschermen ──
   if (stap === 'klaar' && einde) {
     const naam = antw.voornaam || ''
-    if (einde.uitkomst === 'A') {
-      const url = `${CALENDLY}?embed_domain=${encodeURIComponent(window.location.hostname)}&embed_type=Inline&hide_gdpr_banner=1&hide_event_type_details=1&background_color=0a0a0a&text_color=ffffff&primary_color=ffd700`
+    if (einde.uitkomst === 'A' && antw.route === ROUTE_ZELF) {
+      const url = `${CALENDLY}?embed_domain=${encodeURIComponent(window.location.hostname)}&embed_type=Inline&hide_gdpr_banner=1&hide_event_type_details=1&background_color=0a0a0a&text_color=ffffff&primary_color=ffffff`
         + `&name=${encodeURIComponent(naam)}&email=${encodeURIComponent(antw.email || '')}`
         + `&utm_content=${encodeURIComponent(`lead_${einde.leadId}`)}`
         + (utm.current.utm_source ? `&utm_source=${encodeURIComponent(utm.current.utm_source)}` : '')
@@ -262,33 +256,37 @@ export function PrequalFlow({ m = false, compact = false }) {
       return (
         <div style={{ ...buitenkant, maxWidth: 1000, paddingBottom: 0 }}>
           <div ref={bovenRef} />
-          {kop(`Top ${naam}, dit past goed.`)}
-          {sub('Kies hieronder een moment voor je kennismaking. Je naam en e-mail staan al ingevuld.')}
+          {kop(`Top ${naam}, kies een moment.`)}
+          {sub('Je naam en e-mail staan al ingevuld.')}
           <div style={{ marginTop: '1.2rem', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0a0a0a', height: m ? 'min(78vh, 820px)' : 760 }}>
             <iframe src={url} title="Kennismaking plannen" style={{ width: '100%', height: '100%', border: 0, background: '#0a0a0a' }} />
           </div>
         </div>
       )
     }
-    if (einde.uitkomst === 'B') {
+    if (einde.uitkomst === 'A') {
+      const via = antw.kanaal === 'Bellen' ? 'bel ik je' : antw.kanaal === 'E-mail' ? 'mail ik je' : 'app ik je'
       return (
         <div style={buitenkant}>
           <div ref={bovenRef} />
-          {kop(`Dank je${naam ? `, ${naam}` : ''}!`)}
-          {sub(einde.reden?.startsWith('Voor de challenge') ? einde.reden : 'Nu lijkt het nog niet het juiste moment voor de challenge.')}
-          {sub('Hier is een video waarin ik precies uitleg hoe je 10 kg verliest in 16 weken. Zo kun je alvast zelf starten.')}
-          {gratisVideo}
-          <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopGoud(m), marginTop: '0.7rem', background: 'rgba(255,255,255,0.08)', color: '#fff', textDecoration: 'none', boxShadow: 'none', border: '1px solid rgba(255,255,255,0.2)' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
+          <div style={midden}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: WIT, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.2rem' }}>
+              <Check size={34} strokeWidth={3.2} color="#000" />
+            </div>
+            {kop(`Top ${naam}, je staat erop.`)}
+            {sub(`Binnen 24 uur ${via} om de challenge door te nemen.`)}
+          </div>
         </div>
       )
     }
     return (
       <div style={buitenkant}>
         <div ref={bovenRef} />
-        {kop('Dank je voor het invullen.')}
-        {sub('De challenge past op dit moment niet bij je situatie. Wel heb ik deze video voor je, waarin ik uitleg hoe je 10 kg verliest in 16 weken.')}
-        {gratisVideo}
-        <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" style={{ ...knopGoud(m), marginTop: '0.7rem', background: 'rgba(255,255,255,0.08)', color: '#fff', textDecoration: 'none', boxShadow: 'none', border: '1px solid rgba(255,255,255,0.2)' }}><Instagram size={22} strokeWidth={2.4} /> Volg op Instagram</a>
+        <div style={midden}>
+          {kop('Dank je voor het invullen.')}
+          {sub('De challenge is vanaf 18 jaar. Wel heb ik deze video voor je, waarin ik uitleg hoe je 10 kg verliest in 16 weken.')}
+          {gratisVideo}
+        </div>
       </div>
     )
   }
@@ -297,94 +295,91 @@ export function PrequalFlow({ m = false, compact = false }) {
 
   // ── Vraag ──
   const klaar = ingevuld(vraag)
+  const totaal = pad.length
   const nummer = stap + 1
+  const meteenDoor = vraag.soort === 'keuze'
+
   return (
     <div style={buitenkant}>
       <div ref={bovenRef} />
-      {/* Voortgang */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.2rem' }}>
-        <button onClick={terug} aria-label="Terug" style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-          <ArrowLeft size={18} strokeWidth={2.6} />
+      {/* Voortgang: terug, balk, en hoeveel er nog komt. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={terug} aria-label="Terug" disabled={stap === 0} style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: WIT, cursor: stap === 0 ? 'default' : 'pointer', opacity: stap === 0 ? 0 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          <ArrowLeft size={18} strokeWidth={2.8} />
         </button>
-        <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
-          <div style={{ width: `${(nummer / VRAGEN.length) * 100}%`, height: '100%', background: GOUD_KNOP, transition: 'width 0.3s ease' }} />
+        <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
+          <div style={{ width: `${(nummer / totaal) * 100}%`, height: '100%', background: WIT, borderRadius: 3, transition: 'width 0.35s ease' }} />
         </div>
-        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{nummer}/{VRAGEN.length}</span>
+        <span style={{ fontSize: '0.8rem', fontWeight: 900, color: WIT, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{nummer}/{totaal}</span>
       </div>
 
-      {kop(vraag.vraag)}
-      {vraag.hint && sub(vraag.hint)}
-
-      <div style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-        {vraag.soort === 'tekst' && (
-          <input
-            autoFocus value={antw[vraag.id] || ''} placeholder={vraag.placeholder}
-            onChange={e => zet(vraag.id, e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') verder() }}
-            style={invoer(m)}
-          />
-        )}
-        {vraag.soort === 'lang' && (
-          <textarea
-            autoFocus value={antw[vraag.id] || ''} placeholder={vraag.placeholder} rows={4}
-            onChange={e => zet(vraag.id, e.target.value)}
-            style={{ ...invoer(m), resize: 'vertical', lineHeight: 1.45 }}
-          />
-        )}
-        {vraag.soort === 'keuze' && vraag.opties.map(o => (
-          <Optie key={o} tekst={o} aan={antw[vraag.id] === o} m={m} onClick={() => zet(vraag.id, o)} />
-        ))}
-        {vraag.soort === 'meerkeuze' && vraag.opties.map(o => {
-          const huidig = Array.isArray(antw[vraag.id]) ? antw[vraag.id] : []
-          const aan = huidig.includes(o)
-          return <Optie key={o} tekst={o} aan={aan} meer m={m} onClick={() => zet(vraag.id, aan ? huidig.filter(x => x !== o) : [...huidig, o])} />
-        })}
-        {vraag.soort === 'schaal' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
-            {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
-              const aan = Number(antw[vraag.id]) === n
-              return (
-                <button key={n} onClick={() => zet(vraag.id, n)} style={{
-                  minHeight: m ? 52 : 58, borderRadius: 12, fontSize: '1.15rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
-                  background: aan ? GOUD_KNOP : 'rgba(255,255,255,0.04)', color: aan ? '#000' : '#fff',
-                  border: `1.5px solid ${aan ? GOLD : 'rgba(255,255,255,0.15)'}`,
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>{n}</button>
-              )
-            })}
-          </div>
-        )}
-        {vraag.soort === 'email' && (
+      <div key={vraag.id} style={{ ...midden, animation: 'prequalIn 0.25s ease' }}>
+        {vraag.soort === 'info' ? (
           <>
-            <input
-              type="email" inputMode="email" autoComplete="email" autoFocus
-              value={antw.email || ''} placeholder={vraag.placeholder}
-              onChange={e => zet('email', e.target.value.trim())}
-              onKeyDown={e => { if (e.key === 'Enter') verder() }}
-              style={invoer(m)}
-            />
-            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
-              Geen spam. Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>privacyverklaring</a>.
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: WIT, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.2rem' }}>
+              <Check size={34} strokeWidth={3.2} color="#000" />
             </div>
+            {kop(vraag.vraag)}
+            {sub('Op basis van je antwoorden past de 6 Weken Challenge bij jou. Nog twee korte stappen.')}
           </>
-        )}
-        {vraag.soort === 'contact' && (
+        ) : (
           <>
-            <input type="tel" inputMode="tel" autoComplete="tel" autoFocus value={antw.telefoon || ''} placeholder="Telefoonnummer (WhatsApp)" onChange={e => zet('telefoon', e.target.value)} style={invoer(m)} />
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: '0.4rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45 }}>
-              <input type="checkbox" checked={antw.akkoord === true} onChange={e => zet('akkoord', e.target.checked)} style={{ width: 20, height: 20, marginTop: 2, accentColor: GOLD, flexShrink: 0 }} />
-              <span>Ik ga akkoord dat Kersten contact met me opneemt. Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>privacyverklaring</a>.</span>
-            </label>
+            {kop(vraag.vraag)}
+            {vraag.hint && sub(vraag.hint)}
           </>
         )}
+
+        <div style={{ marginTop: '1.6rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {vraag.soort === 'keuze' && vraag.opties.map(o => (
+            <Optie key={o} tekst={o} aan={antw[vraag.id] === o} m={m} onClick={() => kies(o)} />
+          ))}
+          {vraag.soort === 'meerkeuze' && vraag.opties.map(o => {
+            const huidig = Array.isArray(antw[vraag.id]) ? antw[vraag.id] : []
+            const aan = huidig.includes(o)
+            return <Optie key={o} tekst={o} aan={aan} meer m={m} onClick={() => zet(vraag.id, aan ? huidig.filter(x => x !== o) : [...huidig, o])} />
+          })}
+          {vraag.soort === 'gegevens' && (
+            <>
+              <input
+                autoFocus autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam"
+                onChange={e => zet('voornaam', e.target.value)} style={invoer(m)}
+              />
+              {telefoon ? (
+                <input
+                  type="tel" inputMode="tel" autoComplete="tel" value={antw.telefoon || ''}
+                  placeholder={antw.kanaal === 'WhatsApp' ? 'Telefoonnummer (WhatsApp)' : 'Telefoonnummer'}
+                  onChange={e => zet('telefoon', e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') verder() }} style={invoer(m)}
+                />
+              ) : (
+                <input
+                  type="email" inputMode="email" autoComplete="email" value={antw.email || ''} placeholder="jouw@email.nl"
+                  onChange={e => zet('email', e.target.value.trim())}
+                  onKeyDown={e => { if (e.key === 'Enter') verder() }} style={invoer(m)}
+                />
+              )}
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, textAlign: 'center', marginTop: '0.2rem' }}>
+                {antw.route === ROUTE_CONTACT ? 'Door te versturen ga je akkoord dat Kersten contact met je opneemt. ' : 'Geen spam. '}
+                Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: WIT }}>privacyverklaring</a>.
+              </div>
+            </>
+          )}
+        </div>
+
+        {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
+
+        {!meteenDoor && (
+          <button onClick={() => verder()} disabled={!klaar || bezig} style={{ ...knopWit(m, !klaar || bezig), marginTop: '1.4rem' }}>
+            {bezig ? 'Even geduld…'
+              : vraag.soort === 'info' ? 'Verder'
+              : vraag.soort === 'gegevens' ? (antw.route === ROUTE_ZELF ? 'Naar de agenda' : 'Versturen')
+              : 'Volgende'}
+            {!bezig && <ArrowRight size={22} strokeWidth={2.6} />}
+          </button>
+        )}
+        {meteenDoor && bezig && <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.85rem', fontWeight: 800, color: ZWAK }}>Even geduld…</div>}
       </div>
-
-      {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 700, color: '#ef4444' }}>{fout}</div>}
-
-      <button onClick={verder} disabled={!klaar || bezig} style={{ ...knopGoud(m, !klaar || bezig), marginTop: '1.4rem' }}>
-        {bezig ? 'Even geduld…' : stap === VRAGEN.length - 1 ? 'Versturen' : 'Volgende'}
-        {!bezig && <ArrowRight size={22} strokeWidth={2.6} />}
-      </button>
+      <style>{'@keyframes prequalIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }'}</style>
     </div>
   )
 }
