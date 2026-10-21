@@ -6,7 +6,7 @@
 // formulier: de kennismaking is de enige actie.
 //
 // Zelfde huisstijl als /6weekchallenge: puur zwart, DM Sans, witte koppen,
-// kleine gouden labels, witte knoppen. Deze pagina scrolt gewoon door (geen
+// kleine grijze labels, witte knoppen. Deze pagina scrolt gewoon door (geen
 // snap-scroll), want het is leestekst en geen presentatie.
 
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
@@ -19,17 +19,17 @@ import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 import { PrequalFlow } from './ChallengePrequalPage'
 import { meet, pixel, volgTijdOpPagina } from './challengeTracking'
 
-const GOLD = '#FFD700'
 const TP_GREEN = '#00B67A'
 const BG = '#000000'
 
 // Drie vlakken wisselen elkaar af, zoals op de acquisition.com-pagina: zwart,
-// wit en een lichte goudtint. Elke Sectie zet zijn thema; Kop, Tekst en Label
+// wit en lichtgrijs. Elke Sectie zet zijn thema; Kop, Tekst en Label
 // lezen het mee zodat de kleuren per vlak kloppen.
 const THEMAS = {
-  zwart: { bg: BG,        tekst: '#fff', tekst85: 'rgba(255,255,255,0.85)', dim: 'rgba(255,255,255,0.55)', rand: 'rgba(255,255,255,0.1)',  randZacht: 'rgba(255,255,255,0.08)', kaart: 'rgba(255,255,255,0.03)', label: GOLD,      icoon: '#fff' },
-  wit:   { bg: '#ffffff', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.12)',       randZacht: 'rgba(0,0,0,0.1)',        kaart: 'rgba(0,0,0,0.03)',       label: '#a86f00', icoon: '#000' },
-  goud:  { bg: '#f6edd2', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.12)',       randZacht: 'rgba(0,0,0,0.1)',        kaart: 'rgba(255,255,255,0.65)', label: '#a86f00', icoon: '#000' },
+  zwart: { bg: BG,        tekst: '#fff', tekst85: 'rgba(255,255,255,0.85)', dim: 'rgba(255,255,255,0.55)', rand: 'rgba(255,255,255,0.1)',  randZacht: 'rgba(255,255,255,0.08)', kaart: 'rgba(255,255,255,0.03)', label: 'rgba(255,255,255,0.55)', icoon: '#fff' },
+  wit:   { bg: '#ffffff', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.12)',       randZacht: 'rgba(0,0,0,0.1)',        kaart: 'rgba(0,0,0,0.03)',       label: 'rgba(0,0,0,0.5)', icoon: '#000' },
+  // 'goud' heet nog zo, maar is sinds 21 okt 2026 lichtgrijs: geen geel meer op de pagina.
+  goud:  { bg: '#f2f2f2', tekst: '#000', tekst85: '#1a1a1a',                dim: 'rgba(0,0,0,0.6)',        rand: 'rgba(0,0,0,0.1)',        randZacht: 'rgba(0,0,0,0.1)',        kaart: '#ffffff',                label: 'rgba(0,0,0,0.5)', icoon: '#000' },
 }
 const ThemaCtx = createContext(THEMAS.zwart)
 // Elke knop opent het kalenderblad; de functie komt via context zodat de
@@ -39,7 +39,6 @@ const useThema = () => useContext(ThemaCtx)
 // De hero is net iets lichter dan de vaste balk erboven, zodat je de twee
 // vlakken van elkaar ziet.
 const HERO_BG = '#161616'
-const GOUD_KNOP = 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
 
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const VIDEO_ID = '41Hfc2YVBAA'
