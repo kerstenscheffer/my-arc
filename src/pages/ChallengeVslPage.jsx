@@ -486,10 +486,9 @@ function KalenderBlad({ open, onClose, m }) {
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', animation: 'bladWaas 0.2s ease',
-        // De modal hangt bovenaan en is zo hoog als zijn inhoud: geen lege
-        // zwarte ruimte onder de vraag. Boven vast, zodat de foto's niet
-        // verspringen als een volgende vraag korter of langer is.
-        display: 'flex', justifyContent: 'center', alignItems: 'flex-start', boxSizing: 'border-box',
+        // De modal staat midden op de pagina en is zo hoog als zijn inhoud:
+        // geen lege zwarte ruimte onder de vraag.
+        display: 'flex', justifyContent: 'center', alignItems: 'center', boxSizing: 'border-box',
         padding: m ? 'calc(env(safe-area-inset-top, 0px) + 2.2rem) 0.75rem calc(env(safe-area-inset-bottom, 0px) + 2.2rem)' : '5vh 1rem',
       }}
     >
