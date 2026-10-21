@@ -680,7 +680,7 @@ export default function ChallengeVslPage() {
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
           <Kop m={m} center groot>In shape komen naast je drukke en sociale leven?</Kop>
           <Tekst m={m} center style={{ marginTop: m ? '1.2rem' : '1.6rem', fontSize: m ? '1.3rem' : '1.55rem', fontWeight: 800, lineHeight: 1.35, color: '#fff' }}>
-            Kijk de video waarin ik uitleg hoe ik je hier 6 weken gratis bij help.
+            Kijk de video waar ik uitleg hoe de 6 weken challenge je hierbij helpt.
           </Tekst>
         </div>
       </section>
