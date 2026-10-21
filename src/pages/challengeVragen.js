@@ -15,6 +15,12 @@
 export const ROUTE_ZELF = 'Zelf een moment inplannen'
 export const ROUTE_CONTACT = 'Neem contact met mij op'
 
+const LASTIG_AFVALLEN = ["'s Avonds snaaien", 'Weekenden en sociale momenten', 'Ik weet niet wat en hoeveel ik moet eten', 'Ik train, maar zie geen resultaat', 'Ik hou het een paar weken vol en dan stopt het', 'Te weinig tijd']
+const LASTIG_SPIEREN = ['Ik train, maar groei nauwelijks', 'Genoeg eten zonder vet aan te komen', 'Genoeg eiwit binnenkrijgen', 'Ik weet niet welk schema bij mij past', 'Ik hou het een paar weken vol en dan stopt het', 'Te weinig tijd']
+
+// Opties van een vraag; sommige hangen af van een eerder antwoord.
+export const optiesVan = (q, antw) => (typeof q.opties === 'function' ? q.opties(antw) : q.opties)
+
 export const VRAGEN = [
   {
     id: 'doel', soort: 'keuze', vraag: 'Wat wil je de komende 6 weken bereiken?',
@@ -22,7 +28,9 @@ export const VRAGEN = [
   },
   {
     id: 'vastlopen', soort: 'meerkeuze', vraag: 'Wat vind je nu lastig?', hint: 'Kies alles wat past',
-    opties: ["'s Avonds snaaien", 'Weekenden en sociale momenten', 'Ik weet niet wat en hoeveel ik moet eten', 'Ik train, maar zie geen resultaat', 'Ik hou het een paar weken vol en dan stopt het', 'Te weinig tijd'],
+    // Wie spieren wil opbouwen loopt op andere dingen vast dan wie vet wil
+    // verliezen: eigen tak (21 okt 2026).
+    opties: (antw) => (antw.doel === 'Spieren opbouwen' ? LASTIG_SPIEREN : LASTIG_AFVALLEN),
   },
   {
     id: 'geprobeerd', soort: 'meerkeuze', vraag: 'Wat heb je al geprobeerd?', hint: 'Kies alles wat past',

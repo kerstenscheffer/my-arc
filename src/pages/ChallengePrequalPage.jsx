@@ -20,7 +20,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, ArrowRight, Check, Instagram, Play } from 'lucide-react'
 import db from '../services/DatabaseService'
 import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies } from './challengeTracking'
-import { VRAGEN, ROUTE_ZELF, ROUTE_CONTACT, vraagtTelefoon } from './challengeVragen'
+import { VRAGEN, ROUTE_ZELF, ROUTE_CONTACT, vraagtTelefoon, optiesVan } from './challengeVragen'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
@@ -201,6 +201,8 @@ export function PrequalFlow({ m = false, compact = false }) {
   // Eén keuze: even laten zien dat hij aanstaat, dan door.
   const kies = (o) => {
     const nieuw = { ...antw, [vraag.id]: o }
+    // Ander doel = andere lijst bij 'Wat vind je nu lastig?': oude vinkjes weg.
+    if (vraag.id === 'doel' && antw.doel !== o) delete nieuw.vastlopen
     setAntw(nieuw)
     clearTimeout(doorTimer.current)
     doorTimer.current = setTimeout(() => verder(nieuw), 220)
@@ -330,10 +332,10 @@ export function PrequalFlow({ m = false, compact = false }) {
         )}
 
         <div style={{ marginTop: '1.6rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          {vraag.soort === 'keuze' && vraag.opties.map(o => (
+          {vraag.soort === 'keuze' && optiesVan(vraag, antw).map(o => (
             <Optie key={o} tekst={o} aan={antw[vraag.id] === o} m={m} onClick={() => kies(o)} />
           ))}
-          {vraag.soort === 'meerkeuze' && vraag.opties.map(o => {
+          {vraag.soort === 'meerkeuze' && optiesVan(vraag, antw).map(o => {
             const huidig = Array.isArray(antw[vraag.id]) ? antw[vraag.id] : []
             const aan = huidig.includes(o)
             return <Optie key={o} tekst={o} aan={aan} meer m={m} onClick={() => zet(vraag.id, aan ? huidig.filter(x => x !== o) : [...huidig, o])} />
