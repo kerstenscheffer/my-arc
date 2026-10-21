@@ -530,10 +530,10 @@ function KalenderBlad({ open, onClose, m }) {
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
           {/* Bovenin het blad de transformaties van Kersten en Nitish: zo zie
               je tijdens de vragen waar je het voor doet (21 okt 2026).
-              Bijgesneden op het bovenlijf, zodat de vragen eronder passen. */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: m ? 8 : 12, width: '100%', maxWidth: 560, margin: '0 auto', boxSizing: 'border-box', padding: m ? '0.5rem 1.25rem 0' : '0.8rem 2rem 0', flexShrink: 0 }}>
+              Volle breedte, tegen elkaar aan; bijgesneden op het bovenlijf. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, width: '100%', flexShrink: 0 }}>
             {TRANSFORMATIES.map(t => (
-              <div key={t.src} style={{ position: 'relative', height: m ? 150 : 210, borderRadius: 14, overflow: 'hidden', background: '#141414' }}>
+              <div key={t.src} style={{ position: 'relative', height: m ? 170 : 240, overflow: 'hidden', background: '#141414' }}>
                 <img src={t.src} alt={t.caption} draggable={false}
                   onError={(e) => { e.currentTarget.style.opacity = 0 }}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 42%', display: 'block' }} />
