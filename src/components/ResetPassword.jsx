@@ -30,6 +30,23 @@ export default function ResetPassword() {
       setCheckingToken(false)
       return
     }
+    // Nieuwe mailtemplate: de link wijst naar ons eigen domein met
+    // ?token_hash=…&type=recovery en de pagina wisselt die hier zelf in.
+    // Een link naar *.supabase.co in een 'reset je wachtwoord'-mail lijkt op
+    // phishing; Gmail/Outlook namen zulke mails aan maar toonden ze nergens.
+    const query = new URLSearchParams(window.location.search)
+    const tokenHash = query.get('token_hash')
+    if (tokenHash) {
+      const { error } = await passwordReset.supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+      // Token uit de adresbalk, zodat verversen niet opnieuw probeert.
+      window.history.replaceState(null, '', window.location.pathname)
+      if (error) {
+        setMessage({ ok: false, text: 'Deze link is al gebruikt of verlopen. Vraag in de app een nieuwe resetmail aan en open alleen de nieuwste link.' })
+        setIsValidToken(false)
+        setCheckingToken(false)
+        return
+      }
+    }
     try {
       const result = await passwordReset.verifyResetToken()
       setIsValidToken(result.valid)
