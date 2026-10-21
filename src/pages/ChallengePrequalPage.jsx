@@ -312,13 +312,17 @@ export function PrequalFlow({ m = false, compact = false }) {
       <div ref={bovenRef} />
       <div style={midden}>
         {/* Voortgang direct boven de vraag, even breed als de antwoorden:
-            erboven terug en de teller, eronder één balk. Kleur loopt van
+            erboven de naam van de challenge (met terug ervoor) en de teller,
+            eronder één balk. Kleur loopt van
             licht naar vol groen naarmate je verder komt (21 okt 2026). */}
         <div style={{ marginBottom: m ? '1.4rem' : '1.8rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 28, marginBottom: 8 }}>
-            <button onClick={terug} aria-label="Vorige vraag" disabled={stap === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 0', background: 'none', border: 'none', color: ZWAK, fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', cursor: stap === 0 ? 'default' : 'pointer', visibility: stap === 0 ? 'hidden' : 'visible', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <ArrowLeft size={16} strokeWidth={2.8} /> Terug
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <button onClick={terug} aria-label="Vorige vraag" disabled={stap === 0} style={{ display: stap === 0 ? 'none' : 'inline-flex', alignItems: 'center', padding: '4px 4px 4px 0', background: 'none', border: 'none', color: WIT, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                <ArrowLeft size={17} strokeWidth={2.8} />
+              </button>
+              <span style={{ fontSize: '0.85rem', fontWeight: 900, color: WIT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Gratis 6 Weken Challenge</span>
+            </div>
             <span style={{ fontSize: '0.85rem', fontWeight: 900, color: voortgangKleur, fontVariantNumeric: 'tabular-nums', transition: 'color 0.35s ease' }}>
               Stap {nummer} van {totaal}
             </span>
