@@ -83,3 +83,15 @@ export function zetOpgewarmd(oefening) {
   try { localStorage.setItem(sleutel(oefening), '1') }
   catch { /* privémodus of geblokkeerde opslag: dan vraagt hij nog eens. */ }
 }
+
+const OPWARM_PROMPT_KEY = 'myarc:opwarm_prompt_aan'
+
+export function isOpwarmPromptAan() {
+  try { return localStorage.getItem(OPWARM_PROMPT_KEY) !== '0' }
+  catch { return true }
+}
+
+export function zetOpwarmPrompt(aan) {
+  try { localStorage.setItem(OPWARM_PROMPT_KEY, aan ? '1' : '0') }
+  catch {}
+}

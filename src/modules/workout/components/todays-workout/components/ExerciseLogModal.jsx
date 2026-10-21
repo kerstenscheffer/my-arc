@@ -15,12 +15,12 @@ import RustTimer from './RustTimer'
 import { rusttijdVoor, timerStaatAan, bewaarTimerAan } from '../rusttijd'
 import ExerciseService from '../../../../../services/ExerciseService'
 import OpwarmPoort from './OpwarmPoort'
-import { isOpgewarmd, zetOpgewarmd } from '../opwarmen'
+import { isOpgewarmd, zetOpgewarmd, isOpwarmPromptAan } from '../opwarmen'
 import VideoPlayerModal from '../../../../videos/VideoPlayerModal'
 import { appSafeEmbedUrl } from '../../../../videos/utils/youtubeHelpers'
 
 // ========== SCROLL NUMBER PICKER ==========
-function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'kg', onConfirm, halfStep = null }) {
+function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'kg', onConfirm, halfStep = null, smallStep = null }) {
   const isMobile = window.innerWidth <= 768
   const scrollRef = useRef(null)
   const [localValue, setLocalValue] = useState(value)
@@ -69,6 +69,8 @@ function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'k
         <AdjustBtn label={`-${step * 5}`} onClick={() => handleSelect(localValue - step * 5)} isMobile={isMobile} />
         <AdjustBtn label={`-${step}`} onClick={() => handleSelect(localValue - step)} isMobile={isMobile} />
         {halfStep && <AdjustBtn label={`-${halfStep}`} onClick={() => handleSelect(localValue - halfStep)} isMobile={isMobile} />}
+        {smallStep && <AdjustBtn label={`-${smallStep}`} onClick={() => handleSelect(Math.round((localValue - smallStep) * 10) / 10)} isMobile={isMobile} />}
+        {smallStep && <AdjustBtn label={`+${smallStep}`} onClick={() => handleSelect(Math.round((localValue + smallStep) * 10) / 10)} isMobile={isMobile} />}
         {halfStep && <AdjustBtn label={`+${halfStep}`} onClick={() => handleSelect(localValue + halfStep)} isMobile={isMobile} />}
         <AdjustBtn label={`+${step}`} onClick={() => handleSelect(localValue + step)} isMobile={isMobile} />
         <AdjustBtn label={`+${step * 5}`} onClick={() => handleSelect(localValue + step * 5)} isMobile={isMobile} />
@@ -183,7 +185,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
           {stepTitles[step]}
         </h3>
 
-        {step === 1 && <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 660 : 300} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} />}
+        {step === 1 && <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 660 : 300} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} smallStep={eenheid === 'lb' ? null : 0.1} />}
         {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => (editMode || snel) ? handleFinishWithoutDrop() : setStep(3)} />}
 
         {step === 3 && !editMode && (
@@ -386,7 +388,7 @@ function DropsetInput({ onSave, onCancel, isMobile, eenheid = 'kg' }) {
         <button onClick={onCancel} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: isMobile ? '0.65rem' : '0.7rem', cursor: 'pointer', touchAction: 'manipulation' }}>Annuleren</button>
       </div>
       {step === 1
-        ? <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 440 : 200} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} />
+        ? <NumberPicker value={weight} onChange={setWeight} min={0} max={eenheid === 'lb' ? 440 : 200} step={eenheid === 'lb' ? 5 : 1} unit={EH} onConfirm={() => setStep(2)} halfStep={eenheid === 'lb' ? 2.5 : 0.5} smallStep={eenheid === 'lb' ? null : 0.1} />
         : <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => onSave({ weight: naarKg(weight, eenheid), reps })} />}
     </div>
   )
@@ -716,7 +718,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // anders is de ene ingang wel beveiligd en de andere niet.
   const startSet = () => {
     setEditingIndex(null)
-    if (loggedSets.length === 0 && !isOpgewarmd(exercise.name)) {
+    if (loggedSets.length === 0 && isOpwarmPromptAan() && !isOpgewarmd(exercise.name)) {
       setPoortOpen(true)
       return
     }

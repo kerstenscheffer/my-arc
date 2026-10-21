@@ -23,7 +23,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Flame, Check, Play, ArrowRight } from 'lucide-react'
-import { opwarmSets } from '../opwarmen'
+import { opwarmSets, zetOpwarmPrompt } from '../opwarmen'
 import { getThumbnailFromUrl } from '../../../../videos/utils/youtubeHelpers'
 
 const LIJN = 'rgba(255,255,255,0.1)'
@@ -158,6 +158,18 @@ export default function OpwarmPoort({
             <ArrowRight size={15} strokeWidth={3} />
           </button>
         </div>
+        <button
+          onClick={() => { zetOpwarmPrompt(false); onKlaar() }}
+          style={{
+            width: '100%', marginTop: 8, padding: '0.4rem',
+            background: 'transparent', border: 'none',
+            color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem', fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Opwarmvraag uitschakelen
+        </button>
         </div>
       </div>
     )
@@ -311,6 +323,19 @@ export default function OpwarmPoort({
       <button onClick={onKlaar} style={{ ...knop(true), width: '100%' }}>
         <Check size={16} strokeWidth={3} />
         Ik ben opgewarmd
+      </button>
+
+      <button
+        onClick={() => { zetOpwarmPrompt(false); onKlaar() }}
+        style={{
+          width: '100%', marginTop: 8, padding: '0.45rem',
+          background: 'transparent', border: 'none',
+          color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', fontWeight: 700,
+          cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        Opwarmvraag uitschakelen
       </button>
     </div>
   )

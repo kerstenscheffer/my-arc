@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core'
 import DatabaseService from '../../services/DatabaseService'
 import { Venster, VensterKop, VensterVoet, Kopje, Knop } from '../../components/arc-ui'
 import FotoCredits from '../../modules/ingredient-photos/FotoCredits'
+import { isOpwarmPromptAan, zetOpwarmPrompt } from '../../modules/workout/components/todays-workout/opwarmen'
 const db = DatabaseService
 
 // MY ARC modal-stijl: zwart met wit accent. Het goud dat hier overal in de
@@ -30,6 +31,7 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
   const [saving, setSaving] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showFotoCredits, setShowFotoCredits] = useState(false)
+  const [opwarmAan, setOpwarmAan] = useState(() => isOpwarmPromptAan())
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
 
@@ -440,6 +442,36 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
                 {i === arr.length - 1 && null}
               </button>
             ))}
+
+            {/* Opwarmvraag toggle */}
+            <button
+              onClick={() => {
+                const nieuw = !opwarmAan
+                zetOpwarmPrompt(nieuw)
+                setOpwarmAan(nieuw)
+              }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '0.85rem 0', minHeight: 48,
+                background: 'transparent', border: 'none',
+                borderTop: `1px solid ${LIJN}`,
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: '0.85rem', fontWeight: 800, textAlign: 'left',
+                cursor: 'pointer', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Settings size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0 }}>Opwarmvraag bij training</span>
+              <span style={{
+                padding: '2px 8px', borderRadius: 999, fontSize: '0.7rem', fontWeight: 900,
+                background: opwarmAan ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)',
+                color: opwarmAan ? '#10b981' : 'rgba(255,255,255,0.35)',
+                border: `1px solid ${opwarmAan ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'}`,
+              }}>
+                {opwarmAan ? 'Aan' : 'Uit'}
+              </span>
+            </button>
           </div>
         )}
       </div>

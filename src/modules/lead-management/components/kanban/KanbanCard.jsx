@@ -159,7 +159,10 @@ export default function KanbanCard({
   // en tekst die weg is, is weg.
   const toonNaam = (() => {
     const voor = (lead.first_name || '').trim()
-    const achter = (lead.last_name || '').trim()
+    // Instagram-leads hebben dezelfde gebruikersnaam in voor- én achternaam.
+    // Dan één keer tonen in plaats van "dylan dylan".
+    const achterRaw = (lead.last_name || '').trim()
+    const achter = achterRaw.toLowerCase() === voor.toLowerCase() ? '' : achterRaw
     if (!verbergNaam) return `${voor} ${achter}`.trim()
     const maskeer = (deel) => {
       if (!deel) return ''
