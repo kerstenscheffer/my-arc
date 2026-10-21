@@ -503,8 +503,9 @@ function KalenderBlad({ open, onClose, m }) {
       >
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: m ? '0.7rem 0.9rem 0.6rem' : '0.9rem 1.2rem 0.8rem',
-          borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
+          // Zwevend, zonder rand of vakken: één geheel met de vragen eronder.
+          padding: m ? '0.9rem 1.1rem 0.4rem' : '1.1rem 1.5rem 0.4rem',
+          flexShrink: 0,
         }}>
           {/* MY ARC-logo en de naam van de challenge i.p.v. foto en titel
               (21 okt 2026). Wit logo op transparant. */}
@@ -513,7 +514,6 @@ function KalenderBlad({ open, onClose, m }) {
               src="/ma-logo-header.png" alt="MY ARC"
               style={{ width: m ? 84 : 104, height: 'auto', display: 'block', flexShrink: 0 }}
             />
-            <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
             <div style={{ fontSize: m ? '1rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Gratis 6 Weken Challenge
             </div>
@@ -521,13 +521,13 @@ function KalenderBlad({ open, onClose, m }) {
           <button
             onClick={onClose} aria-label="Sluiten"
             style={{
-              width: 38, height: 38, flexShrink: 0, borderRadius: 10,
-              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
-              color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 40, height: 40, flexShrink: 0, marginRight: -8,
+              background: 'none', border: 'none',
+              color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <X size={18} strokeWidth={2.6} />
+            <X size={24} strokeWidth={2.6} />
           </button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
