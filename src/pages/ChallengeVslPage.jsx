@@ -80,34 +80,11 @@ const HERKENNING = [
   'Na een paar weken haalt een drukke periode je weer onderuit.',
 ]
 
+// Compact (21 okt 2026): per onderdeel één kop en één zin.
 const AANPAK = [
-  {
-    Icon: Utensils,
-    kop: 'Voeding die past bij jouw leven',
-    alineas: [
-      'Je krijgt een persoonlijk voedingsplan in de app, met maaltijd- en gerechtopties die aansluiten op je doel.',
-      'We brengen structuur aan op momenten waarop dat makkelijk kan. Bijvoorbeeld bij je ontbijt en lunch op werkdagen. Rond gezinsmaaltijden, etentjes en andere sociale momenten kijken we hoe je flexibiliteit kunt houden.',
-      'Zo hoef je niet iedere dag opnieuw uit te zoeken wat je gaat eten en hoe dat binnen je plan past.',
-    ],
-  },
-  {
-    Icon: Dumbbell,
-    kop: 'Training waarmee je gericht vooruitgaat',
-    alineas: [
-      'Je krijgt een trainingsschema dat aansluit op je doel en beschikbare tijd, inclusief uitlegvideo’s in de app.',
-      'Afhankelijk van jouw situatie kan dat bijvoorbeeld met twee tot drie trainingen van ongeveer 45 minuten per week.',
-      'Je houdt bij wat je doet, zodat we kunnen zien of je vooruitgaat en wanneer een aanpassing nodig is.',
-    ],
-  },
-  {
-    Icon: MessageCircle,
-    kop: 'Persoonlijke begeleiding bij het volhouden',
-    alineas: [
-      'Een drukke week, honger in de avond of weinig vooruitgang: je kunt bespreken waar je tegenaan loopt.',
-      'Via check-ins en WhatsApp kijk ik met je mee. We gebruiken onder andere je gewicht, trainingsprestaties, energie en slaap om te bepalen wat goed gaat en wat aandacht nodig heeft.',
-      'Je krijgt een plan én hulp om het in jouw dagelijks leven uit te voeren.',
-    ],
-  },
+  { Icon: Utensils, kop: 'Voeding die past bij jouw leven', zin: 'Persoonlijk plan in de app, met ruimte voor etentjes en weekenden.' },
+  { Icon: Dumbbell, kop: 'Training die je vooruit helpt', zin: "Schema op jouw tijd en niveau, met uitlegvideo's per oefening." },
+  { Icon: MessageCircle, kop: 'Begeleiding bij het volhouden', zin: 'Check-ins en WhatsApp: ik kijk mee en we sturen samen bij.' },
 ]
 
 const GESCHIKT = [
@@ -995,31 +972,28 @@ export default function ChallengeVslPage() {
 
       {/* ══ 4. De aanpak ══ */}
       <Sectie m={m} thema="wit">
-        <Label m={m} center>De aanpak</Label>
-        <Kop m={m} center>Je weet wat je gaat eten, hoe je gaat trainen en wie er met je meekijkt.</Kop>
-        <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>Tijdens de 6 Weken Challenge werken we aan drie onderdelen.</Tekst>
+        <Kop m={m} center>Eten, trainen en iemand die meekijkt.</Kop>
         <div style={{
           display: 'grid', gridTemplateColumns: m ? '1fr' : 'repeat(3, 1fr)',
-          gap: m ? '0.8rem' : '1.2rem', marginTop: m ? '1.5rem' : '2.4rem',
+          gap: m ? '0.6rem' : '1rem', marginTop: m ? '1.4rem' : '2.2rem',
         }}>
-          {AANPAK.map((a, i) => (
+          {AANPAK.map(a => (
             <div key={a.kop} style={{
-              padding: m ? '1.2rem 1.1rem' : '1.6rem 1.4rem', borderRadius: 16,
+              padding: m ? '0.95rem 1rem' : '1.3rem 1.3rem', borderRadius: 16,
               border: `1px solid ${THEMAS.wit.rand}`, background: THEMAS.wit.kaart,
-              display: 'flex', flexDirection: 'column', gap: '0.8rem',
+              display: 'flex', alignItems: m ? 'center' : 'flex-start', flexDirection: m ? 'row' : 'column', gap: m ? 14 : 12,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-                <a.Icon size={m ? 28 : 32} strokeWidth={2.6} color={THEMAS.wit.icoon} />
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.15em', color: THEMAS.wit.label }}>{i + 1} VAN 3</span>
+              <span style={{ width: 44, height: 44, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <a.Icon size={22} strokeWidth={2.6} color="#fff" />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <h3 style={{ margin: 0, fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: THEMAS.wit.tekst }}>{a.kop}</h3>
+                <div style={{ marginTop: 4, fontSize: m ? '0.9rem' : '0.98rem', fontWeight: 700, lineHeight: 1.4, color: THEMAS.wit.dim }}>{a.zin}</div>
               </div>
-              <h3 style={{ margin: 0, fontSize: m ? '1.2rem' : '1.3rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: THEMAS.wit.tekst }}>{a.kop}</h3>
-              {a.alineas.map((t, n) => (
-                <Tekst key={n} m={m} style={{ fontSize: m ? '0.92rem' : '0.98rem' }}>{t}</Tekst>
-              ))}
             </div>
           ))}
         </div>
-        <Cta m={m} style={{ marginTop: m ? '2.4rem' : '3.2rem' }} />
+        <Cta m={m} style={{ marginTop: m ? '1.8rem' : '2.6rem' }} />
       </Sectie>
 
       {/* ══ 5. De coach ══ */}
