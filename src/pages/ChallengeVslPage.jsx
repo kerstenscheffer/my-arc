@@ -506,12 +506,18 @@ function KalenderBlad({ open, onClose, m }) {
           padding: m ? '0.7rem 0.9rem 0.6rem' : '0.9rem 1.2rem 0.8rem',
           borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
         }}>
-          {/* MY ARC-logo i.p.v. foto en titel (21 okt 2026): rustiger boven
-              de vragen. Wit logo op transparant. */}
-          <img
-            src="/ma-logo-header.png" alt="MY ARC"
-            style={{ width: m ? 96 : 116, height: 'auto', display: 'block' }}
-          />
+          {/* MY ARC-logo en de naam van de challenge i.p.v. foto en titel
+              (21 okt 2026). Wit logo op transparant. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 16, minWidth: 0 }}>
+            <img
+              src="/ma-logo-header.png" alt="MY ARC"
+              style={{ width: m ? 84 : 104, height: 'auto', display: 'block', flexShrink: 0 }}
+            />
+            <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
+            <div style={{ fontSize: m ? '1rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Gratis 6 Weken Challenge
+            </div>
+          </div>
           <button
             onClick={onClose} aria-label="Sluiten"
             style={{
