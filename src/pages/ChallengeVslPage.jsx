@@ -160,7 +160,7 @@ function Cta({ m, sub, style, licht }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, ...style }}>
       <button
-        onClick={openKalender}
+        onClick={openKalender} data-cta=""
         style={{
           border: 'none', cursor: 'pointer', fontFamily: 'inherit',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -785,11 +785,25 @@ export default function ChallengeVslPage() {
     return volgTijdOpPagina()
   }, [])
 
+  // Zwevend alleen als de bovenste knop voorbij is én er geen andere
+  // startknop in beeld staat (21 okt 2026): nooit twee knoppen tegelijk.
   useEffect(() => {
-    const el = heroCtaRef.current
-    if (!el) return
-    const obs = new IntersectionObserver(([e]) => setZwevend(!e.isIntersecting && e.boundingClientRect.top < 0), { threshold: 0 })
-    obs.observe(el)
+    const hero = heroCtaRef.current
+    if (!hero) return
+    const knoppen = [...document.querySelectorAll('[data-cta]')]
+    const zichtbaar = new Set()
+    let heroVoorbij = false
+    const werkBij = () => setZwevend(heroVoorbij && zichtbaar.size === 0)
+    const obs = new IntersectionObserver((items) => {
+      items.forEach(e => {
+        if (e.target === hero) heroVoorbij = !e.isIntersecting && e.boundingClientRect.top < 0
+        else if (e.isIntersecting) zichtbaar.add(e.target)
+        else zichtbaar.delete(e.target)
+      })
+      werkBij()
+    }, { threshold: 0 })
+    obs.observe(hero)
+    knoppen.forEach(k => { if (!hero.contains(k)) obs.observe(k) })
     return () => obs.disconnect()
   }, [])
 
