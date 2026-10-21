@@ -506,17 +506,12 @@ function KalenderBlad({ open, onClose, m }) {
           padding: m ? '0.7rem 0.9rem 0.6rem' : '0.9rem 1.2rem 0.8rem',
           borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 16, minWidth: 0 }}>
-            <img
-              src="/kersten-rond.jpg" alt="Kersten Scheffer"
-              style={{ width: m ? 52 : 64, height: m ? 52 : 64, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center 15%', flexShrink: 0, border: '1px solid rgba(255,255,255,0.15)' }}
-              onError={(e) => { e.currentTarget.style.display = 'none' }}
-            />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Kersten Scheffer</div>
-              <div style={{ fontSize: m ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, marginTop: 2 }}>Start 6-week-challenge | Kersten</div>
-            </div>
-          </div>
+          {/* MY ARC-logo i.p.v. foto en titel (21 okt 2026): rustiger boven
+              de vragen. Wit logo op transparant. */}
+          <img
+            src="/ma-logo-header.png" alt="MY ARC"
+            style={{ width: m ? 96 : 116, height: 'auto', display: 'block' }}
+          />
           <button
             onClick={onClose} aria-label="Sluiten"
             style={{
