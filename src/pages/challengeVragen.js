@@ -10,13 +10,14 @@
 // belang, hoe vaak trainen en de borg (de borg was de grootste afhaker).
 //
 // `soort`: keuze | meerkeuze | info | gegevens
+// `eigen`: placeholder van een open veld onder de keuzes (antwoord in <id>_eigen).
 // `afwijzen(antwoord)` geeft 'B' of 'C' terug als deze keuze het einde is.
 // `alleen(antw)`: scherm alleen tonen als dit waar is.
 export const ROUTE_ZELF = 'Zelf een moment inplannen'
 export const ROUTE_CONTACT = 'Neem contact met mij op'
 
-const LASTIG_AFVALLEN = ["'s Avonds snaaien", 'Weekenden en sociale momenten', 'Ik weet niet wat en hoeveel ik moet eten', 'Ik train, maar zie geen resultaat', 'Ik hou het een paar weken vol en dan stopt het', 'Te weinig tijd']
-const LASTIG_SPIEREN = ['Ik train, maar groei nauwelijks', 'Genoeg eten zonder vet aan te komen', 'Genoeg eiwit binnenkrijgen', 'Ik weet niet welk schema bij mij past', 'Ik hou het een paar weken vol en dan stopt het', 'Te weinig tijd']
+const LASTIG_AFVALLEN = ["'s Avonds snaaien", 'Weekenden en sociale momenten', 'Ik weet niet wat en hoeveel ik moet eten', 'Ik hou het een paar weken vol en dan stopt het']
+const LASTIG_SPIEREN = ['Ik train, maar groei nauwelijks', 'Genoeg eten zonder vet aan te komen', 'Ik weet niet welk schema bij mij past', 'Ik hou het een paar weken vol en dan stopt het']
 
 // Opties van een vraag; sommige hangen af van een eerder antwoord.
 export const optiesVan = (q, antw) => (typeof q.opties === 'function' ? q.opties(antw) : q.opties)
@@ -31,6 +32,8 @@ export const VRAGEN = [
     // Wie spieren wil opbouwen loopt op andere dingen vast dan wie vet wil
     // verliezen: eigen tak (21 okt 2026).
     opties: (antw) => (antw.doel === 'Spieren opbouwen' ? LASTIG_SPIEREN : LASTIG_AFVALLEN),
+    // Vier keuzes plus een eigen antwoord; een van beide is genoeg.
+    eigen: 'Iets anders, namelijk…',
   },
   {
     id: 'geprobeerd', soort: 'meerkeuze', vraag: 'Wat heb je al geprobeerd?', hint: 'Kies alles wat past',

@@ -46,13 +46,16 @@ const telOk = (t) => String(t || '').replace(/[^0-9+]/g, '').length >= 8
 
 // Antwoorden omzetten naar wat het bord nodig heeft.
 function bouwPayload(antw, uitkomst, afwijsreden, utm) {
+  // Meerkeuze met het eigen antwoord erachter (alleen 'Wat vind je nu lastig?').
+  const eigen = String(antw.vastlopen_eigen || '').trim()
+  const lastig = [...(Array.isArray(antw.vastlopen) ? antw.vastlopen : []), ...(eigen ? [eigen] : [])]
   const lijst = (v) => (Array.isArray(v) ? v.join(', ') : (v || ''))
   const voorkeur = antw.route === ROUTE_CONTACT ? `Wil benaderd worden via ${antw.kanaal || '-'}` : 'Plant zelf in'
   const regels = [
     `Prekwalificatie 6 Weken Challenge (${uitkomst === 'A' ? 'past' : uitkomst === 'B' ? 'nog niet het moment' : 'past niet'})`,
     `Leeftijd: ${antw.leeftijd || '-'}`,
     `Doel: ${antw.doel || '-'}`,
-    `Loopt vast op: ${lijst(antw.vastlopen) || '-'}`,
+    `Vindt lastig: ${lijst(lastig) || '-'}`,
     `Al geprobeerd: ${lijst(antw.geprobeerd) || '-'}`,
   ]
   if (uitkomst === 'A') regels.push(voorkeur)
@@ -61,7 +64,7 @@ function bouwPayload(antw, uitkomst, afwijsreden, utm) {
   // de tab Vragen. Niet beantwoord (afgewezen vóór die vraag) = weggelaten.
   const antwoorden = VRAGEN.map(q => {
     if (q.soort === 'info') return null
-    const v = q.soort === 'gegevens' ? [antw.voornaam, antw.telefoon, antw.email].filter(Boolean) : antw[q.id]
+    const v = q.soort === 'gegevens' ? [antw.voornaam, antw.telefoon, antw.email].filter(Boolean) : q.id === 'vastlopen' ? lastig : antw[q.id]
     const tekst = Array.isArray(v) ? v.join(', ') : (v == null ? '' : String(v)).trim()
     return tekst ? { vraag: q.vraag, antwoord: tekst } : null
   }).filter(Boolean)
@@ -70,9 +73,9 @@ function bouwPayload(antw, uitkomst, afwijsreden, utm) {
     uitkomst, afwijsreden: afwijsreden || '',
     voornaam: antw.voornaam || '', email: antw.email || '', telefoon: antw.telefoon || '',
     qual_goal: antw.doel || '',
-    qual_pain: [lijst(antw.vastlopen), antw.geprobeerd?.length ? `al geprobeerd: ${lijst(antw.geprobeerd)}` : null].filter(Boolean).join(' · '),
+    qual_pain: [lijst(lastig), antw.geprobeerd?.length ? `al geprobeerd: ${lijst(antw.geprobeerd)}` : null].filter(Boolean).join(' · '),
     qual_open: uitkomst === 'A' ? voorkeur : '',
-    lead_goal: antw.doel || '', lead_struggle: lijst(antw.vastlopen),
+    lead_goal: antw.doel || '', lead_struggle: lijst(lastig),
     samenvatting: regels.join('\n'),
     ...utm,
   }
@@ -160,7 +163,7 @@ export function PrequalFlow({ m = false, compact = false }) {
   const ingevuld = (q, a = antw) => {
     const v = a[q.id]
     if (q.soort === 'keuze') return v != null && v !== ''
-    if (q.soort === 'meerkeuze') return Array.isArray(v) && v.length > 0
+    if (q.soort === 'meerkeuze') return (Array.isArray(v) && v.length > 0) || (!!q.eigen && String(a[`${q.id}_eigen`] || '').trim().length > 0)
     if (q.soort === 'info') return true
     if (q.soort === 'gegevens') {
       if (!String(a.voornaam || '').trim()) return false
@@ -340,6 +343,14 @@ export function PrequalFlow({ m = false, compact = false }) {
             const aan = huidig.includes(o)
             return <Optie key={o} tekst={o} aan={aan} meer m={m} onClick={() => zet(vraag.id, aan ? huidig.filter(x => x !== o) : [...huidig, o])} />
           })}
+          {vraag.soort === 'meerkeuze' && vraag.eigen && (
+            <input
+              value={antw[`${vraag.id}_eigen`] || ''} placeholder={vraag.eigen}
+              onChange={e => zet(`${vraag.id}_eigen`, e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') verder() }}
+              style={{ ...invoer(m), minHeight: m ? 58 : 62, borderRadius: 14, fontWeight: 900, borderColor: String(antw[`${vraag.id}_eigen`] || '').trim() ? WIT : 'rgba(255,255,255,0.15)' }}
+            />
+          )}
           {vraag.soort === 'gegevens' && (
             <>
               <input
