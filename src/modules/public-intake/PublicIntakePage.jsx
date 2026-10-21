@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import IntakePhase1 from './components/IntakePhase1'
 import IntakePhase3 from './components/IntakePhase3'
+import { trainingsFrequentie } from './trainingsFrequentie'
 import BetalingGelukt from '../../components/BetalingGelukt'
 import DatabaseService from '../../services/DatabaseService'
 import { findClient, updateClient, saveBaseline, ensureClient } from '../../lib/publicIntakeApi'
@@ -217,7 +218,7 @@ function buildWorkoutPrefs(data = {}, personalData = {}) {
 
   return {
     default_experience_level: toText(data.experience_level),
-    default_days_per_week: toInt(data.days_per_week ?? personalData?.preferred_training_days?.length),
+    default_days_per_week: toInt(data.days_per_week ?? trainingsFrequentie(personalData)),
     default_time_per_session: toInt(data.time_per_session),
     default_equipment: toArr(data.equipment),              // text[]
     default_primary_goal: toText(personalData?.primary_goal),
@@ -500,7 +501,7 @@ export default function PublicIntakePage() {
           await supabase.from('user_workout_preferences').upsert({
             user_id: userId,
             training_time: tijdOfNull(data.training_time),
-            default_days_per_week: data.preferred_training_frequency || data.preferred_training_days?.length || null,
+            default_days_per_week: trainingsFrequentie(data),
           }, { onConflict: 'user_id' })
           console.log('✅ training_time opgeslagen:', data.training_time)
         } catch (e) {

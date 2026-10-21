@@ -7,6 +7,7 @@ import FocusFlow from './phase3/FocusFlow'
 import CardioFlow from './phase3/CardioFlow'
 import LimitationsFlow from './phase3/LimitationsFlow'
 import { Q, Hint, NextBtn, SkipBtn, TextField } from './phase1/FlowStep'
+import { trainingsFrequentie } from '../trainingsFrequentie'
 
 // Secties per profiel
 // Beginner:   experience → practical → focus → cardio → limitations
@@ -28,7 +29,10 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
     console.log('🏁 Phase3 handleComplete — data:', data)
     onComplete({
       ...data,
-      days_per_week: data.days_per_week || personalData?.preferred_training_days?.length || null,
+      // Hoe vaak hij wil trainen is de vraag 'Hoeveel dagen per week' uit de
+      // weekplanner, niet het aantal dagen dat hij aanvinkte als beschikbaar.
+      // Eerst won dat laatste: 3x gekozen + 5 dagen aangevinkt werd 5x (21 okt 2026).
+      days_per_week: data.days_per_week || trainingsFrequentie(personalData),
       training_time: data.training_time || personalData?.training_time || null,
       // Samenvoeg pills + open tekst in avoided_exercises
       avoided_exercises: [
