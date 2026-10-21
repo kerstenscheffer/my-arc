@@ -21,7 +21,7 @@ export const VRAGEN = [
     opties: ['Buikvet kwijt', 'Vet verliezen en sterker worden', 'Spieren opbouwen', 'Fitter en meer energie'],
   },
   {
-    id: 'vastlopen', soort: 'meerkeuze', vraag: 'Waar loop je nu op vast?', hint: 'Kies alles wat past',
+    id: 'vastlopen', soort: 'meerkeuze', vraag: 'Wat vind je nu lastig?', hint: 'Kies alles wat past',
     opties: ["'s Avonds snaaien", 'Weekenden en sociale momenten', 'Ik weet niet wat en hoeveel ik moet eten', 'Ik train, maar zie geen resultaat', 'Ik hou het een paar weken vol en dan stopt het', 'Te weinig tijd'],
   },
   {
