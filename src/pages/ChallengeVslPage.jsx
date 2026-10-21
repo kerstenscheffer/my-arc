@@ -51,6 +51,8 @@ const RESULTATEN = [
   { kg: '2,5', weken: 2 },
 ]
 
+const HERO_PUNTEN = ['Persoonlijk voedingsplan', 'Persoonlijk trainingsplan', '1-op-1 begeleiding', 'Stok achter de deur']
+
 const TRANSFORMATIES = [
   { src: '/review-transformatie-1.png', naam: 'Kersten', caption: 'Kersten: van zachte buik naar sixpack.' },
   { src: '/transformatie-nitish.jpg', naam: 'Nitish', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
@@ -706,9 +708,19 @@ export default function ChallengeVslPage() {
           <div ref={heroCtaRef}>
             <Cta m={m} licht />
           </div>
-          <Tekst m={m} center style={{ marginTop: m ? '1.8rem' : '2.4rem', color: '#111', fontWeight: 700 }}>
-            Persoonlijke voeding, gerichte trainingen en coaching, met ruimte voor een biertje en lekker eten. Zonder iedere dag in de sportschool te staan.
-          </Tekst>
+          {/* Wat je krijgt, onder elkaar met een vinkje (21 okt 2026). */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: m ? '1.6rem' : '2.2rem' }}>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: m ? 10 : 12 }}>
+              {HERO_PUNTEN.map(p => (
+                <li key={p} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: m ? '1.08rem' : '1.22rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em' }}>
+                  <span style={{ width: m ? 26 : 30, height: m ? 26 : 30, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Check size={m ? 16 : 18} strokeWidth={3.4} color="#fff" />
+                  </span>
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 
