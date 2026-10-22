@@ -650,32 +650,32 @@ function KalenderBlad({ open, onClose, m }) {
 const PIJLERS = {
   voeding: {
     foto: '/methode/voeding-slide.jpg', kop: 'Weet wat je eet',
-    zin: 'Vaste structuur in de app, zonder rekenen. Etentjes bouwen we in.',
+    zin: 'Een vast plan in de app. Geen rekenen, etentjes passen erin.',
     doen: [
-      { Icon: ClipboardList, kop: 'Structuur', tekst: 'Plan staat klaar. Nul denkwerk.' },
-      { Icon: Utensils, kop: 'Keuze', tekst: '500 gerechten in jouw plan.' },
-      { Icon: PartyPopper, kop: 'Flexibiliteit', tekst: 'Etentjes leren we mee omgaan.' },
-      { Icon: ShieldCheck, kop: 'Zekerheid', tekst: 'Weten dat het klopt.' },
+      { Icon: ClipboardList, kop: 'Structuur', tekst: 'Plan staat klaar.' },
+      { Icon: Utensils, kop: 'Keuze', tekst: '500 gerechten.' },
+      { Icon: PartyPopper, kop: 'Flexibel', tekst: 'Etentjes horen erbij.' },
+      { Icon: ShieldCheck, kop: 'Zekerheid', tekst: 'Je weet dat het klopt.' },
     ],
   },
   training: {
     foto: '/methode/training-slide.jpg', kop: 'Elke training telt',
-    zin: "Schema op maat, uitlegvideo's per oefening, onder het uur.",
+    zin: "Schema op maat met uitlegvideo's. Binnen het uur klaar.",
     doen: [
-      { Icon: ClipboardList, kop: 'Schema', tekst: 'Jouw dagen, locatie, niveau.' },
+      { Icon: ClipboardList, kop: 'Schema', tekst: 'Jouw dagen en niveau.' },
       { Icon: Crosshair, kop: 'Focus', tekst: 'Alleen wat telt.' },
-      { Icon: TrendingUp, kop: 'Resultaatgericht', tekst: 'Zie dat het werkt.' },
-      { Icon: ShieldCheck, kop: 'Zekerheid', tekst: 'Hoe, hoeveel, welke. Nooit twijfelen.' },
+      { Icon: TrendingUp, kop: 'Resultaat', tekst: 'Zie dat het werkt.' },
+      { Icon: ShieldCheck, kop: 'Zekerheid', tekst: 'Nooit twijfelen.' },
     ],
   },
   begeleiding: {
     foto: '/methode/begeleiding-slide.jpg', kop: 'Coach in jouw corner',
-    zin: 'Wekelijkse call, snel bereikbaar in de app, ik kijk mee met je cijfers.',
+    zin: 'Ik kijk mee met je cijfers en ben snel bereikbaar in de app.',
     doen: [
-      { Icon: LineChart, kop: 'Cijfers', tekst: 'Kijk dagelijks mee, stuur op data.' },
-      { Icon: SlidersHorizontal, kop: 'Bijsturen', tekst: 'Stilstaan is geen optie.' },
-      { Icon: ClipboardCheck, kop: 'Check-in', tekst: 'Wat liep vast, wat gaat anders.' },
-      { Icon: VideoIcoon, kop: 'Weekcall', tekst: 'Wat werkt, wat niet.' },
+      { Icon: LineChart, kop: 'Cijfers', tekst: 'Dagelijks bekeken.' },
+      { Icon: SlidersHorizontal, kop: 'Bijsturen', tekst: 'Geen stilstand.' },
+      { Icon: ClipboardCheck, kop: 'Check-in', tekst: 'Wat liep vast?' },
+      { Icon: VideoIcoon, kop: 'Weekcall', tekst: 'Elke week samen.' },
     ],
   },
 }
@@ -688,23 +688,24 @@ function PijlerModal({ pijler, onClose, onStart, m }) {
         <>
           <img src={p.foto} alt={p.kop} draggable={false}
             style={{ width: '100%', aspectRatio: '1960 / 600', objectFit: 'cover', display: 'block', flexShrink: 0, background: '#141414' }} />
-          <div style={{ padding: m ? '1.2rem 1.15rem 1.3rem' : '1.6rem 1.7rem 1.7rem', fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-            <p style={{ margin: 0, fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 800, lineHeight: 1.45, color: '#fff', textAlign: 'center', letterSpacing: '-0.01em' }}>{p.zin}</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: m ? '1.2rem' : '1.5rem' }}>
+          <div style={{ padding: m ? '1.1rem 1.15rem 1.2rem' : '1.4rem 1.7rem 1.6rem', fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
+            <p style={{ margin: 0, fontSize: m ? '1rem' : '1.1rem', fontWeight: 800, lineHeight: 1.4, color: '#fff', textAlign: 'center', letterSpacing: '-0.01em' }}>{p.zin}</p>
+            {/* Vier punten in een 2x2 raster, zonder kaders (22 okt 2026). */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: m ? '1rem 0.8rem' : '1.2rem 1.2rem', marginTop: m ? '1.1rem' : '1.4rem' }}>
               {p.doen.map(d => (
-                <div key={d.kop} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: m ? '0.8rem 0.95rem' : '0.95rem 1.15rem', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.12)' }}>
-                  <span style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <d.Icon size={20} strokeWidth={2.6} color="#000" />
+                <div key={d.kop} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span style={{ width: m ? 34 : 38, height: m ? 34 : 38, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <d.Icon size={m ? 17 : 19} strokeWidth={2.6} color="#000" />
                   </span>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: m ? '1rem' : '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{d.kop}</div>
-                    <div style={{ fontSize: m ? '0.88rem' : '0.94rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{d.tekst}</div>
+                    <div style={{ fontSize: m ? '0.95rem' : '1.02rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{d.kop}</div>
+                    <div style={{ fontSize: m ? '0.8rem' : '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 1, lineHeight: 1.3 }}>{d.tekst}</div>
                   </div>
                 </div>
               ))}
             </div>
             <button onClick={onStart} style={{
-              marginTop: m ? '1.3rem' : '1.6rem', width: '100%', minHeight: m ? 58 : 64, borderRadius: 14, border: 'none',
+              marginTop: m ? '1.3rem' : '1.6rem', width: '100%', minHeight: m ? 56 : 62, borderRadius: 14, border: 'none',
               background: CTA_GROEN, color: '#fff', fontSize: m ? '1rem' : '1.15rem', fontWeight: 900, fontFamily: 'inherit',
               letterSpacing: '0.03em', textTransform: 'uppercase', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
