@@ -847,17 +847,9 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                   border: `1px solid ${open ? 'rgba(255,255,255,0.35)' : isVast ? `${k}66` : 'rgba(255,255,255,0.08)'}`,
                   transition: 'background 0.15s, border-color 0.15s', WebkitTapHighlightColor: 'transparent',
                 }}>
-                  {/* Bovenaan het oordeel als label, dan bolletje + naam met de
-                      vraag eronder, onderaan de belangrijkste cijfers. */}
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' }}>
-                    <span style={{
-                      fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                      padding: '3px 8px', borderRadius: 6,
-                      color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
-                    }}>{isVast ? `${f.oordeel.tekst} · eerst aanpakken` : f.oordeel.tekst}</span>
-                    <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 2 }}>
+                  {/* Bolletje, naam met het oordeel-label erachter op dezelfde
+                      hoogte, de vraag eronder; onderaan de belangrijkste cijfers. */}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
                     <span style={{
                       width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -866,10 +858,18 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                       boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
                       animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
                     }}>{i + 1}</span>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
-                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3, marginTop: 1 }}>{f.vraag}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
+                        <span style={{
+                          fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                          padding: '2px 7px', borderRadius: 6,
+                          color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
+                        }}>{isVast ? `${f.oordeel.tekst} · eerst aanpakken` : f.oordeel.tekst}</span>
+                      </span>
+                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3, marginTop: 2 }}>{f.vraag}</span>
                     </span>
+                    <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, alignSelf: 'flex-start', marginTop: 4, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                   </span>
                   <span style={{ display: 'flex', gap: m ? 12 : 14, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                     {(f.preview || []).map(([label, waarde, meting]) => {
