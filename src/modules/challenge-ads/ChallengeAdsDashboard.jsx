@@ -61,7 +61,6 @@ const RICHT = {
   knop: { goed: 0.2, matig: 0.1, min: 20 },
   fstart: { goed: 0.15, matig: 0.08, min: 20 },
   leads: { goed: 0.5, matig: 0.3, min: 10 },
-  bericht: { goed: 0.9, matig: 0.7, min: 3 },
   contact: { goed: 0.6, matig: 0.4, min: 3 },
   voorgesteld: { goed: 0.6, matig: 0.4, min: 3 },
   ingepland: { goed: 0.7, matig: 0.5, min: 3 },
@@ -91,7 +90,7 @@ const SCHERM_NAAM = {
 const ICONEN = {
   'Klikratio (CTR)': Percent, 'Kosten per klik': Euro,
   Bezoekers: Users, 'Video gestart': Play, 'Op de knop geklikt': MousePointerClick, 'Formulier gestart': PenLine, 'Leads binnen': UserCheck,
-  'Bericht gestuurd': Send, 'In gesprek': MessageCircle,
+  'Follow-up gestuurd': Send, 'In gesprek': MessageCircle,
   'Call voorgesteld': PhoneOutgoing, 'Call ingepland': CalendarCheck, 'Call gehad': PhoneCall,
   Sale: Trophy, 'Gem. orderwaarde': Wallet,
 }
@@ -287,8 +286,8 @@ function LeadRegel({ l }) {
                 : l.call ? { tekst: 'Call ingepland', kleur: '#60a5fa' }
                   : l.voorgesteld ? { tekst: 'Call voorgesteld', kleur: '#60a5fa' }
                     : l.contact ? { tekst: 'In gesprek', kleur: '#fff' }
-                      : l.bericht ? { tekst: 'Bericht gestuurd', kleur: ORANJE }
-                        : { tekst: 'Nog geen bericht', kleur: ORANJE }
+                      : l.bericht_gelogd ? { tekst: 'Follow-up gestuurd', kleur: ORANJE }
+                        : { tekst: 'Nog niet in gesprek', kleur: ORANJE }
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0', borderBottom: LIJN }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -467,7 +466,9 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const advertenties = perAdvertentie(hooks.filter(h => h.ad), leads.filter(l => l.ad), spendRijen)
 
   // Lead-fases (cohort: leads uit deze periode, met alles wat daarna gebeurde).
-  const metBericht = leads.filter(l => l.bericht)
+  // Alleen wat op het bord als follow-up vastligt (DM gestuurd, follow-up
+  // gelogd), net als op de leadkaart. Dus niet afgeleid uit een reactie.
+  const metFollowup = leads.filter(l => l.bericht_gelogd)
   const inGesprek = leads.filter(l => l.contact)
   const voorgesteld = leads.filter(l => l.voorgesteld)
   const noshows = leads.filter(l => l.noshow)
@@ -498,9 +499,9 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       M('Formulier gestart', T.form_start, T.sessies, RICHT.fstart, `${T.form_start} · ${pct(T.form_start, T.sessies)}`, 'formulier', 'van de bezoekers'),
       M('Leads binnen', leads.length, T.form_start, RICHT.leads, `${leads.length} · ${pct(leads.length, T.form_start)}`, 'gegevens', `van wie begon · ${T.afgewezen} niet geschikt`),
     ] },
-    { id: 'followup', naam: 'Follow-up', vraag: 'Komen we in contact?', preview: [['Bericht', pct(metBericht.length, leads.length), 'Bericht gestuurd'], ['In gesprek', String(inGesprek.length), 'In gesprek']], metingen: [
-      M('Bericht gestuurd', metBericht.length, leads.length, RICHT.bericht, `${metBericht.length} · ${pct(metBericht.length, leads.length)}`, 'followup', 'van de leads'),
-      M('In gesprek', inGesprek.length, metBericht.length, RICHT.contact, `${inGesprek.length} · ${pct(inGesprek.length, metBericht.length)}`, 'followup', 'reageerde op je bericht'),
+    { id: 'followup', naam: 'Follow-up', vraag: 'Komen we in contact?', preview: [['In gesprek', String(inGesprek.length), 'In gesprek'], ['Van de leads', pct(inGesprek.length, leads.length), 'In gesprek'], ['Follow-ups', String(metFollowup.length)]], metingen: [
+      M('Follow-up gestuurd', metFollowup.length, leads.length, null, `${metFollowup.length} · ${pct(metFollowup.length, leads.length)}`, 'followup', 'gelogd op het bord'),
+      M('In gesprek', inGesprek.length, leads.length, RICHT.contact, `${inGesprek.length} · ${pct(inGesprek.length, leads.length)}`, 'followup', 'van de leads reageerde'),
     ] },
     { id: 'call', naam: 'Call', vraag: 'Worden er calls geboekt en gehouden?', preview: [['Ingepland', String(calls.length), 'Call ingepland'], ['Gehad', String(gehouden.length), 'Call gehad'], ['No-show', String(noshows.length)]], metingen: [
       M('Call voorgesteld', voorgesteld.length, inGesprek.length, RICHT.voorgesteld, `${voorgesteld.length} · ${pct(voorgesteld.length, inGesprek.length)}`, 'call', 'van wie in gesprek is'),
@@ -709,24 +710,18 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       inhoud: (
         <>
           <Regel label="Leads" waarde={leads.length} />
-          <Regel label="Bericht gestuurd" waarde={`${metBericht.length} (${pct(metBericht.length, leads.length)})`} />
-          <Regel label="In gesprek" waarde={`${inGesprek.length} (${pct(inGesprek.length, metBericht.length)} van de berichten)`} sterk />
-          {leads.some(l => !l.bericht) && (
+          <Regel label="Follow-up gestuurd (gelogd)" waarde={`${metFollowup.length} (${pct(metFollowup.length, leads.length)})`} />
+          <Regel label="In gesprek" waarde={`${inGesprek.length} (${pct(inGesprek.length, leads.length)})`} sterk />
+          {leads.some(l => !l.contact) && (
             <>
-              <div style={{ ...kop, marginTop: 18, color: ORANJE }}>Nog geen bericht ({leads.filter(l => !l.bericht).length})</div>
-              {leads.filter(l => !l.bericht).map(l => <LeadRegel key={l.id} l={l} />)}
-            </>
-          )}
-          {metBericht.some(l => !l.contact) && (
-            <>
-              <div style={{ ...kop, marginTop: 18, color: ORANJE }}>Bericht, nog geen reactie ({metBericht.filter(l => !l.contact).length})</div>
-              {metBericht.filter(l => !l.contact).map(l => <LeadRegel key={l.id} l={l} />)}
+              <div style={{ ...kop, marginTop: 18, color: ORANJE }}>Nog niet in gesprek ({leads.filter(l => !l.contact).length})</div>
+              {leads.filter(l => !l.contact).map(l => <LeadRegel key={l.id} l={l} />)}
             </>
           )}
           <div style={{ ...kop, marginTop: 18 }}>In gesprek</div>
           {inGesprek.length ? inGesprek.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog niemand in gesprek.</Leeg>}
           <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
-            Bericht gestuurd telt als je op het bord "DM gestuurd" kiest, een follow-up logt of een reactie telt. In gesprek telt zodra je een reactie telt of de lead naar een gesprek- of callsectie zet. Een lead die alleen op "DM vandaag" stond telt niet: die lijst zet het bord zelf.
+            Follow-up gestuurd telt alleen wat op de leadkaart staat: "DM gestuurd" of een gelogde follow-up. In gesprek telt zodra je een reactie telt of de lead naar een gesprek- of callsectie zet. Een lead die alleen op "DM vandaag" stond telt niet: die lijst zet het bord zelf.
           </div>
         </>
       ),
@@ -823,7 +818,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 22, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: m ? -8 : -12, marginBottom: m ? 24 : 34, paddingBottom: 2 }}>
         {[
           { label: 'Nieuwe leads', waarde: leads.length, Icon: UserPlus, kleur: '#3b82f6', venster: 'gegevens' },
-          { label: 'Follow-ups (bericht gestuurd)', waarde: metBericht.length, Icon: Send, kleur: '#f59e0b', venster: 'followup' },
+          { label: 'Follow-ups (gelogd op het bord)', waarde: metFollowup.length, Icon: Send, kleur: '#f59e0b', venster: 'followup' },
           { label: 'Reacties (in gesprek)', waarde: inGesprek.length, Icon: MessageCircle, kleur: '#10b981', venster: 'followup' },
           { label: 'Call voorgesteld', waarde: voorgesteld.length, Icon: Phone, kleur: '#a855f7', venster: 'call' },
           { label: 'Call ingepland', waarde: calls.length, Icon: CalendarCheck, kleur: '#06b6d4', venster: 'call' },
