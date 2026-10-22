@@ -2,17 +2,14 @@
 //
 // Prekwalificatie voor de 6 Weken Challenge: één vraag per scherm, midden in
 // beeld. Vier vragen (doel, vastlopen, geprobeerd, leeftijd), dan "je bent
-// geschikt", dan kiezen: zelf inplannen of contact (WhatsApp, bellen, mail).
-// De gegevens komen pas aan het eind, op één scherm. Uitkomsten:
-//   A  past, zelf inplannen -> Calendly, met naam en e-mail al ingevuld
-//   A  past, contact        -> bevestiging "binnen 24 uur app/bel/mail ik je"
-//   C  onder 18             -> vriendelijk afgewezen, gratis video
+// geschikt": Kerstens video met daaronder naam + telefoonnummer (22 okt 2026;
+// zelf inplannen in Calendly is weg). Uitkomsten:
+//   A  past   -> bevestiging "binnen 24 uur bel of app ik je"
+//   C  onder 18 -> vriendelijk afgewezen, gratis video
 //
 // Elke inzending wordt een lead op het bord van Kersten via de
 // database-functie submit_challenge_prequal: A in "🎯 Ad lead", C in "Niet
-// geschikt". De voorkeur (zelf inplannen of hoe benaderen) staat in de
-// kwalificatie Open en in de notities. Boekt iemand in Calendly, dan koppelt
-// de Calendly-sync die afspraak via utm_content=lead_<id> aan dezelfde lead.
+// geschikt". "Wil gebeld worden" staat in de kwalificatie Open en de notities.
 //
 // Werkt los op /challenge/start én in het blad van de VSL (/challenge).
 
@@ -20,10 +17,9 @@ import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, ArrowRight, Check, Instagram, Play } from 'lucide-react'
 import db from '../services/DatabaseService'
 import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies } from './challengeTracking'
-import { VRAGEN, ROUTE_ZELF, ROUTE_CONTACT, vraagtTelefoon, optiesVan } from './challengeVragen'
+import { VRAGEN, vraagtTelefoon, optiesVan } from './challengeVragen'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
-const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const INSTAGRAM = 'https://instagram.com/myarc.nl'
 // Gratis waarde aan het eind: de video waarin Kersten uitlegt hoe je 10 kg
 // verliest in 16 weken. Ingesloten op de pagina, met een knop naar YouTube.
@@ -50,7 +46,7 @@ function bouwPayload(antw, uitkomst, afwijsreden, utm) {
   const eigen = String(antw.vastlopen_eigen || '').trim()
   const lastig = [...(Array.isArray(antw.vastlopen) ? antw.vastlopen : []), ...(eigen ? [eigen] : [])]
   const lijst = (v) => (Array.isArray(v) ? v.join(', ') : (v || ''))
-  const voorkeur = antw.route === ROUTE_CONTACT ? `Wil benaderd worden via ${antw.kanaal || '-'}` : 'Plant zelf in'
+  const voorkeur = 'Wil gebeld of geappt worden'
   const regels = [
     `Prekwalificatie 6 Weken Challenge (${uitkomst === 'A' ? 'past' : uitkomst === 'B' ? 'nog niet het moment' : 'past niet'})`,
     `Leeftijd: ${antw.leeftijd || '-'}`,
@@ -143,7 +139,7 @@ export function PrequalFlow({ m = false, compact = false }) {
   const bovenRef = useRef(null)
   const doorTimer = useRef(null)
 
-  // De schermen die voor deze persoon gelden (kanaal alleen bij contact).
+  // De schermen die voor deze persoon gelden (`alleen` in challengeVragen).
   const pad = VRAGEN.filter(q => !q.alleen || q.alleen(antw))
   const vraag = typeof stap === 'number' ? pad[stap] : null
 
@@ -184,7 +180,7 @@ export function PrequalFlow({ m = false, compact = false }) {
       setEinde({ uitkomst, reden, leadId: data })
       if (emailOk(antw.email)) db.supabase.rpc('save_prequal_email', { p_email: antw.email, p_lead_id: data, p_uitkomst: uitkomst }).then(r => r, () => null)
       setStap('klaar')
-      meet('form_klaar', { meta: { uitkomst, reden: reden || null, vraag: vraag?.id || null, route: antw.route || null, kanaal: antw.kanaal || null }, lead_id: data })
+      meet('form_klaar', { meta: { uitkomst, reden: reden || null, vraag: vraag?.id || null }, lead_id: data })
       // Zelfde event_id als de server (Conversions API): Meta telt hem één keer.
       if (uitkomst === 'A') pixel('Lead', { content_name: '6 weken challenge prequal' }, `lead_${data}`)
     } catch (e) {
@@ -252,25 +248,7 @@ export function PrequalFlow({ m = false, compact = false }) {
   // ── Eindschermen ──
   if (stap === 'klaar' && einde) {
     const naam = antw.voornaam || ''
-    if (einde.uitkomst === 'A' && antw.route === ROUTE_ZELF) {
-      const url = `${CALENDLY}?embed_domain=${encodeURIComponent(window.location.hostname)}&embed_type=Inline&hide_gdpr_banner=1&hide_event_type_details=1&background_color=0a0a0a&text_color=ffffff&primary_color=ffffff`
-        + `&name=${encodeURIComponent(naam)}&email=${encodeURIComponent(antw.email || '')}`
-        + `&utm_content=${encodeURIComponent(`lead_${einde.leadId}`)}`
-        + (utm.current.utm_source ? `&utm_source=${encodeURIComponent(utm.current.utm_source)}` : '')
-        + (utm.current.utm_campaign ? `&utm_campaign=${encodeURIComponent(utm.current.utm_campaign)}` : '')
-      return (
-        <div style={{ ...buitenkant, maxWidth: 1000, paddingBottom: 0 }}>
-          <div ref={bovenRef} />
-          {kop(`Top ${naam}, kies een moment.`)}
-          {sub('Je naam en e-mail staan al ingevuld.')}
-          <div style={{ marginTop: '1.2rem', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0a0a0a', height: m ? 'min(78vh, 820px)' : 760 }}>
-            <iframe src={url} title="Kennismaking plannen" style={{ width: '100%', height: '100%', border: 0, background: '#0a0a0a' }} />
-          </div>
-        </div>
-      )
-    }
     if (einde.uitkomst === 'A') {
-      const via = antw.kanaal === 'Bellen' ? 'bel ik je' : antw.kanaal === 'E-mail' ? 'mail ik je' : 'app ik je'
       return (
         <div style={buitenkant}>
           <div ref={bovenRef} />
@@ -279,7 +257,7 @@ export function PrequalFlow({ m = false, compact = false }) {
               <Check size={34} strokeWidth={3.2} color="#000" />
             </div>
             {kop(`Top ${naam}, je staat erop.`)}
-            {sub(`Binnen 24 uur ${via} om de challenge door te nemen.`)}
+            {sub('Binnen 24 uur bel of app ik je om de challenge door te nemen.')}
           </div>
         </div>
       )
@@ -341,6 +319,21 @@ export function PrequalFlow({ m = false, compact = false }) {
             {kop(vraag.vraag)}
             {sub('Op basis van je antwoorden past de 6 Weken Challenge bij jou. Nog twee korte stappen.')}
           </>
+        ) : vraag.video ? (
+          <>
+            {kop(vraag.vraag)}
+            {sub('Bekijk mijn video en laat hieronder je gegevens achter.')}
+            {/* Staande Short: midden, zo hoog dat de velden er nog onder passen. */}
+            <div style={{ margin: '1.2rem auto 0', height: m ? 'min(52vh, 420px)' : 'min(56vh, 480px)', aspectRatio: '9 / 16', maxWidth: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)', background: '#000' }}>
+              <iframe
+                src={appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${vraag.video}?rel=0&playsinline=1&modestbranding=1`)}
+                title="Je bent geschikt"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
+              />
+            </div>
+          </>
         ) : (
           <>
             {kop(vraag.vraag)}
@@ -368,13 +361,13 @@ export function PrequalFlow({ m = false, compact = false }) {
           {vraag.soort === 'gegevens' && (
             <>
               <input
-                autoFocus autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam"
+                autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam"
                 onChange={e => zet('voornaam', e.target.value)} style={invoer(m)}
               />
               {telefoon ? (
                 <input
                   type="tel" inputMode="tel" autoComplete="tel" value={antw.telefoon || ''}
-                  placeholder={antw.kanaal === 'WhatsApp' ? 'Telefoonnummer (WhatsApp)' : 'Telefoonnummer'}
+                  placeholder="Telefoonnummer"
                   onChange={e => zet('telefoon', e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') verder() }} style={invoer(m)}
                 />
@@ -386,7 +379,7 @@ export function PrequalFlow({ m = false, compact = false }) {
                 />
               )}
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, textAlign: 'center', marginTop: '0.2rem' }}>
-                {antw.route === ROUTE_CONTACT ? 'Door te versturen ga je akkoord dat Kersten contact met je opneemt. ' : 'Geen spam. '}
+                Door te versturen ga je akkoord dat Kersten contact met je opneemt.{' '}
                 Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: WIT }}>privacyverklaring</a>.
               </div>
             </>
@@ -399,7 +392,7 @@ export function PrequalFlow({ m = false, compact = false }) {
           <button onClick={() => verder()} disabled={!klaar || bezig} style={{ ...knopWit(m, !klaar || bezig), marginTop: '1.4rem' }}>
             {bezig ? 'Even geduld…'
               : vraag.soort === 'info' ? 'Verder'
-              : vraag.soort === 'gegevens' ? (antw.route === ROUTE_ZELF ? 'Naar de agenda' : 'Versturen')
+              : vraag.soort === 'gegevens' ? 'Neem contact met mij op'
               : 'Volgende'}
             {!bezig && <ArrowRight size={22} strokeWidth={2.6} />}
           </button>
