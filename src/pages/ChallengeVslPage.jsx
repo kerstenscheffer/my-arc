@@ -51,16 +51,6 @@ const CTA_TEKST = 'Plan kennismakingsgesprek'
 // Donkergroen met witte letters, op lichte en donkere vlakken (22 okt 2026).
 const CTA_GROEN = '#15803d'
 
-// Punten onder de bovenste knop. Met `pijler` is het punt klikbaar en opent
-// het de uitleg van die pijler (PijlerModal).
-const HERO_PUNTEN = [
-  { tekst: 'Persoonlijk voedingsplan', pijler: 'voeding' },
-  { tekst: 'Persoonlijk trainingsplan', pijler: 'training' },
-  { tekst: '1-op-1 begeleiding', pijler: 'begeleiding' },
-  { tekst: 'Stok achter de deur' },
-  { tekst: 'Alles in 1 app' },
-]
-
 const TRANSFORMATIES = [
   { src: '/review-transformatie-1.png', naam: 'Kersten', caption: 'Kersten: van zachte buik naar sixpack.' },
   { src: '/transformatie-nitish.jpg', naam: 'Nitish', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
@@ -87,10 +77,12 @@ const HERKENNING = [
 ]
 
 // Compact (21 okt 2026): per onderdeel één kop en één zin.
+// De drie pijlers als kaarten onder de bovenste knop (22 okt 2026; stonden
+// eerst als aparte sectie verderop). Tik opent de uitleg (PijlerModal).
 const AANPAK = [
-  { Icon: Utensils, kop: 'Voeding die past bij jouw leven', zin: 'Persoonlijk plan in de app, met ruimte voor etentjes en weekenden.' },
-  { Icon: Dumbbell, kop: 'Training die je vooruit helpt', zin: "Schema op jouw tijd en niveau, met uitlegvideo's per oefening." },
-  { Icon: MessageCircle, kop: 'Begeleiding bij het volhouden', zin: 'Check-ins en WhatsApp: ik kijk mee en we sturen samen bij.' },
+  { pijler: 'voeding', Icon: Utensils, kop: 'Voeding die past bij jouw leven', zin: 'Persoonlijk plan in de app, met ruimte voor etentjes en weekenden.' },
+  { pijler: 'training', Icon: Dumbbell, kop: 'Training die je vooruit helpt', zin: "Schema op jouw tijd en niveau, met uitlegvideo's per oefening." },
+  { pijler: 'begeleiding', Icon: MessageCircle, kop: 'Begeleiding bij het volhouden', zin: 'Check-ins en WhatsApp: ik kijk mee en we sturen samen bij.' },
 ]
 
 // Kort (21 okt 2026): vier punten van een paar woorden.
@@ -872,29 +864,29 @@ export default function ChallengeVslPage() {
           <div ref={heroCtaRef}>
             <Cta m={m} licht />
           </div>
-          {/* Wat je krijgt, onder elkaar met een vinkje (21 okt 2026). */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: m ? '1.6rem' : '2.2rem' }}>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: m ? 10 : 12 }}>
-              {HERO_PUNTEN.map(p => {
-                const regel = { display: 'flex', alignItems: 'center', gap: 12, fontSize: m ? '1.08rem' : '1.22rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em' }
-                const vink = (
-                  <span style={{ width: m ? 26 : 30, height: m ? 26 : 30, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Check size={m ? 16 : 18} strokeWidth={3.4} color="#fff" />
-                  </span>
-                )
-                return (
-                  <li key={p.tekst} style={regel}>
-                    {p.pijler ? (
-                      <button onClick={() => { setPijler(p.pijler); meet('pijler', { meta: { pijler: p.pijler } }) }} style={{ ...regel, padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                        {vink}
-                        <span style={{ textDecoration: 'underline', textDecorationThickness: 2, textUnderlineOffset: 4, textDecorationColor: 'rgba(0,0,0,0.25)' }}>{p.tekst}</span>
-                        <ChevronRight size={m ? 18 : 20} strokeWidth={3} style={{ flexShrink: 0, marginLeft: -4 }} />
-                      </button>
-                    ) : (<>{vink}{p.tekst}</>)}
-                  </li>
-                )
-              })}
-            </ul>
+          {/* Eten, trainen, iemand die meekijkt: drie kaarten, elk opent zijn pijler. */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: m ? '1fr' : 'repeat(3, 1fr)',
+            gap: m ? '0.6rem' : '1rem', marginTop: m ? '1.6rem' : '2.2rem',
+          }}>
+            {AANPAK.map(a => (
+              <button key={a.kop} onClick={() => { setPijler(a.pijler); meet('pijler', { meta: { pijler: a.pijler } }) }} style={{
+                padding: m ? '0.95rem 1rem' : '1.3rem 1.3rem', borderRadius: 16,
+                border: `1px solid ${THEMAS.wit.rand}`, background: THEMAS.wit.kaart,
+                display: 'flex', alignItems: m ? 'center' : 'flex-start', flexDirection: m ? 'row' : 'column', gap: m ? 14 : 12,
+                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', position: 'relative',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span style={{ width: 44, height: 44, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <a.Icon size={22} strokeWidth={2.6} color="#fff" />
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <h3 style={{ margin: 0, paddingRight: m ? 0 : 24, fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: THEMAS.wit.tekst }}>{a.kop}</h3>
+                  <div style={{ marginTop: 4, fontSize: m ? '0.9rem' : '0.98rem', fontWeight: 700, lineHeight: 1.4, color: THEMAS.wit.dim }}>{a.zin}</div>
+                </div>
+                <ChevronRight size={20} strokeWidth={3} color={THEMAS.wit.tekst} style={{ flexShrink: 0, ...(m ? {} : { position: 'absolute', top: '1.3rem', right: '1.1rem' }) }} />
+              </button>
+            ))}
           </div>
           {/* Direct onder de punten de transformaties van Kersten en Nitish
               (21 okt 2026; stonden eerst verderop bij de resultaten). */}
@@ -941,32 +933,6 @@ export default function ChallengeVslPage() {
         <p style={{ margin: `${m ? '1.5rem' : '2rem'} 0 0`, fontSize: m ? '1.15rem' : '1.35rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: '#fff' }}>
           Je plan moet ook werken op je drukste dagen. Daar zorgen we samen voor.
         </p>
-      </Sectie>
-
-      {/* ══ 4. De aanpak ══ */}
-      <Sectie m={m} thema="wit">
-        <Kop m={m} center>Eten, trainen en iemand die meekijkt.</Kop>
-        <div style={{
-          display: 'grid', gridTemplateColumns: m ? '1fr' : 'repeat(3, 1fr)',
-          gap: m ? '0.6rem' : '1rem', marginTop: m ? '1.4rem' : '2.2rem',
-        }}>
-          {AANPAK.map(a => (
-            <div key={a.kop} style={{
-              padding: m ? '0.95rem 1rem' : '1.3rem 1.3rem', borderRadius: 16,
-              border: `1px solid ${THEMAS.wit.rand}`, background: THEMAS.wit.kaart,
-              display: 'flex', alignItems: m ? 'center' : 'flex-start', flexDirection: m ? 'row' : 'column', gap: m ? 14 : 12,
-            }}>
-              <span style={{ width: 44, height: 44, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <a.Icon size={22} strokeWidth={2.6} color="#fff" />
-              </span>
-              <div style={{ minWidth: 0 }}>
-                <h3 style={{ margin: 0, fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: THEMAS.wit.tekst }}>{a.kop}</h3>
-                <div style={{ marginTop: 4, fontSize: m ? '0.9rem' : '0.98rem', fontWeight: 700, lineHeight: 1.4, color: THEMAS.wit.dim }}>{a.zin}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <Cta m={m} style={{ marginTop: m ? '1.8rem' : '2.6rem' }} />
       </Sectie>
 
       {/* ══ 5. De coach ══ */}
