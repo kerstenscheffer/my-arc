@@ -220,25 +220,17 @@ function GeschiktVideo({ id, m, vol = false, onKlaar }) {
       // veel weg), zo hoog dat kop, velden en knop er zonder scrollen onder
       // passen (22 okt 2026).
       position: 'relative', margin: '0 auto', height: 'max(220px, calc(100dvh - 590px))', aspectRatio: '9 / 16', maxWidth: '100%',
-      borderRadius: 16, overflow: 'hidden', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.6)', containerType: 'size',
+      borderRadius: 16, overflow: 'hidden', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
     } : {
       position: 'relative', margin: '1.2rem auto 0', height: m ? 'min(46vh, 390px)' : 'min(52vh, 460px)', aspectRatio: '9 / 16', maxWidth: '100%',
-      borderRadius: 18, overflow: 'hidden', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.6)', containerType: 'size',
+      borderRadius: 18, overflow: 'hidden', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
     }}>
       {eigenLaag ? (
         <>
-          {/* Een staande iframe krijgt van YouTube de Shorts-laag (Like-knop,
-              kanaalnaam onderin). Daarom een liggende iframe, veel breder dan
-              het kader: YouTube toont dan de gewone speler met de video als
-              smalle kolom in het midden, precies in ons kader. Iets hoger dan
-              het kader, zodat ook de titel bovenin wegvalt. */}
+          {/* Hoger dan het kader: de YouTube-titel valt bovenin weg. */}
           <iframe ref={iframeRef} src={embed} title="Je bent geschikt"
             allow="autoplay; encrypted-media; picture-in-picture"
-            style={{
-              position: 'absolute', top: -60, height: 'calc(100cqh + 120px)',
-              width: 'calc((100cqh + 120px) * 16 / 9)', left: 'calc(50% - (100cqh + 120px) * 8 / 9)',
-              border: 0, pointerEvents: 'none',
-            }} />
+            style={{ position: 'absolute', left: 0, top: -70, width: '100%', height: 'calc(100% + 140px)', border: 0, pointerEvents: 'none' }} />
           <button onClick={tik} aria-label={gedempt ? 'Geluid aan' : speelt ? 'Pauze' : 'Afspelen'} style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
             background: speelt && !gedempt ? 'transparent' : 'rgba(0,0,0,0.25)',
