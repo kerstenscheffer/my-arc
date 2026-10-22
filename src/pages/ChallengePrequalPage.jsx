@@ -216,12 +216,11 @@ function GeschiktVideo({ id, m, vol = false, onKlaar }) {
 
   return (
     <div style={vol ? {
-      // Volle breedte van het blad, tegen de randen aan; te hoog = boven en
-      // onder bijgesneden (de iframe meet zich aan de breedte, zie cqw).
-      position: 'relative', width: '100%', aspectRatio: '9 / 16',
-      // Zo hoog dat kop, velden en knop er zonder scrollen onder passen.
-      maxHeight: 'max(200px, calc(100dvh - 530px))',
-      overflow: 'hidden', background: '#111', containerType: 'inline-size',
+      // In het blad op de telefoon: staand en heel (volle breedte sneed te
+      // veel weg), zo hoog dat kop, velden en knop er zonder scrollen onder
+      // passen (22 okt 2026).
+      position: 'relative', margin: '0 auto', height: 'max(220px, calc(100dvh - 590px))', aspectRatio: '9 / 16', maxWidth: '100%',
+      borderRadius: 16, overflow: 'hidden', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
     } : {
       position: 'relative', margin: '1.2rem auto 0', height: m ? 'min(46vh, 390px)' : 'min(52vh, 460px)', aspectRatio: '9 / 16', maxWidth: '100%',
       borderRadius: 18, overflow: 'hidden', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
@@ -231,9 +230,7 @@ function GeschiktVideo({ id, m, vol = false, onKlaar }) {
           {/* Hoger dan het kader: de YouTube-titel valt bovenin weg. */}
           <iframe ref={iframeRef} src={embed} title="Je bent geschikt"
             allow="autoplay; encrypted-media; picture-in-picture"
-            style={vol
-              ? { position: 'absolute', left: 0, top: 'calc(50% - (100cqw * 16 / 9 + 140px) / 2)', width: '100%', height: 'calc(100cqw * 16 / 9 + 140px)', border: 0, pointerEvents: 'none' }
-              : { position: 'absolute', left: 0, top: -70, width: '100%', height: 'calc(100% + 140px)', border: 0, pointerEvents: 'none' }} />
+            style={{ position: 'absolute', left: 0, top: -70, width: '100%', height: 'calc(100% + 140px)', border: 0, pointerEvents: 'none' }} />
           <button onClick={tik} aria-label={gedempt ? 'Geluid aan' : speelt ? 'Pauze' : 'Afspelen'} style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
             background: speelt && !gedempt ? 'transparent' : 'rgba(0,0,0,0.25)',
@@ -288,7 +285,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
   // De schermen die voor deze persoon gelden (`alleen` in challengeVragen).
   const pad = VRAGEN.filter(q => !q.alleen || q.alleen(antw))
   const vraag = typeof stap === 'number' ? pad[stap] : null
-  // Op de telefoon in het blad: de video over de volle breedte bovenaan, en
+  // Op de telefoon in het blad: de video bovenaan zonder voortgangsbalk, en
   // het blad laat dan de transformatiefoto's weg (22 okt 2026).
   const volVideo = compact && m && !!vraag?.video
   useEffect(() => { onVolVideo?.(volVideo) }, [volVideo, onVolVideo])
@@ -474,8 +471,8 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
           </>
         ) : vraag.video && volVideo ? (
           <>
-            {/* Tegen de randen van het blad: de padding van de buitenkant teniet. */}
-            <div style={{ margin: '-1.1rem -1.1rem 1rem' }}><GeschiktVideo id={vraag.video} m={m} vol onKlaar={naarGegevens} /></div>
+            {/* Ruimte bovenin voor het zwevende logo en kruisje. */}
+            <div style={{ paddingTop: '2.6rem', marginBottom: '1rem' }}><GeschiktVideo id={vraag.video} m={m} vol onKlaar={naarGegevens} /></div>
             {kop(vraag.vraag)}
             <p style={{ margin: '0.4rem 0 0', fontSize: '0.92rem', fontWeight: 700, color: ZWAK, lineHeight: 1.4, textAlign: 'center' }}>Laat je gegevens achter, dan neem ik contact op.</p>
           </>
