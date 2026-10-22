@@ -870,9 +870,6 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
 
       {/* ═══ 2. WAAR LOOPT HET VAST ═══ */}
       <div style={{ marginBottom: m ? 34 : 46 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-          <div style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Waar loopt het vast?</div>
-        </div>
         {/* De vijf fases naast elkaar met pijltjes; een tik opent de
             metingen van die fase eronder. Op de telefoon veeg je de rij. */}
         <div style={{
