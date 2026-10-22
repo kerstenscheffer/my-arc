@@ -738,26 +738,37 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       <div style={{ marginBottom: m ? 34 : 46 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
           <div style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Waar loopt het vast?</div>
-          {vast && <div style={{ fontSize: '0.82rem', fontWeight: 900, color: vast.oordeel.kleur }}>Eerst aanpakken: {vast.naam}</div>}
         </div>
         {FASES.map((f, i) => {
           const isVast = vast?.id === f.id
+          const k = f.oordeel.kleur
+          const gemeten = f.oordeel.rang >= 0
           return (
-            <div key={f.id} style={{
-              padding: openFase === f.id ? '0.9rem 0 0.4rem' : '0.9rem 0', borderTop: i ? LIJN : 'none',
-              ...(isVast ? { borderLeft: `3px solid ${f.oordeel.kleur}`, paddingLeft: 12, marginLeft: -15 } : {}),
-            }}>
+            <div key={f.id} style={{ padding: openFase === f.id ? '0.9rem 0 0.4rem' : '0.9rem 0', borderTop: i ? LIJN : 'none' }}>
               <button onClick={() => setOpenFase(o => (o === f.id ? null : f.id))} aria-expanded={openFase === f.id} style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 0, background: 'none', border: 'none',
+                width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 0, background: 'none', border: 'none',
                 color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
               }}>
-                <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#fff', color: '#000', fontSize: '0.8rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                {/* Het bolletje draagt het oordeel: groen, oranje, rood. De
+                    bottleneck pulseert. Te weinig data blijft neutraal. */}
+                <span style={{
+                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
+                  fontSize: '0.88rem', fontWeight: 900,
+                  boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
+                  animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
+                }}>{i + 1}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
-                  <span style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: ZWAK }}>{f.vraag}</span>
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 900, color: f.oordeel.kleur, whiteSpace: 'nowrap' }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: f.oordeel.kleur }} />{f.oordeel.tekst}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
+                    <span style={{
+                      fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.02em', whiteSpace: 'nowrap',
+                      padding: '2px 8px', borderRadius: 999,
+                      color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
+                    }}>{isVast ? `${f.oordeel.tekst} · eerst aanpakken` : f.oordeel.tekst}</span>
+                  </span>
+                  <span style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: ZWAK, marginTop: 2 }}>{f.vraag}</span>
                 </span>
                 <ChevronDown size={17} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: openFase === f.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </button>
@@ -884,7 +895,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         </Venster>
       )}
 
-      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+      <style>{'@keyframes spin { to { transform: rotate(360deg); } } @keyframes vastPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }'}</style>
     </div>
   )
 }
