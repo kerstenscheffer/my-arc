@@ -367,10 +367,11 @@ function Video({ m }) {
   const appUrl = appSafeEmbedUrl(directeEmbed)
   // In de app gaat de URL door yt.html; dan geen eigen laag.
   const eigenLaag = appUrl === directeEmbed
-  // Op het web start de video meteen, zonder geluid (zoals Hormozi, 22 okt
-  // 2026): browsers staan alleen stil automatisch afspelen toe. Een tik
-  // zet het geluid aan en begint opnieuw vanaf het begin; die tik telt als
-  // video_start. In de app blijft het tik-om-te-starten.
+  // Op het web start de video meteen (zoals Hormozi met Vidalytics, 22 okt
+  // 2026): eerst met geluid; weigert de browser dat, dan zonder geluid met
+  // "Tik voor geluid". Die tik zet het geluid aan en begint opnieuw vanaf
+  // het begin. video_start = de video loopt met geluid (vanzelf of na de
+  // tik). In de app blijft het tik-om-te-starten.
   const [gestart, setGestart] = useState(eigenLaag)
   const [stilStart, setStilStart] = useState(eigenLaag)
   const [ooitGespeeld, setOoitGespeeld] = useState(false)
@@ -382,6 +383,8 @@ function Video({ m }) {
   const [bedieningZichtbaar, setBedieningZichtbaar] = useState(true)
   const iframeRef = useRef(null)
   const spelerRef = useRef(null)
+  // Al getikt voor geluid? Dan laat de geluidsproef de speler met rust.
+  const getiktRef = useRef(false)
   const verbergTimer = useRef(null)
   // Mijlpalen van de échte voortgang (niet de getoonde balk), één keer per sessie.
   const mijlpalen = useRef(new Set())
@@ -411,7 +414,23 @@ function Video({ m }) {
       if (weg || !iframeRef.current) return
       spelerRef.current = new YT.Player(iframeRef.current, {
         events: {
-          onReady: (e) => { e.target.mute(); e.target.playVideo() },
+          onReady: (e) => {
+            const p = e.target
+            try { p.unMute(); p.playVideo() } catch { /* leeg */ }
+            // Na ruim een seconde kijken of het met geluid mocht.
+            setTimeout(() => {
+              if (weg || getiktRef.current) return
+              try {
+                if (p.getPlayerState() === YT.PlayerState.PLAYING && !p.isMuted()) {
+                  setStilStart(false); setGedempt(false)
+                  meet('video_start', { meta: { auto: true } })
+                  pixel('ViewContent', { content_name: '6 weken challenge video' })
+                } else {
+                  p.mute(); p.playVideo()
+                }
+              } catch { /* speler weg */ }
+            }, 1200)
+          },
           onStateChange: (e) => {
             setSpeelt(e.data === YT.PlayerState.PLAYING)
             if (e.data === YT.PlayerState.PLAYING) setOoitGespeeld(true)
@@ -442,6 +461,7 @@ function Video({ m }) {
     if (p.getPlayerState() === 1) p.pauseVideo(); else p.playVideo()
   }
   const metGeluid = () => {
+    getiktRef.current = true
     setStilStart(false); setGedempt(false); setVoortgang(0)
     meet('video_start'); pixel('ViewContent', { content_name: '6 weken challenge video' })
     const p = spelerRef.current
@@ -508,7 +528,7 @@ function Video({ m }) {
     <div style={kader}>
       <iframe
         ref={iframeRef}
-        src={`${directeEmbed}&mute=1&enablejsapi=1&controls=0&disablekb=1&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`}
+        src={`${directeEmbed}&enablejsapi=1&controls=0&disablekb=1&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`}
         title="Hoe de 6 Weken Challenge werkt"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
