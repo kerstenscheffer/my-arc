@@ -989,9 +989,27 @@ export default function ChallengeVslPage() {
           gap: m ? '1.4rem' : '3rem', alignItems: 'center',
         }}>
           <div>
-            <Label m={m}>De coach</Label>
-            <Kop m={m}>Ik ben Kersten. En ik kijk verder dan je voedings- en trainingsschema.</Kop>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: m ? '1.1rem' : '1.4rem' }}>
+            {m ? (
+              // Telefoon: één vak met de foto rechts (heel bovenlijf in beeld),
+              // naar links weggevaagd, en de kop links eroverheen (22 okt 2026).
+              <div style={{ position: 'relative', minHeight: 420, borderRadius: 18, overflow: 'hidden', background: '#111', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'flex-end' }}>
+                <img src="/waarom-kersten.jpg" alt="Kersten" draggable={false}
+                  style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: '74%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
+                <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #111 0%, #111 26%, rgba(17,17,17,0.85) 40%, rgba(17,17,17,0) 72%)' }} />
+                <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', background: 'linear-gradient(0deg, rgba(17,17,17,0.9) 0%, rgba(17,17,17,0) 100%)' }} />
+                <div style={{ position: 'relative', width: '62%', padding: '1.3rem 0 1.4rem 1.2rem' }}>
+                  <Label m={m}>De coach</Label>
+                  <h2 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.02em', color: '#fff', textTransform: 'uppercase' }}>Ik ben Kersten.</h2>
+                  <p style={{ margin: '0.6rem 0 0', fontSize: '1rem', fontWeight: 800, lineHeight: 1.35, color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
+                    En ik kijk verder dan je voedings- en trainingsschema.
+                  </p>
+                </div>
+              </div>
+            ) : (<>
+              <Label m={m}>De coach</Label>
+              <Kop m={m}>Ik ben Kersten. En ik kijk verder dan je voedings- en trainingsschema.</Kop>
+            </>)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: m ? '1.4rem' : '1.4rem' }}>
               <Tekst m={m}>Als ondernemer heb ik zelf ook niet altijd tijd om lang in de sportschool te staan. Ik begrijp dus dat je resultaat wilt boeken met de tijd die je beschikbaar hebt.</Tekst>
               <Tekst m={m}>In mijn coaching kijk ik daarom naar jouw hele situatie. Wat wil je bereiken? Hoe ziet je week eruit? En op welke momenten wordt het lastig?</Tekst>
               <Tekst m={m}>Ik begeleid al tientallen mannen en help ze om concrete oplossingen te vinden voor de dingen waar ze op vastlopen.</Tekst>
@@ -1001,11 +1019,13 @@ export default function ChallengeVslPage() {
               </p>
             </div>
           </div>
-          <div style={{
-            borderRadius: 18, overflow: 'hidden', aspectRatio: m ? '4 / 3' : '4 / 5',
-            backgroundImage: 'url(/waarom-kersten.jpg)', backgroundSize: 'cover', backgroundPosition: 'center top',
-            border: '1px solid rgba(255,255,255,0.1)', order: m ? -1 : 0,
-          }} />
+          {!m && (
+            <div style={{
+              borderRadius: 18, overflow: 'hidden', aspectRatio: '4 / 5',
+              backgroundImage: 'url(/waarom-kersten.jpg)', backgroundSize: 'cover', backgroundPosition: 'center top',
+              border: '1px solid rgba(255,255,255,0.1)',
+            }} />
+          )}
         </div>
       </Sectie>
 
