@@ -14,7 +14,7 @@
 // Werkt los op /challenge/start én in het blad van de VSL (/challenge).
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, ArrowRight, Check, Instagram, Play } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Instagram, Play, Volume2 } from 'lucide-react'
 import db from '../services/DatabaseService'
 import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies } from './challengeTracking'
 import { VRAGEN, vraagtTelefoon, optiesVan } from './challengeVragen'
@@ -121,6 +121,127 @@ function Optie({ tekst, aan, onClick, m, meer }) {
         {aan && <Check size={15} strokeWidth={3.5} color="#000" />}
       </span>
     </button>
+  )
+}
+
+// ── Video op het geschikt-scherm ────────────────────────────────────────────
+// Speelt meteen. Eerst met geluid; houdt de browser dat tegen (iPhone doet
+// dat altijd), dan gedempt met een grote knop "Tik voor geluid", die de
+// video ook terug naar het begin zet. YouTube-bediening en titelbalk zijn
+// weg: de iframe is hoger dan het kader, zodat de titel bovenin buiten beeld
+// valt. In de native app (yt.html) werkt de API niet; daar gedempt afspelen.
+// Laadt dezelfde API als de speler op /challenge (gedeelde belofte).
+function laadYouTubeApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT)
+  if (!window.__ytApiBelofte) {
+    window.__ytApiBelofte = new Promise((resolve) => {
+      const vorige = window.onYouTubeIframeAPIReady
+      window.onYouTubeIframeAPIReady = () => { vorige?.(); resolve(window.YT) }
+      const el = document.createElement('script')
+      el.src = 'https://www.youtube.com/iframe_api'
+      document.head.appendChild(el)
+    })
+  }
+  return window.__ytApiBelofte
+}
+
+function GeschiktVideo({ id, m }) {
+  const [speelt, setSpeelt] = useState(false)
+  const [gedempt, setGedempt] = useState(false)
+  const [voortgang, setVoortgang] = useState(0)
+  const iframeRef = useRef(null)
+  const spelerRef = useRef(null)
+  const gemeten = useRef(new Set())
+  const meetEens = (naam, meta) => { if (!gemeten.current.has(naam)) { gemeten.current.add(naam); meet(naam, meta ? { meta } : undefined) } }
+
+  const embed = `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+  const appUrl = appSafeEmbedUrl(`https://www.youtube.com/embed/${id}?autoplay=1&mute=1&rel=0&playsinline=1`)
+  const eigenLaag = !appUrl.includes('yt.html')
+
+  useEffect(() => {
+    if (!eigenLaag) return
+    let weg = false
+    let controle
+    laadYouTubeApi().then((YT) => {
+      if (weg || !iframeRef.current) return
+      spelerRef.current = new YT.Player(iframeRef.current, {
+        events: {
+          onReady: (e) => {
+            e.target.unMute(); e.target.playVideo()
+            // Speelt hij na een moment niet, dan blokkeert de browser geluid.
+            controle = setTimeout(() => {
+              if (weg) return
+              if (e.target.getPlayerState?.() !== YT.PlayerState.PLAYING) {
+                e.target.mute(); e.target.playVideo(); setGedempt(true)
+              }
+            }, 900)
+          },
+          onStateChange: (e) => {
+            const aan = e.data === YT.PlayerState.PLAYING
+            setSpeelt(aan)
+            if (aan) meetEens('geschikt_video_start')
+            if (e.data === YT.PlayerState.ENDED) { setVoortgang(1); meetEens('geschikt_video_klaar') }
+          },
+        },
+      })
+    })
+    return () => { weg = true; clearTimeout(controle); try { spelerRef.current?.destroy?.() } catch { /* leeg */ } }
+  }, [eigenLaag])
+
+  useEffect(() => {
+    if (!speelt) return
+    const t = setInterval(() => {
+      try {
+        const p = spelerRef.current
+        const duur = p?.getDuration?.() || 0
+        if (duur > 0) setVoortgang((p.getCurrentTime?.() || 0) / duur)
+      } catch { /* nog niet klaar */ }
+    }, 200)
+    return () => clearInterval(t)
+  }, [speelt])
+
+  const tik = () => {
+    const p = spelerRef.current
+    if (!p?.getPlayerState) return
+    if (gedempt) { p.unMute(); p.seekTo(0, true); p.playVideo(); setGedempt(false); meetEens('geschikt_video_geluid'); return }
+    if (p.getPlayerState() === 1) p.pauseVideo(); else p.playVideo()
+  }
+
+  return (
+    <div style={{
+      position: 'relative', margin: '1.2rem auto 0', height: m ? 'min(46vh, 390px)' : 'min(52vh, 460px)', aspectRatio: '9 / 16', maxWidth: '100%',
+      borderRadius: 18, overflow: 'hidden', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+    }}>
+      {eigenLaag ? (
+        <>
+          {/* Hoger dan het kader: de YouTube-titel valt bovenin weg. */}
+          <iframe ref={iframeRef} src={embed} title="Je bent geschikt"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            style={{ position: 'absolute', left: 0, top: -70, width: '100%', height: 'calc(100% + 140px)', border: 0, pointerEvents: 'none' }} />
+          <button onClick={tik} aria-label={gedempt ? 'Geluid aan' : speelt ? 'Pauze' : 'Afspelen'} style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
+            background: speelt && !gedempt ? 'transparent' : 'rgba(0,0,0,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            {gedempt ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0.75rem 1.1rem', borderRadius: 999, background: '#fff', color: '#000', fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', boxShadow: '0 6px 20px rgba(0,0,0,0.45)', animation: 'geluidPuls 1.6s ease-in-out infinite' }}>
+                <Volume2 size={20} strokeWidth={2.8} /> Tik voor geluid
+              </span>
+            ) : !speelt && (
+              <Play size={m ? 56 : 64} fill="#fff" color="#fff" strokeWidth={1} style={{ filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }} />
+            )}
+          </button>
+          {/* Dunne balk met de echte voortgang. */}
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }}>
+            <div style={{ width: `${voortgang * 100}%`, height: '100%', background: '#fff', transition: 'width 0.2s linear' }} />
+          </div>
+        </>
+      ) : (
+        <iframe src={appUrl} title="Je bent geschikt" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
+      )}
+    </div>
   )
 }
 
@@ -287,7 +408,8 @@ export function PrequalFlow({ m = false, compact = false }) {
 
   return (
     <div style={buitenkant}>
-      <div ref={bovenRef} />
+      {/* In het blad zweven logo en kruisje bovenin: ruimte laten bij het scrollen. */}
+      <div ref={bovenRef} style={{ scrollMarginTop: compact ? (m ? 64 : 80) : 0 }} />
       <div style={midden}>
         {/* Voortgang direct boven de vraag, even breed als de antwoorden:
             erboven de naam van de challenge (met terug ervoor) en de teller,
@@ -322,17 +444,8 @@ export function PrequalFlow({ m = false, compact = false }) {
         ) : vraag.video ? (
           <>
             {kop(vraag.vraag)}
-            {sub('Bekijk mijn video en laat hieronder je gegevens achter.')}
-            {/* Staande Short: midden, zo hoog dat de velden er nog onder passen. */}
-            <div style={{ margin: '1.2rem auto 0', height: m ? 'min(52vh, 420px)' : 'min(56vh, 480px)', aspectRatio: '9 / 16', maxWidth: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)', background: '#000' }}>
-              <iframe
-                src={appSafeEmbedUrl(`https://www.youtube-nocookie.com/embed/${vraag.video}?rel=0&playsinline=1&modestbranding=1`)}
-                title="Je bent geschikt"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
-              />
-            </div>
+            {sub('Laat hieronder je gegevens achter, dan neem ik contact met je op.')}
+            <GeschiktVideo id={vraag.video} m={m} />
           </>
         ) : (
           <>
@@ -400,7 +513,7 @@ export function PrequalFlow({ m = false, compact = false }) {
         {meteenDoor && bezig && <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.85rem', fontWeight: 800, color: ZWAK }}>Even geduld…</div>}
         </div>
       </div>
-      <style>{'@keyframes prequalIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }'}</style>
+      <style>{'@keyframes prequalIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } } @keyframes geluidPuls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }'}</style>
     </div>
   )
 }
