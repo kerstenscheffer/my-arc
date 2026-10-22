@@ -66,7 +66,7 @@ const schoon = (naam) => {
 }
 const sleutelVan = (hook) => (schoon(hook) || '').toLowerCase() || '__onbekend'
 
-const VELDEN = ['sessies', 'mobiel', 'blijft_30s', 'video_start', 'video_25', 'video_50', 'video_75', 'video_100',
+const VELDEN = ['sessies', 'geopend', 'mobiel', 'blijft_30s', 'video_start', 'video_25', 'video_50', 'video_75', 'video_100',
   'knop', 'form_start', 'form_klaar', 'geschikt', 'afgewezen', 'geschikt_video_start', 'geschikt_video_klaar']
 function telOp(hooks) {
   const t = Object.fromEntries(VELDEN.map(k => [k, 0]))
@@ -313,6 +313,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const spend = spendRijen.reduce((s, r) => s + (Number(r.spend) || 0), 0)
   const klikken = spendRijen.reduce((s, r) => s + (Number(r.klikken) || 0), 0)
   const impressies = spendRijen.reduce((s, r) => s + (Number(r.impressies) || 0), 0)
+  const geladen = spendRijen.reduce((s, r) => s + (Number(r.geladen) || 0), 0)
+  const ruis = data?.ruis || {}
   const calls = leads.filter(l => l.call)
   const gehouden = leads.filter(l => l.gehouden)
   const sales = leads.filter(l => Number(l.omzet) > 0)
@@ -394,20 +396,31 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       ),
     },
     bezoekers: {
-      titel: 'Op de pagina', sub: alleenAds ? 'Alleen bezoekers via een advertentie' : 'Alle bezoekers, ook Instagram-bio en direct',
+      titel: 'Op de pagina', sub: alleenAds ? 'Unieke bezoekers via een advertentie' : 'Unieke bezoekers, ook Instagram-bio en direct',
       inhoud: (
         <>
           <Grafiek data={dagen} sleutel="sessies" label="bezoekers" />
-          <Regel label="Bezoekers" waarde={T.sessies} sterk />
-          {alleenAds && <Regel label="Klikken volgens Meta" waarde={klikken} />}
+          <Regel label="Unieke bezoekers" waarde={T.sessies} sterk />
+          <Regel label="Pagina geopend, ook opnieuw" waarde={T.geopend} />
           <Regel label="Gemiddelde tijd op de pagina" waarde={fmtTijd(T.tijd)} />
-          <Regel label="Bleef langer dan 30 seconden" waarde={`${T.blijft_30s} (${pct(T.blijft_30s, T.sessies)})`} />
-          <Regel label="Op de telefoon" waarde={pct(T.mobiel, T.sessies)} />
-          <Regel label="Klikte op de knop" waarde={`${T.knop} (${pct(T.knop, T.sessies)})`} />
+          <Regel label="Bleef langer dan 30 seconden" waarde={`${T.blijft_30s} (${pct(T.blijft_30s, T.geopend)})`} />
+          <Regel label="Op de telefoon" waarde={pct(T.mobiel, T.geopend)} />
+          <Regel label="Klikte op de knop" waarde={`${T.knop} (${pct(T.knop, T.geopend)})`} />
           {alleenAds && (
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
-              Bezoekers kan hoger zijn dan de klikken van Meta: wie de pagina in een nieuw tabblad opent of later terugkomt, telt als nieuw bezoek.
-            </div>
+            <>
+              <div style={{ ...kop, marginTop: 20 }}>Naast de cijfers van Meta</div>
+              <Regel label="Linkklikken (Meta)" waarde={klikken} />
+              <Regel label="Pagina geladen (Meta)" waarde={geladen} />
+              <Regel label="Unieke bezoekers (hier)" waarde={T.sessies} sterk />
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 12, lineHeight: 1.55 }}>
+                Meta telt alleen wie zijn advertentie-cookies toestaat en de pagina laat laden voordat hij wegklikt. Wij tellen elke klik met een eigen klik-id van Meta, ook als iemand de tracking uit heeft staan. Daarom zit dit getal meestal wat boven dat van Meta. Opnieuw openen (terug naar Instagram en weer terug) telt hier één keer.
+              </div>
+              {(ruis.controle_ad > 0 || ruis.fragment_ad > 0) && (
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: ZWAK, marginTop: 10, lineHeight: 1.55 }}>
+                  Niet meegeteld: {ruis.controle_ad || 0} controlebezoeken van Meta zelf (bij het publiceren of aanpassen van een advertentie) en {ruis.fragment_ad || 0} losse meetstukjes zonder echt bezoek.
+                </div>
+              )}
+            </>
           )}
         </>
       ),
