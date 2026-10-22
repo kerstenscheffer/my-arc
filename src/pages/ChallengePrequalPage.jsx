@@ -145,13 +145,16 @@ function laadYouTubeApi() {
   return window.__ytApiBelofte
 }
 
-function GeschiktVideo({ id, m, vol = false }) {
+function GeschiktVideo({ id, m, vol = false, onKlaar }) {
   const [speelt, setSpeelt] = useState(false)
   const [gedempt, setGedempt] = useState(false)
   const [voortgang, setVoortgang] = useState(0)
   const iframeRef = useRef(null)
   const spelerRef = useRef(null)
   const gemeten = useRef(new Set())
+  // Via een ref, zodat de speler niet opnieuw opgebouwd wordt als de functie wisselt.
+  const klaarRef = useRef(onKlaar)
+  useEffect(() => { klaarRef.current = onKlaar }, [onKlaar])
   const meetEens = (naam, meta) => { if (!gemeten.current.has(naam)) { gemeten.current.add(naam); meet(naam, meta ? { meta } : undefined) } }
 
   const embed = `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
@@ -180,7 +183,11 @@ function GeschiktVideo({ id, m, vol = false }) {
             const aan = e.data === YT.PlayerState.PLAYING
             setSpeelt(aan)
             if (aan) meetEens('geschikt_video_start')
-            if (e.data === YT.PlayerState.ENDED) { setVoortgang(1); meetEens('geschikt_video_klaar') }
+            // De eerste keer uitgekeken: door naar de gegevens.
+            if (e.data === YT.PlayerState.ENDED) {
+              setVoortgang(1)
+              if (!gemeten.current.has('geschikt_video_klaar')) { meetEens('geschikt_video_klaar'); klaarRef.current?.() }
+            }
           },
         },
       })
@@ -266,6 +273,15 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
   const utm = useRef({ ...utmUitUrl(), ...herkomst() })
   const bovenRef = useRef(null)
   const doorTimer = useRef(null)
+  const voornaamRef = useRef(null)
+  // Video uitgekeken: rustig naar de velden en de cursor in de voornaam.
+  // (iPhone opent het toetsenbord alleen na een tik; daar staat het veld dan klaar.)
+  const naarGegevens = () => {
+    const el = voornaamRef.current
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => { try { el.focus({ preventScroll: true }) } catch { /* leeg */ } }, 450)
+  }
 
   // De schermen die voor deze persoon gelden (`alleen` in challengeVragen).
   const pad = VRAGEN.filter(q => !q.alleen || q.alleen(antw))
@@ -457,7 +473,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
         ) : vraag.video && volVideo ? (
           <>
             {/* Tegen de randen van het blad: de padding van de buitenkant teniet. */}
-            <div style={{ margin: '-1.1rem -1.1rem 1.2rem' }}><GeschiktVideo id={vraag.video} m={m} vol /></div>
+            <div style={{ margin: '-1.1rem -1.1rem 1.2rem' }}><GeschiktVideo id={vraag.video} m={m} vol onKlaar={naarGegevens} /></div>
             {kop(vraag.vraag)}
             {sub('Laat hieronder je gegevens achter, dan neem ik contact met je op.')}
           </>
@@ -465,7 +481,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
           <>
             {kop(vraag.vraag)}
             {sub('Laat hieronder je gegevens achter, dan neem ik contact met je op.')}
-            <GeschiktVideo id={vraag.video} m={m} />
+            <GeschiktVideo id={vraag.video} m={m} onKlaar={naarGegevens} />
           </>
         ) : (
           <>
@@ -494,7 +510,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
           {vraag.soort === 'gegevens' && (
             <>
               <input
-                autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam"
+                ref={voornaamRef} autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam"
                 onChange={e => zet('voornaam', e.target.value)} style={invoer(m)}
               />
               {telefoon ? (
