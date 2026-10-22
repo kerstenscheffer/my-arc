@@ -982,25 +982,27 @@ export default function ChallengeVslPage() {
         </p>
       </Sectie>
 
-      {/* ══ 5. De coach ══ */}
-      <Sectie m={m} style={{ background: BG }}>
+      {/* ══ 5. De coach ══ (wit sinds 22 okt 2026: na het weghalen van De
+          aanpak stonden er twee donkere secties onder elkaar) */}
+      <Sectie m={m} thema="wit">
         <div style={{
           display: 'grid', gridTemplateColumns: m ? '1fr' : '1.15fr 0.85fr',
           gap: m ? '1.4rem' : '3rem', alignItems: 'center',
         }}>
           <div>
             {m ? (
-              // Telefoon: één vak met de foto rechts (heel bovenlijf in beeld),
-              // naar links weggevaagd, en de kop links eroverheen (22 okt 2026).
-              <div style={{ position: 'relative', minHeight: 420, borderRadius: 18, overflow: 'hidden', background: '#111', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'flex-end' }}>
+              // Telefoon: schermbreed vak bovenaan de sectie met de foto rechts
+              // (heel bovenlijf in beeld), naar links weggevaagd in wit, en de
+              // kop links eroverheen (22 okt 2026).
+              <div style={{ position: 'relative', minHeight: 440, margin: '-4rem -1.25rem 0', overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'flex-end' }}>
                 <img src="/waarom-kersten.jpg" alt="Kersten" draggable={false}
                   style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: '74%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
-                <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #111 0%, #111 26%, rgba(17,17,17,0.85) 40%, rgba(17,17,17,0) 72%)' }} />
-                <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', background: 'linear-gradient(0deg, rgba(17,17,17,0.9) 0%, rgba(17,17,17,0) 100%)' }} />
-                <div style={{ position: 'relative', width: '62%', padding: '1.3rem 0 1.4rem 1.2rem' }}>
+                <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #fff 0%, #fff 26%, rgba(255,255,255,0.85) 40%, rgba(255,255,255,0) 72%)' }} />
+                <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%', background: 'linear-gradient(0deg, #fff 0%, rgba(255,255,255,0) 100%)' }} />
+                <div style={{ position: 'relative', width: '62%', padding: '1.3rem 0 0.6rem 1.25rem' }}>
                   <Label m={m}>De coach</Label>
-                  <h2 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.02em', color: '#fff', textTransform: 'uppercase' }}>Ik ben Kersten.</h2>
-                  <p style={{ margin: '0.6rem 0 0', fontSize: '1rem', fontWeight: 800, lineHeight: 1.35, color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.02em', color: '#000', textTransform: 'uppercase' }}>Ik ben Kersten.</h2>
+                  <p style={{ margin: '0.6rem 0 0', fontSize: '1rem', fontWeight: 800, lineHeight: 1.35, color: '#1a1a1a', textShadow: '0 1px 8px rgba(255,255,255,0.8)' }}>
                     En ik kijk verder dan je voedings- en trainingsschema.
                   </p>
                 </div>
@@ -1014,7 +1016,7 @@ export default function ChallengeVslPage() {
               <Tekst m={m}>In mijn coaching kijk ik daarom naar jouw hele situatie. Wat wil je bereiken? Hoe ziet je week eruit? En op welke momenten wordt het lastig?</Tekst>
               <Tekst m={m}>Ik begeleid al tientallen mannen en help ze om concrete oplossingen te vinden voor de dingen waar ze op vastlopen.</Tekst>
               <Tekst m={m}>Met deze challenge wil ik je laten ervaren hoe die begeleiding werkt. Zodat je ontdekt wat bij jou past en hoe je gericht aan je lichaam kunt werken.</Tekst>
-              <p style={{ margin: '0.4rem 0 0', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.35, color: '#fff' }}>
+              <p style={{ margin: '0.4rem 0 0', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.35, color: THEMAS.wit.tekst }}>
                 Van jou vraag ik eerlijkheid en inzet. Van mij krijg je een persoonlijk plan, aandacht voor je voortgang en begeleiding bij het bijsturen.
               </p>
             </div>
@@ -1023,7 +1025,7 @@ export default function ChallengeVslPage() {
             <div style={{
               borderRadius: 18, overflow: 'hidden', aspectRatio: '4 / 5',
               backgroundImage: 'url(/waarom-kersten.jpg)', backgroundSize: 'cover', backgroundPosition: 'center top',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: `1px solid ${THEMAS.wit.rand}`,
             }} />
           )}
         </div>
