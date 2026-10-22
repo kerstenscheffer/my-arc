@@ -623,12 +623,14 @@ function ModalKader({ open, onClose, m, children }) {
 }
 
 function KalenderBlad({ open, onClose, m }) {
+  // Op het geschikt-scherm (telefoon) vult de video het blad: dan geen foto's.
+  const [volVideo, setVolVideo] = useState(false)
   return (
     <ModalKader open={open} onClose={onClose} m={m}>
       {/* Bovenin het blad de transformaties van Kersten en Nitish: zo zie
           je tijdens de vragen waar je het voor doet (21 okt 2026).
           Volle breedte, tegen elkaar aan; bijgesneden op het bovenlijf. */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, width: '100%', flexShrink: 0 }}>
+      {!volVideo && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, width: '100%', flexShrink: 0 }}>
         {TRANSFORMATIES.map(t => (
           <div key={t.src} style={{ position: 'relative', height: m ? 170 : 240, overflow: 'hidden', background: '#141414' }}>
             <img src={t.src} alt={t.caption} draggable={false}
@@ -639,8 +641,8 @@ function KalenderBlad({ open, onClose, m }) {
             </div>
           </div>
         ))}
-      </div>
-      <PrequalFlow m={m} compact />
+      </div>}
+      <PrequalFlow m={m} compact onVolVideo={setVolVideo} />
     </ModalKader>
   )
 }

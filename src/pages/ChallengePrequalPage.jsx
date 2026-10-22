@@ -145,7 +145,7 @@ function laadYouTubeApi() {
   return window.__ytApiBelofte
 }
 
-function GeschiktVideo({ id, m }) {
+function GeschiktVideo({ id, m, vol = false }) {
   const [speelt, setSpeelt] = useState(false)
   const [gedempt, setGedempt] = useState(false)
   const [voortgang, setVoortgang] = useState(0)
@@ -208,7 +208,12 @@ function GeschiktVideo({ id, m }) {
   }
 
   return (
-    <div style={{
+    <div style={vol ? {
+      // Volle breedte van het blad, tegen de randen aan; te hoog = boven en
+      // onder bijgesneden (de iframe meet zich aan de breedte, zie cqw).
+      position: 'relative', width: '100%', aspectRatio: '9 / 16', maxHeight: '64vh',
+      overflow: 'hidden', background: '#111', containerType: 'inline-size',
+    } : {
       position: 'relative', margin: '1.2rem auto 0', height: m ? 'min(46vh, 390px)' : 'min(52vh, 460px)', aspectRatio: '9 / 16', maxWidth: '100%',
       borderRadius: 18, overflow: 'hidden', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
     }}>
@@ -217,7 +222,9 @@ function GeschiktVideo({ id, m }) {
           {/* Hoger dan het kader: de YouTube-titel valt bovenin weg. */}
           <iframe ref={iframeRef} src={embed} title="Je bent geschikt"
             allow="autoplay; encrypted-media; picture-in-picture"
-            style={{ position: 'absolute', left: 0, top: -70, width: '100%', height: 'calc(100% + 140px)', border: 0, pointerEvents: 'none' }} />
+            style={vol
+              ? { position: 'absolute', left: 0, top: 'calc(50% - (100cqw * 16 / 9 + 140px) / 2)', width: '100%', height: 'calc(100cqw * 16 / 9 + 140px)', border: 0, pointerEvents: 'none' }
+              : { position: 'absolute', left: 0, top: -70, width: '100%', height: 'calc(100% + 140px)', border: 0, pointerEvents: 'none' }} />
           <button onClick={tik} aria-label={gedempt ? 'Geluid aan' : speelt ? 'Pauze' : 'Afspelen'} style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
             background: speelt && !gedempt ? 'transparent' : 'rgba(0,0,0,0.25)',
@@ -250,7 +257,7 @@ function GeschiktVideo({ id, m }) {
 // startscherm meer: wie op de knop drukt zit meteen in vraag 1. Eén keuze =
 // meteen door; bij meerkeuze en bij de gegevens een knop.
 
-export function PrequalFlow({ m = false, compact = false }) {
+export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
   const [stap, setStap] = useState(0)            // index in `pad`, of 'klaar'
   const [antw, setAntw] = useState({})
   const [einde, setEinde] = useState(null)       // { uitkomst, reden, leadId }
@@ -263,6 +270,10 @@ export function PrequalFlow({ m = false, compact = false }) {
   // De schermen die voor deze persoon gelden (`alleen` in challengeVragen).
   const pad = VRAGEN.filter(q => !q.alleen || q.alleen(antw))
   const vraag = typeof stap === 'number' ? pad[stap] : null
+  // Op de telefoon in het blad: de video over de volle breedte bovenaan, en
+  // het blad laat dan de transformatiefoto's weg (22 okt 2026).
+  const volVideo = compact && m && !!vraag?.video
+  useEffect(() => { onVolVideo?.(volVideo) }, [volVideo, onVolVideo])
 
   useEffect(() => { meet('form_start') }, [])
   useEffect(() => () => clearTimeout(doorTimer.current), [])
@@ -411,6 +422,7 @@ export function PrequalFlow({ m = false, compact = false }) {
       {/* In het blad zweven logo en kruisje bovenin: ruimte laten bij het scrollen. */}
       <div ref={bovenRef} style={{ scrollMarginTop: compact ? (m ? 64 : 80) : 0 }} />
       <div style={midden}>
+        {!volVideo && <>
         {/* Voortgang direct boven de vraag, even breed als de antwoorden:
             erboven de naam van de challenge (met terug ervoor) en de teller,
             eronder één balk. Kleur loopt van
@@ -431,6 +443,7 @@ export function PrequalFlow({ m = false, compact = false }) {
             <div style={{ width: `${(nummer / totaal) * 100}%`, height: '100%', background: voortgangKleur, borderRadius: 4, transition: 'width 0.35s ease, background-color 0.35s ease' }} />
           </div>
         </div>
+        </>}
         {/* Alleen de vraag schuift in; de balk blijft staan en loopt vloeiend op. */}
         <div key={vraag.id} style={{ animation: 'prequalIn 0.25s ease' }}>
         {vraag.soort === 'info' ? (
@@ -440,6 +453,13 @@ export function PrequalFlow({ m = false, compact = false }) {
             </div>
             {kop(vraag.vraag)}
             {sub('Op basis van je antwoorden past de 6 Weken Challenge bij jou. Nog twee korte stappen.')}
+          </>
+        ) : vraag.video && volVideo ? (
+          <>
+            {/* Tegen de randen van het blad: de padding van de buitenkant teniet. */}
+            <div style={{ margin: '-1.1rem -1.1rem 1.2rem' }}><GeschiktVideo id={vraag.video} m={m} vol /></div>
+            {kop(vraag.vraag)}
+            {sub('Laat hieronder je gegevens achter, dan neem ik contact met je op.')}
           </>
         ) : vraag.video ? (
           <>
