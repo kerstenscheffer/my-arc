@@ -29,7 +29,7 @@ import { createElement, useEffect, useState } from 'react'
 import {
   RefreshCw, Copy, Check, ChevronDown, ChevronRight, X, Link2,
   Megaphone, Info, Percent, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
-  PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet,
+  PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PrequalAfhaken from './PrequalAfhaken'
@@ -816,6 +816,31 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       </div>
 
       {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.84rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
+
+      {/* ═══ Statistiekbalk zoals in het leadsysteem, voor de advertentieleads ═══
+          Zelfde iconen en kleuren als PeriodStatsBar. Telt per lead die in de
+          periode binnenkwam wat er daarna met hem gebeurde. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 22, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: m ? -8 : -12, marginBottom: m ? 24 : 34, paddingBottom: 2 }}>
+        {[
+          { label: 'Nieuwe leads', waarde: leads.length, Icon: UserPlus, kleur: '#3b82f6', venster: 'gegevens' },
+          { label: 'Follow-ups (bericht gestuurd)', waarde: metBericht.length, Icon: Send, kleur: '#f59e0b', venster: 'followup' },
+          { label: 'Reacties (in gesprek)', waarde: inGesprek.length, Icon: MessageCircle, kleur: '#10b981', venster: 'followup' },
+          { label: 'Call voorgesteld', waarde: voorgesteld.length, Icon: Phone, kleur: '#a855f7', venster: 'call' },
+          { label: 'Call ingepland', waarde: calls.length, Icon: CalendarCheck, kleur: '#06b6d4', venster: 'call' },
+          { label: 'Call gevoerd', waarde: gehouden.length, Icon: PhoneCall, kleur: '#10b981', venster: 'call' },
+          { label: 'Sales', waarde: sales.length, Icon: Trophy, kleur: '#FFD700', venster: 'sale' },
+          { label: 'Omzet', waarde: euro(omzet), Icon: Euro, kleur: '#22c55e', venster: 'omzet' },
+          { label: 'Sale verloren', waarde: verloren.length, Icon: XCircle, kleur: '#ef4444', venster: 'sale' },
+        ].map(it => (
+          <button key={it.label} title={it.label} onClick={() => setInfo(it.venster)} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: 0, background: 'none', border: 'none',
+            color: '#fff', fontFamily: 'inherit', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <it.Icon size={15} color={it.kleur} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: m ? '0.95rem' : '1.25rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: laden ? 0.45 : 1 }}>{it.waarde}</span>
+          </button>
+        ))}
+      </div>
 
       {/* ═══ 1. RENDEMENT ═══ */}
       <div style={{ display: 'grid', gridTemplateColumns: m ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: m ? '22px 18px' : 32, marginBottom: m ? 34 : 46 }}>
