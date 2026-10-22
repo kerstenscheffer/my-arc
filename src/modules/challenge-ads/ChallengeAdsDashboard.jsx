@@ -893,12 +893,24 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         {(() => {
           const f = FASES.find(x => x.id === openFase)
           if (!f) return null
+          // Eén vak in de kleur van het oordeel van de fase: dit hoort bij
+          // elkaar, en bij rood zie je meteen dat je hier moet kijken.
+          const k = f.oordeel.rang >= 0 ? f.oordeel.kleur : '#ffffff'
+          const nr = FASES.indexOf(f) + 1
           return (
+            <div style={{
+              marginTop: 8, borderRadius: 16, border: `1px solid ${k}55`, background: `${k}0d`,
+              boxShadow: vast?.id === f.id ? `0 0 28px ${k}22` : 'none', overflow: 'hidden',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: m ? '0.8rem 0.9rem 0' : '0.95rem 1.2rem 0' }}>
+              <span style={{ fontSize: '0.92rem', fontWeight: 900 }}>{nr}. {f.naam}</span>
+              <span style={{ fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 6, color: f.oordeel.kleur, background: `${k}1f` }}>{f.oordeel.tekst}</span>
+              <span style={{ fontSize: '0.76rem', fontWeight: 700, color: ZWAK, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.vraag}</span>
+            </div>
             <div style={{
               display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8,
               overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-              padding: '14px 16px 8px 8px', margin: m ? '6px -16px 0 -8px' : '6px 0 0 -8px',
-              borderTop: LIJN,
+              padding: m ? '12px 14px 14px 10px' : '14px 20px 18px 14px',
             }}>
               {f.metingen.map((x, j) => {
                 const [groot, klein] = String(x.tekst).split(' · ')
@@ -930,6 +942,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                   </div>
                 )
               })}
+            </div>
             </div>
           )
         })()}
