@@ -388,7 +388,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   }
   const FASES = [
     { id: 'advertentie', naam: 'Advertentie', vraag: 'Klikken mensen, en goedkoop?', metingen: [
-      M('Klikratio (CTR)', ctr, 1, null, ctr != null ? procent(ctr, 1) : '–', 'spend', `${klikken} klikken op ${impressies.toLocaleString('nl-NL')} vertoningen`),
+      M('Klikratio (CTR)', klikken, impressies, RICHT.ctr, ctr != null ? procent(ctr, 1) : '–', 'spend', `goed is 1% of meer · ${klikken} klikken`),
       M('Kosten per klik', cpc, null, RICHT.cpc, cpc != null ? euro(cpc, true) : '–', 'spend', 'goed is onder €0,60'),
     ] },
     { id: 'funnel', naam: 'Funnel', vraag: 'Laten bezoekers hun gegevens achter?', metingen: [
