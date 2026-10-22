@@ -25,7 +25,7 @@
 // vastloopt. De lead-fases tellen met dezelfde woorden als de statistiekbalk
 // van het leadsysteem, maar alleen voor leads uit de advertenties.
 
-import { createElement, useEffect, useState } from 'react'
+import { createElement, useEffect, useRef, useState } from 'react'
 import {
   Copy, Check, ChevronDown, ChevronRight, X, Link2,
   Megaphone, Info, Percent, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
@@ -324,6 +324,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     setPeriodeState(p)
     try { localStorage.setItem('arc_ads_periode', p) } catch { /* geen opslag */ }
   }
+  const datumRef = useRef(null)
   const [vanafDatum, setVanafDatum] = useState(() => {
     try { return localStorage.getItem('arc_ads_vanaf') || '' } catch { return '' }
   })
@@ -862,16 +863,28 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             {campagne && !campagnes.some(c => c.k === campagne) && <option value={keuzeWaarde}>Gekozen campagne (geen data in deze periode)</option>}
           </select>
           <span style={scheiding} />
-          <select value={periode} onChange={e => setPeriode(e.target.value)} style={{ ...seg, flex: m ? '1 1 0' : '0 0 auto' }} aria-label="Periode">
-            {PERIODES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-          </select>
-          {periode === 'vanaf' && (
-            <>
-              <span style={scheiding} />
-              <input type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')}
-                onChange={e => kiesVanaf(e.target.value)} style={{ ...seg, flex: '0 0 auto' }} aria-label="Vanaf" />
-            </>
-          )}
+          {/* Periode en 'vanaf' in één: kies je een datum, dan opent de
+              datumkiezer en staat er daarna "Vanaf 10 okt". */}
+          <span style={{ position: 'relative', display: 'flex', height: '100%', flex: m ? '1 1 0' : '0 0 auto' }}>
+            <select value={periode === 'vanaf' && vanafDatum ? 'vanaf' : (periode === 'vanaf' ? '14' : periode)}
+              onChange={e => {
+                const v = e.target.value
+                if (v === 'vanaf' || v === 'vanaf_kies') {
+                  try { datumRef.current?.showPicker?.() } catch { datumRef.current?.focus?.() }
+                  return
+                }
+                setPeriode(v)
+              }}
+              style={{ ...seg, width: '100%' }} aria-label="Periode">
+              {PERIODES.filter(p => p.id !== 'vanaf').map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+              {periode === 'vanaf' && vanafDatum
+                ? <><option value="vanaf">Vanaf {dagLabel(vanafDatum)}</option><option value="vanaf_kies">Andere datum…</option></>
+                : <option value="vanaf_kies">Vanaf datum…</option>}
+            </select>
+            <input ref={datumRef} type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')} tabIndex={-1} aria-hidden="true"
+              onChange={e => { kiesVanaf(e.target.value); if (e.target.value) setPeriode('vanaf') }}
+              style={{ position: 'absolute', left: 0, bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none', border: 0, padding: 0 }} />
+          </span>
           <span style={scheiding} />
           <button onClick={() => setPaneel('advertenties')} title="Per advertentie" style={{ ...seg, display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
             <Megaphone size={14} strokeWidth={2.6} />{!m && 'Per advertentie'}
