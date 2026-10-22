@@ -40,6 +40,37 @@ const utmUitUrl = () => {
 const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim())
 const telOk = (t) => String(t || '').replace(/[^0-9+]/g, '').length >= 8
 
+// Telefoonveld: landcode los ervoor, Nederland staat klaar met 06 erin
+// (22 okt 2026). Opgeslagen als +316…, zonder de 0. Plakt iemand of de
+// browser een nummer met +31/0031, dan wordt de landcode eruit gehaald.
+const LANDEN = [
+  { code: '+31', naam: 'NL', start: '06', cijfers: 9 },
+  { code: '+32', naam: 'BE', start: '', cijfers: 9 },
+  { code: '+49', naam: 'DE', start: '', cijfers: 0 },
+  { code: '+44', naam: 'UK', start: '', cijfers: 0 },
+]
+const landVan = (code) => LANDEN.find(l => l.code === code) || LANDEN[0]
+function leesTelefoon(land, invoer) {
+  let rest = String(invoer || '').replace(/[^0-9+]/g, '')
+  if (rest.startsWith('00')) rest = `+${rest.slice(2)}`
+  if (rest.startsWith('+')) {
+    const l = LANDEN.find(x => rest.startsWith(x.code))
+    if (l) { land = l.code; rest = rest.slice(l.code.length) } else rest = rest.slice(1)
+    // Na de landcode schrijven we het nationaal, met 0 ervoor als dat zo hoort.
+    if (landVan(land).start && rest && !rest.startsWith('0')) rest = `0${rest}`
+  }
+  return { land, nummer: rest }
+}
+const volledigNummer = (land, nummer) => {
+  const kaal = String(nummer || '').replace(/\D/g, '').replace(/^0+/, '')
+  return kaal ? `${land}${kaal}` : ''
+}
+const nummerOk = (land, nummer) => {
+  const kaal = String(nummer || '').replace(/\D/g, '').replace(/^0+/, '')
+  const nodig = landVan(land).cijfers
+  return nodig ? kaal.length === nodig : kaal.length >= 7
+}
+
 // Antwoorden omzetten naar wat het bord nodig heeft.
 function bouwPayload(antw, uitkomst, afwijsreden, utm) {
   // Meerkeuze met het eigen antwoord erachter (alleen 'Wat vind je nu lastig?').
@@ -311,7 +342,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
     if (q.soort === 'info') return true
     if (q.soort === 'gegevens') {
       if (!String(a.voornaam || '').trim()) return false
-      return vraagtTelefoon(a) ? telOk(a.telefoon) : emailOk(a.email)
+      return vraagtTelefoon(a) ? nummerOk(a.tel_land || '+31', a.tel_nummer) && telOk(a.telefoon) : emailOk(a.email)
     }
     return false
   }
@@ -514,12 +545,32 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
                 onChange={e => zet('voornaam', e.target.value)} style={invoer(m)}
               />
               {telefoon ? (
-                <input
-                  type="tel" inputMode="tel" autoComplete="tel" value={antw.telefoon || ''}
-                  placeholder="Telefoonnummer*"
-                  onChange={e => zet('telefoon', e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') verder() }} style={invoer(m)}
-                />
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <select
+                    aria-label="Landcode" value={antw.tel_land || '+31'}
+                    onChange={e => {
+                      const land = e.target.value
+                      const oud = antw.tel_nummer ?? '06'
+                      // Alleen de klaargezette 06 meewisselen, nooit een getypt nummer.
+                      const nummer = !oud || oud === landVan(antw.tel_land || '+31').start ? landVan(land).start : oud
+                      setAntw(a => ({ ...a, tel_land: land, tel_nummer: nummer, telefoon: volledigNummer(land, nummer) }))
+                    }}
+                    style={{ ...invoer(m), width: 'auto', flexShrink: 0, paddingRight: '0.6rem', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', textAlign: 'center', colorScheme: 'dark' }}
+                  >
+                    {LANDEN.map(l => <option key={l.code} value={l.code}>{l.naam} {l.code}</option>)}
+                  </select>
+                  <input
+                    type="tel" inputMode="tel" autoComplete="tel"
+                    value={antw.tel_nummer ?? landVan(antw.tel_land || '+31').start}
+                    placeholder={(antw.tel_land || '+31') === '+31' ? '06 12345678*' : 'Telefoonnummer*'}
+                    onChange={e => {
+                      const { land, nummer } = leesTelefoon(antw.tel_land || '+31', e.target.value)
+                      setAntw(a => ({ ...a, tel_land: land, tel_nummer: nummer, telefoon: volledigNummer(land, nummer) }))
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter') verder() }}
+                    style={{ ...invoer(m), flex: 1, minWidth: 0 }}
+                  />
+                </div>
               ) : (
                 <input
                   type="email" inputMode="email" autoComplete="email" value={antw.email || ''} placeholder="jouw@email.nl"
