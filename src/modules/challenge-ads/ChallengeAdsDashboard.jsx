@@ -486,27 +486,27 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     return { label, tekst, sub, venster, oordeel, score }
   }
   const FASES = [
-    { id: 'advertentie', naam: 'Advertentie', vraag: 'Klikken mensen, en goedkoop?', metingen: [
+    { id: 'advertentie', naam: 'Advertentie', vraag: 'Klikken mensen, en goedkoop?', preview: [['Uitgegeven', euro(spend)], ['CTR', ctr != null ? procent(ctr, 1) : '–', 'Klikratio (CTR)'], ['Per klik', cpc != null ? euro(cpc, true) : '–', 'Kosten per klik']], metingen: [
       M('Klikratio (CTR)', klikken, impressies, RICHT.ctr, ctr != null ? procent(ctr, 1) : '–', 'spend', `goed is 1% of meer · ${klikken} klikken`),
       M('Kosten per klik', cpc, null, RICHT.cpc, cpc != null ? euro(cpc, true) : '–', 'spend', 'goed is onder €0,60'),
     ] },
-    { id: 'funnel', naam: 'Funnel', vraag: 'Laten bezoekers hun gegevens achter?', metingen: [
+    { id: 'funnel', naam: 'Funnel', vraag: 'Laten bezoekers hun gegevens achter?', preview: [['Bezoekers', String(T.sessies)], ['Leads', String(leads.length), 'Leads binnen'], ['Conversie', pct(leads.length, T.sessies)]], metingen: [
       M('Bezoekers', T.sessies, null, null, String(T.sessies), 'bezoekers', `gem. ${fmtTijd(T.tijd)} op de pagina`),
       M('Video gestart', T.video_start, T.sessies, RICHT.video, `${T.video_start} · ${pct(T.video_start, T.sessies)}`, 'video', `${pct(T.video_100, T.video_start)} kijkt hem helemaal`),
       M('Op de knop geklikt', T.knop, T.sessies, RICHT.knop, `${T.knop} · ${pct(T.knop, T.sessies)}`, 'formulier', 'van de bezoekers'),
       M('Formulier gestart', T.form_start, T.sessies, RICHT.fstart, `${T.form_start} · ${pct(T.form_start, T.sessies)}`, 'formulier', 'van de bezoekers'),
       M('Leads binnen', leads.length, T.form_start, RICHT.leads, `${leads.length} · ${pct(leads.length, T.form_start)}`, 'gegevens', `van wie begon · ${T.afgewezen} niet geschikt`),
     ] },
-    { id: 'followup', naam: 'Follow-up', vraag: 'Komen we in contact?', metingen: [
+    { id: 'followup', naam: 'Follow-up', vraag: 'Komen we in contact?', preview: [['Bericht', pct(metBericht.length, leads.length), 'Bericht gestuurd'], ['In gesprek', String(inGesprek.length), 'In gesprek']], metingen: [
       M('Bericht gestuurd', metBericht.length, leads.length, RICHT.bericht, `${metBericht.length} · ${pct(metBericht.length, leads.length)}`, 'followup', 'van de leads'),
       M('In gesprek', inGesprek.length, metBericht.length, RICHT.contact, `${inGesprek.length} · ${pct(inGesprek.length, metBericht.length)}`, 'followup', 'reageerde op je bericht'),
     ] },
-    { id: 'call', naam: 'Call', vraag: 'Worden er calls geboekt en gehouden?', metingen: [
+    { id: 'call', naam: 'Call', vraag: 'Worden er calls geboekt en gehouden?', preview: [['Ingepland', String(calls.length), 'Call ingepland'], ['Gehad', String(gehouden.length), 'Call gehad'], ['No-show', String(noshows.length)]], metingen: [
       M('Call voorgesteld', voorgesteld.length, inGesprek.length, RICHT.voorgesteld, `${voorgesteld.length} · ${pct(voorgesteld.length, inGesprek.length)}`, 'call', 'van wie in gesprek is'),
       M('Call ingepland', calls.length, voorgesteld.length, RICHT.ingepland, `${calls.length} · ${pct(calls.length, voorgesteld.length)}`, 'call', `van de voorstellen · ${nogGepland.length} staat nog`),
       M('Call gehad', gehouden.length, afgerond, RICHT.show, `${gehouden.length} · ${pct(gehouden.length, afgerond)}`, 'call', `kwam opdagen · ${noshows.length} no-show · ${afgezegd.length} afgezegd`),
     ] },
-    { id: 'close', naam: 'Close', vraag: 'Wordt er geclosed?', metingen: [
+    { id: 'close', naam: 'Close', vraag: 'Wordt er geclosed?', preview: [['Sales', String(sales.length), 'Sale'], ['Omzet', euro(omzet)]], metingen: [
       M('Sale', sales.length, gehouden.length, RICHT.close, `${sales.length} · ${pct(sales.length, gehouden.length)}`, 'sale', `van de calls · ${verloren.length} verloren`),
       M('Gem. orderwaarde', null, null, null, sales.length ? euro(omzet / sales.length) : '–', 'omzet', `${euro(omzet)} omzet`),
     ] },
@@ -847,8 +847,17 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                   border: `1px solid ${open ? 'rgba(255,255,255,0.35)' : isVast ? `${k}66` : 'rgba(255,255,255,0.08)'}`,
                   transition: 'background 0.15s, border-color 0.15s', WebkitTapHighlightColor: 'transparent',
                 }}>
-                  {/* Het bolletje draagt het oordeel; de bottleneck pulseert. */}
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
+                  {/* Bovenaan het oordeel als label, dan bolletje + naam met de
+                      vraag eronder, onderaan de belangrijkste cijfers. */}
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' }}>
+                    <span style={{
+                      fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                      padding: '3px 8px', borderRadius: 6,
+                      color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
+                    }}>{isVast ? `${f.oordeel.tekst} · eerst aanpakken` : f.oordeel.tekst}</span>
+                    <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 2 }}>
                     <span style={{
                       width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -857,15 +866,23 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                       boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
                       animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
                     }}>{i + 1}</span>
-                    <span style={{ fontSize: '0.98rem', fontWeight: 900, flex: 1, minWidth: 0 }}>{f.naam}</span>
-                    <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
+                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3, marginTop: 1 }}>{f.vraag}</span>
+                    </span>
                   </span>
-                  <span style={{
-                    fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.02em', whiteSpace: 'nowrap',
-                    padding: '2px 8px', borderRadius: 999,
-                    color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
-                  }}>{isVast ? `${f.oordeel.tekst} · eerst aanpakken` : f.oordeel.tekst}</span>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, lineHeight: 1.35 }}>{f.vraag}</span>
+                  <span style={{ display: 'flex', gap: m ? 12 : 14, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                    {(f.preview || []).map(([label, waarde, meting]) => {
+                      const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
+                      const kl = o && o.rang >= 0 ? o.kleur : '#fff'
+                      return (
+                        <span key={label} style={{ minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', color: kl, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{waarde}</span>
+                          <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: ZWAK, whiteSpace: 'nowrap' }}>{label}</span>
+                        </span>
+                      )
+                    })}
+                  </span>
                 </button>
               </div>
             )
