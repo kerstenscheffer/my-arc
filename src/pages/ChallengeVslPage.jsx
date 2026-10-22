@@ -569,7 +569,7 @@ function ModalKader({ open, onClose, m, children }) {
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', animation: 'bladWaas 0.2s ease',
+        position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', animation: 'bladWaas 0.2s ease',
         // De modal staat midden op de pagina en is zo hoog als zijn inhoud:
         // geen lege zwarte ruimte onder de vraag.
         display: 'flex', justifyContent: 'center', alignItems: 'center', boxSizing: 'border-box',
