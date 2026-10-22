@@ -413,7 +413,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
               <Regel label="Pagina geladen (Meta)" waarde={geladen} />
               <Regel label="Unieke bezoekers (hier)" waarde={T.sessies} sterk />
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 12, lineHeight: 1.55 }}>
-                Meta telt alleen wie zijn advertentie-cookies toestaat en de pagina laat laden voordat hij wegklikt. Wij tellen elke klik met een eigen klik-id van Meta, ook als iemand de tracking uit heeft staan. Daarom zit dit getal meestal wat boven dat van Meta. Opnieuw openen (terug naar Instagram en weer terug) telt hier één keer.
+                Elke klik op je advertentie krijgt van Meta een klik-id; hier telt elk id één keer, ook als iemand de pagina vaker opent. Meta haalt zelf nog dubbele en ongeldige klikken eruit, en Instagram geeft soms een nieuw id als de pagina opnieuw laadt. Daarom ligt dit getal iets boven dat van Meta. Kosten per klik reken je met het getal van Meta, de trechter hier met de unieke bezoekers.
               </div>
               {(ruis.controle_ad > 0 || ruis.fragment_ad > 0) && (
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: ZWAK, marginTop: 10, lineHeight: 1.55 }}>
