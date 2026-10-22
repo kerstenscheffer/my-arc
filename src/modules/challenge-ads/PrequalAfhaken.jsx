@@ -25,7 +25,9 @@ const waLink = (tel) => {
   return `https://wa.me/${n.replace(/^\+/, '')}`
 }
 
-export default function PrequalAfhaken({ venster, m }) {
+// `alleenNummers`: alleen wie zijn nummer gaf en afhaakte (het Ads-scherm
+// toont het afhaken per scherm zelf).
+export default function PrequalAfhaken({ venster, m, alleenNummers = false }) {
   const [rijen, setRijen] = useState(null)
   const [open, setOpen] = useState([])
 
@@ -59,7 +61,7 @@ export default function PrequalAfhaken({ venster, m }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : '1.4fr 1fr', gap: m ? 28 : 40, marginBottom: m ? 32 : 44 }}>
-      <div style={{ minWidth: 0 }}>
+      {!alleenNummers && <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginBottom: 4 }}>Afhaken per vraag</div>
         {begin === 0 ? (
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>
@@ -97,7 +99,7 @@ export default function PrequalAfhaken({ venster, m }) {
             </div>
           </>
         )}
-      </div>
+      </div>}
 
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>

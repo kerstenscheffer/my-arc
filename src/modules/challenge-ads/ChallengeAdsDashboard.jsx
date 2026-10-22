@@ -79,6 +79,14 @@ const beoordeel = (waarde, basis, r) => {
   if (r.laag) return waarde <= r.goed ? OORDEEL.goed : waarde <= r.matig ? OORDEEL.matig : OORDEEL.slecht
   return waarde >= r.goed ? OORDEEL.goed : waarde >= r.matig ? OORDEEL.matig : OORDEEL.slecht
 }
+// Korte naam per formulierscherm, ook van eerdere versies van het formulier.
+const SCHERM_NAAM = {
+  doel: 'Doel', vastlopen: 'Waar loop je vast', geprobeerd: 'Wat al geprobeerd', leeftijd: 'Leeftijd',
+  gegevens: 'Naam en nummer', voornaam: 'Voornaam', email: 'E-mailadres', contact: 'Telefoonnummer', telefoon: 'Telefoonnummer',
+  kilos: 'Hoeveel kilo', waarom_nu: 'Waarom nu', belang: 'Hoe belangrijk', trainen: 'Hoe vaak trainen', borg: 'Borg',
+  geschikt: 'Geschikt-uitleg', route: 'Zelf plannen of contact', kanaal: 'Hoe contact',
+}
+
 // Icoon per meting in de fases.
 const ICONEN = {
   'Klikratio (CTR)': Percent, 'Kosten per klik': Euro,
@@ -356,9 +364,13 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       const van = (periode === 'vanaf' && vanafDatum)
         ? new Date(`${vanafDatum}T00:00:00`)
         : (() => { const d = new Date(); d.setDate(d.getDate() - dagen + 1); d.setHours(0, 0, 0, 0); return d })()
-      const { data: res, error } = await db.supabase.rpc('get_challenge_ads_overzicht', { p_van: van.toISOString(), p_tot: totEx.toISOString() })
+      const p = { p_van: van.toISOString(), p_tot: totEx.toISOString() }
+      const [{ data: res, error }, st] = await Promise.all([
+        db.supabase.rpc('get_challenge_ads_overzicht', p),
+        db.supabase.rpc('get_prequal_stappen', p).then(r => r, () => ({ data: [] })),
+      ])
       if (error) throw error
-      setData(res || {})
+      setData({ ...(res || {}), stappen: st?.data || [] })
       setVenster({ van: van.toISOString(), tot: totEx.toISOString() })
     } catch (e) {
       console.error('ads-overzicht laden mislukt:', e)
@@ -411,6 +423,27 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   }
 
   const T = telOp(hooks)
+
+  // Formulier per scherm: wie kwam door, wie klikte weg, wie werd afgewezen.
+  // Volgorde = gemiddelde plek in het formulier.
+  const perScherm = new Map()
+  ;(data?.stappen || []).filter(past).forEach(r => {
+    const o = perScherm.get(r.vraag) || { vraag: r.vraag, door: 0, afgewezen: 0, stapSom: 0, n: 0 }
+    const b = Number(r.beantwoord) || 0
+    o.door += b; o.afgewezen += Number(r.afgewezen) || 0
+    if (r.stap != null) { o.stapSom += Number(r.stap) * Math.max(1, b); o.n += Math.max(1, b) }
+    perScherm.set(r.vraag, o)
+  })
+  const schermen = []
+  ;[...perScherm.values()].filter(x => x.door + x.afgewezen > 0)
+    .sort((a, b) => (a.n ? a.stapSom / a.n : 99) - (b.n ? b.stapSom / b.n : 99))
+    .reduce((vorige, x) => {
+      const weg = Math.max(0, vorige - x.door - x.afgewezen)
+      schermen.push({ ...x, binnen: vorige, weg, naam: SCHERM_NAAM[x.vraag] || x.vraag })
+      return x.door
+    }, T.form_start)
+  const grootsteAfhaker = schermen.reduce((x, y) => (y.weg > (x?.weg || 0) ? y : x), null)
+  const weggeklikt = Math.max(0, T.form_start - leads.length - T.afgewezen)
   const spend = spendRijen.reduce((s, r) => s + (Number(r.spend) || 0), 0)
   const klikken = spendRijen.reduce((s, r) => s + (Number(r.klikken) || 0), 0)
   const impressies = spendRijen.reduce((s, r) => s + (Number(r.impressies) || 0), 0)
@@ -595,17 +628,56 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       ),
     },
     formulier: {
-      titel: 'Formulier', sub: `${pct(T.form_start, T.sessies)} van de bezoekers begint eraan`,
+      titel: 'Formulier', sub: `${T.form_start} begonnen · ${pct(leads.length, T.form_start)} laat gegevens achter`,
       inhoud: (
         <>
-          <Balk label="Klikte op de knop" aantal={T.knop} basis={T.sessies} />
-          <Balk label="Formulier begonnen" aantal={T.form_start} basis={T.sessies} />
-          <Balk label="Tot het eind ingevuld" aantal={T.form_klaar} basis={T.form_start} kleur="#60a5fa" />
-          <Balk label="Geschikt, gegevens achtergelaten" aantal={leads.length} basis={T.form_start} kleur={GROEN} />
-          <Balk label="Niet geschikt" aantal={T.afgewezen} basis={T.form_start} kleur={ORANJE} />
-          <div style={{ height: 14 }} />
-          {gefilterd && <div style={{ fontSize: '0.78rem', fontWeight: 800, color: ORANJE, marginBottom: 8 }}>Afhaken per vraag telt alle campagnes samen.</div>}
-          <PrequalAfhaken venster={venster} m />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px 18px', marginBottom: 20 }}>
+            <Getal label="Begonnen" waarde={T.form_start} sub={`${pct(T.form_start, T.sessies)} van de bezoekers`} />
+            <Getal label="Gegevens achtergelaten" waarde={leads.length} kleur={GROEN} sub={`${pct(leads.length, T.form_start)} van wie begon`} />
+            <Getal label="Weggeklikt" waarde={weggeklikt} kleur={weggeklikt ? ROOD : '#fff'} sub={`${pct(weggeklikt, T.form_start)} stopte halverwege`} />
+            <Getal label="Niet geschikt" waarde={T.afgewezen} kleur={T.afgewezen ? ORANJE : '#fff'} sub={`${pct(T.afgewezen, T.form_start)} afgewezen`} />
+          </div>
+
+          <div style={kop}>Per scherm</div>
+          {grootsteAfhaker?.weg > 0 && (
+            <div style={{ fontSize: '0.86rem', fontWeight: 800, marginBottom: 10 }}>
+              Meeste mensen weg bij <span style={{ color: ROOD }}>{grootsteAfhaker.naam}</span>: {grootsteAfhaker.weg} van de {grootsteAfhaker.binnen} ({pct(grootsteAfhaker.weg, grootsteAfhaker.binnen)})
+            </div>
+          )}
+          {(() => {
+            const rij = (key, nr, naam, aantal, rechts, kleur = '#fff', nadruk = false) => (
+              <div key={key} style={{ padding: '0.5rem 0', borderBottom: LIJN }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: ZWAK, width: 18, flexShrink: 0 }}>{nr}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.86rem', fontWeight: 800, color: nadruk ? ROOD : '#fff' }}>{naam}</span>
+                  {rechts}
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, minWidth: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{aantal}</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.06)', marginTop: 5, marginLeft: 26, overflow: 'hidden' }}>
+                  <div style={{ width: `${T.form_start ? Math.max(2, (aantal / T.form_start) * 100) : 0}%`, height: '100%', borderRadius: 4, background: kleur }} />
+                </div>
+              </div>
+            )
+            return (
+              <>
+                {rij('start', '', 'Formulier geopend', T.form_start, null)}
+                {schermen.map((x, i) => rij(x.vraag, i + 1, x.naam, x.door, (
+                  <span style={{ display: 'inline-flex', gap: 8, fontSize: '0.76rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
+                    {x.weg > 0 && <span style={{ color: ROOD }}>−{x.weg} weg</span>}
+                    {x.afgewezen > 0 && <span style={{ color: ORANJE }}>{x.afgewezen} afgewezen</span>}
+                  </span>
+                ), 'rgba(255,255,255,0.75)', grootsteAfhaker === x && x.weg > 0))}
+                {rij('klaar', '', 'Gegevens achtergelaten', leads.length, null, GROEN)}
+              </>
+            )
+          })()}
+          {!schermen.length && <Leeg>Nog geen schermen gemeten in deze periode.</Leeg>}
+          <div style={{ fontSize: '0.76rem', fontWeight: 700, color: ZWAK, marginTop: 10, lineHeight: 1.5 }}>
+            Getal rechts = mensen die dat scherm afrondden. Rood = klikte daar weg, oranje = werd daar afgewezen. Valt de periode over twee versies van het formulier, dan staan de schermen van beide versies erin.
+          </div>
+
+          <div style={{ height: 22 }} />
+          <PrequalAfhaken venster={venster} m alleenNummers />
         </>
       ),
     },
