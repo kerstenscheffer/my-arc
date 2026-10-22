@@ -47,7 +47,9 @@ const ZWART_MIDDEN = '#0b0b0b'
 const CALENDLY = 'https://calendly.com/kerstenscheffer/strategie-gesprek-kersten-clone'
 const VIDEO_ID = '41Hfc2YVBAA'
 
-const CTA_TEKST = 'Start mijn challenge'
+const CTA_TEKST = 'Plan kennismakingsgesprek'
+// Donkergroen met witte letters, op lichte en donkere vlakken (22 okt 2026).
+const CTA_GROEN = '#166534'
 
 // Punten onder de bovenste knop. Met `pijler` is het punt klikbaar en opent
 // het de uitleg van die pijler (PijlerModal).
@@ -148,15 +150,15 @@ function Tekst({ children, m, center, dim, style }) {
   )
 }
 
-// De knop in MY ARC-stijl (21 okt 2026, eerst goud): op een donker vlak wit
-// met zwarte tekst, op een licht vlak zwart met witte tekst. `licht` voor
-// een vlak zonder eigen Sectie-thema (de witte strook onder de video).
+// De startknop: overal donkergroen met witte tekst (22 okt 2026, eerst wit/
+// zwart). `licht` bepaalt alleen nog de Trustpilot-regel eronder, voor een
+// vlak zonder eigen Sectie-thema (de witte strook onder de video).
 function Cta({ m, sub, style, licht }) {
   const openKalender = useContext(OpenKalenderCtx)
   const t = useThema()
   const opLicht = licht ?? t.tekst === '#000'
-  const vlak = opLicht ? '#000' : '#fff'
-  const letter = opLicht ? '#fff' : '#000'
+  const vlak = CTA_GROEN
+  const letter = '#fff'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, ...style }}>
       <button
@@ -170,7 +172,7 @@ function Cta({ m, sub, style, licht }) {
           // Eén regel op de telefoon: kleiner lettertype en nooit afbreken.
           // Dikker dan 900 bestaat niet in het lettertype; een dunne zwarte
           // contour maakt de letters zwaarder.
-          fontSize: m ? '1.12rem' : '1.45rem', fontWeight: 900, letterSpacing: '0.03em',
+          fontSize: m ? '1rem' : '1.4rem', fontWeight: 900, letterSpacing: '0.03em',
           whiteSpace: 'nowrap', WebkitTextStroke: `${m ? '0.5px' : '0.7px'} ${letter}`,
           textTransform: 'uppercase', textDecoration: 'none', boxSizing: 'border-box',
           boxShadow: 'none',
@@ -711,7 +713,7 @@ function PijlerModal({ pijler, onClose, onStart, m }) {
             </div>
             <button onClick={onStart} style={{
               marginTop: m ? '1.3rem' : '1.6rem', width: '100%', minHeight: m ? 58 : 64, borderRadius: 14, border: 'none',
-              background: '#fff', color: '#000', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, fontFamily: 'inherit',
+              background: CTA_GROEN, color: '#fff', fontSize: m ? '1rem' : '1.15rem', fontWeight: 900, fontFamily: 'inherit',
               letterSpacing: '0.03em', textTransform: 'uppercase', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -1050,7 +1052,7 @@ export default function ChallengeVslPage() {
           transition: 'opacity 0.25s ease',
           display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
           padding: m ? '0.85rem 1.6rem' : '0.95rem 2rem', borderRadius: 999,
-          background: '#fff', color: '#000', textDecoration: 'none',
+          background: CTA_GROEN, color: '#fff', textDecoration: 'none',
           fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 900, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.03em',
           boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
