@@ -163,12 +163,13 @@ function perAdvertentie(hooks, leads, spend) {
 // ── Bouwstenen ─────────────────────────────────────────────────────────────
 
 const kop = { fontSize: '0.8rem', fontWeight: 800, color: ZWAK, marginBottom: 10 }
-// Compacte keuzelijst: laag, haarlijn, geen vlak.
-const keuze = {
-  height: 32, padding: '0 0.6rem', borderRadius: 8, background: 'transparent', color: '#fff',
-  borderWidth: 1, borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.16)',
-  fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', colorScheme: 'dark',
+// Onderdeel van de keuzebalk: geen eigen rand, de balk heeft er één.
+const seg = {
+  height: '100%', padding: '0 0.7rem', background: 'transparent', color: '#fff', border: 'none', outline: 'none',
+  fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', colorScheme: 'dark', minWidth: 0,
 }
+const scheiding = { width: 1, height: 18, background: 'rgba(255,255,255,0.16)', flexShrink: 0 }
+
 
 function Getal({ label, waarde, sub, kleur = '#fff', onClick }) {
   return (
@@ -796,32 +797,6 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
 
   return (
     <div style={{ padding: m ? '1rem' : '1.5rem 2.5rem', color: '#fff', maxWidth: 1680, margin: '0 auto' }}>
-      {/* ═══ KOP: alle keuzes op één regel ═══
-          Campagne en advertentie bepalen wat alles hieronder telt. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: m ? 22 : 30 }}>
-        <select value={keuzeWaarde} onChange={e => kiesFilter(e.target.value)} aria-label="Campagne of advertentie"
-          style={{ ...keuze, flex: m ? '1 1 100%' : '0 1 360px', minWidth: 0, borderColor: campagne ? '#fff' : keuze.borderColor }}>
-          <option value="">Alle campagnes</option>
-          {campagnes.map(c => (
-            <optgroup key={c.k} label={c.naam}>
-              <option value={JSON.stringify([c.k])}>{c.naam} · hele campagne</option>
-              {advVan(c.k).map(a => <option key={a.k} value={JSON.stringify([c.k, a.k])}>{a.naam}</option>)}
-            </optgroup>
-          ))}
-          {campagne && !campagnes.some(c => c.k === campagne) && <option value={keuzeWaarde}>Gekozen campagne (geen data in deze periode)</option>}
-        </select>
-        <select value={periode} onChange={e => setPeriode(e.target.value)} style={{ ...keuze, flex: m ? '1 1 0' : '0 0 auto' }} aria-label="Periode">
-          {PERIODES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-        </select>
-        {periode === 'vanaf' && (
-          <input type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')}
-            onChange={e => kiesVanaf(e.target.value)} style={{ ...keuze, colorScheme: 'dark' }} aria-label="Vanaf" />
-        )}
-        <button onClick={() => setPaneel('advertenties')} title="Per advertentie" style={{ ...keuze, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: m ? 0 : 'auto' }}>
-          <Megaphone size={14} strokeWidth={2.6} />{!m && 'Per advertentie'}
-        </button>
-      </div>
-
       {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.84rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
 
       {/* ═══ Eén statistiekbalk ═══
@@ -829,7 +804,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           kleuren als PeriodStatsBar | resultaat (sales, omzet, ROAS). Telt per
           lead die in de periode binnenkwam wat er daarna gebeurde. Elk getal
           opent zijn detailvenster; het label staat in de tooltip. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 20, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: m ? -8 : -12, marginBottom: m ? 26 : 36, paddingBottom: 2 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 20, flexWrap: m ? 'wrap-reverse' : 'nowrap', marginBottom: m ? 26 : 36 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 20, overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: '1 1 auto', minWidth: 0, paddingBottom: 2 }}>
         {[
           [
             { label: 'Uitgegeven', waarde: euro(spend), Icon: Banknote, kleur: '#94a3b8', venster: 'spend' },
@@ -867,6 +843,40 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             ))}
           </div>
         ))}
+      </div>
+
+        {/* Keuzes als één balk met scheidingslijnen, rechts van de cijfers. */}
+        <div style={{
+          display: 'flex', alignItems: 'center', flexShrink: m ? 1 : 0, width: m ? '100%' : 'auto', minWidth: 0,
+          height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', overflow: 'hidden',
+        }}>
+          <select value={keuzeWaarde} onChange={e => kiesFilter(e.target.value)} aria-label="Campagne of advertentie"
+            style={{ ...seg, flex: m ? '1 1 0' : '0 1 280px', maxWidth: m ? 'none' : 280, color: campagne ? '#fff' : 'rgba(255,255,255,0.85)' }}>
+            <option value="">Alle campagnes</option>
+            {campagnes.map(c => (
+              <optgroup key={c.k} label={c.naam}>
+                <option value={JSON.stringify([c.k])}>{c.naam} · hele campagne</option>
+                {advVan(c.k).map(a => <option key={a.k} value={JSON.stringify([c.k, a.k])}>{a.naam}</option>)}
+              </optgroup>
+            ))}
+            {campagne && !campagnes.some(c => c.k === campagne) && <option value={keuzeWaarde}>Gekozen campagne (geen data in deze periode)</option>}
+          </select>
+          <span style={scheiding} />
+          <select value={periode} onChange={e => setPeriode(e.target.value)} style={{ ...seg, flex: m ? '1 1 0' : '0 0 auto' }} aria-label="Periode">
+            {PERIODES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+          {periode === 'vanaf' && (
+            <>
+              <span style={scheiding} />
+              <input type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')}
+                onChange={e => kiesVanaf(e.target.value)} style={{ ...seg, flex: '0 0 auto' }} aria-label="Vanaf" />
+            </>
+          )}
+          <span style={scheiding} />
+          <button onClick={() => setPaneel('advertenties')} title="Per advertentie" style={{ ...seg, display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
+            <Megaphone size={14} strokeWidth={2.6} />{!m && 'Per advertentie'}
+          </button>
+        </div>
       </div>
 
       {/* ═══ 2. WAAR LOOPT HET VAST ═══ */}
