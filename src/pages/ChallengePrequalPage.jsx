@@ -14,7 +14,7 @@
 // Werkt los op /challenge/start én in het blad van de VSL (/challenge).
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, ArrowRight, Check, Instagram, Play, Volume2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Instagram, Play, Volume2 } from 'lucide-react'
 import db from '../services/DatabaseService'
 import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies } from './challengeTracking'
 import { VRAGEN, vraagtTelefoon, optiesVan } from './challengeVragen'
@@ -44,10 +44,10 @@ const telOk = (t) => String(t || '').replace(/[^0-9+]/g, '').length >= 8
 // (22 okt 2026). Opgeslagen als +316…, zonder de 0. Plakt iemand of de
 // browser een nummer met +31/0031, dan wordt de landcode eruit gehaald.
 const LANDEN = [
-  { code: '+31', naam: 'NL', start: '06', cijfers: 9 },
-  { code: '+32', naam: 'BE', start: '', cijfers: 9 },
-  { code: '+49', naam: 'DE', start: '', cijfers: 0 },
-  { code: '+44', naam: 'UK', start: '', cijfers: 0 },
+  { code: '+31', naam: 'NL', land: 'Nederland', start: '06', cijfers: 9 },
+  { code: '+32', naam: 'BE', land: 'België', start: '', cijfers: 9 },
+  { code: '+49', naam: 'DE', land: 'Duitsland', start: '', cijfers: 0 },
+  { code: '+44', naam: 'UK', land: 'Verenigd Koninkrijk', start: '', cijfers: 0 },
 ]
 const landVan = (code) => LANDEN.find(l => l.code === code) || LANDEN[0]
 function leesTelefoon(land, invoer) {
@@ -153,6 +153,81 @@ function Optie({ tekst, aan, onClick, m, meer }) {
         {aan && <Check size={15} strokeWidth={3.5} color="#000" />}
       </span>
     </button>
+  )
+}
+
+// ── Telefoonveld ────────────────────────────────────────────────────────────
+// Eén vak: links de landcode (eigen lijstje, geen systeem-dropdown), een
+// streep, rechts het nummer met 06 al ingevuld (22 okt 2026). Het lijstje
+// klapt naar boven open: onder het veld past het niet in het blad.
+function TelefoonVeld({ m, antw, setAntw, onEnter }) {
+  const [open, setOpen] = useState(false)
+  const [focus, setFocus] = useState(false)
+  const kaderRef = useRef(null)
+  const nummerRef = useRef(null)
+  const land = antw.tel_land || '+31'
+  const nummer = antw.tel_nummer ?? landVan(land).start
+  const zetNummer = (l, n) => setAntw(a => ({ ...a, tel_land: l, tel_nummer: n, telefoon: volledigNummer(l, n) }))
+
+  useEffect(() => {
+    if (!open) return
+    const buiten = (e) => { if (!kaderRef.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('pointerdown', buiten)
+    return () => document.removeEventListener('pointerdown', buiten)
+  }, [open])
+
+  const kies = (l) => {
+    // Alleen de klaargezette 06 meewisselen, nooit een getypt nummer.
+    const n = !nummer || nummer === landVan(land).start ? landVan(l).start : nummer
+    zetNummer(l, n); setOpen(false)
+    setTimeout(() => nummerRef.current?.focus(), 0)
+  }
+  const basis = invoer(m)
+  return (
+    <div ref={kaderRef} style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex', alignItems: 'stretch', background: basis.background, borderRadius: basis.borderRadius,
+        border: `1.5px solid ${focus || open ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.14)'}`, transition: 'border-color 0.15s',
+      }}>
+        <button type="button" onClick={() => setOpen(o => !o)} aria-label="Landcode" aria-expanded={open} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: m ? '0 0.6rem 0 0.95rem' : '0 0.7rem 0 1.05rem',
+          background: 'none', border: 'none', color: WIT, fontSize: basis.fontSize, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          {land}
+          <ChevronDown size={16} strokeWidth={2.8} style={{ opacity: 0.6, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+        </button>
+        <span aria-hidden style={{ width: 1.5, margin: '0.55rem 0', background: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
+        <input
+          ref={nummerRef} type="tel" inputMode="tel" autoComplete="tel" value={nummer}
+          placeholder={land === '+31' ? '06 12345678*' : 'Telefoonnummer*'}
+          onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+          onChange={e => { const r = leesTelefoon(land, e.target.value); zetNummer(r.land, r.nummer) }}
+          onKeyDown={e => { if (e.key === 'Enter') onEnter() }}
+          style={{ ...basis, flex: 1, minWidth: 0, border: 'none', background: 'transparent', paddingLeft: m ? '0.8rem' : '0.9rem' }}
+        />
+      </div>
+      {open && (
+        <div style={{
+          position: 'absolute', left: 0, bottom: 'calc(100% + 6px)', zIndex: 5, minWidth: 200,
+          background: '#111', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, padding: 4,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.6)', animation: 'prequalIn 0.15s ease',
+        }}>
+          {LANDEN.map(l => (
+            <button key={l.code} type="button" onClick={() => kies(l.code)} style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              padding: '0.7rem 0.8rem', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: l.code === land ? 'rgba(255,255,255,0.08)' : 'transparent', color: WIT,
+              fontSize: '0.98rem', fontWeight: 800, textAlign: 'left',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <span>{l.land} <span style={{ color: ZWAK }}>{l.code}</span></span>
+              {l.code === land && <Check size={16} strokeWidth={3} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -545,32 +620,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
                 onChange={e => zet('voornaam', e.target.value)} style={invoer(m)}
               />
               {telefoon ? (
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <select
-                    aria-label="Landcode" value={antw.tel_land || '+31'}
-                    onChange={e => {
-                      const land = e.target.value
-                      const oud = antw.tel_nummer ?? '06'
-                      // Alleen de klaargezette 06 meewisselen, nooit een getypt nummer.
-                      const nummer = !oud || oud === landVan(antw.tel_land || '+31').start ? landVan(land).start : oud
-                      setAntw(a => ({ ...a, tel_land: land, tel_nummer: nummer, telefoon: volledigNummer(land, nummer) }))
-                    }}
-                    style={{ ...invoer(m), width: 'auto', flexShrink: 0, paddingRight: '0.6rem', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', textAlign: 'center', colorScheme: 'dark' }}
-                  >
-                    {LANDEN.map(l => <option key={l.code} value={l.code}>{l.naam} {l.code}</option>)}
-                  </select>
-                  <input
-                    type="tel" inputMode="tel" autoComplete="tel"
-                    value={antw.tel_nummer ?? landVan(antw.tel_land || '+31').start}
-                    placeholder={(antw.tel_land || '+31') === '+31' ? '06 12345678*' : 'Telefoonnummer*'}
-                    onChange={e => {
-                      const { land, nummer } = leesTelefoon(antw.tel_land || '+31', e.target.value)
-                      setAntw(a => ({ ...a, tel_land: land, tel_nummer: nummer, telefoon: volledigNummer(land, nummer) }))
-                    }}
-                    onKeyDown={e => { if (e.key === 'Enter') verder() }}
-                    style={{ ...invoer(m), flex: 1, minWidth: 0 }}
-                  />
-                </div>
+                <TelefoonVeld m={m} antw={antw} setAntw={setAntw} onEnter={() => verder()} />
               ) : (
                 <input
                   type="email" inputMode="email" autoComplete="email" value={antw.email || ''} placeholder="jouw@email.nl"
