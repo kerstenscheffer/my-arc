@@ -96,6 +96,7 @@ const GESCHIKT = [
 
 // Kort (21 okt 2026): één of twee zinnen per antwoord.
 const VRAGEN = [
+  { vraag: 'Hoe hoog is de borg?', antwoord: ['De borg is €297. Die krijg je terug na de 6 weken.'] },
   { vraag: 'Moet ik na zes weken doorgaan?', antwoord: ['Nee. Wil je daarna verder, dan bespreken we dat. Jij beslist.'] },
   { vraag: 'Past dit bij een drukke baan en gezin?', antwoord: ['Ja, je plan past zich aan je week aan. Trainen en je afspraken nakomen doe je wel zelf.'] },
   { vraag: 'Hoeveel begeleiding krijg ik?', antwoord: ['De app, je plannen, wekelijkse check-ins en WhatsApp. Waar nodig een call.'] },
@@ -1031,23 +1032,23 @@ export default function ChallengeVslPage() {
         </div>
       </Sectie>
 
-      {/* ══ 6. Geschiktheid ══ */}
-      <Sectie m={m} smal thema="goud">
+      {/* ══ 6. Geschiktheid ══ (zwart sinds 22 okt 2026, tussen twee witte secties) */}
+      <Sectie m={m} smal thema="zwart">
         <Kop m={m}>Past dit bij jou?</Kop>
         <div style={{ marginTop: m ? '1.1rem' : '1.4rem' }}>
           {GESCHIKT.map((t, i) => (
             <div key={t} style={{
               display: 'flex', gap: '0.8rem', alignItems: 'center',
               padding: m ? '0.75rem 0' : '0.95rem 0',
-              borderTop: i === 0 ? `1px solid ${THEMAS.goud.randZacht}` : 'none',
-              borderBottom: `1px solid ${THEMAS.goud.randZacht}`,
+              borderTop: i === 0 ? `1px solid ${THEMAS.zwart.randZacht}` : 'none',
+              borderBottom: `1px solid ${THEMAS.zwart.randZacht}`,
             }}>
-              <Check size={m ? 22 : 26} strokeWidth={3} color={THEMAS.goud.icoon} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: THEMAS.goud.tekst }}>{t}</span>
+              <Check size={m ? 22 : 26} strokeWidth={3} color={THEMAS.zwart.icoon} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3, color: THEMAS.zwart.tekst }}>{t}</span>
             </div>
           ))}
         </div>
-        <p style={{ margin: `${m ? '1.2rem' : '1.5rem'} 0 0`, fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.35, color: THEMAS.goud.tekst }}>
+        <p style={{ margin: `${m ? '1.2rem' : '1.5rem'} 0 0`, fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.35, color: THEMAS.zwart.tekst }}>
           Perfect hoeft niet. Inzet wel.
         </p>
       </Sectie>
