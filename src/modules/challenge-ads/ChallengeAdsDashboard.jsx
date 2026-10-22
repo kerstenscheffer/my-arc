@@ -782,9 +782,11 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                   horizontaal te vegen). Getal groot, percentage in de kleur
                   van het oordeel. */}
               {openFase === f.id && <div style={{
-                display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8, marginTop: 14,
+                // Ruimte rondom: de scrollrij knipt anders de gloed en het
+                // schudden van de zwakste meting af.
+                display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8, marginTop: 2,
                 overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-                paddingBottom: 6, marginRight: m ? -16 : 0, paddingRight: m ? 16 : 0,
+                padding: '14px 16px 8px 8px', margin: m ? '2px -16px 0 -8px' : '2px 0 0 -8px',
               }}>
                 {f.metingen.map((x, j) => {
                   const [groot, klein] = String(x.tekst).split(' · ')
