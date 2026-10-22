@@ -242,7 +242,7 @@ function Grafiek({ data, sleutel, kleur = '#fff', label, euroAs }) {
 }
 
 // Venster: op mobiel een blad van onderen, op desktop gecentreerd.
-function Venster({ titel, sub, m, onClose, children }) {
+function Venster({ titel, sub, m, onClose, children, breed = false }) {
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', esc)
@@ -256,7 +256,7 @@ function Venster({ titel, sub, m, onClose, children }) {
       display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? 0 : '2rem',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        width: '100%', maxWidth: 640, maxHeight: m ? '90dvh' : '86vh', overflowY: 'auto', overscrollBehavior: 'contain',
+        width: '100%', maxWidth: breed ? 1000 : 640, maxHeight: m ? '90dvh' : '86vh', overflowY: 'auto', overscrollBehavior: 'contain',
         background: '#0b0b0b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: m ? '20px 20px 0 0' : 18,
         padding: m ? '1.1rem 1.1rem calc(1.5rem + env(safe-area-inset-bottom))' : '1.4rem 1.6rem 1.6rem', color: '#fff',
       }}>
@@ -349,7 +349,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const [fout, setFout] = useState('')
   const [info, setInfo] = useState(null)        // id van het open venster
   const [advertentie, setAdvertentie] = useState(null)
-  const [linkOpen, setLinkOpen] = useState(false)
+  // Per advertentie en de advertentielink zitten achter knoppen in de balk.
+  const [paneel, setPaneel] = useState(null)
   // Fases staan dicht: eerst alleen het oordeel per fase, details op een tik.
   const [openFase, setOpenFase] = useState(null)
   const [gekopieerd, setGekopieerd] = useState(false)
@@ -806,6 +807,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         <button onClick={laad} aria-label="Verversen" style={{ ...keuze, width: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <RefreshCw size={14} style={{ animation: laden ? 'spin 1s linear infinite' : 'none' }} />
         </button>
+        <button onClick={() => setPaneel('advertenties')} title="Per advertentie" style={{ ...keuze, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: m ? 0 : 'auto' }}>
+          <Megaphone size={14} strokeWidth={2.6} />{!m && 'Per advertentie'}
+        </button>
+        <button onClick={() => setPaneel('link')} title="Link voor in de advertentie" style={{ ...keuze, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <Link2 size={14} strokeWidth={2.6} />{!m && 'Link'}
+        </button>
       </div>
 
       {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.84rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
@@ -951,9 +958,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         </div>
       </div>
 
-      {/* ═══ 3. PER ADVERTENTIE ═══ */}
-      <div style={{ marginBottom: m ? 28 : 40 }}>
-        <div style={{ ...kop, display: 'flex', alignItems: 'center', gap: 6 }}><Megaphone size={14} strokeWidth={2.6} /> Per advertentie</div>
+      {paneel === 'advertenties' && (
+        <Venster titel="Per advertentie" sub={`${advertenties.filter(a => !a.onbekend).length} advertenties · tik op een advertentie voor de flow`} m={m} breed onClose={() => setPaneel(null)}>
         <div style={{ display: 'grid', gridTemplateColumns: m ? 'minmax(0, 1fr) 58px 44px 50px' : 'minmax(0, 1fr) 80px 80px 70px 80px 60px 60px 90px', gap: 8, paddingBottom: 6, borderBottom: LIJN, fontSize: '0.7rem', fontWeight: 800, color: ZWAK }}>
           <span>Advertentie</span>
           <span style={{ textAlign: 'right' }}>Spend</span>
@@ -985,16 +991,10 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900, color: (m ? a.calls : a.omzet) > 0 ? GROEN : '#fff' }}>{m ? a.calls : (a.omzet ? euro(a.omzet) : '–')}</span>
           </button>
         ))}
-      </div>
-
-      {/* ═══ Link voor in de advertentie, dicht ═══ */}
-      <div style={{ borderTop: LIJN }}>
-        <button onClick={() => setLinkOpen(o => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.9rem 0', background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
-          <Link2 size={16} strokeWidth={2.5} />
-          <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900 }}>Link voor in de advertentie</span>
-          <ChevronDown size={17} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ transform: linkOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-        </button>
-        {linkOpen && (
+        </Venster>
+      )}
+      {paneel === 'link' && (
+        <Venster titel="Link voor in de advertentie" sub="Plak achter de URL bij URL-parameters in Meta" m={m} onClose={() => setPaneel(null)}>
           <div style={{ paddingBottom: '1rem' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <code style={{ flex: 1, fontSize: '0.76rem', color: 'rgba(255,255,255,0.85)', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{LINK_VOORBEELD}</code>
@@ -1006,8 +1006,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
               Meta vult {'{{campaign.name}}'} en {'{{ad.name}}'} zelf in. Zo komen bezoekers en spend bij dezelfde advertentie uit.
             </div>
           </div>
-        )}
-      </div>
+        </Venster>
+      )}
 
       {open && (
         <Venster titel={open.titel} sub={open.sub} m={m} onClose={() => setInfo(null)}>{open.inhoud}</Venster>
