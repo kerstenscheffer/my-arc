@@ -646,11 +646,10 @@ function KalenderBlad({ open, onClose, m }) {
 }
 
 // De drie pijlers van de aanpak, zoals op de 6-weken-pagina: banner met de
-// titel erin, één zin, vier punten. Opent vanaf de punten onder de knop.
+// titel erin en vier punten (de losse zin is sinds 22 okt 2026 weg). Opent vanaf de punten onder de knop.
 const PIJLERS = {
   voeding: {
     foto: '/methode/voeding-slide.jpg', kop: 'Weet wat je eet',
-    zin: 'Een vast plan in de app. Geen rekenen, etentjes passen erin.',
     doen: [
       { Icon: ClipboardList, kop: 'Structuur', tekst: 'Plan staat klaar.' },
       { Icon: Utensils, kop: 'Keuze', tekst: '500 gerechten.' },
@@ -660,7 +659,6 @@ const PIJLERS = {
   },
   training: {
     foto: '/methode/training-slide.jpg', kop: 'Elke training telt',
-    zin: "Schema op maat met uitlegvideo's. Binnen het uur klaar.",
     doen: [
       { Icon: ClipboardList, kop: 'Schema', tekst: 'Jouw dagen en niveau.' },
       { Icon: Crosshair, kop: 'Focus', tekst: 'Alleen wat telt.' },
@@ -670,7 +668,6 @@ const PIJLERS = {
   },
   begeleiding: {
     foto: '/methode/begeleiding-slide.jpg', kop: 'Coach in jouw corner',
-    zin: 'Ik kijk mee met je cijfers en ben snel bereikbaar in de app.',
     doen: [
       { Icon: LineChart, kop: 'Cijfers', tekst: 'Dagelijks bekeken.' },
       { Icon: SlidersHorizontal, kop: 'Bijsturen', tekst: 'Geen stilstand.' },
@@ -689,9 +686,8 @@ function PijlerModal({ pijler, onClose, onStart, m }) {
           <img src={p.foto} alt={p.kop} draggable={false}
             style={{ width: '100%', aspectRatio: '1960 / 600', objectFit: 'cover', display: 'block', flexShrink: 0, background: '#141414' }} />
           <div style={{ padding: m ? '1.1rem 1.15rem 1.2rem' : '1.4rem 1.7rem 1.6rem', fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-            <p style={{ margin: 0, fontSize: m ? '1rem' : '1.1rem', fontWeight: 800, lineHeight: 1.4, color: '#fff', textAlign: 'center', letterSpacing: '-0.01em' }}>{p.zin}</p>
             {/* Vier punten in een 2x2 raster, zonder kaders (22 okt 2026). */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: m ? '1rem 0.8rem' : '1.2rem 1.2rem', marginTop: m ? '1.1rem' : '1.4rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: m ? '1rem 0.8rem' : '1.2rem 1.2rem' }}>
               {p.doen.map(d => (
                 <div key={d.kop} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <span style={{ width: m ? 34 : 38, height: m ? 34 : 38, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
