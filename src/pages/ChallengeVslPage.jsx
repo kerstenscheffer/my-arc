@@ -885,8 +885,8 @@ export default function ChallengeVslPage() {
                 }}>
                   {i + 1}
                 </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: m ? '1rem' : '1.15rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em' }}>
-                  {a.kort}<ChevronRight size={m ? 15 : 17} strokeWidth={3} style={{ flexShrink: 0 }} />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 1, fontSize: m ? '0.92rem' : '1.15rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                  {a.kort}<ChevronRight size={m ? 13 : 17} strokeWidth={3} style={{ flexShrink: 0 }} />
                 </span>
                 <span style={{ marginTop: -4, fontSize: m ? '0.78rem' : '0.88rem', fontWeight: 700, color: 'rgba(0,0,0,0.55)', lineHeight: 1.3 }}>
                   {a.sub}
