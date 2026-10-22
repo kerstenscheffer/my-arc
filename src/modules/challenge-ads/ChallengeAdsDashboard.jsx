@@ -825,85 +825,99 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
           <div style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Waar loopt het vast?</div>
         </div>
-        {FASES.map((f, i) => {
-          const isVast = vast?.id === f.id
-          const k = f.oordeel.kleur
-          const gemeten = f.oordeel.rang >= 0
-          return (
-            <div key={f.id} style={{ padding: openFase === f.id ? '0.9rem 0 0.4rem' : '0.9rem 0', borderTop: i ? LIJN : 'none' }}>
-              <button onClick={() => setOpenFase(o => (o === f.id ? null : f.id))} aria-expanded={openFase === f.id} style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 0, background: 'none', border: 'none',
-                color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-              }}>
-                {/* Het bolletje draagt het oordeel: groen, oranje, rood. De
-                    bottleneck pulseert. Te weinig data blijft neutraal. */}
-                <span style={{
-                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
-                  fontSize: '0.88rem', fontWeight: 900,
-                  boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
-                  animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
-                }}>{i + 1}</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
+        {/* De vijf fases naast elkaar met pijltjes; een tik opent de
+            metingen van die fase eronder. Op de telefoon veeg je de rij. */}
+        <div style={{
+          display: 'flex', alignItems: 'stretch', gap: m ? 4 : 6, marginTop: 6,
+          overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
+          padding: '10px 16px 10px 8px', margin: m ? '0 -16px 0 -8px' : '0 0 0 -8px',
+        }}>
+          {FASES.map((f, i) => {
+            const isVast = vast?.id === f.id
+            const k = f.oordeel.kleur
+            const gemeten = f.oordeel.rang >= 0
+            const open = openFase === f.id
+            return (
+              <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: m ? 4 : 6, flex: m ? '0 0 auto' : '1 1 0', minWidth: 0, scrollSnapAlign: 'start' }}>
+                {i > 0 && <ChevronRight size={18} strokeWidth={2.6} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />}
+                <button onClick={() => setOpenFase(o => (o === f.id ? null : f.id))} aria-expanded={open} style={{
+                  flex: 1, minWidth: m ? 150 : 0, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+                  padding: '0.85rem 0.9rem', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
+                  background: open ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.025)',
+                  border: `1px solid ${open ? 'rgba(255,255,255,0.35)' : isVast ? `${k}66` : 'rgba(255,255,255,0.08)'}`,
+                  transition: 'background 0.15s, border-color 0.15s', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  {/* Het bolletje draagt het oordeel; de bottleneck pulseert. */}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
                     <span style={{
-                      fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.02em', whiteSpace: 'nowrap',
-                      padding: '2px 8px', borderRadius: 999,
-                      color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
-                    }}>{isVast ? `${f.oordeel.tekst} · eerst aanpakken` : f.oordeel.tekst}</span>
+                      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
+                      fontSize: '0.88rem', fontWeight: 900,
+                      boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
+                      animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
+                    }}>{i + 1}</span>
+                    <span style={{ fontSize: '0.98rem', fontWeight: 900, flex: 1, minWidth: 0 }}>{f.naam}</span>
+                    <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                   </span>
-                  <span style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: ZWAK, marginTop: 2 }}>{f.vraag}</span>
-                </span>
-                <ChevronDown size={17} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: openFase === f.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-              </button>
-              {/* Open: de metingen naast elkaar als een flow (op de telefoon
-                  horizontaal te vegen). Getal groot, percentage in de kleur
-                  van het oordeel. */}
-              {openFase === f.id && <div style={{
-                // Ruimte rondom: de scrollrij knipt anders de gloed en het
-                // schudden van de zwakste meting af.
-                display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8,
-                overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-                padding: '14px 16px 8px 8px', margin: m ? '2px -16px 0 -8px' : '2px 0 0 -8px',
-              }}>
-                {f.metingen.map((x, j) => {
-                  const [groot, klein] = String(x.tekst).split(' · ')
-                  const kleur = x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff'
-                  const icoon = ICONEN[x.label] || Info
-                  const schud = f.zwakste === x.label
-                  return (
-                    <div key={x.label} style={{ display: 'flex', alignItems: 'flex-start', gap: m ? 6 : 8, flex: m ? '0 0 auto' : '1 1 0', minWidth: 0, scrollSnapAlign: 'start' }}>
-                      {j > 0 && <ChevronRight size={16} strokeWidth={2.6} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, marginTop: 12 }} />}
-                      <button onClick={() => setInfo(x.venster)} style={{
-                        flex: 1, minWidth: m ? 118 : 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
-                        padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
-                        cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+                  <span style={{
+                    fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.02em', whiteSpace: 'nowrap',
+                    padding: '2px 8px', borderRadius: 999,
+                    color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
+                  }}>{isVast ? `${f.oordeel.tekst} · eerst aanpakken` : f.oordeel.tekst}</span>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, lineHeight: 1.35 }}>{f.vraag}</span>
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Metingen van de gekozen fase, ook als flow. */}
+        {(() => {
+          const f = FASES.find(x => x.id === openFase)
+          if (!f) return null
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8,
+              overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
+              padding: '14px 16px 8px 8px', margin: m ? '6px -16px 0 -8px' : '6px 0 0 -8px',
+              borderTop: LIJN,
+            }}>
+              {f.metingen.map((x, j) => {
+                const [groot, klein] = String(x.tekst).split(' · ')
+                const kleur = x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff'
+                const icoon = ICONEN[x.label] || Info
+                const schud = f.zwakste === x.label
+                return (
+                  <div key={x.label} style={{ display: 'flex', alignItems: 'flex-start', gap: m ? 6 : 8, flex: m ? '0 0 auto' : '1 1 0', minWidth: 0, scrollSnapAlign: 'start' }}>
+                    {j > 0 && <ChevronRight size={16} strokeWidth={2.6} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, marginTop: 12 }} />}
+                    <button onClick={() => setInfo(x.venster)} style={{
+                      flex: 1, minWidth: m ? 118 : 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
+                      padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+                      cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <span style={{
+                        width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: kleur === '#fff' ? 'rgba(255,255,255,0.08)' : `${kleur}22`,
+                        ...(schud ? { boxShadow: `0 0 0 2px ${kleur}, 0 0 16px ${kleur}99`, animation: 'vastSchud 2.4s ease-in-out infinite' } : {}),
                       }}>
-                        <span style={{
-                          width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: kleur === '#fff' ? 'rgba(255,255,255,0.08)' : `${kleur}22`,
-                          ...(schud ? { boxShadow: `0 0 0 2px ${kleur}, 0 0 16px ${kleur}99`, animation: 'vastSchud 2.4s ease-in-out infinite' } : {}),
-                        }}>
-                          {createElement(icoon, { size: 19, strokeWidth: 2.4, color: kleur })}
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: m ? '1.45rem' : '1.6rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: klein ? '#fff' : kleur }}>{groot}</span>
-                          {klein && <span style={{ fontSize: '0.8rem', fontWeight: 900, color: kleur }}>{klein}</span>}
-                        </span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 900, lineHeight: 1.2 }}>{x.label}</span>
-                        {x.sub && <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ZWAK, lineHeight: 1.35 }}>{x.sub}</span>}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>}
+                        {createElement(icoon, { size: 19, strokeWidth: 2.4, color: kleur })}
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: m ? '1.45rem' : '1.6rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: klein ? '#fff' : kleur }}>{groot}</span>
+                        {klein && <span style={{ fontSize: '0.8rem', fontWeight: 900, color: kleur }}>{klein}</span>}
+                      </span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 900, lineHeight: 1.2 }}>{x.label}</span>
+                      {x.sub && <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ZWAK, lineHeight: 1.35 }}>{x.sub}</span>}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           )
-        })}
+        })()}
         <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 8, lineHeight: 1.5 }}>
-          Groen, oranje en rood zijn vuistregels voor koud verkeer uit Meta. Percentage = van de stap ervoor. Leads tellen vanaf de dag dat ze binnenkwamen, met alles wat er daarna gebeurde. Tik op een fase om hem open te klappen.
+          Groen, oranje en rood zijn vuistregels voor koud verkeer uit Meta. Percentage = van de stap ervoor. Leads tellen vanaf de dag dat ze binnenkwamen, met alles wat er daarna gebeurde. Tik op een fase voor de cijfers eronder.
         </div>
       </div>
 
