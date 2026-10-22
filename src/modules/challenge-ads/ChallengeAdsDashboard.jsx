@@ -321,6 +321,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const [info, setInfo] = useState(null)        // id van het open venster
   const [advertentie, setAdvertentie] = useState(null)
   const [linkOpen, setLinkOpen] = useState(false)
+  // Fases staan dicht: eerst alleen het oordeel per fase, details op een tik.
+  const [openFase, setOpenFase] = useState(null)
   const [gekopieerd, setGekopieerd] = useState(false)
 
   const laad = async () => {
@@ -679,10 +681,13 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           const isVast = vast?.id === f.id
           return (
             <div key={f.id} style={{
-              padding: '0.9rem 0 0.4rem', borderTop: i ? LIJN : 'none',
+              padding: openFase === f.id ? '0.9rem 0 0.4rem' : '0.9rem 0', borderTop: i ? LIJN : 'none',
               ...(isVast ? { borderLeft: `3px solid ${f.oordeel.kleur}`, paddingLeft: 12, marginLeft: -15 } : {}),
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button onClick={() => setOpenFase(o => (o === f.id ? null : f.id))} aria-expanded={openFase === f.id} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 0, background: 'none', border: 'none',
+                color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+              }}>
                 <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#fff', color: '#000', fontSize: '0.8rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
@@ -691,8 +696,9 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 900, color: f.oordeel.kleur, whiteSpace: 'nowrap' }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: f.oordeel.kleur }} />{f.oordeel.tekst}
                 </span>
-              </div>
-              <div style={{ marginTop: 6, marginLeft: 36 }}>
+                <ChevronDown size={17} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: openFase === f.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+              {openFase === f.id && <div style={{ marginTop: 6, marginLeft: 36 }}>
                 {f.metingen.map(x => (
                   <button key={x.label} onClick={() => setInfo(x.venster)} style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', background: 'none', border: 'none',
@@ -706,12 +712,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                     <ChevronRight size={15} strokeWidth={2.6} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
                   </button>
                 ))}
-              </div>
+              </div>}
             </div>
           )
         })}
         <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 8, lineHeight: 1.5 }}>
-          Groen, oranje en rood zijn vuistregels voor koud verkeer uit Meta. Percentage = van de stap ervoor. Leads tellen vanaf de dag dat ze binnenkwamen, met alles wat er daarna gebeurde. Tik op een regel voor de details.
+          Groen, oranje en rood zijn vuistregels voor koud verkeer uit Meta. Percentage = van de stap ervoor. Leads tellen vanaf de dag dat ze binnenkwamen, met alles wat er daarna gebeurde. Tik op een fase om hem open te klappen.
         </div>
       </div>
 
