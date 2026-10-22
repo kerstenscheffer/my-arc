@@ -1366,6 +1366,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               {openTabs.campagnes && campaignBreakdown && campaignBreakdown.campaigns.length > 0 && (
                 <>
                   <SectionTitle icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} />
+                  <CampagneGeldTotaal campaigns={campaignBreakdown.campaigns} adspend={campaignBreakdown.adspend || 0} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.85rem' }}>
                     {campaignBreakdown.campaigns.map(c => (
                       <CampaignStatCard
@@ -2078,6 +2079,44 @@ function GenderRing({ gender }) {
   )
 }
 
+// Geld per campagne: orderwaarde van de sales, wat er al binnen is, het deel
+// van Marcel en wat er overblijft. Bedragen komen van de sale-rij op het bord.
+const euro = (v) => '€' + Math.round(Number(v) || 0).toLocaleString('nl-NL')
+function geldItems(g = {}, adspend = null) {
+  const omzet = Number(g.omzet) || 0
+  const partner = Number(g.partner) || 0
+  const items = [
+    { label: 'Omzet',  value: euro(omzet),     Icon: Euro,   color: '#22c55e', sub: `${g.sales || 0} betaalde sale${g.sales === 1 ? '' : 's'}` },
+    { label: 'Binnen', value: euro(g.binnen),  Icon: Wallet, color: '#22c55e', sub: omzet > 0 ? `${euro(omzet - (Number(g.binnen) || 0))} open` : undefined },
+  ]
+  // Adspend gaat vóór de verdeling af (zoals in Verdeling). Per campagne is
+  // er geen adspend bekend, dus daar blijft het omzet − partner.
+  const rest = omzet - (adspend || 0)
+  const deelPct = omzet > 0 ? partner / omzet : 0
+  const marcel = adspend == null ? partner : Math.max(0, rest) * deelPct
+  if (adspend != null) items.push({ label: 'Adspend', value: euro(adspend), Icon: Target, color: '#ef4444' })
+  items.push({ label: 'Marcel', value: euro(marcel), Icon: Users, color: '#f59e0b', sub: deelPct ? `${Math.round(deelPct * 100)}%` : undefined })
+  items.push({ label: 'Winst', value: euro(rest - marcel), Icon: TrendingUp, color: '#22c55e', sub: 'blijft in het bedrijf' })
+  return items
+}
+
+// Totaal over alle campagnes, mét adspend erafgetrokken.
+function CampagneGeldTotaal({ campaigns, adspend }) {
+  const tot = campaigns.reduce((t, c) => {
+    const g = c.geld || {}
+    t.omzet += Number(g.omzet) || 0; t.binnen += Number(g.binnen) || 0
+    t.partner += Number(g.partner) || 0; t.sales += Number(g.sales) || 0
+    return t
+  }, { omzet: 0, binnen: 0, partner: 0, sales: 0 })
+  if (!tot.omzet && !adspend) return null
+  return (
+    <div style={{ padding: '0.7rem 0.75rem', marginBottom: '0.5rem', background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 10 }}>
+      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', marginBottom: 4 }}>Totaal alle campagnes</div>
+      <StatFlow items={geldItems(tot, adspend)} activeStage={null} onToggle={() => {}} />
+    </div>
+  )
+}
+
 // Per-campagne stat-kaart: naam + total, met daaronder de Aantallen- en
 // Percentages-rijen in exact dezelfde StatFlow-stijl als bovenin de modal.
 // Alle cijfers zijn "ná campagne-bericht" (uit getCampaignBreakdown).
@@ -2140,6 +2179,8 @@ function CampaignStatCard({ campaign: c, isMobile, onVraag, revertingId, deletin
       )}
       <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '2px 0' }}>Percentages</div>
       <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
+      <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '2px 0' }}>Geld</div>
+      <StatFlow items={geldItems(c.geld)} activeStage={null} onToggle={() => {}} />
       {showMsg && c.messageText && (
         <div style={{ marginTop: 6, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 6, padding: '0.55rem 0.7rem', fontSize: '0.75rem', color: 'rgba(255,255,255,0.85)', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
           {c.messageText}

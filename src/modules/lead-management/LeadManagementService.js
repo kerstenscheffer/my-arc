@@ -3795,7 +3795,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             .order('id', { ascending: true })),
           this._fetchAllRows(() => this.db.supabase
             .from('lead_movements')
-            .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at, call_happened, outcome_type, call_date')
+            .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at, call_happened, outcome_type, call_date, order_value, partner_share_pct, payment_received, reverted_at')
             .in('lead_id', chunk)
             .order('id', { ascending: true })),
         ])
@@ -3849,6 +3849,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           sentCount: 0, lastSentAt: null,
           // Hoeveel koppelingen inmiddels naar een andere campagne zijn gegaan.
           afgeslotenLeads: 0,
+          // Geld: orderwaarde van de sales binnen het venster, wat daarvan al
+          // binnen is, en het partnerdeel (Marcel). Winst = omzet − partner.
+          geld: { omzet: 0, binnen: 0, partner: 0, sales: 0 },
           // callHeld/noShow/saleLost horen erbij: een close rate over
           // ingeplande calls rekent no-shows mee als gemiste kans, terwijl je
           // alleen kunt closen op een call die je écht gevoerd hebt.
@@ -3886,11 +3889,22 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // niet als allebei.
         let heeftGevoerd = false
         let gemisteCall = null
+        // Eén verkoop per lead per campagne: de eerste sale-rij met een bedrag.
+        let geteld = false
         ;(movPerLead.get(lead.id) || [])
           .filter(m => binnen(m.moved_at))
           .sort((a, b) => String(a.moved_at).localeCompare(String(b.moved_at)))
           .forEach(m => {
             const titel = (m.to_section_title || '').toLowerCase()
+
+            const bedrag = Number(m.order_value) || 0
+            if (!geteld && bedrag > 0 && !m.reverted_at) {
+              geteld = true
+              entry.geld.sales += 1
+              entry.geld.omzet += bedrag
+              if (m.payment_received) entry.geld.binnen += bedrag
+              entry.geld.partner += bedrag * (Number(m.partner_share_pct) || 0) / 100
+            }
 
             // Call gevoerd of niet: dat staat op de call-rij zelf, los van de
             // sectie waar de lead heen ging.
@@ -3941,9 +3955,16 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         campStats.set(t.campaign_id, entry)
       })
 
+      // Adspend staat per uitbetaalperiode, niet per campagne. Daarom gaat
+      // 'ie alleen van het totaal af, net als in de verdeling met Marcel.
+      const { data: spendRijen } = await this.db.supabase.from('ad_spend').select('bedrag')
+        .then(r => r, () => ({ data: [] }))
+      const adspend = (spendRijen || []).reduce((t, r) => t + (Number(r.bedrag) || 0), 0)
+
       return {
         campaigns: [...campStats.values()].sort((a, b) => b.total - a.total),
         totalLeads: tags.length,
+        adspend,
       }
     } catch (error) {
       console.error('❌ Get campaign breakdown failed:', error)
