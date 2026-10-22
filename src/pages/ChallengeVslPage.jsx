@@ -864,29 +864,30 @@ export default function ChallengeVslPage() {
           <div ref={heroCtaRef}>
             <Cta m={m} licht />
           </div>
-          {/* Eten, trainen, iemand die meekijkt: drie kaarten, elk opent zijn pijler. */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: m ? '1fr' : 'repeat(3, 1fr)',
-            gap: m ? '0.6rem' : '1rem', marginTop: m ? '1.6rem' : '2.2rem',
-          }}>
-            {AANPAK.map(a => (
-              <button key={a.kop} onClick={() => { setPijler(a.pijler); meet('pijler', { meta: { pijler: a.pijler } }) }} style={{
-                padding: m ? '0.95rem 1rem' : '1.3rem 1.3rem', borderRadius: 16,
-                border: `1px solid ${THEMAS.wit.rand}`, background: THEMAS.wit.kaart,
-                display: 'flex', alignItems: m ? 'center' : 'flex-start', flexDirection: m ? 'row' : 'column', gap: m ? 14 : 12,
-                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', position: 'relative',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-                <span style={{ width: 44, height: 44, borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <a.Icon size={22} strokeWidth={2.6} color="#fff" />
-                </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <h3 style={{ margin: 0, paddingRight: m ? 0 : 24, fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, color: THEMAS.wit.tekst }}>{a.kop}</h3>
-                  <div style={{ marginTop: 4, fontSize: m ? '0.9rem' : '0.98rem', fontWeight: 700, lineHeight: 1.4, color: THEMAS.wit.dim }}>{a.zin}</div>
-                </div>
-                <ChevronRight size={20} strokeWidth={3} color={THEMAS.wit.tekst} style={{ flexShrink: 0, ...(m ? {} : { position: 'absolute', top: '1.3rem', right: '1.1rem' }) }} />
-              </button>
-            ))}
+          {/* Eten, trainen, iemand die meekijkt als stappenplan: links een lijn
+              met 1, 2, 3, per stap alleen de titel, geen kaarten (22 okt
+              2026). Elke stap opent zijn pijler. */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: m ? '1.6rem' : '2.2rem' }}>
+            <ol style={{ listStyle: 'none', margin: 0, padding: 0, position: 'relative', display: 'flex', flexDirection: 'column', gap: m ? 18 : 22 }}>
+              {/* De lijn loopt van het midden van bol 1 tot het midden van bol 3. */}
+              <span aria-hidden style={{ position: 'absolute', left: (m ? 30 : 34) / 2 - 1, top: (m ? 30 : 34) / 2, bottom: (m ? 30 : 34) / 2, width: 2, background: 'rgba(0,0,0,0.18)' }} />
+              {AANPAK.map((a, i) => (
+                <li key={a.kop} style={{ position: 'relative' }}>
+                  <button onClick={() => { setPijler(a.pijler); meet('pijler', { meta: { pijler: a.pijler } }) }} style={{
+                    display: 'flex', alignItems: 'center', gap: 14, padding: 0, background: 'none', border: 'none',
+                    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                    fontSize: m ? '1.08rem' : '1.22rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', lineHeight: 1.25,
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    <span style={{ width: m ? 30 : 34, height: m ? 30 : 34, borderRadius: '50%', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 900 }}>
+                      {i + 1}
+                    </span>
+                    <span>{a.kop}</span>
+                    <ChevronRight size={m ? 18 : 20} strokeWidth={3} style={{ flexShrink: 0, marginLeft: -6 }} />
+                  </button>
+                </li>
+              ))}
+            </ol>
           </div>
           {/* Direct onder de punten de transformaties van Kersten en Nitish
               (21 okt 2026; stonden eerst verderop bij de resultaten). */}
