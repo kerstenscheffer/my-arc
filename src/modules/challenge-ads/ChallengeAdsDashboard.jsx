@@ -154,9 +154,11 @@ function perAdvertentie(hooks, leads, spend) {
 // ── Bouwstenen ─────────────────────────────────────────────────────────────
 
 const kop = { fontSize: '0.8rem', fontWeight: 800, color: ZWAK, marginBottom: 10 }
+// Compacte keuzelijst: laag, haarlijn, geen vlak.
 const keuze = {
-  minHeight: 36, padding: '0 0.7rem', borderRadius: 10, background: '#111', color: '#fff',
-  border: '1px solid rgba(255,255,255,0.14)', fontSize: '0.82rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+  height: 32, padding: '0 0.6rem', borderRadius: 8, background: 'transparent', color: '#fff',
+  borderWidth: 1, borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.16)',
+  fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', colorScheme: 'dark',
 }
 
 function Getal({ label, waarde, sub, kleur = '#fff', onClick }) {
@@ -689,41 +691,35 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const ad = advertentie ? advertenties.find(a => a.sleutel === advertentie) : null
 
   return (
-    <div style={{ padding: m ? '1rem' : '1.5rem 2rem', color: '#fff', maxWidth: 1080, margin: '0 auto' }}>
-      {/* ═══ KOP ═══ */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: m ? 22 : 30 }}>
-        <div style={{ fontSize: m ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em' }}>Ads · 6 Weken Challenge</div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {!gefilterd && <select value={bron} onChange={e => setBron(e.target.value)} style={keuze} aria-label="Bron">
-            <option value="ads">Alleen advertenties</option>
-            <option value="alles">Alle bezoekers</option>
-          </select>}
-          <select value={periode} onChange={e => setPeriode(e.target.value)} style={keuze} aria-label="Periode">
-            {PERIODES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-          </select>
-          {periode === 'vanaf' && (
-            <input type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')}
-              onChange={e => kiesVanaf(e.target.value)} style={{ ...keuze, colorScheme: 'dark' }} aria-label="Vanaf" />
-          )}
-          <button onClick={laad} aria-label="Verversen" style={{ ...keuze, width: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <RefreshCw size={15} style={{ animation: laden ? 'spin 1s linear infinite' : 'none' }} />
-          </button>
-        </div>
-      </div>
-
-      {/* Campagne + advertentie: alles hieronder rekent alleen daarmee. */}
-      <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8, marginTop: m ? -10 : -16, marginBottom: m ? 22 : 30 }}>
+    <div style={{ padding: m ? '1rem' : '1.5rem 2.5rem', color: '#fff', maxWidth: 1680, margin: '0 auto' }}>
+      {/* ═══ KOP: alle keuzes op één regel ═══
+          Campagne en advertentie bepalen wat alles hieronder telt. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: m ? 22 : 30 }}>
         <select value={campagne} onChange={e => setCampagne(e.target.value)} aria-label="Campagne"
-          style={{ ...keuze, width: '100%', minHeight: 42, fontSize: '0.88rem', border: `1px solid ${campagne ? '#fff' : 'rgba(255,255,255,0.14)'}` }}>
+          style={{ ...keuze, flex: m ? '1 1 100%' : '0 1 300px', minWidth: 0, borderColor: campagne ? '#fff' : keuze.borderColor }}>
           <option value="">Alle campagnes</option>
           {campagnes.map(c => <option key={c.k} value={c.k}>{c.naam}</option>)}
           {campagne && !campagnes.some(c => c.k === campagne) && <option value={campagne}>Gekozen campagne (geen data in deze periode)</option>}
         </select>
         <select value={advFilter} onChange={e => setAdvFilter(e.target.value)} aria-label="Advertentie" disabled={!advKeuzes.length}
-          style={{ ...keuze, width: '100%', minHeight: 42, fontSize: '0.88rem', border: `1px solid ${advFilter ? '#fff' : 'rgba(255,255,255,0.14)'}`, opacity: advKeuzes.length ? 1 : 0.5 }}>
-          <option value="">{campagne ? 'Alle advertenties in deze campagne' : 'Alle advertenties'}</option>
+          style={{ ...keuze, flex: m ? '1 1 100%' : '0 1 260px', minWidth: 0, borderColor: advFilter ? '#fff' : keuze.borderColor, opacity: advKeuzes.length ? 1 : 0.5 }}>
+          <option value="">Alle advertenties</option>
           {advKeuzes.map(a => <option key={a.k} value={a.k}>{a.naam}</option>)}
         </select>
+        {!gefilterd && <select value={bron} onChange={e => setBron(e.target.value)} style={{ ...keuze, flex: m ? '1 1 0' : '0 0 auto' }} aria-label="Bron">
+          <option value="ads">Alleen advertenties</option>
+          <option value="alles">Alle bezoekers</option>
+        </select>}
+        <select value={periode} onChange={e => setPeriode(e.target.value)} style={{ ...keuze, flex: m ? '1 1 0' : '0 0 auto' }} aria-label="Periode">
+          {PERIODES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+        {periode === 'vanaf' && (
+          <input type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')}
+            onChange={e => kiesVanaf(e.target.value)} style={{ ...keuze, colorScheme: 'dark' }} aria-label="Vanaf" />
+        )}
+        <button onClick={laad} aria-label="Verversen" style={{ ...keuze, width: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <RefreshCw size={14} style={{ animation: laden ? 'spin 1s linear infinite' : 'none' }} />
+        </button>
       </div>
 
       {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.84rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
