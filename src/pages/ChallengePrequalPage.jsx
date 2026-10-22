@@ -16,7 +16,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Instagram, Play, Volume2 } from 'lucide-react'
 import db from '../services/DatabaseService'
-import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies } from './challengeTracking'
+import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies, isIntern } from './challengeTracking'
 import { VRAGEN, vraagtTelefoon, optiesVan } from './challengeVragen'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 
@@ -441,6 +441,8 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
       // De database wil een voornaam; wie vóór de gegevens wordt afgewezen
       // heeft die nog niet gegeven.
       if (!payload.voornaam) payload.voornaam = 'Onbekend'
+      // Jouw eigen testinzending: wel op het bord, geen Lead naar Meta.
+      if (isIntern()) payload.intern = true
       const { data, error } = await db.supabase.rpc('submit_challenge_prequal', { p: payload })
       if (error) throw error
       setEinde({ uitkomst, reden, leadId: data })

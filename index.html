@@ -14,8 +14,25 @@
     <!-- Meta Pixel Code -->
     <!-- Niet in de native app: daar komt geen advertentieverkeer binnen en
          het script kost bij elke start laadtijd. -->
+    <!-- Ook niet voor Kersten zelf (localhost, ingelogd op dit apparaat, of
+         ooit ?intern=1): zijn testbezoeken horen niet in Meta. Zelfde regel
+         als isIntern() in src/pages/challengeTracking.js. -->
     <script>
-    if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) && location.protocol !== 'capacitor:')
+    window.__myarcIntern = (function () {
+      try {
+        if (/^(localhost|127\.|0\.0\.0\.0|192\.168\.|10\.)/.test(location.hostname) || /\.local$/.test(location.hostname)) return true;
+        var q = new URLSearchParams(location.search).get('intern');
+        if (q === '0') { localStorage.removeItem('myarc_intern'); return false; }
+        if (q === '1') localStorage.setItem('myarc_intern', '1');
+        if (localStorage.getItem('myarc_intern') === '1') return true;
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (/^sb-.*-auth-token$/.test(k) && localStorage.getItem(k)) { localStorage.setItem('myarc_intern', '1'); return true; }
+        }
+      } catch (e) {}
+      return false;
+    })();
+    if (!window.__myarcIntern && !(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) && location.protocol !== 'capacitor:')
     !function(f,b,e,v,n,t,s)
     {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
     n.callMethod.apply(n,arguments):n.queue.push(arguments)};

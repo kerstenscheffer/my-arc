@@ -48,10 +48,41 @@ export function herkomst() {
   return { referrer: document.referrer || '' }
 }
 
+// Kersten zelf telt niet mee (22 okt 2026: hij testte het formulier vaak en
+// dat stond tussen de advertentiecijfers). Intern is: localhost of een
+// netwerkadres, ooit ingelogd in MY ARC op dit apparaat (coach of klant,
+// onthouden ook na uitloggen), of ooit de pagina geopend met ?intern=1.
+// ?intern=0 zet het weer uit. Bots en linkvoorbeelden van Meta tellen ook
+// niet. index.html past dezelfde regel toe op de Meta Pixel.
+const INTERN_SLEUTEL = 'myarc_intern'
+let internUitkomst = null
+export function isIntern() {
+  if (internUitkomst != null) return internUitkomst
+  internUitkomst = (() => {
+    try {
+      if (window.__myarcIntern) return true
+      if (/(bot|crawler|spider|externalhit|externalads|headless|lighthouse)/i.test(navigator.userAgent || '')) return true
+      const host = window.location.hostname
+      if (/^(localhost|127\.|0\.0\.0\.0|192\.168\.|10\.)/.test(host) || host.endsWith('.local')) return true
+      const q = new URLSearchParams(window.location.search).get('intern')
+      if (q === '0') { localStorage.removeItem(INTERN_SLEUTEL); return false }
+      if (q === '1') localStorage.setItem(INTERN_SLEUTEL, '1')
+      if (localStorage.getItem(INTERN_SLEUTEL) === '1') return true
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (/^sb-.*-auth-token$/.test(k || '') && localStorage.getItem(k)) { localStorage.setItem(INTERN_SLEUTEL, '1'); return true }
+      }
+    } catch { /* geen opslag: telt gewoon mee */ }
+    return false
+  })()
+  return internUitkomst
+}
+
 const isMobiel = () => { try { return window.innerWidth <= 768 } catch { return null } }
 
 // Eén gebeurtenis wegschrijven. Faalt stil: meten mag de pagina nooit breken.
 export function meet(event, extra = {}) {
+  if (isIntern()) return
   try {
     const h = herkomst()
     const rij = {
@@ -72,6 +103,7 @@ export function meet(event, extra = {}) {
 // `eventId`: hetzelfde id als de server via de Conversions API stuurt
 // (bv. lead_<id>), zodat Meta browser- en server-event als één telt.
 export function pixel(naam, data, eventId) {
+  if (isIntern()) return
   try {
     if (typeof window.fbq !== 'function') return
     if (eventId) window.fbq('track', naam, data || {}, { eventID: eventId })
@@ -96,6 +128,7 @@ export function metaCookies() {
 // eindstand, met keepalive zodat het verzoek het sluiten van het tabblad
 // overleeft. Het scherm neemt per sessie de hoogste waarde.
 export function volgTijdOpPagina() {
+  if (isIntern()) return () => {}
   const start = Date.now()
   let laatst = 0
   const seconden = () => Math.round((Date.now() - start) / 1000)
