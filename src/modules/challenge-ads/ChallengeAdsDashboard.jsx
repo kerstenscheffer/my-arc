@@ -27,7 +27,7 @@
 
 import { createElement, useEffect, useState } from 'react'
 import {
-  RefreshCw, Copy, Check, ChevronDown, ChevronRight, X, Link2,
+  Copy, Check, ChevronDown, ChevronRight, X, Link2,
   Megaphone, Info, Percent, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
   PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle, Repeat, Banknote, Coins, TrendingUp,
 } from 'lucide-react'
@@ -330,11 +330,6 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     setVanafDatum(iso)
     try { if (iso) localStorage.setItem('arc_ads_vanaf', iso); else localStorage.removeItem('arc_ads_vanaf') } catch { /* geen opslag */ }
   }
-  // Alleen advertentieverkeer, of ook Instagram-bio en direct (o.a. je eigen bezoeken).
-  const [bron, setBronState] = useState(() => {
-    try { return localStorage.getItem('arc_ads_bron') === 'alles' ? 'alles' : 'ads' } catch { return 'ads' }
-  })
-  const setBron = (b) => { setBronState(b); try { localStorage.setItem('arc_ads_bron', b) } catch { /* geen opslag */ } }
 
   // Campagne en advertentie (22 okt 2026: nieuwe campagne los van de oude
   // kunnen bekijken). Leeg = alles. De campagne wordt onthouden.
@@ -381,6 +376,11 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     } finally { setLaden(false) }
   }
   useEffect(() => { laad() }, [periode, vanafDatum]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Geen verversknop meer: elke 5 minuten vanzelf, zolang het tabblad openstaat.
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') laad() }, 5 * 60 * 1000)
+    return () => clearInterval(t)
+  }, [periode, vanafDatum]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keuzelijsten: campagnes en advertenties uit spend, bezoek en leads.
   // Nieuwste activiteit bovenaan, zodat een net gestarte campagne vooraan staat.
@@ -394,14 +394,25 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   ;(data?.dagen || []).filter(d => d.ad).forEach(d => noteer(laatst, campSleutel(d.camp), schoon(d.camp), String(d.dag)))
   ;(data?.spend || []).forEach(r => noteer(laatst, campSleutel(r.camp), schoon(r.camp), ''))
   const campagnes = [...laatst.entries()].map(([k, v]) => ({ k, ...v })).sort((a, b) => (b.dag > a.dag ? 1 : b.dag < a.dag ? -1 : 0))
-  const advMap = new Map()
-  ;(data?.dagen || []).filter(d => d.ad && (!campagne || campSleutel(d.camp) === campagne))
-    .forEach(d => { const k = sleutelVan(d.hook); if (k !== '__onbekend') noteer(advMap, k, schoon(d.hook), String(d.dag)) })
-  const advKeuzes = [...advMap.entries()].map(([k, v]) => ({ k, ...v })).sort((a, b) => (b.dag > a.dag ? 1 : b.dag < a.dag ? -1 : 0))
+  // Advertenties per campagne, voor de groepen in de keuzelijst.
+  const advPerCamp = new Map()
+  ;(data?.dagen || []).filter(d => d.ad).forEach(d => {
+    const ck = campSleutel(d.camp), ak = sleutelVan(d.hook)
+    if (!ck || ak === '__onbekend') return
+    if (!advPerCamp.has(ck)) advPerCamp.set(ck, new Map())
+    noteer(advPerCamp.get(ck), ak, schoon(d.hook), String(d.dag))
+  })
+  const advVan = (ck) => [...(advPerCamp.get(ck) || new Map()).entries()].map(([k, v]) => ({ k, ...v }))
+    .sort((a, b) => (b.dag > a.dag ? 1 : b.dag < a.dag ? -1 : 0))
+  // Eén keuzelijst: '' = alles, ["campagne"] = hele campagne, ["campagne","advertentie"].
+  const keuzeWaarde = campagne ? JSON.stringify(advFilter ? [campagne, advFilter] : [campagne]) : ''
+  const kiesFilter = (v) => {
+    if (!v) { setCampagne(''); return }
+    try { const [c, a] = JSON.parse(v); setCampagne(c); if (a) setAdvFilter(a) } catch { setCampagne('') }
+  }
 
-  // Met een campagne of advertentie gekozen telt alleen advertentieverkeer.
-  const gefilterd = !!(campagne || advFilter)
-  const alleenAds = gefilterd || bron === 'ads'
+  // Dit scherm telt alleen advertentieverkeer (eigen bezoek telt al niet mee).
+  const alleenAds = true
   const past = (r) => (!alleenAds || r.ad !== false)
     && (!campagne || campSleutel(r.camp) === campagne)
     && (!advFilter || sleutelVan(r.hook) === advFilter)
@@ -788,21 +799,17 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       {/* ═══ KOP: alle keuzes op één regel ═══
           Campagne en advertentie bepalen wat alles hieronder telt. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: m ? 22 : 30 }}>
-        <select value={campagne} onChange={e => setCampagne(e.target.value)} aria-label="Campagne"
-          style={{ ...keuze, flex: m ? '1 1 100%' : '0 1 300px', minWidth: 0, borderColor: campagne ? '#fff' : keuze.borderColor }}>
+        <select value={keuzeWaarde} onChange={e => kiesFilter(e.target.value)} aria-label="Campagne of advertentie"
+          style={{ ...keuze, flex: m ? '1 1 100%' : '0 1 360px', minWidth: 0, borderColor: campagne ? '#fff' : keuze.borderColor }}>
           <option value="">Alle campagnes</option>
-          {campagnes.map(c => <option key={c.k} value={c.k}>{c.naam}</option>)}
-          {campagne && !campagnes.some(c => c.k === campagne) && <option value={campagne}>Gekozen campagne (geen data in deze periode)</option>}
+          {campagnes.map(c => (
+            <optgroup key={c.k} label={c.naam}>
+              <option value={JSON.stringify([c.k])}>{c.naam} · hele campagne</option>
+              {advVan(c.k).map(a => <option key={a.k} value={JSON.stringify([c.k, a.k])}>{a.naam}</option>)}
+            </optgroup>
+          ))}
+          {campagne && !campagnes.some(c => c.k === campagne) && <option value={keuzeWaarde}>Gekozen campagne (geen data in deze periode)</option>}
         </select>
-        <select value={advFilter} onChange={e => setAdvFilter(e.target.value)} aria-label="Advertentie" disabled={!advKeuzes.length}
-          style={{ ...keuze, flex: m ? '1 1 100%' : '0 1 260px', minWidth: 0, borderColor: advFilter ? '#fff' : keuze.borderColor, opacity: advKeuzes.length ? 1 : 0.5 }}>
-          <option value="">Alle advertenties</option>
-          {advKeuzes.map(a => <option key={a.k} value={a.k}>{a.naam}</option>)}
-        </select>
-        {!gefilterd && <select value={bron} onChange={e => setBron(e.target.value)} style={{ ...keuze, flex: m ? '1 1 0' : '0 0 auto' }} aria-label="Bron">
-          <option value="ads">Alleen advertenties</option>
-          <option value="alles">Alle bezoekers</option>
-        </select>}
         <select value={periode} onChange={e => setPeriode(e.target.value)} style={{ ...keuze, flex: m ? '1 1 0' : '0 0 auto' }} aria-label="Periode">
           {PERIODES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
@@ -810,14 +817,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           <input type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')}
             onChange={e => kiesVanaf(e.target.value)} style={{ ...keuze, colorScheme: 'dark' }} aria-label="Vanaf" />
         )}
-        <button onClick={laad} aria-label="Verversen" style={{ ...keuze, width: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <RefreshCw size={14} style={{ animation: laden ? 'spin 1s linear infinite' : 'none' }} />
-        </button>
         <button onClick={() => setPaneel('advertenties')} title="Per advertentie" style={{ ...keuze, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: m ? 0 : 'auto' }}>
           <Megaphone size={14} strokeWidth={2.6} />{!m && 'Per advertentie'}
-        </button>
-        <button onClick={() => setPaneel('link')} title="Link voor in de advertentie" style={{ ...keuze, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <Link2 size={14} strokeWidth={2.6} />{!m && 'Link'}
         </button>
       </div>
 
@@ -1029,10 +1030,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900, color: (m ? a.calls : a.omzet) > 0 ? GROEN : '#fff' }}>{m ? a.calls : (a.omzet ? euro(a.omzet) : '–')}</span>
           </button>
         ))}
-        </Venster>
-      )}
-      {paneel === 'link' && (
-        <Venster titel="Link voor in de advertentie" sub="Plak achter de URL bij URL-parameters in Meta" m={m} onClose={() => setPaneel(null)}>
+          <div style={{ ...kop, marginTop: 24, display: 'flex', alignItems: 'center', gap: 6 }}><Link2 size={14} strokeWidth={2.6} /> Link voor in de advertentie</div>
           <div style={{ paddingBottom: '1rem' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <code style={{ flex: 1, fontSize: '0.76rem', color: 'rgba(255,255,255,0.85)', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{LINK_VOORBEELD}</code>
@@ -1046,7 +1044,6 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           </div>
         </Venster>
       )}
-
       {open && (
         <Venster titel={open.titel} sub={open.sub} m={m} onClose={() => setInfo(null)}>{open.inhoud}</Venster>
       )}
