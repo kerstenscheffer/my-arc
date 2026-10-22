@@ -442,6 +442,14 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       schermen.push({ ...x, binnen: vorige, weg, naam: SCHERM_NAAM[x.vraag] || x.vraag })
       return x.door
     }, T.form_start)
+  // Na het laatste scherm: wie niet als lead binnenkwam. Afwijzingen die niet
+  // aan een vraag hangen (oudere versie) horen hier.
+  const laatsteDoor = schermen.length ? schermen[schermen.length - 1].door : T.form_start
+  const restAfgewezen = Math.max(0, T.afgewezen - schermen.reduce((n, x) => n + x.afgewezen, 0))
+  const eindWeg = Math.max(0, laatsteDoor - leads.length - restAfgewezen)
+  if (schermen.length && eindWeg + restAfgewezen > 0) {
+    schermen.push({ vraag: '__eind', naam: 'Na het laatste scherm (versturen)', binnen: laatsteDoor, door: leads.length, weg: eindWeg, afgewezen: restAfgewezen })
+  }
   const grootsteAfhaker = schermen.reduce((x, y) => (y.weg > (x?.weg || 0) ? y : x), null)
   const weggeklikt = Math.max(0, T.form_start - leads.length - T.afgewezen)
   const spend = spendRijen.reduce((s, r) => s + (Number(r.spend) || 0), 0)
