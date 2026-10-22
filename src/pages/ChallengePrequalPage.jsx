@@ -218,7 +218,9 @@ function GeschiktVideo({ id, m, vol = false, onKlaar }) {
     <div style={vol ? {
       // Volle breedte van het blad, tegen de randen aan; te hoog = boven en
       // onder bijgesneden (de iframe meet zich aan de breedte, zie cqw).
-      position: 'relative', width: '100%', aspectRatio: '9 / 16', maxHeight: '64vh',
+      position: 'relative', width: '100%', aspectRatio: '9 / 16',
+      // Zo hoog dat kop, velden en knop er zonder scrollen onder passen.
+      maxHeight: 'max(200px, calc(100dvh - 530px))',
       overflow: 'hidden', background: '#111', containerType: 'inline-size',
     } : {
       position: 'relative', margin: '1.2rem auto 0', height: m ? 'min(46vh, 390px)' : 'min(52vh, 460px)', aspectRatio: '9 / 16', maxWidth: '100%',
@@ -473,9 +475,9 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
         ) : vraag.video && volVideo ? (
           <>
             {/* Tegen de randen van het blad: de padding van de buitenkant teniet. */}
-            <div style={{ margin: '-1.1rem -1.1rem 1.2rem' }}><GeschiktVideo id={vraag.video} m={m} vol onKlaar={naarGegevens} /></div>
+            <div style={{ margin: '-1.1rem -1.1rem 1rem' }}><GeschiktVideo id={vraag.video} m={m} vol onKlaar={naarGegevens} /></div>
             {kop(vraag.vraag)}
-            {sub('Laat hieronder je gegevens achter, dan neem ik contact met je op.')}
+            <p style={{ margin: '0.4rem 0 0', fontSize: '0.92rem', fontWeight: 700, color: ZWAK, lineHeight: 1.4, textAlign: 'center' }}>Laat je gegevens achter, dan neem ik contact op.</p>
           </>
         ) : vraag.video ? (
           <>
@@ -490,7 +492,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
           </>
         )}
 
-        <div style={{ marginTop: '1.6rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div style={{ marginTop: volVideo ? '1rem' : '1.6rem', display: 'flex', flexDirection: 'column', gap: volVideo ? '0.5rem' : '0.6rem' }}>
           {vraag.soort === 'keuze' && optiesVan(vraag, antw).map(o => (
             <Optie key={o} tekst={o} aan={antw[vraag.id] === o} m={m} onClick={() => kies(o)} />
           ))}
@@ -538,7 +540,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
 
         {!meteenDoor && (
-          <button onClick={() => verder()} disabled={!klaar || bezig} style={{ ...knopWit(m, !klaar || bezig), marginTop: '1.4rem' }}>
+          <button onClick={() => verder()} disabled={!klaar || bezig} style={{ ...knopWit(m, !klaar || bezig), marginTop: volVideo ? '0.9rem' : '1.4rem' }}>
             {bezig ? 'Even geduld…'
               : vraag.soort === 'info' ? 'Verder'
               : vraag.soort === 'gegevens' ? 'Neem contact met mij op'
