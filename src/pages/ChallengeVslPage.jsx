@@ -372,8 +372,15 @@ function Video({ m }) {
   // "Tik voor geluid". Die tik zet het geluid aan en begint opnieuw vanaf
   // het begin. video_start = de video loopt met geluid (vanzelf of na de
   // tik). In de app blijft het tik-om-te-starten.
+  //   geluid: 'proef' (nog niet bekend) → 'aan' of 'stil'
+  // Zolang het 'proef' is of de video nog niet loopt, ligt de eigen
+  // thumbnail eroverheen: geen YouTube-laadscherm, en de geluidsknop komt
+  // pas als vaststaat dat geluid geweigerd is.
   const [gestart, setGestart] = useState(eigenLaag)
-  const [stilStart, setStilStart] = useState(eigenLaag)
+  const [geluid, setGeluidState] = useState(eigenLaag ? 'proef' : 'aan')
+  const geluidRef = useRef(geluid)
+  const setGeluid = (g) => { geluidRef.current = g; setGeluidState(g) }
+  const stilStart = geluid !== 'aan'
   const [ooitGespeeld, setOoitGespeeld] = useState(false)
   const [speelt, setSpeelt] = useState(false)
   const [gedempt, setGedempt] = useState(eigenLaag)
@@ -383,8 +390,6 @@ function Video({ m }) {
   const [bedieningZichtbaar, setBedieningZichtbaar] = useState(true)
   const iframeRef = useRef(null)
   const spelerRef = useRef(null)
-  // Al getikt voor geluid? Dan laat de geluidsproef de speler met rust.
-  const getiktRef = useRef(false)
   const verbergTimer = useRef(null)
   // Mijlpalen van de échte voortgang (niet de getoonde balk), één keer per sessie.
   const mijlpalen = useRef(new Set())
@@ -416,20 +421,34 @@ function Video({ m }) {
         events: {
           onReady: (e) => {
             const p = e.target
-            try { p.unMute(); p.playVideo() } catch { /* leeg */ }
-            // Na ruim een seconde kijken of het met geluid mocht.
-            setTimeout(() => {
-              if (weg || getiktRef.current) return
+            try {
+              p.unMute()
+              if (p.getPlayerState() !== YT.PlayerState.PLAYING) p.playVideo()
+            } catch { /* leeg */ }
+            // Mocht het met geluid? Kijk elke 250 ms. Speelt hij: geluid aan
+            // of (door de browser) gedempt. Staat hij na 0,8 s stil en laadt
+            // hij niet: geweigerd. Na 4 s hoe dan ook beslissen.
+            const begin = Date.now()
+            const t = setInterval(() => {
+              if (weg || geluidRef.current !== 'proef') { clearInterval(t); return }
               try {
-                if (p.getPlayerState() === YT.PlayerState.PLAYING && !p.isMuted()) {
-                  setStilStart(false); setGedempt(false)
-                  meet('video_start', { meta: { auto: true } })
-                  pixel('ViewContent', { content_name: '6 weken challenge video' })
-                } else {
+                const st = p.getPlayerState()
+                const verstreken = Date.now() - begin
+                if (st === YT.PlayerState.PLAYING) {
+                  clearInterval(t)
+                  if (p.isMuted()) { setGeluid('stil'); setGedempt(true) }
+                  else {
+                    setGeluid('aan'); setGedempt(false)
+                    meet('video_start', { meta: { auto: true } })
+                    pixel('ViewContent', { content_name: '6 weken challenge video' })
+                  }
+                } else if ((st !== YT.PlayerState.BUFFERING && verstreken > 800) || verstreken > 4000) {
+                  clearInterval(t)
+                  setGeluid('stil'); setGedempt(true)
                   p.mute(); p.playVideo()
                 }
-              } catch { /* speler weg */ }
-            }, 1200)
+              } catch { clearInterval(t) }
+            }, 250)
           },
           onStateChange: (e) => {
             setSpeelt(e.data === YT.PlayerState.PLAYING)
@@ -461,8 +480,7 @@ function Video({ m }) {
     if (p.getPlayerState() === 1) p.pauseVideo(); else p.playVideo()
   }
   const metGeluid = () => {
-    getiktRef.current = true
-    setStilStart(false); setGedempt(false); setVoortgang(0)
+    setGeluid('aan'); setGedempt(false); setVoortgang(0)
     meet('video_start'); pixel('ViewContent', { content_name: '6 weken challenge video' })
     const p = spelerRef.current
     try { p?.unMute?.(); p?.seekTo?.(0, true); p?.playVideo?.() } catch { /* speler nog niet klaar */ }
@@ -531,7 +549,10 @@ function Video({ m }) {
         src={`${directeEmbed}&enablejsapi=1&controls=0&disablekb=1&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`}
         title="Hoe de 6 Weken Challenge werkt"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+        // Iframe 140 px hoger dan het kader: het beeld blijft precies passend
+        // (breedte bepaalt), YouTube's titelbalk met kanaalfoto bovenin en
+        // het logo onderin vallen buiten beeld.
+        style={{ position: 'absolute', left: 0, top: -70, width: '100%', height: 'calc(100% + 140px)', border: 0, pointerEvents: 'none' }}
       />
       {/* Tikken op het beeld pauzeert of hervat; de laag vangt de klik af
           zodat de YouTube-knoppen eronder niet reageren. */}
@@ -541,25 +562,24 @@ function Video({ m }) {
         onTouchStart={toonBediening}
         style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: bedieningZichtbaar ? bediening : 0, cursor: bedieningZichtbaar ? 'pointer' : 'none' }}
       />
-      {stilStart && (
-        <button onClick={metGeluid} aria-label="Geluid aan en vanaf het begin kijken" style={{
+      {(geluid === 'proef' || !ooitGespeeld) ? (
+        // Eigen thumbnail tot het geluid beslist is en de video loopt. Een
+        // tik hierop start meteen met geluid.
+        <button onClick={metGeluid} aria-label="Video met geluid afspelen" style={{
           position: 'absolute', inset: 0, zIndex: 3, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          // Tot de video echt loopt (of als de telefoon automatisch afspelen
-          // blokkeert, bv. in spaarstand) staat de eigen thumbnail eronder.
-          background: ooitGespeeld ? 'rgba(0,0,0,0.12)' : 'url(/challenge-thumbnail.jpg) center / cover',
+          background: 'url(/challenge-thumbnail.jpg) center / cover',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: m ? 8 : 10,
-            padding: m ? '0.7rem 1.05rem' : '0.85rem 1.35rem', borderRadius: 999,
-            background: 'rgba(0,0,0,0.78)', border: '1.5px solid rgba(255,255,255,0.9)',
-            color: '#fff', fontSize: m ? '0.95rem' : '1.1rem', fontWeight: 900, fontFamily: 'inherit',
-            boxShadow: '0 8px 28px rgba(0,0,0,0.5)', animation: 'tikGeluid 1.6s ease-in-out infinite',
-          }}>
-            <VolumeX size={m ? 20 : 24} strokeWidth={2.6} /> Tik voor geluid
-          </span>
-          <style>{'@keyframes tikGeluid { 0%,100% { transform: scale(1) } 50% { transform: scale(1.05) } }'}</style>
+          {geluid === 'stil' && <GeluidPil m={m} />}
+        </button>
+      ) : geluid === 'stil' && (
+        <button onClick={metGeluid} aria-label="Geluid aan en vanaf het begin kijken" style={{
+          position: 'absolute', inset: 0, zIndex: 3, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.12)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          <GeluidPil m={m} />
         </button>
       )}
       {!speelt && !stilStart && (
@@ -595,6 +615,21 @@ function Video({ m }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function GeluidPil({ m }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: m ? 8 : 10,
+      padding: m ? '0.7rem 1.05rem' : '0.85rem 1.35rem', borderRadius: 999,
+      background: 'rgba(0,0,0,0.78)', border: '1.5px solid rgba(255,255,255,0.9)',
+      color: '#fff', fontSize: m ? '0.95rem' : '1.1rem', fontWeight: 900, fontFamily: 'inherit',
+      boxShadow: '0 8px 28px rgba(0,0,0,0.5)', animation: 'tikGeluid 1.6s ease-in-out infinite',
+    }}>
+      <VolumeX size={m ? 20 : 24} strokeWidth={2.6} /> Tik voor geluid
+      <style>{'@keyframes tikGeluid { 0%,100% { transform: scale(1) } 50% { transform: scale(1.05) } }'}</style>
+    </span>
   )
 }
 
