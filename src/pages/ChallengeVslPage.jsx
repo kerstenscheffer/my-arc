@@ -740,14 +740,15 @@ function PijlerModal({ pijler, onClose, onStart, onWissel, m }) {
               }}>
                 {CTA_TEKST}
               </button>
-              {/* Alleen het icoon van de volgende pijler (22 okt 2026). */}
+              {/* Icoon van de volgende pijler met een pijltje, zonder kader (22 okt 2026). */}
               <button onClick={() => ga(volgende, 1)} aria-label={`Bekijk ${PIJLER_NAAM[volgende].toLowerCase()}`} style={{
-                flexShrink: 0, width: m ? 56 : 62, height: m ? 56 : 62, borderRadius: 14, padding: 0,
-                background: 'transparent', border: '1.5px solid rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer',
+                flexShrink: 0, height: m ? 56 : 62, padding: '0 4px', gap: 2,
+                background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
                 <VolgendIcoon size={m ? 24 : 26} strokeWidth={2.6} />
+                <ChevronRight size={m ? 16 : 18} strokeWidth={3} />
               </button>
             </div>
           </div>
