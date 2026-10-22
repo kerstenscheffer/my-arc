@@ -136,6 +136,9 @@ export default function TrajectModal({ open, modus = 'verleng', client, coachId,
         const { data: { user } = {} } = await supabase.auth.getUser()
         const { error: omzetFout } = await supabase.from('lead_movements').insert({
           lead_id: vorige?.leadId || null,
+          // Klant erbij, zodat de verlenging terug te leiden is naar de lead
+          // en de advertentie waar hij vandaan kwam (Ads-scherm).
+          client_id: client.id,
           to_section_title: VERLENGING_TITEL,
           lead_name: client.name || [client.first_name, client.last_name].filter(Boolean).join(' ') || client.email || 'Klant',
           coach_id: user?.id || coachId || null,

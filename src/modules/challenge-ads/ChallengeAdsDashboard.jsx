@@ -29,7 +29,7 @@ import { createElement, useEffect, useState } from 'react'
 import {
   RefreshCw, Copy, Check, ChevronDown, ChevronRight, X, Link2,
   Megaphone, Info, Percent, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
-  PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle,
+  PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle, Repeat,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PrequalAfhaken from './PrequalAfhaken'
@@ -66,6 +66,7 @@ const RICHT = {
   ingepland: { goed: 0.7, matig: 0.5, min: 3 },
   show: { goed: 0.75, matig: 0.6, min: 3 },
   close: { goed: 0.3, matig: 0.15, min: 3 },
+  verlengd: { goed: 0.5, matig: 0.3, min: 3 },
 }
 const OORDEEL = {
   goed: { id: 'goed', tekst: 'Goed', kleur: GROEN, rang: 0 },
@@ -92,7 +93,7 @@ const ICONEN = {
   Bezoekers: Users, 'Video gestart': Play, 'Op de knop geklikt': MousePointerClick, 'Formulier gestart': PenLine, 'Leads binnen': UserCheck,
   'Follow-up gestuurd': Send, 'In gesprek': MessageCircle,
   'Call voorgesteld': PhoneOutgoing, 'Call ingepland': CalendarCheck, 'Call gehad': PhoneCall,
-  Sale: Trophy, 'Gem. orderwaarde': Wallet,
+  Sale: Trophy, Verlengd: Repeat, 'Gem. orderwaarde': Wallet,
 }
 
 const procent = (x, dec = 0) => `${(x * 100).toFixed(dec).replace('.', ',')}%`
@@ -153,7 +154,8 @@ function perAdvertentie(hooks, leads, spend) {
       ...r, t,
       calls: r.leads.filter(l => l.call).length,
       sales: sales.length,
-      omzet: sales.reduce((s, l) => s + Number(l.omzet), 0),
+      // Sale plus verlenging: alles wat deze advertentie uiteindelijk opleverde.
+      omzet: sales.reduce((s, l) => s + Number(l.omzet), 0) + r.leads.reduce((s, l) => s + (Number(l.verlenging_omzet) || 0), 0),
     }
   }).sort((a, b) => (a.onbekend - b.onbekend) || (b.spend - a.spend) || (b.t.sessies - a.t.sessies))
 }
@@ -276,7 +278,8 @@ function Venster({ titel, sub, m, onClose, children, breed = false }) {
 
 // Eén lead met waar hij nu staat.
 function LeadRegel({ l }) {
-  const status = Number(l.omzet) > 0 ? { tekst: `Sale ${euro(l.omzet)}`, kleur: GROEN }
+  const status = l.verlengd ? { tekst: `Verlengd${l.verlenging_omzet ? ` ${euro(l.verlenging_omzet)}` : ''}`, kleur: GROEN }
+    : Number(l.omzet) > 0 ? { tekst: `Sale ${euro(l.omzet)}`, kleur: GROEN }
     : l.verloren ? { tekst: 'Sale verloren', kleur: ROOD }
       : l.gehouden ? { tekst: 'Call gehad', kleur: '#fff' }
         : l.noshow ? { tekst: 'No-show', kleur: ROOD }
@@ -460,7 +463,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const calls = leads.filter(l => l.call)
   const gehouden = leads.filter(l => l.gehouden)
   const sales = leads.filter(l => Number(l.omzet) > 0)
-  const omzet = sales.reduce((s, l) => s + Number(l.omzet), 0)
+  const saleOmzet = sales.reduce((s, l) => s + Number(l.omzet), 0)
+  // Doorgezet naar een verlenging (TrajectModal). Die omzet hoort ook bij de
+  // advertentie: telt mee in omzet en ROAS.
+  const verlengd = leads.filter(l => l.verlengd)
+  const verlengOmzet = verlengd.reduce((s, l) => s + (Number(l.verlenging_omzet) || 0), 0)
+  const omzet = saleOmzet + verlengOmzet
   const cpl = leads.length ? spend / leads.length : null
   const roas = spend > 0 ? omzet / spend : null
   const advertenties = perAdvertentie(hooks.filter(h => h.ad), leads.filter(l => l.ad), spendRijen)
@@ -503,14 +511,15 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       M('Follow-up gestuurd', metFollowup.length, leads.length, null, `${metFollowup.length} · ${pct(metFollowup.length, leads.length)}`, 'followup', 'gelogd op het bord'),
       M('In gesprek', inGesprek.length, leads.length, RICHT.contact, `${inGesprek.length} · ${pct(inGesprek.length, leads.length)}`, 'followup', 'van de leads reageerde'),
     ] },
-    { id: 'call', naam: 'Call', vraag: 'Worden er calls geboekt en gehouden?', preview: [['Ingepland', String(calls.length), 'Call ingepland'], ['Gehad', String(gehouden.length), 'Call gehad'], ['No-show', String(noshows.length)]], metingen: [
+    { id: 'call', naam: 'Call', vraag: 'Worden er calls geboekt en gehouden?', preview: [['Ingepland', String(calls.length), 'Call ingepland'], ['Gehad', String(gehouden.length), 'Call gehad'], ['No-show', String(noshows.length)], ['Afgezegd', String(afgezegd.length)]], metingen: [
       M('Call voorgesteld', voorgesteld.length, inGesprek.length, RICHT.voorgesteld, `${voorgesteld.length} · ${pct(voorgesteld.length, inGesprek.length)}`, 'call', 'van wie in gesprek is'),
       M('Call ingepland', calls.length, voorgesteld.length, RICHT.ingepland, `${calls.length} · ${pct(calls.length, voorgesteld.length)}`, 'call', `van de voorstellen · ${nogGepland.length} staat nog`),
       M('Call gehad', gehouden.length, afgerond, RICHT.show, `${gehouden.length} · ${pct(gehouden.length, afgerond)}`, 'call', `kwam opdagen · ${noshows.length} no-show · ${afgezegd.length} afgezegd`),
     ] },
-    { id: 'close', naam: 'Close', vraag: 'Wordt er geclosed?', preview: [['Sales', String(sales.length), 'Sale'], ['Omzet', euro(omzet)]], metingen: [
+    { id: 'close', naam: 'Close', vraag: 'Wordt er geclosed?', preview: [['Sales', String(sales.length), 'Sale'], ['Verlengd', String(verlengd.length), 'Verlengd'], ['Omzet', euro(omzet)]], metingen: [
       M('Sale', sales.length, gehouden.length, RICHT.close, `${sales.length} · ${pct(sales.length, gehouden.length)}`, 'sale', `van de calls · ${verloren.length} verloren`),
-      M('Gem. orderwaarde', null, null, null, sales.length ? euro(omzet / sales.length) : '–', 'omzet', `${euro(omzet)} omzet`),
+      M('Verlengd', verlengd.length, sales.length, RICHT.verlengd, `${verlengd.length} · ${pct(verlengd.length, sales.length)}`, 'sale', verlengOmzet ? `${euro(verlengOmzet)} aan verlengingen` : 'doorgezet na de challenge'),
+      M('Gem. orderwaarde', null, null, null, sales.length ? euro(saleOmzet / sales.length) : '–', 'omzet', `${euro(omzet)} omzet incl. verlengingen`),
     ] },
   ].map(f => {
     const beoordeeld = f.metingen.map(x => x.oordeel).filter(o => o && o.rang >= 0)
@@ -564,9 +573,10 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       titel: 'Omzet uit advertenties', sub: 'Orderwaarde van sales uit deze leads, zoals op het bord',
       inhoud: (
         <>
-          <Regel label="Sales" waarde={sales.length} />
-          <Regel label="Omzet" waarde={euro(omzet)} sterk />
-          <Regel label="Gemiddeld per sale" waarde={sales.length ? euro(omzet / sales.length) : '–'} />
+          <Regel label="Sales" waarde={`${sales.length} · ${euro(saleOmzet)}`} />
+          <Regel label="Verlengingen" waarde={`${verlengd.length} · ${euro(verlengOmzet)}`} />
+          <Regel label="Omzet totaal" waarde={euro(omzet)} sterk />
+          <Regel label="Gemiddeld per sale" waarde={sales.length ? euro(saleOmzet / sales.length) : '–'} />
           <div style={{ ...kop, marginTop: 18 }}>Sales</div>
           {sales.length ? sales.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog geen sale uit een advertentielead in deze periode.</Leeg>}
         </>
@@ -760,6 +770,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           <Regel label="Call gehad" waarde={gehouden.length} />
           <Regel label="Sales" waarde={sales.length} sterk />
           <Regel label="Sale verloren" waarde={verloren.length} />
+          <Regel label="Doorgezet naar verlenging" waarde={`${verlengd.length} (${pct(verlengd.length, sales.length)} van de sales)`} />
           <Regel label="Omzet" waarde={euro(omzet)} />
           <Regel label="Kosten per sale" waarde={sales.length ? euro(spend / sales.length, true) : '–'} />
           <div style={{ ...kop, marginTop: 18 }}>Sales</div>
