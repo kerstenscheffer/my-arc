@@ -93,9 +93,10 @@ const knopWit = (m, uit = false) => ({
 })
 const knopZacht = (m) => ({ ...knopWit(m), background: 'rgba(255,255,255,0.08)', color: WIT, border: '1px solid rgba(255,255,255,0.2)', textDecoration: 'none' })
 
+// Lager en donkerder dan eerst (22 okt 2026).
 const invoer = (m) => ({
-  width: '100%', boxSizing: 'border-box', padding: m ? '1rem 1rem' : '1.1rem 1.15rem',
-  background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: 12,
+  width: '100%', boxSizing: 'border-box', padding: m ? '0.72rem 0.95rem' : '0.8rem 1.05rem',
+  background: '#050505', border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 12,
   color: WIT, fontSize: m ? '1.05rem' : '1.1rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none',
 })
 
@@ -509,13 +510,13 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
           {vraag.soort === 'gegevens' && (
             <>
               <input
-                ref={voornaamRef} autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam"
+                ref={voornaamRef} autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam*"
                 onChange={e => zet('voornaam', e.target.value)} style={invoer(m)}
               />
               {telefoon ? (
                 <input
                   type="tel" inputMode="tel" autoComplete="tel" value={antw.telefoon || ''}
-                  placeholder="Telefoonnummer"
+                  placeholder="Telefoonnummer*"
                   onChange={e => zet('telefoon', e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') verder() }} style={invoer(m)}
                 />
