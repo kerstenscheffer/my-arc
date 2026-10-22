@@ -160,7 +160,7 @@ function Optie({ tekst, aan, onClick, m, meer }) {
 // Eén vak: links de landcode (eigen lijstje, geen systeem-dropdown), een
 // streep, rechts het nummer met 06 al ingevuld (22 okt 2026). Het lijstje
 // klapt naar boven open: onder het veld past het niet in het blad.
-function TelefoonVeld({ m, antw, setAntw, onEnter }) {
+function TelefoonVeld({ m, antw, setAntw, onEnter, onFocus }) {
   const [open, setOpen] = useState(false)
   const [focus, setFocus] = useState(false)
   const kaderRef = useRef(null)
@@ -201,7 +201,7 @@ function TelefoonVeld({ m, antw, setAntw, onEnter }) {
         <input
           ref={nummerRef} type="tel" inputMode="tel" autoComplete="tel" value={nummer}
           placeholder={land === '+31' ? '06 12345678*' : 'Telefoonnummer*'}
-          onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+          onFocus={() => { setFocus(true); onFocus?.() }} onBlur={() => setFocus(false)}
           onChange={e => { const r = leesTelefoon(land, e.target.value); zetNummer(r.land, r.nummer) }}
           onKeyDown={e => { if (e.key === 'Enter') onEnter() }}
           style={{ ...basis, flex: 1, minWidth: 0, border: 'none', background: 'transparent', paddingLeft: m ? '0.8rem' : '0.9rem' }}
@@ -252,7 +252,7 @@ function laadYouTubeApi() {
   return window.__ytApiBelofte
 }
 
-function GeschiktVideo({ id, m, vol = false, onKlaar }) {
+function GeschiktVideo({ id, m, vol = false, onKlaar, stil = false }) {
   const [speelt, setSpeelt] = useState(false)
   const [gedempt, setGedempt] = useState(false)
   const [voortgang, setVoortgang] = useState(0)
@@ -262,6 +262,13 @@ function GeschiktVideo({ id, m, vol = false, onKlaar }) {
   // Via een ref, zodat de speler niet opnieuw opgebouwd wordt als de functie wisselt.
   const klaarRef = useRef(onKlaar)
   useEffect(() => { klaarRef.current = onKlaar }, [onKlaar])
+  // Na het einde niet vanzelf opnieuw (Shorts lussen): alleen na een tik.
+  const afgelopen = useRef(false)
+  // Begint iemand aan de gegevens, dan één keer pauze: niet afleiden.
+  useEffect(() => {
+    if (!stil) return
+    try { if (spelerRef.current?.getPlayerState?.() === 1) spelerRef.current.pauseVideo() } catch { /* leeg */ }
+  }, [stil])
   const meetEens = (naam, meta) => { if (!gemeten.current.has(naam)) { gemeten.current.add(naam); meet(naam, meta ? { meta } : undefined) } }
 
   const embed = `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
@@ -288,10 +295,12 @@ function GeschiktVideo({ id, m, vol = false, onKlaar }) {
           },
           onStateChange: (e) => {
             const aan = e.data === YT.PlayerState.PLAYING
+            if (aan && afgelopen.current) { e.target.pauseVideo(); e.target.seekTo(0, true); return }
             setSpeelt(aan)
             if (aan) meetEens('geschikt_video_start')
             // De eerste keer uitgekeken: door naar de gegevens.
             if (e.data === YT.PlayerState.ENDED) {
+              afgelopen.current = true
               setVoortgang(1)
               if (!gemeten.current.has('geschikt_video_klaar')) { meetEens('geschikt_video_klaar'); klaarRef.current?.() }
             }
@@ -317,6 +326,7 @@ function GeschiktVideo({ id, m, vol = false, onKlaar }) {
   const tik = () => {
     const p = spelerRef.current
     if (!p?.getPlayerState) return
+    afgelopen.current = false
     if (gedempt) { p.unMute(); p.seekTo(0, true); p.playVideo(); setGedempt(false); meetEens('geschikt_video_geluid'); return }
     if (p.getPlayerState() === 1) p.pauseVideo(); else p.playVideo()
   }
@@ -380,6 +390,8 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
   const bovenRef = useRef(null)
   const doorTimer = useRef(null)
   const voornaamRef = useRef(null)
+  // Eerste tik in naam of nummer: video pauzeert (GeschiktVideo `stil`).
+  const [aanGegevens, setAanGegevens] = useState(false)
   // Video uitgekeken: rustig naar de velden en de cursor in de voornaam.
   // (iPhone opent het toetsenbord alleen na een tik; daar staat het veld dan klaar.)
   const naarGegevens = () => {
@@ -579,7 +591,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
         ) : vraag.video && volVideo ? (
           <>
             {/* Ruimte bovenin voor het zwevende logo en kruisje. */}
-            <div style={{ paddingTop: '2.6rem', marginBottom: '1rem' }}><GeschiktVideo id={vraag.video} m={m} vol onKlaar={naarGegevens} /></div>
+            <div style={{ paddingTop: '2.6rem', marginBottom: '1rem' }}><GeschiktVideo id={vraag.video} m={m} vol onKlaar={naarGegevens} stil={aanGegevens} /></div>
             {kop(vraag.vraag)}
             <p style={{ margin: '0.4rem 0 0', fontSize: '0.92rem', fontWeight: 700, color: ZWAK, lineHeight: 1.4, textAlign: 'center' }}>Laat je gegevens achter, dan neem ik contact op.</p>
           </>
@@ -587,7 +599,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
           <>
             {kop(vraag.vraag)}
             {sub('Laat hieronder je gegevens achter, dan neem ik contact met je op.')}
-            <GeschiktVideo id={vraag.video} m={m} onKlaar={naarGegevens} />
+            <GeschiktVideo id={vraag.video} m={m} onKlaar={naarGegevens} stil={aanGegevens} />
           </>
         ) : (
           <>
@@ -616,11 +628,11 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
           {vraag.soort === 'gegevens' && (
             <>
               <input
-                ref={voornaamRef} autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam*"
+                ref={voornaamRef} onFocus={() => setAanGegevens(true)} autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam*"
                 onChange={e => zet('voornaam', e.target.value)} style={invoer(m)}
               />
               {telefoon ? (
-                <TelefoonVeld m={m} antw={antw} setAntw={setAntw} onEnter={() => verder()} />
+                <TelefoonVeld m={m} antw={antw} setAntw={setAntw} onEnter={() => verder()} onFocus={() => setAanGegevens(true)} />
               ) : (
                 <input
                   type="email" inputMode="email" autoComplete="email" value={antw.email || ''} placeholder="jouw@email.nl"
