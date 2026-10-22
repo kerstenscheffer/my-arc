@@ -363,9 +363,19 @@ function laadYouTubeApi() {
 }
 
 function Video({ m }) {
-  const [gestart, setGestart] = useState(false)
+  const directeEmbed = `https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
+  const appUrl = appSafeEmbedUrl(directeEmbed)
+  // In de app gaat de URL door yt.html; dan geen eigen laag.
+  const eigenLaag = appUrl === directeEmbed
+  // Op het web start de video meteen, zonder geluid (zoals Hormozi, 22 okt
+  // 2026): browsers staan alleen stil automatisch afspelen toe. Een tik
+  // zet het geluid aan en begint opnieuw vanaf het begin; die tik telt als
+  // video_start. In de app blijft het tik-om-te-starten.
+  const [gestart, setGestart] = useState(eigenLaag)
+  const [stilStart, setStilStart] = useState(eigenLaag)
+  const [ooitGespeeld, setOoitGespeeld] = useState(false)
   const [speelt, setSpeelt] = useState(false)
-  const [gedempt, setGedempt] = useState(false)
+  const [gedempt, setGedempt] = useState(eigenLaag)
   const [voortgang, setVoortgang] = useState(0)
   // De bediening verdwijnt na een paar seconden zodra de video speelt, en
   // komt terug bij een tik of muisbeweging. Bij pauze blijft hij staan.
@@ -375,11 +385,13 @@ function Video({ m }) {
   const verbergTimer = useRef(null)
   // Mijlpalen van de échte voortgang (niet de getoonde balk), één keer per sessie.
   const mijlpalen = useRef(new Set())
+  // Stil meekijken telt niet: pas na de tik voor geluid.
   useEffect(() => {
+    if (stilStart) return
     [[0.25, 'video_25'], [0.5, 'video_50'], [0.75, 'video_75'], [0.98, 'video_100']].forEach(([grens, naam]) => {
       if (voortgang >= grens && !mijlpalen.current.has(naam)) { mijlpalen.current.add(naam); meet(naam) }
     })
-  }, [voortgang])
+  }, [voortgang, stilStart])
 
   const toonBediening = () => {
     setBedieningZichtbaar(true)
@@ -392,11 +404,6 @@ function Video({ m }) {
     return () => clearTimeout(verbergTimer.current)
   }, [speelt])
 
-  const directeEmbed = `https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
-  const appUrl = appSafeEmbedUrl(directeEmbed)
-  // In de app gaat de URL door yt.html; dan geen eigen laag.
-  const eigenLaag = appUrl === directeEmbed
-
   useEffect(() => {
     if (!gestart || !eigenLaag) return
     let weg = false
@@ -404,9 +411,10 @@ function Video({ m }) {
       if (weg || !iframeRef.current) return
       spelerRef.current = new YT.Player(iframeRef.current, {
         events: {
-          onReady: (e) => { e.target.playVideo() },
+          onReady: (e) => { e.target.mute(); e.target.playVideo() },
           onStateChange: (e) => {
             setSpeelt(e.data === YT.PlayerState.PLAYING)
+            if (e.data === YT.PlayerState.PLAYING) setOoitGespeeld(true)
             if (e.data === YT.PlayerState.ENDED) setVoortgang(1)
           },
         },
@@ -432,6 +440,12 @@ function Video({ m }) {
     const p = spelerRef.current
     if (!p?.getPlayerState) return
     if (p.getPlayerState() === 1) p.pauseVideo(); else p.playVideo()
+  }
+  const metGeluid = () => {
+    setStilStart(false); setGedempt(false); setVoortgang(0)
+    meet('video_start'); pixel('ViewContent', { content_name: '6 weken challenge video' })
+    const p = spelerRef.current
+    try { p?.unMute?.(); p?.seekTo?.(0, true); p?.playVideo?.() } catch { /* speler nog niet klaar */ }
   }
   const wisselGeluid = (e) => {
     e.stopPropagation()
@@ -494,7 +508,7 @@ function Video({ m }) {
     <div style={kader}>
       <iframe
         ref={iframeRef}
-        src={`${directeEmbed}&enablejsapi=1&controls=0&disablekb=1&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`}
+        src={`${directeEmbed}&mute=1&enablejsapi=1&controls=0&disablekb=1&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`}
         title="Hoe de 6 Weken Challenge werkt"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
@@ -507,7 +521,28 @@ function Video({ m }) {
         onTouchStart={toonBediening}
         style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: bedieningZichtbaar ? bediening : 0, cursor: bedieningZichtbaar ? 'pointer' : 'none' }}
       />
-      {!speelt && (
+      {stilStart && (
+        <button onClick={metGeluid} aria-label="Geluid aan en vanaf het begin kijken" style={{
+          position: 'absolute', inset: 0, zIndex: 3, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          // Tot de video echt loopt (of als de telefoon automatisch afspelen
+          // blokkeert, bv. in spaarstand) staat de eigen thumbnail eronder.
+          background: ooitGespeeld ? 'rgba(0,0,0,0.12)' : 'url(/challenge-thumbnail.jpg) center / cover',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: m ? 8 : 10,
+            padding: m ? '0.7rem 1.05rem' : '0.85rem 1.35rem', borderRadius: 999,
+            background: 'rgba(0,0,0,0.78)', border: '1.5px solid rgba(255,255,255,0.9)',
+            color: '#fff', fontSize: m ? '0.95rem' : '1.1rem', fontWeight: 900, fontFamily: 'inherit',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.5)', animation: 'tikGeluid 1.6s ease-in-out infinite',
+          }}>
+            <VolumeX size={m ? 20 : 24} strokeWidth={2.6} /> Tik voor geluid
+          </span>
+          <style>{'@keyframes tikGeluid { 0%,100% { transform: scale(1) } 50% { transform: scale(1.05) } }'}</style>
+        </button>
+      )}
+      {!speelt && !stilStart && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
           <Play size={m ? 56 : 72} fill="#fff" color="#fff" strokeWidth={1} style={{ filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }} />
         </div>
@@ -520,9 +555,9 @@ function Video({ m }) {
           display: 'flex', alignItems: 'center', gap: m ? 10 : 14,
           padding: m ? '0 0.75rem' : '0 1rem',
           background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)',
-          opacity: bedieningZichtbaar ? 1 : 0,
-          transform: bedieningZichtbaar ? 'none' : 'translateY(8px)',
-          pointerEvents: bedieningZichtbaar ? 'auto' : 'none',
+          opacity: bedieningZichtbaar && !stilStart ? 1 : 0,
+          transform: bedieningZichtbaar && !stilStart ? 'none' : 'translateY(8px)',
+          pointerEvents: bedieningZichtbaar && !stilStart ? 'auto' : 'none',
           transition: 'opacity 0.3s ease, transform 0.3s ease',
         }}>
         <button onClick={wisselSpelen} aria-label={speelt ? 'Pauzeren' : 'Afspelen'} style={knopIcoon}>
