@@ -680,6 +680,7 @@ const PIJLERS = {
 // Volgorde voor de knop "Bekijk training" naast de startknop en voor vegen.
 const PIJLER_VOLGORDE = ['voeding', 'training', 'begeleiding']
 const PIJLER_NAAM = { voeding: 'Voeding', training: 'Training', begeleiding: 'Begeleiding' }
+const PIJLER_ICOON = { voeding: Utensils, training: Dumbbell, begeleiding: MessageCircle }
 
 function PijlerModal({ pijler, onClose, onStart, onWissel, m }) {
   const p = PIJLERS[pijler]
@@ -690,6 +691,7 @@ function PijlerModal({ pijler, onClose, onStart, onWissel, m }) {
   const i = PIJLER_VOLGORDE.indexOf(pijler)
   const volgende = PIJLER_VOLGORDE[(i + 1) % PIJLER_VOLGORDE.length]
   const vorige = PIJLER_VOLGORDE[(i + PIJLER_VOLGORDE.length - 1) % PIJLER_VOLGORDE.length]
+  const VolgendIcoon = PIJLER_ICOON[volgende]
   const ga = (doel, r) => { setRichting(r); onWissel(doel) }
   useEffect(() => { if (!pijler) setRichting(0) }, [pijler])
   return (
@@ -738,20 +740,14 @@ function PijlerModal({ pijler, onClose, onStart, onWissel, m }) {
               }}>
                 {CTA_TEKST}
               </button>
+              {/* Alleen het icoon van de volgende pijler (22 okt 2026). */}
               <button onClick={() => ga(volgende, 1)} aria-label={`Bekijk ${PIJLER_NAAM[volgende].toLowerCase()}`} style={{
-                flexShrink: 0, minHeight: m ? 56 : 62, borderRadius: 14, padding: m ? '0 0.7rem' : '0 1.1rem',
-                background: 'transparent', border: '1.5px solid rgba(255,255,255,0.22)', color: '#fff', fontFamily: 'inherit', cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', gap: m ? 7 : 10,
+                flexShrink: 0, width: m ? 56 : 62, height: m ? 56 : 62, borderRadius: 14, padding: 0,
+                background: 'transparent', border: '1.5px solid rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
-                <span style={{ width: m ? 26 : 30, height: m ? 26 : 30, borderRadius: '50%', background: '#fff', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: m ? '0.85rem' : '0.95rem', fontWeight: 900 }}>
-                  {PIJLER_VOLGORDE.indexOf(volgende) + 1}
-                </span>
-                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
-                  <span style={{ fontSize: m ? '0.66rem' : '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bekijk</span>
-                  <span style={{ fontSize: m ? '0.88rem' : '1rem', fontWeight: 900, letterSpacing: '-0.01em' }}>{PIJLER_NAAM[volgende]}</span>
-                </span>
-                <ChevronRight size={m ? 16 : 18} strokeWidth={3} style={{ flexShrink: 0, marginLeft: -2 }} />
+                <VolgendIcoon size={m ? 24 : 26} strokeWidth={2.6} />
               </button>
             </div>
           </div>
