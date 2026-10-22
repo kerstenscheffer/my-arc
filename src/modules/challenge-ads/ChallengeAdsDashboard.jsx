@@ -29,7 +29,7 @@ import { createElement, useEffect, useState } from 'react'
 import {
   RefreshCw, Copy, Check, ChevronDown, ChevronRight, X, Link2,
   Megaphone, Info, Percent, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
-  PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle, Repeat,
+  PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle, Repeat, Banknote, Coins, TrendingUp,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PrequalAfhaken from './PrequalAfhaken'
@@ -823,39 +823,49 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
 
       {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.84rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
 
-      {/* ═══ Statistiekbalk zoals in het leadsysteem, voor de advertentieleads ═══
-          Zelfde iconen en kleuren als PeriodStatsBar. Telt per lead die in de
-          periode binnenkwam wat er daarna met hem gebeurde. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 22, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: m ? -8 : -12, marginBottom: m ? 24 : 34, paddingBottom: 2 }}>
+      {/* ═══ Eén statistiekbalk ═══
+          Geld (uitgegeven, per lead) | de lead-stappen met dezelfde iconen en
+          kleuren als PeriodStatsBar | resultaat (sales, omzet, ROAS). Telt per
+          lead die in de periode binnenkwam wat er daarna gebeurde. Elk getal
+          opent zijn detailvenster; het label staat in de tooltip. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 20, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: m ? -8 : -12, marginBottom: m ? 26 : 36, paddingBottom: 2 }}>
         {[
-          { label: 'Nieuwe leads', waarde: leads.length, Icon: UserPlus, kleur: '#3b82f6', venster: 'gegevens' },
-          { label: 'Follow-ups (gelogd op het bord)', waarde: metFollowup.length, Icon: Send, kleur: '#f59e0b', venster: 'followup' },
-          { label: 'Reacties (in gesprek)', waarde: inGesprek.length, Icon: MessageCircle, kleur: '#10b981', venster: 'followup' },
-          { label: 'Call voorgesteld', waarde: voorgesteld.length, Icon: Phone, kleur: '#a855f7', venster: 'call' },
-          { label: 'Call ingepland', waarde: calls.length, Icon: CalendarCheck, kleur: '#06b6d4', venster: 'call' },
-          { label: 'Call gevoerd', waarde: gehouden.length, Icon: PhoneCall, kleur: '#10b981', venster: 'call' },
-          { label: 'Sales', waarde: sales.length, Icon: Trophy, kleur: '#FFD700', venster: 'sale' },
-          { label: 'Omzet', waarde: euro(omzet), Icon: Euro, kleur: '#22c55e', venster: 'omzet' },
-          { label: 'Sale verloren', waarde: verloren.length, Icon: XCircle, kleur: '#ef4444', venster: 'sale' },
-        ].map(it => (
-          <button key={it.label} title={it.label} onClick={() => setInfo(it.venster)} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: 0, background: 'none', border: 'none',
-            color: '#fff', fontFamily: 'inherit', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-          }}>
-            <it.Icon size={15} color={it.kleur} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: m ? '0.95rem' : '1.25rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: laden ? 0.45 : 1 }}>{it.waarde}</span>
-          </button>
+          [
+            { label: 'Uitgegeven', waarde: euro(spend), Icon: Banknote, kleur: '#94a3b8', venster: 'spend' },
+            { label: 'Kosten per lead', waarde: euro(cpl), Icon: Coins, kleur: '#94a3b8', venster: 'cpl' },
+          ],
+          [
+            { label: 'Nieuwe leads', waarde: leads.length, Icon: UserPlus, kleur: '#3b82f6', venster: 'gegevens' },
+            { label: 'Follow-ups (gelogd op het bord)', waarde: metFollowup.length, Icon: Send, kleur: '#f59e0b', venster: 'followup' },
+            { label: 'Reacties (in gesprek)', waarde: inGesprek.length, Icon: MessageCircle, kleur: '#10b981', venster: 'followup' },
+            { label: 'Call voorgesteld', waarde: voorgesteld.length, Icon: Phone, kleur: '#a855f7', venster: 'call' },
+            { label: 'Call ingepland', waarde: calls.length, Icon: CalendarCheck, kleur: '#06b6d4', venster: 'call' },
+            { label: 'Call gevoerd', waarde: gehouden.length, Icon: PhoneCall, kleur: '#10b981', venster: 'call' },
+          ],
+          [
+            { label: 'Sales', waarde: sales.length, Icon: Trophy, kleur: '#FFD700', venster: 'sale' },
+            { label: 'Omzet (incl. verlengingen)', waarde: euro(omzet), Icon: Euro, kleur: '#22c55e', venster: 'omzet' },
+            { label: `ROAS, doel ${DOEL_ROAS}x`, waarde: roas != null ? `${roas.toFixed(1).replace('.', ',')}x` : '–', doel: `/ ${DOEL_ROAS}x`, Icon: TrendingUp,
+              kleur: roas == null ? '#94a3b8' : roas >= DOEL_ROAS ? GROEN : roas >= 1 ? ORANJE : ROOD, gekleurd: roas != null, venster: 'roas' },
+            { label: 'Sale verloren', waarde: verloren.length, Icon: XCircle, kleur: '#ef4444', venster: 'sale' },
+          ],
+        ].map((groep, gi) => (
+          <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 20, flexShrink: 0 }}>
+            {gi > 0 && <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.14)', flexShrink: 0 }} />}
+            {groep.map(it => (
+              <button key={it.label} title={it.label} onClick={() => setInfo(it.venster)} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: 0, background: 'none', border: 'none',
+                color: '#fff', fontFamily: 'inherit', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <it.Icon size={15} color={it.kleur} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: m ? '0.95rem' : '1.25rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: laden ? 0.45 : 1, color: it.gekleurd ? it.kleur : '#fff' }}>
+                  {it.waarde}
+                  {it.doel && <span style={{ fontSize: m ? '0.65rem' : '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}> {it.doel}</span>}
+                </span>
+              </button>
+            ))}
+          </div>
         ))}
-      </div>
-
-      {/* ═══ 1. RENDEMENT ═══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: m ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: m ? '22px 18px' : 32, marginBottom: m ? 34 : 46 }}>
-        <Getal label="Uitgegeven" waarde={euro(spend)} sub={`${klikken} klikken · ${klikken ? euro(spend / klikken, true) : '–'} per klik`} onClick={() => setInfo('spend')} />
-        <Getal label="Kosten per lead" waarde={euro(cpl)} sub={`${leads.length} ${leads.length === 1 ? 'lead' : 'leads'}`} onClick={() => setInfo('cpl')} />
-        <Getal label="Omzet" waarde={euro(omzet)} kleur={omzet > 0 ? GROEN : '#fff'} sub={`${sales.length} ${sales.length === 1 ? 'sale' : 'sales'}`} onClick={() => setInfo('omzet')} />
-        <Getal label="ROAS" waarde={roas != null ? `${roas.toFixed(1).replace('.', ',')}x` : '–'}
-          kleur={roas == null ? '#fff' : roas >= DOEL_ROAS ? GROEN : roas >= 1 ? ORANJE : ROOD}
-          sub={spend > 0 ? (nodigVoorDoel > 0 ? `doel ${DOEL_ROAS}x · nog ${euro(nodigVoorDoel)} omzet` : `doel ${DOEL_ROAS}x gehaald`) : 'nog geen spend'} onClick={() => setInfo('roas')} />
       </div>
 
       {/* ═══ 2. WAAR LOOPT HET VAST ═══ */}
