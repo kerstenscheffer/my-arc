@@ -439,7 +439,10 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
 
   const M = (label, waarde, basis, richt, tekst, venster, sub) => {
     const deel = richt?.laag ? waarde : (basis ? waarde / basis : null)
-    return { label, tekst, sub, venster, oordeel: richt ? beoordeel(deel, richt.laag ? klikken : basis, richt) : null }
+    const oordeel = richt ? beoordeel(deel, richt.laag ? klikken : basis, richt) : null
+    // Hoe ver onder 'goed' (1 = precies goed, lager = verder eronder).
+    const score = oordeel && oordeel.rang >= 0 ? (richt.laag ? richt.goed / deel : deel / richt.goed) : null
+    return { label, tekst, sub, venster, oordeel, score }
   }
   const FASES = [
     { id: 'advertentie', naam: 'Advertentie', vraag: 'Klikken mensen, en goedkoop?', metingen: [
@@ -469,7 +472,10 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   ].map(f => {
     const beoordeeld = f.metingen.map(x => x.oordeel).filter(o => o && o.rang >= 0)
     const oordeel = beoordeeld.length ? beoordeeld.reduce((x, y) => (y.rang > x.rang ? y : x)) : OORDEEL.weinig
-    return { ...f, oordeel }
+    // De zwakste meting die rood staat: die schudt als de fase open is.
+    const rood = f.metingen.filter(x => x.oordeel?.id === 'slecht')
+    const zwakste = rood.length ? rood.reduce((x, y) => (y.score < x.score ? y : x)).label : null
+    return { ...f, oordeel, zwakste }
   })
   const vast = FASES.find(f => f.oordeel.id === 'slecht') || FASES.find(f => f.oordeel.id === 'matig') || null
   const nodigVoorDoel = spend * DOEL_ROAS - omzet
@@ -784,6 +790,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                   const [groot, klein] = String(x.tekst).split(' · ')
                   const kleur = x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff'
                   const icoon = ICONEN[x.label] || Info
+                  const schud = f.zwakste === x.label
                   return (
                     <div key={x.label} style={{ display: 'flex', alignItems: 'flex-start', gap: m ? 6 : 8, flex: m ? '0 0 auto' : '1 1 0', minWidth: 0, scrollSnapAlign: 'start' }}>
                       {j > 0 && <ChevronRight size={16} strokeWidth={2.6} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, marginTop: 12 }} />}
@@ -792,7 +799,11 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                         padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
                         cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
                       }}>
-                        <span style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: kleur === '#fff' ? 'rgba(255,255,255,0.08)' : `${kleur}22` }}>
+                        <span style={{
+                          width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: kleur === '#fff' ? 'rgba(255,255,255,0.08)' : `${kleur}22`,
+                          ...(schud ? { boxShadow: `0 0 0 2px ${kleur}, 0 0 16px ${kleur}99`, animation: 'vastSchud 2.4s ease-in-out infinite' } : {}),
+                        }}>
                           {createElement(icoon, { size: 19, strokeWidth: 2.4, color: kleur })}
                         </span>
                         <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
@@ -895,7 +906,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         </Venster>
       )}
 
-      <style>{'@keyframes spin { to { transform: rotate(360deg); } } @keyframes vastPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }'}</style>
+      <style>{'@keyframes spin { to { transform: rotate(360deg); } } @keyframes vastPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } } @keyframes vastSchud { 0%,60%,100% { transform: translateX(0) rotate(0) } 64% { transform: translateX(-4px) rotate(-6deg) } 70% { transform: translateX(4px) rotate(6deg) } 76% { transform: translateX(-3px) rotate(-4deg) } 82% { transform: translateX(3px) rotate(4deg) } 88% { transform: translateX(0) rotate(0) } }'}</style>
     </div>
   )
 }
