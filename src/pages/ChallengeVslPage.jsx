@@ -992,17 +992,17 @@ export default function ChallengeVslPage() {
           <div>
             {m ? (
               // Telefoon: schermbreed vak bovenaan de sectie met de foto rechts
-              // (heel bovenlijf in beeld), naar links weggevaagd in wit, en de
+              // (heel bovenlijf in beeld), naar links weggevaagd in zwart, en de
               // kop links eroverheen (22 okt 2026).
-              <div style={{ position: 'relative', minHeight: 440, margin: '-4rem -1.25rem 0', overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'flex-end' }}>
+              <div style={{ position: 'relative', minHeight: 440, margin: '-4rem -1.25rem 0', overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'flex-end' }}>
                 <img src="/waarom-kersten.jpg" alt="Kersten" draggable={false}
                   style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: '74%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
-                <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #fff 0%, #fff 26%, rgba(255,255,255,0.85) 40%, rgba(255,255,255,0) 72%)' }} />
-                <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%', background: 'linear-gradient(0deg, #fff 0%, rgba(255,255,255,0) 100%)' }} />
-                <div style={{ position: 'relative', width: '62%', padding: '1.3rem 0 0.6rem 1.25rem' }}>
-                  <Label m={m}>De coach</Label>
-                  <h2 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.02em', color: '#000', textTransform: 'uppercase' }}>Ik ben Kersten.</h2>
-                  <p style={{ margin: '0.6rem 0 0', fontSize: '1rem', fontWeight: 800, lineHeight: 1.35, color: '#1a1a1a', textShadow: '0 1px 8px rgba(255,255,255,0.8)' }}>
+                <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #000 0%, #000 26%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0) 72%)' }} />
+                <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%', background: 'linear-gradient(0deg, #000 0%, rgba(0,0,0,0) 100%)' }} />
+                <div style={{ position: 'relative', width: '62%', padding: '1.3rem 0 1.4rem 1.25rem' }}>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.15em', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginBottom: '0.7rem' }}>De coach</div>
+                  <h2 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.02em', color: '#fff', textTransform: 'uppercase' }}>Ik ben Kersten.</h2>
+                  <p style={{ margin: '0.6rem 0 0', fontSize: '1rem', fontWeight: 800, lineHeight: 1.35, color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
                     En ik kijk verder dan je voedings- en trainingsschema.
                   </p>
                 </div>
