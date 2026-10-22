@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import {
   Star, ChevronDown, ChevronLeft, ChevronRight, Utensils, Dumbbell, MessageCircle,
-  Check, CalendarCheck, Play, Pause, Volume2, VolumeX, X,
+  Check, Play, Pause, Volume2, VolumeX, X,
   ClipboardList, ClipboardCheck, PartyPopper, ShieldCheck, Crosshair, TrendingUp, LineChart, SlidersHorizontal, Video as VideoIcoon,
 } from 'lucide-react'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
@@ -49,7 +49,7 @@ const VIDEO_ID = '41Hfc2YVBAA'
 
 const CTA_TEKST = 'Plan kennismakingsgesprek'
 // Donkergroen met witte letters, op lichte en donkere vlakken (22 okt 2026).
-const CTA_GROEN = '#166534'
+const CTA_GROEN = '#15803d'
 
 // Punten onder de bovenste knop. Met `pijler` is het punt klikbaar en opent
 // het de uitleg van die pijler (PijlerModal).
@@ -179,7 +179,7 @@ function Cta({ m, sub, style, licht }) {
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <CalendarCheck size={m ? 22 : 26} strokeWidth={3} style={{ flexShrink: 0 }} /> {CTA_TEKST}
+        {CTA_TEKST}
       </button>
       {/* Trustpilot direct onder elke startknop (21 okt 2026). */}
       <TrustpilotBadge licht={opLicht} style={{ marginTop: 4 }} />
@@ -718,7 +718,7 @@ function PijlerModal({ pijler, onClose, onStart, m }) {
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              <CalendarCheck size={22} strokeWidth={3} /> {CTA_TEKST}
+              {CTA_TEKST}
             </button>
           </div>
         </>
@@ -1058,7 +1058,7 @@ export default function ChallengeVslPage() {
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {CTA_TEKST} <ChevronRight size={16} strokeWidth={3} />
+        {CTA_TEKST}
       </button>
 
       <KalenderBlad open={kalenderOpen} onClose={() => setKalenderOpen(false)} m={m} />
