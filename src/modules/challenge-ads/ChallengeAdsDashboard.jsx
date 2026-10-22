@@ -17,11 +17,18 @@
 //
 // Weggehaald als ruis: rapportcijfer-meter, KPI-rij met sparklines,
 // algemene tips en de ruwe tabel per regel.
+//
+// Doel (Kersten, 22 okt 2026): ROAS 3 of hoger, €1 in en €3 uit. Testen
+// waar het vastloopt, dat verbeteren, herhalen. Daarom staat de trechter in
+// vijf fases (FASES): advertentie, funnel, follow-up, call, close. Elke
+// meting heeft een richtwaarde; de eerste fase die eronder zit is waar het
+// vastloopt. De lead-fases tellen met dezelfde woorden als de statistiekbalk
+// van het leadsysteem, maar alleen voor leads uit de advertenties.
 
-import { createElement, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   RefreshCw, Copy, Check, ChevronDown, ChevronRight, X, Link2,
-  MousePointerClick, Play, PenLine, UserCheck, CalendarCheck, Trophy, Megaphone, Info,
+  Megaphone, Info,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PrequalAfhaken from './PrequalAfhaken'
@@ -40,6 +47,38 @@ const ORANJE = '#f59e0b'
 const ROOD = '#ef4444'
 const ZWAK = 'rgba(255,255,255,0.6)'
 const LIJN = '1px solid rgba(255,255,255,0.08)'
+
+const DOEL_ROAS = 3
+
+// Richtwaarden per meting: vuistregels voor koud Meta-verkeer naar een
+// coachingaanbod, geen wet. `laag` = lager is beter (kosten per klik).
+// `min` = onder zoveel mensen in de basis zegt het percentage nog niets.
+const RICHT = {
+  ctr: { goed: 0.01, matig: 0.006, min: 1000 },
+  cpc: { goed: 0.6, matig: 1.0, laag: true, min: 20 },
+  video: { goed: 0.3, matig: 0.15, min: 20 },
+  knop: { goed: 0.2, matig: 0.1, min: 20 },
+  fstart: { goed: 0.15, matig: 0.08, min: 20 },
+  leads: { goed: 0.5, matig: 0.3, min: 10 },
+  bericht: { goed: 0.9, matig: 0.7, min: 3 },
+  contact: { goed: 0.6, matig: 0.4, min: 3 },
+  voorgesteld: { goed: 0.6, matig: 0.4, min: 3 },
+  ingepland: { goed: 0.7, matig: 0.5, min: 3 },
+  show: { goed: 0.75, matig: 0.6, min: 3 },
+  close: { goed: 0.3, matig: 0.15, min: 3 },
+}
+const OORDEEL = {
+  goed: { id: 'goed', tekst: 'Goed', kleur: GROEN, rang: 0 },
+  matig: { id: 'matig', tekst: 'Kan beter', kleur: ORANJE, rang: 1 },
+  slecht: { id: 'slecht', tekst: 'Loopt vast', kleur: ROOD, rang: 2 },
+  weinig: { id: 'weinig', tekst: 'Te weinig data', kleur: 'rgba(255,255,255,0.45)', rang: -1 },
+}
+const beoordeel = (waarde, basis, r) => {
+  if (!r || waarde == null || !isFinite(waarde) || !(basis >= r.min)) return OORDEEL.weinig
+  if (r.laag) return waarde <= r.goed ? OORDEEL.goed : waarde <= r.matig ? OORDEEL.matig : OORDEEL.slecht
+  return waarde >= r.goed ? OORDEEL.goed : waarde >= r.matig ? OORDEEL.matig : OORDEEL.slecht
+}
+const procent = (x, dec = 0) => `${(x * 100).toFixed(dec).replace('.', ',')}%`
 
 const LINK_VOORBEELD = 'https://www.myarcfitness.com/challenge?utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}'
 
@@ -218,11 +257,18 @@ function Venster({ titel, sub, m, onClose, children }) {
 
 // Eén lead met waar hij nu staat.
 function LeadRegel({ l }) {
-  const status = Number(l.omzet) > 0
-    ? { tekst: `Sale ${euro(l.omzet)}`, kleur: GROEN }
-    : l.gehouden ? { tekst: 'Call gehouden', kleur: '#fff' }
-      : l.call ? { tekst: l.call_datum ? `Call ${dagLabel(l.call_datum)}` : 'Call gepland', kleur: '#60a5fa' }
-        : { tekst: 'Nog geen call', kleur: ORANJE }
+  const status = Number(l.omzet) > 0 ? { tekst: `Sale ${euro(l.omzet)}`, kleur: GROEN }
+    : l.verloren ? { tekst: 'Sale verloren', kleur: ROOD }
+      : l.gehouden ? { tekst: 'Call gehad', kleur: '#fff' }
+        : l.noshow ? { tekst: 'No-show', kleur: ROOD }
+          : l.afgezegd ? { tekst: 'Call afgezegd', kleur: ORANJE }
+            : l.nog_gepland ? { tekst: `Call ${dagLabel(l.call_datum)}`, kleur: '#60a5fa' }
+              : l.afgewezen ? { tekst: 'Call afgewezen', kleur: ROOD }
+                : l.call ? { tekst: 'Call ingepland', kleur: '#60a5fa' }
+                  : l.voorgesteld ? { tekst: 'Call voorgesteld', kleur: '#60a5fa' }
+                    : l.contact ? { tekst: 'In gesprek', kleur: '#fff' }
+                      : l.bericht ? { tekst: 'Bericht gestuurd', kleur: ORANJE }
+                        : { tekst: 'Nog geen bericht', kleur: ORANJE }
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0', borderBottom: LIJN }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -323,14 +369,55 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const roas = spend > 0 ? omzet / spend : null
   const advertenties = perAdvertentie((data?.hooks || []).filter(h => h.ad), (data?.leads || []).filter(l => l.ad), spendRijen)
 
-  const stappen = [
-    { id: 'bezoekers', label: 'Op de pagina', icoon: MousePointerClick, aantal: T.sessies, sub: `gem. ${fmtTijd(T.tijd)} op de pagina` },
-    { id: 'video', label: 'Video gestart', icoon: Play, aantal: T.video_start, basis: T.sessies, sub: `${pct(T.video_100, T.video_start)} kijkt hem helemaal` },
-    { id: 'formulier', label: 'Formulier begonnen', icoon: PenLine, aantal: T.form_start, basis: T.sessies, sub: `${T.form_klaar} ingevuld tot het eind` },
-    { id: 'gegevens', label: 'Gegevens achtergelaten', icoon: UserCheck, aantal: leads.length, basis: T.form_start, sub: `${T.afgewezen} niet geschikt` },
-    { id: 'call', label: 'Call gepland', icoon: CalendarCheck, aantal: calls.length, basis: leads.length, sub: `${gehouden.length} gehouden` },
-    { id: 'sale', label: 'Sale', icoon: Trophy, aantal: sales.length, basis: calls.length, sub: omzet > 0 ? `${euro(omzet)} omzet` : 'nog geen omzet' },
-  ]
+  // Lead-fases (cohort: leads uit deze periode, met alles wat daarna gebeurde).
+  const metBericht = leads.filter(l => l.bericht)
+  const inGesprek = leads.filter(l => l.contact)
+  const voorgesteld = leads.filter(l => l.voorgesteld)
+  const noshows = leads.filter(l => l.noshow)
+  const afgezegd = leads.filter(l => l.afgezegd)
+  const nogGepland = leads.filter(l => l.nog_gepland)
+  const afgewezen = leads.filter(l => l.afgewezen)
+  const verloren = leads.filter(l => l.verloren)
+  const afgerond = gehouden.length + noshows.length   // calls waarvan de uitkomst bekend is
+  const ctr = impressies ? klikken / impressies : null
+  const cpc = klikken ? spend / klikken : null
+
+  const M = (label, waarde, basis, richt, tekst, venster, sub) => {
+    const deel = richt?.laag ? waarde : (basis ? waarde / basis : null)
+    return { label, tekst, sub, venster, oordeel: richt ? beoordeel(deel, richt.laag ? klikken : basis, richt) : null }
+  }
+  const FASES = [
+    { id: 'advertentie', naam: 'Advertentie', vraag: 'Klikken mensen, en goedkoop?', metingen: [
+      M('Klikratio (CTR)', ctr, 1, null, ctr != null ? procent(ctr, 1) : '–', 'spend', `${klikken} klikken op ${impressies.toLocaleString('nl-NL')} vertoningen`),
+      M('Kosten per klik', cpc, null, RICHT.cpc, cpc != null ? euro(cpc, true) : '–', 'spend', 'goed is onder €0,60'),
+    ] },
+    { id: 'funnel', naam: 'Funnel', vraag: 'Laten bezoekers hun gegevens achter?', metingen: [
+      M('Bezoekers', T.sessies, null, null, String(T.sessies), 'bezoekers', `gem. ${fmtTijd(T.tijd)} op de pagina`),
+      M('Video gestart', T.video_start, T.sessies, RICHT.video, `${T.video_start} · ${pct(T.video_start, T.sessies)}`, 'video', `${pct(T.video_100, T.video_start)} kijkt hem helemaal`),
+      M('Op de knop geklikt', T.knop, T.sessies, RICHT.knop, `${T.knop} · ${pct(T.knop, T.sessies)}`, 'formulier', 'van de bezoekers'),
+      M('Formulier gestart', T.form_start, T.sessies, RICHT.fstart, `${T.form_start} · ${pct(T.form_start, T.sessies)}`, 'formulier', 'van de bezoekers'),
+      M('Leads binnen', leads.length, T.form_start, RICHT.leads, `${leads.length} · ${pct(leads.length, T.form_start)}`, 'gegevens', `van wie begon · ${T.afgewezen} niet geschikt`),
+    ] },
+    { id: 'followup', naam: 'Follow-up', vraag: 'Komen we in contact?', metingen: [
+      M('Bericht gestuurd', metBericht.length, leads.length, RICHT.bericht, `${metBericht.length} · ${pct(metBericht.length, leads.length)}`, 'followup', 'van de leads'),
+      M('In gesprek', inGesprek.length, metBericht.length, RICHT.contact, `${inGesprek.length} · ${pct(inGesprek.length, metBericht.length)}`, 'followup', 'reageerde op je bericht'),
+    ] },
+    { id: 'call', naam: 'Call', vraag: 'Worden er calls geboekt en gehouden?', metingen: [
+      M('Call voorgesteld', voorgesteld.length, inGesprek.length, RICHT.voorgesteld, `${voorgesteld.length} · ${pct(voorgesteld.length, inGesprek.length)}`, 'call', 'van wie in gesprek is'),
+      M('Call ingepland', calls.length, voorgesteld.length, RICHT.ingepland, `${calls.length} · ${pct(calls.length, voorgesteld.length)}`, 'call', `van de voorstellen · ${nogGepland.length} staat nog`),
+      M('Call gehad', gehouden.length, afgerond, RICHT.show, `${gehouden.length} · ${pct(gehouden.length, afgerond)}`, 'call', `kwam opdagen · ${noshows.length} no-show · ${afgezegd.length} afgezegd`),
+    ] },
+    { id: 'close', naam: 'Close', vraag: 'Wordt er geclosed?', metingen: [
+      M('Sale', sales.length, gehouden.length, RICHT.close, `${sales.length} · ${pct(sales.length, gehouden.length)}`, 'sale', `van de calls · ${verloren.length} verloren`),
+      M('Gem. orderwaarde', null, null, null, sales.length ? euro(omzet / sales.length) : '–', 'omzet', `${euro(omzet)} omzet`),
+    ] },
+  ].map(f => {
+    const beoordeeld = f.metingen.map(x => x.oordeel).filter(o => o && o.rang >= 0)
+    const oordeel = beoordeeld.length ? beoordeeld.reduce((x, y) => (y.rang > x.rang ? y : x)) : OORDEEL.weinig
+    return { ...f, oordeel }
+  })
+  const vast = FASES.find(f => f.oordeel.id === 'slecht') || FASES.find(f => f.oordeel.id === 'matig') || null
+  const nodigVoorDoel = spend * DOEL_ROAS - omzet
 
   const kopieer = async () => {
     try { await navigator.clipboard.writeText(LINK_VOORBEELD); setGekopieerd(true); setTimeout(() => setGekopieerd(false), 2000) } catch { /* leeg */ }
@@ -389,8 +476,11 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           <Regel label="Uitgegeven" waarde={euro(spend, true)} />
           <Regel label="Winst na advertenties" waarde={euro(omzet - spend)} sterk />
           <Regel label="ROAS" waarde={roas != null ? `${roas.toFixed(1).replace('.', ',')}x` : '–'} sterk />
+          <Regel label={`Doel ${DOEL_ROAS}x: omzet nodig`} waarde={euro(spend * DOEL_ROAS)} />
+          <Regel label="Nog te gaan" waarde={nodigVoorDoel > 0 ? euro(nodigVoorDoel) : 'gehaald'} />
+          <Regel label={`Max. kosten per sale voor ${DOEL_ROAS}x`} waarde={sales.length ? euro(omzet / sales.length / DOEL_ROAS) : '–'} />
           <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
-            Boven 1x verdien je je advertenties terug. Omzet telt de orderwaarde van de sale, ook als die in termijnen binnenkomt.
+            Doel is €1 in, €3 uit. Boven 1x verdien je je advertenties terug. Omzet telt de orderwaarde van de sale, ook als die in termijnen binnenkomt.
           </div>
         </>
       ),
@@ -471,32 +561,67 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         </>
       ),
     },
-    call: {
-      titel: 'Calls', sub: `${pct(calls.length, leads.length)} van de leads plant een call`,
+    followup: {
+      titel: 'Follow-up', sub: `${pct(inGesprek.length, leads.length)} van de leads is in gesprek`,
       inhoud: (
         <>
-          <Regel label="Call gepland" waarde={calls.length} sterk />
-          <Regel label="Call gehouden" waarde={gehouden.length} />
-          <Regel label="Kosten per geplande call" waarde={calls.length ? euro(spend / calls.length, true) : '–'} />
+          <Regel label="Leads" waarde={leads.length} />
+          <Regel label="Bericht gestuurd" waarde={`${metBericht.length} (${pct(metBericht.length, leads.length)})`} />
+          <Regel label="In gesprek" waarde={`${inGesprek.length} (${pct(inGesprek.length, metBericht.length)} van de berichten)`} sterk />
+          {leads.some(l => !l.bericht) && (
+            <>
+              <div style={{ ...kop, marginTop: 18, color: ORANJE }}>Nog geen bericht ({leads.filter(l => !l.bericht).length})</div>
+              {leads.filter(l => !l.bericht).map(l => <LeadRegel key={l.id} l={l} />)}
+            </>
+          )}
+          {metBericht.some(l => !l.contact) && (
+            <>
+              <div style={{ ...kop, marginTop: 18, color: ORANJE }}>Bericht, nog geen reactie ({metBericht.filter(l => !l.contact).length})</div>
+              {metBericht.filter(l => !l.contact).map(l => <LeadRegel key={l.id} l={l} />)}
+            </>
+          )}
+          <div style={{ ...kop, marginTop: 18 }}>In gesprek</div>
+          {inGesprek.length ? inGesprek.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog niemand in gesprek.</Leeg>}
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
+            Bericht gestuurd telt als je op het bord "DM gestuurd" kiest, een follow-up logt of een reactie telt. In gesprek telt zodra je een reactie telt of de lead naar een gesprek- of callsectie zet. Een lead die alleen op "DM vandaag" stond telt niet: die lijst zet het bord zelf.
+          </div>
+        </>
+      ),
+    },
+    call: {
+      titel: 'Calls', sub: `${pct(calls.length, leads.length)} van de leads boekt een call`,
+      inhoud: (
+        <>
+          <Regel label="Call voorgesteld" waarde={voorgesteld.length} />
+          <Regel label="Call ingepland" waarde={calls.length} sterk />
+          <Regel label="Nog gepland" waarde={nogGepland.length} />
+          <Regel label="Call gehad" waarde={gehouden.length} sterk />
+          <Regel label="No-show" waarde={noshows.length} />
+          <Regel label="Call afgezegd" waarde={afgezegd.length} />
+          <Regel label="Call afgewezen" waarde={afgewezen.length} />
+          <Regel label="Opkomst (gehad van afgerond)" waarde={pct(gehouden.length, afgerond)} />
+          <Regel label="Kosten per ingeplande call" waarde={calls.length ? euro(spend / calls.length, true) : '–'} />
           <div style={{ ...kop, marginTop: 18 }}>Met een call</div>
           {calls.length ? calls.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog geen calls in deze periode.</Leeg>}
-          {leads.length > calls.length && (
+          {inGesprek.some(l => !l.call) && (
             <>
-              <div style={{ ...kop, marginTop: 18, color: ORANJE }}>Nog bellen ({leads.length - calls.length})</div>
-              {leads.filter(l => !l.call).map(l => <LeadRegel key={l.id} l={l} />)}
+              <div style={{ ...kop, marginTop: 18, color: ORANJE }}>In gesprek, nog geen call ({inGesprek.filter(l => !l.call).length})</div>
+              {inGesprek.filter(l => !l.call).map(l => <LeadRegel key={l.id} l={l} />)}
             </>
           )}
           <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
-            Een call telt zodra je de lead naar Sales Call zet of er een calldatum bij zet. Gehouden telt als je de call als gehouden markeert.
+            Zelfde tellingen als in je leadsysteem: voorgesteld = naar Call voorgesteld, ingepland = naar Sales Call of met een calldatum, gehad = call gemarkeerd als gehouden, no-show = laatste call niet gehouden. Een verplaatste call telt niet dubbel.
           </div>
         </>
       ),
     },
     sale: {
-      titel: 'Sales', sub: `${pct(sales.length, calls.length)} van de calls wordt een sale`,
+      titel: 'Close', sub: `${pct(sales.length, gehouden.length)} van de gehouden calls wordt een sale`,
       inhoud: (
         <>
+          <Regel label="Call gehad" waarde={gehouden.length} />
           <Regel label="Sales" waarde={sales.length} sterk />
+          <Regel label="Sale verloren" waarde={verloren.length} />
           <Regel label="Omzet" waarde={euro(omzet)} />
           <Regel label="Kosten per sale" waarde={sales.length ? euro(spend / sales.length, true) : '–'} />
           <div style={{ ...kop, marginTop: 18 }}>Sales</div>
@@ -540,43 +665,53 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         <Getal label="Kosten per lead" waarde={euro(cpl)} sub={`${leads.length} ${leads.length === 1 ? 'lead' : 'leads'}`} onClick={() => setInfo('cpl')} />
         <Getal label="Omzet" waarde={euro(omzet)} kleur={omzet > 0 ? GROEN : '#fff'} sub={`${sales.length} ${sales.length === 1 ? 'sale' : 'sales'}`} onClick={() => setInfo('omzet')} />
         <Getal label="ROAS" waarde={roas != null ? `${roas.toFixed(1).replace('.', ',')}x` : '–'}
-          kleur={roas == null ? '#fff' : roas >= 1 ? GROEN : ROOD}
-          sub={spend > 0 ? `${euro(omzet - spend)} na advertenties` : 'nog geen spend'} onClick={() => setInfo('roas')} />
+          kleur={roas == null ? '#fff' : roas >= DOEL_ROAS ? GROEN : roas >= 1 ? ORANJE : ROOD}
+          sub={spend > 0 ? (nodigVoorDoel > 0 ? `doel ${DOEL_ROAS}x · nog ${euro(nodigVoorDoel)} omzet` : `doel ${DOEL_ROAS}x gehaald`) : 'nog geen spend'} onClick={() => setInfo('roas')} />
       </div>
 
-      {/* ═══ 2. TRECHTER ═══ */}
+      {/* ═══ 2. WAAR LOOPT HET VAST ═══ */}
       <div style={{ marginBottom: m ? 34 : 46 }}>
-        <div style={kop}>Van klik tot sale</div>
-        {stappen.map((st, i) => {
-          const breedte = T.sessies > 0 ? Math.max(1.5, (st.aantal / T.sessies) * 100) : 0
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+          <div style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Waar loopt het vast?</div>
+          {vast && <div style={{ fontSize: '0.82rem', fontWeight: 900, color: vast.oordeel.kleur }}>Eerst aanpakken: {vast.naam}</div>}
+        </div>
+        {FASES.map((f, i) => {
+          const isVast = vast?.id === f.id
           return (
-            <button key={st.id} onClick={() => setInfo(st.id)} style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0.8rem 0',
-              background: 'none', border: 'none', borderBottom: i < stappen.length - 1 ? LIJN : 'none',
-              color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+            <div key={f.id} style={{
+              padding: '0.9rem 0 0.4rem', borderTop: i ? LIJN : 'none',
+              ...(isVast ? { borderLeft: `3px solid ${f.oordeel.kleur}`, paddingLeft: 12, marginLeft: -15 } : {}),
             }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {createElement(st.icoon, { size: 16, strokeWidth: 2.5, color: st.id === 'sale' && st.aantal > 0 ? GROEN : '#fff' })}
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.95rem', fontWeight: 900 }}>{st.label}</span>
-                  {st.basis != null && <span style={{ fontSize: '0.8rem', fontWeight: 800, color: ZWAK, whiteSpace: 'nowrap' }}>{pct(st.aantal, st.basis)}</span>}
-                  <span style={{ fontSize: '1.1rem', fontWeight: 900, minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{st.aantal}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#fff', color: '#000', fontSize: '0.8rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
+                  <span style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: ZWAK }}>{f.vraag}</span>
                 </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 5 }}>
-                  <span style={{ flex: 1, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                    <span style={{ display: 'block', width: `${breedte}%`, height: '100%', borderRadius: 4, background: st.id === 'sale' ? GROEN : 'rgba(255,255,255,0.75)' }} />
-                  </span>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, whiteSpace: 'nowrap' }}>{st.sub}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 900, color: f.oordeel.kleur, whiteSpace: 'nowrap' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: f.oordeel.kleur }} />{f.oordeel.tekst}
                 </span>
-              </span>
-              <ChevronRight size={17} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
-            </button>
+              </div>
+              <div style={{ marginTop: 6, marginLeft: 36 }}>
+                {f.metingen.map(x => (
+                  <button key={x.label} onClick={() => setInfo(x.venster)} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', background: 'none', border: 'none',
+                    color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 800 }}>{x.label}</span>
+                      {x.sub && <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.sub}</span>}
+                    </span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff' }}>{x.tekst}</span>
+                    <ChevronRight size={15} strokeWidth={2.6} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+            </div>
           )
         })}
-        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 8 }}>
-          Percentage = van de stap waar het uit komt. Tik op een stap voor de details.
+        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 8, lineHeight: 1.5 }}>
+          Groen, oranje en rood zijn vuistregels voor koud verkeer uit Meta. Percentage = van de stap ervoor. Leads tellen vanaf de dag dat ze binnenkwamen, met alles wat er daarna gebeurde. Tik op een regel voor de details.
         </div>
       </div>
 
