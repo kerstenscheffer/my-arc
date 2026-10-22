@@ -677,12 +677,39 @@ const PIJLERS = {
   },
 }
 
-function PijlerModal({ pijler, onClose, onStart, m }) {
+// Volgorde voor de knop "Bekijk training" naast de startknop en voor vegen.
+const PIJLER_VOLGORDE = ['voeding', 'training', 'begeleiding']
+const PIJLER_NAAM = { voeding: 'Voeding', training: 'Training', begeleiding: 'Begeleiding' }
+
+function PijlerModal({ pijler, onClose, onStart, onWissel, m }) {
   const p = PIJLERS[pijler]
+  // Richting van de laatste wissel, voor de schuifanimatie: 1 = volgende
+  // (komt van rechts), -1 = vorige (komt van links).
+  const [richting, setRichting] = useState(0)
+  const veeg = useRef(null)
+  const i = PIJLER_VOLGORDE.indexOf(pijler)
+  const volgende = PIJLER_VOLGORDE[(i + 1) % PIJLER_VOLGORDE.length]
+  const vorige = PIJLER_VOLGORDE[(i + PIJLER_VOLGORDE.length - 1) % PIJLER_VOLGORDE.length]
+  const ga = (doel, r) => { setRichting(r); onWissel(doel) }
+  useEffect(() => { if (!pijler) setRichting(0) }, [pijler])
   return (
     <ModalKader open={!!p} onClose={onClose} m={m}>
       {p && (
-        <>
+        // Opnieuw gemount per pijler zodat de schuifanimatie elke wissel speelt.
+        <div key={pijler}
+          onTouchStart={(e) => { const t = e.touches[0]; veeg.current = { x: t.clientX, y: t.clientY } }}
+          onTouchEnd={(e) => {
+            const start = veeg.current; veeg.current = null
+            if (!start) return
+            const t = e.changedTouches[0]
+            const dx = t.clientX - start.x, dy = t.clientY - start.y
+            if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+            if (dx < 0) ga(volgende, 1); else ga(vorige, -1)
+          }}
+          style={{
+            display: 'flex', flexDirection: 'column', minHeight: 0,
+            animation: richting ? `${richting > 0 ? 'pijlerVanRechts' : 'pijlerVanLinks'} 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)` : undefined,
+          }}>
           <img src={p.foto} alt={p.kop} draggable={false}
             style={{ width: '100%', aspectRatio: '1960 / 600', objectFit: 'cover', display: 'block', flexShrink: 0, background: '#141414' }} />
           <div style={{ padding: m ? '1.1rem 1.15rem 1.2rem' : '1.4rem 1.7rem 1.6rem', fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
@@ -700,17 +727,35 @@ function PijlerModal({ pijler, onClose, onStart, m }) {
                 </div>
               ))}
             </div>
-            <button onClick={onStart} style={{
-              marginTop: m ? '1.3rem' : '1.6rem', width: '100%', minHeight: m ? 56 : 62, borderRadius: 14, border: 'none',
-              background: CTA_GROEN, color: '#fff', fontSize: m ? '1rem' : '1.15rem', fontWeight: 900, fontFamily: 'inherit',
-              letterSpacing: '0.03em', textTransform: 'uppercase', cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-              {CTA_TEKST}
-            </button>
+            {/* Startknop met rechts ernaast de volgende pijler (22 okt 2026). */}
+            <div style={{ display: 'flex', gap: m ? 8 : 10, marginTop: m ? '1.3rem' : '1.6rem' }}>
+              <button onClick={onStart} style={{
+                flex: 1, minWidth: 0, minHeight: m ? 56 : 62, borderRadius: 14, border: 'none', padding: m ? '0 0.6rem' : '0 1rem',
+                background: CTA_GROEN, color: '#fff', fontSize: m ? '0.86rem' : '1.05rem', fontWeight: 900, fontFamily: 'inherit',
+                letterSpacing: '0.03em', textTransform: 'uppercase', cursor: 'pointer', lineHeight: 1.15,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                {CTA_TEKST}
+              </button>
+              <button onClick={() => ga(volgende, 1)} aria-label={`Bekijk ${PIJLER_NAAM[volgende].toLowerCase()}`} style={{
+                flexShrink: 0, minHeight: m ? 56 : 62, borderRadius: 14, padding: m ? '0 0.7rem' : '0 1.1rem',
+                background: 'transparent', border: '1.5px solid rgba(255,255,255,0.22)', color: '#fff', fontFamily: 'inherit', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: m ? 7 : 10,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span style={{ width: m ? 26 : 30, height: m ? 26 : 30, borderRadius: '50%', background: '#fff', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: m ? '0.85rem' : '0.95rem', fontWeight: 900 }}>
+                  {PIJLER_VOLGORDE.indexOf(volgende) + 1}
+                </span>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
+                  <span style={{ fontSize: m ? '0.66rem' : '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bekijk</span>
+                  <span style={{ fontSize: m ? '0.88rem' : '1rem', fontWeight: 900, letterSpacing: '-0.01em' }}>{PIJLER_NAAM[volgende]}</span>
+                </span>
+                <ChevronRight size={m ? 16 : 18} strokeWidth={3} style={{ flexShrink: 0, marginLeft: -2 }} />
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </ModalKader>
   )
@@ -1031,7 +1076,7 @@ export default function ChallengeVslPage() {
       </button>
 
       <KalenderBlad open={kalenderOpen} onClose={() => setKalenderOpen(false)} m={m} />
-      <PijlerModal pijler={pijler} m={m} onClose={() => setPijler(null)} onStart={() => { setPijler(null); openKalender() }} />
+      <PijlerModal pijler={pijler} m={m} onClose={() => setPijler(null)} onWissel={(p) => { setPijler(p); meet('pijler', { meta: { pijler: p, via: 'volgende' } }) }} onStart={() => { setPijler(null); openKalender() }} />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
@@ -1039,6 +1084,8 @@ export default function ChallengeVslPage() {
         body { background: #000; margin: 0; }
         @keyframes bladWaas { from { opacity: 0; } to { opacity: 1; } }
         @keyframes modalIn { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }
+        @keyframes pijlerVanRechts { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+        @keyframes pijlerVanLinks { from { opacity: 0; transform: translateX(-48px); } to { opacity: 1; transform: none; } }
         @keyframes bladOmhoog { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
     </div>
