@@ -80,9 +80,9 @@ const HERKENNING = [
 // De drie pijlers als kaarten onder de bovenste knop (22 okt 2026; stonden
 // eerst als aparte sectie verderop). Tik opent de uitleg (PijlerModal).
 const AANPAK = [
-  { pijler: 'voeding', Icon: Utensils, kop: 'Voeding die past bij jouw leven', zin: 'Persoonlijk plan in de app, met ruimte voor etentjes en weekenden.' },
-  { pijler: 'training', Icon: Dumbbell, kop: 'Training die je vooruit helpt', zin: "Schema op jouw tijd en niveau, met uitlegvideo's per oefening." },
-  { pijler: 'begeleiding', Icon: MessageCircle, kop: 'Begeleiding bij het volhouden', zin: 'Check-ins en WhatsApp: ik kijk mee en we sturen samen bij.' },
+  { pijler: 'voeding', kort: 'Voeding', sub: 'die past bij je leven', Icon: Utensils, kop: 'Voeding die past bij jouw leven', zin: 'Persoonlijk plan in de app, met ruimte voor etentjes en weekenden.' },
+  { pijler: 'training', kort: 'Training', sub: 'die je vooruit helpt', Icon: Dumbbell, kop: 'Training die je vooruit helpt', zin: "Schema op jouw tijd en niveau, met uitlegvideo's per oefening." },
+  { pijler: 'begeleiding', kort: 'Begeleiding', sub: 'bij het volhouden', Icon: MessageCircle, kop: 'Begeleiding bij het volhouden', zin: 'Check-ins en WhatsApp: ik kijk mee en we sturen samen bij.' },
 ]
 
 // Kort (21 okt 2026): vier punten van een paar woorden.
@@ -864,30 +864,35 @@ export default function ChallengeVslPage() {
           <div ref={heroCtaRef}>
             <Cta m={m} licht />
           </div>
-          {/* Eten, trainen, iemand die meekijkt als stappenplan: links een lijn
-              met 1, 2, 3, per stap alleen de titel, geen kaarten (22 okt
-              2026). Elke stap opent zijn pijler. */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: m ? '1.6rem' : '2.2rem' }}>
-            <ol style={{ listStyle: 'none', margin: 0, padding: 0, position: 'relative', display: 'flex', flexDirection: 'column', gap: m ? 18 : 22 }}>
-              {/* De lijn loopt van het midden van bol 1 tot het midden van bol 3. */}
-              <span aria-hidden style={{ position: 'absolute', left: (m ? 30 : 34) / 2 - 1, top: (m ? 30 : 34) / 2, bottom: (m ? 30 : 34) / 2, width: 2, background: 'rgba(0,0,0,0.18)' }} />
-              {AANPAK.map((a, i) => (
-                <li key={a.kop} style={{ position: 'relative' }}>
-                  <button onClick={() => { setPijler(a.pijler); meet('pijler', { meta: { pijler: a.pijler } }) }} style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: 0, background: 'none', border: 'none',
-                    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                    fontSize: m ? '1.08rem' : '1.22rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', lineHeight: 1.25,
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}>
-                    <span style={{ width: m ? 30 : 34, height: m ? 30 : 34, borderRadius: '50%', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 900 }}>
-                      {i + 1}
-                    </span>
-                    <span>{a.kop}</span>
-                    <ChevronRight size={m ? 18 : 20} strokeWidth={3} style={{ flexShrink: 0, marginLeft: -6 }} />
-                  </button>
-                </li>
-              ))}
-            </ol>
+          {/* Eten, trainen, iemand die meekijkt als horizontaal stappenplan:
+              drie bollen 1-2-3 op één lijn, eronder het woord en een korte
+              regel, geen kaarten (22 okt 2026). Elke stap opent zijn pijler. */}
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', maxWidth: 620, margin: `${m ? '1.8rem' : '2.4rem'} auto 0` }}>
+            {/* De lijn loopt van het midden van bol 1 naar het midden van bol 3. */}
+            <span aria-hidden style={{ position: 'absolute', left: '16.67%', right: '16.67%', top: (m ? 44 : 52) / 2 - 1, height: 2, background: 'rgba(0,0,0,0.15)' }} />
+            {AANPAK.map((a, i) => (
+              <button key={a.kop} onClick={() => { setPijler(a.pijler); meet('pijler', { meta: { pijler: a.pijler } }) }} aria-label={a.kop} style={{
+                position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: m ? 8 : 10,
+                padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span style={{
+                  width: m ? 44 : 52, height: m ? 44 : 52, borderRadius: '50%', background: '#000', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: m ? '1.1rem' : '1.25rem', fontWeight: 900,
+                  // Witte ring zodat de lijn netjes achter de bol stopt.
+                  boxShadow: '0 0 0 5px #fff',
+                }}>
+                  {i + 1}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: m ? '1rem' : '1.15rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em' }}>
+                  {a.kort}<ChevronRight size={m ? 15 : 17} strokeWidth={3} style={{ flexShrink: 0 }} />
+                </span>
+                <span style={{ marginTop: -4, fontSize: m ? '0.78rem' : '0.88rem', fontWeight: 700, color: 'rgba(0,0,0,0.55)', lineHeight: 1.3 }}>
+                  {a.sub}
+                </span>
+              </button>
+            ))}
           </div>
           {/* Direct onder de punten de transformaties van Kersten en Nitish
               (21 okt 2026; stonden eerst verderop bij de resultaten). */}
