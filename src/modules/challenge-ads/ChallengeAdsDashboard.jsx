@@ -314,6 +314,15 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   })
   const setBron = (b) => { setBronState(b); try { localStorage.setItem('arc_ads_bron', b) } catch { /* geen opslag */ } }
 
+  // Campagne en advertentie (22 okt 2026: nieuwe campagne los van de oude
+  // kunnen bekijken). Leeg = alles. De campagne wordt onthouden.
+  const [campagne, setCampagneState] = useState(() => { try { return localStorage.getItem('arc_ads_campagne') || '' } catch { return '' } })
+  const [advFilter, setAdvFilter] = useState('')
+  const setCampagne = (c) => {
+    setCampagneState(c); setAdvFilter('')
+    try { if (c) localStorage.setItem('arc_ads_campagne', c); else localStorage.removeItem('arc_ads_campagne') } catch { /* geen opslag */ }
+  }
+
   const [data, setData] = useState(null)
   const [venster, setVenster] = useState(null)
   const [laden, setLaden] = useState(true)
@@ -346,16 +355,48 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   }
   useEffect(() => { laad() }, [periode, vanafDatum]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const alleenAds = bron === 'ads'
-  const hooks = (data?.hooks || []).filter(h => !alleenAds || h.ad)
-  const leads = (data?.leads || []).filter(l => !alleenAds || l.ad)
-  const spendRijen = data?.spend || []
-  const dagen = (data?.dagen || []).map(d => ({
-    dag: String(d.dag).slice(0, 10),
-    sessies: alleenAds ? d.sessies_ad : d.sessies,
-    leads: alleenAds ? d.leads_ad : d.leads,
-    spend: Number(d.spend) || 0,
-  }))
+  // Keuzelijsten: campagnes en advertenties uit spend, bezoek en leads.
+  // Nieuwste activiteit bovenaan, zodat een net gestarte campagne vooraan staat.
+  const campSleutel = (c) => (schoon(c) || '').toLowerCase()
+  const laatst = new Map()
+  const noteer = (map, k, naam, dag) => {
+    if (!k) return
+    const o = map.get(k)
+    if (!o || dag > o.dag) map.set(k, { naam, dag: dag || (o?.dag ?? '') })
+  }
+  ;(data?.dagen || []).filter(d => d.ad).forEach(d => noteer(laatst, campSleutel(d.camp), schoon(d.camp), String(d.dag)))
+  ;(data?.spend || []).forEach(r => noteer(laatst, campSleutel(r.camp), schoon(r.camp), ''))
+  const campagnes = [...laatst.entries()].map(([k, v]) => ({ k, ...v })).sort((a, b) => (b.dag > a.dag ? 1 : b.dag < a.dag ? -1 : 0))
+  const advMap = new Map()
+  ;(data?.dagen || []).filter(d => d.ad && (!campagne || campSleutel(d.camp) === campagne))
+    .forEach(d => { const k = sleutelVan(d.hook); if (k !== '__onbekend') noteer(advMap, k, schoon(d.hook), String(d.dag)) })
+  const advKeuzes = [...advMap.entries()].map(([k, v]) => ({ k, ...v })).sort((a, b) => (b.dag > a.dag ? 1 : b.dag < a.dag ? -1 : 0))
+
+  // Met een campagne of advertentie gekozen telt alleen advertentieverkeer.
+  const gefilterd = !!(campagne || advFilter)
+  const alleenAds = gefilterd || bron === 'ads'
+  const past = (r) => (!alleenAds || r.ad !== false)
+    && (!campagne || campSleutel(r.camp) === campagne)
+    && (!advFilter || sleutelVan(r.hook) === advFilter)
+  const hooks = (data?.hooks || []).filter(past)
+  const leads = (data?.leads || []).filter(past)
+  const spendRijen = (data?.spend || []).filter(r => past({ ...r, ad: true }))
+  // Per dag optellen na het filter, met lege dagen erbij voor de grafiek.
+  const perDagMap = new Map()
+  ;(data?.dagen || []).filter(past).forEach(d => {
+    const k = String(d.dag).slice(0, 10)
+    const o = perDagMap.get(k) || { sessies: 0, leads: 0, spend: 0 }
+    o.sessies += Number(d.sessies) || 0; o.leads += Number(d.leads) || 0; o.spend += Number(d.spend) || 0
+    perDagMap.set(k, o)
+  })
+  const dagen = []
+  if (venster) {
+    const eind = new Date(new Date(venster.tot).getTime() - 1)
+    for (let d = new Date(venster.van); d <= eind; d.setDate(d.getDate() + 1)) {
+      const k = d.toLocaleDateString('sv-SE')
+      dagen.push({ dag: k, ...(perDagMap.get(k) || { sessies: 0, leads: 0, spend: 0 }) })
+    }
+  }
 
   const T = telOp(hooks)
   const spend = spendRijen.reduce((s, r) => s + (Number(r.spend) || 0), 0)
@@ -369,7 +410,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const omzet = sales.reduce((s, l) => s + Number(l.omzet), 0)
   const cpl = leads.length ? spend / leads.length : null
   const roas = spend > 0 ? omzet / spend : null
-  const advertenties = perAdvertentie((data?.hooks || []).filter(h => h.ad), (data?.leads || []).filter(l => l.ad), spendRijen)
+  const advertenties = perAdvertentie(hooks.filter(h => h.ad), leads.filter(l => l.ad), spendRijen)
 
   // Lead-fases (cohort: leads uit deze periode, met alles wat daarna gebeurde).
   const metBericht = leads.filter(l => l.bericht)
@@ -545,6 +586,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           <Balk label="Geschikt, gegevens achtergelaten" aantal={leads.length} basis={T.form_start} kleur={GROEN} />
           <Balk label="Niet geschikt" aantal={T.afgewezen} basis={T.form_start} kleur={ORANJE} />
           <div style={{ height: 14 }} />
+          {gefilterd && <div style={{ fontSize: '0.78rem', fontWeight: 800, color: ORANJE, marginBottom: 8 }}>Afhaken per vraag telt alle campagnes samen.</div>}
           <PrequalAfhaken venster={venster} m />
         </>
       ),
@@ -642,10 +684,10 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: m ? 22 : 30 }}>
         <div style={{ fontSize: m ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em' }}>Ads · 6 Weken Challenge</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select value={bron} onChange={e => setBron(e.target.value)} style={keuze} aria-label="Bron">
+          {!gefilterd && <select value={bron} onChange={e => setBron(e.target.value)} style={keuze} aria-label="Bron">
             <option value="ads">Alleen advertenties</option>
             <option value="alles">Alle bezoekers</option>
-          </select>
+          </select>}
           <select value={periode} onChange={e => setPeriode(e.target.value)} style={keuze} aria-label="Periode">
             {PERIODES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
@@ -657,6 +699,21 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             <RefreshCw size={15} style={{ animation: laden ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
+      </div>
+
+      {/* Campagne + advertentie: alles hieronder rekent alleen daarmee. */}
+      <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8, marginTop: m ? -10 : -16, marginBottom: m ? 22 : 30 }}>
+        <select value={campagne} onChange={e => setCampagne(e.target.value)} aria-label="Campagne"
+          style={{ ...keuze, width: '100%', minHeight: 42, fontSize: '0.88rem', border: `1px solid ${campagne ? '#fff' : 'rgba(255,255,255,0.14)'}` }}>
+          <option value="">Alle campagnes</option>
+          {campagnes.map(c => <option key={c.k} value={c.k}>{c.naam}</option>)}
+          {campagne && !campagnes.some(c => c.k === campagne) && <option value={campagne}>Gekozen campagne (geen data in deze periode)</option>}
+        </select>
+        <select value={advFilter} onChange={e => setAdvFilter(e.target.value)} aria-label="Advertentie" disabled={!advKeuzes.length}
+          style={{ ...keuze, width: '100%', minHeight: 42, fontSize: '0.88rem', border: `1px solid ${advFilter ? '#fff' : 'rgba(255,255,255,0.14)'}`, opacity: advKeuzes.length ? 1 : 0.5 }}>
+          <option value="">{campagne ? 'Alle advertenties in deze campagne' : 'Alle advertenties'}</option>
+          {advKeuzes.map(a => <option key={a.k} value={a.k}>{a.naam}</option>)}
+        </select>
       </div>
 
       {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.84rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
