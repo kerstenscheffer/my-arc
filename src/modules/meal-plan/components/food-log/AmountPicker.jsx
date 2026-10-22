@@ -225,7 +225,8 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     : (isPer100g ? (item?.defaultPortion || 100) : 1)
 
   const [quantity, setQuantity] = useState(startNatuurlijk ? 1 : initialQuantity)
-  const [showQuantityPicker, setShowQuantityPicker] = useState(false)
+  const [editingQty, setEditingQty] = useState(false)
+  const [editQtyText, setEditQtyText] = useState('')
   const [portieOpen, setPortieOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [mealMoment, setMealMoment] = useState(defaultMealMoment || getDefaultMoment())
@@ -459,14 +460,40 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 14 : 20, marginTop: isMobile ? '1.4rem' : '1.75rem', padding: '0 1rem' }}>
         <button aria-label="Minder" style={plusMin}
           onClick={() => kies(() => setQuantity(q => Math.max(stap, Math.round((q - stap) * 100) / 100)))}>−</button>
-        <button onClick={() => setShowQuantityPicker(true)} style={{
-          background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
-          fontSize: isMobile ? '3.4rem' : '3.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em',
-          lineHeight: 1, fontVariantNumeric: 'tabular-nums', minWidth: '1.6ch', textAlign: 'center',
-          WebkitTapHighlightColor: 'transparent',
-        }}>
-          {displayQuantity(quantity)}
-        </button>
+        {editingQty ? (
+          <input
+            type="text"
+            inputMode="decimal"
+            autoFocus
+            value={editQtyText}
+            onChange={e => setEditQtyText(e.target.value.replace(/[^0-9.,]/g, ''))}
+            onFocus={e => e.target.select()}
+            onBlur={() => {
+              const v = parseFloat(String(editQtyText).replace(',', '.'))
+              if (Number.isFinite(v) && v > 0) setQuantity(Math.round(v * 100) / 100)
+              setEditingQty(false)
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+            style={{
+              background: 'none', border: 'none', outline: 'none', padding: 0,
+              fontFamily: 'inherit',
+              fontSize: isMobile ? '3.4rem' : '3.8rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+              width: `${Math.max(2, editQtyText.length + 0.5)}ch`, minWidth: '1.6ch',
+              textAlign: 'center', borderBottom: '2px solid rgba(255,255,255,0.5)',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          />
+        ) : (
+          <button onClick={() => { setEditingQty(true); setEditQtyText(String(quantity)) }} style={{
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
+            fontSize: isMobile ? '3.4rem' : '3.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em',
+            lineHeight: 1, fontVariantNumeric: 'tabular-nums', minWidth: '1.6ch', textAlign: 'center',
+            WebkitTapHighlightColor: 'transparent',
+          }}>
+            {displayQuantity(quantity)}
+          </button>
+        )}
         <button aria-label="Meer" style={plusMin}
           onClick={() => kies(() => setQuantity(q => Math.round((q + stap) * 100) / 100))}>+</button>
       </div>
@@ -680,16 +707,6 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
         </button>
       </div>
 
-      {showQuantityPicker && (
-        <HoeveelheidInvoer
-          value={quantity}
-          eenheid={eenheidTekst}
-          porties={!gramStand}
-          onConfirm={(val) => { setQuantity(val); setShowQuantityPicker(false) }}
-          onClose={() => setShowQuantityPicker(false)}
-          isMobile={isMobile}
-        />
-      )}
     </div>
   )
 }
