@@ -865,7 +865,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                           fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
                           padding: '2px 7px', borderRadius: 6,
                           color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
-                        }}>{isVast ? `${f.oordeel.tekst} · eerst aanpakken` : f.oordeel.tekst}</span>
+                        }}>{f.oordeel.tekst}</span>
                       </span>
                       <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3, marginTop: 2 }}>{f.vraag}</span>
                     </span>
