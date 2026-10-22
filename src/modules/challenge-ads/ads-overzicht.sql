@@ -1,0 +1,16 @@
+-- Ads-scherm: spend per advertentie en het overzicht van klik tot sale
+-- (22 okt 2026). Staat in de DB als migraties meta_ad_insights en
+-- get_challenge_ads_overzicht_bron.
+--   meta_ad_insights              per dag + ad_id: spend, vertoningen, bereik,
+--                                 linkklikken, campagne- en advertentienaam
+--   sync_meta_ad_insights(dagen)  haalt Meta /insights level=ad per dag op
+--                                 (Vault meta_ads_token, meta_ad_account_id);
+--                                 cron meta-ad-insights elk uur op :22, 7 dagen
+--   _is_ad_bron(utm_source)       meta/fb/facebook of --sanitized-- = advertentie
+--   get_challenge_ads_overzicht(van,tot) jsonb:
+--     hooks  trechter per campagne+hook+ad uit challenge_events
+--     leads  geschikte challenge_prequal-leads met call/gehouden/omzet uit
+--            lead_movements (call = calldatum of naar Sales Call; sale =
+--            _meta_is_sale_titel + order_value)
+--     spend  per campagne + advertentienaam (= utm_content op de pagina)
+--     dagen  bezoekers, leads en spend per dag

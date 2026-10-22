@@ -1,113 +1,62 @@
 // src/modules/challenge-ads/ChallengeAdsDashboard.jsx
 //
 // Coachscherm "Ads": wat de Meta-advertenties voor de 6 Weken Challenge
-// opleveren, per hook (utm_content). Bron: challenge_events (gemeten op de
-// pagina) en call_leads (aanmeldingen en geplande calls), via de
-// database-functie get_challenge_ad_stats.
+// opleveren, van klik tot sale. Opnieuw opgezet 22 okt 2026 (Kersten: "wat
+// is belangrijk om te zien en wat is ruis"):
+//   1. Rendement: uitgegeven, kosten per lead, omzet, ROAS.
+//   2. De trechter: bezoekers → video → formulier → gegevens → call → sale.
+//      Elke stap opent een venster met de diepere cijfers.
+//   3. Per advertentie: spend naast leads, calls en sales.
 //
-// Opgezet zodat je in tien seconden snapt hoe het gaat (Kersten, 12 okt 2026:
-// "een kind van 10 moet het begrijpen"):
-//   1. Rapportcijfer (meter: calls per 100 bezoekers) + grafiek per dag.
-//   2. Vier KPI-kaarten met sparkline en verschil met de vorige periode.
-//   3. De trechter tegen richtwaarden, naast wat je kunt verbeteren.
-//   4. Welke advertentie werkt: hooks samengevoegd en gerangschikt.
-// Opzet à la Stripe: kaarten, grafieken, deltas (Kersten: "zou Stripe zo'n
-// dashboard hebben?"). Per-dag-cijfers via get_challenge_ad_daily.
+// Bron: get_challenge_ads_overzicht (één RPC). Pagina-events uit
+// challenge_events, leads uit call_leads met hun weg over het bord
+// (lead_movements: call gepland, gehouden, sale met order_value) en de
+// Meta-spend per advertentie per dag uit meta_ad_insights (cron
+// meta-ad-insights, elk uur, sync_meta_ad_insights). De advertentienaam in
+// Meta is gelijk aan utm_content op de pagina; zo hoort spend bij een hook.
 //
-// De richtwaarden zijn vuistregels voor koud verkeer uit Meta naar een
-// aanmeldpagina met formulier, geen wet. Ze staan bovenaan in RICHT.
-//
-// CTR en kosten staan hier niet: die zitten in Meta Ads Manager.
+// Weggehaald als ruis: rapportcijfer-meter, KPI-rij met sparklines,
+// algemene tips en de ruwe tabel per regel.
 
 import { createElement, useEffect, useState } from 'react'
 import {
-  RefreshCw, Copy, Check, CalendarDays, ChevronDown, Filter, Lightbulb, Megaphone, Table2, Link2,
-  ArrowUpRight, ArrowDownRight, Gauge, Activity, MousePointerClick, Play, PenLine, ClipboardCheck,
-  UserCheck, CalendarCheck, Sparkles,
+  RefreshCw, Copy, Check, ChevronDown, ChevronRight, X, Link2,
+  MousePointerClick, Play, PenLine, UserCheck, CalendarCheck, Trophy, Megaphone, Info,
 } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PrequalAfhaken from './PrequalAfhaken'
 import PrequalAfgewezen from './PrequalAfgewezen'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const PERIODES = [
-  { id: '7', label: '7 dagen', dagen: 7 },
-  { id: '14', label: '14 dagen', dagen: 14 },
-  { id: '30', label: '30 dagen', dagen: 30 },
-  { id: '90', label: '90 dagen', dagen: 90 },
+  { id: '7', label: 'Laatste 7 dagen', dagen: 7 },
+  { id: '14', label: 'Laatste 14 dagen', dagen: 14 },
+  { id: '30', label: 'Laatste 30 dagen', dagen: 30 },
+  { id: '90', label: 'Laatste 90 dagen', dagen: 90 },
+  { id: 'vanaf', label: 'Vanaf datum…' },
 ]
 
 const GROEN = '#10b981'
 const ORANJE = '#f59e0b'
 const ROOD = '#ef4444'
-const GRIJS = 'rgba(255,255,255,0.4)'
+const ZWAK = 'rgba(255,255,255,0.6)'
+const LIJN = '1px solid rgba(255,255,255,0.08)'
 
-// Onder dit aantal mensen bij de stap ervoor zeggen percentages niets.
-const MIN_BASIS = 10
-// Een hook beoordelen we pas vanaf zoveel bezoekers.
-const MIN_HOOK = 20
+const LINK_VOORBEELD = 'https://www.myarcfitness.com/challenge?utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}'
 
-// Richtwaarden per stap: `goed` en `matig` als fractie van de stap ervoor.
-const RICHT = {
-  video: {
-    goed: 0.30, matig: 0.15, goedTekst: '3 op de 10',
-    tipKop: 'Laat meer mensen je video starten',
-    tip: 'Zet de video bovenaan, groot, met een thumbnail met jouw gezicht en één pakkende zin erop. Een video die je pas na scrollen ziet, start bijna niemand.',
-  },
-  fstart: {
-    goed: 0.15, matig: 0.08, goedTekst: '15 van de 100',
-    tipKop: 'Laat meer mensen aan het formulier beginnen',
-    tip: 'Zet de knop direct onder de video én bovenaan, en zeg op de knop wat ze krijgen ("Check of je mee kunt doen"). Sluit aan op de belofte uit de advertentie, anders voelen ze zich op de verkeerde plek.',
-  },
-  fklaar: {
-    goed: 0.60, matig: 0.40, goedTekst: '6 op de 10',
-    tipKop: 'Laat meer mensen het formulier afmaken',
-    tip: 'Haal vragen weg die je niet echt nodig hebt, zet de makkelijkste vragen eerst en laat zien hoe ver ze zijn. Elke extra vraag kost mensen.',
-  },
-  geschikt: {
-    goed: 0.60, matig: 0.40, goedTekst: '6 op de 10',
-    tipKop: 'Trek de juiste mensen aan',
-    tip: 'Veel invullers zijn (nog) niet geschikt. Zeg in de advertentie zelf duidelijker voor wie het is: leeftijd, doel, en dat het een betaald traject is.',
-  },
-  call: {
-    goed: 0.50, matig: 0.30, goedTekst: 'de helft',
-    tipKop: 'Zorg dat geschikte mensen ook een call plannen',
-    tip: 'Laat de agenda direct na het formulier zien, en stuur geschikte mensen die niet plannen binnen een uur een appje. Daar laat je nu calls liggen.',
-  },
-  totaal: { goed: 0.03, matig: 0.01, goedTekst: '3 calls per 100 bezoekers' },
+const euro = (n, dec = false) => {
+  if (n == null || !isFinite(n)) return '–'
+  return '€' + Number(n).toLocaleString('nl-NL', { minimumFractionDigits: dec ? 2 : 0, maximumFractionDigits: dec ? 2 : 0 })
 }
-
-const OORDELEN = {
-  goed: { id: 'goed', tekst: 'Goed', kleur: GROEN },
-  matig: { id: 'matig', tekst: 'Kan beter', kleur: ORANJE },
-  slecht: { id: 'slecht', tekst: 'Slecht', kleur: ROOD },
-  weinig: { id: 'weinig', tekst: 'Te weinig data', kleur: GRIJS },
-}
-
-const oordeelVan = (deel, basis, richt) => {
-  if (deel == null || !basis || basis < MIN_BASIS || !richt) return OORDELEN.weinig
-  if (deel >= richt.goed) return OORDELEN.goed
-  if (deel >= richt.matig) return OORDELEN.matig
-  return OORDELEN.slecht
-}
-
-// "13 van de 100 mensen" of "2 van de 4" — bij weinig mensen geen procenten,
-// want "50%" van twee mensen klinkt groter dan het is.
-const zin = (st) => {
-  if (st.basis >= 20) return `${Math.round(st.deel * 100)} van de 100 doen dit`
-  return `${st.aantal} van de ${st.basis} doen dit`
-}
-
+const pct = (deel, basis) => (basis > 0 ? `${Math.round((deel / basis) * 100)}%` : '–')
 const fmtTijd = (s) => {
   const n = Math.round(Number(s) || 0)
   if (n < 60) return `${n}s`
   return `${Math.floor(n / 60)}m ${String(n % 60).padStart(2, '0')}s`
 }
-const komma = (n) => (Math.round(n * 10) / 10).toString().replace('.', ',')
+const dagLabel = (iso) => new Date(`${String(iso).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 
-// utm_content komt soms nog gecodeerd binnen ('strakker%2C+maar+uiteten'),
-// soms als placeholder ('{{ad.name}}') of door Meta weggepoetst
-// ('--sanitized--'). Netjes maken en samenvoegen, anders staat dezelfde
-// advertentie er drie keer in.
+// utm_content komt soms gecodeerd binnen ('strakker%2C+maar+uiteten'), soms
+// als placeholder ('{{ad.name}}') of door Meta weggepoetst ('--sanitized--').
 const schoon = (naam) => {
   let v = String(naam || '')
   try { v = decodeURIComponent(v.replace(/\+/g, ' ')) } catch { v = v.replace(/\+/g, ' ') }
@@ -115,182 +64,186 @@ const schoon = (naam) => {
   if (!v || v === '(geen)' || /^\{\{.*\}\}$/.test(v) || /sanitized/i.test(v)) return null
   return v
 }
+const sleutelVan = (hook) => (schoon(hook) || '').toLowerCase() || '__onbekend'
 
-function groepeerHooks(rijen) {
-  const map = new Map()
-  for (const r of rijen) {
-    const naam = schoon(r.hook)
-    const sleutel = naam ? naam.toLowerCase() : '__onbekend'
-    const g = map.get(sleutel) || {
-      naam: naam || 'Onbekend (geen advertentienaam)', onbekend: !naam,
-      sessies: 0, tijdSom: 0, form_klaar: 0, geschikt: 0, calls: 0,
-    }
-    const ses = Number(r.sessies) || 0
-    g.sessies += ses
-    g.tijdSom += (Number(r.tijd_gem) || 0) * ses
-    g.form_klaar += Number(r.form_klaar) || 0
-    g.geschikt += Number(r.geschikt) || 0
-    g.calls += Number(r.calls_gepland) || 0
-    map.set(sleutel, g)
+const VELDEN = ['sessies', 'mobiel', 'blijft_30s', 'video_start', 'video_25', 'video_50', 'video_75', 'video_100',
+  'knop', 'form_start', 'form_klaar', 'geschikt', 'afgewezen', 'geschikt_video_start', 'geschikt_video_klaar']
+function telOp(hooks) {
+  const t = Object.fromEntries(VELDEN.map(k => [k, 0]))
+  let tijdSom = 0
+  for (const h of hooks) {
+    for (const k of VELDEN) t[k] += Number(h[k]) || 0
+    tijdSom += (Number(h.tijd_gem) || 0) * (Number(h.sessies) || 0)
   }
-  return [...map.values()]
-    .map(g => ({ ...g, tijd: g.sessies ? g.tijdSom / g.sessies : 0 }))
-    .sort((a, b) => (a.onbekend - b.onbekend)
-      || (b.calls - a.calls)
-      || (b.geschikt - a.geschikt)
-      || ((b.form_klaar / Math.max(1, b.sessies)) - (a.form_klaar / Math.max(1, a.sessies)))
-      || (b.sessies - a.sessies))
+  t.tijd = t.sessies ? tijdSom / t.sessies : 0
+  return t
 }
 
-// Per advertentie: levert hij calls of in elk geval formulieren op?
-const hookOordeel = (h) => {
-  if (h.onbekend) return { id: 'weinig', tekst: 'Niet te koppelen', kleur: GRIJS }
-  if (h.calls > 0) return { id: 'goed', tekst: 'Winnaar', kleur: GROEN }
-  if (h.sessies < MIN_HOOK) return OORDELEN.weinig
-  const f = h.form_klaar / h.sessies
-  if (f >= 0.05) return { id: 'matig', tekst: 'Belooft wat', kleur: ORANJE }
-  return { id: 'slecht', tekst: 'Werkt niet', kleur: ROOD }
+// Per advertentie: pagina-cijfers, leads en spend bij elkaar op advertentienaam.
+function perAdvertentie(hooks, leads, spend) {
+  const map = new Map()
+  const rij = (hook) => {
+    const k = sleutelVan(hook)
+    if (!map.has(k)) map.set(k, { sleutel: k, naam: schoon(hook) || 'Naam niet doorgekomen', onbekend: k === '__onbekend', hooks: [], leads: [], spend: 0, klikken: 0, impressies: 0 })
+    return map.get(k)
+  }
+  hooks.forEach(h => rij(h.hook).hooks.push(h))
+  leads.forEach(l => rij(l.hook).leads.push(l))
+  spend.forEach(s => { const r = rij(s.hook); r.spend += Number(s.spend) || 0; r.klikken += Number(s.klikken) || 0; r.impressies += Number(s.impressies) || 0 })
+  return [...map.values()].map(r => {
+    const t = telOp(r.hooks)
+    const sales = r.leads.filter(l => Number(l.omzet) > 0)
+    return {
+      ...r, t,
+      calls: r.leads.filter(l => l.call).length,
+      sales: sales.length,
+      omzet: sales.reduce((s, l) => s + Number(l.omzet), 0),
+    }
+  }).sort((a, b) => (a.onbekend - b.onbekend) || (b.spend - a.spend) || (b.t.sessies - a.t.sessies))
 }
 
-const LINK_VOORBEELD = 'https://www.myarcfitness.com/challenge?utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}'
+// ── Bouwstenen ─────────────────────────────────────────────────────────────
 
-const pil = (aan) => ({
-  padding: '0.45rem 0.8rem', borderRadius: 10, fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-  background: aan ? '#fff' : 'rgba(255,255,255,0.06)', color: aan ? '#000' : 'rgba(255,255,255,0.75)',
-  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-})
+const kop = { fontSize: '0.8rem', fontWeight: 800, color: ZWAK, marginBottom: 10 }
+const keuze = {
+  minHeight: 36, padding: '0 0.7rem', borderRadius: 10, background: '#111', color: '#fff',
+  border: '1px solid rgba(255,255,255,0.14)', fontSize: '0.82rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+}
 
-function Stempel({ oordeel, klein }) {
+function Getal({ label, waarde, sub, kleur = '#fff', onClick }) {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
-      fontSize: klein ? '0.7rem' : '0.8rem', fontWeight: 900, color: oordeel.kleur, whiteSpace: 'nowrap',
+    <button onClick={onClick} style={{
+      minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, color: '#fff',
+      fontFamily: 'inherit', cursor: onClick ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent',
     }}>
-      <span style={{ width: klein ? 7 : 9, height: klein ? 7 : 9, borderRadius: '50%', background: oordeel.kleur }} />
-      {oordeel.tekst}
-    </span>
+      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: ZWAK, display: 'flex', alignItems: 'center', gap: 5 }}>
+        {label}{onClick && <Info size={12} strokeWidth={2.6} style={{ opacity: 0.6 }} />}
+      </div>
+      <div style={{ fontSize: '1.9rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.1, marginTop: 4, color: kleur, fontVariantNumeric: 'tabular-nums' }}>{waarde}</div>
+      {sub && <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 3 }}>{sub}</div>}
+    </button>
   )
 }
 
-// Eén uitklapregel: icoon, titel, een korte samenvatting rechts en een pijl.
-// Dicht zie je in één oogopslag wat waar zit én hoe het ervoor staat.
-function Sectie({ id, icoon, titel, samenvatting, kleur = '#fff', open, onWissel, children }) {
+function Regel({ label, waarde, sterk }) {
   return (
-    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-      <button onClick={() => onWissel(id)} style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0.95rem 0',
-        background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      }}>
-        <span style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          {createElement(icoon, { size: 18, strokeWidth: 2.4, color: kleur })}
-        </span>
-        <span style={{ flex: 1, minWidth: 0, fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em' }}>{titel}</span>
-        {samenvatting && (
-          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: kleur === '#fff' ? 'rgba(255,255,255,0.5)' : kleur, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '45%' }}>{samenvatting}</span>
-        )}
-        <ChevronDown size={18} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-      </button>
-      {open && <div style={{ paddingBottom: '1rem' }}>{children}</div>}
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '0.55rem 0', borderBottom: LIJN }}>
+      <span style={{ flex: 1, minWidth: 0, fontSize: '0.86rem', fontWeight: 700, color: sterk ? '#fff' : 'rgba(255,255,255,0.75)' }}>{label}</span>
+      <span style={{ fontSize: '0.95rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{waarde}</span>
     </div>
   )
 }
 
-// ── Stripe-achtige bouwstenen ──────────────────────────────────────────────
-
-// Geen kaders: de blokken zweven op de pagina, ruimte doet het scheiden.
-const kaart = { minWidth: 0 }
-const kaartKop = { fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', gap: 6 }
-
-const dagLabel = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-
-// Verschil met de vorige periode van dezelfde lengte. Onder de 5 in beide
-// periodes zeggen procenten niets; dan tonen we het absolute verschil.
-function Delta({ nu, vorig }) {
-  if (vorig == null) return null
-  const verschil = nu - vorig
-  if (verschil === 0) return <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>gelijk</span>
-  const omhoog = verschil > 0
-  const tekst = vorig >= 5 ? `${Math.round(Math.abs(verschil / vorig) * 100)}%` : `${Math.abs(verschil)}`
-  const kleur = omhoog ? GROEN : ROOD
+function Balk({ label, aantal, basis, kleur = '#fff', tekst }) {
+  const breedte = basis > 0 ? Math.max(2, (aantal / basis) * 100) : 0
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: '0.72rem', fontWeight: 900, color: kleur, background: omhoog ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', padding: '2px 7px', borderRadius: 999 }}>
-      {omhoog ? <ArrowUpRight size={12} strokeWidth={3} /> : <ArrowDownRight size={12} strokeWidth={3} />}{tekst}
-    </span>
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ flex: 1, fontSize: '0.84rem', fontWeight: 800 }}>{label}</span>
+        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: ZWAK }}>{tekst ?? pct(aantal, basis)}</span>
+        <span style={{ fontSize: '0.9rem', fontWeight: 900, minWidth: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{aantal}</span>
+      </div>
+      <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,0.06)', marginTop: 5, overflow: 'hidden' }}>
+        <div style={{ width: `${breedte}%`, height: '100%', borderRadius: 5, background: kleur, transition: 'width 0.4s ease' }} />
+      </div>
+    </div>
   )
 }
 
-function Sparkline({ data, sleutel, kleur }) {
-  const id = `spark-${sleutel}`
+function Grafiek({ data, sleutel, kleur = '#fff', label, euroAs }) {
+  const id = `ads-${sleutel}`
   return (
-    <div style={{ height: 40, marginTop: 8 }}>
+    <div style={{ height: 170, margin: '4px 0 14px' }}>
       <ResponsiveContainer>
-        <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -24 }}>
           <defs>
             <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={kleur} stopOpacity={0.35} />
+              <stop offset="0%" stopColor={kleur} stopOpacity={0.3} />
               <stop offset="100%" stopColor={kleur} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <Area type="monotone" dataKey={sleutel} stroke={kleur} strokeWidth={2} fill={`url(#${id})`} isAnimationActive={false} dot={false} />
+          <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+          <XAxis dataKey="dag" tickFormatter={dagLabel} tick={{ fontSize: 10, fill: ZWAK, fontWeight: 800 }} axisLine={false} tickLine={false} minTickGap={24} />
+          <YAxis allowDecimals={!!euroAs} tick={{ fontSize: 10, fill: ZWAK, fontWeight: 800 }} axisLine={false} tickLine={false} width={40} />
+          <Tooltip
+            cursor={{ stroke: 'rgba(255,255,255,0.2)' }}
+            content={({ active, payload, label: dag }) => (active && payload?.length ? (
+              <div style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, padding: '0.45rem 0.6rem', fontSize: '0.76rem', fontWeight: 900 }}>
+                <div style={{ color: ZWAK, fontSize: '0.7rem' }}>{dagLabel(dag)}</div>
+                {euroAs ? euro(payload[0].value, true) : payload[0].value} {label}
+              </div>
+            ) : null)}
+          />
+          <Area type="monotone" dataKey={sleutel} stroke={kleur} strokeWidth={2.4} fill={`url(#${id})`} isAnimationActive={false}
+            dot={data.length <= 14 ? { r: 3, fill: kleur, strokeWidth: 0 } : false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-function KpiKaart({ icoon, label, waarde, vorig, data, sleutel, kleur, sub }) {
+// Venster: op mobiel een blad van onderen, op desktop gecentreerd.
+function Venster({ titel, sub, m, onClose, children }) {
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', esc)
+    const oud = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', esc); document.body.style.overflow = oud }
+  }, [onClose])
   return (
-    <div style={kaart}>
-      <div style={kaartKop}>{createElement(icoon, { size: 14, strokeWidth: 2.6, color: kleur })} {label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '1.9rem', fontWeight: 900, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{waarde}</span>
-        <Delta nu={waarde} vorig={vorig} />
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.78)',
+      display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? 0 : '2rem',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 640, maxHeight: m ? '90dvh' : '86vh', overflowY: 'auto', overscrollBehavior: 'contain',
+        background: '#0b0b0b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: m ? '20px 20px 0 0' : 18,
+        padding: m ? '1.1rem 1.1rem calc(1.5rem + env(safe-area-inset-bottom))' : '1.4rem 1.6rem 1.6rem', color: '#fff',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em' }}>{titel}</div>
+            {sub && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: ZWAK, marginTop: 2 }}>{sub}</div>}
+          </div>
+          <button onClick={onClose} aria-label="Sluiten" style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={18} strokeWidth={2.6} />
+          </button>
+        </div>
+        {children}
       </div>
-      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{sub}</div>
-      <Sparkline data={data} sleutel={sleutel} kleur={kleur} />
     </div>
   )
 }
 
-// Halve-cirkel meter: waar sta je tegenover de richtwaarde?
-function Meter({ waarde, goed, kleur }) {
-  const max = goed * 2
-  const deel = Math.max(0, Math.min(1, (waarde || 0) / max))
-  const r = 70, omtrek = Math.PI * r
+// Eén lead met waar hij nu staat.
+function LeadRegel({ l }) {
+  const status = Number(l.omzet) > 0
+    ? { tekst: `Sale ${euro(l.omzet)}`, kleur: GROEN }
+    : l.gehouden ? { tekst: 'Call gehouden', kleur: '#fff' }
+      : l.call ? { tekst: l.call_datum ? `Call ${dagLabel(l.call_datum)}` : 'Call gepland', kleur: '#60a5fa' }
+        : { tekst: 'Nog geen call', kleur: ORANJE }
   return (
-    <svg width="180" height="100" viewBox="0 0 180 100" style={{ display: 'block' }}>
-      <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="14" strokeLinecap="round" />
-      <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke={kleur} strokeWidth="14" strokeLinecap="round"
-        strokeDasharray={omtrek} strokeDashoffset={omtrek * (1 - deel)} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
-      {/* Streepje op 'goed' (midden van de meter). */}
-      <line x1="90" y1="12" x2="90" y2="28" stroke="rgba(255,255,255,0.6)" strokeWidth="2" />
-    </svg>
-  )
-}
-
-const GRAFIEK_METRIEKEN = [
-  { id: 'sessies', label: 'Bezoekers', kleur: '#fff' },
-  { id: 'form_klaar', label: 'Formulieren', kleur: '#60a5fa' },
-  { id: 'geschikt', label: 'Geschikt', kleur: ORANJE },
-  { id: 'calls', label: 'Calls', kleur: GROEN },
-]
-
-function Grafiekkaartje({ active, payload, label }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.5rem 0.65rem' }}>
-      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{dagLabel(label)}</div>
-      {payload.map(p => (
-        <div key={p.dataKey} style={{ fontSize: '0.76rem', fontWeight: 900, color: p.color }}>{p.value} {p.name.toLowerCase()}</div>
-      ))}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0', borderBottom: LIJN }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.9rem', fontWeight: 900 }}>{l.naam || 'Onbekend'}</div>
+        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {dagLabel(l.created_at)} · {schoon(l.hook) || 'onbekende advertentie'}{l.sectie ? ` · ${l.sectie.trim()}` : ''}
+        </div>
+      </div>
+      <span style={{ fontSize: '0.78rem', fontWeight: 900, color: status.kleur, whiteSpace: 'nowrap' }}>{status.tekst}</span>
     </div>
   )
 }
+
+function Leeg({ children }) {
+  return <div style={{ fontSize: '0.86rem', fontWeight: 700, color: ZWAK, padding: '0.6rem 0' }}>{children}</div>
+}
+
+// ── Scherm ─────────────────────────────────────────────────────────────────
 
 export default function ChallengeAdsDashboard({ db, isMobile }) {
   const m = isMobile
-  // Gekozen periode onthouden, ook 'vanaf' (Kersten, 12 okt 2026).
   const [periode, setPeriodeState] = useState(() => {
     try {
       const p = localStorage.getItem('arc_ads_periode')
@@ -302,33 +255,30 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     setPeriodeState(p)
     try { localStorage.setItem('arc_ads_periode', p) } catch { /* geen opslag */ }
   }
-  // Eigen startdatum ('vanaf'): bijv. de dag dat een nieuwe campagne live ging.
   const [vanafDatum, setVanafDatum] = useState(() => {
     try { return localStorage.getItem('arc_ads_vanaf') || '' } catch { return '' }
   })
   const kiesVanaf = (iso) => {
     setVanafDatum(iso)
     try { if (iso) localStorage.setItem('arc_ads_vanaf', iso); else localStorage.removeItem('arc_ads_vanaf') } catch { /* geen opslag */ }
-    setPeriode(iso ? 'vanaf' : '14')
   }
-  const [rijen, setRijen] = useState([])
-  const [vorigeRijen, setVorigeRijen] = useState(null)
-  const [perDag, setPerDag] = useState([])
+  // Alleen advertentieverkeer, of ook Instagram-bio en direct (o.a. je eigen bezoeken).
+  const [bron, setBronState] = useState(() => {
+    try { return localStorage.getItem('arc_ads_bron') === 'alles' ? 'alles' : 'ads' } catch { return 'ads' }
+  })
+  const setBron = (b) => { setBronState(b); try { localStorage.setItem('arc_ads_bron', b) } catch { /* geen opslag */ } }
+
+  const [data, setData] = useState(null)
+  const [venster, setVenster] = useState(null)
   const [laden, setLaden] = useState(true)
   const [fout, setFout] = useState('')
+  const [info, setInfo] = useState(null)        // id van het open venster
+  const [advertentie, setAdvertentie] = useState(null)
+  const [linkOpen, setLinkOpen] = useState(false)
   const [gekopieerd, setGekopieerd] = useState(false)
-  const [metriek, setMetriek] = useState('sessies')
-  const [open, setOpen] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('arc_ads_open2') || '[]') } catch { return [] }
-  })
-  const wissel = (id) => setOpen(prev => {
-    const nieuw = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    try { localStorage.setItem('arc_ads_open2', JSON.stringify(nieuw)) } catch { /* geen opslag */ }
-    return nieuw
-  })
 
-  const [venster, setVenster] = useState(null)
   const laad = async () => {
+    if (periode === 'vanaf' && !vanafDatum) return
     setLaden(true); setFout('')
     try {
       const dagen = PERIODES.find(p => p.id === periode)?.dagen || 14
@@ -337,333 +287,368 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       const van = (periode === 'vanaf' && vanafDatum)
         ? new Date(`${vanafDatum}T00:00:00`)
         : (() => { const d = new Date(); d.setDate(d.getDate() - dagen + 1); d.setHours(0, 0, 0, 0); return d })()
-      // Vorige periode: even lang, direct ervoor.
-      const vorigVan = new Date(van.getTime() - (totEx.getTime() - van.getTime()))
-      const [nu, vorig, dag] = await Promise.all([
-        db.supabase.rpc('get_challenge_ad_stats', { p_van: van.toISOString(), p_tot: totEx.toISOString() }),
-        db.supabase.rpc('get_challenge_ad_stats', { p_van: vorigVan.toISOString(), p_tot: van.toISOString() }),
-        db.supabase.rpc('get_challenge_ad_daily', { p_van: van.toISOString(), p_tot: totEx.toISOString() }),
-      ])
-      if (nu.error) throw nu.error
+      const { data: res, error } = await db.supabase.rpc('get_challenge_ads_overzicht', { p_van: van.toISOString(), p_tot: totEx.toISOString() })
+      if (error) throw error
+      setData(res || {})
       setVenster({ van: van.toISOString(), tot: totEx.toISOString() })
-      setRijen(nu.data || [])
-      setVorigeRijen(vorig.error ? null : (vorig.data || []))
-      setPerDag((dag.data || []).map(d => ({ ...d, dag: String(d.dag).slice(0, 10) })))
     } catch (e) {
-      console.error('ads-stats laden mislukt:', e)
+      console.error('ads-overzicht laden mislukt:', e)
       setFout(e.message || 'Laden mislukt')
     } finally { setLaden(false) }
   }
   useEffect(() => { laad() }, [periode, vanafDatum]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const somVan = (lijst, k) => (lijst || []).reduce((s, r) => s + (Number(r[k]) || 0), 0)
-  const totaal = {
-    sessies: somVan(rijen, 'sessies'),
-    video_start: somVan(rijen, 'video_start'),
-    form_start: somVan(rijen, 'form_start'), form_klaar: somVan(rijen, 'form_klaar'),
-    geschikt: somVan(rijen, 'geschikt'), calls: somVan(rijen, 'calls_gepland'),
-  }
-  const vorig = vorigeRijen ? {
-    sessies: somVan(vorigeRijen, 'sessies'), form_klaar: somVan(vorigeRijen, 'form_klaar'),
-    geschikt: somVan(vorigeRijen, 'geschikt'), calls: somVan(vorigeRijen, 'calls_gepland'),
-  } : {}
+  const alleenAds = bron === 'ads'
+  const hooks = (data?.hooks || []).filter(h => !alleenAds || h.ad)
+  const leads = (data?.leads || []).filter(l => !alleenAds || l.ad)
+  const spendRijen = data?.spend || []
+  const dagen = (data?.dagen || []).map(d => ({
+    dag: String(d.dag).slice(0, 10),
+    sessies: alleenAds ? d.sessies_ad : d.sessies,
+    leads: alleenAds ? d.leads_ad : d.leads,
+    spend: Number(d.spend) || 0,
+  }))
+
+  const T = telOp(hooks)
+  const spend = spendRijen.reduce((s, r) => s + (Number(r.spend) || 0), 0)
+  const klikken = spendRijen.reduce((s, r) => s + (Number(r.klikken) || 0), 0)
+  const impressies = spendRijen.reduce((s, r) => s + (Number(r.impressies) || 0), 0)
+  const calls = leads.filter(l => l.call)
+  const gehouden = leads.filter(l => l.gehouden)
+  const sales = leads.filter(l => Number(l.omzet) > 0)
+  const omzet = sales.reduce((s, l) => s + Number(l.omzet), 0)
+  const cpl = leads.length ? spend / leads.length : null
+  const roas = spend > 0 ? omzet / spend : null
+  const advertenties = perAdvertentie((data?.hooks || []).filter(h => h.ad), (data?.leads || []).filter(l => l.ad), spendRijen)
+
+  const stappen = [
+    { id: 'bezoekers', label: 'Op de pagina', icoon: MousePointerClick, aantal: T.sessies, sub: `gem. ${fmtTijd(T.tijd)} op de pagina` },
+    { id: 'video', label: 'Video gestart', icoon: Play, aantal: T.video_start, basis: T.sessies, sub: `${pct(T.video_100, T.video_start)} kijkt hem helemaal` },
+    { id: 'formulier', label: 'Formulier begonnen', icoon: PenLine, aantal: T.form_start, basis: T.sessies, sub: `${T.form_klaar} ingevuld tot het eind` },
+    { id: 'gegevens', label: 'Gegevens achtergelaten', icoon: UserCheck, aantal: leads.length, basis: T.form_start, sub: `${T.afgewezen} niet geschikt` },
+    { id: 'call', label: 'Call gepland', icoon: CalendarCheck, aantal: calls.length, basis: leads.length, sub: `${gehouden.length} gehouden` },
+    { id: 'sale', label: 'Sale', icoon: Trophy, aantal: sales.length, basis: calls.length, sub: omzet > 0 ? `${euro(omzet)} omzet` : 'nog geen omzet' },
+  ]
 
   const kopieer = async () => {
     try { await navigator.clipboard.writeText(LINK_VOORBEELD); setGekopieerd(true); setTimeout(() => setGekopieerd(false), 2000) } catch { /* leeg */ }
   }
 
-  // ── De trechter: elke stap tegen de stap waar hij uit komt ──
-  const ruweStappen = [
-    { id: 'mensen', label: 'Op je pagina', icoon: MousePointerClick, aantal: totaal.sessies },
-    { id: 'video', label: 'Video gestart', icoon: Play, aantal: totaal.video_start, van: 'mensen', ...RICHT.video },
-    { id: 'fstart', label: 'Formulier begonnen', icoon: PenLine, aantal: totaal.form_start, van: 'mensen', ...RICHT.fstart },
-    { id: 'fklaar', label: 'Formulier af', icoon: ClipboardCheck, aantal: totaal.form_klaar, van: 'fstart', ...RICHT.fklaar },
-    { id: 'geschikt', label: 'Geschikt', icoon: UserCheck, aantal: totaal.geschikt, van: 'fklaar', ...RICHT.geschikt },
-    { id: 'call', label: 'Call gepland', icoon: CalendarCheck, aantal: totaal.calls, van: 'geschikt', ...RICHT.call },
-  ]
-  const stappen = ruweStappen.map(st => {
-    const basis = st.van ? ruweStappen.find(x => x.id === st.van).aantal : null
-    const deel = basis ? st.aantal / basis : null
-    return { ...st, basis, deel, oordeel: oordeelVan(deel, basis, st) }
-  })
-  const perHonderd = totaal.sessies > 0 ? (totaal.calls / totaal.sessies) * 100 : null
-  const totaalOordeel = oordeelVan(perHonderd != null ? perHonderd / 100 : null, totaal.sessies, RICHT.totaal)
-  const meterKleur = totaalOordeel.kleur === GRIJS ? '#fff' : totaalOordeel.kleur
+  const bijgewerkt = data?.spend_bijgewerkt
+    ? new Date(data.spend_bijgewerkt).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : null
 
-  const verbeterpunten = stappen
-    .filter(st => st.tip && st.oordeel.id !== 'weinig' && st.oordeel.id !== 'goed')
-    .sort((x, y) => (x.deel / x.goed) - (y.deel / y.goed))
-    .slice(0, 3)
+  // ── Inhoud van de vensters ──
+  const vensters = {
+    spend: {
+      titel: 'Uitgegeven', sub: `Meta-advertenties · bijgewerkt ${bijgewerkt || 'nog niet'}`,
+      inhoud: (
+        <>
+          <Grafiek data={dagen} sleutel="spend" kleur={GROEN} label="uitgegeven" euroAs />
+          <Regel label="Uitgegeven" waarde={euro(spend, true)} sterk />
+          <Regel label="Vertoningen" waarde={impressies.toLocaleString('nl-NL')} />
+          <Regel label="Klikken op de link (Meta)" waarde={klikken} />
+          <Regel label="Kosten per klik" waarde={klikken ? euro(spend / klikken, true) : '–'} />
+          <Regel label="Klikratio (CTR)" waarde={impressies ? `${((klikken / impressies) * 100).toFixed(1).replace('.', ',')}%` : '–'} />
+          <Regel label="Kosten per 1.000 vertoningen" waarde={impressies ? euro((spend / impressies) * 1000, true) : '–'} />
+        </>
+      ),
+    },
+    cpl: {
+      titel: 'Kosten per lead', sub: 'Uitgegeven gedeeld door de mensen die hun gegevens achterlieten',
+      inhoud: (
+        <>
+          <Regel label="Uitgegeven" waarde={euro(spend, true)} />
+          <Regel label="Leads" waarde={leads.length} />
+          <Regel label="Kosten per lead" waarde={euro(cpl, true)} sterk />
+          <Regel label="Kosten per geplande call" waarde={calls.length ? euro(spend / calls.length, true) : '–'} />
+          <Regel label="Kosten per sale" waarde={sales.length ? euro(spend / sales.length, true) : '–'} />
+          <Grafiek data={dagen} sleutel="leads" kleur="#60a5fa" label="leads" />
+        </>
+      ),
+    },
+    omzet: {
+      titel: 'Omzet uit advertenties', sub: 'Orderwaarde van sales uit deze leads, zoals op het bord',
+      inhoud: (
+        <>
+          <Regel label="Sales" waarde={sales.length} />
+          <Regel label="Omzet" waarde={euro(omzet)} sterk />
+          <Regel label="Gemiddeld per sale" waarde={sales.length ? euro(omzet / sales.length) : '–'} />
+          <div style={{ ...kop, marginTop: 18 }}>Sales</div>
+          {sales.length ? sales.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog geen sale uit een advertentielead in deze periode.</Leeg>}
+        </>
+      ),
+    },
+    roas: {
+      titel: 'Rendement (ROAS)', sub: 'Hoeveel euro omzet elke uitgegeven euro opleverde',
+      inhoud: (
+        <>
+          <Regel label="Omzet" waarde={euro(omzet)} />
+          <Regel label="Uitgegeven" waarde={euro(spend, true)} />
+          <Regel label="Winst na advertenties" waarde={euro(omzet - spend)} sterk />
+          <Regel label="ROAS" waarde={roas != null ? `${roas.toFixed(1).replace('.', ',')}x` : '–'} sterk />
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
+            Boven 1x verdien je je advertenties terug. Omzet telt de orderwaarde van de sale, ook als die in termijnen binnenkomt.
+          </div>
+        </>
+      ),
+    },
+    bezoekers: {
+      titel: 'Op de pagina', sub: alleenAds ? 'Alleen bezoekers via een advertentie' : 'Alle bezoekers, ook Instagram-bio en direct',
+      inhoud: (
+        <>
+          <Grafiek data={dagen} sleutel="sessies" label="bezoekers" />
+          <Regel label="Bezoekers" waarde={T.sessies} sterk />
+          {alleenAds && <Regel label="Klikken volgens Meta" waarde={klikken} />}
+          <Regel label="Gemiddelde tijd op de pagina" waarde={fmtTijd(T.tijd)} />
+          <Regel label="Bleef langer dan 30 seconden" waarde={`${T.blijft_30s} (${pct(T.blijft_30s, T.sessies)})`} />
+          <Regel label="Op de telefoon" waarde={pct(T.mobiel, T.sessies)} />
+          <Regel label="Klikte op de knop" waarde={`${T.knop} (${pct(T.knop, T.sessies)})`} />
+          {alleenAds && (
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
+              Bezoekers kan hoger zijn dan de klikken van Meta: wie de pagina in een nieuw tabblad opent of later terugkomt, telt als nieuw bezoek.
+            </div>
+          )}
+        </>
+      ),
+    },
+    video: {
+      titel: 'Video', sub: `${pct(T.video_start, T.sessies)} van de bezoekers start de video`,
+      inhoud: (
+        <>
+          <div style={kop}>Hoe ver kijken ze?</div>
+          <Balk label="Gestart" aantal={T.video_start} basis={T.video_start} tekst="100%" />
+          <Balk label="Kwart gezien" aantal={T.video_25} basis={T.video_start} />
+          <Balk label="Helft gezien" aantal={T.video_50} basis={T.video_start} />
+          <Balk label="Driekwart gezien" aantal={T.video_75} basis={T.video_start} />
+          <Balk label="Helemaal gezien" aantal={T.video_100} basis={T.video_start} kleur={GROEN} />
+          <div style={{ height: 8 }} />
+          <Regel label="Bezoekers die de video starten" waarde={`${T.video_start} van ${T.sessies} (${pct(T.video_start, T.sessies)})`} />
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
+            Percentages zijn van wie de video startte. Kwart, helft en driekwart worden gemeten sinds 11 oktober.
+          </div>
+        </>
+      ),
+    },
+    formulier: {
+      titel: 'Formulier', sub: `${pct(T.form_start, T.sessies)} van de bezoekers begint eraan`,
+      inhoud: (
+        <>
+          <Balk label="Klikte op de knop" aantal={T.knop} basis={T.sessies} />
+          <Balk label="Formulier begonnen" aantal={T.form_start} basis={T.sessies} />
+          <Balk label="Tot het eind ingevuld" aantal={T.form_klaar} basis={T.form_start} kleur="#60a5fa" />
+          <Balk label="Geschikt, gegevens achtergelaten" aantal={leads.length} basis={T.form_start} kleur={GROEN} />
+          <Balk label="Niet geschikt" aantal={T.afgewezen} basis={T.form_start} kleur={ORANJE} />
+          <div style={{ height: 14 }} />
+          <PrequalAfhaken venster={venster} m />
+        </>
+      ),
+    },
+    gegevens: {
+      titel: 'Gegevens achtergelaten', sub: `${leads.length} geschikte leads, ${pct(leads.length, T.form_start)} van wie begon`,
+      inhoud: (
+        <>
+          {T.geschikt_video_start > 0 && (
+            <Regel label="Keek jouw video op het geschikt-scherm" waarde={`${T.geschikt_video_start} (${T.geschikt_video_klaar} helemaal)`} />
+          )}
+          <div style={{ ...kop, marginTop: 14 }}>Leads</div>
+          {leads.length ? leads.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog geen leads in deze periode.</Leeg>}
+          <div style={{ height: 22 }} />
+          <PrequalAfgewezen venster={venster} />
+        </>
+      ),
+    },
+    call: {
+      titel: 'Calls', sub: `${pct(calls.length, leads.length)} van de leads plant een call`,
+      inhoud: (
+        <>
+          <Regel label="Call gepland" waarde={calls.length} sterk />
+          <Regel label="Call gehouden" waarde={gehouden.length} />
+          <Regel label="Kosten per geplande call" waarde={calls.length ? euro(spend / calls.length, true) : '–'} />
+          <div style={{ ...kop, marginTop: 18 }}>Met een call</div>
+          {calls.length ? calls.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog geen calls in deze periode.</Leeg>}
+          {leads.length > calls.length && (
+            <>
+              <div style={{ ...kop, marginTop: 18, color: ORANJE }}>Nog bellen ({leads.length - calls.length})</div>
+              {leads.filter(l => !l.call).map(l => <LeadRegel key={l.id} l={l} />)}
+            </>
+          )}
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ZWAK, marginTop: 12, lineHeight: 1.5 }}>
+            Een call telt zodra je de lead naar Sales Call zet of er een calldatum bij zet. Gehouden telt als je de call als gehouden markeert.
+          </div>
+        </>
+      ),
+    },
+    sale: {
+      titel: 'Sales', sub: `${pct(sales.length, calls.length)} van de calls wordt een sale`,
+      inhoud: (
+        <>
+          <Regel label="Sales" waarde={sales.length} sterk />
+          <Regel label="Omzet" waarde={euro(omzet)} />
+          <Regel label="Kosten per sale" waarde={sales.length ? euro(spend / sales.length, true) : '–'} />
+          <div style={{ ...kop, marginTop: 18 }}>Sales</div>
+          {sales.length ? sales.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog geen sale uit deze leads.</Leeg>}
+        </>
+      ),
+    },
+  }
 
-  const hooks = groepeerHooks(rijen)
-  const echteHooks = hooks.filter(h => !h.onbekend)
-  const maxHook = Math.max(1, ...hooks.map(h => h.sessies))
-  const actieveMetriek = GRAFIEK_METRIEKEN.find(x => x.id === metriek) || GRAFIEK_METRIEKEN[0]
-
-  const kolommen = [
-    { k: 'hook', label: 'Hook (utm_content)', links: true },
-    { k: 'campagne', label: 'Campagne', links: true },
-    { k: 'sessies', label: 'Bezoekers' },
-    { k: 'tijd_gem', label: 'Tijd', f: fmtTijd },
-    { k: 'video_start', label: 'Video' },
-    { k: 'form_start', label: 'Form begonnen' },
-    { k: 'form_klaar', label: 'Form af' },
-    { k: 'geschikt', label: 'Geschikt' },
-    { k: 'ongeschikt_tot', label: 'Ongeschikt', f: (v, r) => (Number(r.nog_niet) || 0) + (Number(r.ongeschikt) || 0) },
-    { k: 'calls_gepland', label: 'Calls' },
-  ]
-
-  const twee = m ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)'
+  const open = info ? vensters[info] : null
+  const ad = advertentie ? advertenties.find(a => a.sleutel === advertentie) : null
 
   return (
-    <div style={{ padding: m ? '1rem' : '1.5rem 2rem', color: '#fff', maxWidth: 1180, margin: '0 auto' }}>
+    <div style={{ padding: m ? '1rem' : '1.5rem 2rem', color: '#fff', maxWidth: 1080, margin: '0 auto' }}>
       {/* ═══ KOP ═══ */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-        <div>
-          <div style={{ fontSize: m ? '1.2rem' : '1.45rem', fontWeight: 900, letterSpacing: '-0.03em' }}>Ads · 6 Weken Challenge</div>
-          <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-            Vanaf de klik op de advertentie · vergeleken met de periode ervoor
-          </div>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: m ? 22 : 30 }}>
+        <div style={{ fontSize: m ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em' }}>Ads · 6 Weken Challenge</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {PERIODES.map(p => (
-            <button key={p.id} onClick={() => setPeriode(p.id)} style={pil(periode === p.id)}>{p.label}</button>
-          ))}
-          <label title="Vanaf een datum" style={{ ...pil(periode === 'vanaf'), position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <CalendarDays size={14} strokeWidth={2.6} />
-            {vanafDatum ? `Vanaf ${dagLabel(vanafDatum)}` : 'Vanaf…'}
-            <input
-              type="date"
-              value={vanafDatum}
-              max={new Date().toLocaleDateString('sv-SE')}
-              onChange={e => kiesVanaf(e.target.value)}
-              onClick={e => { if (vanafDatum && periode !== 'vanaf') { e.preventDefault(); setPeriode('vanaf') } else { try { e.currentTarget.showPicker?.() } catch { /* oudere browser */ } } }}
-              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-            />
-          </label>
-          <button onClick={laad} aria-label="Verversen" style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <select value={bron} onChange={e => setBron(e.target.value)} style={keuze} aria-label="Bron">
+            <option value="ads">Alleen advertenties</option>
+            <option value="alles">Alle bezoekers</option>
+          </select>
+          <select value={periode} onChange={e => setPeriode(e.target.value)} style={keuze} aria-label="Periode">
+            {PERIODES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+          {periode === 'vanaf' && (
+            <input type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')}
+              onChange={e => kiesVanaf(e.target.value)} style={{ ...keuze, colorScheme: 'dark' }} aria-label="Vanaf" />
+          )}
+          <button onClick={laad} aria-label="Verversen" style={{ ...keuze, width: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <RefreshCw size={15} style={{ animation: laden ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
       </div>
 
-      {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.82rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
+      {fout && <div style={{ padding: '0.7rem 0.9rem', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '0.84rem', fontWeight: 700, marginBottom: '1rem' }}>{fout}</div>}
 
-      {/* ═══ RIJ 1: rapport + grafiek ═══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : 'minmax(0, 340px) minmax(0, 1fr)', gap: m ? 28 : 40, marginBottom: m ? 32 : 44 }}>
-        <div style={{ ...kaart, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          <div style={{ ...kaartKop, alignSelf: 'flex-start' }}><Gauge size={14} strokeWidth={2.6} /> Rapportcijfer</div>
-          <div style={{ position: 'relative', marginTop: 10 }}>
-            <Meter waarde={perHonderd} goed={RICHT.totaal.goed * 100} kleur={meterKleur} />
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 4, textAlign: 'center' }}>
-              <div style={{ fontSize: '2.2rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, color: meterKleur }}>{perHonderd != null ? komma(perHonderd) : '–'}</div>
-            </div>
-          </div>
-          <div style={{ fontSize: '0.85rem', fontWeight: 900, marginTop: 6 }}>calls per 100 bezoekers</div>
-          <div style={{ marginTop: 6 }}><Stempel oordeel={totaalOordeel} /></div>
-          <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginTop: 10, lineHeight: 1.5 }}>
-            {totaal.sessies > 0
-              ? <>Van de <b style={{ color: '#fff' }}>{totaal.sessies}</b> klikkers {totaal.calls === 1 ? 'plande' : 'planden'} er <b style={{ color: '#fff' }}>{totaal.calls}</b> een call. Goed is {RICHT.totaal.goedTekst} (streepje).</>
-              : (laden ? 'Laden…' : 'Nog geen bezoekers in deze periode.')}
-          </div>
-        </div>
-
-        <div style={kaart}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <div style={kaartKop}><Activity size={14} strokeWidth={2.6} /> Per dag</div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {GRAFIEK_METRIEKEN.map(x => (
-                <button key={x.id} onClick={() => setMetriek(x.id)} style={{
-                  padding: '0.3rem 0.6rem', borderRadius: 8, fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-                  background: metriek === x.id ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none',
-                  color: metriek === x.id ? '#fff' : 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 5,
-                }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: x.kleur }} />{x.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8 }}>
-            <span style={{ fontSize: '1.9rem', fontWeight: 900, letterSpacing: '-0.04em' }}>{somVan(perDag, metriek)}</span>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{actieveMetriek.label.toLowerCase()} in deze periode</span>
-          </div>
-          <div style={{ height: m ? 170 : 210, marginTop: 6 }}>
-            <ResponsiveContainer>
-              <AreaChart data={perDag} margin={{ top: 8, right: 4, bottom: 0, left: -24 }}>
-                <defs>
-                  <linearGradient id="ads-hoofd" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={actieveMetriek.kleur} stopOpacity={0.3} />
-                    <stop offset="100%" stopColor={actieveMetriek.kleur} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="dag" tickFormatter={dagLabel} tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.6)', fontWeight: 800 }} axisLine={false} tickLine={false} minTickGap={24} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.6)', fontWeight: 800 }} axisLine={false} tickLine={false} width={40} />
-                <Tooltip content={<Grafiekkaartje />} cursor={{ stroke: 'rgba(255,255,255,0.2)' }} />
-                <Area type="monotone" dataKey={metriek} name={actieveMetriek.label} stroke={actieveMetriek.kleur} strokeWidth={2.4} fill="url(#ads-hoofd)" isAnimationActive={false}
-                  dot={perDag.length <= 14 ? { r: 3, fill: actieveMetriek.kleur, strokeWidth: 0 } : false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      {/* ═══ 1. RENDEMENT ═══ */}
+      <div style={{ display: 'grid', gridTemplateColumns: m ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: m ? '22px 18px' : 32, marginBottom: m ? 34 : 46 }}>
+        <Getal label="Uitgegeven" waarde={euro(spend)} sub={`${klikken} klikken · ${klikken ? euro(spend / klikken, true) : '–'} per klik`} onClick={() => setInfo('spend')} />
+        <Getal label="Kosten per lead" waarde={euro(cpl)} sub={`${leads.length} ${leads.length === 1 ? 'lead' : 'leads'}`} onClick={() => setInfo('cpl')} />
+        <Getal label="Omzet" waarde={euro(omzet)} kleur={omzet > 0 ? GROEN : '#fff'} sub={`${sales.length} ${sales.length === 1 ? 'sale' : 'sales'}`} onClick={() => setInfo('omzet')} />
+        <Getal label="ROAS" waarde={roas != null ? `${roas.toFixed(1).replace('.', ',')}x` : '–'}
+          kleur={roas == null ? '#fff' : roas >= 1 ? GROEN : ROOD}
+          sub={spend > 0 ? `${euro(omzet - spend)} na advertenties` : 'nog geen spend'} onClick={() => setInfo('roas')} />
       </div>
 
-      {/* ═══ RIJ 2: KPI's met sparkline en verschil ═══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: m ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: m ? 28 : 40, marginBottom: m ? 32 : 44 }}>
-        <KpiKaart icoon={MousePointerClick} label="Bezoekers" waarde={totaal.sessies} vorig={vorig.sessies} data={perDag} sleutel="sessies" kleur="#fff" sub="klikten op je advertentie" />
-        <KpiKaart icoon={ClipboardCheck} label="Formulier af" waarde={totaal.form_klaar} vorig={vorig.form_klaar} data={perDag} sleutel="form_klaar" kleur="#60a5fa" sub={`${totaal.form_start} begonnen eraan`} />
-        <KpiKaart icoon={UserCheck} label="Geschikt" waarde={totaal.geschikt} vorig={vorig.geschikt} data={perDag} sleutel="geschikt" kleur={ORANJE} sub="passen bij de challenge" />
-        <KpiKaart icoon={CalendarCheck} label="Calls gepland" waarde={totaal.calls} vorig={vorig.calls} data={perDag} sleutel="calls" kleur={GROEN} sub="in je agenda" />
-      </div>
-
-      {/* ═══ RIJ 3: trechter + verbeterpunten ═══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: twee, gap: m ? 28 : 40, marginBottom: m ? 32 : 44 }}>
-        <div style={kaart}>
-          <div style={kaartKop}><Filter size={14} strokeWidth={2.6} /> Waar haken mensen af?</div>
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {stappen.map(st => {
-              const breedte = totaal.sessies > 0 ? Math.max(2, (st.aantal / totaal.sessies) * 100) : 0
-              const kleur = st.basis != null ? st.oordeel.kleur : '#fff'
-              return (
-                <div key={st.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {createElement(st.icoon, { size: 14, strokeWidth: 2.6, color: 'rgba(255,255,255,0.6)' })}
-                    <span style={{ fontSize: '0.82rem', fontWeight: 900, flex: 1, minWidth: 0 }}>{st.label}</span>
-                    {st.basis != null && st.basis > 0 && (
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: kleur, whiteSpace: 'nowrap' }} title={`goed is ${st.goedTekst}`}>
-                        {st.basis >= 20 ? `${Math.round(st.deel * 100)}%` : `${st.aantal}/${st.basis}`} door
-                      </span>
-                    )}
-                    <span style={{ fontSize: '0.9rem', fontWeight: 900, minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{st.aantal}</span>
-                  </div>
-                  <div style={{ height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.05)', marginTop: 5, overflow: 'hidden' }}>
-                    <div style={{ width: `${breedte}%`, height: '100%', borderRadius: 6, background: kleur, opacity: st.basis != null ? 0.9 : 0.75, transition: 'width 0.5s ease' }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12, fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
-            {[OORDELEN.goed, OORDELEN.matig, OORDELEN.slecht, OORDELEN.weinig].map(o => <Stempel key={o.id} oordeel={o} klein />)}
-          </div>
-        </div>
-
-        <div style={kaart}>
-          <div style={kaartKop}><Lightbulb size={14} strokeWidth={2.6} color={ORANJE} /> Wat kun je verbeteren?</div>
-          {verbeterpunten.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
-              <Sparkles size={18} color={GROEN} /> {totaal.sessies >= MIN_BASIS ? 'Elke stap zit op of boven de richtwaarde.' : 'Nog te weinig bezoekers voor een advies.'}
-            </div>
-          ) : (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {verbeterpunten.map((st, i) => (
-                <div key={st.id} style={{ display: 'flex', gap: 12 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${st.oordeel.kleur}22` }}>
-                    {createElement(st.icoon, { size: 15, strokeWidth: 2.6, color: st.oordeel.kleur })}
-                  </span>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.86rem', fontWeight: 900 }}>{i + 1}. {st.tipKop}</div>
-                    <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginTop: 2 }}>
-                      Nu {zin(st)}, goed is {st.goedTekst}. {st.tip}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ═══ Afhaken per vraag + wie afhaakte na zijn nummer ═══ */}
-      <PrequalAfhaken venster={venster} m={m} />
-      <PrequalAfgewezen venster={venster} />
-
-      {/* ═══ RIJ 4: advertenties ═══ */}
-      <div style={{ ...kaart, marginBottom: m ? 28 : 40 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={kaartKop}><Megaphone size={14} strokeWidth={2.6} /> Welke advertentie werkt?</div>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{echteHooks.length} advertenties · oordeel vanaf {MIN_HOOK} bezoekers</span>
-        </div>
-        {!m && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 70px 70px 70px 64px', gap: 10, marginTop: 12, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            <span>Advertentie</span><span style={{ textAlign: 'right' }}>Tijd</span><span style={{ textAlign: 'right' }}>Formulier</span><span style={{ textAlign: 'right' }}>Geschikt</span><span style={{ textAlign: 'right' }}>Calls</span>
-          </div>
-        )}
-        {!laden && hooks.length === 0 && (
-          <div style={{ padding: '1rem 0', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Nog geen bezoeken in deze periode.</div>
-        )}
-        {hooks.map((h, i) => {
-          const o = hookOordeel(h)
+      {/* ═══ 2. TRECHTER ═══ */}
+      <div style={{ marginBottom: m ? 34 : 46 }}>
+        <div style={kop}>Van klik tot sale</div>
+        {stappen.map((st, i) => {
+          const breedte = T.sessies > 0 ? Math.max(1.5, (st.aantal / T.sessies) * 100) : 0
           return (
-            <div key={h.naam} style={{
-              display: 'grid', gridTemplateColumns: m ? 'minmax(0, 1fr) 48px 48px' : 'minmax(0, 1fr) 70px 70px 70px 64px',
-              gap: 10, alignItems: 'center', padding: '0.7rem 0',
-              borderBottom: i < hooks.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', opacity: h.onbekend ? 0.5 : 1,
+            <button key={st.id} onClick={() => setInfo(st.id)} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0.8rem 0',
+              background: 'none', border: 'none', borderBottom: i < stappen.length - 1 ? LIJN : 'none',
+              color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
             }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: o.kleur, flexShrink: 0 }} title={o.tekst} />
-                  <span style={{ fontSize: '0.88rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.naam}</span>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 900, color: o.kleur, whiteSpace: 'nowrap' }}>{o.tekst}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, marginLeft: 16 }}>
-                  <div style={{ flex: 1, maxWidth: 260, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-                    <div style={{ width: `${(h.sessies / maxHook) * 100}%`, height: '100%', background: 'rgba(255,255,255,0.45)', borderRadius: 4 }} />
-                  </div>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>{h.sessies} bezoekers</span>
-                </div>
-              </div>
-              {!m && <span style={{ textAlign: 'right', fontSize: '0.82rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{fmtTijd(h.tijd)}</span>}
-              <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900 }}>{h.form_klaar}</span>
-              {!m && <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900 }}>{h.geschikt}</span>}
-              <span style={{ textAlign: 'right', fontSize: '1rem', fontWeight: 900, color: h.calls > 0 ? GROEN : 'rgba(255,255,255,0.5)' }}>{h.calls}</span>
-            </div>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {createElement(st.icoon, { size: 16, strokeWidth: 2.5, color: st.id === 'sale' && st.aantal > 0 ? GROEN : '#fff' })}
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.95rem', fontWeight: 900 }}>{st.label}</span>
+                  {st.basis != null && <span style={{ fontSize: '0.8rem', fontWeight: 800, color: ZWAK, whiteSpace: 'nowrap' }}>{pct(st.aantal, st.basis)}</span>}
+                  <span style={{ fontSize: '1.1rem', fontWeight: 900, minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{st.aantal}</span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 5 }}>
+                  <span style={{ flex: 1, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <span style={{ display: 'block', width: `${breedte}%`, height: '100%', borderRadius: 4, background: st.id === 'sale' ? GROEN : 'rgba(255,255,255,0.75)' }} />
+                  </span>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, whiteSpace: 'nowrap' }}>{st.sub}</span>
+                </span>
+              </span>
+              <ChevronRight size={17} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
+            </button>
           )
         })}
+        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 8 }}>
+          Percentage = van de stap waar het uit komt. Tik op een stap voor de details.
+        </div>
       </div>
 
-      {/* ═══ ONDERAAN: details en link, dicht ═══ */}
-      <Sectie id="tabel" icoon={Table2} titel="Alle cijfers per regel" open={open.includes('tabel')} onWissel={wissel}
-        samenvatting={`${rijen.length} regels`}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: m ? '0.76rem' : '0.82rem', minWidth: 760 }}>
-            <thead>
-              <tr>
-                {kolommen.map(c => (
-                  <th key={c.k} style={{ textAlign: c.links ? 'left' : 'right', padding: '0.5rem 0.6rem', fontSize: '0.64rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', borderBottom: '1px solid rgba(255,255,255,0.08)', whiteSpace: 'nowrap' }}>{c.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rijen.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  {kolommen.map(c => {
-                    const ruw = c.f ? c.f(r[c.k], r) : r[c.k]
-                    return (
-                      <td key={c.k} style={{ textAlign: c.links ? 'left' : 'right', padding: '0.5rem 0.6rem', fontWeight: c.links ? 800 : 700, color: c.links ? '#fff' : 'rgba(255,255,255,0.8)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', maxWidth: c.links ? 220 : undefined, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {ruw ?? '–'}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* ═══ 3. PER ADVERTENTIE ═══ */}
+      <div style={{ marginBottom: m ? 28 : 40 }}>
+        <div style={{ ...kop, display: 'flex', alignItems: 'center', gap: 6 }}><Megaphone size={14} strokeWidth={2.6} /> Per advertentie</div>
+        <div style={{ display: 'grid', gridTemplateColumns: m ? 'minmax(0, 1fr) 58px 44px 50px' : 'minmax(0, 1fr) 80px 80px 70px 80px 60px 60px 90px', gap: 8, paddingBottom: 6, borderBottom: LIJN, fontSize: '0.7rem', fontWeight: 800, color: ZWAK }}>
+          <span>Advertentie</span>
+          <span style={{ textAlign: 'right' }}>Spend</span>
+          {!m && <span style={{ textAlign: 'right' }}>Bezoekers</span>}
+          <span style={{ textAlign: 'right' }}>Leads</span>
+          {!m && <span style={{ textAlign: 'right' }}>Per lead</span>}
+          {!m && <span style={{ textAlign: 'right' }}>Calls</span>}
+          {!m && <span style={{ textAlign: 'right' }}>Sales</span>}
+          <span style={{ textAlign: 'right' }}>{m ? 'Calls' : 'Omzet'}</span>
         </div>
-      </Sectie>
-
-      <Sectie id="link" icoon={Link2} titel="Link voor in de advertentie" open={open.includes('link')} onWissel={wissel} samenvatting="kopiëren">
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <code style={{ flex: 1, fontSize: '0.74rem', color: 'rgba(255,255,255,0.8)', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{LINK_VOORBEELD}</code>
-          <button onClick={kopieer} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.7rem', borderRadius: 10, background: gekopieerd ? 'rgba(16,185,129,0.15)' : '#fff', color: gekopieerd ? GROEN : '#000', border: 'none', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-            {gekopieerd ? <Check size={14} /> : <Copy size={14} />} {gekopieerd ? 'Gekopieerd' : 'Kopieer'}
+        {!laden && advertenties.length === 0 && <Leeg>Nog geen advertentieverkeer in deze periode.</Leeg>}
+        {advertenties.map(a => (
+          <button key={a.sleutel} onClick={() => setAdvertentie(a.sleutel)} style={{
+            width: '100%', display: 'grid', gridTemplateColumns: m ? 'minmax(0, 1fr) 58px 44px 50px' : 'minmax(0, 1fr) 80px 80px 70px 80px 60px 60px 90px',
+            gap: 8, alignItems: 'center', padding: '0.7rem 0', background: 'none', border: 'none', borderBottom: LIJN,
+            color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', opacity: a.onbekend ? 0.55 : 1,
+            fontVariantNumeric: 'tabular-nums', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.naam}</span>
+              {m && <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, marginTop: 1 }}>{a.t.sessies} bezoekers{a.leads.length ? ` · ${euro(a.spend / a.leads.length)} per lead` : ''}</span>}
+            </span>
+            <span style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }}>{a.spend ? euro(a.spend) : '–'}</span>
+            {!m && <span style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }}>{a.t.sessies}</span>}
+            <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900 }}>{a.leads.length}</span>
+            {!m && <span style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }}>{a.leads.length && a.spend ? euro(a.spend / a.leads.length) : '–'}</span>}
+            {!m && <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900 }}>{a.calls}</span>}
+            {!m && <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900, color: a.sales ? GROEN : '#fff' }}>{a.sales}</span>}
+            <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900, color: (m ? a.calls : a.omzet) > 0 ? GROEN : '#fff' }}>{m ? a.calls : (a.omzet ? euro(a.omzet) : '–')}</span>
           </button>
-        </div>
-        <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginTop: 6, lineHeight: 1.45 }}>
-          Meta vult {'{{campaign.name}}'} en {'{{ad.name}}'} zelf in. Geef elke hook een eigen advertentienaam, dan staat hij hier als aparte regel.
-        </div>
-      </Sectie>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        ))}
+      </div>
+
+      {/* ═══ Link voor in de advertentie, dicht ═══ */}
+      <div style={{ borderTop: LIJN }}>
+        <button onClick={() => setLinkOpen(o => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.9rem 0', background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+          <Link2 size={16} strokeWidth={2.5} />
+          <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900 }}>Link voor in de advertentie</span>
+          <ChevronDown size={17} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ transform: linkOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </button>
+        {linkOpen && (
+          <div style={{ paddingBottom: '1rem' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <code style={{ flex: 1, fontSize: '0.76rem', color: 'rgba(255,255,255,0.85)', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{LINK_VOORBEELD}</code>
+              <button onClick={kopieer} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.7rem', borderRadius: 10, background: gekopieerd ? 'rgba(16,185,129,0.15)' : '#fff', color: gekopieerd ? GROEN : '#000', border: 'none', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {gekopieerd ? <Check size={14} /> : <Copy size={14} />} {gekopieerd ? 'Gekopieerd' : 'Kopieer'}
+              </button>
+            </div>
+            <div style={{ fontSize: '0.76rem', fontWeight: 700, color: ZWAK, marginTop: 6, lineHeight: 1.45 }}>
+              Meta vult {'{{campaign.name}}'} en {'{{ad.name}}'} zelf in. Zo komen bezoekers en spend bij dezelfde advertentie uit.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {open && (
+        <Venster titel={open.titel} sub={open.sub} m={m} onClose={() => setInfo(null)}>{open.inhoud}</Venster>
+      )}
+
+      {ad && (
+        <Venster titel={ad.naam} sub={`${euro(ad.spend, true)} uitgegeven · ${ad.klikken} klikken`} m={m} onClose={() => setAdvertentie(null)}>
+          <Balk label="Op de pagina" aantal={ad.t.sessies} basis={ad.t.sessies} tekst={`gem. ${fmtTijd(ad.t.tijd)}`} />
+          <Balk label="Video gestart" aantal={ad.t.video_start} basis={ad.t.sessies} />
+          <Balk label="Video helemaal gezien" aantal={ad.t.video_100} basis={ad.t.video_start} />
+          <Balk label="Formulier begonnen" aantal={ad.t.form_start} basis={ad.t.sessies} />
+          <Balk label="Gegevens achtergelaten" aantal={ad.leads.length} basis={ad.t.form_start} kleur="#60a5fa" />
+          <Balk label="Call gepland" aantal={ad.calls} basis={ad.leads.length} kleur="#60a5fa" />
+          <Balk label="Sale" aantal={ad.sales} basis={ad.calls} kleur={GROEN} />
+          <div style={{ height: 6 }} />
+          <Regel label="Kosten per klik" waarde={ad.klikken ? euro(ad.spend / ad.klikken, true) : '–'} />
+          <Regel label="Kosten per lead" waarde={ad.leads.length ? euro(ad.spend / ad.leads.length, true) : '–'} sterk />
+          <Regel label="Omzet" waarde={euro(ad.omzet)} />
+          <Regel label="ROAS" waarde={ad.spend ? `${(ad.omzet / ad.spend).toFixed(1).replace('.', ',')}x` : '–'} />
+          <div style={{ ...kop, marginTop: 18 }}>Leads</div>
+          {ad.leads.length ? ad.leads.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog geen leads uit deze advertentie.</Leeg>}
+        </Venster>
+      )}
+
+      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
     </div>
   )
 }
