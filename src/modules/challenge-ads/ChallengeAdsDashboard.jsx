@@ -784,7 +784,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
               {openFase === f.id && <div style={{
                 // Ruimte rondom: de scrollrij knipt anders de gloed en het
                 // schudden van de zwakste meting af.
-                display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8, marginTop: 2,
+                display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8,
                 overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
                 padding: '14px 16px 8px 8px', margin: m ? '2px -16px 0 -8px' : '2px 0 0 -8px',
               }}>
