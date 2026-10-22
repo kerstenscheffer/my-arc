@@ -243,6 +243,59 @@ function Grafiek({ data, sleutel, kleur = '#fff', label, euroAs }) {
   )
 }
 
+// Eigen keuzemenu in de stijl van de app (de systeemlijst van de browser
+// paste er niet bij). opties: { waarde, label, kop?, in? } — kop = groepskop,
+// in = ingesprongen onder een kop.
+function Keuzemenu({ weergave, waarde, opties, onKies, label, stijl, rechts = false, breedte = 260 }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const weg = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', weg)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('pointerdown', weg); document.removeEventListener('keydown', esc) }
+  }, [open])
+  return (
+    <span ref={ref} style={{ position: 'relative', display: 'flex', height: '100%', minWidth: 0, ...stijl }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-label={label} aria-expanded={open} style={{
+        height: '100%', width: '100%', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '0 0.7rem',
+        background: open ? 'rgba(255,255,255,0.06)' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer',
+        fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', textAlign: 'left',
+      }}>
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{weergave}</span>
+        <ChevronDown size={14} strokeWidth={2.6} color="rgba(255,255,255,0.55)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+      {open && (
+        <div role="listbox" style={{
+          position: 'absolute', top: 'calc(100% + 6px)', [rechts ? 'right' : 'left']: 0, zIndex: 50,
+          minWidth: '100%', width: breedte, maxWidth: 'calc(100vw - 32px)', maxHeight: 380, overflowY: 'auto',
+          background: '#0b0b0b', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, padding: 5,
+          boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+        }}>
+          {opties.map((o, i) => o.kop ? (
+            <div key={`k${i}`} style={{ padding: '0.55rem 0.6rem 0.25rem', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderTop: i ? '1px solid rgba(255,255,255,0.07)' : 'none', marginTop: i ? 4 : 0 }}>{o.kop}</div>
+          ) : (
+            <button key={o.waarde} type="button" role="option" aria-selected={o.waarde === waarde}
+              onClick={() => { setOpen(false); onKies(o.waarde) }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: `0.5rem 0.6rem 0.5rem ${o.in ? '1.2rem' : '0.6rem'}`,
+                background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                color: '#fff', fontSize: '0.82rem', fontWeight: o.waarde === waarde ? 900 : 700, fontFamily: 'inherit',
+              }}>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
+              {o.waarde === waarde && <Check size={14} strokeWidth={3} color={GROEN} style={{ flexShrink: 0 }} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  )
+}
+
 // Venster: op mobiel een blad van onderen, op desktop gecentreerd.
 function Venster({ titel, sub, m, onClose, children, breed = false }) {
   useEffect(() => {
@@ -849,38 +902,44 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         {/* Keuzes als één balk met scheidingslijnen, rechts van de cijfers. */}
         <div style={{
           display: 'flex', alignItems: 'center', flexShrink: m ? 1 : 0, width: m ? '100%' : 'auto', minWidth: 0,
-          height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', overflow: 'hidden',
+          height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', position: 'relative', zIndex: 20,
         }}>
-          <select value={keuzeWaarde} onChange={e => kiesFilter(e.target.value)} aria-label="Campagne of advertentie"
-            style={{ ...seg, flex: m ? '1 1 0' : '0 1 280px', maxWidth: m ? 'none' : 280, color: campagne ? '#fff' : 'rgba(255,255,255,0.85)' }}>
-            <option value="">Alle campagnes</option>
-            {campagnes.map(c => (
-              <optgroup key={c.k} label={c.naam}>
-                <option value={JSON.stringify([c.k])}>{c.naam} · hele campagne</option>
-                {advVan(c.k).map(a => <option key={a.k} value={JSON.stringify([c.k, a.k])}>{a.naam}</option>)}
-              </optgroup>
-            ))}
-            {campagne && !campagnes.some(c => c.k === campagne) && <option value={keuzeWaarde}>Gekozen campagne (geen data in deze periode)</option>}
-          </select>
+          <Keuzemenu label="Campagne of advertentie" waarde={keuzeWaarde} onKies={kiesFilter} breedte={320}
+            stijl={{ flex: m ? '1 1 0' : '0 1 280px', maxWidth: m ? 'none' : 280 }}
+            weergave={(() => {
+              if (!campagne) return 'Alle campagnes'
+              const c = campagnes.find(x => x.k === campagne)
+              const a = advFilter ? advVan(campagne).find(x => x.k === advFilter) : null
+              return a ? `${c?.naam || 'Campagne'} · ${a.naam}` : (c?.naam || 'Gekozen campagne')
+            })()}
+            opties={[
+              { waarde: '', label: 'Alle campagnes' },
+              ...campagnes.flatMap(c => [
+                { kop: c.naam },
+                { waarde: JSON.stringify([c.k]), label: 'Hele campagne', in: true },
+                ...advVan(c.k).map(a => ({ waarde: JSON.stringify([c.k, a.k]), label: a.naam, in: true })),
+              ]),
+            ]} />
           <span style={scheiding} />
           {/* Periode en 'vanaf' in één: kies je een datum, dan opent de
               datumkiezer en staat er daarna "Vanaf 10 okt". */}
           <span style={{ position: 'relative', display: 'flex', height: '100%', flex: m ? '1 1 0' : '0 0 auto' }}>
-            <select value={periode === 'vanaf' && vanafDatum ? 'vanaf' : (periode === 'vanaf' ? '14' : periode)}
-              onChange={e => {
-                const v = e.target.value
+            <Keuzemenu label="Periode" rechts breedte={190} stijl={{ width: '100%' }}
+              waarde={periode === 'vanaf' && vanafDatum ? 'vanaf' : periode}
+              weergave={periode === 'vanaf' && vanafDatum ? `Vanaf ${dagLabel(vanafDatum)}` : (PERIODES.find(p => p.id === periode)?.label || 'Periode')}
+              onKies={(v) => {
                 if (v === 'vanaf' || v === 'vanaf_kies') {
                   try { datumRef.current?.showPicker?.() } catch { datumRef.current?.focus?.() }
                   return
                 }
                 setPeriode(v)
               }}
-              style={{ ...seg, width: '100%' }} aria-label="Periode">
-              {PERIODES.filter(p => p.id !== 'vanaf').map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-              {periode === 'vanaf' && vanafDatum
-                ? <><option value="vanaf">Vanaf {dagLabel(vanafDatum)}</option><option value="vanaf_kies">Andere datum…</option></>
-                : <option value="vanaf_kies">Vanaf datum…</option>}
-            </select>
+              opties={[
+                ...PERIODES.filter(p => p.id !== 'vanaf').map(p => ({ waarde: p.id, label: p.label })),
+                ...(periode === 'vanaf' && vanafDatum
+                  ? [{ waarde: 'vanaf', label: `Vanaf ${dagLabel(vanafDatum)}` }, { waarde: 'vanaf_kies', label: 'Andere datum…' }]
+                  : [{ waarde: 'vanaf_kies', label: 'Vanaf datum…' }]),
+              ]} />
             <input ref={datumRef} type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')} tabIndex={-1} aria-hidden="true"
               onChange={e => { kiesVanaf(e.target.value); if (e.target.value) setPeriode('vanaf') }}
               style={{ position: 'absolute', left: 0, bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none', border: 0, padding: 0 }} />
