@@ -25,10 +25,11 @@
 // vastloopt. De lead-fases tellen met dezelfde woorden als de statistiekbalk
 // van het leadsysteem, maar alleen voor leads uit de advertenties.
 
-import { useEffect, useState } from 'react'
+import { createElement, useEffect, useState } from 'react'
 import {
   RefreshCw, Copy, Check, ChevronDown, ChevronRight, X, Link2,
-  Megaphone, Info,
+  Megaphone, Info, Percent, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
+  PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PrequalAfhaken from './PrequalAfhaken'
@@ -78,6 +79,15 @@ const beoordeel = (waarde, basis, r) => {
   if (r.laag) return waarde <= r.goed ? OORDEEL.goed : waarde <= r.matig ? OORDEEL.matig : OORDEEL.slecht
   return waarde >= r.goed ? OORDEEL.goed : waarde >= r.matig ? OORDEEL.matig : OORDEEL.slecht
 }
+// Icoon per meting in de fases.
+const ICONEN = {
+  'Klikratio (CTR)': Percent, 'Kosten per klik': Euro,
+  Bezoekers: Users, 'Video gestart': Play, 'Op de knop geklikt': MousePointerClick, 'Formulier gestart': PenLine, 'Leads binnen': UserCheck,
+  'Bericht gestuurd': Send, 'In gesprek': MessageCircle,
+  'Call voorgesteld': PhoneOutgoing, 'Call ingepland': CalendarCheck, 'Call gehad': PhoneCall,
+  Sale: Trophy, 'Gem. orderwaarde': Wallet,
+}
+
 const procent = (x, dec = 0) => `${(x * 100).toFixed(dec).replace('.', ',')}%`
 
 const LINK_VOORBEELD = 'https://www.myarcfitness.com/challenge?utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}'
@@ -755,20 +765,39 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                 </span>
                 <ChevronDown size={17} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, transform: openFase === f.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </button>
-              {openFase === f.id && <div style={{ marginTop: 6, marginLeft: 36 }}>
-                {f.metingen.map(x => (
-                  <button key={x.label} onClick={() => setInfo(x.venster)} style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0', background: 'none', border: 'none',
-                    color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-                  }}>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 800 }}>{x.label}</span>
-                      {x.sub && <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.sub}</span>}
-                    </span>
-                    <span style={{ fontSize: '0.95rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff' }}>{x.tekst}</span>
-                    <ChevronRight size={15} strokeWidth={2.6} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
-                  </button>
-                ))}
+              {/* Open: de metingen naast elkaar als een flow (op de telefoon
+                  horizontaal te vegen). Getal groot, percentage in de kleur
+                  van het oordeel. */}
+              {openFase === f.id && <div style={{
+                display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8, marginTop: 14,
+                overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
+                paddingBottom: 6, marginRight: m ? -16 : 0, paddingRight: m ? 16 : 0,
+              }}>
+                {f.metingen.map((x, j) => {
+                  const [groot, klein] = String(x.tekst).split(' · ')
+                  const kleur = x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff'
+                  const icoon = ICONEN[x.label] || Info
+                  return (
+                    <div key={x.label} style={{ display: 'flex', alignItems: 'flex-start', gap: m ? 6 : 8, flex: m ? '0 0 auto' : '1 1 0', minWidth: 0, scrollSnapAlign: 'start' }}>
+                      {j > 0 && <ChevronRight size={16} strokeWidth={2.6} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, marginTop: 12 }} />}
+                      <button onClick={() => setInfo(x.venster)} style={{
+                        flex: 1, minWidth: m ? 118 : 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
+                        padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+                        cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+                      }}>
+                        <span style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: kleur === '#fff' ? 'rgba(255,255,255,0.08)' : `${kleur}22` }}>
+                          {createElement(icoon, { size: 19, strokeWidth: 2.4, color: kleur })}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: m ? '1.45rem' : '1.6rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: klein ? '#fff' : kleur }}>{groot}</span>
+                          {klein && <span style={{ fontSize: '0.8rem', fontWeight: 900, color: kleur }}>{klein}</span>}
+                        </span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 900, lineHeight: 1.2 }}>{x.label}</span>
+                        {x.sub && <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ZWAK, lineHeight: 1.35 }}>{x.sub}</span>}
+                      </button>
+                    </div>
+                  )
+                })}
               </div>}
             </div>
           )
