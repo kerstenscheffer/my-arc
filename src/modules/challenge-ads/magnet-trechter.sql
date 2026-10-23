@@ -110,8 +110,36 @@ as $function$
       coalesce(call_happened = false and coalesce(call_uitkomst, '') <> 'cancelled'
         and not (gehouden_los or coalesce(omzet, 0) > 0 or verloren), false) noshow
     from l0
+  ),
+  -- Calls en sales IN de periode, van alle magnet-leads (ook van vóór de
+  -- periode): een sale komt vaak weken na de comment. Net als de stats-balk.
+  mleads as (
+    select cl.id, magnet_woord(cl.lead_magnets_shared[1]) woord, cl.first_reply_at
+    from call_leads cl where cl.deleted_at is null and cardinality(cl.lead_magnets_shared) > 0
+  ),
+  ev as (
+    select m.lead_id,
+      bool_or(m.moved_at >= p_van and m.moved_at < p_tot and lower(m.to_section_title) ~ '(voorgesteld|voorstel)') voorgesteld,
+      bool_or(m.moved_at >= p_van and m.moved_at < p_tot and (m.call_date is not null or lower(m.to_section_title) ~ '(sales call|ingepland|scheduled|booking|afspraak|meeting)')) ingepland,
+      bool_or(coalesce(m.call_happened, false) and coalesce(m.call_date::timestamptz, m.moved_at) >= p_van and coalesce(m.call_date::timestamptz, m.moved_at) < p_tot) gehouden,
+      bool_or(m.call_happened = false and coalesce(m.outcome_type, '') <> 'cancelled' and m.call_date::timestamptz >= p_van and m.call_date::timestamptz < p_tot) noshow,
+      max(m.order_value) filter (where m.moved_at >= p_van and m.moved_at < p_tot and _meta_is_sale_titel(m.to_section_title) and coalesce(m.order_value, 0) > 0) omzet
+    from lead_movements m join mleads ml on ml.id = m.lead_id
+    where m.reverted_at is null and (m.moved_at >= p_van - interval '60 days')
+    group by 1
+  ),
+  st as (
+    select ml.id, ml.woord,
+      coalesce(ml.first_reply_at >= p_van and ml.first_reply_at < p_tot, false)
+        or exists (select 1 from lead_reaction_events r where r.lead_id = ml.id and r.delta > 0 and r.created_at >= p_van and r.created_at < p_tot) reactie,
+      coalesce(ev.voorgesteld, false) voorgesteld, coalesce(ev.ingepland, false) call,
+      coalesce(ev.gehouden, false) or ev.omzet is not null gehouden,
+      coalesce(ev.noshow, false) and not (coalesce(ev.gehouden, false) or ev.omzet is not null) noshow,
+      ev.omzet
+    from mleads ml left join ev on ev.lead_id = ml.id
   )
   select jsonb_build_object(
+    'stappen', coalesce((select jsonb_agg(to_jsonb(x)) from st x where x.reactie or x.voorgesteld or x.call or x.gehouden or x.noshow or x.omzet is not null), '[]'::jsonb),
     'reels', coalesce((select jsonb_agg(to_jsonb(r) order by r.views desc nulls last) from reels r), '[]'::jsonb),
     'leads', coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from l x), '[]'::jsonb),
     'vanaf', (select v from start),

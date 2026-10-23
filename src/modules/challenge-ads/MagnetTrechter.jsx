@@ -12,7 +12,7 @@
 
 import { useState } from 'react'
 import {
-  Film, Eye, MessageSquare, UserPlus, Send, MessageCircle, PhoneOutgoing, CalendarCheck, PhoneCall, Trophy,
+  Film, Eye, MessageSquare, UserPlus, Send, MessageCircle, MessagesSquare, PhoneOutgoing, CalendarCheck, PhoneCall, Trophy,
 } from 'lucide-react'
 import FaseTrechter from './FaseTrechter'
 import { GROEN, ZWAK, beoordeel, vatFaseSamen } from './fases'
@@ -37,7 +37,7 @@ const RICHT = {
 
 const ICONEN = {
   'Magnet-reels': Film, 'Views per reel': Eye, Commenters: MessageSquare, 'Op het bord': UserPlus,
-  'Follow-up gestuurd': Send, Reactie: MessageCircle, 'Call voorgesteld': PhoneOutgoing,
+  'Follow-up gestuurd': Send, Reactie: MessageCircle, 'Reacties in periode': MessagesSquare, 'Call voorgesteld': PhoneOutgoing,
   'Call ingepland': CalendarCheck, 'Call gehad': PhoneCall, Sale: Trophy,
 }
 
@@ -46,8 +46,13 @@ const pct = (deel, basis) => (basis > 0 ? `${Math.round((deel / basis) * 100)}%`
 const perDuizend = (deel, basis) => (basis > 0 ? `${((deel / basis) * 1000).toFixed(1).replace('.', ',')}‰` : '–')
 const euro = (n) => '€' + Math.round(Number(n) || 0).toLocaleString('nl-NL')
 
-// Alle tellingen voor één set reels + leads (totaal of één woord).
-function tel(reels, leads) {
+// Alle tellingen voor één set (totaal of één woord). Twee soorten:
+//  - reels, comments, nieuwe leads en hun reactie: wat er in de periode
+//    binnenkwam (leads = nieuw op het bord in de periode);
+//  - stappen (calls, sales): wat er in de periode GEBEURDE bij alle
+//    magnet-leads, ook leads van eerder. Een sale komt vaak weken na de
+//    comment; per instroom tellen liet zo bijna alle calls en sales weg.
+function tel(reels, leads, stappen) {
   const r = reels.reduce((t, x) => ({
     reels: t.reels + (Number(x.reels) || 0),
     views: t.views + (Number(x.views) || 0),
@@ -55,16 +60,17 @@ function tel(reels, leads) {
   }), { reels: 0, views: 0, comments: 0 })
   // Elke comment krijgt één antwoord van Kersten: de helft zijn commenters.
   r.commenters = Math.round(r.comments / 2)
-  const sales = leads.filter(l => Number(l.omzet) > 0)
-  const gehouden = leads.filter(l => l.gehouden)
-  const noshows = leads.filter(l => l.noshow)
+  const sales = stappen.filter(l => Number(l.omzet) > 0)
+  const gehouden = stappen.filter(l => l.gehouden)
+  const noshows = stappen.filter(l => l.noshow)
   return {
     ...r,
     leads: leads.length,
     opgevolgd: leads.filter(l => l.bericht).length,
     reactie: leads.filter(l => l.contact).length,
-    voorgesteld: leads.filter(l => l.voorgesteld).length,
-    calls: leads.filter(l => l.call).length,
+    reactiesPeriode: stappen.filter(l => l.reactie).length,
+    voorgesteld: stappen.filter(l => l.voorgesteld).length,
+    calls: stappen.filter(l => l.call).length,
     gehouden: gehouden.length,
     afgerond: gehouden.length + noshows.length,
     noshows: noshows.length,
@@ -99,16 +105,17 @@ function maakFases(t) {
         M('Op het bord', t.leads, t.commenters, RICHT.bord, `${t.leads} · ${pct(t.leads, t.commenters)}`, 'nieuwe leads van de commenters · wie al op het bord stond en opnieuw commentet telt niet mee'),
       ] },
     { id: 'gesprek', naam: 'Gesprek', vraag: 'Reageren ze op het automatische bericht?',
-      preview: [['Reactie', pct(t.reactie, t.leads), 'Reactie'], ['Reageerden', String(t.reactie)], ['Voorgesteld', String(t.voorgesteld), 'Call voorgesteld']],
+      preview: [['Reactie', pct(t.reactie, t.leads), 'Reactie'], ['Reacties', String(t.reactiesPeriode), 'Reacties in periode'], ['Voorgesteld', String(t.voorgesteld), 'Call voorgesteld']],
       metingen: [
-        M('Reactie', t.reactie, t.leads, RICHT.reactie, `${t.reactie} · ${pct(t.reactie, t.leads)}`, 'van de leads reageerde (+1 reactie op het bord) · goed vanaf 18%'),
-        M('Call voorgesteld', t.voorgesteld, t.reactie, RICHT.voorgesteld, `${t.voorgesteld} · ${pct(t.voorgesteld, t.reactie)}`, 'van wie reageerde'),
+        M('Reactie', t.reactie, t.leads, RICHT.reactie, `${t.reactie} · ${pct(t.reactie, t.leads)}`, 'van de nieuwe leads reageerde op het automatische bericht (+1 reactie) · goed vanaf 18%'),
+        M('Reacties in periode', null, null, null, String(t.reactiesPeriode), 'alle magnet-leads die in deze periode reageerden, ook van eerder'),
+        M('Call voorgesteld', null, null, null, String(t.voorgesteld), 'in deze periode, alle magnet-leads'),
         M('Follow-up gestuurd', null, null, null, `${t.opgevolgd} · ${pct(t.opgevolgd, t.leads)}`, 'extra bericht gelogd, naast het automatische'),
       ] },
     { id: 'close', naam: 'Call & close', vraag: 'Calls geboekt, gehouden en geclosed?',
       preview: [['Ingepland', String(t.calls), 'Call ingepland'], ['Gehad', String(t.gehouden), 'Call gehad'], ['Sales', String(t.sales), 'Sale']],
       metingen: [
-        M('Call ingepland', t.calls, t.voorgesteld, RICHT.ingepland, `${t.calls} · ${pct(t.calls, t.voorgesteld)}`, 'van de voorstellen'),
+        M('Call ingepland', t.calls, t.voorgesteld, RICHT.ingepland, `${t.calls} · ${pct(t.calls, t.voorgesteld)}`, 'in deze periode · t.o.v. de voorstellen'),
         M('Call gehad', t.gehouden, t.afgerond, RICHT.show, `${t.gehouden} · ${pct(t.gehouden, t.afgerond)}`, `kwam opdagen · ${t.noshows} no-show`),
         M('Sale', t.sales, t.gehouden, RICHT.close, `${t.sales} · ${pct(t.sales, t.gehouden)}`, `van de calls · ${euro(t.omzet)} omzet`),
       ] },
@@ -121,15 +128,16 @@ export default function MagnetTrechter({ data, m, laden }) {
   const reels = data?.reels || []
   const vanaf = data?.vanaf ? new Date(data.vanaf).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }) : null
   const leads = data?.leads || []
+  const stappen = data?.stappen || []
 
-  const woorden = [...new Set([...reels.map(r => r.woord), ...leads.map(l => l.woord)].filter(Boolean))]
-  const perWoord = woorden.map(w => ({ woord: w, t: tel(reels.filter(r => r.woord === w), leads.filter(l => l.woord === w)) }))
+  const woorden = [...new Set([...reels.map(r => r.woord), ...leads.map(l => l.woord), ...stappen.map(l => l.woord)].filter(Boolean))]
+  const perWoord = woorden.map(w => ({ woord: w, t: tel(reels.filter(r => r.woord === w), leads.filter(l => l.woord === w), stappen.filter(l => l.woord === w)) }))
     .sort((a, b) => (b.t.views - a.t.views) || (b.t.leads - a.t.leads))
 
   const gekozen = woord && woorden.includes(woord) ? woord : ''
   const t = gekozen
     ? perWoord.find(x => x.woord === gekozen).t
-    : tel(reels, leads)
+    : tel(reels, leads, stappen)
   const fases = maakFases(t)
 
   const kol = m ? 'minmax(0, 1fr) 54px 50px 44px 44px' : 'minmax(0, 1fr) 60px 90px 80px 70px 70px 70px 60px 60px'
@@ -138,7 +146,7 @@ export default function MagnetTrechter({ data, m, laden }) {
   return (
     <div style={{ opacity: laden ? 0.5 : 1, transition: 'opacity 0.15s' }}>
       <FaseTrechter fases={fases} m={m} iconen={ICONEN} uitleg={<>
-        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen.
+        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. Calls en sales: wat er in deze periode gebeurde, ook bij magnet-leads van eerder.
       </>} />
 
       {/* Per woord: welke magnet het goed doet. Tik = trechter van dat woord. */}
