@@ -12,13 +12,14 @@
 // komt niet tussen de challenge-cijfers. Zelfde gebeurtenissen: bezoek, tijd,
 // video_*, knop, form_start, form_vraag/form_stap per vraag, form_klaar, en
 // eigen: pdf_download.
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, Download, Loader2, Play, Volume2, VolumeX, Pause, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, ArrowRight, Check, Download, Loader2, Play, Volume2, VolumeX, Pause, X, RefreshCw, Undo2 } from 'lucide-react'
 import db from '../services/DatabaseService'
 import { herkomst, meet, volgTijdOpPagina } from './challengeTracking'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 import { SPLITS, DAG_NAAM, WEEK, DOELEN, NIVEAUS, LOCATIES, tips } from './mijn-split/splitRegels'
 import { downloadSplitPdf, fotoVoor, duur, totaalSets } from './mijn-split/splitPdf'
+import { BEPERKINGEN, beperkingenVoor, pasBeperkingenToe, suggestiesVoor } from './mijn-split/oefeningWissel'
 
 // YouTube-id van de uitlegvideo. Leeg = stilstaand beeld zonder afspeelknop.
 const VIDEO_ID = ''
@@ -34,7 +35,7 @@ const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 
 
 const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim())
 
-const STAPPEN = ['dagen', 'locatie', 'doel', 'niveau', 'gegevens']
+const STAPPEN = ['dagen', 'locatie', 'doel', 'niveau', 'beperkingen', 'gegevens']
 const TOTAAL = STAPPEN.length
 const DAGEN_KEUZE = [
   { key: 2, label: '2 dagen' },
@@ -48,6 +49,7 @@ const VRAGEN = {
   locatie: { titel: 'Waar train je?', lijst: LOCATIES },
   doel: { titel: 'Wat is je doel?', lijst: DOELEN },
   niveau: { titel: 'Hoe lang train je al?', lijst: NIVEAUS },
+  beperkingen: { titel: 'Is er iets wat je niet kunt of wilt?' },
   gegevens: { titel: 'Waar mag je split heen?' },
 }
 
@@ -59,7 +61,7 @@ const VOORBEELDEN = [
 ]
 // Drie stappen onder de bovenste knop, zelfde vorm als op /challenge.
 const STAPPEN_UITLEG = [
-  { kop: 'Vragen', sub: '4 korte vragen' },
+  { kop: 'Vragen', sub: '5 korte vragen' },
   { kop: 'Split', sub: 'op jouw dagen' },
   { kop: 'Uitvoeren', sub: 'met logboek' },
 ]
@@ -385,7 +387,7 @@ const invoer = (m) => ({
   color: WIT, fontSize: m ? '1.05rem' : '1.1rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none',
 })
 
-function Optie({ label, aan, onClick, m }) {
+function Optie({ label, aan, onClick, m, meer }) {
   return (
     <button onClick={onClick} style={{
       width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
@@ -396,7 +398,7 @@ function Optie({ label, aan, onClick, m }) {
     }}>
       <span style={{ minWidth: 0, fontSize: m ? '1.02rem' : '1.08rem', fontWeight: 900 }}>{label}</span>
       <span style={{
-        width: 24, height: 24, flexShrink: 0, borderRadius: '50%', border: `2px solid ${aan ? WIT : 'rgba(255,255,255,0.3)'}`,
+        width: 24, height: 24, flexShrink: 0, borderRadius: meer ? 7 : '50%', border: `2px solid ${aan ? WIT : 'rgba(255,255,255,0.3)'}`,
         background: aan ? WIT : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {aan && <Check size={15} strokeWidth={3.5} color="#000" />}
@@ -407,7 +409,7 @@ function Optie({ label, aan, onClick, m }) {
 
 function SplitFlow({ m }) {
   const [stap, setStap] = useState(0)            // index in STAPPEN, TOTAAL = klaar
-  const [antw, setAntw] = useState({ dagen: null, locatie: null, doel: null, niveau: null, voornaam: '', email: '' })
+  const [antw, setAntw] = useState({ dagen: null, locatie: null, doel: null, niveau: null, beperkingen: [], beperking_eigen: '', voornaam: '', email: '' })
   const [dagen, setDagen] = useState(null)        // { code: { focus, oefeningen } }
   const [bezig, setBezig] = useState(false)
   const [pdfBezig, setPdfBezig] = useState(false)
@@ -440,6 +442,28 @@ function SplitFlow({ m }) {
     return () => { weg = true }
   }, [antw.locatie])
 
+  // De split zoals hij wordt: eerst de vervangingen uit de beperkingen, dan
+  // wat iemand op het laatste scherm zelf wisselde (sleutel code:plek).
+  const [wissels, setWissels] = useState({})
+  const mijnDagen = useMemo(() => {
+    const basis = pasBeperkingenToe(dagen, antw.beperkingen)
+    if (!basis) return basis
+    return Object.fromEntries(Object.entries(basis).map(([code, dag]) => [code, {
+      ...dag,
+      oefeningen: dag.oefeningen.map((o, i) => {
+        const n = wissels[`${code}:${i}`]
+        if (!n || n === o.naam) return o
+        const bron = o.origineel || o.naam
+        if (n === bron) return { ...o, naam: n, origineel: undefined, reden: undefined }
+        return { ...o, naam: n, origineel: bron, reden: 'Zelf gewisseld' }
+      }),
+    }]))
+  }, [dagen, antw.beperkingen, wissels])
+  const wissel = (code, i, van, naar) => {
+    setWissels(w => ({ ...w, [`${code}:${i}`]: naar }))
+    meet('oefening_wissel', { meta: { van, naar } })
+  }
+
   const split = antw.dagen ? SPLITS[antw.dagen] : null
   const huidig = STAPPEN[stap]
   const gegevensOk = antw.voornaam.trim().length > 0 && emailOk(antw.email)
@@ -459,17 +483,21 @@ function SplitFlow({ m }) {
       const doelLabel = DOELEN.find(d => d.key === antw.doel)?.label
       const niveauLabel = NIVEAUS.find(n => n.key === antw.niveau)?.label
       const locLabel = LOCATIES.find(l => l.key === antw.locatie)?.label
+      const kanNiet = BEPERKINGEN.filter(b => antw.beperkingen.includes(b.key)).map(b => b.label).join(', ')
+      const eigen = antw.beperking_eigen.trim()
       const u = utm.current || {}
       const { data: leadId, error } = await db.supabase.rpc('submit_mijn_split', { p: {
         voornaam: antw.voornaam.trim(),
         email: antw.email.trim(),
         doel: doelLabel,
-        samenvatting: `Mijn split: ${split.naam} (${antw.dagen} dagen, ${locLabel?.toLowerCase()}). Doel: ${doelLabel}. Traint: ${niveauLabel?.toLowerCase()}.`,
+        samenvatting: `Mijn split: ${split.naam} (${antw.dagen} dagen, ${locLabel?.toLowerCase()}). Doel: ${doelLabel}. Traint: ${niveauLabel?.toLowerCase()}.${kanNiet ? ` Kan/wil niet: ${kanNiet}.` : ''}${eigen ? ` Anders: ${eigen}` : ''}`,
         antwoorden: [
           { vraag: 'Dagen per week', antwoord: String(antw.dagen) },
           { vraag: 'Waar', antwoord: locLabel },
           { vraag: 'Doel', antwoord: doelLabel },
           { vraag: 'Traint al', antwoord: niveauLabel },
+          { vraag: 'Kan of wil niet', antwoord: kanNiet || 'Alles kan' },
+          ...(eigen ? [{ vraag: 'Iets anders', antwoord: eigen }] : []),
           { vraag: 'Split', antwoord: split.naam },
         ],
         utm_source: u.utm_source, utm_medium: u.utm_medium, utm_campaign: u.utm_campaign,
@@ -486,10 +514,10 @@ function SplitFlow({ m }) {
   }
 
   const download = async () => {
-    if (pdfBezig || !dagen) return
+    if (pdfBezig || !mijnDagen) return
     setPdfBezig(true); setFout('')
     try {
-      await downloadSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen, tips: tips(antw), doel: antw.doel })
+      await downloadSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen: mijnDagen, tips: tips(antw), doel: antw.doel })
       meet('pdf_download', { meta: { split: split.naam } })
     } catch (e) {
       console.error('PDF mislukt:', e)
@@ -523,7 +551,7 @@ function SplitFlow({ m }) {
           {pdfBezig ? 'PDF maken…' : 'Download je split (PDF)'}
         </button>
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
-        <SplitOverzicht split={split} dagen={dagen} locatie={antw.locatie} m={m} onDownload={download} pdfBezig={pdfBezig} />
+        <SplitOverzicht split={split} dagen={mijnDagen} locatie={antw.locatie} keuzes={antw.beperkingen} onWissel={wissel} m={m} onDownload={download} pdfBezig={pdfBezig} />
       </div>
     )
   }
@@ -531,6 +559,12 @@ function SplitFlow({ m }) {
   // ── Vraag ──
   const v = VRAGEN[huidig]
   const isGegevens = huidig === 'gegevens'
+  const isBeperkingen = huidig === 'beperkingen'
+  const zetBeperking = (key) => setAntw(a => ({ ...a, beperkingen: a.beperkingen.includes(key) ? a.beperkingen.filter(k => k !== key) : [...a.beperkingen, key] }))
+  const beperkingenDoor = () => {
+    meet('form_stap', { meta: { stap: stap + 1, vraag: 'beperkingen' } })
+    setStap(s => s + 1)
+  }
   const nummer = stap + 1
   const deel = TOTAAL > 1 ? (nummer - 1) / (TOTAAL - 1) : 1
   const voortgangKleur = `hsl(${Math.round(110 + deel * 32)}, ${Math.round(50 + deel * 30)}%, ${Math.round(64 - deel * 20)}%)`
@@ -558,7 +592,17 @@ function SplitFlow({ m }) {
       <div key={huidig} style={{ animation: 'vraagIn 0.25s ease' }}>
         {kop(v.titel)}
         <div style={{ marginTop: '1.3rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-          {!isGegevens && v.lijst.map(o => (
+          {isBeperkingen && (
+            <>
+              <Optie label="Nee, alles kan" m={m} aan={false} onClick={() => { setAntw(a => ({ ...a, beperkingen: [], beperking_eigen: '' })); beperkingenDoor() }} />
+              {beperkingenVoor(antw.locatie).map(b => (
+                <Optie key={b.key} label={b.label} m={m} meer aan={antw.beperkingen.includes(b.key)} onClick={() => zetBeperking(b.key)} />
+              ))}
+              <input value={antw.beperking_eigen} onChange={e => setAntw(a => ({ ...a, beperking_eigen: e.target.value }))}
+                placeholder="Iets anders? (mag leeg)" style={{ ...invoer(m), minHeight: m ? 54 : 58, borderRadius: 14 }} />
+            </>
+          )}
+          {!isGegevens && !isBeperkingen && v.lijst.map(o => (
             <Optie key={o.key} label={o.label} m={m} aan={antw[huidig] === o.key} onClick={() => kies(huidig, o.key)} />
           ))}
           {isGegevens && (
@@ -575,6 +619,11 @@ function SplitFlow({ m }) {
           )}
         </div>
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
+        {isBeperkingen && (
+          <button onClick={beperkingenDoor} style={{ ...knopWit(m), marginTop: '1.4rem' }}>
+            Volgende <ArrowRight size={22} strokeWidth={2.6} />
+          </button>
+        )}
         {isGegevens && (
           <button onClick={verstuur} disabled={!gegevensOk || bezig} style={{ ...knopWit(m, !gegevensOk || bezig), marginTop: '1.4rem' }}>
             {bezig ? 'Even geduld…' : 'Laat mijn split zien'}
@@ -586,14 +635,25 @@ function SplitFlow({ m }) {
   )
 }
 
+const chip = (terug) => ({
+  display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.5rem 0.75rem', borderRadius: 999, cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800, textAlign: 'left',
+  border: `1px solid ${terug ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.16)'}`,
+  background: terug ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)', color: WIT,
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+})
+
 // De split zelf onder de downloadknop, in de stijl van de PDF: de week als
 // fotokaartjes, een wisselaar per training en per training een kaart met
 // foto, kerncijfers en de oefeningen.
 const ANTON = "'Anton', 'DM Sans', sans-serif"
 
-function SplitOverzicht({ split, dagen, locatie, m, onDownload, pdfBezig }) {
+function SplitOverzicht({ split, dagen, locatie, keuzes, onWissel, m, onDownload, pdfBezig }) {
   const uniek = [...new Set(split.dagen)]
   const [actief, setActief] = useState(uniek[0])
+  // Welke oefening zijn wissellijst open heeft (plek in de training), of null.
+  const [open, setOpen] = useState(null)
+  useEffect(() => { setOpen(null) }, [actief])
   const dag = dagen?.[actief]
   const nr = uniek.indexOf(actief) + 1
   const wanneer = split.week.filter((_, k) => split.dagen[k] === actief).join(' + ')
@@ -655,14 +715,51 @@ function SplitOverzicht({ split, dagen, locatie, m, onDownload, pdfBezig }) {
                 </div>
               ))}
             </div>
-            {dag.oefeningen.map((o, j) => (
-              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0', borderBottom: j === dag.oefeningen.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
-                <span style={{ width: 18, flexShrink: 0, fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>{twee(j + 1)}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 700, lineHeight: 1.3 }}>{o.naam}</span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 900, whiteSpace: 'nowrap' }}>{o.sets} × {o.reps}</span>
-                <span style={{ fontSize: '0.75rem', color: ZWAK, fontWeight: 700, whiteSpace: 'nowrap', width: 42, textAlign: 'right' }}>{o.rust}</span>
-              </div>
-            ))}
+            <div style={{ fontSize: '0.76rem', fontWeight: 700, color: ZWAK, padding: '0.7rem 0 0.2rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <RefreshCw size={13} strokeWidth={2.6} style={{ flexShrink: 0 }} /> Kun of wil je een oefening niet? Tik op het pijltje om te wisselen.
+            </div>
+            {dag.oefeningen.map((o, j) => {
+              const isOpen = open === j
+              const opDag = dag.oefeningen.map(x => x.naam)
+              const suggesties = isOpen ? suggestiesVoor(o, opDag, keuzes) : []
+              const terugMag = o.origineel && !BEPERKINGEN.some(b => keuzes.includes(b.key) && b.verboden.includes(o.origineel)) && !opDag.includes(o.origineel)
+              return (
+                <div key={j} style={{ borderBottom: j === dag.oefeningen.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0' }}>
+                    <span style={{ width: 18, flexShrink: 0, fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>{twee(j + 1)}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: '0.92rem', fontWeight: 700, lineHeight: 1.3 }}>{o.naam}</span>
+                      {o.origineel && (
+                        <span style={{ display: 'block', marginTop: 2, fontSize: '0.7rem', fontWeight: 800, color: '#86efac' }}>
+                          {o.reden === 'Zelf gewisseld' ? `Gewisseld · was ${o.origineel}` : `Aangepast: ${o.reden.toLowerCase()}`}
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, whiteSpace: 'nowrap' }}>{o.sets} × {o.reps}</span>
+                    <button onClick={() => setOpen(isOpen ? null : j)} aria-label={`Wissel ${o.naam}`} aria-expanded={isOpen} style={{
+                      width: 32, height: 32, flexShrink: 0, borderRadius: 9, cursor: 'pointer',
+                      border: `1px solid ${isOpen ? WIT : 'rgba(255,255,255,0.16)'}`, background: isOpen ? WIT : 'transparent', color: isOpen ? '#000' : WIT,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      {isOpen ? <X size={16} strokeWidth={2.8} /> : <RefreshCw size={15} strokeWidth={2.6} />}
+                    </button>
+                  </div>
+                  {isOpen && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 0 0.8rem 28px', animation: 'vraagIn 0.2s ease' }}>
+                      {terugMag && (
+                        <button onClick={() => { onWissel(actief, j, o.naam, o.origineel); setOpen(null) }} style={chip(true)}>
+                          <Undo2 size={13} strokeWidth={2.8} /> {o.origineel}
+                        </button>
+                      )}
+                      {suggesties.map(n => (
+                        <button key={n} onClick={() => { onWissel(actief, j, o.naam, n); setOpen(null) }} style={chip(false)}>{n}</button>
+                      ))}
+                      {!terugMag && !suggesties.length && <span style={{ fontSize: '0.8rem', fontWeight: 700, color: ZWAK }}>Geen alternatief voor deze oefening.</span>}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -756,7 +853,7 @@ export default function MijnSplit() {
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
           <Kop m={m} center groot>Welke trainingssplit past bij jou?</Kop>
           <Tekst m={m} center style={{ marginTop: m ? '1.2rem' : '1.6rem', fontSize: m ? '1.3rem' : '1.55rem', fontWeight: 800, lineHeight: 1.35, color: WIT }}>
-            Beantwoord 4 vragen en krijg de split waar mijn klanten mee trainen.
+            Beantwoord 5 vragen en krijg de split waar mijn klanten mee trainen.
           </Tekst>
         </div>
       </section>
@@ -878,7 +975,7 @@ export default function MijnSplit() {
       {/* Slot (wit, na de zwarte coach-sectie). */}
       <Sectie m={m} licht style={{ paddingBottom: m ? '7rem' : '8rem' }}>
         <Kop m={m} center licht>Klaar voor je split?</Kop>
-        <Tekst m={m} center dim licht style={{ marginTop: '0.9rem' }}>Vier vragen, dan staat hij voor je klaar.</Tekst>
+        <Tekst m={m} center dim licht style={{ marginTop: '0.9rem' }}>Vijf vragen, dan staat hij voor je klaar.</Tekst>
         <Cta m={m} onClick={openForm} licht style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
         <div style={{ marginTop: m ? '2.5rem' : '3rem', textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(0,0,0,0.35)' }}>
           <a href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy</a>

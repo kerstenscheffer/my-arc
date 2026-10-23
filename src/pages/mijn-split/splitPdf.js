@@ -374,7 +374,13 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
       font('Source', 'normal', 6.5); kleur(DOF)
       doc.text(tweeCijfers(k + 1), M, mid)
       font('Source', 'normal', 9); kleur(WIT)
-      doc.text(doc.splitTextToSize(o.naam, xSets - M - 22)[0], M + 6, mid)
+      // Vervangen oefening: naam iets hoger, eronder waarom (beperking of zelf gewisseld).
+      doc.text(doc.splitTextToSize(o.naam, xSets - M - 22)[0], M + 6, o.origineel ? mid - 1.6 : mid)
+      if (o.origineel) {
+        font('Source', 'bold', 6.3); doc.setTextColor(134, 239, 172)
+        const waarom = o.reden === 'Zelf gewisseld' ? `gewisseld · was ${o.origineel}` : `aangepast: ${String(o.reden).toLowerCase()}`
+        doc.text(doc.splitTextToSize(waarom, xSets - M - 22)[0], M + 6, mid + 2.4)
+      }
       font('Source', 'black', 9); kleur(WIT)
       doc.text(`${o.sets ?? ''} × ${o.reps || ''}`, xSets, mid, { align: 'right' })
       font('Source', 'normal', 8.5); kleur(GRIJS)

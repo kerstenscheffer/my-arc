@@ -54,7 +54,7 @@ const PERIODES = [
 const PAGINAS = [
   { id: '/challenge', label: '/challenge', alleenAds: true, schermNaam: {} },
   { id: '/mijn-split', label: '/mijn-split', alleenAds: false, pdf: true,
-    schermNaam: { dagen: 'Dagen per week', locatie: 'Gym of thuis', doel: 'Doel', niveau: 'Hoe lang trainen', gegevens: 'Naam en e-mail' } },
+    schermNaam: { dagen: 'Dagen per week', locatie: 'Gym of thuis', doel: 'Doel', niveau: 'Hoe lang trainen', beperkingen: 'Kan of wil niet', gegevens: 'Naam en e-mail' } },
 ]
 const paginaVan = (id) => PAGINAS.find(p => p.id === id) || PAGINAS[0]
 
