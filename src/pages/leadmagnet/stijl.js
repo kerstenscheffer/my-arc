@@ -23,3 +23,13 @@ export const invoer = (m) => ({
   background: '#050505', border: '1.5px solid rgba(255,255,255,0.14)', borderRadius: 12,
   color: WIT, fontSize: m ? '1.05rem' : '1.1rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none',
 })
+
+// Naam en e-mail onthouden in de browser van de bezoeker zelf, zodat ze bij
+// een volgende lead magnet al ingevuld staan. Alleen lokaal, nergens anders.
+const GEGEVENS_SLEUTEL = 'myarc_lead_gegevens'
+export function bewaardeGegevens() {
+  try { const g = JSON.parse(localStorage.getItem(GEGEVENS_SLEUTEL) || '{}'); return { voornaam: g.voornaam || '', email: g.email || '' } } catch { return { voornaam: '', email: '' } }
+}
+export function onthoudGegevens({ voornaam, email }) {
+  try { localStorage.setItem(GEGEVENS_SLEUTEL, JSON.stringify({ voornaam: String(voornaam || '').trim(), email: String(email || '').trim() })) } catch { /* privémodus */ }
+}

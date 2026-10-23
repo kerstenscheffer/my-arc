@@ -7,7 +7,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Play, Volume2, VolumeX, Pause, X } from 'lucide-react'
 import { meet, volgTijdOpPagina } from '../challengeTracking'
 import { appSafeEmbedUrl } from '../../modules/videos/utils/youtubeHelpers'
-import { WIT, ZWAK, CTA_GROEN, BG, HERO_BG, FONT } from './stijl'
+import { WIT, ZWAK, CTA_GROEN, BG, HERO_BG, FONT, invoer } from './stijl'
 
 // De kennismakings-modal en Trustpilot van /challenge, pas geladen als een
 // pagina een challengeSlot heeft (dan zit /challenge niet in elke bundel).
@@ -380,6 +380,29 @@ export function Optie({ label, aan, onClick, m, meer }) {
         {aan && <Check size={15} strokeWidth={3.5} color="#000" />}
       </span>
     </button>
+  )
+}
+
+// ── Naam en e-mail ─────────────────────────────────────────────────────────
+// Een echt <form> met de standaard autocomplete-namen, zodat Safari/Chrome
+// (en iCloud-sleutelhanger of Google) naam en e-mail met één tik invullen,
+// zoals bij een webshop. De verstuurknop staat in de pagina en hoort via
+// form={formId} bij dit formulier.
+export function GegevensVelden({ m, formId, antw, setAntw, onVerstuur }) {
+  return (
+    <form id={formId} autoComplete="on" onSubmit={(e) => { e.preventDefault(); onVerstuur() }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+      <input id={`${formId}-naam`} name="given-name" autoComplete="given-name" autoCapitalize="words" enterKeyHint="next"
+        value={antw.voornaam} onChange={e => setAntw(a => ({ ...a, voornaam: e.target.value }))}
+        placeholder="Je voornaam*" aria-label="Voornaam" style={invoer(m)} />
+      <input id={`${formId}-email`} name="email" type="email" inputMode="email" autoComplete="email"
+        autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="send"
+        value={antw.email} onChange={e => setAntw(a => ({ ...a, email: e.target.value.trim() }))}
+        placeholder="jouw@email.nl*" aria-label="E-mailadres" style={invoer(m)} />
+      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, textAlign: 'center', marginTop: '0.2rem' }}>
+        Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: WIT }}>privacyverklaring</a>.
+      </div>
+    </form>
   )
 }
 

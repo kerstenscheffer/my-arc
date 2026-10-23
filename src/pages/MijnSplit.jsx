@@ -16,8 +16,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Download, Loader2, X, RefreshCw, Undo2 } from 'lucide-react'
 import db from '../services/DatabaseService'
 import { herkomst, meet } from './challengeTracking'
-import { Optie, LeadMagnetPagina } from './leadmagnet/Bouwstenen'
-import { CTA_GROEN, WIT, ZWAK, FONT, emailOk, knopWit, invoer } from './leadmagnet/stijl'
+import { Optie, LeadMagnetPagina, GegevensVelden } from './leadmagnet/Bouwstenen'
+import { CTA_GROEN, WIT, ZWAK, FONT, emailOk, knopWit, invoer, bewaardeGegevens, onthoudGegevens } from './leadmagnet/stijl'
 import { SPLITS, DAG_NAAM, WEEK, DOELEN, NIVEAUS, LOCATIES, tips } from './mijn-split/splitRegels'
 import { maakSplitPdf, fotoVoor, duur, totaalSets } from './mijn-split/splitPdf'
 import { mailPdf } from './leadmagnet/mailPdf'
@@ -86,7 +86,7 @@ const PAGINA = {
 
 function SplitFlow({ m }) {
   const [stap, setStap] = useState(0)            // index in STAPPEN, TOTAAL = klaar
-  const [antw, setAntw] = useState({ dagen: null, locatie: null, doel: null, niveau: null, beperkingen: [], beperking_eigen: '', voornaam: '', email: '' })
+  const [antw, setAntw] = useState({ dagen: null, locatie: null, doel: null, niveau: null, beperkingen: [], beperking_eigen: '', ...bewaardeGegevens() })
   const [dagen, setDagen] = useState(null)        // { code: { focus, oefeningen } }
   const [bezig, setBezig] = useState(false)
   const [pdfBezig, setPdfBezig] = useState(false)
@@ -188,6 +188,7 @@ function SplitFlow({ m }) {
       meet('form_stap', { meta: { stap: TOTAAL, vraag: 'gegevens' } })
       meet('form_klaar', { meta: { uitkomst: 'A', vraag: 'gegevens' }, lead_id: nieuwId || null })
       setLeadId(nieuwId || null)
+      onthoudGegevens(antw)
       setStap(TOTAAL)
     } catch (e) {
       console.error('mijn-split opslaan mislukt:', e)
@@ -293,18 +294,7 @@ function SplitFlow({ m }) {
           {!isGegevens && !isBeperkingen && v.lijst.map(o => (
             <Optie key={o.key} label={o.label} m={m} aan={antw[huidig] === o.key} onClick={() => kies(huidig, o.key)} />
           ))}
-          {isGegevens && (
-            <>
-              <input value={antw.voornaam} onChange={e => setAntw(a => ({ ...a, voornaam: e.target.value }))}
-                placeholder="Je voornaam*" autoComplete="given-name" style={invoer(m)} />
-              <input value={antw.email} onChange={e => setAntw(a => ({ ...a, email: e.target.value.trim() }))}
-                onKeyDown={e => e.key === 'Enter' && verstuur()}
-                placeholder="jouw@email.nl*" type="email" inputMode="email" autoComplete="email" style={invoer(m)} />
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, textAlign: 'center', marginTop: '0.2rem' }}>
-                Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: WIT }}>privacyverklaring</a>.
-              </div>
-            </>
-          )}
+          {isGegevens && <GegevensVelden m={m} formId="split-gegevens" antw={antw} setAntw={setAntw} onVerstuur={verstuur} />}
         </div>
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
         {isBeperkingen && (
@@ -313,7 +303,7 @@ function SplitFlow({ m }) {
           </button>
         )}
         {isGegevens && (
-          <button onClick={verstuur} disabled={!gegevensOk || bezig} style={{ ...knopWit(m, !gegevensOk || bezig), marginTop: '1.4rem' }}>
+          <button type="submit" form="split-gegevens" disabled={!gegevensOk || bezig} style={{ ...knopWit(m, !gegevensOk || bezig), marginTop: '1.4rem' }}>
             {bezig ? 'Even geduld…' : 'Laat mijn split zien'}
             {!bezig && <ArrowRight size={22} strokeWidth={2.6} />}
           </button>

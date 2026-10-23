@@ -12,8 +12,8 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Download, Loader2, X, RefreshCw } from 'lucide-react'
 import db from '../services/DatabaseService'
 import { herkomst, meet } from './challengeTracking'
-import { Optie, LeadMagnetPagina } from './leadmagnet/Bouwstenen'
-import { CTA_GROEN, WIT, ZWAK, FONT, emailOk, knopWit, invoer } from './leadmagnet/stijl'
+import { Optie, LeadMagnetPagina, GegevensVelden } from './leadmagnet/Bouwstenen'
+import { CTA_GROEN, WIT, ZWAK, FONT, emailOk, knopWit, invoer, bewaardeGegevens, onthoudGegevens } from './leadmagnet/stijl'
 import {
   DOELEN, GESLACHT, ACTIVITEIT, MAALTIJDEN, DIEET, LUST_NIET, MOMENT_NAAM, DAGEN,
   berekenDoel, groepeer, maakWeek, wissel, alternatievenVoor, dagTotaal, hoeveel,
@@ -75,7 +75,7 @@ function MenuFlow({ m }) {
   const [stap, setStap] = useState(0)
   const [antw, setAntw] = useState({
     doel: null, geslacht: 'man', leeftijd: '', lengte: '', gewicht: '', activiteit: null, maaltijden: null,
-    dieet: [], lustNiet: [], lust_eigen: '', voornaam: '', email: '',
+    dieet: [], lustNiet: [], lust_eigen: '', ...bewaardeGegevens(),
   })
   const [gerechten, setGerechten] = useState(null)
   const [cijfers, setCijfers] = useState(null)
@@ -167,6 +167,7 @@ function MenuFlow({ m }) {
       meet('form_stap', { meta: { stap: TOTAAL, vraag: 'gegevens' } })
       meet('form_klaar', { meta: { uitkomst: 'A', vraag: 'gegevens' }, lead_id: nieuwId || null })
       setLeadId(nieuwId || null)
+      onthoudGegevens(antw)
       setCijfers(c); setWeek(w)
       setStap(TOTAAL)
     } catch (e) {
@@ -304,18 +305,7 @@ function MenuFlow({ m }) {
             </>
           )}
 
-          {huidig === 'gegevens' && (
-            <>
-              <input value={antw.voornaam} onChange={e => setAntw(a => ({ ...a, voornaam: e.target.value }))}
-                placeholder="Je voornaam*" autoComplete="given-name" style={invoer(m)} />
-              <input value={antw.email} onChange={e => setAntw(a => ({ ...a, email: e.target.value.trim() }))}
-                onKeyDown={e => e.key === 'Enter' && verstuur()}
-                placeholder="jouw@email.nl*" type="email" inputMode="email" autoComplete="email" style={invoer(m)} />
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, textAlign: 'center', marginTop: '0.2rem' }}>
-                Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: WIT }}>privacyverklaring</a>.
-              </div>
-            </>
-          )}
+          {huidig === 'gegevens' && <GegevensVelden m={m} formId="menu-gegevens" antw={antw} setAntw={setAntw} onVerstuur={verstuur} />}
         </div>
 
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
@@ -331,7 +321,7 @@ function MenuFlow({ m }) {
           </button>
         )}
         {huidig === 'gegevens' && (
-          <button onClick={verstuur} disabled={!gegevensOk || bezig} style={{ ...knopWit(m, !gegevensOk || bezig), marginTop: '1.4rem' }}>
+          <button type="submit" form="menu-gegevens" disabled={!gegevensOk || bezig} style={{ ...knopWit(m, !gegevensOk || bezig), marginTop: '1.4rem' }}>
             {bezig ? 'Menu maken…' : 'Laat mijn menu zien'}
             {!bezig && <ArrowRight size={22} strokeWidth={2.6} />}
           </button>
