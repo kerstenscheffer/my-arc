@@ -1,6 +1,7 @@
 // src/modules/challenge-ads/FaseTrechter.jsx
 //
-// De vijf fases naast elkaar met pijltjes, de eerste die vastloopt pulseert.
+// De vijf fases als één balk met scheidingslijnen en pijltjes; de eerste die
+// vastloopt pulseert.
 // Een tik opent de metingen van die fase eronder. Uit ChallengeAdsDashboard
 // gehaald (23 okt 2026) zodat de Comment-magnet-trechter dezelfde rij gebruikt.
 //
@@ -18,27 +19,41 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
   const vast = vindVast(fases)
   return (
     <>
-    {/* De vijf fases naast elkaar met pijltjes; een tik opent de
-        metingen van die fase eronder. Op de telefoon veeg je de rij. */}
+    {/* De vijf fases als één balk: vakken tegen elkaar, een scheidingslijn
+        met een pijltje ertussen. Een tik opent de metingen van die fase
+        eronder. Op de telefoon veeg je de balk. */}
     <div style={{
-      display: 'flex', alignItems: 'stretch', gap: m ? 4 : 6, marginTop: 6,
-      overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-      padding: '10px 16px 10px 8px', margin: m ? '0 -16px 0 -8px' : '0 0 0 -8px',
+      overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6,
+      padding: '10px 0', margin: m ? '0 -16px' : 0, paddingLeft: m ? 16 : 0, paddingRight: m ? 16 : 0,
+    }}>
+    <div style={{
+      display: 'flex', alignItems: 'stretch', minWidth: m ? fases.length * 175 : 0,
+      border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, background: 'rgba(255,255,255,0.02)',
     }}>
       {fases.map((f, i) => {
         const isVast = vast?.id === f.id
         const k = f.oordeel.kleur
         const gemeten = f.oordeel.rang >= 0
         const open = openFase === f.id
+        const eerste = i === 0, laatste = i === fases.length - 1
         return (
-          <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: m ? 4 : 6, flex: m ? '0 0 auto' : '1 1 0', minWidth: 0, scrollSnapAlign: 'start' }}>
-            {i > 0 && <ChevronRight size={18} strokeWidth={2.6} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />}
+          <div key={f.id} style={{ position: 'relative', display: 'flex', flex: '1 1 0', minWidth: 0, borderLeft: eerste ? 'none' : '1px solid rgba(255,255,255,0.08)' }}>
+            {!eerste && (
+              <span style={{
+                position: 'absolute', left: 0, top: '50%', transform: 'translate(-50%, -50%)', zIndex: 2,
+                width: 24, height: 24, borderRadius: '50%', background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+              }}>
+                <ChevronRight size={14} strokeWidth={2.8} color="rgba(255,255,255,0.5)" />
+              </span>
+            )}
             <button onClick={() => setOpenFase(o => (o === f.id ? null : f.id))} aria-expanded={open} style={{
-              flex: 1, minWidth: m ? 150 : 0, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
-              padding: '0.85rem 0.9rem', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
-              background: open ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.025)',
-              border: `1px solid ${open ? 'rgba(255,255,255,0.35)' : isVast ? `${k}66` : 'rgba(255,255,255,0.08)'}`,
-              transition: 'background 0.15s, border-color 0.15s', WebkitTapHighlightColor: 'transparent',
+              flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+              padding: m ? '0.9rem 1rem' : '1rem 1.2rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
+              borderRadius: eerste ? '15px 0 0 15px' : laatste ? '0 15px 15px 0' : 0,
+              background: open ? 'rgba(255,255,255,0.06)' : isVast ? `${k}0d` : 'transparent',
+              boxShadow: open ? 'inset 0 -2px 0 rgba(255,255,255,0.55)' : 'none',
+              transition: 'background 0.15s', WebkitTapHighlightColor: 'transparent',
             }}>
               {/* Bolletje, naam met het oordeel-label erachter op dezelfde
                   hoogte, de vraag eronder; onderaan de belangrijkste cijfers. */}
@@ -64,7 +79,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
                 </span>
                 <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, alignSelf: 'flex-start', marginTop: 4, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </span>
-              <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: m ? 12 : 14, rowGap: 8, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: m ? 12 : 18, rowGap: 8, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                 {(f.preview || []).map(([label, waarde, meting]) => {
                   const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
                   const kl = o && o.rang >= 0 ? o.kleur : '#fff'
@@ -80,6 +95,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
           </div>
         )
       })}
+    </div>
     </div>
 
     {/* Metingen van de gekozen fase, ook als flow. */}
