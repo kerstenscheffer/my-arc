@@ -10,7 +10,7 @@
 import jsPDF from 'jspdf'
 import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
 import { B, H, M, KAART, LIJN, WIT, ZACHT, GRIJS, DOF, laad, naarBase64, FONTS, tweeCijfers, LOGO_VERHOUDING, maakTekenaar } from '../mijn-split/splitPdf'
-import { DOELEN, MOMENT_NAAM, MOMENTEN, dagTotaal, hoeveel, boodschappen } from './menuRegels'
+import { DOELEN, MOMENT_NAAM, MOMENTEN, dagTotaal, hoeveel, boodschappen, verwachting, kgTekst } from './menuRegels'
 
 const laadMenu = async (bestand) => {
   const r = await fetch(`/mijn-menu/${bestand}`)
@@ -92,29 +92,60 @@ export async function maakMenuPdf({ voornaam, doel, cijfers, week, aantal }) {
   font('Source', 'normal', 10); kleur(ZACHT)
   doc.text(doc.splitTextToSize('Berekend op je lengte, gewicht, leeftijd en hoe actief je bent. Dit is je startpunt: na twee weken weet je of het klopt.', 140), M, 39, { lineHeightFactor: 1.45 })
   // Groot getal
-  label('Per dag', M, 62, { pt: 6.5, c: WIT, stijl: 'black' })
-  font('Anton', 'normal', 54); kleur(WIT); doc.text(String(cijfers.kcal), M, 84)
+  label('Per dag', M, 57, { pt: 6.5, c: WIT, stijl: 'black' })
+  font('Anton', 'normal', 50); kleur(WIT); doc.text(String(cijfers.kcal), M, 77)
   const kw = doc.getTextWidth(String(cijfers.kcal))
-  font('Anton', 'normal', 18); kleur(GRIJS); doc.text('KCAL', M + kw + 3, 84)
+  font('Anton', 'normal', 18); kleur(GRIJS); doc.text('KCAL', M + kw + 3, 77)
   // Macro's als drie vakken
   const vakW = (B - 2 * M - 8) / 3
   ;[['Eiwit', cijfers.eiwit], ['Koolhydraten', cijfers.kh], ['Vet', cijfers.vet]].forEach(([l, g], k) => {
     const x = M + k * (vakW + 4)
-    doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.setLineWidth(0.2); doc.roundedRect(x, 94, vakW, 26, 1.2, 1.2, 'FD')
-    label(l, x + 4, 101, { pt: 6, c: GRIJS })
-    font('Anton', 'normal', 22); kleur(WIT); doc.text(`${g} G`, x + 4, 115)
+    doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.setLineWidth(0.2); doc.roundedRect(x, 84, vakW, 22, 1.2, 1.2, 'FD')
+    label(l, x + 4, 90.5, { pt: 6, c: GRIJS })
+    font('Anton', 'normal', 20); kleur(WIT); doc.text(`${g} G`, x + 4, 102)
   })
+  // Wat je mag verwachten: verbranding − eten = verschil → kilo's.
+  const v = verwachting(cijfers)
+  const duizend = (n) => Math.round(n).toLocaleString('nl-NL')
+  font('Anton', 'normal', 15); kleur(WIT); doc.text('WAT JE MAG VERWACHTEN', M, 120)
+  const tw = (B - 2 * M - 2 * 8) / 3
+  const verschilLabel = v.soort === 'tekort' ? 'Tekort per dag' : v.soort === 'overschot' ? 'Overschot per dag' : 'Verschil per dag'
+  ;[['Je verbrandt', `${duizend(v.tdee)} kcal`], ['Je eet', `${duizend(v.eet)} kcal`], [verschilLabel, `${v.perDag > 0 ? '+' : v.perDag < 0 ? '−' : ''}${duizend(Math.abs(v.perDag))} kcal`]].forEach(([l, w], k) => {
+    const x = M + k * (tw + 8)
+    const accent = k === 2 && v.soort !== 'onderhoud'
+    doc.setFillColor(...KAART); doc.setDrawColor(...(accent ? [134, 239, 172] : LIJN)); doc.setLineWidth(accent ? 0.4 : 0.2)
+    doc.roundedRect(x, 125, tw, 20, 1.2, 1.2, 'FD')
+    label(l, x + 4, 131.5, { pt: 6, c: GRIJS })
+    font('Source', 'black', 12.5); if (accent) doc.setTextColor(134, 239, 172); else kleur(WIT)
+    doc.text(w, x + 4, 140)
+    if (k < 2) { font('Source', 'black', 16); kleur(WIT); doc.text(k === 0 ? '−' : '=', x + tw + 4, 137.5, { align: 'center' }) }
+  })
+  if (v.soort === 'onderhoud') {
+    font('Source', 'black', 13); kleur(WIT); doc.text('Je gewicht blijft ongeveer gelijk', M, 156)
+  } else {
+    font('Anton', 'normal', 24); doc.setTextColor(134, 239, 172); doc.text(`≈ ${kgTekst(v.kgPerWeek)} KG`, M, 157)
+    const gw = doc.getTextWidth(`≈ ${kgTekst(v.kgPerWeek)} KG`)
+    font('Source', 'bold', 11); kleur(WIT); doc.text(v.soort === 'tekort' ? 'vet eraf per week' : 'erbij per week', M + gw + 3, 156.5)
+  }
+  font('Source', 'normal', 9); kleur(ZACHT)
+  const vz = v.soort === 'tekort' ? `Dat is ${duizend(Math.abs(v.perWeek))} kcal per week, ongeveer ${kgTekst(v.kgIn8)} kg in 8 weken. Schatting: 7.700 kcal is ongeveer 1 kg vet; de eerste week zie je vaak meer door vocht.`
+    : v.soort === 'overschot' ? `Dat is ${duizend(v.perWeek)} kcal per week. Train je zwaar, dan gaat het grootste deel naar spier. Schatting: 7.700 kcal is ongeveer 1 kg.`
+      : 'Je eet rond wat je verbrandt: vet eraf en spier erbij gaat tegelijk. Kijk vooral naar de spiegel en je kracht.'
+  const vzr = doc.splitTextToSize(vz, B - 2 * M)
+  doc.text(vzr, M, 163, { lineHeightFactor: 1.4 })
+
   // Hoe berekend
-  font('Anton', 'normal', 15); kleur(WIT); doc.text('ZO IS HET BEREKEND', M, 136)
+  const yb = 163 + vzr.length * 4.4 + 8
+  font('Anton', 'normal', 15); kleur(WIT); doc.text('ZO IS HET BEREKEND', M, yb)
   const regels = [
     ['Wat je verbrandt', `${cijfers.tdee} kcal per dag, met je activiteit meegerekend.`],
     ['Je doel', doel === 'vetverlies' ? `${cijfers.tdee - cijfers.kcal} kcal minder dan je verbrandt, zodat er vet af gaat.` : doel === 'spiermassa' ? `${cijfers.kcal - cijfers.tdee} kcal extra, genoeg om spier op te bouwen zonder onnodig vet.` : 'Rond je onderhoud: vet eraf en spier erbij gaat het best zonder groot tekort.'],
     ['Eiwit', 'Rond 2 gram per kilo lichaamsgewicht. Dat houdt je spieren vast en maakt verzadigd.'],
-    ['Vet en koolhydraten', 'Vet rond 1 gram per kilo, de rest koolhydraten voor energie en je trainingen.'],
+    ['Vet en koolhydraten', cijfers.veelVet ? 'Vet rond 0,6 gram per kilo: je hebt nog genoeg vet in reserve. De rest koolhydraten voor energie en je trainingen.' : 'Vet rond 1 gram per kilo, de rest koolhydraten voor energie en je trainingen.'],
   ]
-  let y = 145
-  regels.forEach(([v, r]) => {
-    font('Source', 'bold', 9.8); kleur(WIT); doc.text(v, M, y)
+  let y = yb + 9
+  regels.forEach(([kopje, r]) => {
+    font('Source', 'bold', 9.8); kleur(WIT); doc.text(kopje, M, y)
     font('Source', 'normal', 9.8); kleur(ZACHT)
     const t = doc.splitTextToSize(r, B - 2 * M - 45); doc.text(t, M + 45, y, { lineHeightFactor: 1.4 })
     y += Math.max(7, t.length * 4.8 + 2.5)
@@ -128,11 +159,11 @@ export async function maakMenuPdf({ voornaam, doel, cijfers, week, aantal }) {
   const mw = (B - 2 * M - (momenten.length - 1) * 4) / momenten.length
   momenten.forEach(([m, deel], k) => {
     const x = M + k * (mw + 4)
-    doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.roundedRect(x, y, mw, 22, 1.2, 1.2, 'FD')
-    label(MOMENT_NAAM[m], x + 4, y + 7, { pt: 6, c: GRIJS })
-    font('Source', 'black', 13); kleur(WIT); doc.text(`± ${Math.round(cijfers.kcal * deel)} kcal`, x + 4, y + 16)
+    doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.roundedRect(x, y, mw, 18, 1.2, 1.2, 'FD')
+    label(MOMENT_NAAM[m], x + 4, y + 6.5, { pt: 6, c: GRIJS })
+    font('Source', 'black', 12); kleur(WIT); doc.text(`± ${Math.round(cijfers.kcal * deel)} kcal`, x + 4, y + 13.5)
   })
-  y += 32
+  y += 26
   const tip = 'Weeg jezelf de komende twee weken elke ochtend en neem het weekgemiddelde. Gaat het niet de goede kant op, dan schuif je 150 à 200 kcal en kijk je opnieuw.'
   const bh = blokHoogte(tip, B - 2 * M)
   blok('Tip', tip, M, y, B - 2 * M, bh)

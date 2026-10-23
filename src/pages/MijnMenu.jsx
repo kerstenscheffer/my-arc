@@ -15,8 +15,8 @@ import { herkomst, meet } from './challengeTracking'
 import { Optie, LeadMagnetPagina, GegevensVelden } from './leadmagnet/Bouwstenen'
 import { CTA_GROEN, WIT, ZWAK, FONT, emailOk, knopWit, invoer, bewaardeGegevens, onthoudGegevens } from './leadmagnet/stijl'
 import {
-  DOELEN, GESLACHT, ACTIVITEIT, MAALTIJDEN, DIEET, LUST_NIET, MOMENT_NAAM, DAGEN,
-  berekenDoel, groepeer, maakWeek, wissel, alternatievenVoor, dagTotaal, hoeveel,
+  DOELEN, GESLACHT, ACTIVITEIT, MAALTIJDEN, VARIATIE, vasteMomenten, DIEET, LUST_NIET, MOMENT_NAAM, DAGEN,
+  berekenDoel, groepeer, maakWeek, wissel, alternatievenVoor, dagTotaal, hoeveel, verwachting, kgTekst,
 } from './mijn-menu/menuRegels'
 import { maakMenuPdf, fotoUrl } from './mijn-menu/menuPdf'
 import { mailPdf } from './leadmagnet/mailPdf'
@@ -27,10 +27,10 @@ const VIDEO_ID = ''
 const PAGINA = {
   pil: 'Gratis weekmenu',
   kop: 'Wat moet jij eten om je doel te halen?',
-  sub: 'Beantwoord 7 korte vragen en krijg een weekmenu op jouw calorieën, uit de gerechten van mijn klanten.',
+  sub: 'Beantwoord 8 korte vragen en krijg een weekmenu op jouw calorieën, uit de gerechten van mijn klanten.',
   videoId: VIDEO_ID, poster: '/mijn-menu/poster.jpg', cta: 'Maak mijn menu',
   stappen: [
-    { kop: 'Vragen', sub: '7 korte vragen' },
+    { kop: 'Vragen', sub: '8 korte vragen' },
     { kop: 'Menu', sub: 'op jouw calorieën' },
     { kop: 'Boodschappen', sub: 'lijst erbij' },
   ],
@@ -50,16 +50,17 @@ const PAGINA = {
   coachKort: 'En dit is hoe mijn klanten eten.',
   coachSlot: 'Deze gerechten zijn dezelfde waar mijn klanten mee werken. Zo zie je hoe ik het aanpak, en kun je er vandaag mee beginnen.',
   slotKop: 'Klaar voor je menu?',
-  slotTekst: 'Zeven vragen, dan staat hij voor je klaar.',
+  slotTekst: 'Acht vragen, dan staat hij voor je klaar.',
 }
 
-const STAPPEN = ['doel', 'overjou', 'activiteit', 'maaltijden', 'dieet', 'lustniet', 'gegevens']
+const STAPPEN = ['doel', 'overjou', 'activiteit', 'maaltijden', 'variatie', 'dieet', 'lustniet', 'gegevens']
 const TOTAAL = STAPPEN.length
 const TITELS = {
   doel: 'Wat is je doel?',
   overjou: 'Even over jou',
   activiteit: 'Hoe actief ben je?',
   maaltijden: 'Hoeveel keer per dag eet je?',
+  variatie: 'Hoeveel afwisseling wil je?',
   dieet: 'Moet je ergens rekening mee houden?',
   lustniet: 'Wat lust je echt niet?',
   gegevens: 'Waar mag je menu heen?',
@@ -74,7 +75,7 @@ const overJouOk = (a) => {
 function MenuFlow({ m }) {
   const [stap, setStap] = useState(0)
   const [antw, setAntw] = useState({
-    doel: null, geslacht: 'man', leeftijd: '', lengte: '', gewicht: '', activiteit: null, maaltijden: null,
+    doel: null, geslacht: 'man', leeftijd: '', lengte: '', gewicht: '', activiteit: null, maaltijden: null, variatie: null,
     dieet: [], lustNiet: [], lust_eigen: '', ...bewaardeGegevens(),
   })
   const [gerechten, setGerechten] = useState(null)
@@ -137,24 +138,26 @@ function MenuFlow({ m }) {
       if (!c) throw new Error('cijfers ontbreken')
       const groepen = groepeer(data, { dieet: antw.dieet, lustNiet: antw.lustNiet })
       groepenRef.current = groepen
-      const w = maakWeek(groepen, c, antw.maaltijden, antw.email.trim().toLowerCase())
+      const w = maakWeek(groepen, c, antw.maaltijden, antw.email.trim().toLowerCase(), antw.variatie)
 
       const doelLabel = DOELEN.find(d => d.key === antw.doel)?.label
       const dieet = DIEET.filter(d => antw.dieet.includes(d.key)).map(d => d.label).join(', ')
       const lustNiet = LUST_NIET.filter(l => antw.lustNiet.includes(l.key)).map(l => l.label).join(', ')
       const eigen = antw.lust_eigen.trim()
       const activiteit = ACTIVITEIT.find(a => a.key === antw.activiteit)?.label
+      const variatie = VARIATIE.find(v => v.key === antw.variatie)?.label
       const u = utm.current || {}
       const { data: nieuwId, error } = await db.supabase.rpc('submit_mijn_menu', { p: {
         voornaam: antw.voornaam.trim(),
         email: antw.email.trim(),
         doel: doelLabel,
-        samenvatting: `Mijn menu: ${c.kcal} kcal (${doelLabel?.toLowerCase()}), ${antw.maaltijden} maaltijden per dag. ${antw.geslacht === 'vrouw' ? 'Vrouw' : 'Man'}, ${antw.leeftijd} jaar, ${antw.lengte} cm, ${antw.gewicht} kg, ${activiteit?.toLowerCase()}.${dieet ? ` Dieet: ${dieet}.` : ''}${lustNiet ? ` Lust niet: ${lustNiet}.` : ''}${eigen ? ` Anders: ${eigen}` : ''}`,
+        samenvatting: `Mijn menu: ${c.kcal} kcal (${doelLabel?.toLowerCase()}), ${antw.maaltijden} maaltijden per dag, ${variatie?.toLowerCase()}. ${antw.geslacht === 'vrouw' ? 'Vrouw' : 'Man'}, ${antw.leeftijd} jaar, ${antw.lengte} cm, ${antw.gewicht} kg, ${activiteit?.toLowerCase()}.${dieet ? ` Dieet: ${dieet}.` : ''}${lustNiet ? ` Lust niet: ${lustNiet}.` : ''}${eigen ? ` Anders: ${eigen}` : ''}`,
         antwoorden: [
           { vraag: 'Doel', antwoord: doelLabel },
           { vraag: 'Over jou', antwoord: `${antw.geslacht === 'vrouw' ? 'Vrouw' : 'Man'}, ${antw.leeftijd} jaar, ${antw.lengte} cm, ${antw.gewicht} kg` },
           { vraag: 'Activiteit', antwoord: activiteit },
           { vraag: 'Maaltijden per dag', antwoord: String(antw.maaltijden) },
+          { vraag: 'Afwisseling', antwoord: variatie },
           { vraag: 'Dieet', antwoord: dieet || 'Geen' },
           { vraag: 'Lust niet', antwoord: lustNiet || 'Alles' },
           ...(eigen ? [{ vraag: 'Iets anders', antwoord: eigen }] : []),
@@ -195,7 +198,7 @@ function MenuFlow({ m }) {
 
   const wisselMaaltijd = (dag, plek, naam) => {
     meet('maaltijd_wissel', { meta: { van: week[dag].maaltijden[plek].naam, naar: naam } })
-    setWeek(w => wissel(w, groepenRef.current, dag, plek, naam))
+    setWeek(w => wissel(w, groepenRef.current, dag, plek, naam, antw.variatie))
   }
 
   const kop = (tekst) => (
@@ -221,7 +224,7 @@ function MenuFlow({ m }) {
         </button>
         {gemaild && <div style={{ marginTop: '0.8rem', fontSize: '0.86rem', fontWeight: 800, color: '#86efac', textAlign: 'center' }}>Ook naar {antw.email.trim()} gestuurd.</div>}
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
-        <MenuOverzicht m={m} cijfers={cijfers} week={week} groepen={groepenRef.current} onWissel={wisselMaaltijd} onDownload={download} pdfBezig={pdfBezig} />
+        <MenuOverzicht m={m} cijfers={cijfers} week={week} vast={vasteMomenten(antw.variatie)} groepen={groepenRef.current} onWissel={wisselMaaltijd} onDownload={download} pdfBezig={pdfBezig} />
       </div>
     )
   }
@@ -230,7 +233,7 @@ function MenuFlow({ m }) {
   const nummer = stap + 1
   const deel = TOTAAL > 1 ? (nummer - 1) / (TOTAAL - 1) : 1
   const voortgangKleur = `hsl(${Math.round(110 + deel * 32)}, ${Math.round(50 + deel * 30)}%, ${Math.round(64 - deel * 20)}%)`
-  const lijst = { doel: DOELEN, activiteit: ACTIVITEIT, maaltijden: MAALTIJDEN }[huidig]
+  const lijst = { doel: DOELEN, activiteit: ACTIVITEIT, maaltijden: MAALTIJDEN, variatie: VARIATIE }[huidig]
   const veldLabel = { fontSize: '0.8rem', fontWeight: 800, color: ZWAK, margin: '0.2rem 0 -0.2rem' }
 
   return (
@@ -333,7 +336,7 @@ function MenuFlow({ m }) {
 
 // Het menu onder de downloadknop: je cijfers, de dagen als knoppen en per dag
 // de maaltijden met foto, hoeveelheden en een wisselknop.
-function MenuOverzicht({ m, cijfers, week, groepen, onWissel, onDownload, pdfBezig }) {
+function MenuOverzicht({ m, cijfers, week, vast = [], groepen, onWissel, onDownload, pdfBezig }) {
   const [dag, setDag] = useState(0)
   const [open, setOpen] = useState(null)
   useEffect(() => { setOpen(null) }, [dag])
@@ -353,6 +356,7 @@ function MenuOverzicht({ m, cijfers, week, groepen, onWissel, onDownload, pdfBez
           </div>
         ))}
       </div>
+      <Verwachting m={m} v={verwachting(cijfers)} />
       {gemEiwit < cijfers.eiwit * 0.85 && (
         <div style={{ marginTop: 10, padding: '0.7rem 0.9rem', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', fontSize: '0.84rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.45 }}>
           Met jouw keuzes kom je gemiddeld op {gemEiwit} g eiwit per dag. Een eiwitshake (plantaardig als je geen zuivel eet) brengt je dichter bij {cijfers.eiwit} g.
@@ -374,7 +378,7 @@ function MenuOverzicht({ m, cijfers, week, groepen, onWissel, onDownload, pdfBez
         <span style={{ fontSize: '0.82rem', fontWeight: 800, color: ZWAK }}>{t.kcal} kcal · {t.eiwit} g eiwit</span>
       </div>
       <div style={{ fontSize: '0.76rem', fontWeight: 700, color: ZWAK, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <RefreshCw size={13} strokeWidth={2.6} /> Zin in iets anders? Tik op het pijltje om te wisselen.
+        <RefreshCw size={13} strokeWidth={2.6} /> {vast.length ? 'Wissel je een vaste maaltijd, dan geldt dat voor de hele week.' : 'Zin in iets anders? Tik op het pijltje om te wisselen.'}
       </div>
 
       {d.maaltijden.map((g, p) => {
@@ -437,6 +441,52 @@ function MenuOverzicht({ m, cijfers, week, groepen, onWissel, onDownload, pdfBez
           {pdfBezig ? <Loader2 size={20} style={{ animation: 'draai 1s linear infinite' }} /> : <Download size={20} strokeWidth={2.6} />}
           {pdfBezig ? 'PDF maken…' : 'Download de PDF'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+// Wat je verbrandt, wat je eet, het verschil en wat dat oplevert, als één
+// rekensom: verbranding − eten = tekort → kilo's.
+const duizend = (n) => Math.round(n).toLocaleString('nl-NL')
+function Verwachting({ m, v }) {
+  if (!v) return null
+  const klein = { fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase', color: ZWAK }
+  const verschil = v.soort === 'tekort' ? 'Tekort' : v.soort === 'overschot' ? 'Overschot' : 'Verschil'
+  const vak = (label, waarde, accent) => (
+    <div style={{ flex: 1, minWidth: 0, padding: '0.65rem 0.55rem', borderRadius: 12, border: `1px solid ${accent ? 'rgba(134,239,172,0.45)' : 'rgba(255,255,255,0.1)'}`, background: accent ? 'rgba(134,239,172,0.07)' : 'rgba(255,255,255,0.03)' }}>
+      <div style={klein}>{label}</div>
+      <div style={{ fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, marginTop: 3, color: accent ? '#86efac' : WIT, whiteSpace: 'nowrap' }}>{waarde}</div>
+    </div>
+  )
+  const teken = (t) => <span style={{ alignSelf: 'center', fontSize: '1rem', fontWeight: 900, color: ZWAK, flexShrink: 0 }}>{t}</span>
+  return (
+    <div style={{ marginTop: 10, padding: m ? '0.9rem' : '1rem 1.1rem', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
+      <div style={{ fontSize: '0.95rem', fontWeight: 900, marginBottom: 10 }}>Zo werkt jouw dag</div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {vak('Je verbrandt', `${duizend(v.tdee)}`)}
+        {teken('−')}
+        {vak('Je eet', `${duizend(v.eet)}`)}
+        {teken('=')}
+        {vak(verschil, `${v.perDag > 0 ? '+' : v.perDag < 0 ? '−' : ''}${duizend(Math.abs(v.perDag))}`, v.soort !== 'onderhoud')}
+      </div>
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        {v.soort === 'onderhoud' ? (
+          <span style={{ fontSize: '1.05rem', fontWeight: 900 }}>Gewicht blijft ongeveer gelijk</span>
+        ) : (
+          <>
+            <span style={{ fontSize: m ? '1.6rem' : '1.8rem', fontWeight: 900, color: '#86efac', letterSpacing: '-0.02em' }}>≈ {kgTekst(v.kgPerWeek)} kg</span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>{v.soort === 'tekort' ? 'vet eraf per week' : 'erbij per week'}</span>
+          </>
+        )}
+      </div>
+      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.45 }}>
+        {v.soort === 'tekort' && `Dat is ${duizend(Math.abs(v.perWeek))} kcal per week, ongeveer ${kgTekst(v.kgIn8)} kg in 8 weken.`}
+        {v.soort === 'overschot' && `Dat is ${duizend(v.perWeek)} kcal per week. Train je zwaar, dan gaat het grootste deel naar spier.`}
+        {v.soort === 'onderhoud' && 'Je eet rond wat je verbrandt: vet eraf en spier erbij gaat tegelijk, dus kijk vooral naar de spiegel en je kracht.'}
+      </div>
+      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginTop: 8, lineHeight: 1.45 }}>
+        Schatting: 7.700 kcal is ongeveer 1 kg vet. De eerste week zie je op de weegschaal vaak meer door vocht.
       </div>
     </div>
   )

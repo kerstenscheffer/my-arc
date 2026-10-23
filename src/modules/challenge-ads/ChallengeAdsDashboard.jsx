@@ -56,7 +56,7 @@ const PAGINAS = [
   { id: '/mijn-split', label: '/mijn-split', alleenAds: false, pdf: true,
     schermNaam: { dagen: 'Dagen per week', locatie: 'Gym of thuis', doel: 'Doel', niveau: 'Hoe lang trainen', beperkingen: 'Kan of wil niet', gegevens: 'Naam en e-mail' } },
   { id: '/mijn-menu', label: '/mijn-menu', alleenAds: false, pdf: true,
-    schermNaam: { doel: 'Doel', overjou: 'Over jou', activiteit: 'Activiteit', maaltijden: 'Maaltijden per dag', dieet: 'Dieet', lustniet: 'Lust niet', gegevens: 'Naam en e-mail' } },
+    schermNaam: { doel: 'Doel', overjou: 'Over jou', activiteit: 'Activiteit', maaltijden: 'Maaltijden per dag', variatie: 'Afwisseling', dieet: 'Dieet', lustniet: 'Lust niet', gegevens: 'Naam en e-mail' } },
 ]
 const paginaVan = (id) => PAGINAS.find(p => p.id === id) || PAGINAS[0]
 
