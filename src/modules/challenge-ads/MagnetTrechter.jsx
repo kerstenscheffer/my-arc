@@ -82,12 +82,10 @@ function tel(reels, leads, stappen) {
     // Campagnes: de sales komen vaak pas na een campagnebericht (vooral het
     // 6 weken challenge-bericht), niet na het automatische magnet-bericht.
     campagneBerichten: stappen.filter(l => l.campagne_bericht).length,
-    perCampagne: Object.entries(sales.reduce((o, l) => {
-      const k = l.campagne || 'zonder campagne'
-      o[k] = o[k] || { sales: 0, omzet: 0 }
-      o[k].sales += 1; o[k].omzet += Number(l.omzet)
-      return o
-    }, {})).sort((a, b) => b[1].omzet - a[1].omzet),
+    // Route van de sale: 'campagne' = campagnebericht kwam vóór de eerste
+    // call-/sale-stap (zelf outreach, bv. de challenge), anders 'direct'.
+    salesDirect: sales.filter(l => l.route !== 'campagne'),
+    salesCampagne: sales.filter(l => l.route === 'campagne'),
   }
 }
 
@@ -141,8 +139,8 @@ function maakFases(t) {
         M('Call ingepland', t.calls, t.voorgesteld, RICHT.ingepland, `${t.calls} · ${pct(t.calls, t.voorgesteld)}`, 'in deze periode · t.o.v. de voorstellen'),
         M('Call gehad', t.gehouden, t.afgerond, RICHT.show, `${t.gehouden} · ${pct(t.gehouden, t.afgerond)}`, `kwam opdagen · ${t.noshows} no-show`),
         M('Sale', t.sales, t.gehouden, RICHT.close, `${t.sales} · ${pct(t.sales, t.gehouden)}`, `van de calls · ${euro(t.omzet)} omzet`),
-        M('Via campagne', null, null, null, t.perCampagne.length ? `${t.perCampagne[0][1].sales} · ${pct(t.perCampagne[0][1].sales, t.sales)}` : '–',
-          t.perCampagne.length ? t.perCampagne.map(([k, v]) => `${k}: ${v.sales} (${euro(v.omzet)})`).join(' · ') : 'nog geen sales in deze periode'),
+        M('Via campagne', null, null, null, `${t.salesCampagne.length} · ${pct(t.salesCampagne.length, t.sales)}`,
+          `via campagne ${t.salesCampagne.length} (${euro(t.salesCampagne.reduce((s, l) => s + Number(l.omzet), 0))}) · direct uit het magnet-gesprek ${t.salesDirect.length} (${euro(t.salesDirect.reduce((s, l) => s + Number(l.omzet), 0))})`),
       ] },
   ].map(vatFaseSamen)
 }
@@ -164,7 +162,7 @@ function LeadRij({ l }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '0.9rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.naam || 'Onbekend'}</div>
         <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          binnen {datum(l.created_at)} · {l.woord || 'magnet'}{l.campagne ? ` · ${l.campagne}` : ''}{l.sectie ? ` · ${l.sectie.trim()}` : ''}
+          binnen {datum(l.created_at)} · {l.woord || 'magnet'}{l.route === 'campagne' ? ` · via ${l.campagne || 'campagne'}` : l.campagne ? ` · ${l.campagne}` : ''}{l.sectie ? ` · ${l.sectie.trim()}` : ''}
         </div>
       </div>
       <span style={{ fontSize: '0.78rem', fontWeight: 900, color: status.kleur, whiteSpace: 'nowrap' }}>{status.tekst}</span>
@@ -198,7 +196,11 @@ export default function MagnetTrechter({ data, m, laden }) {
   const reels = data?.reels || []
   const vanaf = data?.vanaf ? new Date(data.vanaf).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }) : null
   const leads = data?.leads || []
-  const stappen = data?.stappen || []
+  // Route: alles, direct uit het magnet-gesprek, of via een campagnebericht
+  // (zelf outreach). Geldt voor reacties, calls en sales; reels, commenters
+  // en nieuwe leads hebben geen route.
+  const [route, setRoute] = useState('alles')
+  const stappen = (data?.stappen || []).filter(l => route === 'alles' || (route === 'campagne' ? l.route === 'campagne' : l.route !== 'campagne'))
   // Welke lijst er open staat (tik op een meting).
   const [lijst, setLijst] = useState(null)
 
@@ -217,7 +219,19 @@ export default function MagnetTrechter({ data, m, laden }) {
 
   return (
     <div style={{ opacity: laden ? 0.5 : 1, transition: 'opacity 0.15s' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <div role="tablist" style={{ display: 'inline-flex', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 9, overflow: 'hidden', height: 34 }}>
+          {[['alles', 'Alles'], ['direct', 'Direct uit magnet'], ['campagne', 'Via campagne']].map(([id, label], i) => (
+            <button key={id} role="tab" aria-selected={route === id} onClick={() => setRoute(id)} style={{
+              padding: '0 0.8rem', border: 'none', borderLeft: i ? '1px solid rgba(255,255,255,0.16)' : 'none',
+              background: route === id ? '#fff' : 'transparent', color: route === id ? '#000' : '#fff',
+              fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}>{label}</button>
+          ))}
+        </div>
+      </div>
       <FaseTrechter fases={fases} m={m} iconen={ICONEN} onMeting={setLijst} uitleg={<>
+        {route !== 'alles' ? `Alleen ${route === 'direct' ? 'direct uit het magnet-gesprek' : 'via een campagnebericht (zelf outreach)'}: geldt voor reacties, calls en sales; reels, commenters en nieuwe leads tellen altijd alles. ` : ''}
         {vanaf ? `Reels en comments bestaan pas vanaf ${vanaf} (start Instagram-koppeling); leads, calls en sales tellen over de hele periode. ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder, en op een cijfer voor de namen erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. Calls en sales: wat er in deze periode gebeurde, ook bij magnet-leads van eerder.
       </>} />
 

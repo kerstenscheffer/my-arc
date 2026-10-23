@@ -145,7 +145,12 @@ as $function$
       bool_or(m.moved_at >= p_van and m.moved_at < p_tot and (m.call_date is not null or lower(m.to_section_title) ~ '(sales call|ingepland|scheduled|booking|afspraak|meeting)')) ingepland,
       bool_or(coalesce(m.call_happened, false) and coalesce(m.call_date::timestamptz, m.moved_at) >= p_van and coalesce(m.call_date::timestamptz, m.moved_at) < p_tot) gehouden,
       bool_or(m.call_happened = false and coalesce(m.outcome_type, '') <> 'cancelled' and m.call_date::timestamptz >= p_van and m.call_date::timestamptz < p_tot) noshow,
-      max(m.order_value) filter (where m.moved_at >= p_van and m.moved_at < p_tot and _meta_is_sale_titel(m.to_section_title) and coalesce(m.order_value, 0) > 0) omzet
+      max(m.order_value) filter (where m.moved_at >= p_van and m.moved_at < p_tot and _meta_is_sale_titel(m.to_section_title) and coalesce(m.order_value, 0) > 0) omzet,
+      -- Eerste call-/sale-stap in de periode, voor de route hieronder.
+      min(m.moved_at) filter (where m.moved_at >= p_van and m.moved_at < p_tot and (
+        lower(m.to_section_title) ~ '(voorgesteld|voorstel|sales call|ingepland|scheduled|booking|afspraak|meeting)'
+        or m.call_date is not null or coalesce(m.call_happened, false)
+        or (_meta_is_sale_titel(m.to_section_title) and coalesce(m.order_value, 0) > 0))) eerste_stap
     from lead_movements m join mleads ml on ml.id = m.lead_id
     where m.reverted_at is null and (m.moved_at >= p_van - interval '60 days')
     group by 1
@@ -157,6 +162,10 @@ as $function$
   st as (
     select ml.id, ml.woord, ml.naam, ml.created_at, ml.campagne,
       coalesce(ml.campaign_message_sent_at >= p_van and ml.campaign_message_sent_at < p_tot, false) campagne_bericht,
+      -- Route: kwam het campagnebericht vóór de eerste call-/sale-stap, dan
+      -- 'campagne' (zelf outreach), anders 'direct' (magnet-gesprek).
+      case when ml.campaign_message_sent_at is not null and ml.campaign_message_sent_at < coalesce(ev.eerste_stap, p_tot)
+        then 'campagne' else 'direct' end route,
       coalesce(ml.first_reply_at >= p_van and ml.first_reply_at < p_tot, false)
         or rx.lead_id is not null reactie,
       coalesce(ev.voorgesteld, false) voorgesteld, coalesce(ev.ingepland, false) call,
