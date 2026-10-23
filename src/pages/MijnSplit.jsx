@@ -102,7 +102,7 @@ export default function MijnSplit() {
     if (pdfBezig || !dagen) return
     setPdfBezig(true)
     try {
-      await downloadSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen, tips: tips(antw), doel: antw.doel, niveau: antw.niveau })
+      await downloadSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen, tips: tips(antw), doel: antw.doel })
     } catch (e) {
       console.error('PDF mislukt:', e)
       setFout('Downloaden lukte niet. Maak anders even een screenshot.')
@@ -256,7 +256,7 @@ export default function MijnSplit() {
                body: <Opties veld="locatie" lijst={LOCATIES} /> },
     doel: { titel: 'Wat is je doel?', hint: 'Dit bepaalt hoe je de split uitvoert.',
             body: <Opties veld="doel" lijst={DOELEN} /> },
-    niveau: { titel: 'Hoe lang train je al?', hint: 'Eerlijk is het snelst: dan train je op de juiste intensiteit.',
+    niveau: { titel: 'Hoe lang train je al?', hint: 'Eerlijk is het snelst.',
               body: <Opties veld="niveau" lijst={NIVEAUS} /> },
     gegevens: { titel: 'Waar mag je split heen?', hint: 'Je ziet hem direct hierna en kunt hem downloaden als PDF.',
       body: (

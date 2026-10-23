@@ -53,7 +53,7 @@ const TEKST = {
   upper: {
     intro: 'Borst, rug, schouders en armen in één training.',
     tip: 'Rust echt de volle tijd bij de eerste twee oefeningen. Korter rusten kost je herhalingen op de volgende set.',
-    weet: 'Twee sets tot dicht bij falen geven vrijwel dezelfde groei als vier sets waar je nog veel overhoudt. Kwaliteit boven kwantiteit.',
+    weet: 'Twee sets tot falen doen meer dan vier sets waar je nog veel overhoudt. Kwaliteit boven kwantiteit.',
   },
   full: {
     intro: 'Benen, duwen, trekken en een paar isolaties.',
@@ -73,7 +73,6 @@ const TEKST = {
 }
 const tekstVoor = (code) => TEKST[code] || TEKST[code.startsWith('upper') ? 'upper' : code.startsWith('full') ? 'full' : 'push']
 
-const INTENSITEIT = { beginner: '2-3 herh. over', gevorderd: '1-2 herh. over', ervaren: '0-1 herh. over' }
 
 // ── laden ────────────────────────────────────────────────────────────────
 
@@ -108,7 +107,10 @@ const duur = (oef) => Math.round((8 + oef.reduce((t, o) => t + (Number(o.sets) |
 const totaalSets = (oef) => oef.reduce((t, o) => t + (Number(o.sets) || 0), 0)
 const tweeCijfers = (n) => String(n).padStart(2, '0')
 
-function maakTekenaar(doc) {
+// Wit MA COACHING-logo (uitgesneden ma-logo-header.png), 177 × 159 px.
+const LOGO_VERHOUDING = 177 / 159
+
+function maakTekenaar(doc, logo) {
   const kleur = (c) => doc.setTextColor(c[0], c[1], c[2])
   const font = (fam, stijl, pt) => { doc.setFont(fam, stijl); doc.setFontSize(pt) }
 
@@ -124,9 +126,12 @@ function maakTekenaar(doc) {
 
   const achtergrond = () => { doc.setFillColor(...ZWART); doc.rect(0, 0, B, H, 'F') }
 
+  const tekenLogo = (x, y, hoogte) => {
+    if (logo) doc.addImage(logo, 'PNG', x, y, hoogte * LOGO_VERHOUDING, hoogte, 'logo-wit', 'FAST')
+  }
+
   const kop = (rechts) => {
-    font('Anton', 'normal', 10.5); kleur(WIT)
-    doc.text('MY ARC', M, 11)
+    tekenLogo(M, 5, 10)
     if (rechts) label(rechts, B - M, 10.6, { c: ZACHT, align: 'right' })
   }
 
@@ -175,22 +180,23 @@ function maakTekenaar(doc) {
     doc.lines([[r * 0.35, r * 0.38], [r * 0.65, -r * 0.8]], cx - r * 0.48, cy + 0.05)
   }
 
-  return { kleur, font, label, achtergrond, kop, voet, alinea, blok, blokHoogte, vinkje }
+  return { kleur, font, label, achtergrond, tekenLogo, kop, voet, alinea, blok, blokHoogte, vinkje }
 }
 
 // ── de PDF ───────────────────────────────────────────────────────────────
 
-export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel, niveau }) {
+export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel }) {
   const thuis = locatie === 'thuis'
   const uniek = [...new Set(split.dagen)].filter(c => dagen[c])
   const fotoVan = (c) => (thuis ? FOTO_THUIS : FOTO)[c] || (thuis ? 'thuis' : 'full')
   const coverNaam = thuis ? 'cover-thuis' : 'cover'
   const fotoNamen = [...new Set([coverNaam, ...uniek.map(fotoVan)])]
 
-  const [fontData, fotoData, transformaties] = await Promise.all([
+  const [fontData, fotoData, transformaties, logo] = await Promise.all([
     Promise.all(FONTS.map(([f]) => laad(`fonts/${f}`))),
     Promise.all(fotoNamen.map(f => laad(`${f}.jpg`))),
     Promise.all([1, 2, 3].map(i => laad(`transformatie-${i}.jpg`).then(b => b, () => null))),
+    laad('logo-wit.png').then(b => b, () => null),
   ])
   const foto = Object.fromEntries(fotoNamen.map((f, i) => [f, fotoData[i]]))
 
@@ -199,8 +205,8 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     doc.addFileToVFS(f, naarBase64(fontData[i]))
     doc.addFont(f, fam, stijl)
   })
-  const t = maakTekenaar(doc)
-  const { kleur, font, label, achtergrond, kop, voet, alinea, blok, blokHoogte, vinkje } = t
+  const t = maakTekenaar(doc, logo)
+  const { kleur, font, label, achtergrond, tekenLogo, kop, voet, alinea, blok, blokHoogte, vinkje } = t
 
   const naam = (voornaam || '').trim()
   const doelLabel = DOELEN.find(d => d.key === doel)?.label || ''
@@ -212,7 +218,7 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
   // 1. Cover ───────────────────────────────────────────────────────────────
   achtergrond()
   doc.addImage(foto[coverNaam], 'JPEG', 0, 0, B, H, coverNaam, 'FAST')
-  kop('Trainingsschema')
+  tekenLogo(B / 2 - 9, 14, 18 / LOGO_VERHOUDING)
 
   const titel = split.naam.toUpperCase()
   let pt = 78, regels
@@ -240,7 +246,7 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
   font('Source', 'black', 13); kleur(WIT)
   doc.text(`Elke training klaar in ongeveer ${minuut} minuten.`, B / 2, titelOnder + 19 + subRegels.length * 6.1, { align: 'center' })
 
-  label('MY ARC Fitness', M, H - 6.5, { pt: 7, c: ZACHT, ruimte: 1 })
+  label('Trainingsschema', M, H - 6.5, { pt: 7, c: ZACHT, ruimte: 1 })
   font('Source', 'normal', 7.5); kleur(ZACHT)
   doc.text('myarcfitness.com', B - M, H - 6.5, { align: 'right' })
 
@@ -299,9 +305,17 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     const oef = dag.oefeningen
     const tekst = tekstVoor(code)
     const fotoNaam = fotoVan(code)
+    // Logboek: per oefening één schrijfregel per set, in elke weekkolom.
+    const setRegel = 4.2
+    const rijHoogte = (o) => Math.max(1, Number(o.sets) || 1) * setRegel + 2.6
+    const tabelH = oef.reduce((t, o) => t + rijHoogte(o), 0)
+    // Past alles niet onder de volle foto, dan schuift de foto omhoog (de
+    // bovenkant valt weg, de overgang naar zwart blijft).
+    const volleFoto = B * 640 / 1240
+    const fotoH = volleFoto - Math.max(0, volleFoto + 112 + tabelH - 272)
     doc.addPage(); achtergrond()
-    const fotoH = B * 640 / 1240
-    doc.addImage(foto[fotoNaam], 'JPEG', 0, 0, B, fotoH, fotoNaam, 'FAST')
+    doc.addImage(foto[fotoNaam], 'JPEG', 0, fotoH - volleFoto, B, volleFoto, fotoNaam, 'FAST')
+    doc.setFillColor(...ZWART); doc.rect(0, fotoH, B, volleFoto, 'F')
     kop(`Training ${tweeCijfers(i + 1)} van ${tweeCijfers(uniek.length)}`)
 
     const wanneer = split.week.filter((_, k) => split.dagen[k] === code).join(' + ')
@@ -318,7 +332,7 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     const stats = [
       ['Per training', `${oef.length} oefeningen  ·  ${totaalSets(oef)} sets`],
       ['Tijd', `± ${duur(oef)} min totaal`],
-      ['Elke set', INTENSITEIT[niveau] || INTENSITEIT.gevorderd],
+      ['Elke werkset', 'Tot falen'],
     ]
     stats.forEach(([l, w], k) => {
       const x = M + k * kolom + (k ? 5 : 0)
@@ -335,33 +349,40 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     doc.text('OEFENINGEN', M, y)
     y += 5
     font('Source', 'normal', 7.5); kleur(DOF)
-    doc.text('Logboek: schrijf per week je gewicht × herhalingen op. Zo zie je zwart op wit dat je sterker wordt.', M, y)
+    doc.text('Logboek: schrijf per set je gewicht × herhalingen op, bijvoorbeeld 60 × 10. Zo zie je zwart op wit dat je sterker wordt.', M, y)
 
-    // Tabel: oefening | sets × reps | rust | week 1-4
-    const xSets = 98, xRust = 117, xWeek = 124
+    // Tabel: oefening | sets × reps | rust | set | week 1-4
+    const xSets = 92, xRust = 108, xSet = 116, xWeek = 121
     const weekW = (B - M - xWeek) / 4
     y += 7
     label('Oefening', M, y, { pt: 5.6, c: DOF })
     label('Sets × reps', xSets, y, { pt: 5.6, c: WIT, align: 'right' })
     label('Rust', xRust, y, { pt: 5.6, c: DOF, align: 'right' })
+    label('Set', xSet, y, { pt: 5.6, c: DOF, align: 'center' })
     for (let w = 0; w < 4; w++) label(`Week ${w + 1}`, xWeek + w * weekW + weekW - 1, y, { pt: 5.6, c: DOF, align: 'right' })
     y += 2.5
     doc.setDrawColor(...LIJN); doc.line(M, y, B - M, y)
-    const rij = oef.length > 6 ? 7.8 : 8.6
     oef.forEach((o, k) => {
+      const rij = rijHoogte(o)
+      const sets = Math.max(1, Number(o.sets) || 1)
       const mid = y + rij / 2 + 1.2
       font('Source', 'normal', 6.5); kleur(DOF)
       doc.text(tweeCijfers(k + 1), M, mid)
       font('Source', 'normal', 9); kleur(WIT)
-      doc.text(doc.splitTextToSize(o.naam, xSets - M - 26)[0], M + 6, mid)
+      doc.text(doc.splitTextToSize(o.naam, xSets - M - 22)[0], M + 6, mid)
       font('Source', 'black', 9); kleur(WIT)
       doc.text(`${o.sets ?? ''} × ${o.reps || ''}`, xSets, mid, { align: 'right' })
       font('Source', 'normal', 8.5); kleur(GRIJS)
       doc.text(o.rust || '', xRust, mid, { align: 'right' })
-      doc.setDrawColor(...LIJN); doc.setLineWidth(0.2)
-      for (let w = 0; w < 4; w++) {
-        const x = xWeek + w * weekW + 3
-        doc.setDrawColor(70, 70, 70); doc.line(x, mid + 0.8, x + weekW - 4, mid + 0.8)
+      for (let s = 0; s < sets; s++) {
+        const lijnY = y + 1.3 + (s + 1) * setRegel
+        font('Source', 'bold', 7); kleur(GRIJS)
+        doc.text(String(s + 1), xSet, lijnY - 0.4, { align: 'center' })
+        doc.setDrawColor(70, 70, 70); doc.setLineWidth(0.2)
+        for (let w = 0; w < 4; w++) {
+          const x = xWeek + w * weekW + 3
+          doc.line(x, lijnY, x + weekW - 4, lijnY)
+        }
       }
       y += rij
       doc.setDrawColor(...LIJN); doc.line(M, y, B - M, y)
@@ -373,9 +394,9 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     y += 6.5
     const rustTekst = oef[0]?.rust || '2 min'
     const stappen = [
-      ['1. Opwarmen.', 'Vijf minuten licht cardio, dan twee opwarmsets op de helft en driekwart van je werkgewicht.'],
+      ['1. Opwarmen.', 'Drie opwarmsets: 50% van je werkgewicht × 6-8, 75% × 3-4 en 100% × 1. Daarna begin je aan je werksets.'],
       ['2. Werksets.', tips[0]],
-      ['3. Rust.', `Neem ${rustTekst} tussen de sets. Pas als je ademhaling rustig is, begin je aan de volgende.`],
+      ['3. Rust.', `Neem minimaal ${rustTekst} tussen de sets. Begin pas aan de volgende set als je spieren weer hersteld voelen.`],
       ['4. Noteren.', 'Schrijf je gewicht en herhalingen in het logboek. Volgende week: één herhaling of een paar kilo meer.'],
     ]
     stappen.forEach(([v, r]) => { y += alinea(v, r, M, y, B - 2 * M, 9.3, 4.4) + 1.4 })
@@ -439,7 +460,8 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
 
   // 5. Coaching ────────────────────────────────────────────────────────────
   doc.addPage(); achtergrond()
-  const top = 50
+  const top = 58
+  tekenLogo(B / 2 - 10, 18, 20 / LOGO_VERHOUDING)
   font('Anton', 'normal', 30); kleur(WIT)
   doc.text('WIL JIJ 6 WEKEN GRATIS COACHING?', B / 2, top, { align: 'center' })
   const punten = ['Persoonlijk voedingsplan', 'Persoonlijk trainingsplan', '1-op-1 begeleiding', 'Stok achter de deur', 'Alles in 1 app']

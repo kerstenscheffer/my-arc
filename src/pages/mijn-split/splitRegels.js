@@ -42,15 +42,11 @@ export const LOCATIES = [
   { key: 'thuis', label: 'Thuis', sub: 'Dumbbells en een bankje' },
 ]
 
-// Drie korte regels onder de split: hoe je hem uitvoert, afgestemd op doel en
-// ervaring. Kort gehouden; de split is het product, dit is de handleiding.
-export function tips({ doel, niveau }) {
+// Drie korte regels onder de split: hoe je hem uitvoert, afgestemd op het
+// doel. Elke werkset gaat tot falen, ongeacht ervaring. Kort gehouden; de split is het product, dit is de handleiding.
+export function tips({ doel }) {
   const t = []
-  t.push(niveau === 'beginner'
-    ? 'Eindig elke set met 2 à 3 herhalingen over. Eerst de techniek, dan het gewicht.'
-    : niveau === 'ervaren'
-      ? 'Ga op elke set tot 0 à 1 herhaling van falen. Twee zware sets doen meer dan vier halve.'
-      : 'Eindig elke set met 1 à 2 herhalingen over. Haal je de bovenkant van de reps? Gewicht erbij.')
+  t.push('Ga elke werkset tot falen: door tot je geen nette herhaling meer kunt maken. Haal je de bovenkant van de reps? Volgende keer gewicht erbij.')
   t.push('Schrijf je gewichten op en probeer elke week een herhaling of een paar kilo meer te doen.')
   t.push(doel === 'vetverlies'
     ? 'Train precies zo zwaar als hierboven: dat houdt je spieren vast. Het vet gaat eraf via je voeding en 8 à 10k stappen per dag.'
