@@ -2,7 +2,7 @@
 //
 // Comment-magnet-trechter (23 okt 2026): reel met "comment WOORD" →
 // comments → commenters op het bord → opvolging en reactie → call → sale.
-// Als trechter van vijf lagen (dezelfde fases als bij Ads): Reel, Comment,
+// Dezelfde vijf-fasen-rij als de advertenties (FaseTrechter): Reel, Comment,
 // Op het bord, Gesprek, Call & close. Eronder per woord een regel.
 //
 // Bron: get_magnet_trechter (zie magnet-trechter.sql). Reels en comments uit
@@ -12,9 +12,10 @@
 
 import { useState } from 'react'
 import {
-  ChevronDown, Film, Eye, MessageSquare, UserPlus, Send, MessageCircle, PhoneOutgoing, CalendarCheck, PhoneCall, Trophy,
+  Film, Eye, MessageSquare, UserPlus, Send, MessageCircle, PhoneOutgoing, CalendarCheck, PhoneCall, Trophy,
 } from 'lucide-react'
-import { GROEN, ZWAK, beoordeel, vatFaseSamen, vindVast } from './fases'
+import FaseTrechter from './FaseTrechter'
+import { GROEN, ZWAK, beoordeel, vatFaseSamen } from './fases'
 
 // Richtwaarden. Comments en reactie op je eigen cijfers (23 okt 2026):
 //  - commenters per view: Kersten beantwoordt elke comment één keer, dus
@@ -114,100 +115,6 @@ function maakFases(t) {
   ].map(vatFaseSamen)
 }
 
-// Trechter van vijf vakken die smaller worden (niet op schaal), in de stijl
-// van de Ads-fases: donker vak met dunne rand, kleur alleen in het bolletje,
-// het label en de cijfers met een oordeel. Het bolletje van de fase die
-// vastloopt pulseert. Tik = de metingen van die fase klappen eronder open.
-function Trechter({ fases, m }) {
-  const [open, setOpen] = useState(null)
-  const vast = vindVast(fases)
-  const n = fases.length
-  const breedte = (i) => 100 - (i * 32) / (n - 1)   // 100% → 68%
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-      {fases.map((f, i) => {
-        const gemeten = f.oordeel.rang >= 0
-        const k = f.oordeel.kleur
-        const isVast = vast?.id === f.id
-        const isOpen = open === f.id
-        return (
-          <div key={f.id} style={{ width: m ? `${Math.max(breedte(i), 84)}%` : `${breedte(i)}%`, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {/* Eén vak, alles gecentreerd: titel boven, cijfers eronder. */}
-            <button onClick={() => setOpen(o => (o === f.id ? null : f.id))} aria-expanded={isOpen} style={{
-              width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-              padding: m ? '0.9rem 0.8rem' : '1rem 1.2rem', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center', color: '#fff',
-              background: isOpen ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.025)',
-              border: `1px solid ${isOpen ? 'rgba(255,255,255,0.35)' : isVast ? `${k}66` : 'rgba(255,255,255,0.08)'}`,
-              transition: 'background 0.15s, border-color 0.15s', WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{
-                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
-                  fontSize: '0.82rem', fontWeight: 900,
-                  boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
-                  animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
-                }}>{i + 1}</span>
-                <span style={{ fontSize: '1rem', fontWeight: 900 }}>{f.naam}</span>
-                <span style={{
-                  fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                  padding: '2px 7px', borderRadius: 6,
-                  color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
-                }}>{f.oordeel.tekst}</span>
-                <ChevronDown size={14} strokeWidth={2.6} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-              </span>
-              <span style={{ display: 'flex', justifyContent: 'center', gap: m ? 18 : 28, flexWrap: 'wrap' }}>
-                {f.preview.map(([label, waarde, meting]) => {
-                  const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
-                  return (
-                    <span key={label} style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: m ? '1.1rem' : '1.25rem', fontWeight: 900, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: o && o.rang >= 0 ? o.kleur : '#fff' }}>{waarde}</span>
-                      <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: ZWAK, whiteSpace: 'nowrap' }}>{label}</span>
-                    </span>
-                  )
-                })}
-              </span>
-            </button>
-
-            {/* Metingen van deze fase, onder het vak. */}
-            {isOpen && (
-              <div style={{ borderRadius: 14, border: `1px solid ${gemeten ? `${k}55` : 'rgba(255,255,255,0.12)'}`, background: gemeten ? `${k}0d` : 'rgba(255,255,255,0.02)', padding: m ? '0.9rem' : '1rem 1.2rem', marginBottom: 4 }}>
-                <div style={{ display: 'flex', gap: m ? 18 : 32, flexWrap: 'wrap' }}>
-                  {f.metingen.map(x => {
-                    const [groot, klein] = String(x.tekst).split(' · ')
-                    const kleur = x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff'
-                    const Icoon = ICONEN[x.label]
-                    const schud = f.zwakste === x.label
-                    return (
-                      <div key={x.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, minWidth: m ? 120 : 150, maxWidth: 260 }}>
-                        <span style={{
-                          width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: kleur === '#fff' ? 'rgba(255,255,255,0.08)' : `${kleur}22`,
-                          ...(schud ? { boxShadow: `0 0 0 2px ${kleur}, 0 0 16px ${kleur}99`, animation: 'vastSchud 2.4s ease-in-out infinite' } : {}),
-                        }}>
-                          {Icoon && <Icoon size={19} strokeWidth={2.4} color={kleur} />}
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: m ? '1.45rem' : '1.6rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: klein ? '#fff' : kleur }}>{groot}</span>
-                          {klein && <span style={{ fontSize: '0.8rem', fontWeight: 900, color: kleur }}>{klein}</span>}
-                        </span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 900, lineHeight: 1.2 }}>{x.label}</span>
-                        {x.sub && <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ZWAK, lineHeight: 1.35 }}>{x.sub}</span>}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      })}
-      <style>{'@keyframes vastPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } } @keyframes vastSchud { 0%,60%,100% { transform: translateX(0) rotate(0) } 64% { transform: translateX(-4px) rotate(-6deg) } 70% { transform: translateX(4px) rotate(6deg) } 76% { transform: translateX(-3px) rotate(-4deg) } 82% { transform: translateX(3px) rotate(4deg) } 88% { transform: translateX(0) rotate(0) } }'}</style>
-    </div>
-  )
-}
-
 export default function MagnetTrechter({ data, m, laden }) {
   // Welk woord; leeg = alle magnets samen.
   const [woord, setWoord] = useState('')
@@ -230,10 +137,9 @@ export default function MagnetTrechter({ data, m, laden }) {
 
   return (
     <div style={{ opacity: laden ? 0.5 : 1, transition: 'opacity 0.15s' }}>
-      <Trechter fases={fases} m={m} />
-      <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 10, lineHeight: 1.5 }}>
-        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een vak voor de cijfers erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. De trechter is niet op schaal.
-      </div>
+      <FaseTrechter fases={fases} m={m} iconen={ICONEN} uitleg={<>
+        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen.
+      </>} />
 
       {/* Per woord: welke magnet het goed doet. Tik = trechter van dat woord. */}
       <div style={{ marginTop: m ? 28 : 36 }}>
