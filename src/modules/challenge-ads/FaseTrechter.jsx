@@ -55,29 +55,27 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
               boxShadow: open ? 'inset 0 -2px 0 rgba(255,255,255,0.55)' : 'none',
               transition: 'background 0.15s', WebkitTapHighlightColor: 'transparent',
             }}>
-              {/* Bolletje, naam met het oordeel-label erachter op dezelfde
-                  hoogte, de vraag eronder; onderaan de belangrijkste cijfers. */}
-              <span style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
-                <span style={{
-                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
-                  fontSize: '0.88rem', fontWeight: 900,
-                  boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
-                  animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
-                }}>{i + 1}</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
-                    <span style={{
-                      fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                      padding: '2px 7px', borderRadius: 6,
-                      color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
-                    }}>{f.oordeel.tekst}</span>
-                  </span>
-                  <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3, marginTop: 2 }}>{f.vraag}</span>
+              {/* Bolletje, naam en oordeel op één hoogte; de vraag eronder over
+                  de volle breedte van het vak. */}
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                  <span style={{
+                    width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
+                    fontSize: '0.8rem', fontWeight: 900,
+                    boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
+                    animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
+                  }}>{i + 1}</span>
+                  <span style={{ fontSize: '0.98rem', fontWeight: 900, whiteSpace: 'nowrap' }}>{f.naam}</span>
+                  <span style={{
+                    fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                    padding: '2px 7px', borderRadius: 6,
+                    color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
+                  }}>{f.oordeel.tekst}</span>
+                  <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, marginLeft: 'auto', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </span>
-                <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, alignSelf: 'flex-start', marginTop: 4, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3 }}>{f.vraag}</span>
               </span>
               {/* Cijfers altijd op één regel (Kersten). Vakken hebben geen minWidth 0,
                   dus een vak wordt minstens zo breed als zijn cijferregel; past
