@@ -7,13 +7,15 @@
 // Zelfde huisstijl als /challenge (23 okt 2026): vaste balk met logo en witte
 // pil, kop, video op de overgang zwart/wit, groene knop, en de vragen in een
 // modal midden in beeld, één vraag per scherm met de groene voortgangsbalk.
-// Bewust géén meet() uit challengeTracking: het Ads-scherm telt alle
-// challenge_events op, ongeacht de pagina, en dan zouden split-bezoekers in
-// de challenge-cijfers komen.
+// Meting met dezelfde meet() als /challenge (challenge_events, pad
+// /mijn-split). Het Ads-scherm filtert sinds 23 okt 2026 per pagina, dus dit
+// komt niet tussen de challenge-cijfers. Zelfde gebeurtenissen: bezoek, tijd,
+// video_*, knop, form_start, form_vraag/form_stap per vraag, form_klaar, en
+// eigen: pdf_download.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Download, Loader2, Play, Volume2, VolumeX, Pause, X } from 'lucide-react'
 import db from '../services/DatabaseService'
-import { herkomst } from './challengeTracking'
+import { herkomst, meet, volgTijdOpPagina } from './challengeTracking'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 import { SPLITS, DAG_NAAM, WEEK, DOELEN, NIVEAUS, LOCATIES, tips } from './mijn-split/splitRegels'
 import { downloadSplitPdf, fotoVoor, duur, totaalSets } from './mijn-split/splitPdf'
@@ -155,6 +157,14 @@ function Video({ m }) {
   const iframeRef = useRef(null)
   const spelerRef = useRef(null)
   const verbergTimer = useRef(null)
+  // Mijlpalen van de echte voortgang, één keer per bezoek. Gedempt kijken telt niet.
+  const mijlpalen = useRef(new Set())
+  useEffect(() => {
+    if (gedempt) return
+    [[0.25, 'video_25'], [0.5, 'video_50'], [0.75, 'video_75'], [0.98, 'video_100']].forEach(([grens, naam]) => {
+      if (voortgang >= grens && !mijlpalen.current.has(naam)) { mijlpalen.current.add(naam); meet(naam) }
+    })
+  }, [voortgang, gedempt])
 
   const directeEmbed = `https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
   const appUrl = appSafeEmbedUrl(directeEmbed)
@@ -233,7 +243,7 @@ function Video({ m }) {
   if (!gestart) {
     return (
       <div style={kader}>
-        <button onClick={() => VIDEO_ID && setGestart(true)} disabled={!VIDEO_ID} aria-label="Video afspelen" style={{
+        <button onClick={() => { if (VIDEO_ID) { setGestart(true); meet('video_start') } }} disabled={!VIDEO_ID} aria-label="Video afspelen" style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%', padding: 0, border: 'none',
           cursor: VIDEO_ID ? 'pointer' : 'default', background: `url(${POSTER}) center / cover`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -401,6 +411,15 @@ function SplitFlow({ m }) {
 
   useEffect(() => () => clearTimeout(doorTimer.current), [])
   useEffect(() => { bovenRef.current?.scrollIntoView?.({ block: 'start' }) }, [stap])
+  // Elke vraag die in beeld komt: "gezien"; beantwoord = form_stap. Zo ziet
+  // het Ads-scherm per vraag hoeveel mensen afhaken.
+  const gezien = useRef(new Set())
+  useEffect(() => {
+    const vraag = STAPPEN[stap]
+    if (!vraag || gezien.current.has(vraag)) return
+    gezien.current.add(vraag)
+    meet('form_vraag', { meta: { stap: stap + 1, vraag } })
+  }, [stap])
 
   // De dagen van de gekozen locatie alvast ophalen, zodat het resultaat er
   // direct staat na het opslaan.
@@ -419,6 +438,7 @@ function SplitFlow({ m }) {
   const gegevensOk = antw.voornaam.trim().length > 0 && emailOk(antw.email)
 
   const kies = (veld, waarde) => {
+    meet('form_stap', { meta: { stap: stap + 1, vraag: veld } })
     setAntw(a => ({ ...a, [veld]: waarde }))
     clearTimeout(doorTimer.current)
     doorTimer.current = setTimeout(() => setStap(s => s + 1), 220)
@@ -433,7 +453,7 @@ function SplitFlow({ m }) {
       const niveauLabel = NIVEAUS.find(n => n.key === antw.niveau)?.label
       const locLabel = LOCATIES.find(l => l.key === antw.locatie)?.label
       const u = utm.current || {}
-      const { error } = await db.supabase.rpc('submit_mijn_split', { p: {
+      const { data: leadId, error } = await db.supabase.rpc('submit_mijn_split', { p: {
         voornaam: antw.voornaam.trim(),
         email: antw.email.trim(),
         doel: doelLabel,
@@ -449,6 +469,8 @@ function SplitFlow({ m }) {
         utm_content: u.utm_content, referrer: u.referrer,
       } })
       if (error) throw error
+      meet('form_stap', { meta: { stap: TOTAAL, vraag: 'gegevens' } })
+      meet('form_klaar', { meta: { uitkomst: 'A', vraag: 'gegevens' }, lead_id: leadId || null })
       setStap(TOTAAL)
     } catch (e) {
       console.error('mijn-split opslaan mislukt:', e)
@@ -461,6 +483,7 @@ function SplitFlow({ m }) {
     setPdfBezig(true); setFout('')
     try {
       await downloadSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen, tips: tips(antw), doel: antw.doel })
+      meet('pdf_download', { meta: { split: split.naam } })
     } catch (e) {
       console.error('PDF mislukt:', e)
       setFout('Downloaden lukte niet. Probeer het nog een keer.')
@@ -661,8 +684,18 @@ export default function MijnSplit() {
   const [open, setOpen] = useState(false)
   const [zwevend, setZwevend] = useState(false)
   const heroCtaRef = useRef(null)
-  const openForm = () => setOpen(true)
+  const formGestart = useRef(false)
+  const openForm = () => {
+    setOpen(true); meet('knop')
+    if (!formGestart.current) { formGestart.current = true; meet('form_start') }
+  }
   const sluit = useCallback(() => setOpen(false), [])
+
+  // Bezoek bij binnenkomst, tijd op de pagina tot het verlaten.
+  useEffect(() => {
+    meet('bezoek')
+    return volgTijdOpPagina()
+  }, [])
 
   useEffect(() => {
     const check = () => setM(window.innerWidth <= 768)
