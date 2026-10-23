@@ -23,13 +23,13 @@ import { maakMenuPdf } from './mijn-menu/menuPdf'
 import { mailPdf } from './leadmagnet/mailPdf'
 
 // YouTube-id van de uitlegvideo. Leeg = stilstaand beeld zonder afspeelknop.
-const VIDEO_ID = ''
+const VIDEO_ID = 'vhcQgldADCc'
 
 const PAGINA = {
   pil: 'Gratis weekmenu',
   kop: 'Wat moet jij eten om je doel te halen?',
   sub: 'Beantwoord 8 korte vragen en krijg een weekmenu op jouw calorieën, uit de gerechten van mijn klanten.',
-  videoId: VIDEO_ID, poster: '/mijn-menu/poster.jpg', cta: 'Maak mijn menu',
+  videoId: VIDEO_ID, poster: '/mijn-menu/thumbnail.jpg', cta: 'Maak mijn menu',
   stappen: [
     { kop: 'Vragen', sub: '8 korte vragen' },
     { kop: 'Menu', sub: 'op jouw calorieën' },
