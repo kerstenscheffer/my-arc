@@ -2,8 +2,8 @@
 // De split als A4-PDF in de stijl van de ontbijtgids: zwart vel, Anton-koppen,
 // Source Sans voor de tekst, een foto bovenaan elke training. Opbouw:
 // cover → week → één pagina per training (oefeningen + logboek voor 4 weken)
-// → hoe je hem uitvoert → coaching-aanbod. Getekend met jsPDF met de fonts
-// ingebed, zodat de tekst scherp blijft. Fonts en foto's staan in
+// → hoe je hem uitvoert → de app (uitvoering en progressie). Getekend met
+// jsPDF met de fonts ingebed, zodat de tekst scherp blijft. Fonts en foto's staan in
 // public/mijn-split/ en worden pas geladen als iemand op downloaden drukt.
 import jsPDF from 'jspdf'
 import { DAG_NAAM, WEEK, DOELEN } from './splitRegels'
@@ -174,13 +174,7 @@ function maakTekenaar(doc, logo) {
     return 15 + (doc.splitTextToSize(tekst, w - 8).length - 1) * 4.2
   }
 
-  const vinkje = (cx, cy, r = 2.4) => {
-    doc.setFillColor(...WIT); doc.circle(cx, cy, r, 'F')
-    doc.setDrawColor(...ZWART); doc.setLineWidth(0.55)
-    doc.lines([[r * 0.35, r * 0.38], [r * 0.65, -r * 0.8]], cx - r * 0.48, cy + 0.05)
-  }
-
-  return { kleur, font, label, achtergrond, tekenLogo, kop, voet, alinea, blok, blokHoogte, vinkje }
+  return { kleur, font, label, achtergrond, tekenLogo, kop, voet, alinea, blok, blokHoogte }
 }
 
 // ── de PDF ───────────────────────────────────────────────────────────────
@@ -192,13 +186,16 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
   const coverNaam = thuis ? 'cover-thuis' : 'cover'
   const fotoNamen = [...new Set([coverNaam, ...uniek.map(fotoVan)])]
 
-  const [fontData, fotoData, transformaties, logo] = await Promise.all([
+  const kleinNamen = [...new Set(uniek.map(fotoVan))]
+  const [fontData, fotoData, kleinData, appBeelden, logo] = await Promise.all([
     Promise.all(FONTS.map(([f]) => laad(`fonts/${f}`))),
     Promise.all(fotoNamen.map(f => laad(`${f}.jpg`))),
-    Promise.all([1, 2, 3].map(i => laad(`transformatie-${i}.jpg`).then(b => b, () => null))),
+    Promise.all(kleinNamen.map(f => laad(`klein-${f}.jpg`).then(b => b, () => null))),
+    Promise.all(['app-uitvoering', 'app-progressie'].map(f => laad(`${f}.jpg`).then(b => b, () => null))),
     laad('logo-wit.png').then(b => b, () => null),
   ])
   const foto = Object.fromEntries(fotoNamen.map((f, i) => [f, fotoData[i]]))
+  const klein = Object.fromEntries(kleinNamen.map((f, i) => [f, kleinData[i]]))
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
   FONTS.forEach(([f, fam, stijl], i) => {
@@ -206,7 +203,7 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     doc.addFont(f, fam, stijl)
   })
   const t = maakTekenaar(doc, logo)
-  const { kleur, font, label, achtergrond, tekenLogo, kop, voet, alinea, blok, blokHoogte, vinkje } = t
+  const { kleur, font, label, achtergrond, tekenLogo, kop, voet, alinea, blok, blokHoogte } = t
 
   const naam = (voornaam || '').trim()
   const doelLabel = DOELEN.find(d => d.key === doel)?.label || ''
@@ -269,7 +266,11 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     const midden = y + rijH / 2
 
     doc.setLineWidth(0.25)
-    if (dag) { doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.roundedRect(M, y + 4, 22, 22, 1.2, 1.2, 'FD') }
+    if (dag) {
+      doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.roundedRect(M, y + 4, 22, 22, 1.2, 1.2, 'FD')
+      const k = klein[fotoVan(code)]
+      if (k) { doc.addImage(k, 'JPEG', M, y + 4, 22, 22, `klein-${fotoVan(code)}`, 'FAST'); doc.roundedRect(M, y + 4, 22, 22, 1.2, 1.2, 'S') }
+    }
     else { doc.setDrawColor(...LIJN); doc.roundedRect(M, y + 4, 22, 22, 1.2, 1.2, 'S') }
     font('Anton', 'normal', 16); kleur(dag ? WIT : DOF)
     doc.text(d.toUpperCase(), M + 11, midden + 2.8, { align: 'center' })
@@ -458,30 +459,38 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
   })
   voet(voetLinks, nr(paginas - 1))
 
-  // 5. Coaching ────────────────────────────────────────────────────────────
+  // 5. De app ─────────────────────────────────────────────────────────────
+  // De twee dingen waar mensen met een los schema op vastlopen: hoe voer je
+  // een oefening uit, en word je wel sterker? Met screenshots uit de app.
   doc.addPage(); achtergrond()
-  const top = 58
-  tekenLogo(B / 2 - 10, 18, 20 / LOGO_VERHOUDING)
-  font('Anton', 'normal', 30); kleur(WIT)
-  doc.text('WIL JIJ 6 WEKEN GRATIS COACHING?', B / 2, top, { align: 'center' })
-  const punten = ['Persoonlijk voedingsplan', 'Persoonlijk trainingsplan', '1-op-1 begeleiding', 'Stok achter de deur', 'Alles in 1 app']
-  font('Source', 'black', 13)
-  const puntW = Math.max(...punten.map(p => doc.getTextWidth(p))) + 8
-  const px = B / 2 - puntW / 2
-  punten.forEach((p, k) => {
-    const yy = top + 16 + k * 8.6
-    vinkje(px + 2.4, yy - 1.5)
-    font('Source', 'black', 13); kleur(WIT)
-    doc.text(p, px + 8, yy)
+  tekenLogo(B / 2 - 9, 12, 18 / LOGO_VERHOUDING)
+  font('Anton', 'normal', 28); kleur(WIT)
+  doc.text('ZO TRAIN JE IN MIJN APP', B / 2, 44, { align: 'center' })
+  font('Source', 'normal', 10); kleur(ZACHT)
+  doc.text(doc.splitTextToSize('Een schema is een begin. De meeste mensen lopen vast op twee dingen: voer ik het goed uit, en word ik eigenlijk wel sterker?', 150),
+    B / 2, 52, { align: 'center', lineHeightFactor: 1.45 })
+
+  const kolomW = B / 2 - M - 4
+  const telW = 76, telH = telW * 1792 / 932
+  const appBlokken = [
+    ['Uitvoering', 'Bij elke oefening staat een video waarin ik laat zien hoe je hem uitvoert en waar je op let.', appBeelden[0]],
+    ['Progressie', 'Je logt je sets en ziet direct wat je de vorige keer deed. De grafiek laat zien hoeveel sterker je wordt.', appBeelden[1]],
+  ]
+  appBlokken.forEach(([kopje, tekst, beeld], k) => {
+    const x = k ? B / 2 + 4 : M
+    font('Anton', 'normal', 26); kleur(DOF)
+    doc.text(tweeCijfers(k + 1), x, 80)
+    font('Anton', 'normal', 15); kleur(WIT)
+    doc.text(kopje.toUpperCase(), x + 15, 74.5)
+    font('Source', 'normal', 9.5); kleur(ZACHT)
+    doc.text(doc.splitTextToSize(tekst, kolomW - 15), x + 15, 80.5, { lineHeightFactor: 1.4 })
+    const tx = x + (kolomW - telW) / 2, ty = 98
+    if (beeld) doc.addImage(beeld, 'JPEG', tx, ty, telW, telH, `app-${k}`, 'FAST')
+    else { doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.roundedRect(tx, ty, telW, telH, 4, 4, 'FD') }
   })
-  const fotos = transformaties.filter(Boolean)
-  if (fotos.length) {
-    const fw = 58, fh = fw * 1350 / 1080, gat = 4
-    const startX = B / 2 - (fotos.length * fw + (fotos.length - 1) * gat) / 2
-    fotos.forEach((f, k) => doc.addImage(f, 'JPEG', startX + k * (fw + gat), top + 66, fw, fh, `transformatie-${k}`, 'FAST'))
-  }
-  font('Source', 'black', 17); kleur(WIT)
-  doc.text('DM mij "CHALLENGE" voor meer informatie', B / 2, top + 66 + 72.5 + 16, { align: 'center' })
+
+  font('Source', 'black', 16); kleur(WIT)
+  doc.text('DM mij "APP" voor meer informatie', B / 2, 98 + telH + 13, { align: 'center' })
   label('MY ARC Kersten', M, H - 6.5, { stijl: 'normal', c: DOF, ruimte: 0.8 })
   font('Source', 'normal', 7); kleur(DOF)
   doc.text('@myarcfitness', B - M, H - 6.5, { align: 'right' })
