@@ -35,7 +35,7 @@ import {
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText, Columns2,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
   Bell, Bug, Lightbulb, Smartphone, AlertCircle, Image as ImageIcon, FlaskConical,
-  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck, Megaphone
+  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare, CalendarCheck
 } from 'lucide-react'
 
 // Tabbladen als losse stukken: alleen het tabblad dat je opent wordt
@@ -54,7 +54,6 @@ const CoachCheckinDashboard = lazy(() => import('../modules/client-checkin/Coach
 const CoachOutputDashboard = lazy(() => import('../modules/output-planning/CoachOutputDashboard'))
 const ProductivityHub = lazy(() => import('../modules/productivity/ProductivityHub'))
 const FunnelDashboard = lazy(() => import('../modules/qualification-funnel').then(m => ({ default: m.FunnelDashboard })))
-const ChallengeAdsDashboard = lazy(() => import('../modules/challenge-ads/ChallengeAdsDashboard'))
 const SpotsManager = lazy(() => import('../modules/spots/SpotsManager'))
 const AppVersiesPaneel = lazy(() => import('../modules/app-update/AppVersiesPaneel'))
 const NotificationHub = lazy(() => import('../modules/notifications/NotificationHub'))
@@ -105,8 +104,7 @@ const MORE_CATEGORIES = [
     label: 'Gameplan',
     items: [
       { id: 'productivity', label: 'Productivity', icon: Target },
-      // Wat de Meta-advertenties voor de challenge opleveren, per hook.
-      { id: 'ads', label: 'Ads', icon: Megaphone }
+      // Ads zit sinds 23 okt 2026 in het Leads-tabblad (schakelaar bovenaan).
     ]
   },
   {
@@ -165,9 +163,13 @@ const getTabLabel = (id) => {
 // ============================================
 // HASH ROUTING HELPERS
 // ============================================
+// Tabbladen die opgegaan zijn in een ander tabblad; oude links en
+// bladwijzers komen daar uit. #ads opent Leads, en die toont dan Ads.
+const OUDE_TABS = { ads: 'leads' }
+
 const getHashTab = () => {
   const hash = window.location.hash.replace('#', '')
-  const base = hash.split(':')[0]
+  const base = OUDE_TABS[hash.split(':')[0]] || hash.split(':')[0]
   return ALL_TAB_IDS.includes(base) ? base : 'command'
 }
 
@@ -337,7 +339,7 @@ export default function CoachHub() {
     const parseHash = () => {
       const hash = window.location.hash.replace('#', '')
       const parts = hash.split(':')
-      const tab = ALL_TAB_IDS.includes(parts[0]) ? parts[0] : 'command'
+      const tab = getHashTab()
       setActiveTab(tab)
       if (parts[0] === 'ai-meals' && parts[1]) {
         setReviewPlanId(parts[1])
@@ -539,8 +541,6 @@ export default function CoachHub() {
         return <SalesSection db={db} />
       case 'funnel':
         return <FunnelDashboard isMobile={isMobile} />
-      case 'ads':
-        return <ChallengeAdsDashboard db={db} isMobile={isMobile} />
       case 'client-view':
         return <ClientViewTab db={db} isMobile={isMobile} />
 

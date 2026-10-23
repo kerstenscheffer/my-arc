@@ -2,7 +2,7 @@
 // VERSION 5.0 - COMPACT HEADER + PILL STRIP + ZERO BLOAT
 // Follows MY ARC Styling Guide v2 — compact, data-driven, zero bullshit
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { 
   Users, BarChart3, Settings, RefreshCw, Download, LayoutGrid,
   Target, MessageCircle, TrendingUp, ClipboardList, ChevronDown,
@@ -18,6 +18,12 @@ import LeadAnalyticsDashboard from '../lead-analytics/LeadAnalyticsDashboard'
 import IntakeTab from './components/IntakeTab'
 import LeadMoreMenu from './components/LeadMoreMenu'
 import { SOPModal } from './components/DailyStatsBar'
+import { colors, radius, space, border } from '../../ui/tokens'
+
+// Ads (wat de Meta-advertenties voor de challenge opleveren) hoort bij de
+// leads; het stond los in het Meer-menu. Lazy: wie alleen het bord opent,
+// laadt de ads-code niet.
+const ChallengeAdsDashboard = lazy(() => import('../challenge-ads/ChallengeAdsDashboard'))
 
 // GOLD THEME (consistent with CoachHub)
 const G = {
@@ -45,8 +51,26 @@ const TABS = [
   { id: 'settings', label: 'Settings', icon: Settings }
 ]
 
+// Bovenste schakelaar: Leads of Ads. Staat in de hash (#leads:ads), zodat een
+// herlaadbeurt op dezelfde plek uitkomt; het oude #ads komt ook hier uit.
+const leesOnderdeel = () => {
+  const h = window.location.hash.replace('#', '')
+  return (h === 'ads' || h.split(':')[1] === 'ads') ? 'ads' : 'leads'
+}
+
 export default function LeadManagement({ db, isMobile, coachId, user }) {
+  const [onderdeel, setOnderdeel] = useState(leesOnderdeel)
+  const kiesOnderdeel = (o) => {
+    setOnderdeel(o)
+    // replaceState: wisselen hoort niet in de terug-geschiedenis.
+    history.replaceState(null, '', o === 'ads' ? '#leads:ads' : '#leads')
+  }
   const [activeView, setActiveView] = useState('kanban')
+  // De lijst hieronder (leads + stats) is alleen voor de Overzicht-weergave.
+  // Die laadde altijd mee én hield het bord tegen tot hij binnen was.
+  const overzichtOpen = onderdeel === 'leads' && activeView === 'overview'
+  const overzichtOpenRef = useRef(overzichtOpen)
+  overzichtOpenRef.current = overzichtOpen
   const [moreTabsOpen, setMoreTabsOpen] = useState(false)
   const [showSOP, setShowSOP] = useState(false)
   const [leads, setLeads] = useState([])
@@ -93,8 +117,8 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
   }, [coachId])
 
   useEffect(() => {
-    if (leadService) { loadLeads(); loadStats() }
-  }, [leadService, filters, pagination.page])
+    if (leadService && overzichtOpen) { loadLeads(); loadStats() }
+  }, [leadService, filters, pagination.page, overzichtOpen])
 
   const initializeLeadManagement = async () => {
     try {
@@ -132,7 +156,8 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
   }
 
   const loadLeads = async (showLoader = true) => {
-    if (!leadService || !coachId) return
+    // Ref: de realtime-handler roept dit aan met een closure van bij het openen.
+    if (!leadService || !coachId || !overzichtOpenRef.current) return
     try {
       if (showLoader) setLoading(true)
       const filterParams = {
@@ -155,7 +180,7 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
   }
 
   const loadStats = async () => {
-    if (!leadService || !coachId) return
+    if (!leadService || !coachId || !overzichtOpenRef.current) return
     try {
       const dateRangeMap = { 'today': 1, 'week': 7, 'month': 30, 'quarter': 90 }
       const days = dateRangeMap[filters.dateRange] || 30
@@ -300,7 +325,7 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
   // ============================================
   // LOADING STATE
   // ============================================
-  if (loading && leads.length === 0) {
+  if (!leadService && loading) {
     return (
       <div style={{
         minHeight: '400px',
@@ -329,154 +354,184 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       margin: '0 auto',
       transform: 'translateZ(0)'
     }}>
-      {/* Datum + stats staan nu samengevoegd in de PeriodStatsBar (in de kanban-
-          view). Deze rij toont alleen nog de actieve campagne wanneer relevant. */}
-      {activeCampaign && activeView !== 'campaigns' && (
-      <div style={{
-        padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: isMobile ? '0.5rem' : '0.75rem'
-      }}>
-          <button
-            onClick={() => setActiveView('campaigns')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.2rem 0.5rem',
-              background: G.bg,
-              border: `1px solid ${G.border}`,
-              borderRadius: '6px',
-              color: G.text,
-              fontSize: isMobile ? '0.6rem' : '0.65rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              minHeight: '28px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              maxWidth: isMobile ? '120px' : '200px'
-            }}
-          >
-            <span style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: G.primary,
-              flexShrink: 0
-            }} />
-            <span style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {activeCampaign.name}
-            </span>
-          </button>
-      </div>
-      )}
-
-      {/* Nav-rij: alleen op de ANDERE views (op de kanban-view zit "Meer" in de
-          toolbar). Zo kun je vanaf elke view terug naar Kanban of een andere view. */}
-      {activeView !== 'kanban' && (
-        <div style={{ padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative', zIndex: 30 }}>
-          <LeadMoreMenu views={TABS} activeView={activeView} onSelect={setActiveView} onOpenSOP={() => setShowSOP(true)} isMobile={isMobile} align="left" />
+      {/* Leads | Ads — één schakelaar bovenaan, twee keuzes. */}
+      <div style={{ padding: isMobile ? `${space[2]}px ${space[4]}px 0` : `${space[2]}px ${space[6]}px 0` }}>
+        <div role="tablist" style={{ display: 'inline-flex', background: colors.surface, border: border.subtle, borderRadius: radius.btn, padding: space[1], gap: space[1] }}>
+          {[{ id: 'leads', label: 'Leads' }, { id: 'ads', label: 'Ads' }].map(o => {
+            const aan = onderdeel === o.id
+            return (
+              <button key={o.id} role="tab" aria-selected={aan} onClick={() => kiesOnderdeel(o.id)}
+                style={{
+                  minHeight: 36, minWidth: 88, padding: `0 ${space[4]}px`, border: 'none',
+                  borderRadius: radius.btn - space[1],
+                  background: aan ? colors.textPrimary : 'transparent',
+                  color: aan ? colors.onAccent : colors.textSecondary,
+                  fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                {o.label}
+              </button>
+            )
+          })}
         </div>
-      )}
-
-      {/* ═══ CONTENT ═══ */}
-      <div style={{
-        padding: isMobile ? '1rem' : '1.5rem'
-      }}>
-        {activeView === 'kanban' && (
-          <KanbanBoard
-            leadService={leadService}
-            db={db}
-            coachId={coachId}
-            isMobile={isMobile}
-            campaigns={campaigns}
-            activeCampaign={activeCampaign}
-            onCampaignChange={handleCampaignChange}
-            leadViews={TABS}
-            activeLeadView={activeView}
-            onSelectLeadView={setActiveView}
-            onOpenSOP={() => setShowSOP(true)}
-          />
-        )}
-
-        {activeView === 'intake' && (
-          <IntakeTab isMobile={isMobile} />
-        )}
-
-        {activeView === 'dm-flow' && (
-          <PlaceholderSection
-            icon={MessageCircle}
-            title="DM Flow Dashboard"
-            subtitle="Wordt gebouwd in volgende fase"
-            color="#8b5cf6"
-            isMobile={isMobile}
-          />
-        )}
-
-        {activeView === 'overview' && (
-          <LeadOverview
-            leads={leads}
-            selectedLeads={selectedLeads}
-            filters={filters}
-            stats={stats}
-            pagination={pagination}
-            loading={loading}
-            isMobile={isMobile}
-            onFilterChange={handleFilterChange}
-            onSearch={handleSearch}
-            onLeadSelect={handleLeadSelect}
-            onSelectAll={handleSelectAll}
-            onDeselectAll={handleDeselectAll}
-            onBulkStatusUpdate={handleBulkStatusUpdate}
-            onBulkDelete={handleBulkDelete}
-            onLeadStatusUpdate={handleLeadStatusUpdate}
-            onAddNote={handleAddNote}
-            onPageChange={handlePageChange}
-            leadService={leadService}
-          />
-        )}
-
-        {activeView === 'campaigns' && (
-          <CampaignTracker
-            coachId={coachId}
-            isMobile={isMobile}
-            onCampaignChange={handleCampaignChange}
-          />
-        )}
-
-        {activeView === 'analytics' && (
-          <OutreachAnalytics
-            leadService={leadService}
-            coachId={coachId}
-            isMobile={isMobile}
-          />
-        )}
-
-        {activeView === 'lead-analytics' && (
-          <LeadAnalyticsDashboard
-            db={db}
-            coachId={coachId}
-            isMobile={isMobile}
-          />
-        )}
-
-        {activeView === 'settings' && (
-          <PlaceholderSection
-            icon={Settings}
-            title="Instellingen"
-            subtitle="Wordt gebouwd in Fase 3"
-            color={G.secondary}
-            isMobile={isMobile}
-          />
-        )}
       </div>
+
+      {onderdeel === 'ads' ? (
+        <Suspense fallback={null}>
+          <ChallengeAdsDashboard db={db} isMobile={isMobile} />
+        </Suspense>
+      ) : (
+      <>
+        {/* Datum + stats staan nu samengevoegd in de PeriodStatsBar (in de kanban-
+            view). Deze rij toont alleen nog de actieve campagne wanneer relevant. */}
+        {activeCampaign && activeView !== 'campaigns' && (
+        <div style={{
+          padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: isMobile ? '0.5rem' : '0.75rem'
+        }}>
+            <button
+              onClick={() => setActiveView('campaigns')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.2rem 0.5rem',
+                background: G.bg,
+                border: `1px solid ${G.border}`,
+                borderRadius: '6px',
+                color: G.text,
+                fontSize: isMobile ? '0.6rem' : '0.65rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                minHeight: '28px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                maxWidth: isMobile ? '120px' : '200px'
+              }}
+            >
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: G.primary,
+                flexShrink: 0
+              }} />
+              <span style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {activeCampaign.name}
+              </span>
+            </button>
+        </div>
+        )}
+
+        {/* Nav-rij: alleen op de ANDERE views (op de kanban-view zit "Meer" in de
+            toolbar). Zo kun je vanaf elke view terug naar Kanban of een andere view. */}
+        {activeView !== 'kanban' && (
+          <div style={{ padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative', zIndex: 30 }}>
+            <LeadMoreMenu views={TABS} activeView={activeView} onSelect={setActiveView} onOpenSOP={() => setShowSOP(true)} isMobile={isMobile} align="left" />
+          </div>
+        )}
+
+        {/* ═══ CONTENT ═══ */}
+        <div style={{
+          padding: isMobile ? '1rem' : '1.5rem'
+        }}>
+          {activeView === 'kanban' && (
+            <KanbanBoard
+              leadService={leadService}
+              db={db}
+              coachId={coachId}
+              isMobile={isMobile}
+              campaigns={campaigns}
+              activeCampaign={activeCampaign}
+              onCampaignChange={handleCampaignChange}
+              leadViews={TABS}
+              activeLeadView={activeView}
+              onSelectLeadView={setActiveView}
+              onOpenSOP={() => setShowSOP(true)}
+            />
+          )}
+
+          {activeView === 'intake' && (
+            <IntakeTab isMobile={isMobile} />
+          )}
+
+          {activeView === 'dm-flow' && (
+            <PlaceholderSection
+              icon={MessageCircle}
+              title="DM Flow Dashboard"
+              subtitle="Wordt gebouwd in volgende fase"
+              color="#8b5cf6"
+              isMobile={isMobile}
+            />
+          )}
+
+          {activeView === 'overview' && (
+            <LeadOverview
+              leads={leads}
+              selectedLeads={selectedLeads}
+              filters={filters}
+              stats={stats}
+              pagination={pagination}
+              loading={loading}
+              isMobile={isMobile}
+              onFilterChange={handleFilterChange}
+              onSearch={handleSearch}
+              onLeadSelect={handleLeadSelect}
+              onSelectAll={handleSelectAll}
+              onDeselectAll={handleDeselectAll}
+              onBulkStatusUpdate={handleBulkStatusUpdate}
+              onBulkDelete={handleBulkDelete}
+              onLeadStatusUpdate={handleLeadStatusUpdate}
+              onAddNote={handleAddNote}
+              onPageChange={handlePageChange}
+              leadService={leadService}
+            />
+          )}
+
+          {activeView === 'campaigns' && (
+            <CampaignTracker
+              coachId={coachId}
+              isMobile={isMobile}
+              onCampaignChange={handleCampaignChange}
+            />
+          )}
+
+          {activeView === 'analytics' && (
+            <OutreachAnalytics
+              leadService={leadService}
+              coachId={coachId}
+              isMobile={isMobile}
+            />
+          )}
+
+          {activeView === 'lead-analytics' && (
+            <LeadAnalyticsDashboard
+              db={db}
+              coachId={coachId}
+              isMobile={isMobile}
+            />
+          )}
+
+          {activeView === 'settings' && (
+            <PlaceholderSection
+              icon={Settings}
+              title="Instellingen"
+              subtitle="Wordt gebouwd in Fase 3"
+              color={G.secondary}
+              isMobile={isMobile}
+            />
+          )}
+        </div>
+      </>
+      )}
 
       {showSOP && <SOPModal isMobile={isMobile} onClose={() => setShowSOP(false)} />}
 
