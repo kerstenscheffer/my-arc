@@ -160,7 +160,7 @@ function Optie({ tekst, aan, onClick, m, meer }) {
 // Eén vak: links de landcode (eigen lijstje, geen systeem-dropdown), een
 // streep, rechts het nummer met 06 al ingevuld (22 okt 2026). Het lijstje
 // klapt naar boven open: onder het veld past het niet in het blad.
-function TelefoonVeld({ m, antw, setAntw, onEnter, onFocus }) {
+function TelefoonVeld({ m, antw, setAntw, onFocus }) {
   const [open, setOpen] = useState(false)
   const [focus, setFocus] = useState(false)
   const kaderRef = useRef(null)
@@ -199,11 +199,10 @@ function TelefoonVeld({ m, antw, setAntw, onEnter, onFocus }) {
         </button>
         <span aria-hidden style={{ width: 1.5, margin: '0.55rem 0', background: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
         <input
-          ref={nummerRef} type="tel" inputMode="tel" autoComplete="tel" value={nummer}
+          ref={nummerRef} name="tel" type="tel" inputMode="tel" autoComplete="tel" enterKeyHint="send" value={nummer}
           placeholder={land === '+31' ? '06 12345678*' : 'Telefoonnummer*'}
           onFocus={() => { setFocus(true); onFocus?.() }} onBlur={() => setFocus(false)}
           onChange={e => { const r = leesTelefoon(land, e.target.value); zetNummer(r.land, r.nummer) }}
-          onKeyDown={e => { if (e.key === 'Enter') onEnter() }}
           style={{ ...basis, flex: 1, minWidth: 0, border: 'none', background: 'transparent', paddingLeft: m ? '0.8rem' : '0.9rem' }}
         />
       </div>
@@ -628,32 +627,37 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
             />
           )}
           {vraag.soort === 'gegevens' && (
-            <>
+            // Een echt <form> met de standaard autocomplete-namen: Safari/Chrome
+            // (iCloud-sleutelhanger, Google) vullen naam en nummer met één tik
+            // in (23 okt 2026). Enter of de knop versturen via onSubmit.
+            <form id="prequal-gegevens" autoComplete="on" onSubmit={(e) => { e.preventDefault(); verder() }}
+              style={{ display: 'flex', flexDirection: 'column', gap: volVideo ? '0.5rem' : '0.6rem' }}>
               <input
-                ref={voornaamRef} onFocus={() => setAanGegevens(true)} autoComplete="given-name" value={antw.voornaam || ''} placeholder="Je voornaam*"
+                ref={voornaamRef} onFocus={() => setAanGegevens(true)} name="given-name" autoComplete="given-name" autoCapitalize="words" enterKeyHint="next"
+                value={antw.voornaam || ''} placeholder="Je voornaam*"
                 onChange={e => zet('voornaam', e.target.value)} style={invoer(m)}
               />
               {telefoon ? (
-                <TelefoonVeld m={m} antw={antw} setAntw={setAntw} onEnter={() => verder()} onFocus={() => setAanGegevens(true)} />
+                <TelefoonVeld m={m} antw={antw} setAntw={setAntw} onFocus={() => setAanGegevens(true)} />
               ) : (
                 <input
-                  type="email" inputMode="email" autoComplete="email" value={antw.email || ''} placeholder="jouw@email.nl"
-                  onChange={e => zet('email', e.target.value.trim())}
-                  onKeyDown={e => { if (e.key === 'Enter') verder() }} style={invoer(m)}
+                  name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="send"
+                  value={antw.email || ''} placeholder="jouw@email.nl"
+                  onChange={e => zet('email', e.target.value.trim())} style={invoer(m)}
                 />
               )}
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, textAlign: 'center', marginTop: '0.2rem' }}>
                 Door te versturen ga je akkoord dat Kersten contact met je opneemt.{' '}
                 Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: WIT }}>privacyverklaring</a>.
               </div>
-            </>
+            </form>
           )}
         </div>
 
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
 
         {!meteenDoor && (
-          <button onClick={() => verder()} disabled={!klaar || bezig} style={{ ...knopWit(m, !klaar || bezig), marginTop: volVideo ? '0.9rem' : '1.4rem' }}>
+          <button {...(vraag.soort === 'gegevens' ? { type: 'submit', form: 'prequal-gegevens' } : { onClick: () => verder() })} disabled={!klaar || bezig} style={{ ...knopWit(m, !klaar || bezig), marginTop: volVideo ? '0.9rem' : '1.4rem' }}>
             {bezig ? 'Even geduld…'
               : vraag.soort === 'info' ? 'Verder'
               : vraag.soort === 'gegevens' ? 'Neem contact met mij op'
