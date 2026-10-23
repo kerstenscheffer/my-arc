@@ -10,7 +10,7 @@
 import jsPDF from 'jspdf'
 import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
 import { B, H, M, KAART, LIJN, WIT, ZACHT, GRIJS, DOF, laad, naarBase64, FONTS, tweeCijfers, LOGO_VERHOUDING, maakTekenaar } from '../mijn-split/splitPdf'
-import { DOELEN, MOMENT_NAAM, MOMENTEN, dagTotaal, hoeveel, boodschappen, verwachting, kgTekst } from './menuRegels'
+import { DOELEN, MOMENT_NAAM, MOMENTEN, dagTotaal, hoeveel, boodschappen, verwachting, kgTekst, MACRO, aandeel } from './menuRegels'
 
 const laadMenu = async (bestand) => {
   const r = await fetch(`/mijn-menu/${bestand}`)
@@ -64,6 +64,22 @@ export async function maakMenuPdf({ voornaam, doel, cijfers, week, aantal }) {
   const gemiddeld = week.map(dagTotaal).reduce((t, d) => ({ kcal: t.kcal + d.kcal / 7, eiwit: t.eiwit + d.eiwit / 7 }), { kcal: 0, eiwit: 0 })
   const doelLabel = DOELEN.find(d => d.key === doel)?.label || ''
 
+  // Ring: grijze baan met een gekleurde boog vanaf boven, met de klok mee.
+  const ring = (cx, cy, r, w, deel, rgb) => {
+    doc.setLineWidth(w); doc.setDrawColor(40, 40, 40); doc.circle(cx, cy, r, 'S')
+    const d = Math.max(0, Math.min(1, deel))
+    if (d <= 0) return
+    doc.setDrawColor(...rgb); doc.setLineCap('round')
+    const n = Math.max(2, Math.ceil(d * 90))
+    let px = cx, py = cy - r
+    for (let j = 1; j <= n; j++) {
+      const hoek = -Math.PI / 2 + (j / n) * d * 2 * Math.PI
+      const x = cx + r * Math.cos(hoek), y = cy + r * Math.sin(hoek)
+      doc.line(px, py, x, y); px = x; py = y
+    }
+    doc.setLineCap('butt')
+  }
+
   const fotoVak = (g, x, y, w) => {
     const data = fotoVan[g.naam]
     doc.setFillColor(...KAART); doc.roundedRect(x, y, w, w, 1.5, 1.5, 'F')
@@ -92,17 +108,20 @@ export async function maakMenuPdf({ voornaam, doel, cijfers, week, aantal }) {
   font('Source', 'normal', 10); kleur(ZACHT)
   doc.text(doc.splitTextToSize('Berekend op je lengte, gewicht, leeftijd en hoe actief je bent. Dit is je startpunt: na twee weken weet je of het klopt.', 140), M, 39, { lineHeightFactor: 1.45 })
   // Groot getal
-  label('Per dag', M, 57, { pt: 6.5, c: WIT, stijl: 'black' })
-  font('Anton', 'normal', 50); kleur(WIT); doc.text(String(cijfers.kcal), M, 77)
-  const kw = doc.getTextWidth(String(cijfers.kcal))
-  font('Anton', 'normal', 18); kleur(GRIJS); doc.text('KCAL', M + kw + 3, 77)
-  // Macro's als drie vakken
-  const vakW = (B - 2 * M - 8) / 3
-  ;[['Eiwit', cijfers.eiwit], ['Koolhydraten', cijfers.kh], ['Vet', cijfers.vet]].forEach(([l, g], k) => {
-    const x = M + k * (vakW + 4)
-    doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.setLineWidth(0.2); doc.roundedRect(x, 84, vakW, 22, 1.2, 1.2, 'FD')
-    label(l, x + 4, 90.5, { pt: 6, c: GRIJS })
-    font('Anton', 'normal', 20); kleur(WIT); doc.text(`${g} G`, x + 4, 102)
+  // Macroringen, zelfde kleuren als in de app: grote kcal-ring, en per macro
+  // welk deel van je calorieën eruit komt.
+  doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.setLineWidth(0.2)
+  doc.roundedRect(M, 52, B - 2 * M, 58, 1.5, 1.5, 'FD')
+  ring(M + 28, 81, 20, 4, 1, MACRO.kcal.rgb)
+  font('Anton', 'normal', 24); kleur(WIT); doc.text(String(cijfers.kcal), M + 28, 82, { align: 'center' })
+  label('kcal / dag', M + 28, 89, { pt: 5.6, c: GRIJS, align: 'center' })
+  const a = aandeel(cijfers)
+  ;[['eiwit', 'Eiwit'], ['kh', 'Koolhydraten'], ['vet', 'Vet']].forEach(([k, l], i) => {
+    const cx = M + 78 + i * 40
+    ring(cx, 74, 11, 2.6, a[k], MACRO[k].rgb)
+    font('Source', 'black', 12); kleur(WIT); doc.text(`${cijfers[k]} g`, cx, 75.8, { align: 'center' })
+    label(l, cx, 93, { pt: 6, c: MACRO[k].rgb, stijl: 'black', align: 'center' })
+    font('Source', 'normal', 7.5); kleur(GRIJS); doc.text(`${Math.round(a[k] * 100)}% van je kcal`, cx, 98.5, { align: 'center' })
   })
   // Wat je mag verwachten: verbranding − eten = verschil → kilo's.
   const v = verwachting(cijfers)
@@ -181,13 +200,14 @@ export async function maakMenuPdf({ voornaam, doel, cijfers, week, aantal }) {
   week.forEach(d => {
     const rijH = 30
     font('Anton', 'normal', 14); kleur(WIT); doc.text(d.dag.slice(0, 2).toUpperCase(), M, y + 9)
-    font('Source', 'normal', 7.5); kleur(GRIJS); doc.text(`${dagTotaal(d).kcal} kcal`, M, y + 14)
+    font('Source', 'bold', 7.5); doc.setTextColor(...MACRO.kcal.rgb); doc.text(`${dagTotaal(d).kcal} kcal`, M, y + 14)
     d.maaltijden.forEach((g, k) => {
       const x = kolomX[0] + k * kolomW
       if (g.leeg) return
       font('Source', 'bold', 8.3); kleur(WIT)
       doc.text(doc.splitTextToSize(g.naam, kolomW - 4).slice(0, 3), x, y + 7, { lineHeightFactor: 1.25 })
-      font('Source', 'normal', 7); kleur(GRIJS); doc.text(`${g.kcal} kcal · ${g.eiwit} g eiwit`, x, y + rijH - 6)
+      font('Source', 'bold', 7); doc.setTextColor(...MACRO.kcal.rgb); doc.text(`${g.kcal} kcal`, x, y + rijH - 6)
+      const kw2 = doc.getTextWidth(`${g.kcal} kcal  `); doc.setTextColor(...MACRO.eiwit.rgb); doc.text(`${g.eiwit} g eiwit`, x + kw2, y + rijH - 6)
     })
     y += rijH
     doc.setDrawColor(...LIJN); doc.line(M, y, B - M, y)
@@ -199,16 +219,19 @@ export async function maakMenuPdf({ voornaam, doel, cijfers, week, aantal }) {
     nieuwePagina(d.dag)
     font('Anton', 'normal', 34); kleur(WIT); doc.text(d.dag.toUpperCase(), M, 32)
     const t = dagTotaal(d)
-    const stats = [['Calorieën', `${t.kcal} kcal`], ['Eiwit', `${t.eiwit} g`], ['Koolhydraten', `${t.kh} g`], ['Vet', `${t.vet} g`]]
+    // Dagtotalen in de macrokleuren, met per macro een balkje tegenover je doel.
+    const stats = [['kcal', 'Calorieën', `${t.kcal} kcal`], ['eiwit', 'Eiwit', `${t.eiwit} g`], ['kh', 'Koolhydraten', `${t.kh} g`], ['vet', 'Vet', `${t.vet} g`]]
     const sw = (B - 2 * M) / 4
     doc.setDrawColor(...LIJN); doc.setLineWidth(0.2); doc.line(M, 38, B - M, 38)
-    stats.forEach(([l, w], k) => {
-      const x = M + k * sw + (k ? 4 : 0)
-      if (k) doc.line(x - 4, 41, x - 4, 50)
-      label(l, x, 44, { pt: 6, c: WIT, stijl: 'black' })
-      font('Source', 'bold', 11); kleur(WIT); doc.text(w, x, 49.5)
+    stats.forEach(([k, l, w], i) => {
+      const x = M + i * sw + (i ? 4 : 0)
+      const bw = sw - (i ? 8 : 4)
+      label(l, x, 44, { pt: 6, c: MACRO[k].rgb, stijl: 'black' })
+      font('Source', 'black', 11.5); doc.setTextColor(...MACRO[k].rgb); doc.text(w, x, 49.5)
+      doc.setFillColor(40, 40, 40); doc.roundedRect(x, 51.3, bw, 1.3, 0.6, 0.6, 'F')
+      doc.setFillColor(...MACRO[k].rgb); doc.roundedRect(x, 51.3, Math.max(1.3, bw * Math.min(1, t[k] / (cijfers[k] || 1))), 1.3, 0.6, 0.6, 'F')
     })
-    doc.line(M, 54, B - M, 54)
+    doc.setDrawColor(...LIJN); doc.setLineWidth(0.2); doc.line(M, 55, B - M, 55)
     const vakH = (H - 62 - 16) / d.maaltijden.length
     d.maaltijden.forEach((g, k) => {
       const y0 = 60 + k * vakH
@@ -225,8 +248,12 @@ export async function maakMenuPdf({ voornaam, doel, cijfers, week, aantal }) {
       const titel = doc.splitTextToSize(g.naam, breed).slice(0, 2)
       doc.text(titel, x, y0 + 10.5, { lineHeightFactor: 1.15 })
       let yy = y0 + 10.5 + titel.length * 5.2
-      font('Source', 'bold', 8.5); kleur(ZACHT)
-      doc.text(`${g.kcal} kcal   ·   ${g.eiwit} g eiwit   ·   ${g.kh} g kh   ·   ${g.vet} g vet`, x, yy)
+      // Macro's van de maaltijd, elk in zijn kleur.
+      font('Source', 'black', 8.5)
+      let mx = x
+      ;[['kcal', `${g.kcal} kcal`], ['eiwit', `${g.eiwit} g eiwit`], ['kh', `${g.kh} g kh`], ['vet', `${g.vet} g vet`]].forEach(([k, txt]) => {
+        doc.setTextColor(...MACRO[k].rgb); doc.text(txt, mx, yy); mx += doc.getTextWidth(txt) + 5
+      })
       yy += 5.5
       // Ingrediënten in twee kolommen.
       font('Source', 'normal', 8.3); kleur(ZACHT)

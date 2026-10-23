@@ -306,3 +306,17 @@ export function verwachting(cijfers, doel) {
       : 'Je gewicht blijft ongeveer gelijk: vet eraf en spier erbij gaat tegelijk.'
   return { tdee: cijfers.tdee, eet: cijfers.kcal, perDag, perWeek, kgPerWeek, kgIn8: kgPerWeek * 8, soort, zin, doel }
 }
+
+// Kleuren per macro, zelfde als de ringen in de app (client/components/MacroBoxes).
+export const MACRO = {
+  kcal: { label: 'Kcal', kleur: '#10b981', rgb: [16, 185, 129] },
+  kh: { label: 'Koolh.', kleur: '#ec4899', rgb: [236, 72, 153] },
+  eiwit: { label: 'Eiwit', kleur: '#3b82f6', rgb: [59, 130, 246] },
+  vet: { label: 'Vet', kleur: '#f59e0b', rgb: [245, 158, 11] },
+}
+// Welk deel van de calorieën uit een macro komt (eiwit/kh 4 kcal per gram, vet 9).
+export const aandeel = (c) => {
+  const k = { eiwit: c.eiwit * 4, kh: c.kh * 4, vet: c.vet * 9 }
+  const tot = k.eiwit + k.kh + k.vet || 1
+  return { eiwit: k.eiwit / tot, kh: k.kh / tot, vet: k.vet / tot }
+}
