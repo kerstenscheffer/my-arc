@@ -127,48 +127,43 @@ function Trechter({ fases, m }) {
         const k = f.oordeel.kleur
         const isVast = vast?.id === f.id
         const isOpen = open === f.id
-        const preview = m ? f.preview.slice(0, 2) : f.preview
         return (
           <div key={f.id} style={{ width: m ? `${Math.max(breedte(i), 84)}%` : `${breedte(i)}%`, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* Eén vak, alles gecentreerd: titel boven, cijfers eronder. */}
             <button onClick={() => setOpen(o => (o === f.id ? null : f.id))} aria-expanded={isOpen} style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: m ? 12 : 16, flexWrap: m ? 'wrap' : 'nowrap',
-              padding: m ? '0.8rem 0.9rem' : '0.9rem 1.2rem', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
+              width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+              padding: m ? '0.9rem 0.8rem' : '1rem 1.2rem', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center', color: '#fff',
               background: isOpen ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.025)',
               border: `1px solid ${isOpen ? 'rgba(255,255,255,0.35)' : isVast ? `${k}66` : 'rgba(255,255,255,0.08)'}`,
               transition: 'background 0.15s, border-color 0.15s', WebkitTapHighlightColor: 'transparent', outline: 'none',
             }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 10, flex: m ? '1 1 100%' : '0 0 auto', minWidth: 0 }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{
-                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
-                  fontSize: '0.88rem', fontWeight: 900,
+                  fontSize: '0.82rem', fontWeight: 900,
                   boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
                   animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
                 }}>{i + 1}</span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
-                    <span style={{
-                      fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                      padding: '2px 7px', borderRadius: 6,
-                      color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
-                    }}>{f.oordeel.tekst}</span>
-                  </span>
-                  <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3, marginTop: 2 }}>{f.vraag}</span>
-                </span>
+                <span style={{ fontSize: '1rem', fontWeight: 900 }}>{f.naam}</span>
+                <span style={{
+                  fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                  padding: '2px 7px', borderRadius: 6,
+                  color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
+                }}>{f.oordeel.tekst}</span>
+                <ChevronDown size={14} strokeWidth={2.6} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </span>
-              <span style={{ display: 'flex', gap: m ? 16 : 22, marginLeft: m ? 42 : 'auto', alignItems: 'center' }}>
-                {preview.map(([label, waarde, meting]) => {
+              <span style={{ display: 'flex', justifyContent: 'center', gap: m ? 18 : 28, flexWrap: 'wrap' }}>
+                {f.preview.map(([label, waarde, meting]) => {
                   const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
                   return (
                     <span key={label} style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: o && o.rang >= 0 ? o.kleur : '#fff' }}>{waarde}</span>
+                      <span style={{ display: 'block', fontSize: m ? '1.1rem' : '1.25rem', fontWeight: 900, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: o && o.rang >= 0 ? o.kleur : '#fff' }}>{waarde}</span>
                       <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: ZWAK, whiteSpace: 'nowrap' }}>{label}</span>
                     </span>
                   )
                 })}
-                <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </span>
             </button>
 
