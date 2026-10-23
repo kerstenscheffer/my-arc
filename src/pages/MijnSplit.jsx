@@ -102,7 +102,7 @@ export default function MijnSplit() {
     if (pdfBezig || !dagen) return
     setPdfBezig(true)
     try {
-      await downloadSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen, tips: tips(antw) })
+      await downloadSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen, tips: tips(antw), doel: antw.doel, niveau: antw.niveau })
     } catch (e) {
       console.error('PDF mislukt:', e)
       setFout('Downloaden lukte niet. Maak anders even een screenshot.')
