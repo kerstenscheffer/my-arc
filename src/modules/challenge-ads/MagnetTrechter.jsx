@@ -15,7 +15,8 @@ import {
   Film, Eye, MessageSquare, UserPlus, Send, MessageCircle, MessagesSquare, PhoneOutgoing, CalendarCheck, PhoneCall, Trophy,
 } from 'lucide-react'
 import FaseTrechter from './FaseTrechter'
-import { GROEN, ZWAK, beoordeel, vatFaseSamen } from './fases'
+import Venster from './Venster'
+import { GROEN, ROOD, ORANJE, ZWAK, beoordeel, vatFaseSamen } from './fases'
 
 // Richtwaarden. Comments en reactie op je eigen cijfers (23 okt 2026):
 //  - commenters per view: Kersten beantwoordt elke comment één keer, dus
@@ -79,12 +80,19 @@ function tel(reels, leads, stappen) {
   }
 }
 
+// Welke lijst een meting opent als je erop tikt.
+const LIJST_VAN = {
+  'Magnet-reels': 'reels', 'Views per reel': 'reels', Commenters: 'reels', 'Op het bord': 'nieuw',
+  Reactie: 'reactie', 'Reacties in periode': 'reacties', 'Call voorgesteld': 'voorgesteld', 'Follow-up gestuurd': 'followup',
+  'Call ingepland': 'ingepland', 'Call gehad': 'gehad', Sale: 'sale',
+}
+
 function maakFases(t) {
   const M = (label, deel, basis, richt, tekst, sub, waarde) => {
     const w = waarde ?? (basis ? deel / basis : null)
     const oordeel = richt ? beoordeel(w, basis, richt) : null
     const score = oordeel && oordeel.rang >= 0 ? w / richt.goed : null
-    return { label, tekst, sub, oordeel, score }
+    return { label, tekst, sub, oordeel, score, venster: LIJST_VAN[label] }
   }
   const viewsPerReel = t.reels ? t.views / t.reels : null
   return [
@@ -122,6 +130,51 @@ function maakFases(t) {
   ].map(vatFaseSamen)
 }
 
+const datum = (iso) => (iso ? new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }) : '')
+const LIJN = '1px solid rgba(255,255,255,0.08)'
+
+// Eén lead met waar hij nu staat.
+function LeadRij({ l }) {
+  const status = Number(l.omzet) > 0 ? { tekst: `Sale ${euro(l.omzet)}`, kleur: GROEN }
+    : l.gehouden ? { tekst: 'Call gehad', kleur: '#fff' }
+      : l.noshow ? { tekst: 'No-show', kleur: ROOD }
+        : l.call ? { tekst: 'Call ingepland', kleur: '#60a5fa' }
+          : l.voorgesteld ? { tekst: 'Call voorgesteld', kleur: '#60a5fa' }
+            : (l.contact || l.reactie) ? { tekst: 'Gereageerd', kleur: '#fff' }
+              : { tekst: 'Nog geen reactie', kleur: ORANJE }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0', borderBottom: LIJN }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.9rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.naam || 'Onbekend'}</div>
+        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          binnen {datum(l.created_at)} · {l.woord || 'magnet'}{l.sectie ? ` · ${l.sectie.trim()}` : ''}
+        </div>
+      </div>
+      <span style={{ fontSize: '0.78rem', fontWeight: 900, color: status.kleur, whiteSpace: 'nowrap' }}>{status.tekst}</span>
+    </div>
+  )
+}
+
+// Eén magnet-reel.
+function ReelRij({ r }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0.6rem 0', borderBottom: LIJN }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.9rem', fontWeight: 900 }}>{r.woord} <span style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK }}>· {datum(r.tijd)}</span></div>
+        {r.tekst && <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.tekst}</div>}
+      </div>
+      <span style={{ textAlign: 'right', flexShrink: 0 }}>
+        <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{r.views != null ? getal(r.views) : '–'}</span>
+        <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: ZWAK }}>views</span>
+      </span>
+      <span style={{ textAlign: 'right', flexShrink: 0, minWidth: 64 }}>
+        <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{r.comments != null ? getal(r.comments / 2) : '–'}</span>
+        <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: ZWAK }}>commenters</span>
+      </span>
+    </div>
+  )
+}
+
 export default function MagnetTrechter({ data, m, laden }) {
   // Welk woord; leeg = alle magnets samen.
   const [woord, setWoord] = useState('')
@@ -129,6 +182,8 @@ export default function MagnetTrechter({ data, m, laden }) {
   const vanaf = data?.vanaf ? new Date(data.vanaf).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }) : null
   const leads = data?.leads || []
   const stappen = data?.stappen || []
+  // Welke lijst er open staat (tik op een meting).
+  const [lijst, setLijst] = useState(null)
 
   const woorden = [...new Set([...reels.map(r => r.woord), ...leads.map(l => l.woord), ...stappen.map(l => l.woord)].filter(Boolean))]
   const perWoord = woorden.map(w => ({ woord: w, t: tel(reels.filter(r => r.woord === w), leads.filter(l => l.woord === w), stappen.filter(l => l.woord === w)) }))
@@ -145,8 +200,8 @@ export default function MagnetTrechter({ data, m, laden }) {
 
   return (
     <div style={{ opacity: laden ? 0.5 : 1, transition: 'opacity 0.15s' }}>
-      <FaseTrechter fases={fases} m={m} iconen={ICONEN} uitleg={<>
-        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. Calls en sales: wat er in deze periode gebeurde, ook bij magnet-leads van eerder.
+      <FaseTrechter fases={fases} m={m} iconen={ICONEN} onMeting={setLijst} uitleg={<>
+        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder, en op een cijfer voor de namen erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. Calls en sales: wat er in deze periode gebeurde, ook bij magnet-leads van eerder.
       </>} />
 
       {/* Per woord: welke magnet het goed doet. Tik = trechter van dat woord. */}
@@ -188,6 +243,32 @@ export default function MagnetTrechter({ data, m, laden }) {
           )
         })}
       </div>
+
+      {lijst && (() => {
+        const pastW = (x) => !gekozen || x.woord === gekozen
+        const L = leads.filter(pastW), S = stappen.filter(pastW)
+        const op = (arr, sleutel) => [...arr].sort((a, b) => String(b[sleutel] || '').localeCompare(String(a[sleutel] || '')))
+        const lijsten = {
+          reels: { titel: 'Magnet-reels', sub: 'views en commenters (comments ÷ 2) per reel', reels: (data?.reel_lijst || []).filter(pastW) },
+          nieuw: { titel: 'Nieuw op het bord', sub: 'commenters die in deze periode als lead binnenkwamen', leads: op(L, 'created_at') },
+          reactie: { titel: 'Reageerden op het automatische bericht', sub: 'van de nieuwe leads', leads: op(L.filter(l => l.contact), 'created_at') },
+          followup: { titel: 'Follow-up gestuurd', sub: 'extra bericht gelogd, van de nieuwe leads', leads: op(L.filter(l => l.bericht), 'created_at') },
+          reacties: { titel: 'Reacties in deze periode', sub: 'alle magnet-leads, ook van eerder', leads: op(S.filter(l => l.reactie), 'created_at') },
+          voorgesteld: { titel: 'Call voorgesteld', sub: 'in deze periode', leads: op(S.filter(l => l.voorgesteld), 'created_at') },
+          ingepland: { titel: 'Call ingepland', sub: 'in deze periode', leads: op(S.filter(l => l.call), 'created_at') },
+          gehad: { titel: 'Call gehad', sub: 'in deze periode, plus no-shows', leads: op(S.filter(l => l.gehouden || l.noshow), 'created_at') },
+          sale: { titel: 'Sales', sub: 'in deze periode', leads: [...S.filter(l => Number(l.omzet) > 0)].sort((a, b) => Number(b.omzet) - Number(a.omzet)) },
+        }
+        const v = lijsten[lijst]
+        if (!v) return null
+        const rijen = v.reels || v.leads
+        return (
+          <Venster titel={`${v.titel}${gekozen ? ` · ${gekozen}` : ''}`} sub={`${rijen.length} · ${v.sub}`} m={m} onClose={() => setLijst(null)}>
+            {rijen.length === 0 && <div style={{ fontSize: '0.86rem', fontWeight: 700, color: ZWAK, padding: '0.6rem 0' }}>Niemand in deze periode.</div>}
+            {v.reels ? rijen.map(r => <ReelRij key={r.id} r={r} />) : rijen.map(l => <LeadRij key={l.id} l={l} />)}
+          </Venster>
+        )
+      })()}
     </div>
   )
 }
