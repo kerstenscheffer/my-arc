@@ -77,18 +77,34 @@ export default function KanbanBoard({
   const modalHost = useModalHost()
   const [viewMode, setViewMode] = useState('leads')
   const [sections, _setSections] = useState([])
-  // Snel eerste beeld (9 okt 2026). Het volledige bord is ~10 MB en 20
-  // verzoeken; daarom eerst een voorvertoning: de laatste stand uit deze
-  // sessie, of het lichte bord (aantallen + eerste leads per sectie, één
-  // verzoek). Het volledige bord neemt het daarna stil over.
-  //  - Zolang `voorvertoning` aan staat zijn klikken en slepen op kaarten
-  //    geblokkeerd: de leadlijsten zijn dan nog onvolledig.
+  // Lui laden (23 okt 2026). Drie secties (Nieuwe volgers, 3+ Dagen Stil,
+  // Follow up stil) bevatten ~95% van alle leads; het bord haalde ze elke keer
+  // volledig op (~10 MB). Nu komen alleen secties tot SECTIE_DREMPEL leads mee.
+  // Grotere secties staan `gesloten`: alleen hun aantal (`leadCount`) en een
+  // knop "Open sectie". Een lead daarin vind je via de zoekbalk (server-side).
   //  - Elke wijziging via setSections verhoogt bordVersieRef. Verandert er
-  //    iets terwijl het volledige bord onderweg is, dan halen we het daarna
-  //    nog één keer op, zodat die wijziging niet wordt overschreven.
-  const [voorvertoning, setVoorvertoning] = useState(false)
+  //    iets terwijl het bord onderweg is, dan halen we het daarna nog één keer
+  //    op, zodat die wijziging niet wordt overschreven.
+  //  - Bij een gesloten sectie is `leads` onvolledig. setSections houdt
+  //    `leadCount` daarom bij: komt er een lead bij of gaat er een af, dan
+  //    schuift de teller mee.
   const bordVersieRef = useRef(0)
-  const setSections = useCallback((v) => { bordVersieRef.current++; _setSections(v) }, [])
+  const setSections = useCallback((v) => {
+    bordVersieRef.current++
+    _setSections(prev => {
+      const next = typeof v === 'function' ? v(prev) : v
+      const oud = new Map(prev.map(s => [s.id, s]))
+      return next.map(s => {
+        const p = oud.get(s.id)
+        if (!s.gesloten || !p || p.leadCount !== s.leadCount) return s
+        const verschil = (s.leads || []).length - (p.leads || []).length
+        return verschil ? { ...s, leadCount: Math.max(0, (s.leadCount || 0) + verschil) } : s
+      })
+    })
+  }, [])
+  // Secties die je in deze sessie hebt geopend; blijven open bij herladen.
+  const geopendRef = useRef(new Set())
+  const [sectieLaden, setSectieLaden] = useState(null)
   const [originalSections, setOriginalSections] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -426,6 +442,7 @@ export default function KanbanBoard({
   const fullscreenContentRef = useRef(null)
   
   const MAX_VISIBLE_LEADS = 5
+  const SECTIE_DREMPEL = 250
 
   // ========================================
   // REAL-TIME SUBSCRIPTION — PRESERVED 1:1
@@ -740,13 +757,14 @@ export default function KanbanBoard({
     return () => { cancelled = true; clearTimeout(timer) }
   }, [searchQuery, coachId, leadService])
 
-  // Wat de zoekbalk toont: lokale treffers zodra het bord geladen is, anders
-  // (of als het bord niks heeft) de server-treffers. Ze hebben dezelfde vorm —
-  // id + sectionId/sectionTitle/sectionColor — dus dezelfde render en dezelfde
-  // klik-actie werken voor allebei.
-  const displayedSearchResults = searchResults.length > 0
-    ? searchResults
-    : dbCheckResults.filter(r => r.sectionId)
+  // Wat de zoekbalk toont: lokale treffers (meteen), aangevuld met de
+  // server-treffers. Grote secties zijn niet geladen, dus lokaal is nooit
+  // compleet. Ze hebben dezelfde vorm — id + sectionId/sectionTitle/
+  // sectionColor — dus dezelfde render en dezelfde klik-actie werken voor allebei.
+  const displayedSearchResults = [
+    ...searchResults,
+    ...dbCheckResults.filter(r => r.sectionId && !searchResults.some(l => l.id === r.id)),
+  ].slice(0, 10)
 
   // Called when a magnet is *added* to a lead via the modal. Auto-moves the
   // lead into the "Lead magnets" section if it isn't already there. No-op
@@ -821,20 +839,28 @@ export default function KanbanBoard({
   // opnieuw proberen zodra het bord er is.
   const pendingScrollRef = useRef(null)
   useEffect(() => {
-    // Ook wachten tijdens de voorvertoning: daarin staat maar een deel van de
-    // leads, dus de kaart kan nog ontbreken.
-    if (loading || voorvertoning || !pendingScrollRef.current) return
+    if (loading || !pendingScrollRef.current) return
     const pending = pendingScrollRef.current
     pendingScrollRef.current = null
     scrollToLead(pending.leadId, pending.sectionId)
     // scrollToLead is stabiel binnen deze render-scope; opnemen in de deps zou
     // 'm bij elke render opnieuw laten vuren.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, voorvertoning])
+  }, [loading])
 
-  const scrollToLead = (leadId, sectionId) => {
+  const scrollToLead = async (leadId, sectionId) => {
     // Bord nog niet binnen? Bewaar de sprong voor straks.
-    if (loading || voorvertoning) pendingScrollRef.current = { leadId, sectionId }
+    if (loading) { pendingScrollRef.current = { leadId, sectionId }; return }
+    // Zit de lead in een gesloten sectie, dan alleen die ene kaart ophalen en
+    // erin zetten; de hele sectie openen kost seconden. _setSections: het
+    // aantal in de sectie verandert niet, de lead stond er al.
+    const doel = sections.find(s => s.id === sectionId)
+    if (doel?.gesloten && !(doel.leads || []).some(l => l.id === leadId)) {
+      try {
+        const lead = await leadService.getBoardLead(leadId)
+        _setSections(prev => prev.map(s => s.id === sectionId ? { ...s, leads: [lead, ...(s.leads || [])] } : s))
+      } catch (e) { console.error('Lead ophalen mislukt:', e) }
+    }
     // Op mobiel is alleen de actieve stage in de DOM — schakel eerst naar de
     // sectie van deze lead, anders bestaat de kaart niet en kan 'ie er niet
     // naartoe scrollen.
@@ -900,47 +926,47 @@ export default function KanbanBoard({
     try { localStorage.setItem('leadsMetVrouwen', String(nieuw)) } catch { /* private mode */ }
   }
 
-  const snapshotSleutel = coachId ? `leadsBord:${coachId}:${metVrouwen ? 'mv' : 'm'}` : null
+  // Haalt het bord op met alleen de kleine secties + wat je zelf open had.
+  // 'unassigned' kent de RPC niet als open sectie; die halen we apart.
+  const haalBord = async () => {
+    const open = [...geopendRef.current]
+    const board = await leadService.getKanbanBoardLui(coachId, { metVrouwen, drempel: SECTIE_DREMPEL, open })
+    const un = board.find(s => s.id === 'unassigned')
+    if (un?.gesloten && geopendRef.current.has('unassigned')) {
+      const leads = await leadService.getBoardSectie('unassigned', { metVrouwen })
+      return board.map(s => s.id === 'unassigned' ? { ...s, leads, leadCount: leads.length, gesloten: false } : s)
+    }
+    return board
+  }
 
-  // Bewaar een lichte versie van het volledige bord (eerste 10 per sectie +
-  // aantallen) voor de volgende keer dat je het bord in deze sessie opent.
-  const bewaarSnapshot = (board) => {
-    if (!snapshotSleutel) return
+  // Knop "Open sectie": alle leads van één grote sectie ophalen.
+  // _setSections: er verandert niets aan het bord, we vullen alleen aan.
+  const openSectie = async (sectionId) => {
+    setSectieLaden(sectionId)
     try {
-      const licht = board.map(sec => ({
-        ...sec,
-        leads: [...(sec.leads || [])].sort((a, b) => (a.position || 0) - (b.position || 0)).slice(0, 10),
-        leadCount: (sec.leads || []).length,
-      }))
-      sessionStorage.setItem(snapshotSleutel, JSON.stringify(licht))
-    } catch { /* vol of private mode: dan zonder snapshot */ }
+      const leads = await leadService.getBoardSectie(sectionId, { metVrouwen })
+      geopendRef.current.add(sectionId)
+      _setSections(prev => prev.map(s => s.id === sectionId ? { ...s, leads, leadCount: leads.length, gesloten: false } : s))
+    } catch (e) {
+      console.error('Sectie openen mislukt:', e)
+      alert('Sectie openen mislukt')
+    } finally { setSectieLaden(null) }
+  }
+
+  const sluitSectie = (sectionId) => {
+    geopendRef.current.delete(sectionId)
+    _setSections(prev => prev.map(s => s.id === sectionId ? { ...s, leads: [], leadCount: (s.leads || []).length, gesloten: true } : s))
+    setExpandedSections(prev => ({ ...prev, [sectionId]: false }))
   }
 
   const loadBoard = async (isInitialLoad = false) => {
     try {
       setLoading(true)
       const versieBijStart = bordVersieRef.current
-      const volledig = leadService.getKanbanBoard(coachId, { metVrouwen })
-      if (isInitialLoad) {
-        // Voorvertoning: snapshot uit deze sessie, anders het lichte bord.
-        // Komt het volledige bord eerder binnen, dan slaan we hem over.
-        let voor = null
-        try { voor = JSON.parse(sessionStorage.getItem(snapshotSleutel) || 'null') } catch { voor = null }
-        if (!voor?.length) {
-          const klaar = await Promise.race([volledig.then(() => 'vol'), leadService.getKanbanBoardLight(coachId, 10, { metVrouwen })])
-          voor = klaar === 'vol' ? null : klaar
-        }
-        if (voor?.length) {
-          _setSections(voor); setOriginalSections(voor)
-          setVoorvertoning(true); setLoading(false)
-        }
-      }
-      let board = await volledig
+      let board = await haalBord()
       // Tijdens het laden toch iets veranderd (bv. een lead toegevoegd via de
       // bovenbalk)? Dan nog één keer ophalen, anders verdwijnt die wijziging.
-      if (bordVersieRef.current !== versieBijStart) board = await leadService.getKanbanBoard(coachId, { metVrouwen })
-      if (board.length) bewaarSnapshot(board)
-      setVoorvertoning(false)
+      if (bordVersieRef.current !== versieBijStart) board = await haalBord()
       if (isInitialLoad) { _setSections(board); setOriginalSections(board) }
       else {
         const currentOrder = sections.filter(s => s.id !== 'unassigned').map(s => s.id)
@@ -948,7 +974,8 @@ export default function KanbanBoard({
         const reordered = currentOrder.map(id => board.find(s => s.id === id)).filter(Boolean)
         board.forEach(s => { if (s.id !== 'unassigned' && !currentOrder.includes(s.id)) reordered.push(s) })
         if (unassigned) reordered.push(unassigned)
-        setSections(reordered)
+        // Serverstand, geen wijziging: buiten de teller-correctie van setSections om.
+        _setSections(reordered)
       }
       // Openstaande calls (ingepland, datum+tijd voorbij, nog niet afgehandeld)
       // → drijft de pop-up.
@@ -975,7 +1002,7 @@ export default function KanbanBoard({
   const staleCheckKey = coachId ? `staleCheck:${coachId}` : null
   useEffect(() => {
     const run = async () => {
-      if (!leadService || !coachId || staleCheckDone || loading || voorvertoning) return
+      if (!leadService || !coachId || staleCheckDone || loading) return
       if (typeof leadService.checkAndMoveStaleLeads !== 'function') { setStaleCheckDone(true); return }
       const today = new Date().toISOString().slice(0, 10)
       let lastRun = null
@@ -989,8 +1016,8 @@ export default function KanbanBoard({
         if (result && result.moved > 0) { await loadBoard(true); await loadActivityData() }
       } catch (error) { console.error('❌ Stale check failed:', error); setStaleCheckDone(true) }
     }
-    if (!loading && !voorvertoning && !staleCheckDone) run()
-  }, [leadService, coachId, loading, voorvertoning, staleCheckDone, staleCheckKey])
+    if (!loading && !staleCheckDone) run()
+  }, [leadService, coachId, loading, staleCheckDone, staleCheckKey])
 
 
   // ========================================
@@ -1653,10 +1680,9 @@ export default function KanbanBoard({
   // ========================================
   // RENDER: KANBAN COLUMNS — STYLING UPGRADED
   // ========================================
-  // Staat er een filter aan? Dan kloppen de database-tellers van de
-  // voorvertoning niet meer met wat je ziet.
-  const filterActief = globalPriorityOnly || boardFilter.types.size > 0 || boardFilter.temps.size > 0
-    || boardFilter.followups.size > 0 || boardFilter.genders.size > 0
+  // Teller per sectie: wat de filter doorlaat. Een gesloten sectie heeft haar
+  // leads niet geladen; daar komt het aantal uit de database (zonder filter).
+  const telLeads = (s) => s.gesloten ? (s.leadCount || 0) : getSortedLeads(s).length
 
   const renderKanbanColumns = (isFullscreenView = false) => {
     // Mobiel: kolom vult de volle breedte en je ziet één stage tegelijk (switcher
@@ -1673,7 +1699,7 @@ export default function KanbanBoard({
             <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
               {sections.map((s, i) => {
                 const active = s.id === mobileSecId
-                const n = (voorvertoning && !filterActief && s.leadCount != null) ? s.leadCount : getSortedLeads(s).length
+                const n = telLeads(s)
                 return (
                   <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
                     flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -1693,25 +1719,14 @@ export default function KanbanBoard({
             </div>
           </div>
         )}
-        {voorvertoning && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', margin: '0 0 6px 2px' }}>
-            <span style={{ width: 10, height: 10, border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'kbSpin 0.8s linear infinite', display: 'inline-block' }} />
-            Bord bijwerken…
-          </div>
-        )}
         <div
-          // Voorvertoning: kijken en scrollen mag, klikken en slepen nog niet.
-          onClickCapture={voorvertoning ? (e) => { e.stopPropagation(); e.preventDefault() } : undefined}
-          onDragStartCapture={voorvertoning ? (e) => { e.stopPropagation(); e.preventDefault() } : undefined}
-          style={{ display: 'flex', gap: '0.75rem', overflowX: isMobile ? 'visible' : 'auto', paddingBottom: '0.75rem', WebkitOverflowScrolling: 'touch', cursor: voorvertoning ? 'progress' : undefined }}>
+          style={{ display: 'flex', gap: '0.75rem', overflowX: isMobile ? 'visible' : 'auto', paddingBottom: '0.75rem', WebkitOverflowScrolling: 'touch' }}>
         {renderList.map((section) => {
           const isExpanded = expandedSections[section.id]
           // De teller toont het aantal leads dat de actieve filter doorstaat
           // (bv. "hoeveel met x opvolg"). Zonder filter = gewoon alle leads.
           const sortedLeads = getSortedLeads(section)
-          // In de voorvertoning is de leadlijst onvolledig; de teller komt dan
-          // uit de database (zonder filter) zodat hij niet verspringt.
-          const totalLeads = (voorvertoning && !filterActief && section.leadCount != null) ? section.leadCount : sortedLeads.length
+          const totalLeads = telLeads(section)
           const visibleLeads = (isExpanded || totalLeads <= MAX_VISIBLE_LEADS) ? sortedLeads : sortedLeads.slice(0, MAX_VISIBLE_LEADS)
           const hasMore = totalLeads > MAX_VISIBLE_LEADS
           const isUnassigned = section.id === 'unassigned'
@@ -1724,7 +1739,7 @@ export default function KanbanBoard({
           const contactedCount = getContactedTodayCount(section)
           // DM-Run voortgang — alleen in de "Nieuwe volgers"-kolom.
           const isNieuweVolgers = section.id === NIEUWE_VOLGERS_SECTION_ID
-          const dmTotal = (isNieuweVolgers && !voorvertoning) ? (section.leads || []).length : 0
+          const dmTotal = (isNieuweVolgers && !section.gesloten) ? (section.leads || []).length : 0
           const dmDoneCount = isNieuweVolgers ? (section.leads || []).filter(l => l.last_contacted_at).length : 0
 
           return (
@@ -1834,15 +1849,35 @@ export default function KanbanBoard({
                 minHeight: isFullscreenView ? '300px' : '200px',
                 maxHeight: isExpanded ? 'none' : (isFullscreenView ? '500px' : '600px')
               }}>
-                {totalLeads === 0 ? (
+                {section.gesloten ? (
+                  // Grote sectie: niet standaard geladen. Leads die je in deze
+                  // sessie hierheen sleepte of via zoeken opende staan erboven.
+                  <>
+                    {sortedLeads.map(lead => renderLeadCard(lead, section))}
+                    <button onClick={() => openSectie(section.id)} disabled={sectieLaden === section.id}
+                      style={{ padding: '0.75rem', background: `${section.color}10`, border: `1px solid ${section.color}35`, borderRadius: '8px', color: section.color, cursor: sectieLaden === section.id ? 'progress' : 'pointer', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', minHeight: '40px', touchAction: 'manipulation' }}>
+                      {sectieLaden === section.id
+                        ? <><span style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.15)', borderTopColor: section.color, borderRadius: '50%', animation: 'kbSpin 0.8s linear infinite', display: 'inline-block' }} /> Laden…</>
+                        : <><Eye size={13} /> Open sectie ({section.leadCount})</>}
+                    </button>
+                    <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem' }}>Zoek een lead via de zoekbalk</div>
+                  </>
+                ) : totalLeads === 0 ? (
                   <div style={{ padding: '1.5rem 0.75rem', textAlign: 'center', color: 'rgba(255,255,255,0.15)', fontSize: '0.7rem' }}>Geen leads</div>
                 ) : (
                   <>
                     {visibleLeads.map(lead => renderLeadCard(lead, section))}
                     {hasMore && (
-                      <button onClick={() => toggleSectionExpansion(section.id)} disabled={voorvertoning}
+                      <button onClick={() => toggleSectionExpansion(section.id)}
                         style={{ padding: '0.4rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: section.color, cursor: 'pointer', fontSize: '0.7rem', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '32px', touchAction: 'manipulation' }}>
                         {isExpanded ? <><ChevronUp size={13} /> Minder</> : <><ChevronDown size={13} /> +{totalLeads - MAX_VISIBLE_LEADS} meer</>}
+                      </button>
+                    )}
+                    {/* Geopende grote sectie weer dichtklappen: scheelt geheugen en scrollen. */}
+                    {geopendRef.current.has(section.id) && (
+                      <button onClick={() => sluitSectie(section.id)}
+                        style={{ padding: '0.4rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '32px', touchAction: 'manipulation' }}>
+                        <EyeOff size={13} /> Sectie sluiten
                       </button>
                     )}
                   </>
@@ -2220,7 +2255,7 @@ export default function KanbanBoard({
                   <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
                     {sections.map((s, i) => {
                       const active = s.id === activeSecId
-                      const n = (voorvertoning && !filterActief && s.leadCount != null) ? s.leadCount : getSortedLeads(s).length
+                      const n = telLeads(s)
                       return (
                         <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
                           flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,

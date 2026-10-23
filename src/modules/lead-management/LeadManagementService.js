@@ -35,6 +35,22 @@ const lokaleDag = (d) => {
 // Zelfde standaard als SaleForm en TrajectModal.
 const STANDAARD_PARTNER_PCT = 50
 
+// Kolommen die een kaart op het leadbord nodig heeft. Slank i.p.v. `select *`:
+// de zware jsonb-kolommen (dm_node_history, sales_call_notes) blijven weg; de
+// detail-modal haalt de volledige lead apart op.
+const BORD_KOLOMMEN = `
+  id, first_name, last_name, email, phone, status, lead_source,
+  created_at, last_contacted_at, last_touched, contacted_today_date,
+  last_followup_sent_at, last_dm_interaction, current_dm_node,
+  coach_id, team_id, deleted_at, notes, reply_count, first_reply_at,
+  is_snoozed, campaign_id, followup_count, lead_temperature,
+  lead_magnets_shared, outreach_campaign_id, source_lead_magnet_id,
+  previous_section_color, previous_section_id, previous_section_title,
+  qual_goal_checked, qual_pain_checked, qual_urgency_checked, qual_open_checked, gender,
+  source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
+  outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
+`
+
 class LeadManagementService {
   constructor() {
     this.db = DatabaseService
@@ -725,6 +741,48 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Lui bord (23 okt 2026): secties tot `drempel` leads komen volledig mee, net
+  // als secties in `open`. Grotere secties krijgen alleen hun aantal en
+  // `gesloten: true`; die laad je pas met getBoardSectie() als je ze opent.
+  // Zelfde vorm als getKanbanBoard, dus de rest van het bord werkt ongewijzigd.
+  async getKanbanBoardLui(coachId, { metVrouwen = false, drempel = 250, open = [] } = {}) {
+    const { data, error } = await this.db.supabase
+      .rpc('get_kanban_board_lui', { p_drempel: drempel, p_met_vrouwen: metVrouwen, p_open: open.filter(id => id !== 'unassigned') })
+    if (error) throw error
+    const sections = (data?.sections || []).map(({ lead_count, ...s }) => {
+      const leads = s.leads || []
+      return { ...s, leads, leadCount: lead_count || 0, gesloten: leads.length < (lead_count || 0) }
+    })
+    const un = data?.unassigned || { lead_count: 0, leads: [] }
+    const unLeads = un.leads || []
+    sections.push({
+      id: 'unassigned', title: 'Niet toegewezen', color: '#6b7280', position: 9999,
+      leads: unLeads, leadCount: un.lead_count || 0, gesloten: unLeads.length < (un.lead_count || 0),
+    })
+    return sections
+  }
+
+  // Alle leads van één sectie, voor de knop "Open sectie". 'unassigned' = Niet toegewezen.
+  async getBoardSectie(sectionId, { metVrouwen = false } = {}) {
+    const { data, error } = await this.db.supabase
+      .rpc('get_board_sectie', { p_section_id: sectionId === 'unassigned' ? null : sectionId, p_met_vrouwen: metVrouwen })
+    if (error) throw error
+    return data || []
+  }
+
+  // Eén lead in bordvorm (kaart + sectie-positie). Voor een zoektreffer in een
+  // gesloten sectie: die kaart tonen zonder de hele sectie op te halen.
+  async getBoardLead(leadId) {
+    const [{ data: lead, error }, { data: item }] = await Promise.all([
+      this.db.supabase.from('call_leads').select(BORD_KOLOMMEN).eq('id', leadId).single(),
+      this.db.supabase.from('lead_section_items')
+        .select('position, previous_section_id, previous_section_title, previous_section_color, moved_to_stale_at')
+        .eq('lead_id', leadId).maybeSingle(),
+    ])
+    if (error) throw error
+    return { ...lead, ...(item || {}) }
+  }
+
   // Volgende hap leads van één sectie — voor "toon meer" zonder het bord te herladen.
   async getSectionLeads(sectionId, offset = 0, limit = 50) {
     try {
@@ -762,18 +820,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           // sales_call_notes) en ongebruikte vrije-tekstvelden vielen weg → veel
           // kleinere payload voor 4000+ leads. De detail-modal haalt de volledige
           // lead apart op, dus niks gaat verloren.
-          .select(`
-            id, first_name, last_name, email, phone, status, lead_source,
-            created_at, last_contacted_at, last_touched, contacted_today_date,
-            last_followup_sent_at, last_dm_interaction, current_dm_node,
-            coach_id, team_id, deleted_at, notes, reply_count, first_reply_at,
-            is_snoozed, campaign_id, followup_count, lead_temperature,
-            lead_magnets_shared, outreach_campaign_id, source_lead_magnet_id,
-            previous_section_color, previous_section_id, previous_section_title,
-            qual_goal_checked, qual_pain_checked, qual_urgency_checked, qual_open_checked, gender,
-            source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
-            outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
-          `)
+          .select(BORD_KOLOMMEN)
           // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
           .is('deleted_at', null)
           .order('created_at', { ascending: false })
