@@ -39,6 +39,7 @@ const EightWeekCheckout = lazy(() => import('./pages/EightWeekCheckout'))
 const TwelveWeekCheckout = lazy(() => import('./pages/TwelveWeekCheckout'))
 const CalorieCalculator = lazy(() => import('./pages/CalorieCalculator'))
 const MijnSplit = lazy(() => import('./pages/MijnSplit'))
+const MijnMenu = lazy(() => import('./pages/MijnMenu'))
 const SixteenWeekCheckout = lazy(() => import('./pages/SixteenWeekCheckout'))
 const SixteenWeekMonthlyCheckout = lazy(() => import('./pages/SixteenWeekMonthlyCheckout'))
 const MonthlySubscriptionCheckout = lazy(() => import('./pages/MonthlySubscriptionCheckout'))
@@ -217,6 +218,10 @@ function App() {
   // bibliotheek als PDF. Lead komt in de bordkolom "🧲 Mijn split".
   if (currentPath === '/mijn-split' || currentPath === '/mijnsplit') {
     return <MijnSplit />
+  }
+  // Lead magnet: weekmenu op calorieën uit de dagmenu-gerechten, met PDF.
+  if (currentPath === '/mijn-menu' || currentPath === '/mijnmenu') {
+    return <MijnMenu />
   }
 
   // 16-weken offer — zelfde opbouw als de 6-weken challenge: banner met de
