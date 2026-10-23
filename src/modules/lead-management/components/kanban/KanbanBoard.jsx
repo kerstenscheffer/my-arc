@@ -3,7 +3,7 @@
 // ALL LOGIC PRESERVED 1:1 FROM v6.4
 // STYLING: Compact headers, flush rows, no gradients, no glow, no boxShadow animations
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
 import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3, Megaphone, Eye, EyeOff } from 'lucide-react'
@@ -32,6 +32,10 @@ import DMBibleModal from '../DMBibleModal'
 import StartCampaignModal from '../StartCampaignModal'
 import WeekStatsModal from '../WeekStatsModal'
 import ContentChecklist from '../ContentChecklist'
+
+// Ads-overzicht (challenge-advertenties per hook) klapt open tussen de
+// zoekbalk en de secties. Lazy: pas laden als je op Ads klikt.
+const ChallengeAdsDashboard = lazy(() => import('../../../challenge-ads/ChallengeAdsDashboard'))
 
 
 // "Nieuwe volgers"-kolom — hier krijgt elke card een DM-Run knop (75 volgers
@@ -139,6 +143,16 @@ export default function KanbanBoard({
   const [namenVerborgen, setNamenVerborgen] = useState(() => {
     try { return localStorage.getItem('leadsNamenVerborgen') === 'true' } catch { return false }
   })
+  // Ads-paneel open/dicht. Onthouden; het oude #ads (Meer-menu) opent 'm ook.
+  const [adsOpen, setAdsOpen] = useState(() => {
+    if (/^#ads\b/.test(window.location.hash)) return true
+    try { return localStorage.getItem('leadsAdsOpen') === 'true' } catch { return false }
+  })
+  const wisselAds = () => {
+    const nieuw = !adsOpen
+    setAdsOpen(nieuw)
+    try { localStorage.setItem('leadsAdsOpen', String(nieuw)) } catch { /* private mode */ }
+  }
   const wisselNamen = () => {
     const nieuw = !namenVerborgen
     setNamenVerborgen(nieuw)
@@ -2232,24 +2246,24 @@ export default function KanbanBoard({
               <BarChart3 size={14} /> Stats
             </button>
 
-            {/* Sectie — op telefoon zit deze knop als plus in de sectie-slider,
-                anders neemt hij daar een hele regel in beslag. */}
+            {/* Ads — klapt het ads-overzicht open boven de secties. Op telefoon
+                zit deze knop rechts in de sectie-slider. (Was: + Sectie.) */}
             {!isMobile && (
-            <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', minHeight: 34, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Plus size={14} /> Sectie
+            <button onClick={wisselAds} title={adsOpen ? 'Ads verbergen' : 'Ads tonen'} aria-pressed={adsOpen}
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', background: adsOpen ? '#fff' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: adsOpen ? '#000' : 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', minHeight: 34, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Megaphone size={14} /> Ads
             </button>
             )}
             {/* De knop voor volledig scherm is eruit. */}
 
             {/* Stage-switcher (mobiel) — rij BINNEN de balk (order:3), sluit aan
                 op de zoekbalk (zelfde achtergrond, geen losse strook eronder). */}
-            {/* Ook bij één sectie tonen: de plus-knop hangt aan deze rij. */}
+            {/* Ook bij één sectie tonen: de Ads-knop hangt aan deze rij. */}
             {isMobile && (() => {
               const activeSecId = sections.some(s => s.id === activeMobileSectionId) ? activeMobileSectionId : sections[0]?.id
               return (
-                // De plus-knop staat vast aan de rechterkant; de secties
-                // scrollen eronderdoor. Zo kost 'Sectie' geen eigen regel meer.
+                // De Ads-knop staat vast aan de rechterkant; de secties
+                // scrollen eronderdoor. Zo kost hij geen eigen regel.
                 <div style={{ order: 4, flexBasis: '100%', width: '100%', marginTop: 6, position: 'relative' }}>
                 <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: 44 }}>
                   <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
@@ -2275,7 +2289,7 @@ export default function KanbanBoard({
                   </div>
                 </div>
 
-                {/* Vaste plus-knop met een zwarte fade ervoor, zodat een sectie
+                {/* Vaste Ads-knop met een zwarte fade ervoor, zodat een sectie
                     die eronder doorschuift niet half zichtbaar blijft hangen. */}
                 <div style={{
                   position: 'absolute', top: 0, bottom: 0, right: 0,
@@ -2284,20 +2298,21 @@ export default function KanbanBoard({
                   pointerEvents: 'none',
                 }}>
                   <button
-                    onClick={() => { setSelectedSection(null); setShowSectionModal(true) }}
-                    title="Nieuwe sectie"
-                    aria-label="Nieuwe sectie"
+                    onClick={wisselAds}
+                    title={adsOpen ? 'Ads verbergen' : 'Ads tonen'}
+                    aria-label="Ads"
+                    aria-pressed={adsOpen}
                     style={{
                       pointerEvents: 'auto',
                       width: 34, height: 34, padding: 0, flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(255,255,255,0.05)',
+                      background: adsOpen ? '#fff' : 'rgba(255,255,255,0.05)',
                       border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: 10, color: 'rgba(255,255,255,0.7)',
+                      borderRadius: 10, color: adsOpen ? '#000' : 'rgba(255,255,255,0.7)',
                       cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <Plus size={16} strokeWidth={2.8} />
+                    <Megaphone size={16} strokeWidth={2.4} />
                   </button>
                 </div>
                 </div>
@@ -2450,6 +2465,14 @@ export default function KanbanBoard({
             </div>
           )}
 
+
+          {adsOpen && (
+            <div style={{ marginBottom: 16 }}>
+              <Suspense fallback={boardLoader}>
+                <ChallengeAdsDashboard db={db} isMobile={isMobile} />
+              </Suspense>
+            </div>
+          )}
 
           {loading ? boardLoader : renderKanbanColumns(false)}
 
