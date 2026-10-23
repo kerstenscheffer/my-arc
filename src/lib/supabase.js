@@ -48,6 +48,48 @@ const fetchMetLimiet = async (input, init = {}) => {
   }
 }
 
+// ── Dezelfde leesvraag niet twee keer tegelijk ──
+// Een klantpagina vuurt bij openen ~60 vragen af, en een flink deel twee tot
+// vier keer dezelfde (clients?select=workout_schedule, workout_sessions van
+// vandaag...) omdat losse onderdelen elk zelf ophalen. Gemeten 23 okt 2026:
+// 13% van alle leesvragen was een kopie binnen 1,5 s. Nu wacht een kopie op
+// het antwoord dat al onderweg is, of krijgt dat antwoord als het minder dan
+// een seconde oud is. Elke schrijfvraag (POST/PATCH/DELETE, ook rpc) wist dit
+// geheugen, zodat je na opslaan nooit je oude stand terugleest.
+const HERGEBRUIK_MS = 1000
+const leesvragen = new Map()
+const leesSleutel = (url, init) => {
+  const h = [...new Headers(init.headers || {}).entries()].sort().map(([k, v]) => `${k}:${v}`)
+  return `${url}\n${h.join('\n')}`
+}
+const fetchMetHergebruik = (input, init = {}) => {
+  const url = typeof input === 'string' ? input : ''
+  if (!url.includes('/rest/v1/')) return fetchMetLimiet(input, init)
+  const methode = String(init.method || 'GET').toUpperCase()
+  if (methode !== 'GET') {
+    leesvragen.clear()
+    return fetchMetLimiet(input, init).finally(() => leesvragen.clear())
+  }
+  // Met een eigen abort-signaal niet delen: afbreken zou de ander raken.
+  if (init.signal) return fetchMetLimiet(input, init)
+  const sleutel = leesSleutel(url, init)
+  const bestaand = leesvragen.get(sleutel)
+  if (bestaand && (!bestaand.klaarOp || Date.now() - bestaand.klaarOp < HERGEBRUIK_MS)) {
+    return bestaand.antwoord.then(res => res.clone())
+  }
+  const item = { klaarOp: 0 }
+  const vergeet = () => { if (leesvragen.get(sleutel) === item) leesvragen.delete(sleutel) }
+  item.antwoord = fetchMetLimiet(input, init).then(res => {
+    item.klaarOp = Date.now()
+    if (res.ok) setTimeout(vergeet, HERGEBRUIK_MS)
+    else vergeet()
+    return res
+  }, e => { vergeet(); throw e })
+  leesvragen.set(sleutel, item)
+  // Het origineel blijft ongelezen; iedereen krijgt een eigen kopie.
+  return item.antwoord.then(res => res.clone())
+}
+
 // SINGLETON PATTERN - voorkomt meerdere instances
 let supabaseInstance = null;
 
@@ -61,8 +103,32 @@ export const supabase = (() => {
         storage: window.localStorage,
         storageKey: `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`
       },
-      global: { fetch: fetchMetLimiet },
+      global: { fetch: fetchMetHergebruik },
     })
+
+    // ── getUser() niet bij elke klik naar de server ──
+    // ~30 plekken roepen auth.getUser() aan om alleen het id te weten. Dat is
+    // elke keer een rondje naar /auth/v1/user vóór de eigenlijke vraag
+    // (coach: 1.133 keer op 23 okt 2026). Zolang het toegangstoken hetzelfde
+    // is, is het antwoord hetzelfde; dat bewaren we een minuut. Nieuw token
+    // (verversen, uitloggen, ander account) = opnieuw vragen.
+    const auth = supabaseInstance.auth
+    const echteGetUser = auth.getUser.bind(auth)
+    let bewaard = null
+    auth.getUser = async (jwt) => {
+      if (jwt) return echteGetUser(jwt)
+      const { data: { session } = {} } = await auth.getSession()
+      const token = session?.access_token
+      if (!token) return echteGetUser()
+      if (bewaard?.token === token && Date.now() - bewaard.tijd < 60000) return bewaard.antwoord
+      const item = { token, tijd: Date.now() }
+      item.antwoord = echteGetUser().then(r => {
+        if (r?.error && bewaard === item) bewaard = null
+        return r
+      }, e => { if (bewaard === item) bewaard = null; throw e })
+      bewaard = item
+      return item.antwoord
+    }
   }
   return supabaseInstance
 })()

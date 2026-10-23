@@ -2,15 +2,13 @@
 // MY ARC Progress Module - Database Service Layer (FIXED VERSION)
 // No circular dependencies - direct Supabase access
 
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../../lib/supabase'
 
 class ProgressService {
   constructor() {
-    // Direct Supabase initialization to avoid circular dependency
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-    
-    this.supabase = createClient(supabaseUrl, supabaseKey)
+    // De gedeelde client: een eigen createClient gaf een tweede sessiebeheer
+    // naast de app (dubbel tokens verversen) zonder tijdslimiet.
+    this.supabase = supabase
     this.cache = new Map()
     this.cacheTimeout = 5 * 60 * 1000 // 5 minutes
     this.eventListeners = new Map()

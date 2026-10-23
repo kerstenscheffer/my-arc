@@ -5,12 +5,7 @@
 // Extends DatabaseService with journey-specific methods
 // Uses Supabase tables: client_journey_phases, client_journey_actions, client_journey_notes
 
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+import { supabase } from '../../lib/supabase'
 
 const ClientJourneyService = {
 
