@@ -33,7 +33,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  Copy, Check, ChevronDown, Link2,
+  Copy, Check, ChevronDown, ChevronLeft, ChevronRight, Link2,
   Megaphone, Info, Percent, Download, FileText, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
   PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle, Repeat, Banknote, Coins, TrendingUp,
 } from 'lucide-react'
@@ -58,6 +58,27 @@ const beginVan = (id) => {
   else if (id === 'kwartaal') d.setMonth(Math.floor(d.getMonth() / 3) * 3, 1)
   else d.setDate(1)
   return d
+}
+// Week/maand/kwartaal `stap` terug (−1 = vorige) of vooruit. Het einde stopt
+// bij vandaag. label = naam van die periode, null voor de huidige.
+const periodeBereik = (id, stap = 0) => {
+  const van = beginVan(id)
+  if (id === 'week') van.setDate(van.getDate() + 7 * stap)
+  else if (id === 'kwartaal') van.setMonth(van.getMonth() + 3 * stap, 1)
+  else van.setMonth(van.getMonth() + stap, 1)
+  const eind = new Date(van)
+  if (id === 'week') eind.setDate(eind.getDate() + 6)
+  else if (id === 'kwartaal') eind.setMonth(eind.getMonth() + 3, 0)
+  else eind.setMonth(eind.getMonth() + 1, 0)
+  eind.setHours(23, 59, 59, 999)
+  const nu = new Date(); nu.setHours(23, 59, 59, 999)
+  const tot = eind > nu ? nu : eind
+  const iso = (d) => d.toLocaleDateString('sv-SE')
+  const label = stap === 0 ? null
+    : id === 'week' ? `${dagLabel(iso(van))} – ${dagLabel(iso(eind))}`
+      : id === 'kwartaal' ? `Q${Math.floor(van.getMonth() / 3) + 1} ${van.getFullYear()}`
+        : van.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+  return { van, totEx: new Date(tot.getTime() + 1), label }
 }
 
 // De pagina's met meting. `alleenAds`: alleen advertentieverkeer tellen.
@@ -354,8 +375,10 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       return PERIODES.some(x => x.id === p) ? p : 'maand'
     } catch { return 'maand' }
   })
+  // Bladeren: 0 = deze week/maand/kwartaal, −1 = de vorige, enz.
+  const [stap, setStap] = useState(0)
   const setPeriode = (p) => {
-    setPeriodeState(p)
+    setPeriodeState(p); setStap(0)
     try { localStorage.setItem('arc_ads_periode', p) } catch { /* geen opslag */ }
   }
   // Van … tot …: eigen begin- en einddatum, gekozen in een klein venster met
@@ -403,9 +426,11 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     setLaden(true); setFout('')
     try {
       const tussen = periode === 'tussen' && bereik.van && bereik.tot
-      const tot = tussen ? new Date(`${bereik.tot}T00:00:00`) : new Date(); tot.setHours(23, 59, 59, 999)
-      const totEx = new Date(tot.getTime() + 1)
-      const van = tussen ? new Date(`${bereik.van}T00:00:00`) : beginVan(periode)
+      let van, totEx
+      if (tussen) {
+        const tot = new Date(`${bereik.tot}T00:00:00`); tot.setHours(23, 59, 59, 999)
+        van = new Date(`${bereik.van}T00:00:00`); totEx = new Date(tot.getTime() + 1)
+      } else ({ van, totEx } = periodeBereik(periode, stap))
       if (paginaVan(pagina).magnets) {
         const { data: res, error } = await db.supabase.rpc('get_magnet_trechter', { p_van: van.toISOString(), p_tot: totEx.toISOString() })
         if (error) throw error
@@ -426,12 +451,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       setFout(e.message || 'Laden mislukt')
     } finally { setLaden(false) }
   }
-  useEffect(() => { laad() }, [periode, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { laad() }, [periode, stap, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
   // Geen verversknop meer: elke 5 minuten vanzelf, zolang het tabblad openstaat.
   useEffect(() => {
     const t = setInterval(() => { if (document.visibilityState === 'visible') laad() }, 5 * 60 * 1000)
     return () => clearInterval(t)
-  }, [periode, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [periode, stap, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keuzelijsten: campagnes en advertenties uit spend, bezoek en leads.
   // Nieuwste activiteit bovenaan, zodat een net gestarte campagne vooraan staat.
@@ -918,13 +943,20 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             ]} />
           </>)}
           <span style={scheiding} />
-          {/* Periode: deze week / maand / kwartaal, of van … tot … (venster). */}
+          {/* Periode: deze week / maand / kwartaal, of van … tot … (venster).
+              Met ‹ › blader je naar de vorige of volgende week/maand/kwartaal. */}
+          {periode !== 'tussen' && (
+            <button onClick={() => setStap(x => x - 1)} title="Vorige" aria-label="Vorige periode"
+              style={{ ...seg, flex: '0 0 auto', padding: '0 0.45rem', display: 'flex', alignItems: 'center' }}>
+              <ChevronLeft size={16} strokeWidth={2.8} />
+            </button>
+          )}
           <span style={{ position: 'relative', display: 'flex', height: '100%', flex: m ? '1 1 0' : '0 0 auto' }}>
             <Keuzemenu label="Periode" rechts breedte={190} stijl={{ width: '100%' }}
               waarde={periode}
               weergave={periode === 'tussen' && bereik.van && bereik.tot
                 ? `${dagLabel(bereik.van)} – ${dagLabel(bereik.tot)}`
-                : (PERIODES.find(p => p.id === periode)?.label || 'Periode')}
+                : (periodeBereik(periode, stap).label || PERIODES.find(p => p.id === periode)?.label || 'Periode')}
               onKies={(v) => {
                 if (v === 'tussen' || v === 'tussen_kies') {
                   const vandaag = new Date().toLocaleDateString('sv-SE')
@@ -941,6 +973,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                   : [{ waarde: 'tussen_kies', label: 'Van … tot …' }]),
               ]} />
           </span>
+          {periode !== 'tussen' && (
+            <button onClick={() => setStap(x => Math.min(0, x + 1))} disabled={stap >= 0} title="Volgende" aria-label="Volgende periode"
+              style={{ ...seg, flex: '0 0 auto', padding: '0 0.45rem', display: 'flex', alignItems: 'center', opacity: stap >= 0 ? 0.25 : 1, cursor: stap >= 0 ? 'default' : 'pointer' }}>
+              <ChevronRight size={16} strokeWidth={2.8} />
+            </button>
+          )}
           {!P.magnets && (<>
           <span style={scheiding} />
           <button onClick={() => setPaneel('advertenties')} title="Per advertentie" style={{ ...seg, display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
