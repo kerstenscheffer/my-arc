@@ -12,7 +12,7 @@
 
 import { useState } from 'react'
 import {
-  Film, Eye, MessageSquare, UserPlus, Send, MessageCircle, MessagesSquare, PhoneOutgoing, CalendarCheck, PhoneCall, Trophy,
+  Film, Eye, MessageSquare, UserPlus, Send, MessageCircle, MessagesSquare, Megaphone, PhoneOutgoing, CalendarCheck, PhoneCall, Trophy,
 } from 'lucide-react'
 import FaseTrechter from './FaseTrechter'
 import Venster from './Venster'
@@ -38,7 +38,7 @@ const RICHT = {
 
 const ICONEN = {
   'Magnet-reels': Film, 'Views per reel': Eye, Commenters: MessageSquare, 'Op het bord': UserPlus,
-  'Follow-up gestuurd': Send, Reactie: MessageCircle, 'Reacties in periode': MessagesSquare, 'Call voorgesteld': PhoneOutgoing,
+  'Follow-up gestuurd': Send, Reactie: MessageCircle, 'Reacties in periode': MessagesSquare, Campagnebericht: Megaphone, 'Via campagne': Megaphone, 'Call voorgesteld': PhoneOutgoing,
   'Call ingepland': CalendarCheck, 'Call gehad': PhoneCall, Sale: Trophy,
 }
 
@@ -79,6 +79,15 @@ function tel(reels, leads, stappen) {
     noshows: noshows.length,
     sales: sales.length,
     omzet: sales.reduce((s, l) => s + Number(l.omzet), 0),
+    // Campagnes: de sales komen vaak pas na een campagnebericht (vooral het
+    // 6 weken challenge-bericht), niet na het automatische magnet-bericht.
+    campagneBerichten: stappen.filter(l => l.campagne_bericht).length,
+    perCampagne: Object.entries(sales.reduce((o, l) => {
+      const k = l.campagne || 'zonder campagne'
+      o[k] = o[k] || { sales: 0, omzet: 0 }
+      o[k].sales += 1; o[k].omzet += Number(l.omzet)
+      return o
+    }, {})).sort((a, b) => b[1].omzet - a[1].omzet),
   }
 }
 
@@ -87,6 +96,7 @@ const LIJST_VAN = {
   'Magnet-reels': 'reels', 'Views per reel': 'reels', Commenters: 'reels', 'Op het bord': 'nieuw',
   Reactie: 'reactie', 'Reacties in periode': 'reacties', 'Call voorgesteld': 'voorgesteld', 'Follow-up gestuurd': 'followup',
   'Call ingepland': 'ingepland', 'Call gehad': 'gehad', Sale: 'sale',
+  Campagnebericht: 'campagne', 'Via campagne': 'sale',
 }
 
 function maakFases(t) {
@@ -123,6 +133,7 @@ function maakFases(t) {
         M('Reacties in periode', null, null, null, String(t.reactiesPeriode), 'alle magnet-leads die in deze periode reageerden, ook van eerder'),
         M('Call voorgesteld', null, null, null, String(t.voorgesteld), 'in deze periode, alle magnet-leads'),
         M('Follow-up gestuurd', null, null, null, `${t.opgevolgd} · ${pct(t.opgevolgd, t.leads)}`, 'extra bericht gelogd, naast het automatische'),
+        M('Campagnebericht', null, null, null, getal(t.campagneBerichten), 'magnet-leads die in deze periode een campagnebericht kregen (bv. de 6 weken challenge)'),
       ] },
     { id: 'close', naam: 'Call & close', vraag: 'Calls geboekt, gehouden en geclosed?',
       preview: [['Ingepland', String(t.calls), 'Call ingepland'], ['Gehad', String(t.gehouden), 'Call gehad'], ['Sales', String(t.sales), 'Sale'], ['Omzet', euro(t.omzet)]],
@@ -130,6 +141,8 @@ function maakFases(t) {
         M('Call ingepland', t.calls, t.voorgesteld, RICHT.ingepland, `${t.calls} · ${pct(t.calls, t.voorgesteld)}`, 'in deze periode · t.o.v. de voorstellen'),
         M('Call gehad', t.gehouden, t.afgerond, RICHT.show, `${t.gehouden} · ${pct(t.gehouden, t.afgerond)}`, `kwam opdagen · ${t.noshows} no-show`),
         M('Sale', t.sales, t.gehouden, RICHT.close, `${t.sales} · ${pct(t.sales, t.gehouden)}`, `van de calls · ${euro(t.omzet)} omzet`),
+        M('Via campagne', null, null, null, t.perCampagne.length ? `${t.perCampagne[0][1].sales} · ${pct(t.perCampagne[0][1].sales, t.sales)}` : '–',
+          t.perCampagne.length ? t.perCampagne.map(([k, v]) => `${k}: ${v.sales} (${euro(v.omzet)})`).join(' · ') : 'nog geen sales in deze periode'),
       ] },
   ].map(vatFaseSamen)
 }
@@ -151,7 +164,7 @@ function LeadRij({ l }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '0.9rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.naam || 'Onbekend'}</div>
         <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          binnen {datum(l.created_at)} · {l.woord || 'magnet'}{l.sectie ? ` · ${l.sectie.trim()}` : ''}
+          binnen {datum(l.created_at)} · {l.woord || 'magnet'}{l.campagne ? ` · ${l.campagne}` : ''}{l.sectie ? ` · ${l.sectie.trim()}` : ''}
         </div>
       </div>
       <span style={{ fontSize: '0.78rem', fontWeight: 900, color: status.kleur, whiteSpace: 'nowrap' }}>{status.tekst}</span>
@@ -258,6 +271,7 @@ export default function MagnetTrechter({ data, m, laden }) {
           reactie: { titel: 'Reageerden op het automatische bericht', sub: 'van de nieuwe leads', leads: op(L.filter(l => l.contact), 'created_at') },
           followup: { titel: 'Follow-up gestuurd', sub: 'extra bericht gelogd, van de nieuwe leads', leads: op(L.filter(l => l.bericht), 'created_at') },
           reacties: { titel: 'Reacties in deze periode', sub: 'alle magnet-leads, ook van eerder', leads: op(S.filter(l => l.reactie), 'created_at') },
+          campagne: { titel: 'Campagnebericht gekregen', sub: 'in deze periode, alle magnet-leads', leads: op(S.filter(l => l.campagne_bericht), 'created_at') },
           voorgesteld: { titel: 'Call voorgesteld', sub: 'in deze periode', leads: op(S.filter(l => l.voorgesteld), 'created_at') },
           ingepland: { titel: 'Call ingepland', sub: 'in deze periode', leads: op(S.filter(l => l.call), 'created_at') },
           gehad: { titel: 'Call gehad', sub: 'in deze periode, plus no-shows', leads: op(S.filter(l => l.gehouden || l.noshow), 'created_at') },
