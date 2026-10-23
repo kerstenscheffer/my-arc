@@ -1,6 +1,8 @@
 // src/pages/leadmagnet/stijl.js
 // Kleuren, lettertype en kleine hulpjes van de lead magnets (/mijn-split,
 // /mijn-menu), los van de componenten in Bouwstenen.jsx.
+import { emailCheck } from './emailCheck'
+
 export const BG = '#000'
 export const HERO_BG = '#161616'
 export const CTA_GROEN = '#15803d'
@@ -8,7 +10,7 @@ export const WIT = '#fff'
 export const ZWAK = 'rgba(255,255,255,0.55)'
 export const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
 
-export const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim())
+export const emailOk = (e) => emailCheck(e).ok
 
 
 export const knopWit = (m, uit = false) => ({

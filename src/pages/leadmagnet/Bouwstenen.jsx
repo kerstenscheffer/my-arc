@@ -8,6 +8,7 @@ import { Check, Play, Volume2, VolumeX, Pause, X } from 'lucide-react'
 import { meet, volgTijdOpPagina } from '../challengeTracking'
 import { appSafeEmbedUrl } from '../../modules/videos/utils/youtubeHelpers'
 import { WIT, ZWAK, CTA_GROEN, BG, HERO_BG, FONT, invoer } from './stijl'
+import EmailTip from './EmailTip'
 
 // De kennismakings-modal en Trustpilot van /challenge, pas geladen als een
 // pagina een challengeSlot heeft (dan zit /challenge niet in elke bundel).
@@ -399,6 +400,7 @@ export function GegevensVelden({ m, formId, antw, setAntw, onVerstuur }) {
         autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="send"
         value={antw.email} onChange={e => setAntw(a => ({ ...a, email: e.target.value.trim() }))}
         placeholder="jouw@email.nl*" aria-label="E-mailadres" style={invoer(m)} />
+      <EmailTip email={antw.email} onVerbeter={(v) => setAntw(a => ({ ...a, email: v }))} />
       <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, textAlign: 'center', marginTop: '0.2rem' }}>
         Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: WIT }}>privacyverklaring</a>.
       </div>

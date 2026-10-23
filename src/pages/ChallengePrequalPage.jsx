@@ -19,6 +19,8 @@ import db from '../services/DatabaseService'
 import { meet, pixel, herkomst, volgTijdOpPagina, metaCookies, isIntern } from './challengeTracking'
 import { VRAGEN, vraagtTelefoon, optiesVan } from './challengeVragen'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
+import { emailCheck } from './leadmagnet/emailCheck'
+import EmailTip from './leadmagnet/EmailTip'
 
 const INSTAGRAM = 'https://instagram.com/myarc.nl'
 // Gratis waarde aan het eind: de video waarin Kersten uitlegt hoe je 10 kg
@@ -37,7 +39,7 @@ const utmUitUrl = () => {
   } catch { return {} }
 }
 
-const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim())
+const emailOk = (e) => emailCheck(e).ok
 const telOk = (t) => String(t || '').replace(/[^0-9+]/g, '').length >= 8
 
 // Telefoonveld: landcode los ervoor, Nederland staat klaar met 06 erin
@@ -646,6 +648,7 @@ export function PrequalFlow({ m = false, compact = false, onVolVideo }) {
                   onChange={e => zet('email', e.target.value.trim())} style={invoer(m)}
                 />
               )}
+              {!telefoon && <EmailTip email={antw.email} onVerbeter={(v) => zet('email', v)} />}
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, textAlign: 'center', marginTop: '0.2rem' }}>
                 Door te versturen ga je akkoord dat Kersten contact met je opneemt.{' '}
                 Zie de <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: WIT }}>privacyverklaring</a>.
