@@ -1917,6 +1917,23 @@ export default function KanbanBoard({
     </div>
   )
 
+  // Inhoud van het zoekveld: op telefoon een eigen rij, op desktop in de balk.
+  const zoekInhoud = (
+    <>
+      <Search size={12} color={searchQuery ? '#10b981' : 'rgba(255,255,255,0.2)'} style={{ flexShrink: 0 }} />
+      <input ref={searchInputRef} type="text" value={searchQuery}
+        onChange={(e) => handleSearch(e.target.value)}
+        onFocus={() => searchQuery && setShowSearchResults(true)}
+        placeholder={isMobile ? 'Zoek op naam of Instagram...' : 'Zoek op naam, Instagram, email...'}
+        style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: isMobile ? '0.7rem' : '0.75rem', minWidth: 0 }} />
+      {searchQuery && (
+        <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowSearchResults(false) }} style={{ padding: '2px', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '3px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <X size={10} />
+        </button>
+      )}
+    </>
+  )
+
   const showSaveBar = hasUnsavedChanges()
 
   // ========================================
@@ -1958,19 +1975,20 @@ export default function KanbanBoard({
             top: isMobile ? 68 : 76,   // initieel; useLayoutEffect zet de echte top vóór paint
             left: isMobile ? 0 : barHoriz.left,
             width: isMobile ? '100vw' : (barHoriz.width || 'calc(100vw - 16px)'),
-            background: 'rgba(10,10,10,0.97)',
+            background: isMobile ? 'rgba(10,10,10,0.97)' : 'transparent',
           }}>
-          <div style={{
+          {/* Desktop: geen container meer om de balk heen — de balk zelf is
+              het enige kader. Mobiel houdt de volle strook (zoekveld en
+              stats staan daar op eigen rijen). */}
+          <div style={isMobile ? {
             display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
-            justifyContent: isMobile ? 'center' : 'flex-start',
-            padding: isMobile ? '0.45rem 8px' : '0.4rem',
-            borderRadius: isMobile ? 0 : 12,
+            justifyContent: 'center',
+            padding: '0.45rem 8px',
             background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(8px)',
-            borderTop: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
-            borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
-            borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
             borderBottom: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: isMobile ? '0 6px 16px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.55)',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
+          } : {
+            display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
           }}>
             {/* Uitgeklapte stats (mobiel) — opent BINNEN de balk, tussen de
                 knoppen (order:0) en de zoekbalk (order:2) via order:1, volle breedte. */}
@@ -1985,38 +2003,38 @@ export default function KanbanBoard({
               </div>
             )}
             {/* Search — op mobiel op een eigen rij ONDER de knoppen (order:2 +
-                volle breedte) zodat het zoekveld veel breder is; op desktop
-                gewoon vooraan op één rij (order:0). */}
+                volle breedte) zodat het zoekveld veel breder is. Op desktop
+                zit het vooraan IN de balk, zie hieronder. */}
+            {isMobile && (
             <div style={{
               flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.35rem',
-              order: isMobile ? 2 : 0, ...(isMobile ? { flexBasis: '100%' } : {}),
-              padding: isMobile ? '0.4rem 0.6rem' : '0.35rem 0.625rem',
+              order: 2, flexBasis: '100%',
+              padding: '0.4rem 0.6rem',
               background: 'rgba(255,255,255,0.03)',
               border: showSearchResults && displayedSearchResults.length > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.06)',
               borderRadius: '6px', transition: 'all 0.2s ease', minHeight: '30px'
             }}>
-              <Search size={12} color={searchQuery ? '#10b981' : 'rgba(255,255,255,0.2)'} style={{ flexShrink: 0 }} />
-              <input ref={searchInputRef} type="text" value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                onFocus={() => searchQuery && setShowSearchResults(true)}
-                placeholder={isMobile ? 'Zoek op naam of Instagram...' : 'Zoek op naam, Instagram, email...'}
-                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: isMobile ? '0.7rem' : '0.75rem', minWidth: 0 }} />
-              {searchQuery && (
-                <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowSearchResults(false) }} style={{ padding: '2px', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '3px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                  <X size={10} />
-                </button>
-              )}
+              {zoekInhoud}
             </div>
+            )}
 
-            {/* Eén groep: gelijke vierkante knoppen tegen elkaar aan, met
-                één rand eromheen. Stonden eerder los met elk een eigen kleur
-                en rand; dat gaf zes losse blokjes op een rij. */}
+            {/* Eén balk: (desktop) zoekveld + gelijke vierkante knoppen + periode,
+                Stats en Ads, met één rand eromheen en lijnen ertussen. Dichte
+                achtergrond: er zit geen container meer omheen, en vastgepind
+                schuift de balk over de kaarten heen. */}
             <div style={{
-              display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-              background: 'rgba(255,255,255,0.04)',
+              display: 'inline-flex', alignItems: 'center',
+              ...(isMobile ? { flexShrink: 0 } : { flex: 1, minWidth: 0 }),
+              background: isMobile ? 'rgba(255,255,255,0.04)' : '#141414',
               border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 10, overflow: 'hidden',
             }}>
+            {!isMobile && (<>
+            <div style={{ flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.35rem', alignSelf: 'stretch', padding: '0 0.7rem' }}>
+              {zoekInhoud}
+            </div>
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
+            </>)}
             {/* Content van vandaag (reel, foto, stories, magnets) als ring. */}
             <ContentChecklist supabase={leadService?.db?.supabase} isMobile={isMobile} />
             <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
