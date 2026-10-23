@@ -27,7 +27,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
       padding: '10px 0', margin: m ? '0 -16px' : 0, paddingLeft: m ? 16 : 0, paddingRight: m ? 16 : 0,
     }}>
     <div style={{
-      display: 'flex', alignItems: 'stretch', minWidth: m ? fases.length * 175 : 0,
+      display: 'flex', alignItems: 'stretch', width: '100%', minWidth: 'min-content',
       border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, background: 'rgba(255,255,255,0.02)',
     }}>
       {fases.map((f, i) => {
@@ -37,7 +37,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
         const open = openFase === f.id
         const eerste = i === 0, laatste = i === fases.length - 1
         return (
-          <div key={f.id} style={{ position: 'relative', display: 'flex', flex: '1 1 0', minWidth: 0, borderLeft: eerste ? 'none' : '1px solid rgba(255,255,255,0.08)' }}>
+          <div key={f.id} style={{ position: 'relative', display: 'flex', flex: '1 1 0', borderLeft: eerste ? 'none' : '1px solid rgba(255,255,255,0.08)' }}>
             {!eerste && (
               <span style={{
                 position: 'absolute', left: 0, top: '50%', transform: 'translate(-50%, -50%)', zIndex: 2,
@@ -48,7 +48,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
               </span>
             )}
             <button onClick={() => setOpenFase(o => (o === f.id ? null : f.id))} aria-expanded={open} style={{
-              flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
               padding: m ? '0.9rem 1rem' : '1rem 1.2rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
               borderRadius: eerste ? '15px 0 0 15px' : laatste ? '0 15px 15px 0' : 0,
               background: open ? 'rgba(255,255,255,0.06)' : isVast ? `${k}0d` : 'transparent',
@@ -79,7 +79,10 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
                 </span>
                 <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, alignSelf: 'flex-start', marginTop: 4, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </span>
-              <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: m ? 12 : 18, rowGap: 8, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              {/* Cijfers altijd op één regel (Kersten). Vakken hebben geen minWidth 0,
+                  dus een vak wordt minstens zo breed als zijn cijferregel; past
+                  de balk niet, dan scrolt hij opzij. */}
+              <span style={{ display: 'flex', flexWrap: 'nowrap', gap: m ? 12 : 16, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                 {(f.preview || []).map(([label, waarde, meting]) => {
                   const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
                   const kl = o && o.rang >= 0 ? o.kleur : '#fff'
