@@ -118,6 +118,16 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // kwartaal, jaar, of een zelfgekozen periode ('custom', dan tellen de twee
   // datumvelden en doet anchorDate niet mee).
   const [periodMode, setPeriodMode] = useState('week')
+  // Campagnes: echte aantallen, of omgerekend naar "van 100 getagd". Zo
+  // vergelijk je een campagne van 2.920 leads eerlijk met een van 200.
+  const [per100, setPer100] = useState(() => {
+    try { return localStorage.getItem('campagnesPer100') === 'true' } catch { return false }
+  })
+  const wisselPer100 = () => {
+    const nieuw = !per100
+    setPer100(nieuw)
+    try { localStorage.setItem('campagnesPer100', String(nieuw)) } catch { /* private mode */ }
+  }
   const [periodeMenu, setPeriodeMenu] = useState(false)
   // Welk getal z'n uitlegvenster open heeft (klik op een stat).
   const [uitlegStat, setUitlegStat] = useState(null)
@@ -1365,7 +1375,16 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   Aantallen + Percentages in de top-modal-stijl (StatFlow). */}
               {openTabs.campagnes && campaignBreakdown && campaignBreakdown.campaigns.length > 0 && (
                 <>
-                  <SectionTitle icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <SectionTitle icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} />
+                    </div>
+                    {/* Aantallen omrekenen naar "van 100 getagd". */}
+                    <button onClick={wisselPer100} aria-pressed={per100} title="Toon per campagne wat er van elke 100 getagde leads overblijft"
+                      style={{ flexShrink: 0, minHeight: 32, padding: '0 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.14)', background: per100 ? '#fff' : 'transparent', color: per100 ? '#000' : 'rgba(255,255,255,0.75)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', whiteSpace: 'nowrap' }}>
+                      Per 100
+                    </button>
+                  </div>
                   <CampagneGeldTotaal campaigns={campaignBreakdown.campaigns} adspend={campaignBreakdown.adspend || 0} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.85rem' }}>
                     {campaignBreakdown.campaigns.map(c => (
@@ -1373,6 +1392,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                         key={c.id}
                         campaign={c}
                         isMobile={isMobile}
+                        per100={per100}
                         onVraag={setBevestig} revertingId={revertingId} deletingId={deletingId}
                       />
                     ))}
@@ -2120,7 +2140,7 @@ function CampagneGeldTotaal({ campaigns, adspend }) {
 // Per-campagne stat-kaart: naam + total, met daaronder de Aantallen- en
 // Percentages-rijen in exact dezelfde StatFlow-stijl als bovenin de modal.
 // Alle cijfers zijn "ná campagne-bericht" (uit getCampaignBreakdown).
-function CampaignStatCard({ campaign: c, isMobile, onVraag, revertingId, deletingId }) {
+function CampaignStatCard({ campaign: c, isMobile, onVraag, revertingId, deletingId, per100 = false }) {
   const [showMsg, setShowMsg] = useState(false)
   // Welke stap er per campagne is opengeklapt om de namen te zien.
   const [stap, setStap] = useState(null)
@@ -2131,18 +2151,27 @@ function CampaignStatCard({ campaign: c, isMobile, onVraag, revertingId, deletin
   // stage = de sleutel in c.leads; alleen invullen als er ook namen zijn,
   // anders is het pijltje een dode klik.
   const metNamen = (sleutel) => (namen[sleutel]?.length ? sleutel : undefined)
+  // Per 100: elk aantal als "zoveel van elke 100 getagde leads". Onder de 10
+  // met één decimaal (0,8 sales zegt meer dan 1), het echte aantal eronder.
+  const n100 = (v) => {
+    if (!c.total) return '—'
+    const x = ((Number(v) || 0) / c.total) * 100
+    return x.toLocaleString('nl-NL', { maximumFractionDigits: x < 10 ? 1 : 0 })
+  }
+  const toon = (v) => (per100 ? n100(v) : v)
+  const echt = (v) => (per100 ? `${Number(v) || 0} echt` : undefined)
   const countItems = [
-    { label: 'Getagd',      value: c.total,          Icon: UserPlus,      color: '#a855f7', stage: metNamen('getagd'),
-      sub: c.afgeslotenLeads ? `${c.afgeslotenLeads} verder in andere campagne` : undefined,
+    { label: 'Getagd',      value: per100 ? (c.total ? 100 : '—') : c.total, Icon: UserPlus, color: '#a855f7', stage: metNamen('getagd'),
+      sub: per100 ? `${c.total} echt` : (c.afgeslotenLeads ? `${c.afgeslotenLeads} verder in andere campagne` : undefined),
       info: c.afgeslotenLeads ? 'Deze cijfers staan vast voor de periode dat de lead aan deze campagne hing. Ging de lead daarna naar een andere campagne, dan tellen nieuwe reacties en stappen daar mee, niet meer hier.' : undefined },
-    { label: 'Reacties',    value: s.replied,        Icon: MessageCircle, color: '#10b981', stage: metNamen('replied') },
-    { label: 'Voorgesteld', value: s.callProposed,   Icon: PhoneCall,     color: '#a855f7', stage: metNamen('callProposed') },
-    { label: 'Ingepland',   value: s.callScheduled,  Icon: CalendarCheck, color: '#06b6d4', stage: metNamen('callScheduled') },
-    { label: 'Gevoerd',     value: s.callHeld || 0,  Icon: PhoneCall,     color: '#10b981', stage: metNamen('callHeld') },
-    { label: 'No-shows',    value: s.noShow || 0,    Icon: UserX,         color: '#ef4444', stage: metNamen('noShow') },
-    { label: 'Sale',        value: s.sale,           Icon: Trophy,        color: '#FFD700', stage: metNamen('sale') },
-    { label: 'Verloren',    value: s.saleLost || 0,  Icon: XCircle,       color: '#ef4444', stage: metNamen('saleLost') },
-    { label: 'Opvolg',      value: c.followupCount,  Icon: Send,          color: '#f59e0b' },
+    { label: 'Reacties',    value: toon(s.replied), sub: echt(s.replied),        Icon: MessageCircle, color: '#10b981', stage: metNamen('replied') },
+    { label: 'Voorgesteld', value: toon(s.callProposed), sub: echt(s.callProposed),   Icon: PhoneCall,     color: '#a855f7', stage: metNamen('callProposed') },
+    { label: 'Ingepland',   value: toon(s.callScheduled), sub: echt(s.callScheduled),  Icon: CalendarCheck, color: '#06b6d4', stage: metNamen('callScheduled') },
+    { label: 'Gevoerd',     value: toon(s.callHeld), sub: echt(s.callHeld),  Icon: PhoneCall,     color: '#10b981', stage: metNamen('callHeld') },
+    { label: 'No-shows',    value: toon(s.noShow), sub: echt(s.noShow),    Icon: UserX,         color: '#ef4444', stage: metNamen('noShow') },
+    { label: 'Sale',        value: toon(s.sale), sub: echt(s.sale),           Icon: Trophy,        color: '#FFD700', stage: metNamen('sale') },
+    { label: 'Verloren',    value: toon(s.saleLost), sub: echt(s.saleLost),  Icon: XCircle,       color: '#ef4444', stage: metNamen('saleLost') },
+    { label: 'Opvolg',      value: toon(c.followupCount), sub: echt(c.followupCount),  Icon: Send,          color: '#f59e0b' },
   ]
   const STAP_KLEUR = { getagd: '#a855f7', replied: '#10b981', callProposed: '#a855f7', callScheduled: '#06b6d4', callHeld: '#10b981', noShow: '#ef4444', sale: '#FFD700', saleLost: '#ef4444' }
   const STAP_LABEL = { getagd: 'Getagd', replied: 'Reacties', callProposed: 'Voorgesteld', callScheduled: 'Ingepland', callHeld: 'Gevoerd', noShow: 'No-shows', sale: 'Sale', saleLost: 'Sale verloren' }
@@ -2167,7 +2196,7 @@ function CampaignStatCard({ campaign: c, isMobile, onVraag, revertingId, deletin
           </button>
         )}
       </div>
-      <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '4px 0 2px' }}>Aantallen</div>
+      <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '4px 0 2px' }}>{per100 ? 'Van elke 100 getagd' : 'Aantallen'}</div>
       <StatFlow items={countItems} activeStage={stap} onToggle={(st) => setStap(p2 => p2 === st ? null : st)} />
       {stap && (
         <DrillPanel
