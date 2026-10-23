@@ -917,8 +917,9 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         ))}
       </div>
 
+        {/* Pal tegen de keuzebalk (rij-gap 20 → 8). */}
         {P.magnets && (
-          <div role="tablist" aria-label="Route" style={{ display: 'inline-flex', flexShrink: 0, height: 34, border: '1px solid rgba(255,255,255,0.16)', borderRadius: 9, overflow: 'hidden', marginLeft: m ? 0 : 'auto' }}>
+          <div role="tablist" aria-label="Route" style={{ display: 'inline-flex', flexShrink: 0, height: 34, border: '1px solid rgba(255,255,255,0.16)', borderRadius: 9, overflow: 'hidden', marginRight: m ? 0 : -12 }}>
             {[['alles', 'Alles'], ['direct', 'Direct uit magnet'], ['campagne', 'Via campagne']].map(([id, label], i) => (
               <button key={id} role="tab" aria-selected={route === id} onClick={() => setRoute(id)} style={{
                 padding: '0 0.8rem', border: 'none', borderLeft: i ? '1px solid rgba(255,255,255,0.16)' : 'none',
