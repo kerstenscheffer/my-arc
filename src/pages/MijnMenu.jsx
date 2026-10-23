@@ -18,7 +18,8 @@ import {
   DOELEN, GESLACHT, ACTIVITEIT, MAALTIJDEN, DIEET, LUST_NIET, MOMENT_NAAM, DAGEN,
   berekenDoel, groepeer, maakWeek, wissel, alternatievenVoor, dagTotaal, hoeveel,
 } from './mijn-menu/menuRegels'
-import { downloadMenuPdf, fotoUrl } from './mijn-menu/menuPdf'
+import { maakMenuPdf, fotoUrl } from './mijn-menu/menuPdf'
+import { mailPdf } from './leadmagnet/mailPdf'
 
 // YouTube-id van de uitlegvideo. Leeg = stilstaand beeld zonder afspeelknop.
 const VIDEO_ID = ''
@@ -83,6 +84,10 @@ function MenuFlow({ m }) {
   const [bezig, setBezig] = useState(false)
   const [pdfBezig, setPdfBezig] = useState(false)
   const [fout, setFout] = useState('')
+  // Lead-id voor de PDF-mail; bij de eerste download gaat dezelfde PDF ook naar de mail.
+  const [leadId, setLeadId] = useState(null)
+  const [gemaild, setGemaild] = useState(false)
+  const mailGestart = useRef(false)
   const utm = useRef(herkomst())
   const doorTimer = useRef(null)
   const bovenRef = useRef(null)
@@ -140,7 +145,7 @@ function MenuFlow({ m }) {
       const eigen = antw.lust_eigen.trim()
       const activiteit = ACTIVITEIT.find(a => a.key === antw.activiteit)?.label
       const u = utm.current || {}
-      const { data: leadId, error } = await db.supabase.rpc('submit_mijn_menu', { p: {
+      const { data: nieuwId, error } = await db.supabase.rpc('submit_mijn_menu', { p: {
         voornaam: antw.voornaam.trim(),
         email: antw.email.trim(),
         doel: doelLabel,
@@ -160,7 +165,8 @@ function MenuFlow({ m }) {
       } })
       if (error) throw error
       meet('form_stap', { meta: { stap: TOTAAL, vraag: 'gegevens' } })
-      meet('form_klaar', { meta: { uitkomst: 'A', vraag: 'gegevens' }, lead_id: leadId || null })
+      meet('form_klaar', { meta: { uitkomst: 'A', vraag: 'gegevens' }, lead_id: nieuwId || null })
+      setLeadId(nieuwId || null)
       setCijfers(c); setWeek(w)
       setStap(TOTAAL)
     } catch (e) {
@@ -173,7 +179,12 @@ function MenuFlow({ m }) {
     if (pdfBezig || !week) return
     setPdfBezig(true); setFout('')
     try {
-      await downloadMenuPdf({ voornaam: antw.voornaam.trim(), doel: antw.doel, cijfers, week, aantal: antw.maaltijden })
+      const doc = await maakMenuPdf({ voornaam: antw.voornaam.trim(), doel: antw.doel, cijfers, week, aantal: antw.maaltijden })
+      doc.save('mijn-weekmenu.pdf')
+      if (!mailGestart.current) {
+        mailGestart.current = true
+        mailPdf({ soort: 'menu', leadId, email: antw.email.trim(), voornaam: antw.voornaam.trim(), doc }).then(ok => ok && setGemaild(true))
+      }
       meet('pdf_download', { meta: { kcal: cijfers.kcal } })
     } catch (e) {
       console.error('PDF mislukt:', e)
@@ -205,8 +216,9 @@ function MenuFlow({ m }) {
         {kop(`${antw.voornaam.trim()}, je weekmenu staat klaar.`)}
         <button onClick={download} disabled={pdfBezig} style={{ ...knopWit(m, pdfBezig), marginTop: '1.4rem', background: CTA_GROEN, color: WIT }}>
           {pdfBezig ? <Loader2 size={22} style={{ animation: 'draai 1s linear infinite' }} /> : <Download size={22} strokeWidth={2.6} />}
-          {pdfBezig ? 'PDF maken…' : 'Download je menu (PDF)'}
+          {pdfBezig ? 'PDF maken…' : 'Download en mail je menu'}
         </button>
+        {gemaild && <div style={{ marginTop: '0.8rem', fontSize: '0.86rem', fontWeight: 800, color: '#86efac', textAlign: 'center' }}>Ook naar {antw.email.trim()} gestuurd.</div>}
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
         <MenuOverzicht m={m} cijfers={cijfers} week={week} groepen={groepenRef.current} onWissel={wisselMaaltijd} onDownload={download} pdfBezig={pdfBezig} />
       </div>

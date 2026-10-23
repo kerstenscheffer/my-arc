@@ -19,7 +19,8 @@ import { herkomst, meet } from './challengeTracking'
 import { Optie, LeadMagnetPagina } from './leadmagnet/Bouwstenen'
 import { CTA_GROEN, WIT, ZWAK, FONT, emailOk, knopWit, invoer } from './leadmagnet/stijl'
 import { SPLITS, DAG_NAAM, WEEK, DOELEN, NIVEAUS, LOCATIES, tips } from './mijn-split/splitRegels'
-import { downloadSplitPdf, fotoVoor, duur, totaalSets } from './mijn-split/splitPdf'
+import { maakSplitPdf, fotoVoor, duur, totaalSets } from './mijn-split/splitPdf'
+import { mailPdf } from './leadmagnet/mailPdf'
 import { BEPERKINGEN, beperkingenVoor, pasBeperkingenToe, suggestiesVoor } from './mijn-split/oefeningWissel'
 
 // YouTube-id van de uitlegvideo. Leeg = stilstaand beeld zonder afspeelknop.
@@ -90,6 +91,10 @@ function SplitFlow({ m }) {
   const [bezig, setBezig] = useState(false)
   const [pdfBezig, setPdfBezig] = useState(false)
   const [fout, setFout] = useState('')
+  // Lead-id voor de PDF-mail; bij de eerste download gaat dezelfde PDF ook naar de mail.
+  const [leadId, setLeadId] = useState(null)
+  const [gemaild, setGemaild] = useState(false)
+  const mailGestart = useRef(false)
   const utm = useRef(herkomst())
   const doorTimer = useRef(null)
   const bovenRef = useRef(null)
@@ -162,7 +167,7 @@ function SplitFlow({ m }) {
       const kanNiet = BEPERKINGEN.filter(b => antw.beperkingen.includes(b.key)).map(b => b.label).join(', ')
       const eigen = antw.beperking_eigen.trim()
       const u = utm.current || {}
-      const { data: leadId, error } = await db.supabase.rpc('submit_mijn_split', { p: {
+      const { data: nieuwId, error } = await db.supabase.rpc('submit_mijn_split', { p: {
         voornaam: antw.voornaam.trim(),
         email: antw.email.trim(),
         doel: doelLabel,
@@ -181,7 +186,8 @@ function SplitFlow({ m }) {
       } })
       if (error) throw error
       meet('form_stap', { meta: { stap: TOTAAL, vraag: 'gegevens' } })
-      meet('form_klaar', { meta: { uitkomst: 'A', vraag: 'gegevens' }, lead_id: leadId || null })
+      meet('form_klaar', { meta: { uitkomst: 'A', vraag: 'gegevens' }, lead_id: nieuwId || null })
+      setLeadId(nieuwId || null)
       setStap(TOTAAL)
     } catch (e) {
       console.error('mijn-split opslaan mislukt:', e)
@@ -193,7 +199,12 @@ function SplitFlow({ m }) {
     if (pdfBezig || !mijnDagen) return
     setPdfBezig(true); setFout('')
     try {
-      await downloadSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen: mijnDagen, tips: tips(antw), doel: antw.doel })
+      const doc = await maakSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen: mijnDagen, tips: tips(antw), doel: antw.doel })
+      doc.save(`mijn-split-${split.dagen.length}-dagen.pdf`)
+      if (!mailGestart.current) {
+        mailGestart.current = true
+        mailPdf({ soort: 'split', leadId, email: antw.email.trim(), voornaam: antw.voornaam.trim(), doc }).then(ok => ok && setGemaild(true))
+      }
       meet('pdf_download', { meta: { split: split.naam } })
     } catch (e) {
       console.error('PDF mislukt:', e)
@@ -224,8 +235,9 @@ function SplitFlow({ m }) {
         {sub(`${split.naam}: ${split.dagen.length} dagen per week, ${antw.locatie === 'thuis' ? 'thuis' : 'in de gym'}.`)}
         <button onClick={download} disabled={!dagen || pdfBezig} style={{ ...knopWit(m, !dagen || pdfBezig), marginTop: '1.4rem', background: dagen ? CTA_GROEN : 'rgba(255,255,255,0.12)', color: WIT }}>
           {pdfBezig ? <Loader2 size={22} style={{ animation: 'draai 1s linear infinite' }} /> : <Download size={22} strokeWidth={2.6} />}
-          {pdfBezig ? 'PDF maken…' : 'Download je split (PDF)'}
+          {pdfBezig ? 'PDF maken…' : 'Download en mail je split'}
         </button>
+        {gemaild && <div style={{ marginTop: '0.8rem', fontSize: '0.86rem', fontWeight: 800, color: '#86efac', textAlign: 'center' }}>Ook naar {antw.email.trim()} gestuurd.</div>}
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
         <SplitOverzicht split={split} dagen={mijnDagen} locatie={antw.locatie} keuzes={antw.beperkingen} onWissel={wissel} m={m} onDownload={download} pdfBezig={pdfBezig} />
       </div>
