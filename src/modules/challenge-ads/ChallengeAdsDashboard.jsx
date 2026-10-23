@@ -45,14 +45,20 @@ import Venster from './Venster'
 import MagnetTrechter from './MagnetTrechter'
 import { GROEN, ORANJE, ROOD, ZWAK, beoordeel, vatFaseSamen } from './fases'
 
+// Kalenderperiodes t/m vandaag (week begint maandag), plus een eigen van-tot.
 const PERIODES = [
-  { id: '7', label: 'Laatste 7 dagen', dagen: 7 },
-  { id: '14', label: 'Laatste 14 dagen', dagen: 14 },
-  { id: '30', label: 'Laatste 30 dagen', dagen: 30 },
-  { id: '90', label: 'Laatste 90 dagen', dagen: 90 },
-  { id: 'vanaf', label: 'Vanaf datum…' },
+  { id: 'week', label: 'Deze week' },
+  { id: 'maand', label: 'Deze maand' },
+  { id: 'kwartaal', label: 'Dit kwartaal' },
   { id: 'tussen', label: 'Van … tot …' },
 ]
+const beginVan = (id) => {
+  const d = new Date(); d.setHours(0, 0, 0, 0)
+  if (id === 'week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  else if (id === 'kwartaal') d.setMonth(Math.floor(d.getMonth() / 3) * 3, 1)
+  else d.setDate(1)
+  return d
+}
 
 // De pagina's met meting. `alleenAds`: alleen advertentieverkeer tellen.
 // `schermNaam`: namen van de formulierschermen die per pagina verschillen.
@@ -344,21 +350,16 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const [periode, setPeriodeState] = useState(() => {
     try {
       const p = localStorage.getItem('arc_ads_periode')
-      if (p === 'vanaf') return localStorage.getItem('arc_ads_vanaf') ? 'vanaf' : '14'
-      if (p === 'tussen') return localStorage.getItem('arc_ads_bereik_van') && localStorage.getItem('arc_ads_bereik_tot') ? 'tussen' : '14'
-      return PERIODES.some(x => x.id === p) ? p : '14'
-    } catch { return '14' }
+      if (p === 'tussen') return localStorage.getItem('arc_ads_bereik_van') && localStorage.getItem('arc_ads_bereik_tot') ? 'tussen' : 'maand'
+      return PERIODES.some(x => x.id === p) ? p : 'maand'
+    } catch { return 'maand' }
   })
   const setPeriode = (p) => {
     setPeriodeState(p)
     try { localStorage.setItem('arc_ads_periode', p) } catch { /* geen opslag */ }
   }
-  const datumRef = useRef(null)
-  const [vanafDatum, setVanafDatum] = useState(() => {
-    try { return localStorage.getItem('arc_ads_vanaf') || '' } catch { return '' }
-  })
-  // Van … tot …: eigen begin- en einddatum, los van 'vanaf'. Gekozen in een
-  // klein venster met twee datumvelden.
+  // Van … tot …: eigen begin- en einddatum, gekozen in een klein venster met
+  // twee datumvelden.
   const [bereik, setBereik] = useState(() => {
     try { return { van: localStorage.getItem('arc_ads_bereik_van') || '', tot: localStorage.getItem('arc_ads_bereik_tot') || '' } } catch { return { van: '', tot: '' } }
   })
@@ -368,10 +369,6 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     setBereik({ van, tot })
     try { localStorage.setItem('arc_ads_bereik_van', van); localStorage.setItem('arc_ads_bereik_tot', tot) } catch { /* geen opslag */ }
     setPeriode('tussen')
-  }
-  const kiesVanaf = (iso) => {
-    setVanafDatum(iso)
-    try { if (iso) localStorage.setItem('arc_ads_vanaf', iso); else localStorage.removeItem('arc_ads_vanaf') } catch { /* geen opslag */ }
   }
 
   // Campagne en advertentie (22 okt 2026: nieuwe campagne los van de oude
@@ -402,19 +399,13 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const [gekopieerd, setGekopieerd] = useState(false)
 
   const laad = async () => {
-    if (periode === 'vanaf' && !vanafDatum) return
     if (periode === 'tussen' && !(bereik.van && bereik.tot)) return
     setLaden(true); setFout('')
     try {
-      const dagen = PERIODES.find(p => p.id === periode)?.dagen || 14
       const tussen = periode === 'tussen' && bereik.van && bereik.tot
       const tot = tussen ? new Date(`${bereik.tot}T00:00:00`) : new Date(); tot.setHours(23, 59, 59, 999)
       const totEx = new Date(tot.getTime() + 1)
-      const van = tussen
-        ? new Date(`${bereik.van}T00:00:00`)
-        : (periode === 'vanaf' && vanafDatum)
-          ? new Date(`${vanafDatum}T00:00:00`)
-          : (() => { const d = new Date(); d.setDate(d.getDate() - dagen + 1); d.setHours(0, 0, 0, 0); return d })()
+      const van = tussen ? new Date(`${bereik.van}T00:00:00`) : beginVan(periode)
       if (paginaVan(pagina).magnets) {
         const { data: res, error } = await db.supabase.rpc('get_magnet_trechter', { p_van: van.toISOString(), p_tot: totEx.toISOString() })
         if (error) throw error
@@ -435,12 +426,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       setFout(e.message || 'Laden mislukt')
     } finally { setLaden(false) }
   }
-  useEffect(() => { laad() }, [periode, vanafDatum, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { laad() }, [periode, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
   // Geen verversknop meer: elke 5 minuten vanzelf, zolang het tabblad openstaat.
   useEffect(() => {
     const t = setInterval(() => { if (document.visibilityState === 'visible') laad() }, 5 * 60 * 1000)
     return () => clearInterval(t)
-  }, [periode, vanafDatum, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [periode, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keuzelijsten: campagnes en advertenties uit spend, bezoek en leads.
   // Nieuwste activiteit bovenaan, zodat een net gestarte campagne vooraan staat.
@@ -927,39 +918,28 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             ]} />
           </>)}
           <span style={scheiding} />
-          {/* Periode en 'vanaf' in één: kies je een datum, dan opent de
-              datumkiezer en staat er daarna "Vanaf 10 okt". */}
+          {/* Periode: deze week / maand / kwartaal, of van … tot … (venster). */}
           <span style={{ position: 'relative', display: 'flex', height: '100%', flex: m ? '1 1 0' : '0 0 auto' }}>
             <Keuzemenu label="Periode" rechts breedte={190} stijl={{ width: '100%' }}
-              waarde={periode === 'vanaf' && vanafDatum ? 'vanaf' : periode}
+              waarde={periode}
               weergave={periode === 'tussen' && bereik.van && bereik.tot
                 ? `${dagLabel(bereik.van)} – ${dagLabel(bereik.tot)}`
-                : periode === 'vanaf' && vanafDatum ? `Vanaf ${dagLabel(vanafDatum)}` : (PERIODES.find(p => p.id === periode)?.label || 'Periode')}
+                : (PERIODES.find(p => p.id === periode)?.label || 'Periode')}
               onKies={(v) => {
                 if (v === 'tussen' || v === 'tussen_kies') {
                   const vandaag = new Date().toLocaleDateString('sv-SE')
-                  setBereikInvoer({ van: bereik.van || vanafDatum || vandaag, tot: bereik.tot || vandaag })
+                  setBereikInvoer({ van: bereik.van || beginVan('maand').toLocaleDateString('sv-SE'), tot: bereik.tot || vandaag })
                   setBereikOpen(true)
-                  return
-                }
-                if (v === 'vanaf' || v === 'vanaf_kies') {
-                  try { datumRef.current?.showPicker?.() } catch { datumRef.current?.focus?.() }
                   return
                 }
                 setPeriode(v)
               }}
               opties={[
-                ...PERIODES.filter(p => p.id !== 'vanaf' && p.id !== 'tussen').map(p => ({ waarde: p.id, label: p.label })),
-                ...(periode === 'vanaf' && vanafDatum
-                  ? [{ waarde: 'vanaf', label: `Vanaf ${dagLabel(vanafDatum)}` }, { waarde: 'vanaf_kies', label: 'Andere datum…' }]
-                  : [{ waarde: 'vanaf_kies', label: 'Vanaf datum…' }]),
+                ...PERIODES.filter(p => p.id !== 'tussen').map(p => ({ waarde: p.id, label: p.label })),
                 ...(periode === 'tussen' && bereik.van && bereik.tot
                   ? [{ waarde: 'tussen', label: `${dagLabel(bereik.van)} – ${dagLabel(bereik.tot)}` }, { waarde: 'tussen_kies', label: 'Andere van – tot…' }]
                   : [{ waarde: 'tussen_kies', label: 'Van … tot …' }]),
               ]} />
-            <input ref={datumRef} type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')} tabIndex={-1} aria-hidden="true"
-              onChange={e => { kiesVanaf(e.target.value); if (e.target.value) setPeriode('vanaf') }}
-              style={{ position: 'absolute', left: 0, bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none', border: 0, padding: 0 }} />
           </span>
           {!P.magnets && (<>
           <span style={scheiding} />
