@@ -1,11 +1,9 @@
 // src/pages/mijn-menu/menuRegels.js
 // De rekenkern van /mijn-menu, los van de UI zodat hij zonder React te testen is.
 //
-//   1. Caloriedoel: Mifflin-St Jeor × activiteit. Vet verliezen bij mannen gaat
-//      via bereken() van de calorie-calculator (Kerstens regel: −800, nooit
-//      onder 1500, eiwit 2 g/kg, vet 1 g/kg). Vrouwen −500 met bodem 1200.
-//      Spier opbouwen +250, allebei = onderhoud. (Aannames 23 okt 2026, Kersten
-//      stuurt bij.)
+//   1. Caloriedoel: Mifflin-St Jeor × activiteit, dan −500 (vet verliezen),
+//      +250 (spier) of onderhoud (allebei). Eiwit 2 g/kg, vet 0,6 g/kg, de
+//      rest koolhydraten (Kersten, 23 okt 2026).
 //   2. Gerechten: de dagmenu- en wisselgerechten (get_mijn_menu_maaltijden).
 //      Elk gerecht bestaat in meerdere calorieniveaus; we nemen per moment de
 //      versie die het dichtst bij het doel van dat moment ligt en schalen hem.
@@ -13,7 +11,6 @@
 //      blik) op hele stuks, lepels op halve. Groente en fruit gaan niet
 //      omlaag (volume). Het restverschil komt uit de grootste gram-component
 //      (rijst, kwark, kip …), zodat het gerecht op zijn doel uitkomt.
-import { bereken } from '../calorie-calculator/rekenen'
 
 export const DOELEN = [
   { key: 'vetverlies', label: 'Vet verliezen' },
@@ -98,34 +95,17 @@ export function berekenDoel({ geslacht, leeftijd, lengte, gewicht, activiteit, d
   const vrouw = geslacht === 'vrouw'
   const tdee = Math.round((10 * w + 6.25 * h - 5 * a + (vrouw ? -161 : 5)) * activiteit)
 
-  // Veel vet te verliezen (BMI 30 of hoger, doel vet eraf of allebei): vet op
-  // 0,6 g per kilo in plaats van 1, de rest naar koolhydraten (Kersten, 23 okt
-  // 2026). We vragen geen vetpercentage, dus de BMI is de graadmeter.
-  const bmi = w / ((h / 100) ** 2)
-  const veelVet = bmi >= 30 && doel !== 'spiermassa'
-  const metVet = (c) => {
-    if (!veelVet) return { ...c, vetPerKg: Math.round((c.vet / w) * 10) / 10 }
-    const vet = Math.round(w * 0.6)
-    return { ...c, vet, kh: Math.max(0, Math.round((c.kcal - c.eiwit * 4 - vet * 9) / 4)), vetPerKg: 0.6, veelVet: true }
-  }
-
-  // Man en vet verliezen: precies de calorie-calculator.
-  if (!vrouw && doel === 'vetverlies') {
-    const r = bereken({ leeftijd: a, lengte: h, gewicht: w, activiteit, vetNu: null, vetDoel: null })
-    if (r) return metVet({ tdee: r.tdee, kcal: r.doel, eiwit: r.eiwit, vet: r.vet, kh: r.koolhydraten })
-  }
-
+  // Kersten (23 okt 2026): vet verliezen = verbranding − 500 (± 0,5 kg per
+  // week), spier opbouwen +250, allebei rond onderhoud. Nooit onder 1500
+  // (man) of 1200 (vrouw).
+  const verschil = doel === 'vetverlies' ? -500 : doel === 'spiermassa' ? 250 : 0
   const bodem = vrouw ? 1200 : 1500
-  const kcal = Math.round(Math.max(bodem,
-    doel === 'vetverlies' ? tdee - 500 : doel === 'spiermassa' ? tdee + 250 : tdee))
+  const kcal = Math.round(Math.max(bodem, tdee + verschil))
+  // Eiwit 2 g/kg (tot 120 kg), vet 0,6 g/kg, de rest koolhydraten.
   const eiwit = Math.round(Math.min(w, 120) * 2)
-  let vet = Math.round(w * (vrouw ? 0.9 : 1))
-  let kh = Math.round((kcal - eiwit * 4 - vet * 9) / 4)
-  if (kh < 50) {
-    vet = Math.max(Math.round(w * 0.6), Math.floor((kcal - eiwit * 4 - 200) / 9))
-    kh = Math.max(0, Math.round((kcal - eiwit * 4 - vet * 9) / 4))
-  }
-  return metVet({ tdee, kcal, eiwit, vet, kh })
+  const vet = Math.round(w * 0.6)
+  const kh = Math.max(0, Math.round((kcal - eiwit * 4 - vet * 9) / 4))
+  return { tdee, kcal, verschil: kcal - tdee, eiwit, vet, kh }
 }
 
 // ── Gerechten ───────────────────────────────────────────────────────────────
@@ -289,9 +269,10 @@ export function boodschappen(week) {
 // ── Wat je mag verwachten ───────────────────────────────────────────────────
 // Verbranding (TDEE) tegenover wat je eet, per dag en per week, en wat dat
 // ongeveer aan vet (of gewicht) doet. Zelfde vuistregel als de calorie-
-// calculator: 7.700 kcal ≈ 1 kg vet. Bij spier opbouwen gaat het om gewicht
-// (spier en een beetje vet), bij allebei blijft het gewicht ongeveer gelijk.
-const KCAL_PER_KG = 7700
+// Kerstens rekenregel: 500 kcal per dag tekort ≈ 0,5 kg per week, dus 7.000
+// kcal per kilo. Bij spier opbouwen gaat het om gewicht (spier en een beetje
+// vet), bij allebei blijft het gewicht ongeveer gelijk.
+const KCAL_PER_KG = 7000
 export const kgTekst = (n) => (Math.round(n * 10) / 10).toFixed(1).replace('.', ',')
 export function verwachting(cijfers, doel) {
   if (!cijfers) return null

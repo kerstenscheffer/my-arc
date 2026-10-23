@@ -9,7 +9,8 @@
 // mijn-menu/menuRegels.js. PDF: mijn-menu/menuPdf.js. Meting: meet() met pad
 // /mijn-menu, in het Ads-scherm als eigen pagina.
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, Download, Loader2, X, RefreshCw, Flame, Wheat, Egg, Droplet } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Download, Loader2, RefreshCw, Flame, Wheat, Egg, Droplet, List } from 'lucide-react'
+import MealCard from '../modules/meal-plan/components/day-schedule/MealCard'
 import db from '../services/DatabaseService'
 import { herkomst, meet } from './challengeTracking'
 import { Optie, LeadMagnetPagina, GegevensVelden } from './leadmagnet/Bouwstenen'
@@ -18,7 +19,7 @@ import {
   DOELEN, GESLACHT, ACTIVITEIT, MAALTIJDEN, VARIATIE, vasteMomenten, DIEET, LUST_NIET, MOMENT_NAAM, DAGEN,
   berekenDoel, groepeer, maakWeek, wissel, alternatievenVoor, dagTotaal, hoeveel, verwachting, kgTekst, MACRO, aandeel,
 } from './mijn-menu/menuRegels'
-import { maakMenuPdf, fotoUrl } from './mijn-menu/menuPdf'
+import { maakMenuPdf } from './mijn-menu/menuPdf'
 import { mailPdf } from './leadmagnet/mailPdf'
 
 // YouTube-id van de uitlegvideo. Leeg = stilstaand beeld zonder afspeelknop.
@@ -343,14 +344,12 @@ function MenuOverzicht({ m, cijfers, week, vast = [], groepen, onWissel, onDownl
   const d = week[dag]
   const t = dagTotaal(d)
   const gemEiwit = Math.round(week.reduce((s, x) => s + dagTotaal(x).eiwit, 0) / 7)
-  const klein = { fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: ZWAK }
-
   return (
     <div style={{ marginTop: '1.6rem' }}>
       <Sectiekop nr={1} titel="Jouw cijfers" sub="Per dag, uitgerekend op jou" />
       <MacroRingen m={m} cijfers={cijfers} />
-      <Sectiekop nr={2} titel="Zo werkt jouw dag" sub="Wat je verbrandt tegenover wat je eet" />
-      <Verwachting m={m} v={verwachting(cijfers)} />
+      <Sectiekop nr={2} titel="Zo kom je op jouw doel" sub="Wat je verbrandt, en wat je dus eet" />
+      <DoelSom m={m} cijfers={cijfers} />
       {gemEiwit < cijfers.eiwit * 0.85 && (
         <div style={{ marginTop: 10, padding: '0.7rem 0.9rem', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', fontSize: '0.84rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.45 }}>
           Met jouw keuzes kom je gemiddeld op {gemEiwit} g eiwit per dag. Een eiwitshake (plantaardig als je geen zuivel eet) brengt je dichter bij {cijfers.eiwit} g.
@@ -372,57 +371,58 @@ function MenuOverzicht({ m, cijfers, week, vast = [], groepen, onWissel, onDownl
       </div>
       <DagBalken t={t} cijfers={cijfers} />
       <div style={{ fontSize: '0.76rem', fontWeight: 700, color: ZWAK, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <RefreshCw size={13} strokeWidth={2.6} /> {vast.length ? 'Wissel je een vaste maaltijd, dan geldt dat voor de hele week.' : 'Zin in iets anders? Tik op het pijltje om te wisselen.'}
+        <List size={13} strokeWidth={2.6} /> {vast.length ? 'Tik op een maaltijd voor de hoeveelheden. Wissel je een vaste maaltijd, dan geldt dat voor de hele week.' : 'Tik op een maaltijd voor de hoeveelheden, op de pijltjes om te wisselen.'}
       </div>
 
-      {d.maaltijden.map((g, p) => {
-        const isOpen = open === p
-        if (g.leeg) return <div key={p} style={{ padding: '0.9rem 0', fontSize: '0.86rem', color: ZWAK }}>{MOMENT_NAAM[g.moment]}: met jouw keuzes is hier geen gerecht voor.</div>
-        const opties = isOpen ? alternatievenVoor(groepen, g.moment, d).slice(0, 8) : []
-        return (
-          <div key={p} style={{ marginTop: 10, borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0e0e0e', animation: 'vraagIn 0.25s ease' }}>
-            <div style={{ display: 'flex', gap: 12, padding: 12 }}>
-              <img src={fotoUrl(g, 300)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
-                style={{ width: m ? 76 : 88, height: m ? 76 : 88, borderRadius: 10, objectFit: 'cover', flexShrink: 0, background: '#1a1a1a' }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={klein}>{MOMENT_NAAM[g.moment]}{g.gewisseld ? ' · gewisseld' : ''}</div>
-                <div style={{ fontSize: '0.98rem', fontWeight: 900, lineHeight: 1.25, marginTop: 3 }}>{g.naam}</div>
-                <MacroChips g={g} />
-              </div>
-              <button onClick={() => setOpen(isOpen ? null : p)} aria-label={`Wissel ${g.naam}`} aria-expanded={isOpen} style={{
-                width: 34, height: 34, flexShrink: 0, borderRadius: 9, cursor: 'pointer', alignSelf: 'flex-start',
-                border: `1px solid ${isOpen ? WIT : 'rgba(255,255,255,0.16)'}`, background: isOpen ? WIT : 'transparent', color: isOpen ? '#000' : WIT,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-                {isOpen ? <X size={16} strokeWidth={2.8} /> : <RefreshCw size={15} strokeWidth={2.6} />}
-              </button>
+      {/* Dezelfde maaltijdkaart als in de app (MealCard). Tik op de kaart of
+          het lijstje: hoeveelheden. Pijltjes: wisselen, met de alternatieven
+          ook als app-kaartjes. */}
+      <div style={{ margin: m ? '0 -0.9rem' : '0 -1.25rem' }}>
+        {d.maaltijden.map((g, p) => {
+          if (g.leeg) return <div key={p} style={{ padding: m ? '0.9rem' : '0.9rem 1.25rem', fontSize: '0.86rem', color: ZWAK }}>{MOMENT_NAAM[g.moment]}: met jouw keuzes is hier geen gerecht voor.</div>
+          const ingr = open?.p === p && open.soort === 'ingr'
+          const wisselOpen = open?.p === p && open.soort === 'wissel'
+          const zet = (soort) => setOpen(o => (o?.p === p && o.soort === soort ? null : { p, soort }))
+          const opties = wisselOpen ? alternatievenVoor(groepen, g.moment, d).slice(0, 8) : []
+          const paneel = { margin: m ? '-0.3rem 0.9rem 0.55rem' : '-0.4rem 1.25rem 0.7rem', padding: m ? '0.7rem 0.75rem' : '0.8rem 0.95rem', borderRadius: 12, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', animation: 'vraagIn 0.2s ease' }
+          return (
+            <div key={`${p}-${g.naam}`}>
+              <MealCard
+                meal={{ name: g.naam, calories: g.kcal, protein: g.eiwit, carbs: g.kh, fat: g.vet, image_url: g.foto }}
+                isMobile={m} momentLabel={MOMENT_NAAM[g.moment]} onTik={() => zet('ingr')}
+                label={g.gewisseld ? <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#86efac' }}>Gewisseld</span> : null}
+                acties={[
+                  { icon: <List size={m ? 12 : 13} strokeWidth={2.6} />, label: 'Hoeveelheden', onClick: () => zet('ingr'), kleur: ingr ? WIT : undefined },
+                  { icon: <RefreshCw size={m ? 11 : 12} />, label: 'Wissel', onClick: () => zet('wissel'), kleur: wisselOpen ? WIT : undefined },
+                ]}
+              />
+              {ingr && (
+                <div style={{ ...paneel, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px' }}>
+                  {g.ingredienten.map(x => (
+                    <div key={x.naam} style={{ fontSize: '0.8rem', lineHeight: 1.35, minWidth: 0 }}>
+                      <span style={{ fontWeight: 900 }}>{hoeveel(x)}</span> <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>{x.naam}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {wisselOpen && (
+                <div style={{ margin: m ? '-0.2rem 0 0.4rem' : '-0.3rem 0 0.5rem', animation: 'vraagIn 0.2s ease' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: ZWAK, padding: m ? '0 0.9rem 0.4rem' : '0 1.25rem 0.45rem' }}>Kies een ander gerecht</div>
+                  {opties.map(o => {
+                    const v = o.versies[0]
+                    return (
+                      <MealCard key={o.naam} compact isMobile={m} acties={[]} momentLabel={MOMENT_NAAM[g.moment]}
+                        meal={{ name: o.naam, calories: v.kcal, protein: v.eiwit, carbs: v.kh, fat: v.vet, image_url: v.foto }}
+                        onTik={() => { onWissel(dag, p, o.naam); setOpen(null) }} />
+                    )
+                  })}
+                  {!opties.length && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: ZWAK, padding: m ? '0 0.9rem' : '0 1.25rem' }}>Geen ander gerecht dat bij je keuzes past.</div>}
+                </div>
+              )}
             </div>
-            {isOpen ? (
-              <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {opties.map(o => (
-                  <button key={o.naam} onClick={() => { onWissel(dag, p, o.naam); setOpen(null) }} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: 6, borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                    border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: WIT,
-                  }}>
-                    <img src={fotoUrl({ ...o.versies[0], moment: g.moment }, 160)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
-                      style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', background: '#1a1a1a', flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.86rem', fontWeight: 800 }}>{o.naam}</span>
-                  </button>
-                ))}
-                {!opties.length && <span style={{ fontSize: '0.8rem', fontWeight: 700, color: ZWAK }}>Geen ander gerecht dat bij je keuzes past.</span>}
-              </div>
-            ) : (
-              <div style={{ padding: '0 12px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px' }}>
-                {g.ingredienten.map(i => (
-                  <div key={i.naam} style={{ fontSize: '0.8rem', lineHeight: 1.35, minWidth: 0 }}>
-                    <span style={{ fontWeight: 900 }}>{hoeveel(i)}</span> <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>{i.naam}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
 
       <div style={{ marginTop: '1.2rem', padding: m ? '1rem' : '1.1rem 1.2rem', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)' }}>
         <div style={{ fontSize: '0.98rem', fontWeight: 900 }}>In de PDF staat ook</div>
@@ -472,34 +472,29 @@ function Sectiekop({ nr, titel, sub }) {
   )
 }
 
-// Grote kcal-ring met de drie macro's ernaast: elke ring toont welk deel van
-// je calorieën uit die macro komt.
+// Vier ringen even groot, zonder kader: kcal (vol) en per macro welk deel
+// van je calorieën eruit komt.
 function MacroRingen({ m, cijfers }) {
   const a = aandeel(cijfers)
-  const klein = m ? 64 : 72
+  const maat = m ? 70 : 80
+  const items = [['kcal', cijfers.kcal.toLocaleString('nl-NL'), '', 1], ['eiwit', cijfers.eiwit, 'g', a.eiwit], ['kh', cijfers.kh, 'g', a.kh], ['vet', cijfers.vet, 'g', a.vet]]
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: m ? 10 : 16, padding: m ? '0.9rem' : '1rem 1.2rem', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-      <Ring size={m ? 104 : 118} stroke={m ? 10 : 11} deel={1} kleur={MACRO.kcal.kleur}>
-        <Flame size={14} color={MACRO.kcal.kleur} />
-        <div style={{ fontSize: m ? '1.45rem' : '1.65rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.05 }}>{cijfers.kcal.toLocaleString('nl-NL')}</div>
-        <div style={{ fontSize: '0.6rem', fontWeight: 800, color: ZWAK, letterSpacing: '0.08em', textTransform: 'uppercase' }}>kcal / dag</div>
-      </Ring>
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, minWidth: 0 }}>
-        {['eiwit', 'kh', 'vet'].map(k => {
-          const I = ICOON[k]
-          return (
-            <div key={k} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 0 }}>
-              <Ring size={klein} stroke={m ? 6 : 7} deel={a[k]} kleur={MACRO[k].kleur}>
-                <div style={{ fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 900, color: WIT, lineHeight: 1 }}>{cijfers[k]}<span style={{ fontSize: '0.65em', color: ZWAK }}>g</span></div>
-              </Ring>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.72rem', fontWeight: 900, color: MACRO[k].kleur }}>
-                <I size={11} color={MACRO[k].kleur} /> {MACRO[k].label}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+      {items.map(([k, waarde, eenheid, deel]) => {
+        const I = ICOON[k]
+        return (
+          <div key={k} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <Ring size={maat} stroke={m ? 6 : 7} deel={deel} kleur={MACRO[k].kleur}>
+              <div style={{ fontSize: m ? (k === 'kcal' ? '0.92rem' : '1rem') : '1.08rem', fontWeight: 900, color: WIT, lineHeight: 1, letterSpacing: '-0.02em' }}>
+                {waarde}<span style={{ fontSize: '0.62em', color: ZWAK }}>{eenheid}</span>
               </div>
-              <div style={{ fontSize: '0.64rem', fontWeight: 700, color: ZWAK, whiteSpace: 'nowrap' }}>{Math.round(a[k] * 100)}% kcal</div>
+            </Ring>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.74rem', fontWeight: 900, color: MACRO[k].kleur, whiteSpace: 'nowrap' }}>
+              <I size={11} color={MACRO[k].kleur} /> {MACRO[k].label}
             </div>
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -526,59 +521,38 @@ function DagBalken({ t, cijfers }) {
   )
 }
 
-// De macro's van één maaltijd als gekleurde chips.
-function MacroChips({ g }) {
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-      {['kcal', 'eiwit', 'kh', 'vet'].map(k => (
-        <span key={k} style={{ fontSize: '0.7rem', fontWeight: 900, padding: '2px 7px', borderRadius: 999, color: MACRO[k].kleur, background: `${MACRO[k].kleur}1f` }}>
-          {g[k]}{k === 'kcal' ? ' kcal' : `g ${MACRO[k].label.toLowerCase().replace('.', '')}`}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-// Wat je verbrandt, wat je eet, het verschil en wat dat oplevert, als één
-// rekensom: verbranding − eten = tekort → kilo's.
+// Zo kom je op je doel, als simpele som: geschatte verbranding, het tekort
+// (of overschot) en wat je dus per dag eet (Kersten, 23 okt 2026).
 const duizend = (n) => Math.round(n).toLocaleString('nl-NL')
-function Verwachting({ m, v }) {
+function DoelSom({ m, cijfers }) {
+  const v = verwachting(cijfers)
   if (!v) return null
-  const klein = { fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase', color: ZWAK }
-  const verschil = v.soort === 'tekort' ? 'Tekort' : v.soort === 'overschot' ? 'Overschot' : 'Verschil'
-  const vak = (label, waarde, accent) => (
-    <div style={{ flex: 1, minWidth: 0, padding: '0.65rem 0.55rem', borderRadius: 12, border: `1px solid ${accent ? 'rgba(134,239,172,0.45)' : 'rgba(255,255,255,0.1)'}`, background: accent ? 'rgba(134,239,172,0.07)' : 'rgba(255,255,255,0.03)' }}>
-      <div style={klein}>{label}</div>
-      <div style={{ fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, marginTop: 3, color: accent ? '#86efac' : WIT, whiteSpace: 'nowrap' }}>{waarde}</div>
+  const regel = (teken, waarde, uitleg, sterk) => (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '0.55rem 0', borderTop: sterk ? '1.5px solid rgba(255,255,255,0.25)' : 'none' }}>
+      <span style={{ width: 16, fontSize: '1.1rem', fontWeight: 900, color: ZWAK, flexShrink: 0, textAlign: 'center' }}>{teken}</span>
+      <span style={{ fontSize: sterk ? (m ? '1.5rem' : '1.7rem') : '1.15rem', fontWeight: 900, color: sterk ? MACRO.kcal.kleur : WIT, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>{waarde}</span>
+      <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.35 }}>{uitleg}</span>
     </div>
   )
-  const teken = (t) => <span style={{ alignSelf: 'center', fontSize: '1rem', fontWeight: 900, color: ZWAK, flexShrink: 0 }}>{t}</span>
+  const tussen = v.soort === 'tekort'
+    ? regel('−', `${duizend(Math.abs(v.perDag))}`, `tekort voor ± ${kgTekst(v.kgPerWeek)} kg vet per week`)
+    : v.soort === 'overschot'
+      ? regel('+', `${duizend(v.perDag)}`, 'extra voor spieropbouw')
+      : regel('±', '0', 'rond onderhoud: vet eraf en spier erbij tegelijk')
   return (
-    <div style={{ padding: m ? '0.9rem' : '1rem 1.1rem', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {vak('Je verbrandt', `${duizend(v.tdee)}`)}
-        {teken('−')}
-        {vak('Je eet', `${duizend(v.eet)}`)}
-        {teken('=')}
-        {vak(verschil, `${v.perDag > 0 ? '+' : v.perDag < 0 ? '−' : ''}${duizend(Math.abs(v.perDag))}`, v.soort !== 'onderhoud')}
+    <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 18 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <Ring size={m ? 92 : 104} stroke={m ? 7 : 8} deel={1} kleur="rgba(255,255,255,0.85)">
+          <Flame size={13} color={WIT} />
+          <div style={{ fontSize: m ? '1.1rem' : '1.25rem', fontWeight: 900, lineHeight: 1.05 }}>{duizend(v.tdee)}</div>
+          <div style={{ fontSize: '0.6rem', fontWeight: 800, color: ZWAK }}>kcal</div>
+        </Ring>
+        <div style={{ fontSize: '0.7rem', fontWeight: 900, color: 'rgba(255,255,255,0.8)', textAlign: 'center', lineHeight: 1.2 }}>Geschatte<br />verbranding</div>
       </div>
-      <div style={{ marginTop: 12, display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-        {v.soort === 'onderhoud' ? (
-          <span style={{ fontSize: '1.05rem', fontWeight: 900 }}>Gewicht blijft ongeveer gelijk</span>
-        ) : (
-          <>
-            <span style={{ fontSize: m ? '1.6rem' : '1.8rem', fontWeight: 900, color: '#86efac', letterSpacing: '-0.02em' }}>≈ {kgTekst(v.kgPerWeek)} kg</span>
-            <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>{v.soort === 'tekort' ? 'vet eraf per week' : 'erbij per week'}</span>
-          </>
-        )}
-      </div>
-      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.45 }}>
-        {v.soort === 'tekort' && `Dat is ${duizend(Math.abs(v.perWeek))} kcal per week, ongeveer ${kgTekst(v.kgIn8)} kg in 8 weken.`}
-        {v.soort === 'overschot' && `Dat is ${duizend(v.perWeek)} kcal per week. Train je zwaar, dan gaat het grootste deel naar spier.`}
-        {v.soort === 'onderhoud' && 'Je eet rond wat je verbrandt: vet eraf en spier erbij gaat tegelijk, dus kijk vooral naar de spiegel en je kracht.'}
-      </div>
-      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginTop: 8, lineHeight: 1.45 }}>
-        Schatting: 7.700 kcal is ongeveer 1 kg vet. De eerste week zie je op de weegschaal vaak meer door vocht.
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {regel('', duizend(v.tdee), 'wat je per dag verbrandt')}
+        {tussen}
+        {regel('=', duizend(v.eet), 'kcal per dag: jouw doel', true)}
       </div>
     </div>
   )
