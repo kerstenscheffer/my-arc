@@ -2211,18 +2211,17 @@ export default function KanbanBoard({
 
             {/* De knop om de cijfers te verbergen is eruit: de stats-balk
                 staat nu altijd aan. */}
-            </div>
 
             {/* De oog-knop (namen verbergen) is eruit. */}
 
             {/* De vrouwen-schakelaar staat nu in het filtervenster. */}
 
-            {/* Periode + alle statistieken — stonden op een eigen regel in de
-                stats-balk; nu in dezelfde rij als de rest. */}
+            {/* Periode, Stats en Ads horen bij dezelfde balk: zelfde rand,
+                scheidingslijnen ertussen, geen losse blokjes meer. */}
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
             <div style={{
               position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center',
-              minHeight: 34, padding: '0 0.7rem', borderRadius: 10,
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+              alignSelf: 'stretch', padding: '0 0.7rem',
             }}>
               <Clock size={13} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0, marginRight: 6 }} />
               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>
@@ -2241,19 +2240,23 @@ export default function KanbanBoard({
               </select>
             </div>
 
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
             <button onClick={() => setStatsVolledig(true)} title="Alle statistieken"
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', minHeight: 34, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <BarChart3 size={14} /> Stats
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', minHeight: 34, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              {/* Telefoon: alleen het icoon, zodat de hele balk op één regel past. */}
+              <BarChart3 size={14} />{!isMobile && ' Stats'}
             </button>
 
             {/* Ads — klapt het ads-overzicht open boven de secties. Op telefoon
                 zit deze knop rechts in de sectie-slider. (Was: + Sectie.) */}
-            {!isMobile && (
+            {!isMobile && (<>
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
             <button onClick={wisselAds} title={adsOpen ? 'Ads verbergen' : 'Ads tonen'} aria-pressed={adsOpen}
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', background: adsOpen ? '#fff' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: adsOpen ? '#000' : 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', minHeight: 34, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 0.7rem', background: adsOpen ? '#fff' : 'transparent', border: 'none', color: adsOpen ? '#000' : 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', minHeight: 34, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <Megaphone size={14} /> Ads
             </button>
-            )}
+            </>)}
+            </div>
             {/* De knop voor volledig scherm is eruit. */}
 
             {/* Stage-switcher (mobiel) — rij BINNEN de balk (order:3), sluit aan
