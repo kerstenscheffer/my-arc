@@ -185,12 +185,13 @@ function MenuFlow({ m }) {
     setPdfBezig(true); setFout('')
     try {
       const doc = await maakMenuPdf({ voornaam: antw.voornaam.trim(), doel: antw.doel, cijfers, week, aantal: antw.maaltijden })
+      // Eerst meten: op een iPhone kan opslaan de pagina verlaten voor het verzoek weg is.
+      meet('pdf_download', { meta: { kcal: cijfers.kcal } })
       doc.save('mijn-weekmenu.pdf')
       if (!mailGestart.current) {
         mailGestart.current = true
         mailPdf({ soort: 'menu', leadId, email: antw.email.trim(), voornaam: antw.voornaam.trim(), doc }).then(ok => ok && setGemaild(true))
       }
-      meet('pdf_download', { meta: { kcal: cijfers.kcal } })
     } catch (e) {
       console.error('PDF mislukt:', e)
       setFout('Downloaden lukte niet. Probeer het nog een keer.')

@@ -201,12 +201,13 @@ function SplitFlow({ m }) {
     setPdfBezig(true); setFout('')
     try {
       const doc = await maakSplitPdf({ voornaam: antw.voornaam.trim(), split, locatie: antw.locatie, dagen: mijnDagen, tips: tips(antw), doel: antw.doel })
+      // Eerst meten: op een iPhone kan opslaan de pagina verlaten voor het verzoek weg is.
+      meet('pdf_download', { meta: { split: split.naam } })
       doc.save(`mijn-split-${split.dagen.length}-dagen.pdf`)
       if (!mailGestart.current) {
         mailGestart.current = true
         mailPdf({ soort: 'split', leadId, email: antw.email.trim(), voornaam: antw.voornaam.trim(), doc }).then(ok => ok && setGemaild(true))
       }
-      meet('pdf_download', { meta: { split: split.naam } })
     } catch (e) {
       console.error('PDF mislukt:', e)
       setFout('Downloaden lukte niet. Probeer het nog een keer.')
