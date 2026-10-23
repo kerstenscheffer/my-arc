@@ -114,7 +114,8 @@ as $function$
   -- Calls en sales IN de periode, van alle magnet-leads (ook van vóór de
   -- periode): een sale komt vaak weken na de comment. Net als de stats-balk.
   mleads as (
-    select cl.id, magnet_woord(cl.lead_magnets_shared[1]) woord, cl.first_reply_at
+    select cl.id, magnet_woord(cl.lead_magnets_shared[1]) woord, cl.first_reply_at,
+      trim(coalesce(cl.first_name, '') || ' ' || coalesce(cl.last_name, '')) naam, cl.created_at
     from call_leads cl where cl.deleted_at is null and cardinality(cl.lead_magnets_shared) > 0
   ),
   ev as (
@@ -129,7 +130,7 @@ as $function$
     group by 1
   ),
   st as (
-    select ml.id, ml.woord,
+    select ml.id, ml.woord, ml.naam, ml.created_at,
       coalesce(ml.first_reply_at >= p_van and ml.first_reply_at < p_tot, false)
         or exists (select 1 from lead_reaction_events r where r.lead_id = ml.id and r.delta > 0 and r.created_at >= p_van and r.created_at < p_tot) reactie,
       coalesce(ev.voorgesteld, false) voorgesteld, coalesce(ev.ingepland, false) call,
@@ -139,7 +140,13 @@ as $function$
     from mleads ml left join ev on ev.lead_id = ml.id
   )
   select jsonb_build_object(
-    'stappen', coalesce((select jsonb_agg(to_jsonb(x)) from st x where x.reactie or x.voorgesteld or x.call or x.gehouden or x.noshow or x.omzet is not null), '[]'::jsonb),
+    'reel_lijst', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'tijd', c.tijd, 'woord', upper(c.woord),
+        'views', c.views, 'comments', c.comments, 'tekst', c.tekst) order by c.tijd desc)
+      from content_ig_media c where c.soort = 'magnet' and c.tijd >= (select v from start) and c.tijd < p_tot), '[]'::jsonb),
+    -- Sectie alleen voor de rijen die meegaan (niet voor alle ~6.000 magnet-leads).
+    'stappen', coalesce((select jsonb_agg(to_jsonb(x) || jsonb_build_object('sectie',
+        (select sec.title from lead_section_items i join lead_sections sec on sec.id = i.section_id where i.lead_id = x.id limit 1)))
+      from st x where x.reactie or x.voorgesteld or x.call or x.gehouden or x.noshow or x.omzet is not null), '[]'::jsonb),
     'reels', coalesce((select jsonb_agg(to_jsonb(r) order by r.views desc nulls last) from reels r), '[]'::jsonb),
     'leads', coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from l x), '[]'::jsonb),
     'vanaf', (select v from start),
