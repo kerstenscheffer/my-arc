@@ -41,6 +41,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import PrequalAfhaken from './PrequalAfhaken'
 import PrequalAfgewezen from './PrequalAfgewezen'
 import FaseTrechter from './FaseTrechter'
+import { createPortal } from '../../client/paginaPortal'
 import MagnetTrechter from './MagnetTrechter'
 import { GROEN, ORANJE, ROOD, ZWAK, beoordeel, vatFaseSamen } from './fases'
 
@@ -313,7 +314,10 @@ function Venster({ titel, sub, m, onClose, children, breed = false }) {
     document.body.style.overflow = 'hidden'
     return () => { window.removeEventListener('keydown', esc); document.body.style.overflow = oud }
   }, [onClose])
-  return (
+  // Via een portal naar body: dit scherm staat ook in het leadbord, en een
+  // ouder met transform maakt van position: fixed een plek op de pagina in
+  // plaats van midden in beeld.
+  return createPortal(
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.78)',
       display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? 0 : '2rem',
@@ -334,7 +338,8 @@ function Venster({ titel, sub, m, onClose, children, breed = false }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
