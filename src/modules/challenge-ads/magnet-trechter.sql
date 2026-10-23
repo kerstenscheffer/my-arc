@@ -34,6 +34,19 @@ language sql stable security definer set search_path to 'public' as $$
     upper(trim(e)))
 $$;
 
+-- Alle sleutels (magnet-id, magnet-naam, trigger-woord) → trigger-woord, in één
+-- keer per aanroep i.p.v. per lead (scheelt ~0,4 s bij ~6.000 magnet-leads).
+create or replace function public.magnet_woorden() returns table(sleutel text, woord text)
+language sql stable security definer set search_path to 'public' as $$
+  select distinct on (sleutel) sleutel, woord from (
+    select id::text sleutel, upper(coalesce(woord, name)) woord, 0 prio from lead_magnets
+    union all select upper(name), upper(coalesce(woord, name)), case when woord is null then 2 else 1 end from lead_magnets
+    union all select upper(woord), upper(woord), 0 from lead_magnets where woord is not null
+  ) x order by sleutel, prio
+$$;
+revoke execute on function public.magnet_woorden() from public, anon;
+grant execute on function public.magnet_woorden() to authenticated;
+
 -- 3. De trechter in één keer: magnet-reels (views, comments) en de leads met
 --    een magnet, met dezelfde stap-vlaggen als get_challenge_ads_overzicht.
 --    Security invoker: RLS op content_ig_media en de leadtabellen bepaalt
@@ -44,7 +57,8 @@ language sql
 stable
 set search_path to 'public'
 as $function$
-  with start as (
+  with mw as materialized (select * from magnet_woorden()),
+  start as (
     -- Tellen vanaf de eerste Instagram-data (sync sinds 8 okt 2026): anders
     -- staan leads van maanden tegenover comments van twee weken.
     select greatest(p_van, coalesce((select date_trunc('day', min(tijd) at time zone 'Europe/Amsterdam') at time zone 'Europe/Amsterdam'
@@ -58,7 +72,7 @@ as $function$
     group by 1
   ),
   basis as (
-    select cl.*, magnet_woord(cl.lead_magnets_shared[1]) woord
+    select cl.*, coalesce((select mw.woord from mw where mw.sleutel in (cl.lead_magnets_shared[1], upper(cl.lead_magnets_shared[1])) limit 1), upper(trim(cl.lead_magnets_shared[1]))) woord
     from call_leads cl
     where cl.deleted_at is null and cl.created_at >= p_van and cl.created_at < p_tot
       and cardinality(cl.lead_magnets_shared) > 0
@@ -117,7 +131,7 @@ as $function$
   -- Calls en sales IN de periode, van alle magnet-leads (ook van vóór de
   -- periode): een sale komt vaak weken na de comment. Net als de stats-balk.
   mleads as (
-    select cl.id, magnet_woord(cl.lead_magnets_shared[1]) woord, cl.first_reply_at,
+    select cl.id, coalesce((select mw.woord from mw where mw.sleutel in (cl.lead_magnets_shared[1], upper(cl.lead_magnets_shared[1])) limit 1), upper(trim(cl.lead_magnets_shared[1]))) woord, cl.first_reply_at,
       trim(coalesce(cl.first_name, '') || ' ' || coalesce(cl.last_name, '')) naam, cl.created_at,
       -- Campagne: de sales komen vaak pas na een campagnebericht (vooral het
       -- 6 weken challenge-bericht), niet na het automatische magnet-bericht.
@@ -136,16 +150,20 @@ as $function$
     where m.reverted_at is null and (m.moved_at >= p_van - interval '60 days')
     group by 1
   ),
+  rx as (
+    select distinct r.lead_id from lead_reaction_events r
+    where r.delta > 0 and r.created_at >= p_van and r.created_at < p_tot
+  ),
   st as (
     select ml.id, ml.woord, ml.naam, ml.created_at, ml.campagne,
       coalesce(ml.campaign_message_sent_at >= p_van and ml.campaign_message_sent_at < p_tot, false) campagne_bericht,
       coalesce(ml.first_reply_at >= p_van and ml.first_reply_at < p_tot, false)
-        or exists (select 1 from lead_reaction_events r where r.lead_id = ml.id and r.delta > 0 and r.created_at >= p_van and r.created_at < p_tot) reactie,
+        or rx.lead_id is not null reactie,
       coalesce(ev.voorgesteld, false) voorgesteld, coalesce(ev.ingepland, false) call,
       coalesce(ev.gehouden, false) or ev.omzet is not null gehouden,
       coalesce(ev.noshow, false) and not (coalesce(ev.gehouden, false) or ev.omzet is not null) noshow,
       ev.omzet
-    from mleads ml left join ev on ev.lead_id = ml.id
+    from mleads ml left join ev on ev.lead_id = ml.id left join rx on rx.lead_id = ml.id
   )
   select jsonb_build_object(
     'reel_lijst', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'tijd', c.tijd, 'woord', upper(c.woord),
