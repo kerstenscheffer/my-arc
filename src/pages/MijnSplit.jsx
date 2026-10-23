@@ -57,6 +57,13 @@ const VOORBEELDEN = [
   { src: '/mijn-split/voorbeeld-3.jpg', label: 'Elke training + logboek' },
   { src: '/mijn-split/voorbeeld-4.jpg', label: 'Uitvoering en progressie' },
 ]
+// Drie stappen onder de bovenste knop, zelfde vorm als op /challenge.
+const STAPPEN_UITLEG = [
+  { kop: 'Vragen', sub: '4 korte vragen' },
+  { kop: 'Split', sub: 'op jouw dagen' },
+  { kop: 'Uitvoeren', sub: 'met logboek' },
+]
+
 const INHOUD = [
   'Een split op jouw aantal dagen, in de gym of thuis.',
   'Alle oefeningen met sets, reps en rust.',
@@ -740,7 +747,7 @@ export default function MijnSplit() {
           textTransform: 'uppercase', whiteSpace: 'nowrap',
         }}>
           <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
-          Gratis trainingssplit | MY ARC
+          Gratis trainingssplit
         </span>
       </div>
 
@@ -765,7 +772,27 @@ export default function MijnSplit() {
       <section style={{ background: '#fff', color: '#000', padding: `${m ? '2rem' : '2.8rem'} ${m ? '1.25rem' : '3rem'} ${m ? '3.2rem' : '4.5rem'}` }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div ref={heroCtaRef}>
-            <Cta m={m} onClick={openForm} licht sub="4 vragen · gratis · direct als PDF" />
+            <Cta m={m} onClick={openForm} licht />
+          </div>
+          {/* Drie bollen 1-2-3 op één lijn met eronder het woord en een korte
+              regel, zoals de stappen op /challenge. Tik = formulier open. */}
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', maxWidth: 620, margin: `${m ? '1.8rem' : '2.4rem'} auto 0` }}>
+            <span aria-hidden style={{ position: 'absolute', left: '16.67%', right: '16.67%', top: (m ? 44 : 52) / 2 - 1, height: 2, background: 'rgba(0,0,0,0.15)' }} />
+            {STAPPEN_UITLEG.map((st, i) => (
+              <button key={st.kop} onClick={openForm} aria-label={st.kop} style={{
+                position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: m ? 8 : 10,
+                padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span style={{
+                  width: m ? 44 : 52, height: m ? 44 : 52, borderRadius: '50%', background: '#000', color: WIT,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: m ? '1.1rem' : '1.25rem', fontWeight: 900,
+                  boxShadow: '0 0 0 5px #fff',
+                }}>{i + 1}</span>
+                <span style={{ fontSize: m ? '0.92rem' : '1.15rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>{st.kop}</span>
+                <span style={{ marginTop: -4, fontSize: m ? '0.78rem' : '0.88rem', fontWeight: 700, color: 'rgba(0,0,0,0.55)', lineHeight: 1.3 }}>{st.sub}</span>
+              </button>
+            ))}
           </div>
         </div>
       </section>

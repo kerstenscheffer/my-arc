@@ -24,11 +24,17 @@
 // meting heeft een richtwaarde; de eerste fase die eronder zit is waar het
 // vastloopt. De lead-fases tellen met dezelfde woorden als de statistiekbalk
 // van het leadsysteem, maar alleen voor leads uit de advertenties.
+//
+// Per pagina (23 okt 2026): vooraan in de keuzebalk kies je de pagina
+// (/challenge of /mijn-split). Beide RPC's krijgen p_pagina mee en tellen dan
+// alleen de bezoeken van die pagina en de leads met haar lead_source (zie
+// ads-per-pagina.sql). /mijn-split telt al het verkeer, niet alleen ads:
+// daar komt het meeste via Instagram.
 
 import { createElement, useEffect, useRef, useState } from 'react'
 import {
   Copy, Check, ChevronDown, ChevronRight, X, Link2,
-  Megaphone, Info, Percent, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
+  Megaphone, Info, Percent, Download, FileText, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
   PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle, Repeat, Banknote, Coins, TrendingUp,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -42,6 +48,15 @@ const PERIODES = [
   { id: '90', label: 'Laatste 90 dagen', dagen: 90 },
   { id: 'vanaf', label: 'Vanaf datum…' },
 ]
+
+// De pagina's met meting. `alleenAds`: alleen advertentieverkeer tellen.
+// `schermNaam`: namen van de formulierschermen die per pagina verschillen.
+const PAGINAS = [
+  { id: '/challenge', label: '/challenge', alleenAds: true, schermNaam: {} },
+  { id: '/mijn-split', label: '/mijn-split', alleenAds: false, pdf: true,
+    schermNaam: { dagen: 'Dagen per week', locatie: 'Gym of thuis', doel: 'Doel', niveau: 'Hoe lang trainen', gegevens: 'Naam en e-mail' } },
+]
+const paginaVan = (id) => PAGINAS.find(p => p.id === id) || PAGINAS[0]
 
 const GROEN = '#10b981'
 const ORANJE = '#f59e0b'
@@ -93,12 +108,12 @@ const ICONEN = {
   Bezoekers: Users, 'Video gestart': Play, 'Op de knop geklikt': MousePointerClick, 'Formulier gestart': PenLine, 'Leads binnen': UserCheck,
   'Follow-up gestuurd': Send, 'In gesprek': MessageCircle,
   'Call voorgesteld': PhoneOutgoing, 'Call ingepland': CalendarCheck, 'Call gehad': PhoneCall,
-  Sale: Trophy, Verlengd: Repeat, 'Gem. orderwaarde': Wallet,
+  Sale: Trophy, Verlengd: Repeat, 'Gem. orderwaarde': Wallet, 'PDF gedownload': Download,
 }
 
 const procent = (x, dec = 0) => `${(x * 100).toFixed(dec).replace('.', ',')}%`
 
-const LINK_VOORBEELD = 'https://www.myarcfitness.com/challenge?utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}'
+const linkVoorbeeld = (pad) => `https://www.myarcfitness.com${pad}?utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}`
 
 const euro = (n, dec = false) => {
   if (n == null || !isFinite(n)) return '–'
@@ -124,7 +139,7 @@ const schoon = (naam) => {
 const sleutelVan = (hook) => (schoon(hook) || '').toLowerCase() || '__onbekend'
 
 const VELDEN = ['sessies', 'geopend', 'mobiel', 'blijft_30s', 'video_start', 'video_25', 'video_50', 'video_75', 'video_100',
-  'knop', 'form_start', 'form_klaar', 'geschikt', 'afgewezen', 'geschikt_video_start', 'geschikt_video_klaar']
+  'knop', 'form_start', 'form_klaar', 'geschikt', 'afgewezen', 'geschikt_video_start', 'geschikt_video_klaar', 'pdf']
 function telOp(hooks) {
   const t = Object.fromEntries(VELDEN.map(k => [k, 0]))
   let tijdSom = 0
@@ -395,6 +410,14 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     try { if (c) localStorage.setItem('arc_ads_campagne', c); else localStorage.removeItem('arc_ads_campagne') } catch { /* geen opslag */ }
   }
 
+  // Welke pagina; onthouden. Wisselen zet campagne en advertentie terug.
+  const [pagina, setPaginaState] = useState(() => { try { return paginaVan(localStorage.getItem('arc_ads_pagina')).id } catch { return '/challenge' } })
+  const setPagina = (p) => {
+    setPaginaState(p); setCampagne('')
+    try { localStorage.setItem('arc_ads_pagina', p) } catch { /* geen opslag */ }
+  }
+  const P = paginaVan(pagina)
+
   const [data, setData] = useState(null)
   const [venster, setVenster] = useState(null)
   const [laden, setLaden] = useState(true)
@@ -417,7 +440,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       const van = (periode === 'vanaf' && vanafDatum)
         ? new Date(`${vanafDatum}T00:00:00`)
         : (() => { const d = new Date(); d.setDate(d.getDate() - dagen + 1); d.setHours(0, 0, 0, 0); return d })()
-      const p = { p_van: van.toISOString(), p_tot: totEx.toISOString() }
+      const p = { p_van: van.toISOString(), p_tot: totEx.toISOString(), p_pagina: pagina }
       const [{ data: res, error }, st] = await Promise.all([
         db.supabase.rpc('get_challenge_ads_overzicht', p),
         db.supabase.rpc('get_prequal_stappen', p).then(r => r, () => ({ data: [] })),
@@ -430,12 +453,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       setFout(e.message || 'Laden mislukt')
     } finally { setLaden(false) }
   }
-  useEffect(() => { laad() }, [periode, vanafDatum]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { laad() }, [periode, vanafDatum, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
   // Geen verversknop meer: elke 5 minuten vanzelf, zolang het tabblad openstaat.
   useEffect(() => {
     const t = setInterval(() => { if (document.visibilityState === 'visible') laad() }, 5 * 60 * 1000)
     return () => clearInterval(t)
-  }, [periode, vanafDatum]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [periode, vanafDatum, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keuzelijsten: campagnes en advertenties uit spend, bezoek en leads.
   // Nieuwste activiteit bovenaan, zodat een net gestarte campagne vooraan staat.
@@ -466,8 +489,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     try { const [c, a] = JSON.parse(v); setCampagne(c); if (a) setAdvFilter(a) } catch { setCampagne('') }
   }
 
-  // Dit scherm telt alleen advertentieverkeer (eigen bezoek telt al niet mee).
-  const alleenAds = true
+  // /challenge telt alleen advertentieverkeer, /mijn-split alles (eigen bezoek telt nooit mee).
+  const alleenAds = P.alleenAds
   const past = (r) => (!alleenAds || r.ad !== false)
     && (!campagne || campSleutel(r.camp) === campagne)
     && (!advFilter || sleutelVan(r.hook) === advFilter)
@@ -508,7 +531,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     .sort((a, b) => (a.n ? a.stapSom / a.n : 99) - (b.n ? b.stapSom / b.n : 99))
     .reduce((vorige, x) => {
       const weg = Math.max(0, vorige - x.door - x.afgewezen)
-      schermen.push({ ...x, binnen: vorige, weg, naam: SCHERM_NAAM[x.vraag] || x.vraag })
+      schermen.push({ ...x, binnen: vorige, weg, naam: P.schermNaam[x.vraag] || SCHERM_NAAM[x.vraag] || x.vraag })
       return x.door
     }, T.form_start)
   // Na het laatste scherm: wie niet als lead binnenkwam. Afwijzingen die niet
@@ -571,7 +594,8 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       M('Video gestart', T.video_start, T.sessies, RICHT.video, `${T.video_start} · ${pct(T.video_start, T.sessies)}`, 'video', `${pct(T.video_100, T.video_start)} kijkt hem helemaal`),
       M('Op de knop geklikt', T.knop, T.sessies, RICHT.knop, `${T.knop} · ${pct(T.knop, T.sessies)}`, 'formulier', 'van de bezoekers'),
       M('Formulier gestart', T.form_start, T.sessies, RICHT.fstart, `${T.form_start} · ${pct(T.form_start, T.sessies)}`, 'formulier', 'van de bezoekers'),
-      M('Leads binnen', leads.length, T.form_start, RICHT.leads, `${leads.length} · ${pct(leads.length, T.form_start)}`, 'gegevens', `van wie begon · ${T.afgewezen} niet geschikt`),
+      M('Leads binnen', leads.length, T.form_start, RICHT.leads, `${leads.length} · ${pct(leads.length, T.form_start)}`, 'gegevens', P.pdf ? 'van wie begon' : `van wie begon · ${T.afgewezen} niet geschikt`),
+      ...(P.pdf ? [M('PDF gedownload', T.pdf, leads.length, null, `${T.pdf} · ${pct(T.pdf, leads.length)}`, 'gegevens', 'van de leads')] : []),
     ] },
     { id: 'followup', naam: 'Follow-up', vraag: 'Komen we in contact?', preview: [['In gesprek', String(inGesprek.length), 'In gesprek'], ['Van de leads', pct(inGesprek.length, leads.length), 'In gesprek'], ['Follow-ups', String(metFollowup.length)]], metingen: [
       M('Follow-up gestuurd', metFollowup.length, leads.length, null, `${metFollowup.length} · ${pct(metFollowup.length, leads.length)}`, 'followup', 'gelogd op het bord'),
@@ -599,7 +623,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const nodigVoorDoel = spend * DOEL_ROAS - omzet
 
   const kopieer = async () => {
-    try { await navigator.clipboard.writeText(LINK_VOORBEELD); setGekopieerd(true); setTimeout(() => setGekopieerd(false), 2000) } catch { /* leeg */ }
+    try { await navigator.clipboard.writeText(linkVoorbeeld(pagina)); setGekopieerd(true); setTimeout(() => setGekopieerd(false), 2000) } catch { /* leeg */ }
   }
 
   const bijgewerkt = data?.spend_bijgewerkt
@@ -763,21 +787,22 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           </div>
 
           <div style={{ height: 22 }} />
-          <PrequalAfhaken venster={venster} m alleenNummers />
+          {pagina === '/challenge' && <PrequalAfhaken venster={venster} m alleenNummers />}
         </>
       ),
     },
     gegevens: {
-      titel: 'Gegevens achtergelaten', sub: `${leads.length} geschikte leads, ${pct(leads.length, T.form_start)} van wie begon`,
+      titel: 'Gegevens achtergelaten', sub: `${leads.length} ${P.pdf ? '' : 'geschikte '}leads, ${pct(leads.length, T.form_start)} van wie begon`,
       inhoud: (
         <>
+          {P.pdf && <Regel label="PDF gedownload" waarde={`${T.pdf} van ${leads.length} (${pct(T.pdf, leads.length)})`} sterk />}
           {T.geschikt_video_start > 0 && (
             <Regel label="Keek jouw video op het geschikt-scherm" waarde={`${T.geschikt_video_start} (${T.geschikt_video_klaar} helemaal)`} />
           )}
           <div style={{ ...kop, marginTop: 14 }}>Leads</div>
           {leads.length ? leads.map(l => <LeadRegel key={l.id} l={l} />) : <Leeg>Nog geen leads in deze periode.</Leeg>}
           <div style={{ height: 22 }} />
-          <PrequalAfgewezen venster={venster} />
+          {pagina === '/challenge' && <PrequalAfgewezen venster={venster} />}
         </>
       ),
     },
@@ -904,6 +929,11 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           display: 'flex', alignItems: 'center', flexShrink: m ? 1 : 0, width: m ? '100%' : 'auto', minWidth: 0,
           height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.16)', position: 'relative', zIndex: 20,
         }}>
+          <Keuzemenu label="Pagina" waarde={pagina} onKies={setPagina} breedte={200}
+            stijl={{ flex: '0 0 auto' }}
+            weergave={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={14} strokeWidth={2.6} />{P.label}</span>}
+            opties={PAGINAS.map(x => ({ waarde: x.id, label: x.label }))} />
+          <span style={scheiding} />
           <Keuzemenu label="Campagne of advertentie" waarde={keuzeWaarde} onKies={kiesFilter} breedte={320}
             stijl={{ flex: m ? '1 1 0' : '0 1 280px', maxWidth: m ? 'none' : 280 }}
             weergave={(() => {
@@ -1115,7 +1145,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           <div style={{ ...kop, marginTop: 24, display: 'flex', alignItems: 'center', gap: 6 }}><Link2 size={14} strokeWidth={2.6} /> Link voor in de advertentie</div>
           <div style={{ paddingBottom: '1rem' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <code style={{ flex: 1, fontSize: '0.76rem', color: 'rgba(255,255,255,0.85)', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{LINK_VOORBEELD}</code>
+              <code style={{ flex: 1, fontSize: '0.76rem', color: 'rgba(255,255,255,0.85)', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{linkVoorbeeld(pagina)}</code>
               <button onClick={kopieer} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.7rem', borderRadius: 10, background: gekopieerd ? 'rgba(16,185,129,0.15)' : '#fff', color: gekopieerd ? GROEN : '#000', border: 'none', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                 {gekopieerd ? <Check size={14} /> : <Copy size={14} />} {gekopieerd ? 'Gekopieerd' : 'Kopieer'}
               </button>
