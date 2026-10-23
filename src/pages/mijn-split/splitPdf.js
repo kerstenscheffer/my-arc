@@ -9,17 +9,18 @@ import jsPDF from 'jspdf'
 import { DAG_NAAM, WEEK, DOELEN } from './splitRegels'
 
 const MAP = '/mijn-split/'
-const B = 210
-const H = 297
-const M = 9
+export const B = 210
+export const H = 297
+export const M = 9
 
-const ZWART = [14, 14, 14]
-const KAART = [24, 24, 24]
-const LIJN = [44, 44, 44]
-const WIT = [255, 255, 255]
-const ZACHT = [205, 205, 205]
-const GRIJS = [140, 140, 140]
-const DOF = [85, 85, 85]
+// Kleuren en maten ook gebruikt door de menu-PDF (mijn-menu/menuPdf.js).
+export const ZWART = [14, 14, 14]
+export const KAART = [24, 24, 24]
+export const LIJN = [44, 44, 44]
+export const WIT = [255, 255, 255]
+export const ZACHT = [205, 205, 205]
+export const GRIJS = [140, 140, 140]
+export const DOF = [85, 85, 85]
 
 // Welke foto bij welke dag. Thuis heeft eigen foto's: de gymfoto's laten
 // machines zien die je thuis niet hebt.
@@ -79,18 +80,18 @@ const tekstVoor = (code) => TEKST[code] || TEKST[code.startsWith('upper') ? 'upp
 
 // ── laden ────────────────────────────────────────────────────────────────
 
-const laad = async (bestand) => {
+export const laad = async (bestand) => {
   const r = await fetch(MAP + bestand)
   if (!r.ok) throw new Error(`${bestand}: ${r.status}`)
   return new Uint8Array(await r.arrayBuffer())
 }
-const naarBase64 = (bytes) => {
+export const naarBase64 = (bytes) => {
   let s = ''
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
   return btoa(s)
 }
 
-const FONTS = [
+export const FONTS = [
   ['Anton-Regular.ttf', 'Anton', 'normal'],
   ['SourceSans3-Regular.ttf', 'Source', 'normal'],
   ['SourceSans3-Bold.ttf', 'Source', 'bold'],
@@ -109,12 +110,12 @@ const minuten = (rust) => {
 // ± 45 s plus de rust; op 5 min afgerond.
 export const duur = (oef) => Math.round(oef.reduce((t, o) => t + 4 + (Number(o.sets) || 0) * (0.75 + minuten(o.rust)), 0) / 5) * 5
 export const totaalSets = (oef) => oef.reduce((t, o) => t + (Number(o.sets) || 0), 0)
-const tweeCijfers = (n) => String(n).padStart(2, '0')
+export const tweeCijfers = (n) => String(n).padStart(2, '0')
 
 // Wit MA COACHING-logo (uitgesneden ma-logo-header.png), 177 × 159 px.
-const LOGO_VERHOUDING = 177 / 159
+export const LOGO_VERHOUDING = 177 / 159
 
-function maakTekenaar(doc, logo) {
+export function maakTekenaar(doc, logo) {
   const kleur = (c) => doc.setTextColor(c[0], c[1], c[2])
   const font = (fam, stijl, pt) => { doc.setFont(fam, stijl); doc.setFontSize(pt) }
 
