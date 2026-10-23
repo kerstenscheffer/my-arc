@@ -64,7 +64,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
                 </span>
                 <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, alignSelf: 'flex-start', marginTop: 4, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </span>
-              <span style={{ display: 'flex', gap: m ? 12 : 14, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: m ? 12 : 14, rowGap: 8, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                 {(f.preview || []).map(([label, waarde, meting]) => {
                   const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
                   const kl = o && o.rang >= 0 ? o.kleur : '#fff'

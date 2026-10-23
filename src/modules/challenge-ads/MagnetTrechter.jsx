@@ -121,7 +121,7 @@ function maakFases(t) {
         M('Follow-up gestuurd', null, null, null, `${t.opgevolgd} · ${pct(t.opgevolgd, t.leads)}`, 'extra bericht gelogd, naast het automatische'),
       ] },
     { id: 'close', naam: 'Call & close', vraag: 'Calls geboekt, gehouden en geclosed?',
-      preview: [['Ingepland', String(t.calls), 'Call ingepland'], ['Gehad', String(t.gehouden), 'Call gehad'], ['Sales', String(t.sales), 'Sale']],
+      preview: [['Ingepland', String(t.calls), 'Call ingepland'], ['Gehad', String(t.gehouden), 'Call gehad'], ['Sales', String(t.sales), 'Sale'], ['Omzet', euro(t.omzet)]],
       metingen: [
         M('Call ingepland', t.calls, t.voorgesteld, RICHT.ingepland, `${t.calls} · ${pct(t.calls, t.voorgesteld)}`, 'in deze periode · t.o.v. de voorstellen'),
         M('Call gehad', t.gehouden, t.afgerond, RICHT.show, `${t.gehouden} · ${pct(t.gehouden, t.afgerond)}`, `kwam opdagen · ${t.noshows} no-show`),
