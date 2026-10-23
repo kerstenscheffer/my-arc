@@ -1,4 +1,6 @@
 -- Instagram-sync voor de content-checklist (20 okt 2026).
+-- 23 okt 2026: ook comments_count per post (content_ig_media.comments), voor
+-- de comment-magnet-trechter (zie challenge-ads/magnet-trechter.sql).
 -- Haalt elk uur via de Instagram API (Instagram-login, geen Facebook-pagina)
 -- de laatste posts en de live stories op. Token: Vault 'meta_ig_token'
 -- (rechten instagram_business_basic + instagram_business_manage_insights).
@@ -55,10 +57,11 @@ begin
     else
       v_woord := null; v_soort := 'foto';
     end if;
-    insert into content_ig_media (id, eigenaar, tijd, dag, soort, woord, views, tekst)
-    values (m->>'id', p_eigenaar, v_tijd, v_dag, v_soort, v_woord, (m->>'views')::int, left(m->>'caption', 200))
+    insert into content_ig_media (id, eigenaar, tijd, dag, soort, woord, views, tekst, comments)
+    values (m->>'id', p_eigenaar, v_tijd, v_dag, v_soort, v_woord, (m->>'views')::int, left(m->>'caption', 200), (m->>'comments_count')::int)
     on conflict (id) do update set soort = excluded.soort, woord = excluded.woord,
-      views = coalesce(excluded.views, content_ig_media.views), tekst = excluded.tekst, updated_at = now();
+      views = coalesce(excluded.views, content_ig_media.views), tekst = excluded.tekst,
+      comments = coalesce(excluded.comments, content_ig_media.comments), updated_at = now();
     if v_soort in ('reel', 'magnet') then
       -- Metricool-rij van dezelfde reel (zelfde moment, paar seconden verschil) vervangen.
       delete from content_metricool_posts where eigenaar = p_eigenaar and tijd <> v_lokaal
@@ -121,7 +124,7 @@ begin
     end if;
   end if;
 
-  select * into v_res from http_get(v_basis || 'me/media?fields=id,caption,media_type,media_product_type,timestamp&limit=50&access_token=' || v_tok);
+  select * into v_res from http_get(v_basis || 'me/media?fields=id,caption,media_type,media_product_type,timestamp,comments_count&limit=50&access_token=' || v_tok);
   if v_res.status <> 200 then return 'media fout ' || v_res.status || ': ' || left(coalesce(v_res.content::jsonb -> 'error' ->> 'message', ''), 200); end if;
   v_media := coalesce(v_res.content::jsonb -> 'data', '[]');
 

@@ -31,15 +31,18 @@
 // ads-per-pagina.sql). /mijn-split telt al het verkeer, niet alleen ads:
 // daar komt het meeste via Instagram.
 
-import { createElement, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  Copy, Check, ChevronDown, ChevronRight, X, Link2,
+  Copy, Check, ChevronDown, X, Link2,
   Megaphone, Info, Percent, Download, FileText, Euro, Users, Play, MousePointerClick, PenLine, UserCheck, Send, MessageCircle,
   PhoneOutgoing, CalendarCheck, PhoneCall, Trophy, Wallet, UserPlus, Phone, XCircle, Repeat, Banknote, Coins, TrendingUp,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PrequalAfhaken from './PrequalAfhaken'
 import PrequalAfgewezen from './PrequalAfgewezen'
+import FaseTrechter from './FaseTrechter'
+import MagnetTrechter from './MagnetTrechter'
+import { GROEN, ORANJE, ROOD, ZWAK, beoordeel, vatFaseSamen } from './fases'
 
 const PERIODES = [
   { id: '7', label: 'Laatste 7 dagen', dagen: 7 },
@@ -57,13 +60,11 @@ const PAGINAS = [
     schermNaam: { dagen: 'Dagen per week', locatie: 'Gym of thuis', doel: 'Doel', niveau: 'Hoe lang trainen', beperkingen: 'Kan of wil niet', gegevens: 'Naam en e-mail' } },
   { id: '/mijn-menu', label: '/mijn-menu', alleenAds: false, pdf: true,
     schermNaam: { doel: 'Doel', overjou: 'Over jou', activiteit: 'Activiteit', maaltijden: 'Maaltijden per dag', variatie: 'Afwisseling', dieet: 'Dieet', lustniet: 'Lust niet', gegevens: 'Naam en e-mail' } },
+  // Geen pagina maar de Instagram-route "comment WOORD" (MagnetTrechter).
+  { id: 'magnets', label: 'Comment-magnets', magnets: true, schermNaam: {} },
 ]
 const paginaVan = (id) => PAGINAS.find(p => p.id === id) || PAGINAS[0]
 
-const GROEN = '#10b981'
-const ORANJE = '#f59e0b'
-const ROOD = '#ef4444'
-const ZWAK = 'rgba(255,255,255,0.6)'
 const LIJN = '1px solid rgba(255,255,255,0.08)'
 
 const DOEL_ROAS = 3
@@ -84,17 +85,6 @@ const RICHT = {
   show: { goed: 0.75, matig: 0.6, min: 3 },
   close: { goed: 0.3, matig: 0.15, min: 3 },
   verlengd: { goed: 0.5, matig: 0.3, min: 3 },
-}
-const OORDEEL = {
-  goed: { id: 'goed', tekst: 'Goed', kleur: GROEN, rang: 0 },
-  matig: { id: 'matig', tekst: 'Kan beter', kleur: ORANJE, rang: 1 },
-  slecht: { id: 'slecht', tekst: 'Loopt vast', kleur: ROOD, rang: 2 },
-  weinig: { id: 'weinig', tekst: 'Te weinig data', kleur: 'rgba(255,255,255,0.45)', rang: -1 },
-}
-const beoordeel = (waarde, basis, r) => {
-  if (!r || waarde == null || !isFinite(waarde) || !(basis >= r.min)) return OORDEEL.weinig
-  if (r.laag) return waarde <= r.goed ? OORDEEL.goed : waarde <= r.matig ? OORDEEL.matig : OORDEEL.slecht
-  return waarde >= r.goed ? OORDEEL.goed : waarde >= r.matig ? OORDEEL.matig : OORDEEL.slecht
 }
 // Korte naam per formulierscherm, ook van eerdere versies van het formulier.
 const SCHERM_NAAM = {
@@ -428,8 +418,6 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const [advertentie, setAdvertentie] = useState(null)
   // Per advertentie en de advertentielink zitten achter knoppen in de balk.
   const [paneel, setPaneel] = useState(null)
-  // Fases staan dicht: eerst alleen het oordeel per fase, details op een tik.
-  const [openFase, setOpenFase] = useState(null)
   const [gekopieerd, setGekopieerd] = useState(false)
 
   const laad = async () => {
@@ -442,6 +430,13 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       const van = (periode === 'vanaf' && vanafDatum)
         ? new Date(`${vanafDatum}T00:00:00`)
         : (() => { const d = new Date(); d.setDate(d.getDate() - dagen + 1); d.setHours(0, 0, 0, 0); return d })()
+      if (paginaVan(pagina).magnets) {
+        const { data: res, error } = await db.supabase.rpc('get_magnet_trechter', { p_van: van.toISOString(), p_tot: totEx.toISOString() })
+        if (error) throw error
+        setData({ magnet: res || {} })
+        setVenster({ van: van.toISOString(), tot: totEx.toISOString() })
+        return
+      }
       const p = { p_van: van.toISOString(), p_tot: totEx.toISOString(), p_pagina: pagina }
       const [{ data: res, error }, st] = await Promise.all([
         db.supabase.rpc('get_challenge_ads_overzicht', p),
@@ -613,15 +608,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       M('Verlengd', verlengd.length, sales.length, RICHT.verlengd, `${verlengd.length} · ${pct(verlengd.length, sales.length)}`, 'sale', verlengOmzet ? `${euro(verlengOmzet)} aan verlengingen` : 'doorgezet na de challenge'),
       M('Gem. orderwaarde', null, null, null, sales.length ? euro(saleOmzet / sales.length) : '–', 'omzet', `${euro(omzet)} omzet incl. verlengingen`),
     ] },
-  ].map(f => {
-    const beoordeeld = f.metingen.map(x => x.oordeel).filter(o => o && o.rang >= 0)
-    const oordeel = beoordeeld.length ? beoordeeld.reduce((x, y) => (y.rang > x.rang ? y : x)) : OORDEEL.weinig
-    // De zwakste meting die rood staat: die schudt als de fase open is.
-    const rood = f.metingen.filter(x => x.oordeel?.id === 'slecht')
-    const zwakste = rood.length ? rood.reduce((x, y) => (y.score < x.score ? y : x)).label : null
-    return { ...f, oordeel, zwakste }
-  })
-  const vast = FASES.find(f => f.oordeel.id === 'slecht') || FASES.find(f => f.oordeel.id === 'matig') || null
+  ].map(vatFaseSamen)
   const nodigVoorDoel = spend * DOEL_ROAS - omzet
 
   const kopieer = async () => {
@@ -887,7 +874,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           opent zijn detailvenster; het label staat in de tooltip. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 20, flexWrap: m ? 'wrap-reverse' : 'nowrap', marginBottom: m ? 26 : 36 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: m ? 12 : 20, overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: '1 1 auto', minWidth: 0, paddingBottom: 2 }}>
-        {[
+        {!P.magnets && [
           [
             { label: 'Uitgegeven', waarde: euro(spend), Icon: Banknote, kleur: '#94a3b8', venster: 'spend' },
             { label: 'Kosten per lead', waarde: euro(cpl), Icon: Coins, kleur: '#94a3b8', venster: 'cpl' },
@@ -935,6 +922,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
             stijl={{ flex: '0 0 auto' }}
             weergave={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={14} strokeWidth={2.6} />{P.label}</span>}
             opties={PAGINAS.map(x => ({ waarde: x.id, label: x.label }))} />
+          {!P.magnets && (<>
           <span style={scheiding} />
           <Keuzemenu label="Campagne of advertentie" waarde={keuzeWaarde} onKies={kiesFilter} breedte={320}
             stijl={{ flex: m ? '1 1 0' : '0 1 280px', maxWidth: m ? 'none' : 280 }}
@@ -952,6 +940,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                 ...advVan(c.k).map(a => ({ waarde: JSON.stringify([c.k, a.k]), label: a.naam, in: true })),
               ]),
             ]} />
+          </>)}
           <span style={scheiding} />
           {/* Periode en 'vanaf' in één: kies je een datum, dan opent de
               datumkiezer en staat er daarna "Vanaf 10 okt". */}
@@ -976,139 +965,19 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
               onChange={e => { kiesVanaf(e.target.value); if (e.target.value) setPeriode('vanaf') }}
               style={{ position: 'absolute', left: 0, bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none', border: 0, padding: 0 }} />
           </span>
+          {!P.magnets && (<>
           <span style={scheiding} />
           <button onClick={() => setPaneel('advertenties')} title="Per advertentie" style={{ ...seg, display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
             <Megaphone size={14} strokeWidth={2.6} />{!m && 'Per advertentie'}
           </button>
+          </>)}
         </div>
       </div>
 
       {/* ═══ 2. WAAR LOOPT HET VAST ═══ */}
       <div style={{ marginBottom: m ? 34 : 46 }}>
-        {/* De vijf fases naast elkaar met pijltjes; een tik opent de
-            metingen van die fase eronder. Op de telefoon veeg je de rij. */}
-        <div style={{
-          display: 'flex', alignItems: 'stretch', gap: m ? 4 : 6, marginTop: 6,
-          overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-          padding: '10px 16px 10px 8px', margin: m ? '0 -16px 0 -8px' : '0 0 0 -8px',
-        }}>
-          {FASES.map((f, i) => {
-            const isVast = vast?.id === f.id
-            const k = f.oordeel.kleur
-            const gemeten = f.oordeel.rang >= 0
-            const open = openFase === f.id
-            return (
-              <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: m ? 4 : 6, flex: m ? '0 0 auto' : '1 1 0', minWidth: 0, scrollSnapAlign: 'start' }}>
-                {i > 0 && <ChevronRight size={18} strokeWidth={2.6} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />}
-                <button onClick={() => setOpenFase(o => (o === f.id ? null : f.id))} aria-expanded={open} style={{
-                  flex: 1, minWidth: m ? 150 : 0, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
-                  padding: '0.85rem 0.9rem', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
-                  background: open ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.025)',
-                  border: `1px solid ${open ? 'rgba(255,255,255,0.35)' : isVast ? `${k}66` : 'rgba(255,255,255,0.08)'}`,
-                  transition: 'background 0.15s, border-color 0.15s', WebkitTapHighlightColor: 'transparent',
-                }}>
-                  {/* Bolletje, naam met het oordeel-label erachter op dezelfde
-                      hoogte, de vraag eronder; onderaan de belangrijkste cijfers. */}
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
-                    <span style={{
-                      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
-                      fontSize: '0.88rem', fontWeight: 900,
-                      boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
-                      animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
-                    }}>{i + 1}</span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
-                        <span style={{
-                          fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                          padding: '2px 7px', borderRadius: 6,
-                          color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
-                        }}>{f.oordeel.tekst}</span>
-                      </span>
-                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3, marginTop: 2 }}>{f.vraag}</span>
-                    </span>
-                    <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, alignSelf: 'flex-start', marginTop: 4, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-                  </span>
-                  <span style={{ display: 'flex', gap: m ? 12 : 14, width: '100%', marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-                    {(f.preview || []).map(([label, waarde, meting]) => {
-                      const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
-                      const kl = o && o.rang >= 0 ? o.kleur : '#fff'
-                      return (
-                        <span key={label} style={{ minWidth: 0 }}>
-                          <span style={{ display: 'block', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', color: kl, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{waarde}</span>
-                          <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: ZWAK, whiteSpace: 'nowrap' }}>{label}</span>
-                        </span>
-                      )
-                    })}
-                  </span>
-                </button>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Metingen van de gekozen fase, ook als flow. */}
-        {(() => {
-          const f = FASES.find(x => x.id === openFase)
-          if (!f) return null
-          // Eén vak in de kleur van het oordeel van de fase: dit hoort bij
-          // elkaar, en bij rood zie je meteen dat je hier moet kijken.
-          const k = f.oordeel.rang >= 0 ? f.oordeel.kleur : '#ffffff'
-          const nr = FASES.indexOf(f) + 1
-          return (
-            <div style={{
-              marginTop: 8, borderRadius: 16, border: `1px solid ${k}55`, background: `${k}0d`,
-              boxShadow: vast?.id === f.id ? `0 0 28px ${k}22` : 'none', overflow: 'hidden',
-            }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: m ? '0.8rem 0.9rem 0' : '0.95rem 1.2rem 0' }}>
-              <span style={{ fontSize: '0.92rem', fontWeight: 900 }}>{nr}. {f.naam}</span>
-              <span style={{ fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 6, color: f.oordeel.kleur, background: `${k}1f` }}>{f.oordeel.tekst}</span>
-              <span style={{ fontSize: '0.76rem', fontWeight: 700, color: ZWAK, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.vraag}</span>
-            </div>
-            <div style={{
-              display: 'flex', alignItems: 'stretch', gap: m ? 6 : 8,
-              overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-              padding: m ? '12px 14px 14px 10px' : '14px 20px 18px 14px',
-            }}>
-              {f.metingen.map((x, j) => {
-                const [groot, klein] = String(x.tekst).split(' · ')
-                const kleur = x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff'
-                const icoon = ICONEN[x.label] || Info
-                const schud = f.zwakste === x.label
-                return (
-                  <div key={x.label} style={{ display: 'flex', alignItems: 'flex-start', gap: m ? 6 : 8, flex: m ? '0 0 auto' : '1 1 0', minWidth: 0, scrollSnapAlign: 'start' }}>
-                    {j > 0 && <ChevronRight size={16} strokeWidth={2.6} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, marginTop: 12 }} />}
-                    <button onClick={() => setInfo(x.venster)} style={{
-                      flex: 1, minWidth: m ? 118 : 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
-                      padding: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
-                      cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-                    }}>
-                      <span style={{
-                        width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: kleur === '#fff' ? 'rgba(255,255,255,0.08)' : `${kleur}22`,
-                        ...(schud ? { boxShadow: `0 0 0 2px ${kleur}, 0 0 16px ${kleur}99`, animation: 'vastSchud 2.4s ease-in-out infinite' } : {}),
-                      }}>
-                        {createElement(icoon, { size: 19, strokeWidth: 2.4, color: kleur })}
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: m ? '1.45rem' : '1.6rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: klein ? '#fff' : kleur }}>{groot}</span>
-                        {klein && <span style={{ fontSize: '0.8rem', fontWeight: 900, color: kleur }}>{klein}</span>}
-                      </span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 900, lineHeight: 1.2 }}>{x.label}</span>
-                      {x.sub && <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ZWAK, lineHeight: 1.35 }}>{x.sub}</span>}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-            </div>
-          )
-        })()}
-        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 8, lineHeight: 1.5 }}>
-          Groen, oranje en rood zijn vuistregels voor koud verkeer uit Meta. Percentage = van de stap ervoor. Leads tellen vanaf de dag dat ze binnenkwamen, met alles wat er daarna gebeurde. Tik op een fase voor de cijfers eronder.
-        </div>
+        {P.magnets ? <MagnetTrechter data={data?.magnet} m={m} laden={laden} /> : <FaseTrechter fases={FASES} m={m} iconen={ICONEN} onMeting={setInfo}
+          uitleg="Groen, oranje en rood zijn vuistregels voor koud verkeer uit Meta. Percentage = van de stap ervoor. Leads tellen vanaf de dag dat ze binnenkwamen, met alles wat er daarna gebeurde. Tik op een fase voor de cijfers eronder." />}
       </div>
 
       {paneel === 'advertenties' && (
@@ -1181,7 +1050,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         </Venster>
       )}
 
-      <style>{'@keyframes spin { to { transform: rotate(360deg); } } @keyframes vastPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } } @keyframes vastSchud { 0%,60%,100% { transform: translateX(0) rotate(0) } 64% { transform: translateX(-4px) rotate(-6deg) } 70% { transform: translateX(4px) rotate(6deg) } 76% { transform: translateX(-3px) rotate(-4deg) } 82% { transform: translateX(3px) rotate(4deg) } 88% { transform: translateX(0) rotate(0) } }'}</style>
+      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
     </div>
   )
 }
