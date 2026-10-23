@@ -17,15 +17,16 @@ import {
 import { GROEN, ZWAK, beoordeel, vatFaseSamen, vindVast } from './fases'
 
 // Richtwaarden. Comments en reactie op je eigen cijfers (23 okt 2026):
-//  - comments per view: mediaan 1,5‰, beste kwart vanaf 3,8‰ (48 magnet-reels
-//    8-23 okt) → kan beter vanaf 1,5‰, goed vanaf 3‰;
+//  - commenters per view: Kersten beantwoordt elke comment één keer, dus
+//    commenters = comments / 2. Mediaan 0,75‰, beste kwart vanaf 1,9‰
+//    (48 magnet-reels 8-23 okt) → kan beter vanaf 0,75‰, goed vanaf 1,5‰;
 //  - reactie op het automatische bericht: jun 18%, jul 27%, aug 16%, sep 10%,
 //    okt 6% → goed vanaf 18% (gemiddelde jun-aug), kan beter vanaf 10%.
 // Views per reel is een vuistregel; de call-stappen zijn gelijk aan Ads.
 const RICHT = {
   views: { goed: 5000, matig: 2000, min: 3 },          // gem. views per reel, basis = aantal reels
-  comments: { goed: 0.003, matig: 0.0015, min: 2000 }, // comments per view, basis = views
-  bord: { goed: 0.45, matig: 0.3, min: 20 },           // leads per comment (comments tellen je eigen antwoorden mee)
+  comments: { goed: 0.0015, matig: 0.00075, min: 2000 }, // commenters per view, basis = views
+  bord: { goed: 0.45, matig: 0.3, min: 20 },           // nieuwe leads per commenter
   reactie: { goed: 0.18, matig: 0.1, min: 10 },          // van alle leads (iedereen krijgt het automatische bericht)
   voorgesteld: { goed: 0.6, matig: 0.4, min: 3 },
   ingepland: { goed: 0.7, matig: 0.5, min: 3 },
@@ -34,7 +35,7 @@ const RICHT = {
 }
 
 const ICONEN = {
-  'Magnet-reels': Film, 'Views per reel': Eye, Comments: MessageSquare, 'Op het bord': UserPlus,
+  'Magnet-reels': Film, 'Views per reel': Eye, Commenters: MessageSquare, 'Op het bord': UserPlus,
   'Follow-up gestuurd': Send, Reactie: MessageCircle, 'Call voorgesteld': PhoneOutgoing,
   'Call ingepland': CalendarCheck, 'Call gehad': PhoneCall, Sale: Trophy,
 }
@@ -51,6 +52,8 @@ function tel(reels, leads) {
     views: t.views + (Number(x.views) || 0),
     comments: t.comments + (Number(x.comments) || 0),
   }), { reels: 0, views: 0, comments: 0 })
+  // Elke comment krijgt één antwoord van Kersten: de helft zijn commenters.
+  r.commenters = Math.round(r.comments / 2)
   const sales = leads.filter(l => Number(l.omzet) > 0)
   const gehouden = leads.filter(l => l.gehouden)
   const noshows = leads.filter(l => l.noshow)
@@ -85,14 +88,14 @@ function maakFases(t) {
         M('Views per reel', null, t.reels, RICHT.views, getal(viewsPerReel), `goed is ${getal(RICHT.views.goed)} of meer · ${getal(t.views)} totaal`, viewsPerReel),
       ] },
     { id: 'comment', naam: 'Comment', vraag: 'Commenten mensen het woord?',
-      preview: [['Comments', getal(t.comments), 'Comments'], ['Per 1.000 views', perDuizend(t.comments, t.views), 'Comments']],
+      preview: [['Commenters', getal(t.commenters), 'Commenters'], ['Per 1.000 views', perDuizend(t.commenters, t.views), 'Commenters']],
       metingen: [
-        M('Comments', t.comments, t.views, RICHT.comments, `${getal(t.comments)} · ${perDuizend(t.comments, t.views)}`, 'per 1.000 views · goed vanaf 3‰, je mediaan is 1,5‰'),
+        M('Commenters', t.commenters, t.views, RICHT.comments, `${getal(t.commenters)} · ${perDuizend(t.commenters, t.views)}`, `per 1.000 views · ${getal(t.comments)} comments, de helft is jouw antwoord · goed vanaf 1,5‰`),
       ] },
     { id: 'bord', naam: 'Op het bord', vraag: 'Komen de commenters als lead binnen?',
-      preview: [['Leads', String(t.leads), 'Op het bord'], ['Van de comments', pct(t.leads, t.comments), 'Op het bord']],
+      preview: [['Nieuwe leads', String(t.leads), 'Op het bord'], ['Van de commenters', pct(t.leads, t.commenters), 'Op het bord']],
       metingen: [
-        M('Op het bord', t.leads, t.comments, RICHT.bord, `${t.leads} · ${pct(t.leads, t.comments)}`, 'van de comments · Instagram telt je eigen antwoorden mee, dus 100% haal je niet'),
+        M('Op het bord', t.leads, t.commenters, RICHT.bord, `${t.leads} · ${pct(t.leads, t.commenters)}`, 'nieuwe leads van de commenters · wie al op het bord stond en opnieuw commentet telt niet mee'),
       ] },
     { id: 'gesprek', naam: 'Gesprek', vraag: 'Reageren ze op het automatische bericht?',
       preview: [['Reactie', pct(t.reactie, t.leads), 'Reactie'], ['Reageerden', String(t.reactie)], ['Voorgesteld', String(t.voorgesteld), 'Call voorgesteld']],
@@ -229,7 +232,7 @@ export default function MagnetTrechter({ data, m, laden }) {
     <div style={{ opacity: laden ? 0.5 : 1, transition: 'opacity 0.15s' }}>
       <Trechter fases={fases} m={m} />
       <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 10, lineHeight: 1.5 }}>
-        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een vak voor de cijfers erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt), leads zijn commenters die met dit magnet-woord op het bord kwamen. De trechter is niet op schaal.
+        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een vak voor de cijfers erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. De trechter is niet op schaal.
       </div>
 
       {/* Per woord: welke magnet het goed doet. Tik = trechter van dat woord. */}
@@ -239,7 +242,7 @@ export default function MagnetTrechter({ data, m, laden }) {
           <span style={{ ...kopStijl, textAlign: 'left' }}>Woord</span>
           {!m && <span style={kopStijl}>Reels</span>}
           <span style={kopStijl}>Views</span>
-          <span style={kopStijl}>{m ? 'Com.' : 'Comments'}</span>
+          <span style={kopStijl}>{m ? 'Com.' : 'Commenters'}</span>
           <span style={kopStijl}>Leads</span>
           {!m && <span style={kopStijl}>Reactie</span>}
           {!m && <span style={kopStijl}>Calls</span>}
@@ -261,7 +264,7 @@ export default function MagnetTrechter({ data, m, laden }) {
               <span style={{ fontSize: '0.9rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w}</span>
               {!m && <span style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }}>{x.reels || '–'}</span>}
               <span style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }}>{x.views ? getal(x.views) : '–'}</span>
-              <span style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }}>{x.comments ? getal(x.comments) : '–'}</span>
+              <span style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }}>{x.commenters ? getal(x.commenters) : '–'}</span>
               <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900 }}>{x.leads}</span>
               {!m && <span style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 800 }}>{x.leads ? pct(x.reactie, x.leads) : '–'}</span>}
               {!m && <span style={{ textAlign: 'right', fontSize: '0.92rem', fontWeight: 900 }}>{x.calls}</span>}
