@@ -71,6 +71,9 @@ const TEKST = {
     weet: 'Door elke training andere oefeningen te doen, belast je je spieren net anders. Dat houdt je gewrichten fris.',
   },
 }
+// Naam van de foto (zonder .jpg) bij een dag; ook gebruikt op de pagina.
+export const fotoVoor = (code, locatie) => locatie === 'thuis' ? (FOTO_THUIS[code] || 'thuis') : (FOTO[code] || 'full')
+
 const tekstVoor = (code) => TEKST[code] || TEKST[code.startsWith('upper') ? 'upper' : code.startsWith('full') ? 'full' : 'push']
 
 
@@ -104,8 +107,8 @@ const minuten = (rust) => {
 }
 // Per oefening 4 min voor de drie opwarmsets en het instellen, per werkset
 // ± 45 s plus de rust; op 5 min afgerond.
-const duur = (oef) => Math.round(oef.reduce((t, o) => t + 4 + (Number(o.sets) || 0) * (0.75 + minuten(o.rust)), 0) / 5) * 5
-const totaalSets = (oef) => oef.reduce((t, o) => t + (Number(o.sets) || 0), 0)
+export const duur = (oef) => Math.round(oef.reduce((t, o) => t + 4 + (Number(o.sets) || 0) * (0.75 + minuten(o.rust)), 0) / 5) * 5
+export const totaalSets = (oef) => oef.reduce((t, o) => t + (Number(o.sets) || 0), 0)
 const tweeCijfers = (n) => String(n).padStart(2, '0')
 
 // Wit MA COACHING-logo (uitgesneden ma-logo-header.png), 177 × 159 px.
@@ -183,7 +186,7 @@ function maakTekenaar(doc, logo) {
 export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel }) {
   const thuis = locatie === 'thuis'
   const uniek = [...new Set(split.dagen)].filter(c => dagen[c])
-  const fotoVan = (c) => (thuis ? FOTO_THUIS : FOTO)[c] || (thuis ? 'thuis' : 'full')
+  const fotoVan = (c) => fotoVoor(c, locatie)
   const coverNaam = thuis ? 'cover-thuis' : 'cover'
   const fotoNamen = [...new Set([coverNaam, ...uniek.map(fotoVan)])]
 

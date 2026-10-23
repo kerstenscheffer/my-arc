@@ -16,7 +16,7 @@ import db from '../services/DatabaseService'
 import { herkomst } from './challengeTracking'
 import { appSafeEmbedUrl } from '../modules/videos/utils/youtubeHelpers'
 import { SPLITS, DAG_NAAM, WEEK, DOELEN, NIVEAUS, LOCATIES, tips } from './mijn-split/splitRegels'
-import { downloadSplitPdf } from './mijn-split/splitPdf'
+import { downloadSplitPdf, fotoVoor, duur, totaalSets } from './mijn-split/splitPdf'
 
 // YouTube-id van de uitlegvideo. Leeg = stilstaand beeld zonder afspeelknop.
 const VIDEO_ID = ''
@@ -24,7 +24,6 @@ const POSTER = '/mijn-split/push.jpg'
 
 const BG = '#000'
 const HERO_BG = '#161616'
-const ZWART_MIDDEN = '#0b0b0b'
 const CTA_GROEN = '#15803d'
 const CTA_TEKST = 'Maak mijn split'
 const WIT = '#fff'
@@ -36,18 +35,18 @@ const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim())
 const STAPPEN = ['dagen', 'locatie', 'doel', 'niveau', 'gegevens']
 const TOTAAL = STAPPEN.length
 const DAGEN_KEUZE = [
-  { key: 2, label: '2 dagen', sub: 'Druk leven, toch resultaat' },
-  { key: 3, label: '3 dagen', sub: 'De sweet spot voor de meesten' },
-  { key: 4, label: '4 dagen', sub: 'Meer volume, kortere trainingen' },
-  { key: 5, label: '5 dagen', sub: 'Serieus bezig' },
-  { key: 6, label: '6 dagen', sub: 'Alles erop gericht' },
+  { key: 2, label: '2 dagen' },
+  { key: 3, label: '3 dagen' },
+  { key: 4, label: '4 dagen' },
+  { key: 5, label: '5 dagen' },
+  { key: 6, label: '6 dagen' },
 ]
 const VRAGEN = {
-  dagen: { titel: 'Hoeveel dagen per week kun je trainen?', hint: 'Kies wat je echt volhoudt, ook in een drukke week.', lijst: DAGEN_KEUZE },
-  locatie: { titel: 'Waar train je?', hint: 'Dan krijg je oefeningen die je daar ook echt kunt doen.', lijst: LOCATIES },
-  doel: { titel: 'Wat is je doel?', hint: 'Dit bepaalt hoe je de split uitvoert.', lijst: DOELEN },
-  niveau: { titel: 'Hoe lang train je al?', hint: 'Eerlijk is het snelst.', lijst: NIVEAUS },
-  gegevens: { titel: 'Waar mag je split heen?', hint: 'Je ziet hem direct hierna en downloadt hem als PDF.' },
+  dagen: { titel: 'Hoeveel dagen per week kun je trainen?', lijst: DAGEN_KEUZE },
+  locatie: { titel: 'Waar train je?', lijst: LOCATIES },
+  doel: { titel: 'Wat is je doel?', lijst: DOELEN },
+  niveau: { titel: 'Hoe lang train je al?', lijst: NIVEAUS },
+  gegevens: { titel: 'Waar mag je split heen?' },
 }
 
 const VOORBEELDEN = [
@@ -369,19 +368,16 @@ const invoer = (m) => ({
   color: WIT, fontSize: m ? '1.05rem' : '1.1rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none',
 })
 
-function Optie({ label, sub, aan, onClick, m }) {
+function Optie({ label, aan, onClick, m }) {
   return (
     <button onClick={onClick} style={{
       width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-      minHeight: m ? 62 : 66, padding: m ? '0.75rem 1rem' : '0.85rem 1.2rem', borderRadius: 14, textAlign: 'left',
+      minHeight: m ? 54 : 58, padding: m ? '0.7rem 1rem' : '0.8rem 1.2rem', borderRadius: 14, textAlign: 'left',
       background: aan ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
       border: `1.5px solid ${aan ? WIT : 'rgba(255,255,255,0.15)'}`, color: WIT, cursor: 'pointer', fontFamily: 'inherit',
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'border-color 0.15s, background 0.15s',
     }}>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: m ? '1.02rem' : '1.08rem', fontWeight: 900 }}>{label}</span>
-        {sub && <span style={{ display: 'block', marginTop: 2, fontSize: m ? '0.82rem' : '0.86rem', fontWeight: 700, color: ZWAK }}>{sub}</span>}
-      </span>
+      <span style={{ minWidth: 0, fontSize: m ? '1.02rem' : '1.08rem', fontWeight: 900 }}>{label}</span>
       <span style={{
         width: 24, height: 24, flexShrink: 0, borderRadius: '50%', border: `2px solid ${aan ? WIT : 'rgba(255,255,255,0.3)'}`,
         background: aan ? WIT : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -497,7 +493,7 @@ function SplitFlow({ m }) {
           {pdfBezig ? 'PDF maken…' : 'Download je split (PDF)'}
         </button>
         {fout && <div style={{ marginTop: '0.9rem', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', textAlign: 'center' }}>{fout}</div>}
-        <SplitOverzicht split={split} dagen={dagen} m={m} />
+        <SplitOverzicht split={split} dagen={dagen} locatie={antw.locatie} m={m} onDownload={download} pdfBezig={pdfBezig} />
       </div>
     )
   }
@@ -531,10 +527,9 @@ function SplitFlow({ m }) {
 
       <div key={huidig} style={{ animation: 'vraagIn 0.25s ease' }}>
         {kop(v.titel)}
-        {sub(v.hint)}
-        <div style={{ marginTop: '1.6rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div style={{ marginTop: '1.3rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
           {!isGegevens && v.lijst.map(o => (
-            <Optie key={o.key} label={o.label} sub={o.sub} m={m} aan={antw[huidig] === o.key} onClick={() => kies(huidig, o.key)} />
+            <Optie key={o.key} label={o.label} m={m} aan={antw[huidig] === o.key} onClick={() => kies(huidig, o.key)} />
           ))}
           {isGegevens && (
             <>
@@ -561,50 +556,100 @@ function SplitFlow({ m }) {
   )
 }
 
-// De split zelf onder de downloadknop: per dag in de week de training met
-// oefeningen, in de donkere stijl van het formulier.
-function SplitOverzicht({ split, dagen, m }) {
+// De split zelf onder de downloadknop, in de stijl van de PDF: de week als
+// fotokaartjes, een wisselaar per training en per training een kaart met
+// foto, kerncijfers en de oefeningen.
+const ANTON = "'Anton', 'DM Sans', sans-serif"
+
+function SplitOverzicht({ split, dagen, locatie, m, onDownload, pdfBezig }) {
+  const uniek = [...new Set(split.dagen)]
+  const [actief, setActief] = useState(uniek[0])
+  const dag = dagen?.[actief]
+  const nr = uniek.indexOf(actief) + 1
+  const wanneer = split.week.filter((_, k) => split.dagen[k] === actief).join(' + ')
+  const twee = (n) => String(n).padStart(2, '0')
+  const klein = { fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: ZWAK }
+
   return (
     <div style={{ marginTop: '1.8rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+      {/* De week: trainingsdagen met hun foto, rustdagen leeg. Tik = die training. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: m ? 5 : 6 }}>
         {WEEK.map(d => {
           const idx = split.week.indexOf(d)
-          const aan = idx >= 0
+          const code = idx >= 0 ? split.dagen[idx] : null
+          const aan = code === actief
           return (
-            <div key={d} style={{
-              borderRadius: 8, padding: '7px 2px', textAlign: 'center', minWidth: 0,
-              background: aan ? WIT : 'transparent', border: aan ? 'none' : '1px solid rgba(255,255,255,0.12)',
-              color: aan ? '#000' : 'rgba(255,255,255,0.35)',
+            <button key={d} onClick={() => code && setActief(code)} disabled={!code} aria-label={code ? `${d}: ${DAG_NAAM[code]}` : `${d}: rust`} style={{
+              position: 'relative', aspectRatio: '1', borderRadius: 10, padding: 0, overflow: 'hidden', fontFamily: 'inherit',
+              border: code ? `1.5px solid ${aan ? WIT : 'rgba(255,255,255,0.18)'}` : '1px solid rgba(255,255,255,0.1)',
+              background: code ? `url(/mijn-split/klein-${fotoVoor(code, locatie)}.jpg) center / cover` : 'transparent',
+              cursor: code ? 'pointer' : 'default', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 900 }}>{d}</div>
-              <div style={{ fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.2, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {aan ? DAG_NAAM[split.dagen[idx]].replace(/ \(.*\)/, '') : 'Rust'}
-              </div>
-            </div>
+              <span style={{ fontFamily: ANTON, fontSize: m ? '0.95rem' : '1.1rem', color: code ? WIT : 'rgba(255,255,255,0.3)', letterSpacing: '0.02em' }}>{d.toUpperCase()}</span>
+            </button>
           )
         })}
       </div>
-      {!dagen && <div style={{ padding: '1rem 0', fontSize: '0.88rem', color: ZWAK, textAlign: 'center', fontWeight: 700 }}>Oefeningen laden…</div>}
-      {dagen && [...new Set(split.dagen)].map(code => {
-        const dag = dagen[code]
-        if (!dag) return null
-        const wanneer = split.week.filter((_, k) => split.dagen[k] === code).join(' + ')
-        return (
-          <div key={code} style={{ marginTop: '1.2rem', padding: m ? '0.9rem 1rem' : '1rem 1.2rem', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: '1.05rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.01em' }}>{DAG_NAAM[code]}</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: ZWAK }}>{wanneer}</span>
+
+      {/* Wisselaar tussen de trainingen. */}
+      {uniek.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, marginTop: '0.9rem', overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {uniek.map(c => (
+            <button key={c} onClick={() => setActief(c)} style={{
+              flexShrink: 0, padding: '0.55rem 0.9rem', borderRadius: 999, fontFamily: 'inherit', cursor: 'pointer',
+              border: `1.5px solid ${c === actief ? WIT : 'rgba(255,255,255,0.18)'}`,
+              background: c === actief ? WIT : 'transparent', color: c === actief ? '#000' : WIT,
+              fontSize: '0.85rem', fontWeight: 900, whiteSpace: 'nowrap',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>{DAG_NAAM[c]}</button>
+          ))}
+        </div>
+      )}
+
+      {!dag && <div style={{ padding: '1.4rem 0', fontSize: '0.88rem', color: ZWAK, textAlign: 'center', fontWeight: 700 }}>Oefeningen laden…</div>}
+      {dag && (
+        <div key={actief} style={{ marginTop: '0.9rem', borderRadius: 16, overflow: 'hidden', background: '#0e0e0e', border: '1px solid rgba(255,255,255,0.1)', animation: 'vraagIn 0.25s ease' }}>
+          <div style={{ position: 'relative', aspectRatio: '1240 / 640', background: `url(/mijn-split/${fotoVoor(actief, locatie)}.jpg) center / cover` }}>
+            <div style={{ position: 'absolute', left: m ? 14 : 18, bottom: m ? 12 : 16 }}>
+              <div style={{ ...klein, color: WIT }}>Training {twee(nr)} · {wanneer}</div>
+              <div style={{ fontFamily: ANTON, fontSize: m ? '2.1rem' : '2.6rem', lineHeight: 1, color: WIT, marginTop: 6, textTransform: 'uppercase' }}>{DAG_NAAM[actief]}</div>
+            </div>
+          </div>
+          <div style={{ padding: m ? '0.2rem 1rem 1rem' : '0.3rem 1.2rem 1.2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '0.8rem 0' }}>
+              {[['Per training', `${dag.oefeningen.length} oef. · ${totaalSets(dag.oefeningen)} sets`], ['Tijd', `± ${duur(dag.oefeningen)} min`], ['Elke werkset', 'Tot falen']].map(([l, w], k) => (
+                <div key={l} style={{ paddingLeft: k ? 10 : 0, borderLeft: k ? '1px solid rgba(255,255,255,0.08)' : 'none', minWidth: 0 }}>
+                  <div style={{ ...klein, fontSize: '0.56rem' }}>{l}</div>
+                  <div style={{ fontSize: m ? '0.86rem' : '0.95rem', fontWeight: 900, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{w}</div>
+                </div>
+              ))}
             </div>
             {dag.oefeningen.map((o, j) => (
-              <div key={j} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '0.45rem 0', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 700 }}>{o.naam}</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 900, whiteSpace: 'nowrap' }}>{o.sets} × {o.reps}</span>
-                <span style={{ fontSize: '0.75rem', color: ZWAK, fontWeight: 700, whiteSpace: 'nowrap', width: 44, textAlign: 'right' }}>{o.rust}</span>
+              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0', borderBottom: j === dag.oefeningen.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ width: 18, flexShrink: 0, fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>{twee(j + 1)}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 700, lineHeight: 1.3 }}>{o.naam}</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 900, whiteSpace: 'nowrap' }}>{o.sets} × {o.reps}</span>
+                <span style={{ fontSize: '0.75rem', color: ZWAK, fontWeight: 700, whiteSpace: 'nowrap', width: 42, textAlign: 'right' }}>{o.rust}</span>
               </div>
             ))}
           </div>
-        )
-      })}
+        </div>
+      )}
+
+      {/* Wat de PDF extra heeft, met nog een downloadknop. */}
+      <div style={{ marginTop: '1.2rem', padding: m ? '1rem' : '1.1rem 1.2rem', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)' }}>
+        <div style={{ fontSize: '0.98rem', fontWeight: 900 }}>In de PDF staat ook</div>
+        {['Een logboek per set voor 4 weken', 'Hoe je opwarmt en hoe lang je rust', 'Hoe je progressie bijhoudt'].map(t => (
+          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: '0.88rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
+            <Check size={16} strokeWidth={3} style={{ flexShrink: 0 }} /> {t}
+          </div>
+        ))}
+        <button onClick={onDownload} disabled={!dagen || pdfBezig} style={{ ...knopWit(m, !dagen || pdfBezig), marginTop: '1rem', minHeight: m ? 52 : 56, fontSize: '1rem' }}>
+          {pdfBezig ? <Loader2 size={20} style={{ animation: 'draai 1s linear infinite' }} /> : <Download size={20} strokeWidth={2.6} />}
+          {pdfBezig ? 'PDF maken…' : 'Download de PDF'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -692,6 +737,22 @@ export default function MijnSplit() {
         </div>
       </section>
 
+      {/* Wat erin staat, als vinkjes. */}
+      <Sectie m={m} smal>
+        <Kop m={m}>Wat erin staat</Kop>
+        <div style={{ marginTop: m ? '1.1rem' : '1.4rem' }}>
+          {INHOUD.map((t, i) => (
+            <div key={t} style={{
+              display: 'flex', gap: '0.8rem', alignItems: 'center', padding: m ? '0.75rem 0' : '0.95rem 0',
+              borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none', borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <Check size={m ? 22 : 26} strokeWidth={3} color={WIT} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3 }}>{t}</span>
+            </div>
+          ))}
+        </div>
+      </Sectie>
+
       {/* Wat je krijgt: de pagina's van de PDF zelf. */}
       <Sectie m={m} grijs>
         <Kop m={m} center licht>Dit krijg je</Kop>
@@ -713,28 +774,53 @@ export default function MijnSplit() {
         </div>
       </Sectie>
 
-      {/* Wat erin staat, als vinkjes. */}
-      <Sectie m={m} smal>
-        <Kop m={m}>Wat erin staat</Kop>
-        <div style={{ marginTop: m ? '1.1rem' : '1.4rem' }}>
-          {INHOUD.map((t, i) => (
-            <div key={t} style={{
-              display: 'flex', gap: '0.8rem', alignItems: 'center', padding: m ? '0.75rem 0' : '0.95rem 0',
-              borderTop: i === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none', borderBottom: '1px solid rgba(255,255,255,0.08)',
-            }}>
-              <Check size={m ? 22 : 26} strokeWidth={3} color={WIT} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.3 }}>{t}</span>
+      {/* De coach, zoals op /challenge (zwart, tussen twee lichte vlakken). */}
+      <Sectie m={m} style={{ paddingBottom: m ? '6.5rem' : '9rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : '1.15fr 0.85fr', gap: m ? '1.4rem' : '3rem', alignItems: 'center' }}>
+          <div>
+            {m ? (
+              // Telefoon: schermbreed vak met de foto rechts, naar links
+              // weggevaagd in zwart, en de kop links eroverheen.
+              <div style={{ position: 'relative', minHeight: 440, margin: '-4rem -1.25rem 0', overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'flex-end' }}>
+                <img src="/waarom-kersten.jpg" alt="Kersten" draggable={false}
+                  style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: '74%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
+                <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #000 0%, #000 26%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0) 72%)' }} />
+                <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%', background: 'linear-gradient(0deg, #000 0%, rgba(0,0,0,0) 100%)' }} />
+                <div style={{ position: 'relative', width: '62%', padding: '1.3rem 0 1.4rem 1.25rem' }}>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.15em', color: ZWAK, textTransform: 'uppercase', marginBottom: '0.7rem' }}>De coach</div>
+                  <h2 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.02em', color: WIT, textTransform: 'uppercase' }}>Ik ben Kersten.</h2>
+                  <p style={{ margin: '0.6rem 0 0', fontSize: '1rem', fontWeight: 800, lineHeight: 1.35, color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
+                    En dit is hoe mijn klanten trainen.
+                  </p>
+                </div>
+              </div>
+            ) : (<>
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.15em', color: ZWAK, textTransform: 'uppercase', marginBottom: '0.9rem' }}>De coach</div>
+              <Kop m={m}>Ik ben Kersten. En dit is hoe mijn klanten trainen.</Kop>
+            </>)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1.4rem' }}>
+              <Tekst m={m}>Als ondernemer heb ik zelf ook niet altijd tijd om lang in de sportschool te staan. Ik begrijp dus dat je resultaat wilt boeken met de tijd die je beschikbaar hebt.</Tekst>
+              <Tekst m={m}>Ik begeleid al tientallen mannen en help ze om concrete oplossingen te vinden voor de dingen waar ze op vastlopen.</Tekst>
+              <p style={{ margin: '0.4rem 0 0', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.35, color: WIT }}>
+                Deze splits zijn dezelfde waar mijn klanten mee trainen. Zo zie je hoe ik het aanpak, en kun je er vandaag mee beginnen.
+              </p>
             </div>
-          ))}
+          </div>
+          {!m && (
+            <div style={{
+              borderRadius: 18, overflow: 'hidden', aspectRatio: '4 / 5', border: '1px solid rgba(255,255,255,0.1)',
+              backgroundImage: 'url(/waarom-kersten.jpg)', backgroundSize: 'cover', backgroundPosition: 'center top',
+            }} />
+          )}
         </div>
       </Sectie>
 
-      {/* Slot. */}
-      <Sectie m={m} style={{ paddingBottom: m ? '7rem' : '8rem', background: ZWART_MIDDEN }}>
-        <Kop m={m} center>Klaar voor je split?</Kop>
-        <Tekst m={m} center dim style={{ marginTop: '0.9rem' }}>Vier vragen, dan staat hij voor je klaar.</Tekst>
-        <Cta m={m} onClick={openForm} style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
-        <div style={{ marginTop: m ? '2.5rem' : '3rem', textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
+      {/* Slot (wit, na de zwarte coach-sectie). */}
+      <Sectie m={m} licht style={{ paddingBottom: m ? '7rem' : '8rem' }}>
+        <Kop m={m} center licht>Klaar voor je split?</Kop>
+        <Tekst m={m} center dim licht style={{ marginTop: '0.9rem' }}>Vier vragen, dan staat hij voor je klaar.</Tekst>
+        <Cta m={m} onClick={openForm} licht style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
+        <div style={{ marginTop: m ? '2.5rem' : '3rem', textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(0,0,0,0.35)' }}>
           <a href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy</a>
         </div>
       </Sectie>
@@ -756,7 +842,7 @@ export default function MijnSplit() {
       </ModalKader>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
         html { scroll-behavior: smooth; }
         body { background: #000; margin: 0; }
         input::placeholder { color: rgba(255,255,255,0.35); }
