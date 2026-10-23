@@ -67,6 +67,8 @@ function tel(reels, leads, stappen) {
   return {
     ...r,
     leads: leads.length,
+    // Voor het percentage van de commenters: alleen leads sinds de Instagram-data.
+    leadsIg: leads.filter(l => l.na_ig).length,
     opgevolgd: leads.filter(l => l.bericht).length,
     reactie: leads.filter(l => l.contact).length,
     reactiesPeriode: stappen.filter(l => l.reactie).length,
@@ -108,9 +110,11 @@ function maakFases(t) {
         M('Commenters', t.commenters, t.views, RICHT.comments, `${getal(t.commenters)} · ${perDuizend(t.commenters, t.views)}`, `per 1.000 views · ${getal(t.comments)} comments, de helft is jouw antwoord · goed vanaf 1,5‰`),
       ] },
     { id: 'bord', naam: 'Op het bord', vraag: 'Komen de commenters als lead binnen?',
-      preview: [['Nieuwe leads', String(t.leads), 'Op het bord'], ['Van de commenters', pct(t.leads, t.commenters), 'Op het bord']],
+      preview: [['Nieuwe leads', String(t.leads)], ['Van de commenters', pct(t.leadsIg, t.commenters), 'Op het bord']],
       metingen: [
-        M('Op het bord', t.leads, t.commenters, RICHT.bord, `${t.leads} · ${pct(t.leads, t.commenters)}`, 'nieuwe leads van de commenters · wie al op het bord stond en opnieuw commentet telt niet mee'),
+        M('Op het bord', t.leadsIg, t.commenters, RICHT.bord, `${t.leads} · ${pct(t.leadsIg, t.commenters)}`, t.leadsIg < t.leads
+          ? `nieuwe leads · % alleen over de ${t.leadsIg} sinds er Instagram-data is (8 okt)`
+          : 'nieuwe leads van de commenters · wie al op het bord stond en opnieuw commentet telt niet mee'),
       ] },
     { id: 'gesprek', naam: 'Gesprek', vraag: 'Reageren ze op het automatische bericht?',
       preview: [['Reactie', pct(t.reactie, t.leads), 'Reactie'], ['Reacties', String(t.reactiesPeriode), 'Reacties in periode'], ['Voorgesteld', String(t.voorgesteld), 'Call voorgesteld']],
@@ -201,7 +205,7 @@ export default function MagnetTrechter({ data, m, laden }) {
   return (
     <div style={{ opacity: laden ? 0.5 : 1, transition: 'opacity 0.15s' }}>
       <FaseTrechter fases={fases} m={m} iconen={ICONEN} onMeting={setLijst} uitleg={<>
-        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder, en op een cijfer voor de namen erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. Calls en sales: wat er in deze periode gebeurde, ook bij magnet-leads van eerder.
+        {vanaf ? `Reels en comments bestaan pas vanaf ${vanaf} (start Instagram-koppeling); leads, calls en sales tellen over de hele periode. ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder, en op een cijfer voor de namen erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. Calls en sales: wat er in deze periode gebeurde, ook bij magnet-leads van eerder.
       </>} />
 
       {/* Per woord: welke magnet het goed doet. Tik = trechter van dat woord. */}

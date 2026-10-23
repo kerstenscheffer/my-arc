@@ -60,7 +60,7 @@ as $function$
   basis as (
     select cl.*, magnet_woord(cl.lead_magnets_shared[1]) woord
     from call_leads cl
-    where cl.deleted_at is null and cl.created_at >= (select v from start) and cl.created_at < p_tot
+    where cl.deleted_at is null and cl.created_at >= p_van and cl.created_at < p_tot
       and cardinality(cl.lead_magnets_shared) > 0
   ),
   mv as (
@@ -101,6 +101,9 @@ as $function$
   ),
   l as (
     select id, woord, created_at, naam, sectie, omzet, verloren, afgewezen,
+      -- Binnen sinds er Instagram-data is: alleen die tellen mee in het
+      -- percentage van de commenters.
+      created_at >= (select v from start) na_ig,
       -- Elke latere stap betekent dat de eerdere ook gebeurd is.
       (gehouden_los or coalesce(omzet, 0) > 0 or verloren) gehouden,
       (voorgesteld_los or ingepland or afgewezen) voorgesteld,

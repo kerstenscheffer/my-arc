@@ -48,7 +48,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
               </span>
             )}
             <button onClick={() => setOpenFase(o => (o === f.id ? null : f.id))} aria-expanded={open} style={{
-              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+              position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
               padding: m ? '0.9rem 1rem' : '1rem 1.2rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
               borderRadius: eerste ? '15px 0 0 15px' : laatste ? '0 15px 15px 0' : 0,
               background: open ? 'rgba(255,255,255,0.06)' : isVast ? `${k}0d` : 'transparent',
@@ -58,7 +58,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
               {/* Bolletje, naam en oordeel op één hoogte; de vraag eronder over
                   de volle breedte van het vak. */}
               <span style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                <span style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 8, rowGap: 4, width: '100%', paddingRight: 22 }}>
                   <span style={{
                     width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -73,7 +73,7 @@ export default function FaseTrechter({ fases, m, iconen = {}, onMeting, uitleg }
                     padding: '2px 7px', borderRadius: 6,
                     color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
                   }}>{f.oordeel.tekst}</span>
-                  <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, marginLeft: 'auto', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ position: 'absolute', top: m ? 16 : 18, right: m ? 12 : 14, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </span>
                 <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3 }}>{f.vraag}</span>
               </span>
