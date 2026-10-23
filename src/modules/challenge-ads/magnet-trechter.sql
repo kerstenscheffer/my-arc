@@ -23,8 +23,10 @@ update public.lead_magnets set woord = case
 where woord is null and upper(name) in ('MEAL PREPPING', 'PREP', 'LIDL MAGNET', 'LIDL', 'HONGER', 'JUMBO PRODUCTEN', 'JUBMO', 'AH MAGNET', 'AH');
 
 -- Eén element uit lead_magnets_shared → het trigger-woord.
+-- Security definer: sommige magnets staan op naam van een andere coach en
+-- zijn door RLS onzichtbaar; dit geeft alleen het woord terug.
 create or replace function public.magnet_woord(e text) returns text
-language sql stable set search_path to 'public' as $$
+language sql stable security definer set search_path to 'public' as $$
   select coalesce(
     (select upper(coalesce(m.woord, m.name)) from lead_magnets m
       where m.id::text = e or upper(m.name) = upper(e) order by (m.woord is null) limit 1),
@@ -42,17 +44,23 @@ language sql
 stable
 set search_path to 'public'
 as $function$
-  with reels as (
+  with start as (
+    -- Tellen vanaf de eerste Instagram-data (sync sinds 8 okt 2026): anders
+    -- staan leads van maanden tegenover comments van twee weken.
+    select greatest(p_van, coalesce((select date_trunc('day', min(tijd) at time zone 'Europe/Amsterdam') at time zone 'Europe/Amsterdam'
+      from content_ig_media where soort in ('magnet', 'reel')), p_van)) v
+  ),
+  reels as (
     select upper(woord) woord, count(*) reels, sum(views) views,
       sum(comments) comments, count(comments) met_comments, count(views) met_views
     from content_ig_media
-    where soort = 'magnet' and tijd >= p_van and tijd < p_tot
+    where soort = 'magnet' and tijd >= (select v from start) and tijd < p_tot
     group by 1
   ),
   basis as (
     select cl.*, magnet_woord(cl.lead_magnets_shared[1]) woord
     from call_leads cl
-    where cl.deleted_at is null and cl.created_at >= p_van and cl.created_at < p_tot
+    where cl.deleted_at is null and cl.created_at >= (select v from start) and cl.created_at < p_tot
       and cardinality(cl.lead_magnets_shared) > 0
   ),
   mv as (
@@ -106,9 +114,12 @@ as $function$
   select jsonb_build_object(
     'reels', coalesce((select jsonb_agg(to_jsonb(r) order by r.views desc nulls last) from reels r), '[]'::jsonb),
     'leads', coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from l x), '[]'::jsonb),
+    'vanaf', (select v from start),
     'comments_bijgewerkt', (select max(updated_at) from content_ig_media where comments is not null)
   );
 $function$;
 
+revoke execute on function public.magnet_woord(text) from public, anon;
+grant execute on function public.magnet_woord(text) to authenticated;
 revoke execute on function public.get_magnet_trechter(timestamptz, timestamptz) from public, anon;
 grant execute on function public.get_magnet_trechter(timestamptz, timestamptz) to authenticated;

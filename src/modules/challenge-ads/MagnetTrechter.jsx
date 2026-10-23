@@ -111,79 +111,90 @@ function maakFases(t) {
   ].map(vatFaseSamen)
 }
 
-// Trechter van vijf lagen die smaller worden (niet op schaal). In de laag:
-// naam, oordeel en de belangrijkste cijfers. De eerste die vastloopt
-// pulseert. Tik = de metingen van die fase klappen eronder open.
+// Trechter van vijf vakken die smaller worden (niet op schaal), in de stijl
+// van de Ads-fases: donker vak met dunne rand, kleur alleen in het bolletje,
+// het label en de cijfers met een oordeel. Het bolletje van de fase die
+// vastloopt pulseert. Tik = de metingen van die fase klappen eronder open.
 function Trechter({ fases, m }) {
   const [open, setOpen] = useState(null)
   const vast = vindVast(fases)
   const n = fases.length
-  const breedte = (i) => 100 - (i * 44) / (n - 1)   // 100% → 56%
+  const breedte = (i) => 100 - (i * 32) / (n - 1)   // 100% → 68%
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
       {fases.map((f, i) => {
-        const boven = breedte(i), onder = breedte(Math.min(i + 1, n - 1))
-        const inham = i === n - 1 ? 0 : ((boven - onder) / 2 / boven) * 100
         const gemeten = f.oordeel.rang >= 0
-        const k = gemeten ? f.oordeel.kleur : 'rgba(255,255,255,0.5)'
+        const k = f.oordeel.kleur
         const isVast = vast?.id === f.id
         const isOpen = open === f.id
         const preview = m ? f.preview.slice(0, 2) : f.preview
         return (
-          <div key={f.id}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
-              <button onClick={() => setOpen(o => (o === f.id ? null : f.id))} aria-expanded={isOpen} style={{
-                width: `${boven}%`, minHeight: m ? 92 : 96, border: 'none', cursor: 'pointer', fontFamily: 'inherit', color: '#fff',
-                clipPath: `polygon(0 0, 100% 0, ${100 - inham}% 100%, ${inham}% 100%)`,
-                borderRadius: i === 0 ? '14px 14px 0 0' : i === n - 1 ? '0 0 14px 14px' : 0,
-                background: isOpen ? `${k}40` : isVast ? `${k}33` : gemeten ? `${k}1c` : 'rgba(255,255,255,0.05)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: `0.6rem ${inham + 2}%`,
-                animation: isVast && !isOpen ? 'trechterPuls 1.8s ease-in-out infinite' : 'none',
-                WebkitTapHighlightColor: 'transparent',
-              }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <span style={{
-                    width: 24, height: 24, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    background: gemeten ? k : 'rgba(255,255,255,0.12)', color: gemeten ? '#000' : '#fff', fontSize: '0.78rem', fontWeight: 900,
-                  }}>{i + 1}</span>
-                  <span style={{ fontSize: m ? '0.92rem' : '1rem', fontWeight: 900 }}>{f.naam}</span>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 6, color: gemeten ? k : 'rgba(255,255,255,0.7)', background: gemeten ? `${k}26` : 'rgba(255,255,255,0.08)', whiteSpace: 'nowrap' }}>
-                    {isVast ? 'Hier loopt het vast' : f.oordeel.tekst}
+          <div key={f.id} style={{ width: m ? `${Math.max(breedte(i), 84)}%` : `${breedte(i)}%`, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button onClick={() => setOpen(o => (o === f.id ? null : f.id))} aria-expanded={isOpen} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: m ? 12 : 16, flexWrap: m ? 'wrap' : 'nowrap',
+              padding: m ? '0.8rem 0.9rem' : '0.9rem 1.2rem', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: '#fff',
+              background: isOpen ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.025)',
+              border: `1px solid ${isOpen ? 'rgba(255,255,255,0.35)' : isVast ? `${k}66` : 'rgba(255,255,255,0.08)'}`,
+              transition: 'background 0.15s, border-color 0.15s', WebkitTapHighlightColor: 'transparent', outline: 'none',
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10, flex: m ? '1 1 100%' : '0 0 auto', minWidth: 0 }}>
+                <span style={{
+                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: gemeten ? k : 'rgba(255,255,255,0.1)', color: gemeten ? '#000' : 'rgba(255,255,255,0.75)',
+                  fontSize: '0.88rem', fontWeight: 900,
+                  boxShadow: isVast ? `0 0 0 4px ${k}33, 0 0 18px ${k}88` : 'none',
+                  animation: isVast ? 'vastPuls 1.8s ease-in-out infinite' : 'none',
+                }}>{i + 1}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.98rem', fontWeight: 900 }}>{f.naam}</span>
+                    <span style={{
+                      fontSize: '0.64rem', fontWeight: 900, letterSpacing: '0.03em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                      padding: '2px 7px', borderRadius: 6,
+                      color: gemeten ? k : 'rgba(255,255,255,0.6)', background: gemeten ? `${k}1f` : 'rgba(255,255,255,0.06)',
+                    }}>{f.oordeel.tekst}</span>
                   </span>
-                  <ChevronDown size={14} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: ZWAK, lineHeight: 1.3, marginTop: 2 }}>{f.vraag}</span>
                 </span>
-                <span style={{ display: 'flex', gap: m ? 14 : 22, justifyContent: 'center' }}>
-                  {preview.map(([label, waarde, meting]) => {
-                    const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
-                    return (
-                      <span key={label} style={{ textAlign: 'center', minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: o && o.rang >= 0 ? o.kleur : '#fff' }}>{waarde}</span>
-                        <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: ZWAK, whiteSpace: 'nowrap' }}>{label}</span>
-                      </span>
-                    )
-                  })}
-                </span>
-              </button>
-            </div>
+              </span>
+              <span style={{ display: 'flex', gap: m ? 16 : 22, marginLeft: m ? 42 : 'auto', alignItems: 'center' }}>
+                {preview.map(([label, waarde, meting]) => {
+                  const o = meting ? f.metingen.find(x => x.label === meting)?.oordeel : null
+                  return (
+                    <span key={label} style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: m ? '1.05rem' : '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: o && o.rang >= 0 ? o.kleur : '#fff' }}>{waarde}</span>
+                      <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: ZWAK, whiteSpace: 'nowrap' }}>{label}</span>
+                    </span>
+                  )
+                })}
+                <ChevronDown size={15} strokeWidth={2.6} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </span>
+            </button>
 
-            {/* Metingen van deze fase, onder de laag. */}
+            {/* Metingen van deze fase, onder het vak. */}
             {isOpen && (
-              <div style={{ margin: '4px 0 12px', borderRadius: 14, border: `1px solid ${k}55`, background: `${k}0d`, padding: m ? '0.8rem 0.9rem' : '0.95rem 1.2rem' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: ZWAK, marginBottom: 12 }}>{f.vraag}</div>
+              <div style={{ borderRadius: 14, border: `1px solid ${gemeten ? `${k}55` : 'rgba(255,255,255,0.12)'}`, background: gemeten ? `${k}0d` : 'rgba(255,255,255,0.02)', padding: m ? '0.9rem' : '1rem 1.2rem', marginBottom: 4 }}>
                 <div style={{ display: 'flex', gap: m ? 18 : 32, flexWrap: 'wrap' }}>
                   {f.metingen.map(x => {
                     const [groot, klein] = String(x.tekst).split(' · ')
                     const kleur = x.oordeel && x.oordeel.rang >= 0 ? x.oordeel.kleur : '#fff'
                     const Icoon = ICONEN[x.label]
+                    const schud = f.zwakste === x.label
                     return (
-                      <div key={x.label} style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: m ? 120 : 150, maxWidth: 240 }}>
-                        {Icoon && <Icoon size={18} strokeWidth={2.4} color={kleur} />}
-                        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                          <span style={{ fontSize: m ? '1.35rem' : '1.5rem', fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: klein ? '#fff' : kleur }}>{groot}</span>
+                      <div key={x.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, minWidth: m ? 120 : 150, maxWidth: 260 }}>
+                        <span style={{
+                          width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: kleur === '#fff' ? 'rgba(255,255,255,0.08)' : `${kleur}22`,
+                          ...(schud ? { boxShadow: `0 0 0 2px ${kleur}, 0 0 16px ${kleur}99`, animation: 'vastSchud 2.4s ease-in-out infinite' } : {}),
+                        }}>
+                          {Icoon && <Icoon size={19} strokeWidth={2.4} color={kleur} />}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: m ? '1.45rem' : '1.6rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: klein ? '#fff' : kleur }}>{groot}</span>
                           {klein && <span style={{ fontSize: '0.8rem', fontWeight: 900, color: kleur }}>{klein}</span>}
                         </span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 900 }}>{x.label}</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 900, lineHeight: 1.2 }}>{x.label}</span>
                         {x.sub && <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ZWAK, lineHeight: 1.35 }}>{x.sub}</span>}
                       </div>
                     )
@@ -194,7 +205,7 @@ function Trechter({ fases, m }) {
           </div>
         )
       })}
-      <style>{'@keyframes trechterPuls { 0%,100% { filter: brightness(1) } 50% { filter: brightness(1.4) } }'}</style>
+      <style>{'@keyframes vastPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } } @keyframes vastSchud { 0%,60%,100% { transform: translateX(0) rotate(0) } 64% { transform: translateX(-4px) rotate(-6deg) } 70% { transform: translateX(4px) rotate(6deg) } 76% { transform: translateX(-3px) rotate(-4deg) } 82% { transform: translateX(3px) rotate(4deg) } 88% { transform: translateX(0) rotate(0) } }'}</style>
     </div>
   )
 }
@@ -203,6 +214,7 @@ export default function MagnetTrechter({ data, m, laden }) {
   // Welk woord; leeg = alle magnets samen.
   const [woord, setWoord] = useState('')
   const reels = data?.reels || []
+  const vanaf = data?.vanaf ? new Date(data.vanaf).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }) : null
   const leads = data?.leads || []
 
   const woorden = [...new Set([...reels.map(r => r.woord), ...leads.map(l => l.woord)].filter(Boolean))]
@@ -222,7 +234,7 @@ export default function MagnetTrechter({ data, m, laden }) {
     <div style={{ opacity: laden ? 0.5 : 1, transition: 'opacity 0.15s' }}>
       <Trechter fases={fases} m={m} />
       <div style={{ fontSize: '0.74rem', fontWeight: 700, color: ZWAK, marginTop: 10, lineHeight: 1.5 }}>
-        {gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een laag voor de cijfers erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt), leads zijn commenters die met dit magnet-woord op het bord kwamen. De trechter is niet op schaal.
+        {vanaf ? `Telt vanaf ${vanaf} (sinds dan haalt de app Instagram-data op). ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een vak voor de cijfers erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt), leads zijn commenters die met dit magnet-woord op het bord kwamen. De trechter is niet op schaal.
       </div>
 
       {/* Per woord: welke magnet het goed doet. Tik = trechter van dat woord. */}
