@@ -404,6 +404,9 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   }
 
   // Welke pagina; onthouden. Wisselen zet campagne en advertentie terug.
+  // Comment-magnets: route van reacties/calls/sales (alles, direct uit het
+  // magnet-gesprek of via een campagnebericht). Staat naast de keuzebalk.
+  const [route, setRoute] = useState('alles')
   const [pagina, setPaginaState] = useState(() => { try { return paginaVan(localStorage.getItem('arc_ads_pagina')).id } catch { return '/challenge' } })
   const setPagina = (p) => {
     setPaginaState(p); setCampagne('')
@@ -914,6 +917,17 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
         ))}
       </div>
 
+        {P.magnets && (
+          <div role="tablist" aria-label="Route" style={{ display: 'inline-flex', flexShrink: 0, height: 34, border: '1px solid rgba(255,255,255,0.16)', borderRadius: 9, overflow: 'hidden', marginLeft: m ? 0 : 'auto' }}>
+            {[['alles', 'Alles'], ['direct', 'Direct uit magnet'], ['campagne', 'Via campagne']].map(([id, label], i) => (
+              <button key={id} role="tab" aria-selected={route === id} onClick={() => setRoute(id)} style={{
+                padding: '0 0.8rem', border: 'none', borderLeft: i ? '1px solid rgba(255,255,255,0.16)' : 'none',
+                background: route === id ? '#fff' : 'transparent', color: route === id ? '#000' : '#fff',
+                fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+              }}>{label}</button>
+            ))}
+          </div>
+        )}
         {/* Keuzes als één balk met scheidingslijnen, rechts van de cijfers. */}
         <div style={{
           display: 'flex', alignItems: 'center', flexShrink: m ? 1 : 0, width: m ? '100%' : 'auto', minWidth: 0,
@@ -990,7 +1004,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
 
       {/* ═══ 2. WAAR LOOPT HET VAST ═══ */}
       <div style={{ marginBottom: m ? 34 : 46 }}>
-        {P.magnets ? <MagnetTrechter data={data?.magnet} m={m} laden={laden} /> : <FaseTrechter fases={FASES} m={m} iconen={ICONEN} onMeting={setInfo}
+        {P.magnets ? <MagnetTrechter data={data?.magnet} m={m} laden={laden} route={route} /> : <FaseTrechter fases={FASES} m={m} iconen={ICONEN} onMeting={setInfo}
           uitleg="Groen, oranje en rood zijn vuistregels voor koud verkeer uit Meta. Percentage = van de stap ervoor. Leads tellen vanaf de dag dat ze binnenkwamen, met alles wat er daarna gebeurde. Tik op een fase voor de cijfers eronder." />}
       </div>
 

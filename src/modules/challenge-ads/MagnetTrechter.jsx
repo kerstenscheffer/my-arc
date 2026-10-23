@@ -190,16 +190,15 @@ function ReelRij({ r }) {
   )
 }
 
-export default function MagnetTrechter({ data, m, laden }) {
+export default function MagnetTrechter({ data, m, laden, route = 'alles' }) {
   // Welk woord; leeg = alle magnets samen.
   const [woord, setWoord] = useState('')
   const reels = data?.reels || []
   const vanaf = data?.vanaf ? new Date(data.vanaf).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: 'Europe/Amsterdam' }) : null
   const leads = data?.leads || []
-  // Route: alles, direct uit het magnet-gesprek, of via een campagnebericht
-  // (zelf outreach). Geldt voor reacties, calls en sales; reels, commenters
-  // en nieuwe leads hebben geen route.
-  const [route, setRoute] = useState('alles')
+  // Route (keuze naast de balk in het dashboard): alles, direct uit het
+  // magnet-gesprek, of via een campagnebericht (zelf outreach). Geldt voor
+  // reacties, calls en sales; reels, commenters en nieuwe leads hebben geen route.
   const stappen = (data?.stappen || []).filter(l => route === 'alles' || (route === 'campagne' ? l.route === 'campagne' : l.route !== 'campagne'))
   // Welke lijst er open staat (tik op een meting).
   const [lijst, setLijst] = useState(null)
@@ -219,17 +218,6 @@ export default function MagnetTrechter({ data, m, laden }) {
 
   return (
     <div style={{ opacity: laden ? 0.5 : 1, transition: 'opacity 0.15s' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-        <div role="tablist" style={{ display: 'inline-flex', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 9, overflow: 'hidden', height: 34 }}>
-          {[['alles', 'Alles'], ['direct', 'Direct uit magnet'], ['campagne', 'Via campagne']].map(([id, label], i) => (
-            <button key={id} role="tab" aria-selected={route === id} onClick={() => setRoute(id)} style={{
-              padding: '0 0.8rem', border: 'none', borderLeft: i ? '1px solid rgba(255,255,255,0.16)' : 'none',
-              background: route === id ? '#fff' : 'transparent', color: route === id ? '#000' : '#fff',
-              fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-            }}>{label}</button>
-          ))}
-        </div>
-      </div>
       <FaseTrechter fases={fases} m={m} iconen={ICONEN} onMeting={setLijst} uitleg={<>
         {route !== 'alles' ? `Alleen ${route === 'direct' ? 'direct uit het magnet-gesprek' : 'via een campagnebericht (zelf outreach)'}: geldt voor reacties, calls en sales; reels, commenters en nieuwe leads tellen altijd alles. ` : ''}
         {vanaf ? `Reels en comments bestaan pas vanaf ${vanaf} (start Instagram-koppeling); leads, calls en sales tellen over de hele periode. ` : ''}{gekozen ? `Alleen ${gekozen}. ` : ''}Tik op een fase voor de cijfers eronder, en op een cijfer voor de namen erachter. Percentage = van de stap ervoor; groen, oranje en rood zijn vuistregels. Reels en comments uit Instagram (elk uur bijgewerkt; commenters = comments ÷ 2, want jij beantwoordt elke comment), leads zijn commenters die met dit magnet-woord op het bord kwamen. Calls en sales: wat er in deze periode gebeurde, ook bij magnet-leads van eerder.
