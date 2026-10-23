@@ -102,8 +102,9 @@ const minuten = (rust) => {
   const n = parseFloat(m[1])
   return /^s/i.test(m[2] || '') ? n / 60 : n
 }
-// Werksets × (± 45 s per set + rust), plus 8 min opwarmen, op 5 min afgerond.
-const duur = (oef) => Math.round((8 + oef.reduce((t, o) => t + (Number(o.sets) || 0) * (0.75 + minuten(o.rust)), 0)) / 5) * 5
+// Per oefening 4 min voor de drie opwarmsets en het instellen, per werkset
+// ± 45 s plus de rust; op 5 min afgerond.
+const duur = (oef) => Math.round(oef.reduce((t, o) => t + 4 + (Number(o.sets) || 0) * (0.75 + minuten(o.rust)), 0) / 5) * 5
 const totaalSets = (oef) => oef.reduce((t, o) => t + (Number(o.sets) || 0), 0)
 const tweeCijfers = (n) => String(n).padStart(2, '0')
 
@@ -191,7 +192,7 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     Promise.all(FONTS.map(([f]) => laad(`fonts/${f}`))),
     Promise.all(fotoNamen.map(f => laad(`${f}.jpg`))),
     Promise.all(kleinNamen.map(f => laad(`klein-${f}.jpg`).then(b => b, () => null))),
-    Promise.all(['app-uitvoering', 'app-progressie'].map(f => laad(`${f}.jpg`).then(b => b, () => null))),
+    Promise.all(['app-uitvoering', 'app-progressie'].map(f => laad(`${f}.png`).then(b => b, () => null))),
     laad('logo-wit.png').then(b => b, () => null),
   ])
   const foto = Object.fromEntries(fotoNamen.map((f, i) => [f, fotoData[i]]))
@@ -395,7 +396,7 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     y += 6.5
     const rustTekst = oef[0]?.rust || '2 min'
     const stappen = [
-      ['1. Opwarmen.', 'Drie opwarmsets: 50% van je werkgewicht × 6-8, 75% × 3-4 en 100% × 1. Daarna begin je aan je werksets.'],
+      ['1. Opwarmen.', 'Bij elke oefening drie opwarmsets: 50% van je werkgewicht × 6-8, 75% × 3-4 en 100% × 1. Daarna je werksets.'],
       ['2. Werksets.', tips[0]],
       ['3. Rust.', `Neem minimaal ${rustTekst} tussen de sets. Begin pas aan de volgende set als je spieren weer hersteld voelen.`],
       ['4. Noteren.', 'Schrijf je gewicht en herhalingen in het logboek. Volgende week: één herhaling of een paar kilo meer.'],
@@ -471,7 +472,7 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     B / 2, 52, { align: 'center', lineHeightFactor: 1.45 })
 
   const kolomW = B / 2 - M - 4
-  const telW = 76, telH = telW * 1792 / 932
+  const telW = 82, telH = telW * 2060 / 1074
   const appBlokken = [
     ['Uitvoering', 'Bij elke oefening staat een video waarin ik laat zien hoe je hem uitvoert en waar je op let.', appBeelden[0]],
     ['Progressie', 'Je logt je sets en ziet direct wat je de vorige keer deed. De grafiek laat zien hoeveel sterker je wordt.', appBeelden[1]],
@@ -484,13 +485,13 @@ export async function maakSplitPdf({ voornaam, split, locatie, dagen, tips, doel
     doc.text(kopje.toUpperCase(), x + 15, 74.5)
     font('Source', 'normal', 9.5); kleur(ZACHT)
     doc.text(doc.splitTextToSize(tekst, kolomW - 15), x + 15, 80.5, { lineHeightFactor: 1.4 })
-    const tx = x + (kolomW - telW) / 2, ty = 98
-    if (beeld) doc.addImage(beeld, 'JPEG', tx, ty, telW, telH, `app-${k}`, 'FAST')
+    const tx = x + (kolomW - telW) / 2, ty = 95
+    if (beeld) doc.addImage(beeld, 'PNG', tx, ty, telW, telH, `app-${k}`, 'FAST')
     else { doc.setFillColor(...KAART); doc.setDrawColor(...LIJN); doc.roundedRect(tx, ty, telW, telH, 4, 4, 'FD') }
   })
 
   font('Source', 'black', 16); kleur(WIT)
-  doc.text('DM mij "APP" voor meer informatie', B / 2, 98 + telH + 13, { align: 'center' })
+  doc.text('DM mij "APP" voor meer informatie', B / 2, 95 + telH + 11, { align: 'center' })
   label('MY ARC Kersten', M, H - 6.5, { stijl: 'normal', c: DOF, ruimte: 0.8 })
   font('Source', 'normal', 7); kleur(DOF)
   doc.text('@myarcfitness', B - M, H - 6.5, { align: 'right' })
