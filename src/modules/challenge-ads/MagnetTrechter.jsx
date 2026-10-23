@@ -16,14 +16,17 @@ import {
 } from 'lucide-react'
 import { GROEN, ZWAK, beoordeel, vatFaseSamen, vindVast } from './fases'
 
-// Richtwaarden. Views en comments: vuistregels voor magnet-reels. De rest
-// gelijk aan de advertenties waar het dezelfde stap is.
+// Richtwaarden. Comments en reactie op je eigen cijfers (23 okt 2026):
+//  - comments per view: mediaan 1,5‰, beste kwart vanaf 3,8‰ (48 magnet-reels
+//    8-23 okt) → kan beter vanaf 1,5‰, goed vanaf 3‰;
+//  - reactie op het automatische bericht: jun 18%, jul 27%, aug 16%, sep 10%,
+//    okt 6% → goed vanaf 18% (gemiddelde jun-aug), kan beter vanaf 10%.
+// Views per reel is een vuistregel; de call-stappen zijn gelijk aan Ads.
 const RICHT = {
   views: { goed: 5000, matig: 2000, min: 3 },          // gem. views per reel, basis = aantal reels
-  comments: { goed: 0.004, matig: 0.002, min: 2000 },  // comments per view, basis = views
+  comments: { goed: 0.003, matig: 0.0015, min: 2000 }, // comments per view, basis = views
   bord: { goed: 0.45, matig: 0.3, min: 20 },           // leads per comment (comments tellen je eigen antwoorden mee)
-  opgevolgd: { goed: 0.8, matig: 0.5, min: 10 },
-  reactie: { goed: 0.25, matig: 0.12, min: 10 },         // van wie een bericht kreeg
+  reactie: { goed: 0.18, matig: 0.1, min: 10 },          // van alle leads (iedereen krijgt het automatische bericht)
   voorgesteld: { goed: 0.6, matig: 0.4, min: 3 },
   ingepland: { goed: 0.7, matig: 0.5, min: 3 },
   show: { goed: 0.75, matig: 0.6, min: 3 },
@@ -32,7 +35,7 @@ const RICHT = {
 
 const ICONEN = {
   'Magnet-reels': Film, 'Views per reel': Eye, Comments: MessageSquare, 'Op het bord': UserPlus,
-  Opgevolgd: Send, Reactie: MessageCircle, 'Call voorgesteld': PhoneOutgoing,
+  'Follow-up gestuurd': Send, Reactie: MessageCircle, 'Call voorgesteld': PhoneOutgoing,
   'Call ingepland': CalendarCheck, 'Call gehad': PhoneCall, Sale: Trophy,
 }
 
@@ -84,19 +87,19 @@ function maakFases(t) {
     { id: 'comment', naam: 'Comment', vraag: 'Commenten mensen het woord?',
       preview: [['Comments', getal(t.comments), 'Comments'], ['Per 1.000 views', perDuizend(t.comments, t.views), 'Comments']],
       metingen: [
-        M('Comments', t.comments, t.views, RICHT.comments, `${getal(t.comments)} · ${perDuizend(t.comments, t.views)}`, 'per 1.000 views · goed is 4‰ of meer'),
+        M('Comments', t.comments, t.views, RICHT.comments, `${getal(t.comments)} · ${perDuizend(t.comments, t.views)}`, 'per 1.000 views · goed vanaf 3‰, je mediaan is 1,5‰'),
       ] },
     { id: 'bord', naam: 'Op het bord', vraag: 'Komen de commenters als lead binnen?',
       preview: [['Leads', String(t.leads), 'Op het bord'], ['Van de comments', pct(t.leads, t.comments), 'Op het bord']],
       metingen: [
         M('Op het bord', t.leads, t.comments, RICHT.bord, `${t.leads} · ${pct(t.leads, t.comments)}`, 'van de comments · Instagram telt je eigen antwoorden mee, dus 100% haal je niet'),
       ] },
-    { id: 'gesprek', naam: 'Gesprek', vraag: 'Volgen we op en reageren ze?',
-      preview: [['Opgevolgd', pct(t.opgevolgd, t.leads), 'Opgevolgd'], ['Reactie', pct(t.reactie, t.opgevolgd), 'Reactie'], ['Voorgesteld', String(t.voorgesteld), 'Call voorgesteld']],
+    { id: 'gesprek', naam: 'Gesprek', vraag: 'Reageren ze op het automatische bericht?',
+      preview: [['Reactie', pct(t.reactie, t.leads), 'Reactie'], ['Reageerden', String(t.reactie)], ['Voorgesteld', String(t.voorgesteld), 'Call voorgesteld']],
       metingen: [
-        M('Opgevolgd', t.opgevolgd, t.leads, RICHT.opgevolgd, `${t.opgevolgd} · ${pct(t.opgevolgd, t.leads)}`, 'DM of follow-up gelogd op het bord'),
-        M('Reactie', t.reactie, t.opgevolgd, RICHT.reactie, `${t.reactie} · ${pct(t.reactie, t.opgevolgd)}`, 'van wie een bericht kreeg'),
+        M('Reactie', t.reactie, t.leads, RICHT.reactie, `${t.reactie} · ${pct(t.reactie, t.leads)}`, 'van de leads reageerde (+1 reactie op het bord) · goed vanaf 18%'),
         M('Call voorgesteld', t.voorgesteld, t.reactie, RICHT.voorgesteld, `${t.voorgesteld} · ${pct(t.voorgesteld, t.reactie)}`, 'van wie reageerde'),
+        M('Follow-up gestuurd', null, null, null, `${t.opgevolgd} · ${pct(t.opgevolgd, t.leads)}`, 'extra bericht gelogd, naast het automatische'),
       ] },
     { id: 'close', naam: 'Call & close', vraag: 'Calls geboekt, gehouden en geclosed?',
       preview: [['Ingepland', String(t.calls), 'Call ingepland'], ['Gehad', String(t.gehouden), 'Call gehad'], ['Sales', String(t.sales), 'Sale']],
