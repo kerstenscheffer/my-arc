@@ -24,7 +24,8 @@ import { BEPERKINGEN, beperkingenVoor, pasBeperkingenToe, suggestiesVoor } from 
 
 // YouTube-id van de uitlegvideo. Leeg = stilstaand beeld zonder afspeelknop.
 const VIDEO_ID = 'WshSHiHN0Cw'
-const POSTER = '/mijn-split/push.jpg'
+// Eigen kopie van de YouTube-thumbnail (die loopt na een nieuwe upload soms uren achter).
+const POSTER = '/mijn-split/thumbnail.jpg'
 const CTA_TEKST = 'Maak mijn split'
 
 const STAPPEN = ['dagen', 'locatie', 'doel', 'niveau', 'beperkingen', 'gegevens']
