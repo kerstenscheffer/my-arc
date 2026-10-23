@@ -87,7 +87,10 @@ export function meet(event, extra = {}) {
     const h = herkomst()
     const rij = {
       session_id: sessieId(), event,
-      pad: window.location.pathname,
+      // window.__myarcMeetPad: een formulier dat op een andere pagina openstaat
+      // (de challenge-modal onderaan /mijn-split) meet onder een eigen pad, zodat
+      // zijn stappen niet tussen die van de pagina zelf vallen.
+      pad: window.__myarcMeetPad || window.location.pathname,
       utm_source: h.utm_source || null, utm_medium: h.utm_medium || null,
       utm_campaign: h.utm_campaign || null, utm_content: h.utm_content || null,
       utm_term: h.utm_term || null, fbclid: h.fbclid || null,

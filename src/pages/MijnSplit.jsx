@@ -74,6 +74,12 @@ const PAGINA = {
   coachSlot: 'Deze splits zijn dezelfde waar mijn klanten mee trainen. Zo zie je hoe ik het aanpak, en kun je er vandaag mee beginnen.',
   slotKop: 'Klaar voor je split?',
   slotTekst: 'Vijf vragen, dan staat hij voor je klaar.',
+  // Onderaan de knop naar de 6 Weken Challenge (zelfde modal als /challenge):
+  // in de video verwijst Kersten naar deze knop (23 okt 2026).
+  challengeSlot: {
+    kop: 'Doe mee met de 6 Weken Challenge',
+    tekst: 'Plan je vrijblijvende kennismaking. We kijken samen naar je situatie, je doelen en of de challenge bij jou past.',
+  },
 }
 
 function SplitFlow({ m }) {

@@ -3,11 +3,17 @@
 // huisstijl van /challenge: koppen, tekst, groene knop, secties, de
 // videospeler met eigen bediening, de modal en de keuzevakken van het
 // formulier. Meting van de video via meet() (challenge_events, pad = pagina).
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Play, Volume2, VolumeX, Pause, X } from 'lucide-react'
 import { meet, volgTijdOpPagina } from '../challengeTracking'
 import { appSafeEmbedUrl } from '../../modules/videos/utils/youtubeHelpers'
 import { WIT, ZWAK, CTA_GROEN, BG, HERO_BG, FONT } from './stijl'
+
+// De kennismakings-modal en Trustpilot van /challenge, pas geladen als een
+// pagina een challengeSlot heeft (dan zit /challenge niet in elke bundel).
+const KalenderBlad = lazy(() => import('../ChallengeVslPage').then(x => ({ default: x.KalenderBlad })))
+const TrustpilotBadge = lazy(() => import('../ChallengeVslPage').then(x => ({ default: x.TrustpilotBadge })))
+const CHALLENGE_CTA = 'Plan kennismakingsgesprek'
 
 // ── Bouwstenen (zelfde maten als /challenge) ──────────────────────────────
 
@@ -347,6 +353,16 @@ export function LeadMagnetPagina({ cfg, children }) {
     if (!formGestart.current) { formGestart.current = true; meet('form_start') }
   }
   const sluit = useCallback(() => setOpen(false), [])
+  // Onderaan: de kennismaking voor de 6 Weken Challenge (cfg.challengeSlot).
+  // Zolang die modal open is meet alles onder <pagina>/challenge, zodat de
+  // challenge-vragen niet tussen de vragen van de pagina zelf vallen.
+  const [challengeOpen, setChallengeOpen] = useState(false)
+  const openChallenge = () => {
+    window.__myarcMeetPad = `${window.location.pathname}/challenge`
+    meet('knop')
+    setChallengeOpen(true)
+  }
+  const sluitChallenge = useCallback(() => { setChallengeOpen(false); delete window.__myarcMeetPad }, [])
 
   // Bezoek bij binnenkomst, tijd op de pagina tot het verlaten.
   useEffect(() => {
@@ -527,9 +543,16 @@ export function LeadMagnetPagina({ cfg, children }) {
 
       {/* Slot (wit, na de zwarte coach-sectie). */}
       <Sectie m={m} licht style={{ paddingBottom: m ? '7rem' : '8rem' }}>
-        <Kop m={m} center licht>{cfg.slotKop}</Kop>
-        <Tekst m={m} center dim licht style={{ marginTop: '0.9rem' }}>{cfg.slotTekst}</Tekst>
-        <Cta m={m} onClick={openForm} tekst={cfg.cta} licht style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
+        <Kop m={m} center licht>{cfg.challengeSlot?.kop || cfg.slotKop}</Kop>
+        <Tekst m={m} center dim licht style={{ marginTop: '0.9rem' }}>{cfg.challengeSlot?.tekst || cfg.slotTekst}</Tekst>
+        {cfg.challengeSlot ? (
+          <>
+            <Cta m={m} onClick={openChallenge} tekst={CHALLENGE_CTA} licht style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
+            <Suspense fallback={null}><TrustpilotBadge licht style={{ marginTop: 14 }} /></Suspense>
+          </>
+        ) : (
+          <Cta m={m} onClick={openForm} tekst={cfg.cta} licht style={{ marginTop: m ? '1.8rem' : '2.4rem' }} />
+        )}
         <div style={{ marginTop: m ? '2.5rem' : '3rem', textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(0,0,0,0.35)' }}>
           <a href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy</a>
         </div>
@@ -550,6 +573,9 @@ export function LeadMagnetPagina({ cfg, children }) {
       <ModalKader open={open} onClose={sluit} m={m}>
         {children(m)}
       </ModalKader>
+      {cfg.challengeSlot && challengeOpen && (
+        <Suspense fallback={null}><KalenderBlad open={challengeOpen} onClose={sluitChallenge} m={m} /></Suspense>
+      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:wght@400;500;600;700;800;900&display=swap');

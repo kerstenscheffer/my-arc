@@ -203,7 +203,7 @@ function Sectie({ children, m, smal, lijn = true, thema = 'zwart', style }) {
   )
 }
 
-function TrustpilotBadge({ style, licht }) {
+export function TrustpilotBadge({ style, licht }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', ...style }}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -713,7 +713,8 @@ function ModalKader({ open, onClose, m, children }) {
   )
 }
 
-function KalenderBlad({ open, onClose, m }) {
+// Ook gebruikt onderaan /mijn-split (LeadMagnetPagina, cfg.challengeSlot).
+export function KalenderBlad({ open, onClose, m }) {
   // Op het geschikt-scherm (telefoon) vult de video het blad: dan geen foto's.
   const [volVideo, setVolVideo] = useState(false)
   return (
