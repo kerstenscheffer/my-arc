@@ -50,6 +50,7 @@ const PERIODES = [
   { id: '30', label: 'Laatste 30 dagen', dagen: 30 },
   { id: '90', label: 'Laatste 90 dagen', dagen: 90 },
   { id: 'vanaf', label: 'Vanaf datum…' },
+  { id: 'tussen', label: 'Van … tot …' },
 ]
 
 // De pagina's met meting. `alleenAds`: alleen advertentieverkeer tellen.
@@ -377,6 +378,7 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
     try {
       const p = localStorage.getItem('arc_ads_periode')
       if (p === 'vanaf') return localStorage.getItem('arc_ads_vanaf') ? 'vanaf' : '14'
+      if (p === 'tussen') return localStorage.getItem('arc_ads_bereik_van') && localStorage.getItem('arc_ads_bereik_tot') ? 'tussen' : '14'
       return PERIODES.some(x => x.id === p) ? p : '14'
     } catch { return '14' }
   })
@@ -388,6 +390,18 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
   const [vanafDatum, setVanafDatum] = useState(() => {
     try { return localStorage.getItem('arc_ads_vanaf') || '' } catch { return '' }
   })
+  // Van … tot …: eigen begin- en einddatum, los van 'vanaf'. Gekozen in een
+  // klein venster met twee datumvelden.
+  const [bereik, setBereik] = useState(() => {
+    try { return { van: localStorage.getItem('arc_ads_bereik_van') || '', tot: localStorage.getItem('arc_ads_bereik_tot') || '' } } catch { return { van: '', tot: '' } }
+  })
+  const [bereikOpen, setBereikOpen] = useState(false)
+  const [bereikInvoer, setBereikInvoer] = useState({ van: '', tot: '' })
+  const kiesBereik = (van, tot) => {
+    setBereik({ van, tot })
+    try { localStorage.setItem('arc_ads_bereik_van', van); localStorage.setItem('arc_ads_bereik_tot', tot) } catch { /* geen opslag */ }
+    setPeriode('tussen')
+  }
   const kiesVanaf = (iso) => {
     setVanafDatum(iso)
     try { if (iso) localStorage.setItem('arc_ads_vanaf', iso); else localStorage.removeItem('arc_ads_vanaf') } catch { /* geen opslag */ }
@@ -422,14 +436,18 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
 
   const laad = async () => {
     if (periode === 'vanaf' && !vanafDatum) return
+    if (periode === 'tussen' && !(bereik.van && bereik.tot)) return
     setLaden(true); setFout('')
     try {
       const dagen = PERIODES.find(p => p.id === periode)?.dagen || 14
-      const tot = new Date(); tot.setHours(23, 59, 59, 999)
+      const tussen = periode === 'tussen' && bereik.van && bereik.tot
+      const tot = tussen ? new Date(`${bereik.tot}T00:00:00`) : new Date(); tot.setHours(23, 59, 59, 999)
       const totEx = new Date(tot.getTime() + 1)
-      const van = (periode === 'vanaf' && vanafDatum)
-        ? new Date(`${vanafDatum}T00:00:00`)
-        : (() => { const d = new Date(); d.setDate(d.getDate() - dagen + 1); d.setHours(0, 0, 0, 0); return d })()
+      const van = tussen
+        ? new Date(`${bereik.van}T00:00:00`)
+        : (periode === 'vanaf' && vanafDatum)
+          ? new Date(`${vanafDatum}T00:00:00`)
+          : (() => { const d = new Date(); d.setDate(d.getDate() - dagen + 1); d.setHours(0, 0, 0, 0); return d })()
       if (paginaVan(pagina).magnets) {
         const { data: res, error } = await db.supabase.rpc('get_magnet_trechter', { p_van: van.toISOString(), p_tot: totEx.toISOString() })
         if (error) throw error
@@ -450,12 +468,12 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
       setFout(e.message || 'Laden mislukt')
     } finally { setLaden(false) }
   }
-  useEffect(() => { laad() }, [periode, vanafDatum, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { laad() }, [periode, vanafDatum, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
   // Geen verversknop meer: elke 5 minuten vanzelf, zolang het tabblad openstaat.
   useEffect(() => {
     const t = setInterval(() => { if (document.visibilityState === 'visible') laad() }, 5 * 60 * 1000)
     return () => clearInterval(t)
-  }, [periode, vanafDatum, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [periode, vanafDatum, bereik, pagina]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keuzelijsten: campagnes en advertenties uit spend, bezoek en leads.
   // Nieuwste activiteit bovenaan, zodat een net gestarte campagne vooraan staat.
@@ -947,8 +965,16 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
           <span style={{ position: 'relative', display: 'flex', height: '100%', flex: m ? '1 1 0' : '0 0 auto' }}>
             <Keuzemenu label="Periode" rechts breedte={190} stijl={{ width: '100%' }}
               waarde={periode === 'vanaf' && vanafDatum ? 'vanaf' : periode}
-              weergave={periode === 'vanaf' && vanafDatum ? `Vanaf ${dagLabel(vanafDatum)}` : (PERIODES.find(p => p.id === periode)?.label || 'Periode')}
+              weergave={periode === 'tussen' && bereik.van && bereik.tot
+                ? `${dagLabel(bereik.van)} – ${dagLabel(bereik.tot)}`
+                : periode === 'vanaf' && vanafDatum ? `Vanaf ${dagLabel(vanafDatum)}` : (PERIODES.find(p => p.id === periode)?.label || 'Periode')}
               onKies={(v) => {
+                if (v === 'tussen' || v === 'tussen_kies') {
+                  const vandaag = new Date().toLocaleDateString('sv-SE')
+                  setBereikInvoer({ van: bereik.van || vanafDatum || vandaag, tot: bereik.tot || vandaag })
+                  setBereikOpen(true)
+                  return
+                }
                 if (v === 'vanaf' || v === 'vanaf_kies') {
                   try { datumRef.current?.showPicker?.() } catch { datumRef.current?.focus?.() }
                   return
@@ -956,10 +982,13 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
                 setPeriode(v)
               }}
               opties={[
-                ...PERIODES.filter(p => p.id !== 'vanaf').map(p => ({ waarde: p.id, label: p.label })),
+                ...PERIODES.filter(p => p.id !== 'vanaf' && p.id !== 'tussen').map(p => ({ waarde: p.id, label: p.label })),
                 ...(periode === 'vanaf' && vanafDatum
                   ? [{ waarde: 'vanaf', label: `Vanaf ${dagLabel(vanafDatum)}` }, { waarde: 'vanaf_kies', label: 'Andere datum…' }]
                   : [{ waarde: 'vanaf_kies', label: 'Vanaf datum…' }]),
+                ...(periode === 'tussen' && bereik.van && bereik.tot
+                  ? [{ waarde: 'tussen', label: `${dagLabel(bereik.van)} – ${dagLabel(bereik.tot)}` }, { waarde: 'tussen_kies', label: 'Andere van – tot…' }]
+                  : [{ waarde: 'tussen_kies', label: 'Van … tot …' }]),
               ]} />
             <input ref={datumRef} type="date" value={vanafDatum} max={new Date().toLocaleDateString('sv-SE')} tabIndex={-1} aria-hidden="true"
               onChange={e => { kiesVanaf(e.target.value); if (e.target.value) setPeriode('vanaf') }}
@@ -1025,6 +1054,29 @@ export default function ChallengeAdsDashboard({ db, isMobile }) {
               Meta vult {'{{campaign.name}}'} en {'{{ad.name}}'} zelf in. Zo komen bezoekers en spend bij dezelfde advertentie uit.
             </div>
           </div>
+        </Venster>
+      )}
+      {bereikOpen && (
+        <Venster titel="Van … tot …" sub="Kies een begin- en einddatum" m={m} onClose={() => setBereikOpen(false)}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', paddingBottom: '1rem' }}>
+            {[['van', 'Van'], ['tot', 'Tot en met']].map(([k, label]) => (
+              <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 140px', fontSize: '0.78rem', fontWeight: 800, color: ZWAK }}>
+                {label}
+                <input type="date" value={bereikInvoer[k]} max={new Date().toLocaleDateString('sv-SE')}
+                  onChange={e => setBereikInvoer(b => ({ ...b, [k]: e.target.value }))}
+                  style={{ height: 44, padding: '0 0.8rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: '0.95rem', fontWeight: 800, fontFamily: 'inherit', colorScheme: 'dark' }} />
+              </label>
+            ))}
+            <button
+              disabled={!bereikInvoer.van || !bereikInvoer.tot || bereikInvoer.van > bereikInvoer.tot}
+              onClick={() => { kiesBereik(bereikInvoer.van, bereikInvoer.tot); setBereikOpen(false) }}
+              style={{ height: 44, padding: '0 1.2rem', borderRadius: 10, border: 'none', background: '#fff', color: '#000', fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', opacity: (!bereikInvoer.van || !bereikInvoer.tot || bereikInvoer.van > bereikInvoer.tot) ? 0.4 : 1 }}>
+              Toepassen
+            </button>
+          </div>
+          {bereikInvoer.van && bereikInvoer.tot && bereikInvoer.van > bereikInvoer.tot && (
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: ROOD, paddingBottom: '1rem' }}>De begindatum ligt na de einddatum.</div>
+          )}
         </Venster>
       )}
       {open && (
