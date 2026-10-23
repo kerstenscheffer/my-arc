@@ -23,7 +23,7 @@ import { downloadSplitPdf, fotoVoor, duur, totaalSets } from './mijn-split/split
 import { BEPERKINGEN, beperkingenVoor, pasBeperkingenToe, suggestiesVoor } from './mijn-split/oefeningWissel'
 
 // YouTube-id van de uitlegvideo. Leeg = stilstaand beeld zonder afspeelknop.
-const VIDEO_ID = ''
+const VIDEO_ID = 'WshSHiHN0Cw'
 const POSTER = '/mijn-split/push.jpg'
 const CTA_TEKST = 'Maak mijn split'
 

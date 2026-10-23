@@ -75,9 +75,15 @@ export function Sectie({ children, m, smal, licht, grijs, style }) {
 }
 
 // ── De speler ──────────────────────────────────────────────────────────────
-// Zelfde gedrag als op /challenge: eigen beeld met afspeelknop, daarna de
-// YouTube-speler zonder eigen bediening met onze laag erover (play/pauze,
-// geluid, een balk die eerst snel loopt). Zonder videoId alleen het beeld.
+// Zelfde gedrag als op /challenge (23 okt 2026): op het web start de video
+// meteen, eerst met geluid. Weigert de browser dat (iPhone altijd), dan
+// speelt hij gedempt met "Tik voor geluid"; die tik zet het geluid aan en
+// begint opnieuw vanaf het begin. Zolang het geluid nog niet beslist is of de
+// video nog niet loopt, ligt het eigen beeld eroverheen (geen YouTube-
+// laadscherm). Eigen bediening: play/pauze, geluid en een balk die eerst snel
+// loopt. In de native app (yt.html) werkt de API niet: daar tik-om-te-starten.
+// Zonder videoId alleen het beeld. video_start en de mijlpalen tellen pas als
+// de video met geluid loopt.
 const TOON_VOORTGANG = (x) => Math.pow(Math.max(0, Math.min(1, x)), 0.45)
 
 function laadYouTubeApi() {
@@ -99,27 +105,45 @@ const knopIcoon = {
   background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
+function GeluidPil({ m }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: m ? 8 : 10, padding: m ? '0.7rem 1.05rem' : '0.85rem 1.35rem',
+      borderRadius: 999, background: 'rgba(0,0,0,0.78)', border: '1.5px solid rgba(255,255,255,0.9)', color: WIT,
+      fontSize: m ? '0.95rem' : '1.1rem', fontWeight: 900, fontFamily: 'inherit', boxShadow: '0 8px 28px rgba(0,0,0,0.5)',
+      animation: 'tikGeluid 1.6s ease-in-out infinite',
+    }}>
+      <VolumeX size={m ? 20 : 24} strokeWidth={2.6} /> Tik voor geluid
+    </span>
+  )
+}
+
 export function Video({ m, videoId, poster }) {
-  const [gestart, setGestart] = useState(false)
+  const directeEmbed = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
+  const appUrl = appSafeEmbedUrl(directeEmbed)
+  const eigenLaag = appUrl === directeEmbed
+  //   geluid: 'proef' (nog niet bekend) → 'aan' of 'stil'
+  const [gestart, setGestart] = useState(eigenLaag && !!videoId)
+  const [geluid, setGeluidState] = useState(eigenLaag ? 'proef' : 'aan')
+  const geluidRef = useRef(geluid)
+  const setGeluid = (g) => { geluidRef.current = g; setGeluidState(g) }
+  const stilStart = geluid !== 'aan'
+  const [ooitGespeeld, setOoitGespeeld] = useState(false)
   const [speelt, setSpeelt] = useState(false)
-  const [gedempt, setGedempt] = useState(false)
+  const [gedempt, setGedempt] = useState(eigenLaag)
   const [voortgang, setVoortgang] = useState(0)
   const [bediening, setBediening] = useState(true)
   const iframeRef = useRef(null)
   const spelerRef = useRef(null)
   const verbergTimer = useRef(null)
-  // Mijlpalen van de echte voortgang, één keer per bezoek. Gedempt kijken telt niet.
   const mijlpalen = useRef(new Set())
+
   useEffect(() => {
-    if (gedempt) return
+    if (stilStart) return
     [[0.25, 'video_25'], [0.5, 'video_50'], [0.75, 'video_75'], [0.98, 'video_100']].forEach(([grens, naam]) => {
       if (voortgang >= grens && !mijlpalen.current.has(naam)) { mijlpalen.current.add(naam); meet(naam) }
     })
-  }, [voortgang, gedempt])
-
-  const directeEmbed = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
-  const appUrl = appSafeEmbedUrl(directeEmbed)
-  const eigenLaag = appUrl === directeEmbed
+  }, [voortgang, stilStart])
 
   const toonBediening = () => {
     setBediening(true)
@@ -140,15 +164,32 @@ export function Video({ m, videoId, poster }) {
       spelerRef.current = new YT.Player(iframeRef.current, {
         events: {
           onReady: (e) => {
-            try { e.target.unMute(); e.target.playVideo() } catch { /* leeg */ }
-            // Weigert de browser geluid, dan gedempt verder met "Tik voor geluid".
-            setTimeout(() => {
-              if (weg) return
-              try { if (e.target.getPlayerState() !== YT.PlayerState.PLAYING) { e.target.mute(); e.target.playVideo(); setGedempt(true) } } catch { /* leeg */ }
-            }, 900)
+            const p = e.target
+            try { p.unMute(); if (p.getPlayerState() !== YT.PlayerState.PLAYING) p.playVideo() } catch { /* leeg */ }
+            // Mocht het met geluid? Kijk elke 250 ms. Speelt hij: geluid aan of
+            // (door de browser) gedempt. Staat hij na 0,8 s stil en laadt hij
+            // niet: geweigerd. Na 4 s hoe dan ook beslissen.
+            const begin = Date.now()
+            const t = setInterval(() => {
+              if (weg || geluidRef.current !== 'proef') { clearInterval(t); return }
+              try {
+                const st = p.getPlayerState()
+                const verstreken = Date.now() - begin
+                if (st === YT.PlayerState.PLAYING) {
+                  clearInterval(t)
+                  if (p.isMuted()) { setGeluid('stil'); setGedempt(true) }
+                  else { setGeluid('aan'); setGedempt(false); meet('video_start', { meta: { auto: true } }) }
+                } else if ((st !== YT.PlayerState.BUFFERING && verstreken > 800) || verstreken > 4000) {
+                  clearInterval(t)
+                  setGeluid('stil'); setGedempt(true)
+                  p.mute(); p.playVideo()
+                }
+              } catch { clearInterval(t) }
+            }, 250)
           },
           onStateChange: (e) => {
             setSpeelt(e.data === YT.PlayerState.PLAYING)
+            if (e.data === YT.PlayerState.PLAYING) setOoitGespeeld(true)
             if (e.data === YT.PlayerState.ENDED) setVoortgang(1)
           },
         },
@@ -175,9 +216,10 @@ export function Video({ m, videoId, poster }) {
     if (p.getPlayerState() === 1) p.pauseVideo(); else p.playVideo()
   }
   const metGeluid = () => {
+    setGeluid('aan'); setGedempt(false); setVoortgang(0)
+    meet('video_start')
     const p = spelerRef.current
-    try { p?.unMute?.(); p?.seekTo?.(0, true); p?.playVideo?.() } catch { /* leeg */ }
-    setGedempt(false); setVoortgang(0)
+    try { p?.unMute?.(); p?.seekTo?.(0, true); p?.playVideo?.() } catch { /* speler nog niet klaar */ }
   }
   const wisselGeluid = (e) => {
     e.stopPropagation()
@@ -191,6 +233,7 @@ export function Video({ m, videoId, poster }) {
     background: '#111', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
   }
 
+  // Nog niet gestart: alleen zonder videoId of in de app (tik om te starten).
   if (!gestart) {
     return (
       <div style={kader}>
@@ -210,7 +253,7 @@ export function Video({ m, videoId, poster }) {
   if (!eigenLaag) {
     return (
       <div style={kader}>
-        <iframe src={appUrl} title="Zo werkt je split" allowFullScreen
+        <iframe src={appUrl} title="Uitleg" allowFullScreen
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
       </div>
@@ -222,27 +265,31 @@ export function Video({ m, videoId, poster }) {
     <div style={kader}>
       <iframe ref={iframeRef}
         src={`${directeEmbed}&enablejsapi=1&controls=0&disablekb=1&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`}
-        title="Zo werkt je split"
+        title="Uitleg"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         style={{ position: 'absolute', left: 0, top: -70, width: '100%', height: 'calc(100% + 140px)', border: 0, pointerEvents: 'none' }} />
       <div onClick={() => { wisselSpelen(); toonBediening() }} onMouseMove={toonBediening} onTouchStart={toonBediening}
-        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: bediening ? balk : 0, cursor: 'pointer' }} />
-      {gedempt && (
+        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: bediening ? balk : 0, cursor: bediening ? 'pointer' : 'none' }} />
+      {(geluid === 'proef' || !ooitGespeeld) ? (
+        // Eigen beeld tot het geluid beslist is en de video loopt. Een tik
+        // hierop start meteen met geluid.
+        <button onClick={metGeluid} aria-label="Video met geluid afspelen" style={{
+          position: 'absolute', inset: 0, zIndex: 3, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', background: `url(${poster}) center / cover`,
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          {geluid === 'stil' && <GeluidPil m={m} />}
+        </button>
+      ) : geluid === 'stil' && (
         <button onClick={metGeluid} aria-label="Geluid aan en vanaf het begin kijken" style={{
           position: 'absolute', inset: 0, zIndex: 3, width: '100%', height: '100%', padding: 0, border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.12)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: m ? 8 : 10, padding: m ? '0.7rem 1.05rem' : '0.85rem 1.35rem',
-            borderRadius: 999, background: 'rgba(0,0,0,0.78)', border: '1.5px solid rgba(255,255,255,0.9)', color: WIT,
-            fontSize: m ? '0.95rem' : '1.1rem', fontWeight: 900, fontFamily: 'inherit', animation: 'tikGeluid 1.6s ease-in-out infinite',
-          }}>
-            <VolumeX size={m ? 20 : 24} strokeWidth={2.6} /> Tik voor geluid
-          </span>
+          <GeluidPil m={m} />
         </button>
       )}
-      {!speelt && !gedempt && (
+      {!speelt && !stilStart && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
           <Play size={m ? 56 : 72} fill={WIT} color={WIT} strokeWidth={1} style={{ filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))' }} />
         </div>
@@ -251,8 +298,8 @@ export function Video({ m, videoId, poster }) {
         position: 'absolute', left: 0, right: 0, bottom: 0, height: balk,
         display: 'flex', alignItems: 'center', gap: m ? 10 : 14, padding: m ? '0 0.75rem' : '0 1rem',
         background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)',
-        opacity: bediening && !gedempt ? 1 : 0, pointerEvents: bediening && !gedempt ? 'auto' : 'none',
-        transition: 'opacity 0.3s ease',
+        opacity: bediening && !stilStart ? 1 : 0, transform: bediening && !stilStart ? 'none' : 'translateY(8px)',
+        pointerEvents: bediening && !stilStart ? 'auto' : 'none', transition: 'opacity 0.3s ease, transform 0.3s ease',
       }}>
         <button onClick={wisselSpelen} aria-label={speelt ? 'Pauzeren' : 'Afspelen'} style={knopIcoon}>
           {speelt ? <Pause size={20} fill={WIT} color={WIT} /> : <Play size={20} fill={WIT} color={WIT} />}
