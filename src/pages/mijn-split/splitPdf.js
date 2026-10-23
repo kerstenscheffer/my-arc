@@ -63,35 +63,37 @@ export async function downloadSplitPdf({ voornaam, split, locatie, dagen, tips }
     autoTable(doc, {
       startY: y,
       margin: { left: M, right: M },
-      head: [[{ content: `${split.week[i]} · ${DAG_NAAM[code]}`, colSpan: 2 }, { content: dag.focus || '', colSpan: 2, styles: { halign: 'right', fontStyle: 'normal' } }],
+      head: [[{ content: `${split.week[i]} · ${DAG_NAAM[code]}` }, { content: dag.focus || '', colSpan: 3, styles: { halign: 'right', fontStyle: 'normal', fontSize: 8.5 } }],
              ['Oefening', 'Sets', 'Reps', 'Rust']],
       body: dag.oefeningen.map(o => [o.naam, String(o.sets ?? ''), o.reps || '', o.rust || '']),
       theme: 'plain',
-      styles: { font: 'helvetica', fontSize: 9.5, textColor: [17, 17, 17], cellPadding: { top: 2.2, bottom: 2.2, left: 2, right: 2 }, lineColor: [225, 225, 225], lineWidth: { bottom: 0.2 } },
+      styles: { font: 'helvetica', fontSize: 9.5, textColor: [17, 17, 17], cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 }, lineColor: [225, 225, 225], lineWidth: { bottom: 0.2 } },
       headStyles: { fontStyle: 'bold', fillColor: [255, 255, 255] },
       didParseCell: (c) => {
-        if (c.section === 'head' && c.row.index === 0) { c.cell.styles.fillColor = [17, 17, 17]; c.cell.styles.textColor = [255, 255, 255]; c.cell.styles.fontSize = 11 }
+        if (c.section === 'head' && c.row.index === 0) { c.cell.styles.fillColor = [17, 17, 17]; c.cell.styles.textColor = [255, 255, 255]; if (c.column.index === 0) c.cell.styles.fontSize = 11 }
         if (c.section === 'head' && c.row.index === 1) { c.cell.styles.textColor = [120, 120, 120]; c.cell.styles.fontSize = 8 }
       },
       columnStyles: { 1: { cellWidth: 16, halign: 'center' }, 2: { cellWidth: 20, halign: 'center' }, 3: { cellWidth: 18, halign: 'center' } },
       rowPageBreak: 'avoid',
     })
-    y = doc.lastAutoTable.finalY + 8
+    y = doc.lastAutoTable.finalY + 6
   })
 
   // Uitvoering onderaan, op een nieuwe pagina als het niet meer past.
-  if (y > 250) { doc.addPage(); y = 20 }
+  const H = doc.internal.pageSize.getHeight()
+  doc.setFontSize(9.5)
+  const tipRegels = tips.map(t => doc.splitTextToSize(`•  ${t}`, B - 2 * M))
+  const nodig = 8 + tipRegels.reduce((n, r) => n + r.length * 4.5 + 2, 0)
+  if (y + nodig > H - 16) { doc.addPage(); y = 20 }
   doc.setTextColor(17, 17, 17); doc.setFont('helvetica', 'bold'); doc.setFontSize(12)
   doc.text('Zo voer je hem uit', M, y)
   y += 6
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(60, 60, 60)
-  tips.forEach(t => {
-    const r = doc.splitTextToSize(`•  ${t}`, B - 2 * M)
+  tipRegels.forEach(r => {
     doc.text(r, M, y)
     y += r.length * 4.5 + 2
   })
 
-  const H = doc.internal.pageSize.getHeight()
   const n = doc.getNumberOfPages()
   for (let p = 1; p <= n; p++) {
     doc.setPage(p)

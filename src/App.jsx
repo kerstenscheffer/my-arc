@@ -38,6 +38,7 @@ const BackInShapeMonthlyCheckout = lazy(() => import('./pages/BackInShapeMonthly
 const EightWeekCheckout = lazy(() => import('./pages/EightWeekCheckout'))
 const TwelveWeekCheckout = lazy(() => import('./pages/TwelveWeekCheckout'))
 const CalorieCalculator = lazy(() => import('./pages/CalorieCalculator'))
+const MijnSplit = lazy(() => import('./pages/MijnSplit'))
 const SixteenWeekCheckout = lazy(() => import('./pages/SixteenWeekCheckout'))
 const SixteenWeekMonthlyCheckout = lazy(() => import('./pages/SixteenWeekMonthlyCheckout'))
 const MonthlySubscriptionCheckout = lazy(() => import('./pages/MonthlySubscriptionCheckout'))
@@ -210,6 +211,12 @@ function App() {
   // Beide schrijfwijzen, zodat een gedeelde link met of zonder streepje werkt.
   if (currentPath === '/calorie-calculator' || currentPath === '/caloriecalculator') {
     return <CalorieCalculator />
+  }
+
+  // Lead magnet: vier vragen, naam + e-mail, dan de split uit de MY ARC-
+  // bibliotheek als PDF. Lead komt in de bordkolom "🧲 Mijn split".
+  if (currentPath === '/mijn-split' || currentPath === '/mijnsplit') {
+    return <MijnSplit />
   }
 
   // 16-weken offer — zelfde opbouw als de 6-weken challenge: banner met de
