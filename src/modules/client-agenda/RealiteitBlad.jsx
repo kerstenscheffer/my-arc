@@ -90,7 +90,7 @@ function MaaltijdInhoud({ blok, db, isMobile }) {
   )
 }
 
-function TrainingInhoud({ blok, db, isMobile, onOefening = null }) {
+function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = null }) {
   const meta = blok.meta || {}
   const [oefeningen, setOefeningen] = useState(null)
   useEffect(() => {
@@ -163,6 +163,20 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null }) {
           </div>
         )
       })}
+      {onHervatten && !meta.afgerond && (
+        <button
+          onClick={onHervatten}
+          style={{
+            display: 'block', width: '100%', marginTop: 14, minHeight: isMobile ? 44 : 48,
+            background: '#fff', border: 'none', borderRadius: 14,
+            color: '#0a0a0a', fontSize: isMobile ? '0.9rem' : '0.95rem',
+            fontWeight: 900, letterSpacing: '-0.01em', fontFamily: 'inherit',
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Doorgaan met training
+        </button>
+      )}
     </>
   )
 }
@@ -193,13 +207,13 @@ function SlaapInhoud({ blok }) {
   )
 }
 
-export default function RealiteitBlad({ blok, db, isMobile, onClose, onOefening = null }) {
+export default function RealiteitBlad({ blok, db, isMobile, onClose, onOefening = null, onHervatten = null }) {
   const open = !!blok
   const titel = blok ? (blok.type === 'meal' ? blok.sublabel : blok.type === 'training' ? (blok.sublabel || 'Training') : blok.meta?.slaap ? 'Slaap' : blok.type === 'supplement' ? 'Supplementen' : blok.sublabel || blok.label) : ''
   return (
     <BladModal open={open} titel={titel} onClose={onClose} zIndex={10600}>
       {blok?.type === 'meal' && <MaaltijdInhoud blok={blok} db={db} isMobile={isMobile} />}
-      {blok?.type === 'training' && <TrainingInhoud blok={blok} db={db} isMobile={isMobile} onOefening={onOefening} />}
+      {blok?.type === 'training' && <TrainingInhoud blok={blok} db={db} isMobile={isMobile} onOefening={onOefening} onHervatten={onHervatten} />}
       {blok?.meta?.slaap && <SlaapInhoud blok={blok} />}
       {blok?.type === 'supplement' && (
         <div style={{ paddingBottom: '0.75rem' }}>

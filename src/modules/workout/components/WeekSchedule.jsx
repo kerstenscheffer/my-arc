@@ -856,7 +856,14 @@ export default function WeekSchedule({
       {/* Afgeronde sessie: oefeningen met hun sets, zelfde blad als de
           Realiteit-agenda van de coach. */}
       <RealiteitBlad blok={oefeningLog ? null : sessieBlad} db={db} isMobile={isMobile} onClose={() => setSessieBlad(null)}
-        onOefening={(ex) => setOefeningLog({ exercise: oefeningVan(ex.exercise_name, ex), datum: sessieBlad?.meta?.datum || null })} />
+        onOefening={(ex) => setOefeningLog({ exercise: oefeningVan(ex.exercise_name, ex), datum: sessieBlad?.meta?.datum || null })}
+        onHervatten={(() => {
+          if (!isHuidigeWeek || !sessieBlad || !onDayClick) return null
+          const dagCapitalized = weekDays.find(d => d.toLowerCase() === sessieBlad.day)
+          const workoutKey = dagCapitalized ? tempSchedule[dagCapitalized] : null
+          if (!dagCapitalized || !workoutKey) return null
+          return () => { setSessieBlad(null); onDayClick(dagCapitalized, workoutKey) }
+        })()} />
       {oefeningLog && (
         <ExerciseLogModal db={db} client={client || { id: clientId }} exercise={oefeningLog.exercise} datum={oefeningLog.datum} isMobile={isMobile}
           onClose={() => { setOefeningLog(null); setSessieVersie(v => v + 1) }} />
