@@ -8,9 +8,10 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X } from 'lucide-react'
+import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X, BookOpen } from 'lucide-react'
 import { portieInfo, stapPortie, portieLabel, portieUitleg } from './portie'
 import MealEditModal from './MealEditModal'
+import ReceptBlad from './ReceptBlad'
 import Keuze from '../../../meal-plan/components/Keuze'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 
@@ -73,6 +74,7 @@ export default function MealCard({
 }) {
   const modalHost = useModalHost()
   const [expanded, setExpanded] = useState(false)
+  const [receptOpen, setReceptOpen] = useState(false)
   const [showScaler, setShowScaler]   = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   // Label en tijd bewerken gaat via MomentVenster (tik op de foto).
@@ -399,12 +401,27 @@ export default function MealCard({
         </>)}
         <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
         <ActionCell
+          icon={<BookOpen size={m ? 13 : 14} />}
+          label="Recept"
+          onClick={(e) => { e.stopPropagation(); setReceptOpen(true) }}
+          m={m}
+          active={receptOpen}
+        />
+        <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
+        <ActionCell
           icon={<Trash2 size={m ? 13 : 14} />}
           label="Wis"
           onClick={(e) => { e.stopPropagation(); onDelete?.(dayIndex, slot) }}
           m={m}
           danger
         />
+      </div>
+
+      {/* Kliks in het blad (een portal) lopen in React terug naar de kaart;
+          hier stoppen, anders klapt de kaart open of dicht onder het blad. */}
+      <div onClick={(e) => e.stopPropagation()} style={{ display: 'contents' }}>
+        <ReceptBlad open={receptOpen} onClose={() => setReceptOpen(false)} db={db}
+          meal={meal} ingredienten={ingredientList} naamVan={getIngredientName} />
       </div>
 
       {/* ── CONFLICT BANNER ── */}
