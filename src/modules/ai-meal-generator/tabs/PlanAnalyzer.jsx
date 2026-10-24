@@ -158,7 +158,7 @@ function ClientZoeker({ lijst, naam, gekozen, onSelectClient }) {
   if (gekozen && !zoeken) {
     return (
       <div style={{
-        width: '100%', maxWidth: 560, margin: '0 auto 0.6rem', boxSizing: 'border-box',
+        width: '100%', marginBottom: '0.6rem', boxSizing: 'border-box',
         display: 'flex', alignItems: 'center', gap: '0.6rem', height: 48, padding: '0 0.5rem 0 0.9rem',
         background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 12,
       }}>
@@ -175,7 +175,7 @@ function ClientZoeker({ lijst, naam, gekozen, onSelectClient }) {
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: 560, margin: '0 auto 0.6rem' }}>
+    <div style={{ width: '100%', marginBottom: '0.6rem' }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: '0.6rem',
         height: 48, padding: '0 0.9rem',
@@ -235,6 +235,26 @@ function ClientZoeker({ lijst, naam, gekozen, onSelectClient }) {
     </div>
   )
 }
+
+// Beginscherm: één knopstijl, leesbare plankaarten.
+const startKnop = (hoofd) => ({
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+  height: 46, padding: '0 1rem', borderRadius: 11,
+  background: hoofd ? '#fff' : 'rgba(255,255,255,0.06)',
+  border: `1px solid ${hoofd ? '#fff' : 'rgba(255,255,255,0.16)'}`,
+  color: hoofd ? '#0a0a0a' : '#fff', fontSize: '0.86rem', fontWeight: 900, fontFamily: 'inherit',
+  cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+})
+const startLabel = { fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.45rem 0.15rem' }
+const planKaart = {
+  width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem',
+  minHeight: 60, padding: '0.7rem 0.9rem', boxSizing: 'border-box',
+  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 11,
+  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+const planNaam = { fontSize: '0.92rem', fontWeight: 900, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+const planMetaStijl = { fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 
 // Vaste demo-client (voor voorbeeldplannen). Herkend op dit e-mailadres.
 const DEMO_EMAIL = 'demo@myarcfitness.internal'
@@ -1520,11 +1540,14 @@ export default function PlanAnalyzer({
   if (!weekData && !generatedPlan?.weekPlan) {
     return (
       <div style={{ padding: m ? '1rem' : '1.5rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <BarChart3 size={28} style={{ color: 'rgba(255,255,255,0.1)', marginBottom: '0.5rem' }} />
-          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Plan Analyzer</div>
-          <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.15rem' }}>
-            {!resolvedClientId ? 'Kies eerst een client' : conceptPlans.length > 0 ? 'Kies een plan of begin blanco' : 'Begin blanco, laad een sjabloon of genereer een plan'}
+       {/* Alles in één kolom van 640px: klantbalk, acties en plannen even
+           breed. Stond eerder deels gecentreerd en deels over de volle
+           breedte, met tekst van 0,55rem en drie verschillende knopstijlen. */}
+       <div style={{ maxWidth: 640, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: m ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Plan Analyzer</div>
+          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: '0.25rem' }}>
+            {!resolvedClientId ? 'Kies eerst een klant' : conceptPlans.length > 0 || actiefPlan ? 'Open een plan of begin opnieuw' : 'Begin blanco of laad een sjabloon'}
           </div>
         </div>
         {/* Zonder zijbalk op dit scherm is dit de enige plek om een klant te
@@ -1532,82 +1555,61 @@ export default function PlanAnalyzer({
         <ClientKiezer clients={clients} selectedClient={selectedClient}
           onSelectClient={onSelectClient} m={m} />
 
-        {/* Het plan dat de klant nu volgt. Groen, met een streep ernaast en
-            het label "Actief" — zodat je in één blik ziet welk van de drie
-            plannen live staat, en het niet verwart met een concept. */}
-        {actiefPlan && (
-          <button onClick={() => setSelectedConceptId(actiefPlan.id)} style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: '0.6rem',
-            padding: '0.7rem 0.9rem', marginBottom: '0.6rem',
-            background: 'rgba(16,185,129,0.08)',
-            border: '1px solid rgba(16,185,129,0.35)',
-            borderLeft: '3px solid #10b981',
-            borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
-            fontFamily: 'inherit',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}>
-            <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{
-                  fontSize: '0.85rem', fontWeight: 900, color: '#fff',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>{actiefPlan.template_name}</span>
-                <span style={{
-                  flexShrink: 0, padding: '1px 6px', borderRadius: 4,
-                  background: 'rgba(16,185,129,0.18)', color: '#10b981',
-                  fontSize: '0.5rem', fontWeight: 900, letterSpacing: '0.04em',
-                }}>ACTIEF</span>
-              </div>
-              <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' }}>
-                {actiefPlan.daily_calories} kcal · {actiefPlan.daily_protein}g eiwit · dit ziet je client nu
-              </div>
-            </div>
-            <ChevronRight size={14} color="rgba(16,185,129,0.5)" style={{ flexShrink: 0 }} />
-          </button>
+        {/* Drie acties naast elkaar, één stijl; blanco is de hoofdknop. */}
+        {resolvedClientId && (
+          <div style={{ display: 'grid', gridTemplateColumns: m ? '1fr' : `repeat(${allClientPlans.length > 0 ? 3 : 2}, 1fr)`, gap: 8, margin: '0.4rem 0 1.25rem' }}>
+            <button onClick={handleStartBlanco} disabled={blancoBezig} style={{ ...startKnop(true), opacity: blancoBezig ? 0.6 : 1, cursor: blancoBezig ? 'default' : 'pointer' }}>
+              {blancoBezig
+                ? <><Loader size={15} className="animate-spin" /> Aanmaken…</>
+                : <><Plus size={15} strokeWidth={2.8} /> Begin blanco</>}
+            </button>
+            {allClientPlans.length > 0 && (
+              <button onClick={() => setShowPlanSwitcher(true)} style={startKnop(false)}>
+                <List size={15} /> Alle plannen <span style={{ opacity: 0.5 }}>{allClientPlans.length}</span>
+              </button>
+            )}
+            {/* Altijd bereikbaar: een opgeslagen sjabloon (full_week) laden — ook voor
+                een verse klant zonder eigen plan (maakt dan een nieuw plan aan). */}
+            <button onClick={() => setShowPlanLibrary(true)} style={startKnop(false)}>
+              <Bookmark size={15} /> Sjabloon laden
+            </button>
+          </div>
         )}
 
-        {/* Blanco beginnen. Staat bovenaan omdat het de kortste route is:
-            geen sjabloon, geen AI, meteen een leeg weekplan om in te bouwen. */}
-        {resolvedClientId && (
-          <button onClick={handleStartBlanco} disabled={blancoBezig} style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-            padding: '0.7rem 1rem', marginBottom: '0.6rem',
-            background: '#fff',
-            borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
-            borderRadius: '6px', cursor: blancoBezig ? 'default' : 'pointer',
-            color: '#0a0a0a', fontSize: '0.7rem', fontWeight: 900, fontFamily: 'inherit',
-            opacity: blancoBezig ? 0.6 : 1,
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}>
-            {blancoBezig
-              ? <><Loader size={14} className="animate-spin" /> Aanmaken...</>
-              : <><Plus size={14} /> Begin blanco</>}
-          </button>
+        {/* Het plan dat de klant nu volgt: groene streep en "Actief", zodat
+            je het niet verwart met een concept. */}
+        {actiefPlan && (
+          <>
+            <div style={startLabel}>Actief plan</div>
+            <button onClick={() => setSelectedConceptId(actiefPlan.id)} style={{
+              ...planKaart, marginBottom: '1.25rem',
+              background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.35)', borderLeft: '3px solid #10b981',
+            }}>
+              <Check size={17} color="#10b981" strokeWidth={2.8} style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={planNaam}>{actiefPlan.template_name}</div>
+                <div style={planMetaStijl}>{actiefPlan.daily_calories} kcal · {actiefPlan.daily_protein}g eiwit · dit ziet de klant nu</div>
+              </div>
+              <ChevronRight size={16} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+            </button>
+          </>
         )}
-        {resolvedClientId && allClientPlans.length > 0 && (
-          <button onClick={() => setShowPlanSwitcher(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.625rem 1rem', marginBottom: '0.6rem', background: 'rgba(255,215,0,0.05)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#FFD700', fontSize: '0.65rem', fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <List size={14} /> Alle plannen bekijken ({allClientPlans.length})
-          </button>
-        )}
-        {/* Altijd bereikbaar: een opgeslagen sjabloon (full_week) laden — ook voor
-            een verse klant zonder eigen plan (maakt dan een nieuw plan aan). */}
-        {resolvedClientId && (
-          <button onClick={() => setShowPlanLibrary(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.625rem 1rem', marginBottom: '0.6rem', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '6px', cursor: 'pointer', color: '#FFD700', fontSize: '0.65rem', fontWeight: 800, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <Bookmark size={14} /> Opgeslagen sjabloon laden
-          </button>
-        )}
-        {loadingConcepts && <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>Laden...</div>}
-        {conceptPlans.map(plan => (
-          <button key={plan.id} onClick={() => setSelectedConceptId(plan.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.6rem', padding: m ? '0.625rem 0.75rem' : '0.75rem 1rem', background: 'rgba(255,255,255,0.02)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <FileText size={16} color={plan.ai_generated ? '#FFD700' : '#10b981'} style={{ flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.template_name}</div>
-              <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)' }}>{plan.daily_calories} kcal · {plan.daily_protein}g eiwit · {new Date(plan.created_at).toLocaleDateString('nl-NL')}</div>
-            </div>
-            <ChevronRight size={14} color="rgba(255,255,255,0.1)" />
-          </button>
-        ))}
+
+        {loadingConcepts && <div style={{ textAlign: 'center', padding: '1.5rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', fontWeight: 700 }}>Laden…</div>}
+        {conceptPlans.length > 0 && <div style={startLabel}>Concepten</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {conceptPlans.map(plan => (
+            <button key={plan.id} onClick={() => setSelectedConceptId(plan.id)} style={planKaart}>
+              <FileText size={17} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={planNaam}>{plan.template_name}</div>
+                <div style={planMetaStijl}>{plan.daily_calories} kcal · {plan.daily_protein}g eiwit · {new Date(plan.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}{plan.ai_generated ? ' · AI' : ''}</div>
+              </div>
+              <ChevronRight size={16} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+            </button>
+          ))}
+        </div>
+       </div>
         {showPlanSwitcher && resolvedClientId && (
           <PlanSwitcherModal db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
             onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
