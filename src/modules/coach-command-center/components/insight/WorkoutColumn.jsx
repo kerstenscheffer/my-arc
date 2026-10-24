@@ -4,7 +4,7 @@
 // Props: { workoutData, exerciseProgress, isMobile, onNavigateWorkout, client, onClose }
 // ============================================
 import React, { useState, useMemo, useEffect } from 'react'
-import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward } from 'lucide-react'
+import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward, X } from 'lucide-react'
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
@@ -166,7 +166,17 @@ function PlanWijzigingen({ db, client, isMobile }) {
   )
 }
 
-export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose }) {
+const kopKnopKlein = {
+  flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.2rem',
+  height: 26, padding: '0 0.45rem', borderRadius: 6,
+  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+  color: '#fff', fontSize: '0.72rem', fontWeight: 800, fontFamily: 'inherit',
+  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', whiteSpace: 'nowrap',
+}
+
+// `onVerberg`: kruisje in de eigen kopregel (desktop met meerdere kolommen);
+// dan slaat ClientInsightModal zijn algemene kolomkop over.
+export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose, onVerberg = null }) {
   const [view, setView] = useState('sessions')
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
@@ -343,58 +353,53 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   if (view === 'sessions') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Dumbbell size={15} color="#fff" /><span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Training</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {workoutData?.totalWorkouts > 0 && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>{workoutData.completedWorkouts}/{workoutData.totalWorkouts}</span>}
-            <button
-              onClick={() => setKrachtOpen(true)}
-              title="Kracht: per oefening de stand tegen de band van de fase, zoals de klant het ziet"
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.2rem',
-                padding: '0.25rem 0.4rem',
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                borderRadius: '5px', color: '#fff',
-                fontSize: '0.72rem', fontWeight: '700',
-                cursor: 'pointer', touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent', minHeight: '24px'
-              }}
-            >
-              <BarChart3 size={12} /> Kracht
+        {/* Eén kopregel: titel, plan, voortgang en knoppen. Stond eerder als
+            drie regels (kolomkop, eigen kop, planregel) boven elkaar. */}
+        <div style={{
+          flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.45rem',
+          padding: isMobile ? '0.45rem 0.6rem' : '0.4rem 0.6rem 0.4rem 0.8rem',
+          borderBottom: '1px solid rgba(255,255,255,0.06)', minWidth: 0,
+        }}>
+          <Dumbbell size={14} color="#fff" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', flexShrink: 0 }}>Training</span>
+          <span title={workoutData?.schema ? `${workoutData.schema.name || 'Workout Plan'} · ${workoutData.schema.days_per_week || '-'}d/week · ${workoutData.schema.experience_level || '-'}` : 'Geen schema'}
+            style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+            {workoutData?.schema ? (
+              <>
+                <span style={{ color: '#fff', fontWeight: 800 }}>{workoutData.schema.name || 'Workout Plan'}</span>
+                {' · '}{workoutData.schema.days_per_week || '-'}d/wk · {workoutData.schema.experience_level || '-'}
+              </>
+            ) : 'Geen schema'}
+          </span>
+          {workoutData?.totalWorkouts > 0 && (
+            <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{workoutData.completedWorkouts}/{workoutData.totalWorkouts}</span>
+          )}
+          <button
+            onClick={() => setKrachtOpen(true)}
+            title="Kracht: per oefening de stand tegen de band van de fase, zoals de klant het ziet"
+            style={kopKnopKlein}
+          >
+            <BarChart3 size={12} /> Kracht
+          </button>
+          {onNavigateWorkout && (
+            <button onClick={() => { onNavigateWorkout(client?.id, workoutData?.schema?.id || null); if (onClose) onClose() }}
+              title={workoutData?.schema ? 'Plan openen in de builder' : 'Nieuw plan maken'} style={kopKnopKlein}>
+              <ExternalLink size={11} /> {workoutData?.schema ? 'Plan' : 'Nieuw plan'}
             </button>
-          </div>
+          )}
+          {onVerberg && (
+            <button onClick={onVerberg} title="Training verbergen" aria-label="Training verbergen" style={{
+              flexShrink: 0, width: 24, height: 24, padding: 0, borderRadius: 6, background: 'transparent', border: 'none',
+              color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <X size={13} />
+            </button>
+          )}
         </div>
         {/* Modal boven het inzichtpaneel; zIndex hoger dan dat paneel. */}
         <BladModal open={krachtOpen} titel="Kracht" onClose={() => setKrachtOpen(false)} zIndex={12000}>
           <KrachtBlad db={db} client={client} isMobile={isMobile} />
         </BladModal>
-        {/* ── BEKIJK PLAN KNOP — identiek aan MealsColumn ── */}
-        {onNavigateWorkout && (
-          <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              {workoutData?.schema ? (
-                <>
-                  <div style={{ fontSize: '0.72rem', fontWeight: '600', color: '#fff' }}>{workoutData.schema.name || 'Workout Plan'}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{workoutData.schema.days_per_week || '-'}d/week · {workoutData.schema.experience_level || '-'}</div>
-                </>
-              ) : (
-                <div style={{ fontSize: '0.72rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>Geen schema</div>
-              )}
-            </div>
-            <button onClick={() => { onNavigateWorkout(client?.id, workoutData?.schema?.id || null); if (onClose) onClose() }} style={{
-              padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '6px', color: '#fff',
-              fontSize: '0.72rem', fontWeight: '700',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px'
-            }}>
-              <ExternalLink size={10} /> {workoutData?.schema ? 'Bekijk Plan' : 'Nieuw Plan'}
-            </button>
-          </div>
-        )}
 
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {/* De agenda van de klant zoals hij die zelf ziet: trainingen, cardio

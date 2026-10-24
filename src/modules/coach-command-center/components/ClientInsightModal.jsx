@@ -187,7 +187,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const SECTIES = [
     { id: 'logboek', label: 'Logboek',  icon: BookOpen },
     { id: 'weight',  label: 'Gewicht',  icon: Scale },
-    { id: 'workout', label: 'Training', icon: Dumbbell },
+    { id: 'workout', label: 'Training', icon: Dumbbell, eigenKop: true },
     { id: 'meals',   label: 'Voeding',  icon: UtensilsCrossed },
     { id: 'data',    label: 'Gegevens', icon: User },
     { id: 'checkin', label: 'Check-in', icon: ClipboardCheck },
@@ -211,6 +211,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
         isMobile={klein} onNavigateWorkout={onNavigateWorkout}
         client={effectiveClient} onClose={onClose}
+        onVerberg={!klein && openSecties.length > 1 ? () => toggleSectie('workout') : null}
       />
     )
     if (id === 'meals') return (
@@ -567,7 +568,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 }}>
                   {/* Kop alleen zodra er meer dan één kolom staat; bij één
                       kolom weet je uit de kopregel al waar je naar kijkt. */}
-                  {openSecties.length > 1 && (
+                  {openSecties.length > 1 && !sec.eigenKop && (
                     <div style={{
                       position: 'sticky', top: 0, zIndex: 5,
                       display: 'flex', alignItems: 'center', gap: '0.35rem',
