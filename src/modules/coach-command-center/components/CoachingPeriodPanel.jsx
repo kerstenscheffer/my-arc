@@ -46,6 +46,10 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
   const [draftPayment, setDraftPayment] = useState(client.payment_plan || '')
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [pauseReason, setPauseReason] = useState('')
+  // Pauze kan terugwerken: "ziek sinds 20 okt" zet de teller, het hervatten
+  // en de betaaltermijnen (coaching_pauses.paused_at) vanaf die dag stil.
+  const vandaag = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().split('T')[0] }
+  const [pauseVanaf, setPauseVanaf] = useState(vandaag)
   const [busy, setBusy] = useState(false)
 
   const period = computePeriod(client)
@@ -84,7 +88,9 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
 
   const pause = async () => {
     setBusy(true)
-    const pausedAt = new Date().toISOString()
+    const pausedAt = pauseVanaf && pauseVanaf < vandaag()
+      ? new Date(pauseVanaf + 'T00:00:00').toISOString()
+      : new Date().toISOString()
     const reason = pauseReason.trim() || null
     try {
       const payload = {
@@ -101,6 +107,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
       onClientUpdate?.(payload)
       setShowPauseModal(false)
       setPauseReason('')
+      setPauseVanaf(vandaag())
     } catch (err) {
       console.error('Pause failed:', err); alert('Pauzeren mislukt')
     } finally { setBusy(false) }
@@ -427,6 +434,13 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
               <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', marginBottom: '0.6rem', lineHeight: 1.5 }}>
                 De gepauzeerde dagen worden bovenop de eind-datum opgeteld zodra je hervat. Is de sale gekoppeld, dan staan de termijnen ook stil en schuiven ze mee op.
               </div>
+              <FieldLabel>Gepauzeerd sinds</FieldLabel>
+              <input
+                type="date" value={pauseVanaf}
+                min={client.coaching_start_date || undefined} max={vandaag()}
+                onChange={(e) => setPauseVanaf(e.target.value || vandaag())}
+                style={{ ...inputStyle, height: 36, padding: '0 0.55rem', marginBottom: '0.75rem' }}
+              />
               <FieldLabel>Reden (optioneel)</FieldLabel>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.4rem' }}>
                 {['Vakantie', 'Blessure', 'Ziekte', 'Persoonlijk', 'Drukke periode'].map(preset => (
