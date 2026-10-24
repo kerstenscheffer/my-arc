@@ -593,13 +593,13 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
               <button
                 onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
                 title="Plan Analyzer" aria-label="Plan Analyzer"
-                style={{ ...kopKnopStijl, padding: 0, width: 30, justifyContent: 'center', borderColor: 'rgba(34,197,94,0.6)', color: colors.success }}
+                style={{ ...kopKnopStijl, padding: 0, width: 28, justifyContent: 'center', color: colors.success }}
               >
                 <BarChart3 size={14} strokeWidth={2.6} />
               </button>
             )}
             {onNavigatePlan && db && (
-              <button onClick={() => setShowGenerateModal(true)} title="Automatisch plan genereren" aria-label="Plan genereren" style={{ ...kopKnopStijl, padding: 0, width: 30, justifyContent: 'center' }}>
+              <button onClick={() => setShowGenerateModal(true)} title="Automatisch plan genereren" aria-label="Plan genereren" style={{ ...kopKnopStijl, padding: 0, width: 28, justifyContent: 'center' }}>
                 <Zap size={14} strokeWidth={2.6} />
               </button>
             )}
