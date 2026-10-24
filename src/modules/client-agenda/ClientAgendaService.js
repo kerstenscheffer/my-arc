@@ -23,6 +23,7 @@
 import { standaardWeekindeling, trainingsdagenUitIntake } from './standaardWeekindeling'
 import { laadSupplementen, groepeerPerMoment, klantDoseringTekst, geldtOpDag } from '../supplements/utils/supplementSchedule'
 import { laadDagAanpassingen } from '../meal-plan/dagAanpassingen'
+import { weekplanVoorWeek } from '../meal-plan/DayTemplateService'
 import { preWorkoutUitDag } from '../meal-plan/utils/preWorkoutMeal'
 
 export const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
@@ -388,7 +389,7 @@ export class ClientAgendaService {
     const weekEndDate = new Date(anchor); weekEndDate.setDate(weekEndDate.getDate() + 6)
     const weekEnd = toIsoDate(weekEndDate)
 
-    const [mealPlan, schema, customBlocks, schedulePakket, overrides, intakeSchedule, supplementen, maaltijdAanpassingen] = await Promise.all([
+    const [mealPlanBasis, schema, customBlocks, schedulePakket, overrides, intakeSchedule, supplementen, maaltijdAanpassingen] = await Promise.all([
       forcedMealPlanId ? this._loadMealPlanById(forcedMealPlanId) : this._loadMealPlan(clientId),
       this._loadWorkoutSchema(clientId),
       this._loadCustomBlocks(clientId),
@@ -400,6 +401,13 @@ export class ClientAgendaService {
       // het weekplan, anders vinkt de agenda de originele macro's af.
       laadDagAanpassingen(this.supabase, clientId, weekStart, weekEnd),
     ])
+    // Dagen die voor een datum in deze week anders zijn (coach paste die week
+    // aan, of de klant koos een dagsjabloon) winnen van het basis-weekplan.
+    // Alleen op het actieve plan: datum-dagen horen bij wat de klant volgt,
+    // niet bij een concept dat de coach in de Analyzer openheeft.
+    const mealPlan = mealPlanBasis?.is_active && mealPlanBasis.week_structure
+      ? { ...mealPlanBasis, week_structure: await weekplanVoorWeek(this.supabase, clientId, mealPlanBasis.week_structure, anchor) }
+      : mealPlanBasis
 
     // Geen weekindeling maar wél een schema? Dan delen we hem zelf in. Zonder
     // dit staat een net toegewezen plan nergens in de agenda tot de klant zelf

@@ -287,7 +287,7 @@ export async function getOverrides(supabase, clientId, vanDatum, totDatum) {
   if (!clientId) return {}
   const { data, error } = await supabase
     .from('client_day_overrides')
-    .select('datum, dag, template_id, template_naam')
+    .select('datum, dag, template_id, template_naam, bron')
     .eq('client_id', clientId)
     .gte('datum', vanDatum)
     .lte('datum', totDatum)
@@ -322,12 +322,14 @@ export async function zetDagAltijd(supabase, { clientId, planId, dagIndex, templ
       .eq('id', planId)
     if (error) throw error
 
-    // Tijdelijke dagen op dezelfde weekdag opruimen, vanaf vandaag.
+    // Tijdelijke dagen op dezelfde weekdag opruimen, vanaf vandaag. Alleen
+    // die van de klant zelf: weken die de coach vooruit aanpaste blijven.
     const vandaag = lokaleDatum(new Date())
     const { data: rijen } = await supabase
       .from('client_day_overrides')
       .select('id, datum')
       .eq('client_id', clientId)
+      .eq('bron', 'klant')
       .gte('datum', vandaag)
     const teWissen = (rijen || []).filter(r => dagIndexVan(`${String(r.datum).slice(0, 10)}T00:00:00`) === dagIndex)
     if (teWissen.length) {
@@ -377,4 +379,24 @@ export async function wisOverride(supabase, { clientId, datum }) {
     .eq('client_id', clientId)
     .eq('datum', datum)
   return { error }
+}
+
+// Het weekplan van één bepaalde week: de basis (week_structure, herhaalt
+// elke week) met de datum-dagen van die week eroverheen. `maandag` is de
+// maandag van die week (Date of 'JJJJ-MM-DD'). Geeft de basis terug als er
+// niets afwijkt, of als het plan nog in de oude setA/setB-vorm staat.
+export async function weekplanVoorWeek(supabase, clientId, weekStructure, maandag) {
+  if (!weekStructure || !clientId || !maandag) return weekStructure
+  if ((weekStructure.setA || weekStructure.setB) && !DAG_KEYS.some(k => weekStructure[k])) return weekStructure
+  const start = maandag instanceof Date ? maandag : new Date(`${String(maandag).slice(0, 10)}T00:00:00`)
+  const eind = new Date(start); eind.setDate(eind.getDate() + 6)
+  const map = await getOverrides(supabase, clientId, lokaleDatum(start), lokaleDatum(eind))
+  if (!Object.keys(map).length) return weekStructure
+  const uit = { ...weekStructure }
+  DAG_KEYS.forEach((k, i) => {
+    const d = new Date(start); d.setDate(d.getDate() + i)
+    const rij = map[lokaleDatum(d)]
+    if (rij?.dag) uit[k] = rij.dag
+  })
+  return uit
 }

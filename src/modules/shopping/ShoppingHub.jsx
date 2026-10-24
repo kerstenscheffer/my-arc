@@ -2,6 +2,7 @@
 // v3.1 — PageVideoWidget toegevoegd (pageContext="boodschappen")
 import React, { useState, useEffect } from 'react'
 import ShoppingService from './ShoppingService'
+import { weekplanVoorWeek, lokaleDatum } from '../meal-plan/DayTemplateService'
 import { ShoppingCart } from 'lucide-react'
 
 import WeekShoppingTab from './tabs/WeekShoppingTab'
@@ -74,19 +75,29 @@ export default function ShoppingHub({ client, db, onNavigate }) {
   const loadShoppingData = async () => {
     try {
       const activePlan = await service.getActiveMealPlan(client.id)
-      
+
+      // Het weekplan van déze week: wijkt een dag af (coach paste deze week
+      // aan, of de klant koos een dagsjabloon), dan telt die dag mee in de
+      // lijst in plaats van de basisdag.
+      const maandag = new Date(); maandag.setHours(0, 0, 0, 0)
+      maandag.setDate(maandag.getDate() - ((maandag.getDay() + 6) % 7))
+      const dezeWeek = activePlan?.week_structure
+        ? await weekplanVoorWeek(db.supabase, client.id, activePlan.week_structure, maandag)
+        : null
+      const wijktAf = !!dezeWeek && dezeWeek !== activePlan.week_structure
+
       let shoppingList = null
-      if (activePlan?.shopping_list) {
+      if (activePlan?.shopping_list && !wijktAf) {
         shoppingList = typeof activePlan.shopping_list === 'string' 
           ? JSON.parse(activePlan.shopping_list)
           : activePlan.shopping_list
       }
       
-      if (!shoppingList && activePlan?.week_structure) {
-        const sleutel = `${activePlan.id}:${activePlan.updated_at || ''}`
+      if (!shoppingList && dezeWeek) {
+        const sleutel = `${activePlan.id}:${activePlan.updated_at || ''}:${wijktAf ? lokaleDatum(maandag) + JSON.stringify(dezeWeek).length : ''}`
         shoppingList = berekendeLijsten.get(sleutel)
         if (!shoppingList) {
-          shoppingList = await service.generateShoppingList(activePlan.week_structure)
+          shoppingList = await service.generateShoppingList(dezeWeek)
           if (shoppingList) berekendeLijsten.set(sleutel, shoppingList)
         }
       }
@@ -97,7 +108,7 @@ export default function ShoppingHub({ client, db, onNavigate }) {
         activePlan,
         shoppingList,
         progress,
-        weekStructure: activePlan?.week_structure
+        weekStructure: dezeWeek || activePlan?.week_structure
       })
     } catch (error) {
       console.error('Failed to load shopping data:', error)

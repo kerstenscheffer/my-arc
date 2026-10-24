@@ -32,6 +32,8 @@ import DoelenMacrosPaneel from '../../coach-command-center/components/insight/Do
 import { pasSupplementenToe } from './plan-analyzer/sjabloonExtras'
 import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
+import WeekKeuze from './plan-analyzer/WeekKeuze'
+import { weekplanVoorWeek, lokaleDatum } from '../../meal-plan/DayTemplateService'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
 import { openMealPlanForPrint } from '../mealplanhtmlgenerator'
@@ -285,6 +287,14 @@ export default function PlanAnalyzer({
   const [targets, setTargets] = useState(dailyTargets || null)
   const [blancoBezig, setBlancoBezig] = useState(false)
   const [planMeta, setPlanMeta] = useState(null)
+  // Week-modus: null = het basisplan (herhaalt elke week). Anders de maandag
+  // ('JJJJ-MM-DD') van de week die je apart aanpast. Dan schrijft opslaan
+  // geen week_structure, maar per afwijkende dag een datum-dag
+  // (client_day_overrides, bron 'coach'). basisDagenRef = de basisweek,
+  // gehydrateerd, om te zien welke dagen afwijken.
+  const [weekModus, setWeekModus] = useState(null)
+  const [afwijkendeDagen, setAfwijkendeDagen] = useState([])
+  const basisDagenRef = useRef(null)
   // Eén pre-workout maaltijd voor het hele plan. Staat bewust NIET in
   // week_structure: zo verschuift hij mee als de klant z'n trainingsdagen
   // verplaatst, zonder dat het plan herschreven hoeft te worden.
@@ -627,6 +637,7 @@ export default function PlanAnalyzer({
         templateName = tmpl?.name || null
       }
       setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated, templateId: data.template_id || null, templateName })
+      setWeekModus(null); setAfwijkendeDagen([]); basisDagenRef.current = null
       setWisselBezig(false)
       setPreWorkoutMeal(data.pre_workout_meal || null)
       setActivated(data.is_active || false)
@@ -791,9 +802,84 @@ export default function PlanAnalyzer({
 
   // ════════════ PERSIST ════════════
 
+  // Eén dag in de vorm van week_structure.
+  const dagVorm = (d) => ({ ...(d?.meals || {}), totals: d?.totals, is_training_day: d?.is_training_day })
+
+  // Week-modus: alleen de dagen die afwijken van de basis, als datum-dag.
+  // Een dag die weer gelijk is aan de basis verdwijnt als datum-dag.
+  const bewaarWeek = async (updated, planId) => {
+    const basis = basisDagenRef.current || []
+    const start = new Date(`${weekModus}T00:00:00`)
+    const rijen = [], gelijk = [], afwijkend = []
+    updated.forEach((d, i) => {
+      const dt = new Date(start); dt.setDate(dt.getDate() + i)
+      const datum = lokaleDatum(dt)
+      const vorm = dagVorm(d)
+      if (basis[i] && JSON.stringify(vorm) === JSON.stringify(dagVorm(basis[i]))) { gelijk.push(datum); return }
+      rijen.push({ client_id: resolvedClientId, plan_id: planId, datum, dag: vorm, bron: 'coach', template_id: null, template_naam: null, updated_at: new Date().toISOString() })
+      afwijkend.push(d.dayId)
+    })
+    setWeekSaveState('saving')
+    const [opslaan, wissen] = await Promise.all([
+      rijen.length
+        ? db.supabase.from('client_day_overrides').upsert(rijen, { onConflict: 'client_id,datum' }).select('datum')
+        : { data: [], error: null },
+      gelijk.length
+        ? db.supabase.from('client_day_overrides').delete().eq('client_id', resolvedClientId).in('datum', gelijk)
+        : { error: null },
+    ])
+    if (opslaan.error || wissen.error || (rijen.length && !opslaan.data?.length)) {
+      console.error('❌ Week-aanpassing opslaan mislukt:', opslaan.error || wissen.error || 'geen rij bijgewerkt')
+      setWeekSaveState('error')
+    } else {
+      setAfwijkendeDagen(afwijkend)
+      setWeekSaveState('saved')
+      setTimeout(() => setWeekSaveState(s => (s === 'saved' ? 'idle' : s)), 2000)
+    }
+  }
+
+  // Wisselen tussen het basisplan en één week. Laadt de basis opnieuw uit de
+  // database en legt de datum-dagen van die week eroverheen.
+  const kiesWeek = async (maandagIso) => {
+    if (!actievePlanId || !resolvedClientId) return
+    setWisselBezig(true)
+    try {
+      const { data } = await db.supabase.from('client_meal_plans').select('week_structure').eq('id', actievePlanId).single()
+      const basisWs = data?.week_structure
+      if (!basisWs) return
+      const basis = await hydrateWeekStructure(basisWs)
+      let dagen = basis, afwijkend = []
+      if (maandagIso) {
+        const ws = await weekplanVoorWeek(db.supabase, resolvedClientId, basisWs, maandagIso)
+        if (ws !== basisWs) {
+          dagen = await hydrateWeekStructure(ws)
+          afwijkend = DAYS.filter(d => ws[d.id] !== basisWs[d.id]).map(d => d.id)
+        }
+      }
+      basisDagenRef.current = maandagIso ? basis : null
+      setWeekModus(maandagIso); setAfwijkendeDagen(afwijkend)
+      setWeekData(dagen); setHistory([JSON.parse(JSON.stringify(dagen))]); setHistoryIndex(0)
+    } catch (e) {
+      console.error('Week wisselen mislukt:', e)
+    } finally { setWisselBezig(false) }
+  }
+
+  // Deze week weer gelijk aan elke week: de coach-datum-dagen weg.
+  const zetWeekTerug = async () => {
+    if (!weekModus || !resolvedClientId) return
+    const start = new Date(`${weekModus}T00:00:00`)
+    const datums = DAYS.map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return lokaleDatum(d) })
+    const { error } = await db.supabase.from('client_day_overrides').delete()
+      .eq('client_id', resolvedClientId).eq('bron', 'coach').in('datum', datums)
+    if (error) { console.error('Week terugzetten mislukt:', error); setWeekSaveState('error'); return }
+    await kiesWeek(weekModus)
+  }
+
   const persistWeekData = async (updated) => {
     const planId = actievePlanId
-    if (planId) {
+    if (planId && weekModus) {
+      await bewaarWeek(updated, planId)
+    } else if (planId) {
       const ws = {}
       updated.forEach(d => { ws[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
       setWeekSaveState('saving')
@@ -1755,6 +1841,12 @@ export default function PlanAnalyzer({
             onClear={leegWeek}
             onSaveTemplate={() => setShowPlanLibrary(true)}
           />
+          {/* Alleen bij het plan dat de klant volgt: datum-dagen gelden voor
+              de klant, niet voor een concept. */}
+          {actievePlanId && (activated || planMeta?.isActive) && (
+            <WeekKeuze weekModus={weekModus} aantalAangepast={afwijkendeDagen.length}
+              onKies={kiesWeek} onTerugzetten={zetWeekTerug} bezig={wisselBezig} isMobile={m} />
+          )}
           </div>
         )}
 
