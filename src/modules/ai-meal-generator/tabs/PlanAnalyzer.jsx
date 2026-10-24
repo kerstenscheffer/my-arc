@@ -2,7 +2,7 @@
 // v4.0 — Sidebar layout: linker icon nav + compacte builder rechts
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Grid3X3, Calendar, CalendarDays, List, Download, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill, Users, SlidersHorizontal } from 'lucide-react'
+import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Grid3X3, Calendar, CalendarDays, List, Download, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill, Users, SlidersHorizontal, Search } from 'lucide-react'
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import VezelsMicros from './plan-analyzer/VezelsMicros'
@@ -123,26 +123,115 @@ function ClientKiezer({ clients = [], selectedClient, onSelectClient, compact, m
     )
   }
 
-  return (
-    <div style={{
-      position: 'relative', width: '100%',
-      display: 'flex', alignItems: 'center', gap: '0.45rem',
-      padding: '0.7rem 0.9rem', marginBottom: '0.6rem',
-      background: 'rgba(255,255,255,0.03)',
-      border: `1px solid ${selectedClient ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.12)'}`,
-      borderRadius: 6, cursor: 'pointer',
-    }}>
-      <Users size={14} color={selectedClient ? '#FFD700' : 'rgba(255,255,255,0.4)'} style={{ flexShrink: 0 }} />
-      <span style={{
-        flex: 1, minWidth: 0, textAlign: 'left',
-        fontSize: '0.72rem', fontWeight: 900,
-        color: selectedClient ? '#fff' : 'rgba(255,255,255,0.4)',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  return <ClientZoeker lijst={[...demo, ...gesorteerd]} naam={naam} gekozen={!!selectedClient} onSelectClient={onSelectClient} />
+}
+
+// Beginscherm: een echte zoekbalk met de klanten er direct onder. Typen
+// filtert op naam en e-mail; pijltjes + Enter kiezen, zonder muis. Stond
+// eerder als onzichtbare <select> achter een balk: zoeken kon niet, en met
+// tientallen klanten was scrollen in de systeemlijst traag.
+function ClientZoeker({ lijst, naam, gekozen, onSelectClient }) {
+  const [zoeken, setZoeken] = useState(!gekozen)
+  const [q, setQ] = useState('')
+  const [actief, setActief] = useState(0)
+  const lijstRef = useRef(null)
+  const term = q.trim().toLowerCase()
+  const naamVan = (c) => (c.email === DEMO_EMAIL ? 'Demo persoon' : `${c.first_name || ''} ${c.last_name || ''}`.trim())
+  const treffers = term
+    ? lijst.filter(c => `${naamVan(c)} ${c.email || ''}`.toLowerCase().includes(term))
+    : lijst
+
+  useEffect(() => { setActief(0) }, [term])
+  useEffect(() => {
+    lijstRef.current?.children?.[actief]?.scrollIntoView?.({ block: 'nearest' })
+  }, [actief])
+
+  const toets = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActief(i => Math.min(i + 1, treffers.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActief(i => Math.max(i - 1, 0)) }
+    else if (e.key === 'Enter' && treffers[actief]) { e.preventDefault(); kies(treffers[actief]) }
+    else if (e.key === 'Escape') { if (q) setQ(''); else if (gekozen) setZoeken(false) }
+  }
+  const kies = (c) => { setQ(''); setZoeken(false); onSelectClient?.(c) }
+
+  // Klant al gekozen: één balk met de naam, de lijst pas op verzoek.
+  if (gekozen && !zoeken) {
+    return (
+      <div style={{
+        width: '100%', maxWidth: 560, margin: '0 auto 0.6rem', boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center', gap: '0.6rem', height: 48, padding: '0 0.5rem 0 0.9rem',
+        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 12,
       }}>
-        {naam || 'Kies client…'}
-      </span>
-      <ChevronRight size={14} color="rgba(255,255,255,0.25)" style={{ flexShrink: 0 }} />
-      {select}
+        <Users size={16} color="#FFD700" style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, minWidth: 0, fontSize: '0.95rem', fontWeight: 900, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{naam}</span>
+        <button onClick={() => setZoeken(true)} style={{
+          flexShrink: 0, height: 34, padding: '0 0.75rem', borderRadius: 9,
+          background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)',
+          color: '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}><Search size={14} /> Andere klant</button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 560, margin: '0 auto 0.6rem' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.6rem',
+        height: 48, padding: '0 0.9rem',
+        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 12,
+      }}>
+        <Search size={18} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
+        <input
+          autoFocus
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onKeyDown={toets}
+          placeholder="Zoek klant op naam of e-mail…"
+          aria-label="Zoek klant"
+          style={{
+            flex: 1, minWidth: 0, height: '100%', background: 'transparent', border: 'none', outline: 'none',
+            color: '#fff', fontSize: '0.95rem', fontWeight: 800, fontFamily: 'inherit',
+          }}
+        />
+        {q && (
+          <button onClick={() => setQ('')} aria-label="Wissen" style={{
+            flexShrink: 0, width: 28, height: 28, padding: 0, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.08)',
+            color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}><X size={14} /></button>
+        )}
+      </div>
+      <div ref={lijstRef} style={{
+        marginTop: 6, maxHeight: '55vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, background: 'rgba(255,255,255,0.02)',
+      }}>
+        {treffers.length === 0 ? (
+          <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Geen klant gevonden.</div>
+        ) : treffers.map((c, i) => {
+          const demo = c.email === DEMO_EMAIL
+          return (
+            <button
+              key={c.id}
+              onClick={() => kies(c)}
+              onMouseEnter={() => setActief(i)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                minHeight: 44, padding: '0 0.9rem', textAlign: 'left',
+                background: i === actief ? 'rgba(255,255,255,0.08)' : 'transparent',
+                border: 'none', borderTop: i ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                color: demo ? '#FFD700' : '#fff', fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{naamVan(c)}</span>
+              {!demo && c.email && (
+                <span style={{ flexShrink: 1, minWidth: 0, fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</span>
+              )}
+              <ChevronRight size={14} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
