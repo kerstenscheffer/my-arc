@@ -38,7 +38,9 @@ const formatDate = (iso) => {
 import { computePeriod } from './trajectPeriode'
 import BetaalPauze from './BetaalPauze'
 
-export default function CoachingPeriodPanel({ client, coachId, isMobile, onClientUpdate, onTraject }) {
+// `menu`: alleen de acties als lijstje (dropdown onder de looptijd-lijn in de
+// kopregel); de voortgang zelf staat dan al in LooptijdKort.
+export default function CoachingPeriodPanel({ client, coachId, isMobile, onClientUpdate, onTraject, menu = false }) {
   const modalHost = useModalHost()
   const [editing, setEditing] = useState(false)
   const [draftStart, setDraftStart] = useState(client.coaching_start_date || new Date().toISOString().split('T')[0])
@@ -292,8 +294,52 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
   const overdue = period.isOver && status !== 'ended'
   const barColor = overdue ? '#ef4444' : status === 'paused' ? '#f59e0b' : '#10b981'
 
+  const menuRij = (kleur) => ({
+    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+    minHeight: 40, padding: '0 0.7rem', borderRadius: 9,
+    background: 'transparent', border: 'none', textAlign: 'left',
+    color: kleur || '#fff', fontSize: '0.86rem', fontWeight: 800, fontFamily: 'inherit',
+    cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1,
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
+
   return (
     <>
+      {menu ? (
+        <div style={{ padding: '0.35rem' }}>
+          <div style={{ padding: '0.4rem 0.7rem 0.5rem', fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+            <span style={{ color: '#fff', fontWeight: 900 }}>{sm.label}</span>
+            {client.payment_plan && paymentMeta(client.payment_plan) && <> · {paymentMeta(client.payment_plan).short}</>}
+            {' · '}{formatDate(period.startDate)} → {formatDate(period.endDate)}
+          </div>
+          {onTraject && (
+            <button onClick={() => onTraject('verleng')} disabled={busy} style={menuRij()}><CalendarPlus size={16} /> Verlengen</button>
+          )}
+          {status === 'active' && (
+            <button onClick={() => setShowPauseModal(true)} disabled={busy} style={menuRij()}><Pause size={16} color="#f59e0b" /> Pauzeren</button>
+          )}
+          {status === 'paused' && (
+            <button onClick={resume} disabled={busy} style={menuRij()}><Play size={16} color="#10b981" /> Hervatten</button>
+          )}
+          <button onClick={() => setEditing(true)} style={menuRij()}><Settings size={16} /> Periode aanpassen</button>
+          <button onClick={wisselSlot} disabled={busy} style={menuRij(opSlot ? '#ef4444' : undefined)}>
+            {opSlot ? <><LockOpen size={16} /> Account ontgrendelen</> : <><Lock size={16} /> Account op slot</>}
+          </button>
+          {status !== 'ended' ? (
+            <button onClick={endCoaching} disabled={busy} style={menuRij('#ef4444')}><Square size={15} /> Coaching beëindigen</button>
+          ) : (
+            <button onClick={reopenCoaching} disabled={busy} style={menuRij()}><Play size={16} color="#10b981" /> Coaching heropenen</button>
+          )}
+          {status === 'paused' && client.coaching_pause_reason && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.7rem 0.2rem', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
+              <AlertCircle size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
+              <span style={{ color: '#fff', fontWeight: 900 }}>Reden:</span>
+              <span>{client.coaching_pause_reason}</span>
+            </div>
+          )}
+          <div style={{ padding: '0 0.35rem' }}><BetaalPauze client={client} status={status} /></div>
+        </div>
+      ) : (
       <div style={panelShell(status, isMobile)}>
 
         {/* Eén compacte regel: status en betaalwijze links, voortgang in het
@@ -404,6 +450,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
         )}
         <BetaalPauze client={client} status={status} />
       </div>
+      )}
 
       {/* PAUSE MODAL */}
       {showPauseModal && createPortal(

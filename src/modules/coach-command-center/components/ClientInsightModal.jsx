@@ -11,6 +11,7 @@ import CheckinsColumn from './insight/CheckinsColumn'
 import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
+import LooptijdKort from './LooptijdKort'
 import TrajectModal from './TrajectModal'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
@@ -330,23 +331,33 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
 
                   <div style={{ flex: 1 }} />
 
-                  <button
-                    onClick={() => setLooptijdOpen(v => !v)}
-                    title="Looptijd van het traject"
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3,
-                      background: 'none', border: 'none', padding: '0.3rem 0.4rem',
-                      color: looptijdOpen ? '#fff' : 'rgba(255,255,255,0.5)',
-                      fontSize: '0.76rem', fontWeight: looptijdOpen ? 900 : 700,
-                      fontFamily: 'inherit', cursor: 'pointer', flexShrink: 0,
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >
-                    Looptijd{effectiveClient.account_locked_at && <span style={{ color: '#ef4444', fontWeight: 900 }}> · op slot</span>}
-                    <ChevronDown size={13} strokeWidth={2.6} style={{
-                      transform: looptijdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s',
-                    }} />
-                  </button>
+                  {/* Looptijd: lijn altijd zichtbaar, knoppen in een dropdown. */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <LooptijdKort client={effectiveClient} open={looptijdOpen} onClick={() => setLooptijdOpen(v => !v)} />
+                    {looptijdOpen && (
+                      <>
+                        {/* Klik ernaast = dicht. Een vlak i.p.v. een document-
+                            listener: het pauze-venster is een portal en telt
+                            anders als "ernaast", waardoor het meteen verdween. */}
+                        <div onClick={() => setLooptijdOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                        <div style={{
+                          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 41,
+                          width: 340, maxHeight: '70vh', overflowY: 'auto',
+                          background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12,
+                          boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                        }}>
+                          <CoachingPeriodPanel
+                            client={effectiveClient}
+                            coachId={coachId}
+                            isMobile={false}
+                            menu
+                            onClientUpdate={handleClientUpdate}
+                            onTraject={(m) => { setLooptijdOpen(false); setTrajectModus(m) }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
 
                   {dagCheck && (
                     <button onClick={dagCheck.onWissel} disabled={dagCheck.bezig}
@@ -382,18 +393,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </div>
           )}
 
-          {/* ═══ LOOPTIJD — achter de knop in de kopregel ═══ */}
-          {!isMobile && looptijdOpen && (
-            <div style={{ maxWidth: middenBreedte, margin: '0 auto', width: '100%' }}>
-              <CoachingPeriodPanel
-                client={effectiveClient}
-                coachId={coachId}
-                isMobile={false}
-                onClientUpdate={handleClientUpdate}
-                onTraject={setTrajectModus}
-              />
-            </div>
-          )}
           {/* ═══ MAANDELIJKSE CHECK BANNER (desktop) ═══ */}
           {!isMobile && showMonthlyReminder && (
             <div style={{
@@ -474,32 +473,20 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               {/* ═══ LOOPTIJD — achter één regel, niet standaard open ═══ */}
               {/* Dicht is dit één regel van 30px in plaats van een blok met
                   balken; op een telefoon scheelt dat het halve eerste scherm. */}
-              <button
-                onClick={() => setLooptijdOpen(v => !v)}
-                style={{
-                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
-                  width: '100%', padding: '0.35rem 0.8rem',
-                  background: 'none', border: 'none',
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
-                  color: looptijdOpen ? '#fff' : 'rgba(255,255,255,0.5)',
-                  fontSize: '0.72rem', fontWeight: looptijdOpen ? 900 : 700,
-                  fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                Looptijd{effectiveClient.account_locked_at && <span style={{ color: '#ef4444', fontWeight: 900 }}> · op slot</span>}
-                <ChevronDown size={12} strokeWidth={2.6} style={{
-                  transform: looptijdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s',
-                }} />
-              </button>
+              <div style={{ flexShrink: 0, display: 'flex', padding: '0.1rem 0.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <LooptijdKort client={effectiveClient} open={looptijdOpen} onClick={() => setLooptijdOpen(v => !v)} isMobile />
+              </div>
               {looptijdOpen && (
-                <CoachingPeriodPanel
-                  client={effectiveClient}
-                  coachId={coachId}
-                  isMobile={isMobile}
-                  onClientUpdate={handleClientUpdate}
-                  onTraject={setTrajectModus}
-                />
+                <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#111' }}>
+                  <CoachingPeriodPanel
+                    client={effectiveClient}
+                    coachId={coachId}
+                    isMobile={isMobile}
+                    menu
+                    onClientUpdate={handleClientUpdate}
+                    onTraject={(m) => { setLooptijdOpen(false); setTrajectModus(m) }}
+                  />
+                </div>
               )}
               {/* ═══ MAANDELIJKSE CHECK BANNER (mobiel) ═══ */}
               {showMonthlyReminder && (
