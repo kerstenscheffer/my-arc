@@ -33,7 +33,6 @@ import DoelenMacrosPaneel from '../../coach-command-center/components/insight/Do
 import { pasSupplementenToe } from './plan-analyzer/sjabloonExtras'
 import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
-import WeekKeuze from './plan-analyzer/WeekKeuze'
 import { weekplanVoorWeek, lokaleDatum } from '../../meal-plan/DayTemplateService'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
@@ -46,6 +45,11 @@ import { openMealPlanForPrint } from '../mealplanhtmlgenerator'
 // hoog. Panelen die tot onderaan het scherm lopen moeten die ruimte vrij
 // laten, anders ligt hun knoppenbalk eronder.
 const ZWEVENDE_NAV_HOOGTE = 105
+
+// Maandag ('JJJJ-MM-DD') van deze week, en n weken verder.
+const isoDatum = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const dezeMaandag = () => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return isoDatum(d) }
+const plusWekenIso = (maandag, n) => { const d = new Date(`${maandag || dezeMaandag()}T00:00:00`); d.setDate(d.getDate() + 7 * n); return isoDatum(d) }
 
 const DOCK_LABELS = {
   client: 'Client', timing: 'Tijden', swaps: 'Swaps',
@@ -293,9 +297,16 @@ export default function PlanAnalyzer({
   // geen week_structure, maar per afwijkende dag een datum-dag
   // (client_day_overrides, bron 'coach'). basisDagenRef = de basisweek,
   // gehydrateerd, om te zien welke dagen afwijken.
+  //
+  // Sinds 24 okt 2026 staat het actieve plan altijd in een echte week (de
+  // dagbalk heeft datums en veegt per week). Het basisplan zie je niet meer
+  // los: elke wijziging vraagt of hij elke week geldt (basis) of alleen deze
+  // week (datum-dagen). geldtRef draagt die keuze naar het opslaan.
   const [weekModus, setWeekModus] = useState(null)
   const [afwijkendeDagen, setAfwijkendeDagen] = useState([])
   const basisDagenRef = useRef(null)
+  const laatsteWeekRef = useRef(null)
+  const geldtRef = useRef('altijd')
   // Eén pre-workout maaltijd voor het hele plan. Staat bewust NIET in
   // week_structure: zo verschuift hij mee als de klant z'n trainingsdagen
   // verplaatst, zonder dat het plan herschreven hoeft te worden.
@@ -384,7 +395,11 @@ export default function PlanAnalyzer({
     if (isUndoRedo.current) { isUndoRedo.current = false; return }
     setHistory(prev => {
       const trimmed = prev.slice(0, historyIndex + 1)
-      const next = [...trimmed, JSON.parse(JSON.stringify(newWeekData))]
+      const kopie = JSON.parse(JSON.stringify(newWeekData))
+      // Onthoud of deze stap elke week of alleen deze week gold, zodat
+      // ongedaan maken dezelfde laag terugdraait.
+      kopie._geldt = geldtRef.current
+      const next = [...trimmed, kopie]
       if (next.length > MAX_HISTORY) next.shift()
       return next
     })
@@ -399,7 +414,7 @@ export default function PlanAnalyzer({
     setWeekData(JSON.parse(JSON.stringify(prevData)))
     setHistoryIndex(prev => prev - 1)
     setLastAction('Ongedaan gemaakt')
-    persistWeekData(prevData)
+    persistWeekData(prevData, history[historyIndex], history[historyIndex]?._geldt)
   }, [canUndo, history, historyIndex])
 
   const handleRedo = useCallback(() => {
@@ -409,7 +424,7 @@ export default function PlanAnalyzer({
     setWeekData(JSON.parse(JSON.stringify(nextData)))
     setHistoryIndex(prev => prev + 1)
     setLastAction('Opnieuw uitgevoerd')
-    persistWeekData(nextData)
+    persistWeekData(nextData, history[historyIndex], nextData?._geldt)
   }, [canRedo, history, historyIndex])
 
   useEffect(() => {
@@ -638,6 +653,8 @@ export default function PlanAnalyzer({
         templateName = tmpl?.name || null
       }
       setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated, templateId: data.template_id || null, templateName })
+      // Weer de basis; het effect bij datumModus legt de week (laatsteWeekRef)
+      // er direct weer overheen.
       setWeekModus(null); setAfwijkendeDagen([]); basisDagenRef.current = null
       setWisselBezig(false)
       setPreWorkoutMeal(data.pre_workout_meal || null)
@@ -858,12 +875,28 @@ export default function PlanAnalyzer({
         }
       }
       basisDagenRef.current = maandagIso ? basis : null
+      if (maandagIso) laatsteWeekRef.current = maandagIso
       setWeekModus(maandagIso); setAfwijkendeDagen(afwijkend)
       setWeekData(dagen); setHistory([JSON.parse(JSON.stringify(dagen))]); setHistoryIndex(0)
     } catch (e) {
       console.error('Week wisselen mislukt:', e)
     } finally { setWisselBezig(false) }
   }
+
+  // Het plan dat de klant volgt staat altijd in een echte week: na laden (en
+  // na elke herlaad, die terug naar de basis gaat) de laatst bekeken week,
+  // anders deze week. Een concept heeft geen datums en blijft de basis.
+  const datumModus = !!actievePlanId && !!resolvedClientId && (activated || !!planMeta?.isActive)
+  // Eén poging per geladen plan: lukt de week niet (geen week_structure), dan
+  // niet blijven proberen — kiesWeek zet wisselBezig aan en uit en zou dit
+  // effect anders eindeloos opnieuw starten.
+  const weekPogingRef = useRef(null)
+  useEffect(() => {
+    if (!datumModus || !weekData || weekModus || wisselBezig) return
+    if (weekPogingRef.current === weekData) return
+    weekPogingRef.current = weekData
+    kiesWeek(laatsteWeekRef.current || dezeMaandag())
+  }, [datumModus, weekData, weekModus, wisselBezig])
 
   // Deze week weer gelijk aan elke week: de coach-datum-dagen weg.
   const zetWeekTerug = async () => {
@@ -876,9 +909,39 @@ export default function PlanAnalyzer({
     await kiesWeek(weekModus)
   }
 
-  const persistWeekData = async (updated) => {
+  // Een wijziging die elke week geldt, terwijl je naar een echte week kijkt:
+  // speel precies de slots die veranderden na op de basisweek. Zo komen
+  // afwijkingen van deze week niet per ongeluk in het basisplan.
+  const speelNaOpBasis = (basis, vorige, updated) => (basis || []).map((b, i) => {
+    const oud = vorige?.[i]?.meals || {}, nieuw = updated?.[i]?.meals || {}
+    const meals = { ...(b?.meals || {}) }
+    let veranderd = false
+    new Set([...Object.keys(oud), ...Object.keys(nieuw)]).forEach(slot => {
+      if (JSON.stringify(oud[slot] ?? null) === JSON.stringify(nieuw[slot] ?? null)) return
+      veranderd = true
+      if (nieuw[slot]) meals[slot] = nieuw[slot]; else delete meals[slot]
+    })
+    return veranderd ? { ...b, meals, totals: calculateTotals(meals) } : b
+  })
+
+  const persistWeekData = async (updated, vorige = null, geldt = 'altijd') => {
     const planId = actievePlanId
     if (planId && weekModus) {
+      if (geldt !== 'week' && vorige && basisDagenRef.current) {
+        const basis = speelNaOpBasis(basisDagenRef.current, vorige, updated)
+        const ws = {}
+        basis.forEach(d => { ws[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
+        setWeekSaveState('saving')
+        const { data, error } = await db.supabase.from('client_meal_plans').update({ week_structure: ws }).eq('id', planId).select('id')
+        if (error || !data?.length) {
+          console.error('❌ Basisplan opslaan mislukt:', error || 'geen rij bijgewerkt')
+          setWeekSaveState('error')
+          return
+        }
+        basisDagenRef.current = basis
+      }
+      // Daarna de week zelf: wat nu gelijk is aan de basis verdwijnt als
+      // datum-dag, wat afwijkt blijft (of komt erbij).
       await bewaarWeek(updated, planId)
     } else if (planId) {
       const ws = {}
@@ -937,7 +1000,8 @@ export default function PlanAnalyzer({
     // losse handlers, zodat élke route die tijden raakt automatisch meedoet —
     // de klok op de maaltijdkaart, het tijden-scherm, auto-balance, slepen.
     meldTijden(updated)
-    setWeekData(updated); pushHistory(updated, actionDesc); await persistWeekData(updated)
+    const vorige = weekData
+    setWeekData(updated); pushHistory(updated, actionDesc); await persistWeekData(updated, vorige, geldtRef.current)
     // Eén melding voor álle agenda's: de ingebedde hiernaast én die in de
     // andere helft van het scherm. Die tweede staat in een eigen
     // componentboom en bereik je niet met state — alleen via het
@@ -1031,8 +1095,12 @@ export default function PlanAnalyzer({
   // bereik: 'day' = alleen de open dag, 'all' = overal waar de oude maaltijd
   // staat, 'week' = dit slot op alle zeven dagen.
   // bereik 'dagen' = dit slot op de aangetikte dagen (`dagen` = [0..6]).
-  const handleSwapSelect = async (newMeal, bereik = 'day', dagen = null) => {
+  const handleSwapSelect = async (newMeal, bereik = 'day', dagen = null, geldt = 'altijd') => {
     if (!swapState) return
+    geldtRef.current = geldt
+    try { await wisselUitvoeren(newMeal, bereik, dagen) } finally { geldtRef.current = 'altijd' }
+  }
+  const wisselUitvoeren = async (newMeal, bereik, dagen) => {
     // Pre-workout heeft geen dag (dayIndex null): DAYS[null].full gooide
     // hier een fout vóór het opslaan, dus de maaltijd kwam nooit aan.
     const dagNaam = DAYS[swapState.dayIndex]?.full || 'pre-workout'
@@ -1155,12 +1223,39 @@ export default function PlanAnalyzer({
     // geen, dan in de kolom: één keer, en alleen op trainingsdagen zichtbaar.
     if (bron.meals?.[PRE_WORKOUT_SLOT] && !preWorkoutMeal) await bewaarPreWorkout(bron.meals[PRE_WORKOUT_SLOT])
   }
-  const handleDelete = async (dayIndex, slot) => {
+  // In een echte week eerst vragen: elke week of alleen deze week, en alleen
+  // deze dag of overal waar hij staat. Een concept heeft geen datums: direct.
+  const [verwijderBereik, setVerwijderBereik] = useState(null) // { dayIndex, slot }
+  const [verwijderBezig, setVerwijderBezig] = useState(null)
+  const handleDelete = (dayIndex, slot) => {
     if (!weekData) return
-    const mealName = weekData[dayIndex].meals[slot]?.name || 'maaltijd'
-    const updated = [...weekData]; const meals = { ...updated[dayIndex].meals }; delete meals[slot]
-    updated[dayIndex] = { ...updated[dayIndex], meals }; updated[dayIndex].totals = calculateTotals(meals)
-    await applyWeekUpdate(updated, `Verwijderd: ${mealName} (${DAYS[dayIndex].full})`)
+    if (weekModus) { setVerwijderBereik({ dayIndex, slot }); return }
+    return verwijderUitvoeren(dayIndex, slot, 'day')
+  }
+  const verwijderUitvoeren = async (dayIndex, slot, bereik) => {
+    const oud = weekData[dayIndex]?.meals?.[slot]
+    const mealName = oud?.name || 'maaltijd'
+    const oudId = oud?.meal_id || oud?.id
+    const updated = weekData.map((dag, di) => {
+      const raak = Object.keys(dag?.meals || {}).filter(s => di === dayIndex && s === slot
+        || (bereik === 'all' && oudId && (dag.meals[s]?.meal_id || dag.meals[s]?.id) === oudId))
+      if (!raak.length) return dag
+      const meals = { ...dag.meals }; raak.forEach(s => { delete meals[s] })
+      return { ...dag, meals, totals: calculateTotals(meals) }
+    })
+    await applyWeekUpdate(updated, bereik === 'all' ? `Verwijderd overal: ${mealName}` : `Verwijderd: ${mealName} (${DAYS[dayIndex].full})`)
+  }
+  const kiesVerwijderBereik = async (bereik, _dagen, geldt = 'altijd') => {
+    if (!verwijderBereik || verwijderBezig) return
+    setVerwijderBezig(bereik)
+    geldtRef.current = geldt
+    try {
+      await verwijderUitvoeren(verwijderBereik.dayIndex, verwijderBereik.slot, bereik)
+      setVerwijderBereik(null)
+    } finally {
+      geldtRef.current = 'altijd'
+      setVerwijderBezig(null)
+    }
   }
   const handleAdd = (dayIndex, slot) => setSwapState({ dayIndex, slot, meal: null })
 
@@ -1446,13 +1541,15 @@ export default function PlanAnalyzer({
   const [editBereik, setEditBereik] = useState(null) // { dayIndex, slot, meal }
   const [editBereikBezig, setEditBereikBezig] = useState(null)
   const handleEditSave = (dayIndex, slot, updatedMeal) => setEditBereik({ dayIndex, slot, meal: updatedMeal })
-  const kiesEditBereik = async (bereik) => {
+  const kiesEditBereik = async (bereik, _dagen, geldt = 'altijd') => {
     if (!editBereik || editBereikBezig) return
     setEditBereikBezig(bereik)
+    geldtRef.current = geldt
     try {
       await handleUpdateMeal(editBereik.dayIndex, editBereik.slot, editBereik.meal, bereik)
       setEditBereik(null)
     } finally {
+      geldtRef.current = 'altijd'
       setEditBereikBezig(null)
     }
   }
@@ -1839,12 +1936,6 @@ export default function PlanAnalyzer({
             onUndo={handleUndo} onRedo={handleRedo} canUndo={canUndo} canRedo={canRedo}
             onPdf={handlePDF} pdfBezig={loadingPdf}
             onActivate={planMeta ? handleActivate : null} activating={activating}
-            // Alleen bij het plan dat de klant volgt: datum-dagen gelden voor
-            // de klant, niet voor een concept.
-            midden={actievePlanId && (activated || planMeta?.isActive) ? (
-              <WeekKeuze inline weekModus={weekModus} aantalAangepast={afwijkendeDagen.length}
-                onKies={kiesWeek} onTerugzetten={zetWeekTerug} bezig={wisselBezig} isMobile={m} />
-            ) : null}
           />
           </div>
         )}
@@ -2081,7 +2172,12 @@ export default function PlanAnalyzer({
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: m ? 0 : '0 1rem', boxSizing: 'border-box' }}>
             <DagStrip dagen={dagStripDagen} actief={activeDay}
               onKies={(i) => { setActiveDay(i); if (viewMode === 'week') setViewMode('day') }}
-              doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0} isMobile={m} />
+              doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0} isMobile={m}
+              weekStart={weekModus}
+              onWeek={(n) => kiesWeek(n === 0 ? dezeMaandag() : plusWekenIso(weekModus, n))}
+              aangepast={afwijkendeDagen.map(id => DAYS.findIndex(d => d.id === id)).filter(i => i >= 0)}
+              onTerugzetten={() => { if (window.confirm('Deze week weer gelijk aan elke week maken?')) zetWeekTerug() }}
+              bezig={wisselBezig} />
           </div>
         </div>
 
@@ -2168,6 +2264,11 @@ export default function PlanAnalyzer({
               <div style={{ width: m ? '100%' : 340, flexShrink: 0, boxSizing: 'border-box', position: m ? 'static' : 'sticky', top: '1rem', padding: m ? '0.75rem 0.75rem 0' : 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: m ? 4 : 8 }}>
                   <span style={{ fontSize: m ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{DAYS[activeDay]?.full || '—'}</span>
+                  {weekModus && (
+                    <span style={{ fontSize: m ? '0.9rem' : '1rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+                      {(() => { const d = new Date(`${weekModus}T00:00:00`); d.setDate(d.getDate() + activeDay); return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) })()}
+                    </span>
+                  )}
                   {currentDayIsTraining && (
                     <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#0a0a0a', background: '#fff', padding: '2px 7px', borderRadius: 5, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Trainingsdag</span>
                   )}
@@ -2402,6 +2503,27 @@ export default function PlanAnalyzer({
             plekken={plekkenVanMaaltijd(weekData?.[editBereik.dayIndex]?.meals?.[editBereik.slot])}
             bezig={editBereikBezig}
             onKies={kiesEditBereik}
+          />
+        )}
+      </BladModal>
+
+      <BladModal
+        open={!!verwijderBereik}
+        titel={weekData?.[verwijderBereik?.dayIndex]?.meals?.[verwijderBereik?.slot]?.name || 'Verwijderen'}
+        onClose={() => { if (!verwijderBezig) setVerwijderBereik(null) }}
+        zIndex={10600}
+      >
+        {verwijderBereik && (
+          <BereikKeuze
+            vraag="Waar verwijderen?"
+            dagNaam={DAYS[verwijderBereik.dayIndex]?.full?.toLowerCase() || null}
+            dagIndex={verwijderBereik.dayIndex ?? null}
+            weekStart={weekModus}
+            slot={verwijderBereik.slot}
+            oudeNaam={weekData?.[verwijderBereik.dayIndex]?.meals?.[verwijderBereik.slot]?.name}
+            plekken={plekkenVanMaaltijd(weekData?.[verwijderBereik.dayIndex]?.meals?.[verwijderBereik.slot])}
+            bezig={verwijderBezig}
+            onKies={kiesVerwijderBereik}
           />
         )}
       </BladModal>
