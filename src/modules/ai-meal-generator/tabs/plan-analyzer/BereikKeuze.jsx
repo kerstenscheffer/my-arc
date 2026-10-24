@@ -11,9 +11,11 @@
 //   dagen = dit slot op de dagen die de coach aantikt (alleen bij wisselen);
 //           onKies('dagen', [0..6])
 //
-// `weekStart` ('JJJJ-MM-DD', maandag): de Analyzer staat in week-modus. Dan
-// geldt elke keuze alleen voor die week (het opslaan regelt dat), en zeggen
-// de teksten dat ook in plaats van "elke week".
+// `weekStart` ('JJJJ-MM-DD', maandag): de Analyzer toont een echte week met
+// datums. Dan staat bovenaan een tweede keuze: elke week (het basisplan) of
+// alleen deze week (datum-dagen). onKies(key, dagen, geldt) met geldt =
+// 'altijd' | 'week'. Standaard elke week: een plan bouw je voor elke week,
+// een uitzondering (feestje zaterdag) kies je bewust.
 
 import React, { useState } from 'react'
 import { Repeat, CalendarDays, CalendarRange, CalendarCheck, Check } from 'lucide-react'
@@ -33,10 +35,11 @@ export default function BereikKeuze({
   metAlleDagen = false,  // derde keuze: dit slot op alle dagen
   bezig = null,          // key van de keuze die nu opslaat
   dagIndex = null,       // open dag (0 = ma), vooraf aangevinkt bij 'Kies dagen'
-  weekStart = null,      // maandag van de week in week-modus, anders null
+  weekStart = null,      // maandag van de getoonde week, anders null
   onKies,
 }) {
   const [kiesOpen, setKiesOpen] = useState(false)
+  const [geldt, setGeldt] = useState('altijd')
   const [gekozen, setGekozen] = useState(() => new Set(dagIndex != null ? [dagIndex] : []))
   const wissel = (i) => setGekozen(g => { const n = new Set(g); if (n.has(i)) n.delete(i); else n.add(i); return n })
   const aantal = Array.isArray(plekken) ? plekken.length : 0
@@ -46,14 +49,18 @@ export default function BereikKeuze({
   const dag = dagNaam || 'deze dag'
   const kort = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   const weekBegin = weekStart ? new Date(`${weekStart}T00:00:00`) : null
-  const weekTekst = weekBegin ? (() => { const e = new Date(weekBegin); e.setDate(e.getDate() + 6); return `${kort(weekBegin)} – ${kort(e)}` })() : null
-  const dagDatum = weekBegin && dagIndex != null ? (() => { const d = new Date(weekBegin); d.setDate(d.getDate() + dagIndex); return kort(d) })() : null
+  const datumVan = (i) => { const d = new Date(weekBegin); d.setDate(d.getDate() + i); return d }
+  const weekBereik = weekBegin ? `${kort(weekBegin)} – ${kort(datumVan(6))}` : null
+  // Alleen als 'alleen deze week' gekozen is gelden de datums; anders is het
+  // gewoon het basisplan en horen de teksten 'elke week' te zeggen.
+  const weekTekst = geldt === 'week' ? weekBereik : null
+  const dagDatum = weekTekst && dagIndex != null ? kort(datumVan(dagIndex)) : null
 
   const opties = [
     {
       key: 'day', Icon: CalendarDays,
-      title: `Alleen ${dag}${dagDatum ? ` ${dagDatum}` : ''}`,
-      sub: weekTekst ? 'alleen in deze week' : 'elke week op deze dag',
+      title: dagDatum ? `Alleen ${dag} ${dagDatum}` : `Alleen op ${dag}`,
+      sub: weekTekst ? 'alleen die datum' : `elke ${dag}`,
       effect: `past ${dag} ${slotKort(slot)} aan, de andere dagen blijven zoals ze zijn`,
     },
     {
@@ -82,9 +89,23 @@ export default function BereikKeuze({
       <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: 2 }}>
         {vraag}
       </div>
+      {/* Wanneer: elke week of alleen de getoonde week, met datums. */}
+      {weekBereik && (
+        <div style={{ display: 'flex', height: 36, borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', overflow: 'hidden', margin: '6px 0 6px' }}>
+          {[{ id: 'altijd', label: 'Elke week' }, { id: 'week', label: `Alleen ${weekBereik}` }].map((o, i) => (
+            <button key={o.id} onClick={() => !bezig && setGeldt(o.id)} style={{
+              flex: 1, minWidth: 0, border: 'none', borderLeft: i ? '1px solid rgba(255,255,255,0.14)' : 'none',
+              background: geldt === o.id ? '#fff' : 'transparent', color: geldt === o.id ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+              fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+              overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 0.5rem',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>{o.label}</button>
+          ))}
+        </div>
+      )}
       <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>
         {weekTekst
-          ? <>Geldt alleen voor de week <span style={{ color: '#fff' }}>{weekTekst}</span>. Elke andere week blijft zoals hij is.</>
+          ? <>Geldt alleen voor <span style={{ color: '#fff' }}>{weekTekst}</span>. Elke andere week blijft zoals hij is.</>
           : 'Geldt elke week. Je kunt dit later altijd weer aanpassen.'}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
@@ -95,7 +116,7 @@ export default function BereikKeuze({
           return (
             <button
               key={opt.key}
-              onClick={() => { if (bezig || uit) return; if (opt.open) setKiesOpen(v => !v); else onKies(opt.key) }}
+              onClick={() => { if (bezig || uit) return; if (opt.open) setKiesOpen(v => !v); else onKies(opt.key, null, geldt) }}
               disabled={!!bezig || uit}
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left',
@@ -143,12 +164,15 @@ export default function BereikKeuze({
                     color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
                     fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}>{d}</button>
+                  }}>
+                    {d}
+                    {weekTekst && <div style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.7 }}>{datumVan(i).getDate()}</div>}
+                  </button>
                 )
               })}
             </div>
             <button
-              onClick={() => gekozen.size && !bezig && onKies('dagen', [...gekozen].sort((a, b) => a - b))}
+              onClick={() => gekozen.size && !bezig && onKies('dagen', [...gekozen].sort((a, b) => a - b), geldt)}
               disabled={!gekozen.size || !!bezig}
               style={{
                 width: '100%', minHeight: 46, marginTop: 8, borderRadius: 12, border: 'none',

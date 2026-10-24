@@ -493,19 +493,21 @@ export default function WisselModal({
   }
 
   const [bezig, setBezig] = useState(null)
-  const bevestig = async (bereik = 'day', dagen = null) => {
+  const bevestig = async (bereik = 'day', dagen = null, geldt = 'altijd') => {
     if (!selectedMeal || bezig) return
     const gekozen = selectedMeal
     setBezig(bereik)
     try {
-      await onSelect?.(gekozen, bereik, dagen)
+      await onSelect?.(gekozen, bereik, dagen, geldt)
       setSelectedMeal(null)
     } finally {
       setBezig(null)
     }
   }
 
-  const vraagBereik = plekken !== undefined && !!currentMeal
+  // Ook bij toevoegen (geen currentMeal) als er datums spelen: dan moet je
+  // kunnen kiezen of hij er elke week bij komt of alleen die week.
+  const vraagBereik = plekken !== undefined && (!!currentMeal || !!weekStart)
 
   const filteredMeals = getFilteredMeals()
 
@@ -998,7 +1000,7 @@ export default function WisselModal({
 
             {vraagBereik ? (
               <BereikKeuze
-                vraag="Waar geldt deze wissel?"
+                vraag={currentMeal ? 'Waar geldt deze wissel?' : 'Waar komt hij erbij?'}
                 dagNaam={dagNaam} slot={slot}
                 oudeNaam={currentMeal?.name} nieuweNaam={selectedMeal?.name}
                 plekken={plekken} metAlleDagen dagIndex={dagIndex} weekStart={weekStart}

@@ -2093,6 +2093,20 @@ export default function PlanAnalyzer({
             stale tot reload, maar de DB is bron-van-waarheid. */}
         {viewMode === 'week' && (
           <div style={{ flex: 1, overflow: 'auto' }}>
+            {/* De Weekagenda-knop staat in de dagkolom, en die is hier weg:
+                zonder deze balk kwam je alleen via de dagstrip terug. */}
+            <div style={{ display: 'flex', alignItems: 'stretch', height: 40, borderBottom: '1px solid rgba(255,255,255,0.12)', background: '#0a0a0a' }}>
+              <button onClick={() => setViewMode('day')} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, padding: m ? '0 0.9rem' : '0 1.2rem',
+                background: 'transparent', border: 'none', borderRight: '1px solid rgba(255,255,255,0.12)',
+                color: '#fff', fontSize: m ? '0.82rem' : '0.88rem', fontWeight: 900, letterSpacing: '-0.015em',
+                fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <ChevronLeft size={16} strokeWidth={2.8} /> Terug naar {DAYS[activeDay]?.full?.toLowerCase() || 'de dag'}
+              </button>
+              <span style={{ display: 'flex', alignItems: 'center', padding: '0 1rem', fontSize: '0.8rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)' }}>Weekagenda</span>
+            </div>
             {(clientRecord || resolvedClientId) ? (
               <ClientAgendaView
                 client={clientRecord || { id: resolvedClientId }}
@@ -2158,12 +2172,15 @@ export default function PlanAnalyzer({
                     <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#0a0a0a', background: '#fff', padding: '2px 7px', borderRadius: 5, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Trainingsdag</span>
                   )}
                 </div>
-                <DagRingen
-                  totalen={{ calories: dagTotalen.kcal, protein: dagTotalen.protein, carbs: dagTotalen.carbs, fat: dagTotalen.fat }}
-                  targets={targets || {}}
-                  isMobile={m}
-                  raster={!m}
-                />
+                {/* Mobiel staan de ringen hier al boven de maaltijden; op
+                    desktop staan ze rechts boven de kaarten (zie daar). */}
+                {m && (
+                  <DagRingen
+                    totalen={{ calories: dagTotalen.kcal, protein: dagTotalen.protein, carbs: dagTotalen.carbs, fat: dagTotalen.fat }}
+                    targets={targets || {}}
+                    isMobile={m}
+                  />
+                )}
                 {/* Alleen wat afwijkt; klopt alles, dan één groene regel. */}
                 {targets?.calories > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: m ? '0.25rem 0 0.5rem' : '0.75rem 0' }}>
@@ -2212,6 +2229,18 @@ export default function PlanAnalyzer({
 
               {/* ── RECHTS: de maaltijden ── */}
               <div style={{ flex: 1, minWidth: 0, maxWidth: m ? undefined : 640, width: '100%' }}>
+              {/* Ringen op één rij, even breed als de maaltijdkaarten eronder;
+                  geen kader, weinig lucht erboven en eronder (Kersten, 24 okt 2026). */}
+              {!m && (
+                <div style={{ margin: '0 0.75rem 0.4rem' }}>
+                  <DagRingen
+                    totalen={{ calories: dagTotalen.kcal, protein: dagTotalen.protein, carbs: dagTotalen.carbs, fat: dagTotalen.fat }}
+                    targets={targets || {}}
+                    isMobile={m}
+                    strak
+                  />
+                </div>
+              )}
               {/* ── PRE-WORKOUT ────────────────────────────────────────────
                   Eén maaltijd voor het hele plan, die alleen op trainingsdagen
                   meetelt. Als volwaardige MealCard, zodat je 'm net als elke

@@ -8,7 +8,7 @@
 
 import { useState } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
-import { Shuffle, Pencil, CalendarDays, Trash2, X } from 'lucide-react'
+import { Shuffle, Pencil, CalendarDays, Trash2, X, ChevronDown, Pill } from 'lucide-react'
 import { useModalHost } from '../../../../coach/ModalHost'
 import DatabaseService from '../../../supplements/SupplementPlanService'
 import Keuze from '../../../meal-plan/components/Keuze'
@@ -16,8 +16,13 @@ import {
   doseringTekst, geldtOpDag, momentVanSupplement, minutenNaarKlok,
   DAG_SLEUTELS, DAG_KORT, dagenVanSupplement, MOMENT_LABEL,
 } from '../../../supplements/utils/supplementSchedule'
+import { supplementFoto } from '../../../supplements/utils/supplementFoto'
+import { useProductFotos } from '../../../supplements/utils/productFoto'
 
 const DIVIDER = 'rgba(255,255,255,0.06)'
+// Open/dicht onthouden per browser; standaard dicht, de maaltijden gaan voor.
+const OPEN_SLEUTEL = 'pa_supplementen_open'
+const leesOpen = () => { try { return localStorage.getItem(OPEN_SLEUTEL) === '1' } catch { return false } }
 const MAALTIJD_LABEL = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner', snack: 'Snack', pre_workout: 'Pre workout', post_workout: 'Na training' }
 
 export default function SupplementDaySection({ supplementen, maaltijdTijden, dagSleutel, isMobile, db = null, clientId = null, onChanged = null }) {
@@ -25,6 +30,9 @@ export default function SupplementDaySection({ supplementen, maaltijdTijden, dag
   const modalHost = useModalHost()
   const [templates, setTemplates] = useState(null)
   const [fout, setFout] = useState(null)
+  const [open, setOpen] = useState(leesOpen)
+  const productFotos = useProductFotos()
+  const wisselOpen = () => setOpen(o => { try { localStorage.setItem(OPEN_SLEUTEL, o ? '0' : '1') } catch { /* privémodus */ } return !o })
 
   const lijst = Array.isArray(supplementen) ? supplementen : []
   const vandaag = lijst.map((s, index) => ({ s, index })).filter(({ s }) => geldtOpDag(s, dagSleutel))
@@ -57,9 +65,29 @@ export default function SupplementDaySection({ supplementen, maaltijdTijden, dag
 
   return (
     <>
-      {fout && <div style={{ margin: m ? '0 0.5rem 0.4rem' : '0 0.75rem 0.5rem', fontSize: '0.72rem', fontWeight: 800, color: '#ef4444' }}>{fout}</div>}
-      {vandaag.map(({ s, index }) => (
+      {/* Kopregel: dicht tot je 'm openklapt. Dicht zie je de foto's op een rij. */}
+      <button onClick={wisselOpen} style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: m ? 'calc(100% - 1rem)' : 'calc(100% - 1.5rem)',
+        margin: m ? '0 0.5rem 0.45rem' : '0 0.75rem 0.55rem', padding: '0 0.75rem 0 0', height: 44,
+        background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12,
+        color: '#fff', fontFamily: 'inherit', cursor: 'pointer', overflow: 'hidden', boxSizing: 'border-box',
+      }}>
+        <span style={{ width: 44, height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(34,197,94,0.10)' }}>
+          <Pill size={16} strokeWidth={2.6} />
+        </span>
+        <span style={{ fontSize: m ? '0.86rem' : '0.92rem', fontWeight: 900, letterSpacing: '-0.015em' }}>Supplementen</span>
+        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>{vandaag.length}</span>
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end', gap: 4, overflow: 'hidden' }}>
+          {!open && vandaag.slice(0, 6).map(({ s, index }) => (
+            <SuppFoto key={index} s={s} product={productFotos[s.template_id] || productFotos[s.supplement_id]} maat={26} rond={7} />
+          ))}
+        </span>
+        <ChevronDown size={16} strokeWidth={2.6} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+      {open && fout && <div style={{ margin: m ? '0 0.5rem 0.4rem' : '0 0.75rem 0.5rem', fontSize: '0.72rem', fontWeight: 800, color: '#ef4444' }}>{fout}</div>}
+      {open && vandaag.map(({ s, index }) => (
         <SupplementKaart key={`${s.name}-${index}`} s={s} index={index} m={m} maaltijdTijden={maaltijdTijden}
+          product={productFotos[s.template_id] || productFotos[s.supplement_id]}
           modalHost={modalHost} pas={pas}
           wis={() => { if (window.confirm(`${s.name || 'Dit supplement'} uit het plan halen?`)) bewaar(lijst.filter((_, i) => i !== index)) }}
           wissel={async (pos) => ({ pos, templates: await laadTemplates() })}
@@ -74,7 +102,7 @@ export default function SupplementDaySection({ supplementen, maaltijdTijden, dag
   )
 }
 
-function SupplementKaart({ s, index, m, maaltijdTijden, modalHost, pas, wis, wissel, vervang }) {
+function SupplementKaart({ s, index, m, maaltijdTijden, product, modalHost, pas, wis, wissel, vervang }) {
   const [paneel, setPaneel] = useState(null)        // 'dosering' | 'dagen' | null
   const [naamEdit, setNaamEdit] = useState(null)
   const [moment, setMoment] = useState(null)        // positie voor het momentvenster
@@ -102,12 +130,13 @@ function SupplementKaart({ s, index, m, maaltijdTijden, modalHost, pas, wis, wis
       borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
-        {/* Vlak links: emoji, moment en tijd. Tik = moment aanpassen. */}
+        {/* Vlak links: foto (zoals op de klantpagina), moment en tijd. Tik = moment aanpassen. */}
         <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMoment({ top: r.bottom + 6, left: r.left, boven: r.top }) }} title="Moment aanpassen" style={{
           width: fotoFormaat, height: fotoFormaat, flexShrink: 0, padding: 0, border: 'none', cursor: 'pointer',
-          background: 'rgba(34,197,94,0.10)', position: 'relative', fontFamily: 'inherit',
+          background: '#121212', position: 'relative', fontFamily: 'inherit', overflow: 'hidden',
         }}>
-          <span style={{ position: 'absolute', top: 6, left: 0, right: 0, textAlign: 'center', fontSize: '1.3rem', lineHeight: 1 }}>{s.emoji || '💊'}</span>
+          <SuppFoto s={s} product={product} maat={fotoFormaat} rond={0} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.85) 100%)' }} />
           <div style={{ position: 'absolute', left: 5, right: 4, bottom: 4, lineHeight: 1.1, textAlign: 'left' }}>
             <div style={{ fontSize: '0.5rem', fontWeight: 900, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{momentLabel}</div>
             <div style={{ fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{min != null ? minutenNaarKlok(min) : '—'}</div>
@@ -174,6 +203,23 @@ function SupplementKaart({ s, index, m, maaltijdTijden, modalHost, pas, wis, wis
           </div>
         </Popover>, modalHost)}
     </div>
+  )
+}
+
+// Productfoto uit de catalogus op zwart, anders de stockfoto; laadt niets, dan de emoji.
+function SuppFoto({ s, product, maat, rond }) {
+  const [kapot, setKapot] = useState(false)
+  return (
+    <span style={{
+      position: rond ? 'relative' : 'absolute', inset: rond ? undefined : 0, width: maat, height: maat, flexShrink: 0,
+      borderRadius: rond, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: product ? 'radial-gradient(circle at 50% 40%, #3a3a3a 0%, #121212 75%)' : '#1f1f1f',
+    }}>
+      {!kapot
+        ? <img src={product || supplementFoto(s, maat * 2)} alt="" loading="lazy" onError={() => setKapot(true)}
+            style={{ width: '100%', height: '100%', objectFit: product ? 'contain' : 'cover' }} />
+        : <span style={{ fontSize: maat * 0.45, lineHeight: 1 }}>{s?.emoji || '💊'}</span>}
+    </span>
   )
 }
 

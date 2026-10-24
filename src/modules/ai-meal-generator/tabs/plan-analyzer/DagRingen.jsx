@@ -37,7 +37,8 @@ const OPEN_SLEUTEL = 'analyzer_ringen_open'
 
 // `raster`: 2×2 in een smalle kolom (de dagkolom links in de Analyzer),
 // niet uitgesmeerd over de volle breedte.
-export default function DagRingen({ totalen, targets, isMobile, inklapbaar = false, raster = false }) {
+// `strak`: één rij zonder lijn erboven en met weinig lucht, boven de maaltijdkaarten.
+export default function DagRingen({ totalen, targets, isMobile, inklapbaar = false, raster = false, strak = false }) {
   const m = isMobile
   const t = totalen || {}
   const d = targets || {}
@@ -91,8 +92,8 @@ export default function DagRingen({ totalen, targets, isMobile, inklapbaar = fal
     } : {
       display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start',
       gap: m ? 4 : 8,
-      padding: m ? '0.7rem 0.6rem 0.8rem' : '0.85rem 1rem 0.95rem',
-      borderTop: '1px solid rgba(255,255,255,0.04)',
+      padding: strak ? '0.15rem 0 0.25rem' : m ? '0.7rem 0.6rem 0.8rem' : '0.85rem 1rem 0.95rem',
+      borderTop: strak ? 'none' : '1px solid rgba(255,255,255,0.04)',
     }}>
       {RINGEN.map((ring) => {
         // Binnen de body uitpakken en niet in de parameter: no-unused-vars telt
