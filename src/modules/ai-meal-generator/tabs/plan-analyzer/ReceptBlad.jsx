@@ -2,10 +2,14 @@
 //
 // Het recept van een maaltijd in de Plan Analyzer: foto, macro's,
 // ingrediënten met hoeveelheden (zoals ze in dít plan staan, dus na
-// schalen) en de bereiding + tips uit ai_meals. Staan stappen of tips niet
-// op de maaltijd in het plan, dan halen we ze op via meal_id.
+// schalen) en de bereiding + tips uit ai_meals.
+//
+// Bereiding en tips komen altijd uit ai_meals (het recept zelf); de kopie in
+// het plan alleen als er geen rij is (eigen maaltijd). Bewerken schrijft naar
+// ai_meals: elk plan en elke klant met deze maaltijd ziet het nieuwe recept.
 
 import { useEffect, useState } from 'react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
 import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
 
@@ -17,22 +21,53 @@ const stappenVan = (v) => {
 }
 
 export default function ReceptBlad({ open, onClose, db, meal, ingredienten, naamVan }) {
-  const [extra, setExtra] = useState(null) // { preparation_steps, tips } uit ai_meals
+  // recept: null = laden, false = geen rij in ai_meals, anders de rij.
+  const [recept, setRecept] = useState(null)
+  const [bewerk, setBewerk] = useState(null) // { stappen: [], tips: '' } tijdens bewerken
+  const [opslaan, setOpslaan] = useState(false)
+  const [fout, setFout] = useState(null)
 
   const mealId = meal?.meal_id || meal?.id || null
-  const heeftStappen = stappenVan(meal?.preparation_steps).length > 0
   useEffect(() => {
-    if (!open || heeftStappen || !mealId || !db?.supabase) return
+    if (!open) { setBewerk(null); setFout(null); return }
+    if (!mealId || !db?.supabase) { setRecept(false); return }
     let weg = false
-    db.supabase.from('ai_meals').select('preparation_steps, tips').eq('id', mealId).maybeSingle()
-      .then(({ data }) => { if (!weg) setExtra(data || {}) }, () => { if (!weg) setExtra({}) })
+    setRecept(null)
+    db.supabase.from('ai_meals').select('id, preparation_steps, tips').eq('id', mealId).maybeSingle()
+      .then(({ data }) => { if (!weg) setRecept(data || false) }, () => { if (!weg) setRecept(false) })
     return () => { weg = true }
-  }, [open, mealId, heeftStappen, db])
+  }, [open, mealId, db])
 
   if (!open || !meal) return null
-  const stappen = heeftStappen ? stappenVan(meal.preparation_steps) : stappenVan(extra?.preparation_steps)
-  const tips = meal.tips || extra?.tips || null
-  const laden = !heeftStappen && mealId && extra === null
+  const uitDb = recept && stappenVan(recept.preparation_steps).length > 0
+  const stappen = uitDb ? stappenVan(recept.preparation_steps) : stappenVan(meal.preparation_steps)
+  const tips = (recept && recept.tips) || meal.tips || null
+  const laden = recept === null
+  const kanBewerken = !!recept
+
+  const begin = () => setBewerk({ stappen: stappen.length ? [...stappen] : [''], tips: tips || '' })
+  const bewaar = async () => {
+    const nieuweStappen = bewerk.stappen.map(x => x.trim()).filter(Boolean)
+    const nieuweTips = bewerk.tips.trim() || null
+    setOpslaan(true); setFout(null)
+    const { data, error } = await db.supabase.from('ai_meals')
+      .update({ preparation_steps: nieuweStappen, tips: nieuweTips, updated_at: new Date().toISOString() })
+      .eq('id', recept.id).select('id, preparation_steps, tips')
+    setOpslaan(false)
+    if (error || !data?.length) { console.error('Recept opslaan mislukt:', error || 'geen rij'); setFout('Opslaan lukte niet. Probeer het opnieuw.'); return }
+    setRecept(data[0]); setBewerk(null)
+  }
+  const veld = {
+    width: '100%', boxSizing: 'border-box', padding: '0.55rem 0.7rem', borderRadius: 9,
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.16)',
+    color: '#fff', fontSize: '0.86rem', fontWeight: 600, fontFamily: 'inherit', lineHeight: 1.45,
+    resize: 'vertical', outline: 'none',
+  }
+  const knop = (vol) => ({
+    height: 38, padding: '0 0.9rem', borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: vol ? '#fff' : 'rgba(255,255,255,0.06)', border: `1px solid ${vol ? '#fff' : 'rgba(255,255,255,0.16)'}`,
+    color: vol ? '#0a0a0a' : '#fff', fontSize: '0.84rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+  })
   const foto = meal.image_url || foodImageFallback(meal.name || meal.title, null, 800) || null
   const kop = { fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '1.1rem 0 0.5rem' }
   const macro = (waarde, label) => (
@@ -71,26 +106,70 @@ export default function ReceptBlad({ open, onClose, db, meal, ingredienten, naam
           </>
         )}
 
-        <div style={kop}>Bereiding</div>
-        {laden ? (
-          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Laden…</div>
-        ) : stappen.length === 0 ? (
-          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Voor deze maaltijd staat nog geen bereiding.</div>
-        ) : (
-          <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {stappen.map((s, i) => (
-              <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <span style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 999, background: '#fff', color: '#0a0a0a', fontSize: '0.74rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.88)', lineHeight: 1.5, paddingTop: 2 }}>{s}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-
-        {tips && (
+        {bewerk ? (
           <>
+            <div style={kop}>Bereiding</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {bewerk.stappen.map((st, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ flexShrink: 0, width: 24, height: 24, marginTop: 6, borderRadius: 999, background: '#fff', color: '#0a0a0a', fontSize: '0.74rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                  <textarea value={st} rows={2} style={veld} placeholder="Wat doe je in deze stap?"
+                    onChange={e => setBewerk(b => ({ ...b, stappen: b.stappen.map((x, j) => (j === i ? e.target.value : x)) }))} />
+                  <button onClick={() => setBewerk(b => ({ ...b, stappen: b.stappen.filter((_, j) => j !== i) }))} aria-label="Stap weghalen"
+                    style={{ flexShrink: 0, width: 34, height: 34, marginTop: 2, borderRadius: 9, background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              <button onClick={() => setBewerk(b => ({ ...b, stappen: [...b.stappen, ''] }))} style={{ ...knop(false), alignSelf: 'flex-start' }}>
+                <Plus size={15} /> Stap toevoegen
+              </button>
+            </div>
             <div style={kop}>Tips</div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.55, whiteSpace: 'pre-line' }}>{tips}</div>
+            <textarea value={bewerk.tips} rows={4} style={veld} placeholder="Tips voor de klant (optioneel)"
+              onChange={e => setBewerk(b => ({ ...b, tips: e.target.value }))} />
+            <div style={{ marginTop: 10, fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
+              Dit past het recept van de maaltijd aan: iedere klant met deze maaltijd ziet de nieuwe bereiding.
+            </div>
+            {fout && <div style={{ marginTop: 8, fontSize: '0.8rem', fontWeight: 800, color: '#ef4444' }}>{fout}</div>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button onClick={bewaar} disabled={opslaan} style={{ ...knop(true), flex: 1, justifyContent: 'center', opacity: opslaan ? 0.6 : 1 }}>
+                {opslaan ? 'Opslaan…' : 'Opslaan'}
+              </button>
+              <button onClick={() => { setBewerk(null); setFout(null) }} disabled={opslaan} style={knop(false)}>Annuleren</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ ...kop, display: 'flex', alignItems: 'center' }}>
+              <span style={{ flex: 1 }}>Bereiding</span>
+              {kanBewerken && (
+                <button onClick={begin} style={{ ...knop(false), height: 30, padding: '0 0.65rem', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                  <Pencil size={13} /> Bewerk recept
+                </button>
+              )}
+            </div>
+            {laden ? (
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Laden…</div>
+            ) : stappen.length === 0 ? (
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Voor deze maaltijd staat nog geen bereiding.</div>
+            ) : (
+              <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {stappen.map((st, i) => (
+                  <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 999, background: '#fff', color: '#0a0a0a', fontSize: '0.74rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.88)', lineHeight: 1.5, paddingTop: 2 }}>{st}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {tips && (
+              <>
+                <div style={kop}>Tips</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.55, whiteSpace: 'pre-line' }}>{tips}</div>
+              </>
+            )}
           </>
         )}
       </div>

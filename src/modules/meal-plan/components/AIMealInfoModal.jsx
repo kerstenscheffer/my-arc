@@ -90,11 +90,14 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
   // Merge meal prop met DB data
   const effectiveMeal = {
     ...meal,
-    // ✅ Prioriteit: meal prop (snapshot) als die steps heeft, anders DB
-    preparation_steps: meal.preparation_steps?.length
-      ? meal.preparation_steps
-      : (dbMealData?.preparation_steps || []),
-    tips: meal.tips || dbMealData?.tips || null,
+    // Het recept zelf (ai_meals) wint van de kopie in het plan: de coach kan
+    // bereiding en tips aanpassen in de Plan Analyzer, en die wijziging moet
+    // ook aankomen bij plannen waar de oude stappen al in staan. Geen rij in
+    // ai_meals (eigen maaltijd): dan de kopie.
+    preparation_steps: dbMealData?.preparation_steps?.length
+      ? dbMealData.preparation_steps
+      : (meal.preparation_steps || []),
+    tips: dbMealData?.tips || meal.tips || null,
     // Beschrijving en vragen staan in het plan-object als het daaruit komt,
     // anders bij de maaltijd zelf.
     description: meal.description || dbMealData?.description || null,
