@@ -10,6 +10,10 @@
 //   week = dit slot op alle zeven dagen (alleen bij wisselen)
 //   dagen = dit slot op de dagen die de coach aantikt (alleen bij wisselen);
 //           onKies('dagen', [0..6])
+//
+// `weekStart` ('JJJJ-MM-DD', maandag): de Analyzer staat in week-modus. Dan
+// geldt elke keuze alleen voor die week (het opslaan regelt dat), en zeggen
+// de teksten dat ook in plaats van "elke week".
 
 import React, { useState } from 'react'
 import { Repeat, CalendarDays, CalendarRange, CalendarCheck, Check } from 'lucide-react'
@@ -29,6 +33,7 @@ export default function BereikKeuze({
   metAlleDagen = false,  // derde keuze: dit slot op alle dagen
   bezig = null,          // key van de keuze die nu opslaat
   dagIndex = null,       // open dag (0 = ma), vooraf aangevinkt bij 'Kies dagen'
+  weekStart = null,      // maandag van de week in week-modus, anders null
   onKies,
 }) {
   const [kiesOpen, setKiesOpen] = useState(false)
@@ -39,17 +44,21 @@ export default function BereikKeuze({
     ? 'staat verder nergens in de week'
     : plekken.map(p => `${p.dag} ${slotKort(p.slot)}`).join(' · ')
   const dag = dagNaam || 'deze dag'
+  const kort = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  const weekBegin = weekStart ? new Date(`${weekStart}T00:00:00`) : null
+  const weekTekst = weekBegin ? (() => { const e = new Date(weekBegin); e.setDate(e.getDate() + 6); return `${kort(weekBegin)} – ${kort(e)}` })() : null
+  const dagDatum = weekBegin && dagIndex != null ? (() => { const d = new Date(weekBegin); d.setDate(d.getDate() + dagIndex); return kort(d) })() : null
 
   const opties = [
     {
       key: 'day', Icon: CalendarDays,
-      title: `Alleen ${dag}`,
-      sub: 'elke week op deze dag',
+      title: `Alleen ${dag}${dagDatum ? ` ${dagDatum}` : ''}`,
+      sub: weekTekst ? 'alleen in deze week' : 'elke week op deze dag',
       effect: `past ${dag} ${slotKort(slot)} aan, de andere dagen blijven zoals ze zijn`,
     },
     {
       key: 'all', Icon: Repeat,
-      title: aantal > 1 ? `Overal (${aantal}×)` : 'Overal in de week',
+      title: aantal > 1 ? `Overal (${aantal}×)` : weekTekst ? 'Overal in deze week' : 'Overal in de week',
       sub: `waar ${oudeNaam || 'deze maaltijd'} staat`,
       effect: plekkenTekst,
       uit: aantal === 0,
@@ -58,7 +67,7 @@ export default function BereikKeuze({
       key: 'week', Icon: CalendarRange,
       title: 'Alle dagen',
       sub: `${slotKort(slot)} op 7 dagen`,
-      effect: `zet ${nieuweNaam || 'de nieuwe maaltijd'} als ${slotKort(slot)} op elke dag van de week`,
+      effect: `zet ${nieuweNaam || 'de nieuwe maaltijd'} als ${slotKort(slot)} op elke dag van ${weekTekst ? `de week ${weekTekst}` : 'de week, elke week'}`,
     }, {
       key: 'dagen', Icon: CalendarCheck,
       title: 'Kies dagen',
@@ -74,7 +83,9 @@ export default function BereikKeuze({
         {vraag}
       </div>
       <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>
-        Je kunt dit later altijd weer aanpassen.
+        {weekTekst
+          ? <>Geldt alleen voor de week <span style={{ color: '#fff' }}>{weekTekst}</span>. Elke andere week blijft zoals hij is.</>
+          : 'Geldt elke week. Je kunt dit later altijd weer aanpassen.'}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
         {opties.map(opt => {

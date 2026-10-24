@@ -102,6 +102,8 @@ export default function WisselModal({
   // undefined (pre-workout: één maaltijd voor het hele plan), dan wordt de
   // vraag overgeslagen.
   dagNaam = null, plekken = undefined, dagIndex = null,
+  // Week-modus van de Analyzer: maandag van de week die je apart aanpast.
+  weekStart = null,
   // Toegevoegd vanuit de agenda: de getikte tijd ('18:00').
   tijd = null,
   onSelect, onClose, isMobile, embedded = false,
@@ -999,7 +1001,7 @@ export default function WisselModal({
                 vraag="Waar geldt deze wissel?"
                 dagNaam={dagNaam} slot={slot}
                 oudeNaam={currentMeal?.name} nieuweNaam={selectedMeal?.name}
-                plekken={plekken} metAlleDagen dagIndex={dagIndex}
+                plekken={plekken} metAlleDagen dagIndex={dagIndex} weekStart={weekStart}
                 bezig={bezig} onKies={bevestig}
               />
             ) : (

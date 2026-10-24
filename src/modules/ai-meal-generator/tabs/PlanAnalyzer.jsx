@@ -2059,6 +2059,7 @@ export default function PlanAnalyzer({
               clientId={resolvedClientId || null}
               dagNaam={DAYS[swapState.dayIndex]?.full?.toLowerCase() || null}
               dagIndex={swapState.dayIndex ?? null}
+              weekStart={weekModus}
               tijd={swapState.timing || null}
               plekken={swapState.slot === PRE_WORKOUT_SLOT ? undefined : plekkenVanMaaltijd(swapState.meal)}
               targetCalories={targets?.calories || clientRecord?.target_calories || null}
@@ -2546,6 +2547,8 @@ export default function PlanAnalyzer({
           <BereikKeuze
             vraag="Waar geldt deze aanpassing?"
             dagNaam={DAYS[editBereik.dayIndex]?.full?.toLowerCase() || null}
+            dagIndex={editBereik.dayIndex ?? null}
+            weekStart={weekModus}
             slot={editBereik.slot}
             oudeNaam={weekData?.[editBereik.dayIndex]?.meals?.[editBereik.slot]?.name}
             plekken={plekkenVanMaaltijd(weekData?.[editBereik.dayIndex]?.meals?.[editBereik.slot])}
