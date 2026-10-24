@@ -9,6 +9,8 @@
 // hier ook.
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { KolomKopInhoud } from './KolomKop'
+import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
 import {
   UtensilsCrossed, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet, Info,
   ClipboardCheck, Repeat, Pencil, Database, ScanBarcode, Search, ChefHat, Keyboard, History, CalendarDays,
@@ -577,36 +579,34 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     <>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '1.5rem' }}>
-          {/* Eén regel: welk plan actief is, met Plan Analyzer, Genereer en
-              het Inzicht-scherm van de klant. Geen kaart eromheen. */}
-          <div style={{ padding: isMobile ? '0.6rem 0.9rem' : '0.7rem 1.1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {mealData.plan ? (mealData.plan.name || 'Voedingsplan') : 'Nog geen plan'}
-              </div>
-              <div style={{ fontSize: '0.66rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: mealData.plan?.isActive ? colors.success : colors.textMuted, marginTop: 1 }}>
-                {mealData.plan ? (mealData.plan.isActive ? 'Actief' : 'Concept') : 'Voedingsplan'}
-                {laden && <span style={{ color: colors.textMuted, textTransform: 'none', letterSpacing: 0, fontWeight: 700 }}> · laden…</span>}
-              </div>
-            </div>
+          {/* In de kolomkop: welk plan, met Plan Analyzer, Genereer en het
+              Inzicht-scherm van de klant (zie KolomKop). */}
+          <KolomKopInhoud>
+            <span style={{ ...kopInfoStijl, flex: 1 }} title={mealData.plan ? (mealData.plan.name || 'Voedingsplan') : 'Nog geen plan'}>
+              <span style={{ color: mealData.plan?.isActive ? colors.success : 'rgba(255,255,255,0.5)', fontWeight: 900 }}>
+                {mealData.plan ? (mealData.plan.isActive ? 'Actief' : 'Concept') : 'Geen plan'}
+              </span>
+              {mealData.plan && <> · <span style={{ color: '#fff', fontWeight: 800 }}>{mealData.plan.name || 'Voedingsplan'}</span></>}
+              {laden && ' · laden…'}
+            </span>
             {onNavigatePlan && (
               <button
                 onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
                 title="Plan Analyzer" aria-label="Plan Analyzer"
-                style={{ ...secundaireKnop, padding: 0, width: 44, border: '1px solid rgba(34,197,94,0.6)', color: colors.success }}
+                style={{ ...kopKnopStijl, padding: 0, width: 30, justifyContent: 'center', borderColor: 'rgba(34,197,94,0.6)', color: colors.success }}
               >
-                <BarChart3 size={17} strokeWidth={2.6} />
+                <BarChart3 size={14} strokeWidth={2.6} />
               </button>
             )}
             {onNavigatePlan && db && (
-              <button onClick={() => setShowGenerateModal(true)} title="Automatisch plan genereren" aria-label="Plan genereren" style={{ ...secundaireKnop, padding: 0, width: 44 }}>
-                <Zap size={17} strokeWidth={2.6} />
+              <button onClick={() => setShowGenerateModal(true)} title="Automatisch plan genereren" aria-label="Plan genereren" style={{ ...kopKnopStijl, padding: 0, width: 30, justifyContent: 'center' }}>
+                <Zap size={14} strokeWidth={2.6} />
               </button>
             )}
-            <button onClick={() => setStatsOpen(true)} style={secundaireKnop} title="Maand- en dagoverzicht, zoals de klant het ziet">
-              <CalendarDays size={15} strokeWidth={2.6} /> Inzicht
+            <button onClick={() => setStatsOpen(true)} style={kopKnopStijl} title="Maand- en dagoverzicht, zoals de klant het ziet">
+              <CalendarDays size={13} strokeWidth={2.6} /> Inzicht
             </button>
-          </div>
+          </KolomKopInhoud>
 
           {/* Waterdoel — in liters op de klant (clients.water_intake_target). De
               fles op de maaltijdpagina rekent daarmee; 3 liter is de standaard

@@ -4,7 +4,7 @@
 // Props: { workoutData, exerciseProgress, isMobile, onNavigateWorkout, client, onClose }
 // ============================================
 import React, { useState, useMemo, useEffect } from 'react'
-import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward, X } from 'lucide-react'
+import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer, ArrowLeftRight, Plus, Trash2, SkipForward } from 'lucide-react'
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 import CardioInsightBlock from './CardioInsightBlock'
 import StappenInsight from './StappenInsight'
@@ -15,6 +15,8 @@ import useOefeningFotos from '../../../workout/utils/useOefeningFotos'
 // Hetzelfde krachtblad als de klant op zijn workout-pagina opent: per
 // oefening de stand op 8 reps tegen de band van de fase, met grafiek.
 import KrachtBlad from '../../../workout/components/KrachtBlad'
+import { KolomKopInhoud } from './KolomKop'
+import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
 import KlantPlanTerugzetten from './KlantPlanTerugzetten'
 
@@ -166,17 +168,7 @@ function PlanWijzigingen({ db, client, isMobile }) {
   )
 }
 
-const kopKnopKlein = {
-  flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.2rem',
-  height: 26, padding: '0 0.45rem', borderRadius: 6,
-  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
-  color: '#fff', fontSize: '0.72rem', fontWeight: 800, fontFamily: 'inherit',
-  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', whiteSpace: 'nowrap',
-}
-
-// `onVerberg`: kruisje in de eigen kopregel (desktop met meerdere kolommen);
-// dan slaat ClientInsightModal zijn algemene kolomkop over.
-export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose, onVerberg = null }) {
+export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose }) {
   const [view, setView] = useState('sessions')
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
@@ -353,17 +345,10 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   if (view === 'sessions') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        {/* Eén kopregel: titel, plan, voortgang en knoppen. Stond eerder als
-            drie regels (kolomkop, eigen kop, planregel) boven elkaar. */}
-        <div style={{
-          flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.45rem',
-          padding: isMobile ? '0.45rem 0.6rem' : '0.4rem 0.6rem 0.4rem 0.8rem',
-          borderBottom: '1px solid rgba(255,255,255,0.06)', minWidth: 0,
-        }}>
-          <Dumbbell size={14} color="#fff" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', flexShrink: 0 }}>Training</span>
+        {/* In de kolomkop: plan, voortgang en knoppen (zie KolomKop). */}
+        <KolomKopInhoud>
           <span title={workoutData?.schema ? `${workoutData.schema.name || 'Workout Plan'} · ${workoutData.schema.days_per_week || '-'}d/week · ${workoutData.schema.experience_level || '-'}` : 'Geen schema'}
-            style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+            style={{ ...kopInfoStijl, flex: 1 }}>
             {workoutData?.schema ? (
               <>
                 <span style={{ color: '#fff', fontWeight: 800 }}>{workoutData.schema.name || 'Workout Plan'}</span>
@@ -377,25 +362,17 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <button
             onClick={() => setKrachtOpen(true)}
             title="Kracht: per oefening de stand tegen de band van de fase, zoals de klant het ziet"
-            style={kopKnopKlein}
+            style={kopKnopStijl}
           >
             <BarChart3 size={12} /> Kracht
           </button>
           {onNavigateWorkout && (
             <button onClick={() => { onNavigateWorkout(client?.id, workoutData?.schema?.id || null); if (onClose) onClose() }}
-              title={workoutData?.schema ? 'Plan openen in de builder' : 'Nieuw plan maken'} style={kopKnopKlein}>
+              title={workoutData?.schema ? 'Plan openen in de builder' : 'Nieuw plan maken'} style={kopKnopStijl}>
               <ExternalLink size={11} /> {workoutData?.schema ? 'Plan' : 'Nieuw plan'}
             </button>
           )}
-          {onVerberg && (
-            <button onClick={onVerberg} title="Training verbergen" aria-label="Training verbergen" style={{
-              flexShrink: 0, width: 24, height: 24, padding: 0, borderRadius: 6, background: 'transparent', border: 'none',
-              color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <X size={13} />
-            </button>
-          )}
-        </div>
+        </KolomKopInhoud>
         {/* Modal boven het inzichtpaneel; zIndex hoger dan dat paneel. */}
         <BladModal open={krachtOpen} titel="Kracht" onClose={() => setKrachtOpen(false)} zIndex={12000}>
           <KrachtBlad db={db} client={client} isMobile={isMobile} />

@@ -4,6 +4,8 @@
 // that expands to show all section scores + notes + coach fields.
 
 import React, { useEffect, useState } from 'react'
+import { KolomKopInhoud } from './KolomKop'
+import { kopInfoStijl } from './kolomKopStijl'
 import { createPortal } from '../../../../client/paginaPortal'
 import {
   ClipboardCheck, ChevronDown, ChevronRight,
@@ -535,30 +537,15 @@ export default function CheckinsColumn({ client, db, isMobile }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{
-        padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', alignItems: 'center', gap: '0.4rem',
-      }}>
-        <ClipboardCheck size={14} color={G.primary} />
-        <span style={{
-          fontSize: '0.75rem', fontWeight: 700, color: G.primary,
-          letterSpacing: '-0.01em', flex: 1,
-        }}>
-          Check-ins
-        </span>
-        {checkins && checkins.length > 0 && (
-          <span style={{
-            fontSize: '0.72rem', fontWeight: 700,
-            padding: '0.15rem 0.4rem',
-            background: G.bg, border: `1px solid ${G.border}`,
-            borderRadius: '4px', color: G.primary,
-          }}>
-            {checkins.length}
+      {/* Aantal in de kolomkop (zie KolomKop); de eigen kop "Check-ins"
+          eronder herhaalde alleen de titel. */}
+      {checkins && checkins.length > 0 && (
+        <KolomKopInhoud>
+          <span style={kopInfoStijl}>
+            <span style={{ color: '#fff', fontWeight: 900 }}>{checkins.length}</span> {checkins.length === 1 ? 'check-in' : 'check-ins'}
           </span>
-        )}
-      </div>
+        </KolomKopInhoud>
+      )}
 
       {/* Scrollable list */}
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>

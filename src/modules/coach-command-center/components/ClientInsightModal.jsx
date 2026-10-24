@@ -12,6 +12,7 @@ import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
 import LooptijdKort from './LooptijdKort'
+import { KolomKop } from './insight/KolomKop'
 import TrajectModal from './TrajectModal'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
@@ -187,7 +188,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const SECTIES = [
     { id: 'logboek', label: 'Logboek',  icon: BookOpen },
     { id: 'weight',  label: 'Gewicht',  icon: Scale },
-    { id: 'workout', label: 'Training', icon: Dumbbell, eigenKop: true },
+    { id: 'workout', label: 'Training', icon: Dumbbell },
     { id: 'meals',   label: 'Voeding',  icon: UtensilsCrossed },
     { id: 'data',    label: 'Gegevens', icon: User },
     { id: 'checkin', label: 'Check-in', icon: ClipboardCheck },
@@ -211,7 +212,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
         isMobile={klein} onNavigateWorkout={onNavigateWorkout}
         client={effectiveClient} onClose={onClose}
-        onVerberg={!klein && openSecties.length > 1 ? () => toggleSectie('workout') : null}
       />
     )
     if (id === 'meals') return (
@@ -563,29 +563,15 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <div key={sec.id} style={{
                   flex: '1 1 0',
                   minWidth: openSecties.length > 1 ? 300 : 0,
-                  overflow: 'auto', WebkitOverflowScrolling: 'touch',
+                  overflow: 'hidden',
                   borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none',
                 }}>
-                  {/* Kop alleen zodra er meer dan één kolom staat; bij één
-                      kolom weet je uit de kopregel al waar je naar kijkt. */}
-                  {openSecties.length > 1 && !sec.eigenKop && (
-                    <div style={{
-                      position: 'sticky', top: 0, zIndex: 5,
-                      display: 'flex', alignItems: 'center', gap: '0.35rem',
-                      padding: '0.4rem 0.7rem',
-                      background: 'rgba(10,10,10,0.97)',
-                      borderBottom: '1px solid rgba(255,255,255,0.06)',
-                    }}>
-                      <sec.icon size={13} color="#fff" />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>{sec.label}</span>
-                      <div style={{ flex: 1 }} />
-                      <button onClick={() => toggleSectie(sec.id)} title={`${sec.label} verbergen`}
-                        style={{ ...kopKnop(), width: 22, height: 22 }}>
-                        <X size={13} />
-                      </button>
-                    </div>
-                  )}
-                  {renderSectie(sec.id, false)}
+                  {/* Elke kolom dezelfde kopbalk; de kolom zet er zijn
+                      belangrijkste info en knoppen in (KolomKopInhoud). */}
+                  <KolomKop icon={sec.icon} titel={sec.label}
+                    onVerberg={openSecties.length > 1 ? () => toggleSectie(sec.id) : null}>
+                    {renderSectie(sec.id, false)}
+                  </KolomKop>
                 </div>
               ))}
               </div>
