@@ -5,16 +5,16 @@
 // datumkeuze. Gedeeld door de klant (tracking-pagina) en de coach
 // (coach insight), zodat allebei hetzelfde zien.
 //
-// Downloaden tekent de vergelijking op een canvas — twee foto's, de hoek en
-// de datums erbij — en slaat dat op als één JPG. Geen html2canvas: dat
-// struikelt over externe foto's; met crossOrigin op de Image-elementen werkt
-// Supabase-storage gewoon. Lukt het tekenen niet (CORS), dan openen we de
-// twee foto's los in nieuwe tabbladen in plaats van stil te falen.
+// Bovenaan staat meteen het eindresultaat: dezelfde transformatiekaart als op
+// de tracking-pagina (4:5, MA-COACHING-logo met fade, "Maand X"-labels),
+// getekend uit de twee gekozen foto's. Download slaat precies dat plaatje op,
+// klaar om te delen. Lukt het tekenen niet (CORS), dan openen we de twee
+// foto's los in nieuwe tabbladen in plaats van stil te falen.
 
-import React, { useState, useEffect, useMemo } from 'react'
-import { fotoWeergaveUrl } from '../fotoWeergave'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, ArrowRight, Download, ArrowLeftRight } from 'lucide-react'
+import { X, Download, ArrowLeftRight, Loader } from 'lucide-react'
+import { tekenTransformatie } from './transformatieKaart'
 
 const angleOf = (p) => (p?.metadata?.subtype || 'overig')
 const ANGLE_LABEL = { front: 'Voorkant', side: 'Zijkant', back: 'Achterkant', overig: 'Overig' }
@@ -24,14 +24,6 @@ const fmtDate = (d) => {
   try { return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) }
   catch { return d }
 }
-
-const laadAfbeelding = (url) => new Promise((ok, nee) => {
-  const img = new Image()
-  img.crossOrigin = 'anonymous'
-  img.onload = () => ok(img)
-  img.onerror = nee
-  img.src = url
-})
 
 export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
   const m = isMobile
@@ -84,6 +76,31 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
 
   const wissel = () => { const l = leftId; setLeftId(rightId); setRightId(l) }
 
+  // "Maand 1" = de eerste progressiefoto van de klant, welke hoek dan ook.
+  const startDatum = useMemo(() => {
+    const d = (photos || []).map(p => p.photo_date).filter(Boolean).sort()[0]
+    return d || null
+  }, [photos])
+
+  // Het resultaat tekenen zodra de keuze verandert.
+  const canvasRef = useRef(null)
+  const [beeld, setBeeld] = useState('laden') // laden | klaar | fout
+  useEffect(() => {
+    if (!left || !right || left.id === right.id || !canvasRef.current) return
+    let weg = false
+    setBeeld('laden')
+    ;(async () => {
+      try {
+        const klaar = await tekenTransformatie(canvasRef.current, left, right, { startDatum, afgebroken: () => weg })
+        if (klaar && !weg) setBeeld('klaar')
+      } catch (e) {
+        console.error('Vergelijking tekenen mislukt:', e)
+        if (!weg) setBeeld('fout')
+      }
+    })()
+    return () => { weg = true }
+  }, [left?.id, right?.id, left?.photo_url, right?.photo_url, startDatum]) // eslint-disable-line
+
   // Hoek van een foto verzetten. Klanten kiezen bij het uploaden nog wel eens
   // de verkeerde kant; dan staat een zijkant tussen de voorkanten. De foto
   // verhuist naar de gekozen hoek, en je blijft op de huidige hoek kijken.
@@ -103,48 +120,20 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
     }
   }
 
-  // De vergelijking als één afbeelding bewaren.
+  // Het getekende resultaat bewaren als PNG.
   const download = async () => {
     if (!left || !right || bezig) return
     setBezig(true)
     const naam = `${(client?.first_name || 'client')}-${angle}-${(left.photo_date || '').slice(0, 10)}-vs-${(right.photo_date || '').slice(0, 10)}`.replace(/[^\w.-]+/g, '-').toLowerCase()
     try {
-      const [a, b] = await Promise.all([laadAfbeelding(left.photo_url), laadAfbeelding(right.photo_url)])
-      const H = 1600, W = 1200, KOP = 120, GAP = 24
-      const c = document.createElement('canvas')
-      c.width = W * 2 + GAP
-      c.height = H + KOP
-      const ctx = c.getContext('2d')
-      ctx.fillStyle = '#0a0a0a'
-      ctx.fillRect(0, 0, c.width, c.height)
-      // Foto's: cover-crop in een 3:4-vak, zodat ze gelijk uitgelijnd staan.
-      const teken = (img, x) => {
-        const s = Math.max(W / img.width, H / img.height)
-        const w = img.width * s, h = img.height * s
-        ctx.drawImage(img, x + (W - w) / 2, KOP + (H - h) / 2, w, h)
-      }
-      ctx.save(); ctx.beginPath(); ctx.rect(0, KOP, W, H); ctx.clip(); teken(a, 0); ctx.restore()
-      ctx.save(); ctx.beginPath(); ctx.rect(W + GAP, KOP, W, H); ctx.clip(); teken(b, W + GAP); ctx.restore()
-      // Kop: hoek links, datums per kant.
-      ctx.fillStyle = '#ffffff'
-      ctx.font = '900 44px -apple-system, Helvetica, Arial, sans-serif'
-      ctx.fillText(`${angleLabel(angle)}`, 32, 56)
-      ctx.font = '800 34px -apple-system, Helvetica, Arial, sans-serif'
-      ctx.fillStyle = 'rgba(255,255,255,0.75)'
-      ctx.fillText(`VOOR · ${fmtDate(left.photo_date)}`, 32, 100)
-      ctx.fillText(`NA · ${fmtDate(right.photo_date)}`, W + GAP + 32, 100)
-      ctx.font = '700 28px -apple-system, Helvetica, Arial, sans-serif'
-      ctx.fillStyle = 'rgba(255,255,255,0.35)'
-      const merk = 'MY ARC'
-      ctx.fillText(merk, c.width - 32 - ctx.measureText(merk).width, 56)
-
-      const url = c.toDataURL('image/jpeg', 0.9)
+      if (beeld !== 'klaar') throw new Error('nog niet getekend')
+      const url = canvasRef.current.toDataURL('image/png')
       const link = document.createElement('a')
-      link.href = url; link.download = `myarc-vergelijking-${naam}.jpg`
+      link.href = url; link.download = `myarc-transformatie-${naam}.png`
       document.body.appendChild(link); link.click(); link.remove()
     } catch (e) {
       // Meestal CORS op de foto-URL. Dan los openen, zodat er altijd iets gebeurt.
-      console.error('Vergelijking tekenen mislukt, open los:', e)
+      console.error('Vergelijking opslaan mislukt, open los:', e)
       window.open(left.photo_url, '_blank'); window.open(right.photo_url, '_blank')
     } finally { setBezig(false) }
   }
@@ -157,25 +146,21 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
     fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
   }
 
-  const Side = ({ label, photo, value, onChange }) => (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4', borderRadius: 12, overflow: 'hidden', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}>
-        {photo ? (
-          <img src={fotoWeergaveUrl(photo.photo_url, { breedte: 900, kwaliteit: 85 })} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', fontWeight: 700 }}>Geen foto</div>
-        )}
-        <span style={{ position: 'absolute', top: 8, left: 8, background: label === 'VOOR' ? 'rgba(0,0,0,0.7)' : '#fff', color: label === 'VOOR' ? '#fff' : '#0a0a0a', fontSize: m ? '0.6rem' : '0.66rem', fontWeight: 900, padding: '0.18rem 0.5rem', borderRadius: 6, letterSpacing: '0.08em' }}>{label}</span>
-        {/* Verkeerde hoek gekozen bij uploaden? Hier verzetten. */}
+  // Per kant: datum kiezen, en de hoek verzetten als de klant bij het
+  // uploaden de verkeerde kant koos.
+  const Keuze = ({ label, photo, value, onChange }) => (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: m ? '0.66rem' : '0.7rem', fontWeight: 900, letterSpacing: '0.08em', color: '#fff' }}>{label}</span>
         {photo && (
           <select
             value={angleOf(photo)}
             onChange={e => zetHoek(photo, e.target.value)}
             title="Hoek van deze foto wijzigen"
             style={{
-              position: 'absolute', top: 8, right: 8, maxWidth: 'calc(100% - 70px)',
-              background: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', borderRadius: 6,
-              fontSize: m ? '0.6rem' : '0.66rem', fontWeight: 900, padding: '0.22rem 0.4rem',
+              marginLeft: 'auto', maxWidth: '60%', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)',
+              border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
+              fontSize: m ? '0.62rem' : '0.66rem', fontWeight: 800, padding: '0.15rem 0.3rem',
               fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
             }}
           >
@@ -256,10 +241,25 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                 Van deze hoek is er maar {forAngle.length} foto. Je hebt er minstens 2 nodig om te vergelijken.
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: m ? '0.4rem' : '0.7rem' }}>
-                <Side label="VOOR" photo={left} value={leftId} onChange={setLeftId} />
-                <ArrowRight size={m ? 16 : 20} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
-                <Side label="NA" photo={right} value={rightId} onChange={setRightId} />
+              <div style={{ maxWidth: 480, margin: '0 auto' }}>
+                {/* Het eindresultaat, zoals het gedownload wordt. */}
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', borderRadius: 14, overflow: 'hidden', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: beeld === 'klaar' ? 'block' : 'none' }} />
+                  {left?.id === right?.id ? (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', fontWeight: 700 }}>Kies links en rechts een andere foto.</div>
+                  ) : beeld === 'laden' ? (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700 }}>
+                      <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Laden…
+                    </div>
+                  ) : beeld === 'fout' ? (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', fontWeight: 700 }}>Voorbeeld lukt niet. Download opent de twee foto's los.</div>
+                  ) : null}
+                </div>
+                <div style={{ display: 'flex', gap: m ? '0.6rem' : '0.8rem', marginTop: '0.8rem' }}>
+                  <Keuze label="VOOR" photo={left} value={leftId} onChange={setLeftId} />
+                  <Keuze label="NA" photo={right} value={rightId} onChange={setRightId} />
+                </div>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               </div>
             )}
           </div>

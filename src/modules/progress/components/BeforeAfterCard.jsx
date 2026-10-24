@@ -9,39 +9,8 @@
 // zijn, met de overlay eroverheen zodat het altijd branded oogt.
 
 import { useEffect, useRef, useState } from 'react'
-import { fotoWeergaveUrl } from '../fotoWeergave'
 import { Download, Loader } from 'lucide-react'
-
-const W = 1080, H = 1350
-const OVERLAY_SRC = '/ma-coaching-logo.png'
-
-function monthsBetween(a, b) {
-  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
-    - (b.getDate() < a.getDate() ? 1 : 0)
-}
-
-function loadImg(src, cors) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    if (cors) {
-      img.crossOrigin = 'anonymous'
-      img.onload = () => resolve(img)
-      img.onerror = () => { const i2 = new Image(); i2.onload = () => resolve(i2); i2.onerror = reject; i2.src = src }
-    } else {
-      img.onload = () => resolve(img)
-      img.onerror = reject
-    }
-    img.src = src
-  })
-}
-
-function drawCover(ctx, img, dx, dy, dw, dh) {
-  const ir = img.width / img.height, tr = dw / dh
-  let sw, sh, sx, sy
-  if (ir > tr) { sh = img.height; sw = sh * tr; sx = (img.width - sw) / 2; sy = 0 }
-  else { sw = img.width; sh = sw / tr; sx = 0; sy = (img.height - sh) / 2 }
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh)
-}
+import { tekenTransformatie, OVERLAY_SRC } from './transformatieKaart'
 
 // De tabel bevat 'front', 'side', 'back', 'pump' en incidenteel Nederlandse
 // varianten ('voor', 'zij'). Eén matcher voor alle hoeken.
@@ -123,34 +92,10 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
     let cancelled = false
     ;(async () => {
       try {
-        const [imgA, imgB, overlay] = await Promise.all([
-          loadImg(fotoWeergaveUrl(pair.first.photo_url, { breedte: 1000, kwaliteit: 85 }), true),
-          loadImg(fotoWeergaveUrl(pair.last.photo_url, { breedte: 1000, kwaliteit: 85 }), true),
-          loadImg(OVERLAY_SRC, false),
-        ])
-        if (cancelled) return
         const canvas = canvasRef.current
-        if (!canvas) return
-        const ctx = canvas.getContext('2d')
-        canvas.width = W; canvas.height = H
-        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H)
-        drawCover(ctx, imgA, 0, 0, W / 2, H)          // links = eerste (Maand 1)
-        drawCover(ctx, imgB, W / 2, 0, W / 2, H)      // rechts = laatste (Maand X)
-        ctx.drawImage(overlay, 0, 0, W, H)
-
-        const fd = new Date(pair.first.photo_date), ld = new Date(pair.last.photo_date)
-        const lastMonth = Math.max(1, monthsBetween(fd, ld) + 1)
-        ctx.save()
-        ctx.font = 'italic 900 62px Arial, sans-serif'
-        ctx.fillStyle = '#fff'
-        ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 3
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        const y = H * 0.86
-        ctx.fillText('Maand 1', W * 0.24, y)
-        ctx.fillText(`Maand ${lastMonth}`, W * 0.76, y)
-        ctx.restore()
-
-        if (!cancelled) setStatus('ready')
+        if (!canvas || cancelled) return
+        const klaar = await tekenTransformatie(canvas, pair.first, pair.last, { afgebroken: () => cancelled })
+        if (klaar && !cancelled) setStatus('ready')
       } catch (e) { console.error('BeforeAfter tekenen mislukt:', e); if (!cancelled) setStatus('error') }
     })()
     return () => { cancelled = true }
