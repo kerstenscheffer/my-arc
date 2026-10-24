@@ -29,7 +29,9 @@ const weekLabel = (maandagIso) => {
   return `${naam ? `${naam} · ` : ''}${kort(a)} – ${kort(b)}`
 }
 
-export default function WeekKeuze({ weekModus, aantalAangepast, onKies, onTerugzetten, bezig, isMobile }) {
+// `inline`: in de kopregel van de Analyzer, zonder eigen balk en met een
+// korte tekst ('2 dagen anders') in plaats van de uitleg.
+export default function WeekKeuze({ weekModus, aantalAangepast, onKies, onTerugzetten, bezig, isMobile, inline = false }) {
   const nu = maandagVan()
   const knop = (aan) => ({
     height: 32, padding: '0 0.7rem', borderRadius: 9, flexShrink: 0,
@@ -47,7 +49,9 @@ export default function WeekKeuze({ weekModus, aantalAangepast, onKies, onTerugz
   const week = weekModus
 
   return (
-    <div style={{
+    <div style={inline ? {
+      display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, opacity: bezig ? 0.6 : 1,
+    } : {
       display: 'flex', alignItems: 'center', gap: 6, flexWrap: isMobile ? 'wrap' : 'nowrap',
       padding: isMobile ? '0.4rem 0.6rem' : '0.4rem 1rem',
       borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#0a0a0a',
@@ -59,7 +63,7 @@ export default function WeekKeuze({ weekModus, aantalAangepast, onKies, onTerugz
       <button onClick={() => !bezig && week && week > nu && onKies(plusWeken(week, -1))} disabled={!week || week <= nu} style={pijl(!week || week <= nu)} aria-label="Vorige week">
         <ChevronLeft size={17} strokeWidth={2.6} />
       </button>
-      <button onClick={() => !bezig && !week && onKies(plusWeken(nu, 1))} style={{ ...knop(!!week), minWidth: isMobile ? 0 : 190, justifyContent: 'center' }}
+      <button onClick={() => !bezig && !week && onKies(plusWeken(nu, 1))} style={{ ...knop(!!week), minWidth: isMobile || inline ? 0 : 190, justifyContent: 'center' }}
         title="Eén week apart aanpassen">
         {week ? weekLabel(week) : 'Week aanpassen…'}
       </button>
@@ -67,6 +71,11 @@ export default function WeekKeuze({ weekModus, aantalAangepast, onKies, onTerugz
         <ChevronRight size={17} strokeWidth={2.6} />
       </button>
 
+      {inline ? (week && (
+        <span title="Wijzigingen gelden alleen deze week" style={{ flexShrink: 1, minWidth: 0, marginLeft: 4, fontSize: '0.74rem', fontWeight: 800, color: aantalAangepast > 0 ? '#fff' : 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {aantalAangepast > 0 ? `${aantalAangepast} ${aantalAangepast === 1 ? 'dag' : 'dagen'} anders` : 'alleen deze week'}
+        </span>
+      )) : (
       <span style={{ flex: 1, minWidth: isMobile ? '100%' : 0, order: isMobile ? 5 : 0, fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {week
           ? (aantalAangepast > 0
@@ -74,10 +83,11 @@ export default function WeekKeuze({ weekModus, aantalAangepast, onKies, onTerugz
             : 'Nog gelijk aan elke week · wat je nu wijzigt geldt alleen deze week')
           : 'Wijzigingen gelden elke week'}
       </span>
+      )}
 
       {week && aantalAangepast > 0 && (
-        <button onClick={() => !bezig && onTerugzetten()} style={knop(false)} title="Deze week weer gelijk aan elke week maken">
-          <RotateCcw size={13} strokeWidth={2.6} /> Terugzetten
+        <button onClick={() => !bezig && onTerugzetten()} style={inline ? { ...knop(false), padding: '0 0.5rem' } : knop(false)} title="Deze week weer gelijk aan elke week maken">
+          <RotateCcw size={13} strokeWidth={2.6} />{!inline && ' Terugzetten'}
         </button>
       )}
     </div>

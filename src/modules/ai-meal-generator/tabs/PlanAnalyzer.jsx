@@ -21,6 +21,7 @@ import SupplementPanel from './plan-analyzer/SupplementPanel'
 import { laadSupplementen } from '../../supplements/utils/supplementSchedule'
 import ClientAgendaView from '../../client-agenda/ClientAgendaView'
 import DagRingen from './plan-analyzer/DagRingen'
+import DagStrip from './plan-analyzer/DagStrip'
 import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
 import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
@@ -1766,53 +1767,48 @@ export default function PlanAnalyzer({
 
   const preWorkoutSlot = getPreWorkoutSlot(activeDay)
   const sortedSlots = currentDay ? getSortedSlots(currentDay.meals) : SLOTS
-  const warningCount = weekData?.reduce((count, day) => {
-    if (!targets?.calories) return count
-    const cal = day.totals?.kcal || day.totals?.calories || 0
-    const pct = targets.calories ? cal / targets.calories : 1
-    return count + (pct < 0.85 || pct > 1.15 ? 1 : 0)
-  }, 0) || 0
   const activePlanCount = allClientPlans.filter(p => p.is_active).length
-
-  // ── Sidebar knoppen definitie ──
-  const sidebarTop = [
-    {
-      id: 'activate',
-      render: () => (
-        <button onClick={handleActivate} disabled={activating || activated || planMeta?.isActive} style={{
-          width: '44px', padding: '6px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-          background: (activated || planMeta?.isActive) ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.08)',
-          border: `1px solid ${(activated || planMeta?.isActive) ? 'rgba(16,185,129,0.4)' : 'rgba(16,185,129,0.2)'}`,
-          borderRadius: '7px', cursor: (activated || planMeta?.isActive) ? 'default' : 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-        }}>
-          {activating ? <Loader size={13} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} color="#10b981" />}
-          <span style={{ fontSize: '0.38rem', fontWeight: 700, color: '#10b981' }}>{(activated || planMeta?.isActive) ? 'Actief' : 'Activeer'}</span>
-        </button>
-      )
-    },
-  ]
 
   // Toggle een sectie in het dock-paneel (klik zelfde knop = sluiten).
   const toggleDock = (id) => setDockedSection(d => d === id ? null : id)
   // Tijden en Agenda weggehaald (9 okt 2026): tijden pas je aan op de kaart
   // zelf (tik op de foto), en Week laat hetzelfde zien als Agenda.
-  const sidebarNav = [
-    // Client opent de intake van deze klant (zelfde venster als in CoachHub),
-    // niet meer het zijvak met klantinfo (9 okt 2026).
-    { id: 'client', icon: '👤',                    label: 'Client',  active: intakeOpen, onClick: () => setIntakeOpen(true) },
-    { id: 'dagen',  icon: <CalendarDays size={18} />, label: 'Dagen', active: dockedSection === 'dagen', onClick: () => toggleDock('dagen') },
-    { id: 'week',   icon: <Grid3X3 size={18} />,   label: 'Week',    active: viewMode === 'week',        onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
-    { id: 'swaps',  icon: <Repeat size={18} />,    label: 'Swaps',   active: dockedSection === 'swaps',  onClick: () => toggleDock('swaps') },
-    { id: 'library', icon: <List size={18} />, label: 'Plannen', active: dockedSection === 'library', onClick: () => toggleDock('library'), badge: allClientPlans.length > 0 ? allClientPlans.length : null },
-    { id: 'supp',   icon: <Pill size={18} />,   label: 'Supp',    active: dockedSection === 'supp',    onClick: () => toggleDock('supp'), badge: supplementen.length > 0 ? supplementen.length : null },
-  ]
+  // Gereedschap in de dagkolom (was de brede zijbalk). Client opent de
+  // intake (zelfde venster als in CoachHub); de rest opent in het zijvak.
+  const gereedschap = [
+    onOpenTargets && { id: 'targets', icon: <SlidersHorizontal size={16} />, label: 'Targets', active: false, onClick: openTargets },
+    { id: 'client', icon: <Users size={16} />, label: 'Klantinfo', active: intakeOpen, onClick: () => setIntakeOpen(true) },
+    { id: 'dagen',  icon: <CalendarDays size={16} />, label: 'Dagsjablonen', active: dockedSection === 'dagen', onClick: () => toggleDock('dagen') },
+    { id: 'week',   icon: <Grid3X3 size={16} />, label: 'Weekagenda', active: viewMode === 'week', onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
+    { id: 'swaps',  icon: <Repeat size={16} />, label: 'Swaps', active: dockedSection === 'swaps', onClick: () => toggleDock('swaps') },
+    { id: 'library', icon: <List size={16} />, label: 'Plannen', active: dockedSection === 'library', onClick: () => toggleDock('library'), badge: allClientPlans.length > 0 ? allClientPlans.length : null },
+    { id: 'supp',   icon: <Pill size={16} />, label: 'Supplementen', active: dockedSection === 'supp', onClick: () => toggleDock('supp'), badge: supplementen.length > 0 ? supplementen.length : null },
+  ].filter(Boolean)
 
-  const sidebarBottom = [
-    { id: 'pdf',     icon: loadingPdf ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={16} />, label: 'PDF',    onClick: handlePDF,                                                     color: '#FFD700' },
-    { id: 'undo',    icon: <RotateCcw size={16} />,   label: 'Undo',   onClick: handleUndo,      color: canUndo ? '#fff' : 'rgba(255,255,255,0.2)', disabled: !canUndo },
-    { id: 'redo',    icon: <RotateCw size={16} />,    label: 'Redo',   onClick: handleRedo,      color: canRedo ? '#fff' : 'rgba(255,255,255,0.2)', disabled: !canRedo },
-  ]
+  // Per dag de totalen voor de dagstrip, met de pre-workout op trainingsdagen
+  // (zelfde regel als dagTotalen hierboven).
+  const dagStripDagen = DAYS.map((d, i) => {
+    const dag = weekData?.[i]
+    const training = trainingDays?.length > 0 ? trainingDays.includes(DAY_CODE_BY_INDEX[i]) : !!dag?.is_training_day
+    const telt = preWorkoutMeal && training && !dag?.meals?.[PRE_WORKOUT_SLOT]
+    const t = totalenMetPreWorkout(dag?.totals, telt ? preWorkoutMeal : null) || {}
+    return { label: d.label, kcal: Number(t.kcal ?? t.calories) || 0, eiwit: Number(t.protein) || 0, training }
+  })
+
+  // Wat er deze dag afwijkt van de doelen, in grammen (kcal in kcal).
+  // Zelfde grenzen als de ringen: onder 85% en boven 115%.
+  const afwijkingen = [
+    { label: 'Kcal', w: dagTotalen.kcal, d: targets?.calories, e: ' kcal' },
+    { label: 'Eiwit', w: dagTotalen.protein, d: targets?.protein, e: ' g' },
+    { label: 'Koolh', w: dagTotalen.carbs, d: targets?.carbs, e: ' g' },
+    { label: 'Vet', w: dagTotalen.fat, d: targets?.fat, e: ' g' },
+  ].filter(x => Number(x.d) > 0).map(x => {
+    const pct = (Number(x.w) || 0) / Number(x.d) * 100
+    const verschil = Math.round(Math.abs((Number(x.w) || 0) - Number(x.d)))
+    if (pct < 85) return { label: x.label, tekst: `${verschil}${x.e} onder doel`, kleur: '#ef4444' }
+    if (pct > 115) return { label: x.label, tekst: `${verschil}${x.e} boven doel`, kleur: '#f59e0b' }
+    return null
+  }).filter(Boolean)
 
   return (
     // Eén blok dat onder de kop van CoachHub kleeft: de plantitel over de
@@ -1840,161 +1836,21 @@ export default function PlanAnalyzer({
             onDelete={verwijderHuidigPlan}
             onClear={leegWeek}
             onSaveTemplate={() => setShowPlanLibrary(true)}
+            onUndo={handleUndo} onRedo={handleRedo} canUndo={canUndo} canRedo={canRedo}
+            onPdf={handlePDF} pdfBezig={loadingPdf}
+            onActivate={planMeta ? handleActivate : null} activating={activating}
+            // Alleen bij het plan dat de klant volgt: datum-dagen gelden voor
+            // de klant, niet voor een concept.
+            midden={actievePlanId && (activated || planMeta?.isActive) ? (
+              <WeekKeuze inline weekModus={weekModus} aantalAangepast={afwijkendeDagen.length}
+                onKies={kiesWeek} onTerugzetten={zetWeekTerug} bezig={wisselBezig} isMobile={m} />
+            ) : null}
           />
-          {/* Alleen bij het plan dat de klant volgt: datum-dagen gelden voor
-              de klant, niet voor een concept. */}
-          {actievePlanId && (activated || planMeta?.isActive) && (
-            <WeekKeuze weekModus={weekModus} aantalAangepast={afwijkendeDagen.length}
-              onKies={kiesWeek} onTerugzetten={zetWeekTerug} bezig={wisselBezig} isMobile={m} />
-          )}
           </div>
         )}
 
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', position: 'relative' }}>
-
-      {/* ════════════ SIDEBAR ════════════
-          Bredere kolom (72/92 ipv 56/80), iconen 18px (was 14), labels
-          0.58rem (was 0.42 ≈ 5px). Inactieve knoppen krijgen een subtiele
-          achtergrond + border zodat ze duidelijk als tap-target ogen. */}
-      {/* Op desktop is de zijbalk 40% breed (knoppen met icoon en tekst naast
-          elkaar), de maaltijden 60% rechts (Kersten, 9 okt 2026). Op een
-          telefoon blijft het een smalle kolom. */}
-      <div style={{
-        width: m ? 72 : '40%', maxWidth: m ? undefined : 520, flexShrink: 0,
-        background: '#080808',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex', flexDirection: 'column', alignItems: m ? 'center' : 'stretch',
-        padding: m ? '10px 0' : '12px 14px', gap: 6, boxSizing: 'border-box',
-        paddingBottom: navRuimte,
-        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        // Even hoog als de rij; de rij zelf kleeft onder de kop van CoachHub.
-        minHeight: 0,
-      }}>
-        {/* Klant + targets. Kwamen uit de tabbalk die over deze zijbalk heen
-            lag. Bovenaan, want je kiest eerst een klant en dan pas de rest. */}
-        <ClientKiezer clients={clients} selectedClient={selectedClient}
-          onSelectClient={onSelectClient} compact m={m} />
-        {onOpenTargets && (
-          <button onClick={openTargets} title="Macro-targets van deze klant" style={{
-            width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
-            display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}>
-            <SlidersHorizontal size={18} color="rgba(255,255,255,0.65)" />
-            <span style={{ fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Targets</span>
-          </button>
-        )}
-
-        {/* Activeer knop */}
-        {planMeta && (() => {
-          const isActiveAlready = activated || planMeta?.isActive
-          return (
-            <button
-              onClick={handleActivate}
-              disabled={activating || isActiveAlready}
-              style={{
-                width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
-                display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
-                background: 'rgba(16,185,129,0.08)',
-                border: '1px solid rgba(16,185,129,0.3)',
-                borderRadius: 8,
-                cursor: isActiveAlready ? 'default' : 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {activating
-                ? <Loader size={18} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} />
-                : <Check size={18} color="#10b981" />}
-              <span style={{ fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800, color: '#10b981' }}>
-                {isActiveAlready ? 'Actief' : 'Activeer'}
-              </span>
-            </button>
-          )
-        })()}
-
-        <div style={{ width: 36, height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
-
-        {/* Nav knoppen — altijd zichtbare achtergrond + border zodat ze
-            als knoppen herkenbaar zijn. Active state krijgt gold accent. */}
-        {sidebarNav.map(btn => (
-          <button key={btn.id} onClick={btn.onClick} title={btn.label} style={{
-            width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
-            display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
-            background: btn.active ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.025)',
-            border: `1px solid ${btn.active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.07)'}`,
-            borderRadius: 8, cursor: 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            position: 'relative', transition: 'background 0.15s ease, border-color 0.15s ease',
-          }}>
-            <span style={{
-              color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.65)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: typeof btn.icon === 'string' ? '18px' : undefined,
-            }}>
-              {btn.icon}
-            </span>
-            <span style={{
-              fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800,
-              color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.6)',
-              letterSpacing: '0.01em',
-            }}>{btn.label}</span>
-            {btn.badge && (
-              <span style={{
-                position: 'absolute', top: 3, right: 3,
-                fontSize: '0.45rem', fontWeight: 800,
-                background: '#FFD700', color: '#000',
-                borderRadius: 8, padding: '0 4px',
-                lineHeight: 1.5, minWidth: 14, textAlign: 'center',
-              }}>{btn.badge}</span>
-            )}
-          </button>
-        ))}
-
-        {/* Waarschuwing indicator */}
-        {warningCount > 0 && (
-          <div style={{
-            width: m ? 58 : '100%', padding: m ? '6px 4px' : '0.55rem 0.85rem', boxSizing: 'border-box',
-            display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
-            background: 'rgba(239,68,68,0.08)',
-            border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: 8,
-          }}>
-            <AlertTriangle size={16} color="#ef4444" />
-            <span style={{ fontSize: m ? '0.55rem' : '0.8rem', fontWeight: 800, color: '#ef4444' }}>{warningCount}d</span>
-          </div>
-        )}
-
-        <div style={{ flex: 1 }} />
-
-        <div style={{ width: 36, height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
-
-        {/* Bottom acties — zelfde stijl als nav */}
-        {sidebarBottom.map(btn => (
-          <button key={btn.id} onClick={btn.onClick} disabled={btn.disabled} title={btn.label} style={{
-            width: m ? 58 : '100%', padding: m ? '8px 4px' : '0.6rem 0.85rem', boxSizing: 'border-box',
-            display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'center', gap: m ? 3 : 10,
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 8,
-            cursor: btn.disabled ? 'not-allowed' : 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            opacity: btn.disabled ? 0.4 : 1,
-          }}>
-            <span style={{
-              color: btn.color || 'rgba(255,255,255,0.7)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>{btn.icon}</span>
-            <span style={{
-              fontSize: m ? '0.58rem' : '0.82rem', fontWeight: 800,
-              color: btn.disabled ? 'rgba(255,255,255,0.25)' : (btn.color || 'rgba(255,255,255,0.6)'),
-            }}>{btn.label}</span>
-          </button>
-        ))}
-      </div>
 
       {/* ════════════ DOCK-PANEEL ════════════
           De gekozen sectie opent hier, naast de knoppenbalk. Samen vullen ze
@@ -2015,7 +1871,7 @@ export default function PlanAnalyzer({
           // scherm (min de zwevende navbalk) en scrollt alleen de inhoud;
           // de knoppenbalk onderin blijft daardoor altijd zichtbaar.
           ...(m
-            ? { position: 'fixed', left: 72, right: 0, top: kleefTop, zIndex: 40, height: paneelHoogte }
+            ? { position: 'fixed', left: 0, right: 0, top: kleefTop, zIndex: 40, height: paneelHoogte }
             : { flexBasis: dockWidth, width: dockWidth, minHeight: 0 }),
         }}>
           {/* Kop van het zijvak. Rendert altijd, ook als het paneel eronder
@@ -2219,94 +2075,14 @@ export default function PlanAnalyzer({
         opacity: wisselBezig ? 0.5 : 1, transition: 'opacity 0.2s ease', pointerEvents: wisselBezig ? 'none' : undefined,
       }}>
 
-        {/* Header — compact: pijl + dagnaam + pijl, daaronder de vier
-            dag-ringen in de stijl van het inzicht-paneel. De oude plan-name
-            banner, DayMacroBar en DayNavigator-knoppen zijn weg. */}
-        <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            // Bredere zij-padding → pijlen liggen meer naar binnen, niet
-            // aan de rand van het paneel. Mobiel iets minder agressief
-            // dan desktop om tap-targets behouden te houden.
-            padding: m ? '0.6rem 2.5rem' : '0.75rem 5rem',
-            gap: 10,
-          }}>
-            <button
-              onClick={() => setActiveDay(d => Math.max(0, d - 1))}
-              disabled={activeDay === 0}
-              aria-label="Vorige dag"
-              style={{
-                width: m ? 32 : 36, height: m ? 32 : 36,
-                background: 'transparent', border: 'none',
-                color: activeDay === 0 ? 'rgba(255,255,255,0.18)' : '#FFD700',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: 0, cursor: activeDay === 0 ? 'not-allowed' : 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                flexShrink: 0,
-              }}
-            >
-              <ChevronLeft size={m ? 22 : 24} strokeWidth={2.4} />
-            </button>
-
-            <div style={{
-              flex: 1, textAlign: 'center', minWidth: 0,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-            }}>
-              <div style={{
-                fontSize: m ? '1.15rem' : '1.3rem',
-                fontWeight: 900,
-                color: '#FFD700',
-                letterSpacing: '-0.02em', lineHeight: 1.1,
-                whiteSpace: 'nowrap',
-              }}>
-                {DAYS[activeDay]?.full || '—'}
-              </div>
-              {currentDayIsTraining && (
-                <div style={{
-                  fontSize: '0.55rem', fontWeight: 800,
-                  color: 'rgba(0,0,0,0.85)',
-                  background: '#FFD700',
-                  padding: '2px 7px', borderRadius: 4,
-                  letterSpacing: '0.05em', textTransform: 'uppercase',
-                }}>
-                  Trainingsdag
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => setActiveDay(d => Math.min(6, d + 1))}
-              disabled={activeDay === 6}
-              aria-label="Volgende dag"
-              style={{
-                width: m ? 32 : 36, height: m ? 32 : 36,
-                background: 'transparent', border: 'none',
-                color: activeDay === 6 ? 'rgba(255,255,255,0.18)' : '#FFD700',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: 0, cursor: activeDay === 6 ? 'not-allowed' : 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                flexShrink: 0,
-              }}
-            >
-              <ChevronRight size={m ? 22 : 24} strokeWidth={2.4} />
-            </button>
+        {/* De week in één regel: per dag een mini-ring met de kcal. Tik =
+            die dag openen (vanuit de weekagenda terug naar de dag). */}
+        <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: m ? 0 : '0 1rem', boxSizing: 'border-box' }}>
+            <DagStrip dagen={dagStripDagen} actief={activeDay}
+              onKies={(i) => { setActiveDay(i); if (viewMode === 'week') setViewMode('day') }}
+              doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0} isMobile={m} />
           </div>
-
-          {/* De ringen staan in week-view hier; in day-view verhuizen ze naar
-              boven de meal-cards kolom. */}
-          {viewMode === 'week' && (
-            <DagRingen
-              totalen={{
-                calories: dagTotalen.kcal,
-                protein:  dagTotalen.protein,
-                carbs:    dagTotalen.carbs,
-                fat:      dagTotalen.fat,
-              }}
-              targets={targets || {}}
-              isMobile={m}
-              inklapbaar
-            />
-          )}
         </div>
 
         {/* ── WEEK VIEW: rendered agenda ── */}
@@ -2362,38 +2138,80 @@ export default function PlanAnalyzer({
         )}
 
         {/* ── DAG VIEW ──
-            Twee onafhankelijk scrollende stroken:
-              LINKS  = agenda dag-strook (volle hoogte van content-area)
-              RECHTS = dag-ringen + meal cards (boven elkaar, samen scrollend) */}
+            Twee kolommen in een vak van max. 1200 px: links de dag in
+            cijfers (ringen 2×2, wat afwijkt, vezels) en het gereedschap,
+            rechts de maaltijden als smalle lijst (max. 640 px). Zo staan naam,
+            macro's en knoppen dicht bij elkaar en blijft de dag in beeld
+            terwijl je door de maaltijden scrolt (Kersten, 24 okt 2026). */}
         {viewMode === 'day' && (
-          <div style={{
-            flex: 1, overflow: 'hidden',
-            display: 'flex',
-            flexDirection: m ? 'column' : 'row',
-            WebkitOverflowScrolling: 'touch',
-            position: 'relative',
-          }}>
-            {/* Meal-cards strook — de ringen erboven, beide samen scrollend.
-                Onderaan ruimte voor de zwevende navbalk, anders ligt de
-                laatste maaltijdkaart eronder. */}
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', position: 'relative', paddingBottom: navRuimte }}>
             <div style={{
-              flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-              minWidth: 0, paddingBottom: navRuimte,
-              // Een klein beetje lucht rechts, zodat de kaarten niet tegen de rand staan.
-              paddingRight: m ? 0 : 16,
+              maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box',
+              display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'flex-start',
+              gap: m ? 0 : 28, padding: m ? 0 : '1rem 1rem 0',
             }}>
-              <DagRingen
-                totalen={{
-                  calories: dagTotalen.kcal,
-                  protein:  dagTotalen.protein,
-                  carbs:    dagTotalen.carbs,
-                  fat:      dagTotalen.fat,
-                }}
-                targets={targets || {}}
-                isMobile={m}
-                inklapbaar
-              />
-              <VezelsMicros db={db} maaltijden={maaltijdenVanDag} isMobile={m} />
+              {/* ── LINKS: de dag ── */}
+              <div style={{ width: m ? '100%' : 340, flexShrink: 0, boxSizing: 'border-box', position: m ? 'static' : 'sticky', top: '1rem', padding: m ? '0.75rem 0.75rem 0' : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: m ? 4 : 8 }}>
+                  <span style={{ fontSize: m ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{DAYS[activeDay]?.full || '—'}</span>
+                  {currentDayIsTraining && (
+                    <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#0a0a0a', background: '#fff', padding: '2px 7px', borderRadius: 5, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Trainingsdag</span>
+                  )}
+                </div>
+                <DagRingen
+                  totalen={{ calories: dagTotalen.kcal, protein: dagTotalen.protein, carbs: dagTotalen.carbs, fat: dagTotalen.fat }}
+                  targets={targets || {}}
+                  isMobile={m}
+                  raster={!m}
+                />
+                {/* Alleen wat afwijkt; klopt alles, dan één groene regel. */}
+                {targets?.calories > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: m ? '0.25rem 0 0.5rem' : '0.75rem 0' }}>
+                    {afwijkingen.length === 0 ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 800, color: '#22c55e' }}><Check size={14} strokeWidth={3} /> Dag klopt met de doelen</span>
+                    ) : afwijkingen.map(a => (
+                      <span key={a.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 800, color: a.kleur }}>
+                        <AlertTriangle size={13} strokeWidth={2.8} /> {a.label} {a.tekst}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ margin: m ? '0 -0.75rem' : '0 -1rem' }}>
+                  <VezelsMicros db={db} maaltijden={maaltijdenVanDag} isMobile={m} />
+                </div>
+
+                {/* Gereedschap: wat eerst de brede zijbalk was. Desktop een
+                    korte lijst, mobiel een rij om door te vegen. */}
+                <div style={m ? {
+                  display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', padding: '0.6rem 0', margin: '0 -0.75rem', paddingLeft: '0.75rem', paddingRight: '0.75rem',
+                } : {
+                  marginTop: '0.75rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, overflow: 'hidden',
+                }}>
+                  {gereedschap.map((g, i) => (
+                    <button key={g.id} onClick={g.onClick} style={m ? {
+                      flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 0.75rem', borderRadius: 999,
+                      background: g.active ? '#fff' : 'rgba(255,255,255,0.06)', border: `1px solid ${g.active ? '#fff' : 'rgba(255,255,255,0.14)'}`,
+                      color: g.active ? '#0a0a0a' : '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                    } : {
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10, minHeight: 42, padding: '0 0.85rem',
+                      background: g.active ? 'rgba(255,255,255,0.08)' : 'transparent', border: 'none',
+                      borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                      color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <span style={{ display: 'flex', color: g.active && m ? '#0a0a0a' : 'rgba(255,255,255,0.7)' }}>{g.icon}</span>
+                      <span style={{ flex: m ? undefined : 1 }}>{g.label}</span>
+                      {g.badge != null && (
+                        <span style={{ fontSize: '0.7rem', fontWeight: 900, color: g.active && m ? '#0a0a0a' : 'rgba(255,255,255,0.5)' }}>{g.badge}</span>
+                      )}
+                      {!m && <ChevronRight size={15} color="rgba(255,255,255,0.3)" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── RECHTS: de maaltijden ── */}
+              <div style={{ flex: 1, minWidth: 0, maxWidth: m ? undefined : 640, width: '100%' }}>
               {/* ── PRE-WORKOUT ────────────────────────────────────────────
                   Eén maaltijd voor het hele plan, die alleen op trainingsdagen
                   meetelt. Als volwaardige MealCard, zodat je 'm net als elke
@@ -2475,6 +2293,7 @@ export default function PlanAnalyzer({
                 db={db} clientId={resolvedClientId}
                 onChanged={(lijst) => { setSupplementen(lijst); setAgendaRefreshKey(k => k + 1) }}
               />
+              </div>
             </div>
 
             {/* Maaltijd toevoegen: witte ronde knop linksonder in de

@@ -35,7 +35,9 @@ const kleurVoor = (pct, eigen) => {
 
 const OPEN_SLEUTEL = 'analyzer_ringen_open'
 
-export default function DagRingen({ totalen, targets, isMobile, inklapbaar = false }) {
+// `raster`: 2×2 in een smalle kolom (de dagkolom links in de Analyzer),
+// niet uitgesmeerd over de volle breedte.
+export default function DagRingen({ totalen, targets, isMobile, inklapbaar = false, raster = false }) {
   const m = isMobile
   const t = totalen || {}
   const d = targets || {}
@@ -84,7 +86,9 @@ export default function DagRingen({ totalen, targets, isMobile, inklapbaar = fal
 
   return (<>
     {kop}
-    <div style={{
+    <div style={raster ? {
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 8px', padding: '0.4rem 0',
+    } : {
       display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start',
       gap: m ? 4 : 8,
       padding: m ? '0.7rem 0.6rem 0.8rem' : '0.85rem 1rem 0.95rem',
@@ -99,7 +103,7 @@ export default function DagRingen({ totalen, targets, isMobile, inklapbaar = fal
         const target = Number(d[doel]) || 0
         const pct = target > 0 ? (waarde / target) * 100 : null
 
-        const maat = m ? 54 : 62
+        const maat = raster ? 76 : m ? 54 : 62
         const dikte = 5
         const r = (maat - dikte) / 2
         const omtrek = 2 * Math.PI * r
@@ -121,7 +125,7 @@ export default function DagRingen({ totalen, targets, isMobile, inklapbaar = fal
                 position: 'absolute', inset: 0,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               }}>
-                <span style={{ fontSize: m ? '0.76rem' : '0.82rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                <span style={{ fontSize: raster ? '0.98rem' : m ? '0.76rem' : '0.82rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
                   {nl(waarde)}
                 </span>
                 <span style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)' }}>
@@ -132,9 +136,9 @@ export default function DagRingen({ totalen, targets, isMobile, inklapbaar = fal
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <Icoon size={10} color={kleur} strokeWidth={2.8} />
-              <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#fff' }}>{label}</span>
+              <span style={{ fontSize: raster ? '0.74rem' : '0.62rem', fontWeight: 900, color: '#fff' }}>{label}</span>
             </div>
-            <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: raster ? '0.7rem' : '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
               van {nl(target)}{eenheid}
             </span>
           </div>
