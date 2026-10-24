@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { KolomKopInhoud } from './KolomKop'
 import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
 import {
-  UtensilsCrossed, ChevronRight, ArrowLeft, Zap, BarChart3, Droplet, Info,
+  UtensilsCrossed, ChevronRight, ArrowLeft, Zap, ExternalLink, Droplet, Info,
   ClipboardCheck, Repeat, Pencil, Database, ScanBarcode, Search, ChefHat, Keyboard, History, CalendarDays,
 } from 'lucide-react'
 import MealDaySummaryModal from '../../../meal-plan/components/MealDaySummaryModal'
@@ -589,15 +589,6 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
               {mealData.plan && <> · <span style={{ color: '#fff', fontWeight: 800 }}>{mealData.plan.name || 'Voedingsplan'}</span></>}
               {laden && ' · laden…'}
             </span>
-            {onNavigatePlan && (
-              <button
-                onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
-                title="Plan Analyzer" aria-label="Plan Analyzer"
-                style={{ ...kopKnopStijl, padding: 0, width: 28, justifyContent: 'center', color: colors.success }}
-              >
-                <BarChart3 size={14} strokeWidth={2.6} />
-              </button>
-            )}
             {onNavigatePlan && db && (
               <button onClick={() => setShowGenerateModal(true)} title="Automatisch plan genereren" aria-label="Plan genereren" style={{ ...kopKnopStijl, padding: 0, width: 28, justifyContent: 'center' }}>
                 <Zap size={14} strokeWidth={2.6} />
@@ -606,6 +597,13 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             <button onClick={() => setStatsOpen(true)} style={kopKnopStijl} title="Maand- en dagoverzicht, zoals de klant het ziet">
               <CalendarDays size={13} strokeWidth={2.6} /> Inzicht
             </button>
+            {/* 'Plan' als laatste, zoals bij Training en Gewicht. */}
+            {onNavigatePlan && (
+              <button onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
+                title="Openen in de Plan Analyzer" style={kopKnopStijl}>
+                <ExternalLink size={11} /> Plan
+              </button>
+            )}
           </KolomKopInhoud>
 
           {/* Waterdoel — in liters op de klant (clients.water_intake_target). De

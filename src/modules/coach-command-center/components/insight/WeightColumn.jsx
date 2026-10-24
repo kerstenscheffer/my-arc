@@ -4,7 +4,9 @@
 // Props: { client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery }
 // ============================================
 import React from 'react'
-import { Ruler, Camera, Download, Maximize2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Ruler, Camera, Download, Maximize2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
+import { KolomKopInhoud } from './KolomKop'
+import { kopKnopStijl } from './kolomKopStijl'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
 import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
 import FasePaneel from './FasePaneel'
@@ -87,6 +89,13 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
       {/* De kop 'Gewicht & Body' stond boven een kolom waar alles al over
           gewicht gaat, en het doelgewicht ernaast stuurde niets — dat is nu de
           horizon in de band. Allebei weg: de fase-regel is de eerste regel. */}
+      {/* Kolomkop: 'Plan' op dezelfde plek als bij Training en Voeding,
+          hier het weekdoel en het tempo (DoelModal). */}
+      <KolomKopInhoud>
+        <button onClick={() => setDoelOpen(true)} title="Weekdoel en tempo aanpassen" style={kopKnopStijl}>
+          <ExternalLink size={11} /> Plan
+        </button>
+      </KolomKopInhoud>
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {/* Fase bovenaan: die bepaalt hoe je de cijfers eronder moet lezen.
             +0,1 kg is goed nieuws in een build en slecht in een cut. */}
