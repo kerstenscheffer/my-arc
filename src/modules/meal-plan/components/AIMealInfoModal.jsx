@@ -10,6 +10,7 @@ import { foodImageFallback } from '../foodImageFallback'
 import MealPrepModal from './MealPrepModal'
 import PartnerBestellen from './PartnerBestellen'
 import SausBlok from './SausBlok'
+import IngredientDetail from './IngredientDetail'
 
 export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, datum, onSaved }) {
   const isMobile = window.innerWidth <= 768
@@ -19,6 +20,8 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
   const [dbMealData, setDbMealData] = useState(null)
   const [showEdit, setShowEdit] = useState(false)
   const [showPrep, setShowPrep] = useState(false)
+  // Aangetikt ingrediënt: schuift voor de maaltijd, de pijl zet je terug.
+  const [openIng, setOpenIng] = useState(null)
 
   // Client kan de maaltijd aanpassen zolang we weten in welk plan + slot 'ie zit.
   const canEdit = !!(planId && meal?.slot && client?.id)
@@ -31,6 +34,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
     if (isOpen && meal) {
       setDbMealData(null)
       setIngredients([])
+      setOpenIng(null)
       loadData()
     }
   }, [isOpen, meal?.id, meal?.meal_id])
@@ -147,6 +151,9 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', zIndex: 10500, animation: 'infoFadeIn 0.2s ease' }}>
       <div onClick={e => e.stopPropagation()} style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: isMobile ? '100%' : '600px', width: '100%', margin: '0 auto', background: '#0a0a0a', overflow: 'hidden' }}>
+        {openIng ? (
+          <IngredientDetail ing={openIng} onTerug={() => setOpenIng(null)} onClose={onClose} isMobile={isMobile} />
+        ) : (<>
 
         {/* ════ ZWARTE BALK BOVEN DE FOTO ════
             Zelfde vorm als de balk boven de dag (Boodschappen / Plan tonen):
@@ -229,12 +236,13 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
 
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {activeTab === 'info' && <InfoTab meal={effectiveMeal} ingredients={ingredients} loading={loading} calcMacros={calcMacros} isMobile={isMobile} db={db} clientId={client?.id} />}
+          {activeTab === 'info' && <InfoTab meal={effectiveMeal} ingredients={ingredients} loading={loading} calcMacros={calcMacros} isMobile={isMobile} db={db} clientId={client?.id} onIngredient={setOpenIng} />}
           {activeTab === 'recipe' && <RecipeTab meal={effectiveMeal} loading={loading} isMobile={isMobile} />}
           {activeTab === 'price' && <PriceTab meal={effectiveMeal} ingredients={ingredients} isMobile={isMobile} />}
           {activeTab === 'tips' && <TipsTab meal={effectiveMeal} isMobile={isMobile} />}
           {activeTab === 'faq' && <FaqTab meal={effectiveMeal} isMobile={isMobile} />}
         </div>
+        </>)}
       </div>
       <style>{`@keyframes infoFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes infoSpin { to { transform: rotate(360deg); } }`}</style>
 
@@ -267,7 +275,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
   , document.body)
 }
 
-function InfoTab({ meal, ingredients, loading, calcMacros, isMobile, db, clientId }) {
+function InfoTab({ meal, ingredients, loading, calcMacros, isMobile, db, clientId, onIngredient }) {
   return (
     <div>
       {/* Kant-en-klaar te bestellen (PrepMyMeal): bovenaan, met de knop. */}
@@ -313,6 +321,7 @@ function InfoTab({ meal, ingredients, loading, calcMacros, isMobile, db, clientI
                   rechts={toHumanAmount(ing.name, ing.amount)}
                   isMobile={isMobile}
                   acties={[]}
+                  onTik={() => onIngredient?.(ing)}
                 />
               )
             })}
