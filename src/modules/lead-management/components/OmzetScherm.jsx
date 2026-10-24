@@ -567,10 +567,15 @@ function Blad({ titel, isMobile, onClose, kop, children }) {
 
 function Transacties({ boekingen, maanden, start, isMobile, onClose }) {
   const [bron, setBron] = useState(start.bron || 'alle')
-  const meer = (start.maanden || []).length > 1
-  const [maand, setMaand] = useState(meer ? 'periode' : start.maanden?.[0] || 'alle')
+  // Bereik van … t/m … ('' = geen grens). Start op de gekozen maand,
+  // het kwartaal of het jaar van het scherm erachter.
+  const startMaanden = [...(start.maanden || [])].sort()
+  const [van, setVan] = useState(startMaanden[0] || '')
+  const [tot, setTot] = useState(startMaanden[startMaanden.length - 1] || '')
+  const kiesVan = (k) => { setVan(k); if (k && tot && tot < k) setTot(k) }
+  const kiesTot = (k) => { setTot(k); if (k && van && van > k) setVan(k) }
   const zichtbaar = boekingen.filter(b =>
-    (maand === 'alle' || (maand === 'periode' ? start.maanden.includes(b.maand) : b.maand === maand)) &&
+    (!van || b.maand >= van) && (!tot || b.maand <= tot) &&
     (bron === 'alle' ? !b.toegezegd : bron === 'toegezegd' ? b.toegezegd : (b.bron === bron && !b.toegezegd)))
   const totaal = zichtbaar.reduce((t, b) => t + b.bedrag, 0)
   const nu = new Date()
@@ -582,15 +587,19 @@ function Transacties({ boekingen, maanden, start, isMobile, onClose }) {
   return (
     <Blad titel="Transacties" isMobile={isMobile} onClose={onClose} kop={
       <div style={{ flexShrink: 0, padding: '0 1rem 0.75rem' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <select value={bron} onChange={e => setBron(e.target.value)} style={select}>
-            <option value="alle">Alle soorten</option>
-            {BRONNEN.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
-            <option value="toegezegd">Toegezegd (nog niet betaald)</option>
+        <select value={bron} onChange={e => setBron(e.target.value)} style={{ ...select, width: '100%' }}>
+          <option value="alle">Alle soorten</option>
+          {BRONNEN.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+          <option value="toegezegd">Toegezegd (nog niet betaald)</option>
+        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <select value={van} onChange={e => kiesVan(e.target.value)} style={select} aria-label="Vanaf maand">
+            <option value="">Vanaf begin</option>
+            {maanden.map(m => <option key={m.key} value={m.key}>{cap(maandNaam(m.key))}</option>)}
           </select>
-          <select value={maand} onChange={e => setMaand(e.target.value)} style={select}>
-            <option value="alle">Alle maanden</option>
-            {meer && <option value="periode">{start.label}</option>}
+          <span style={{ flexShrink: 0, fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>t/m</span>
+          <select value={tot} onChange={e => kiesTot(e.target.value)} style={select} aria-label="Tot en met maand">
+            <option value="">Alles daarna</option>
             {maanden.map(m => <option key={m.key} value={m.key}>{cap(maandNaam(m.key))}</option>)}
           </select>
         </div>
