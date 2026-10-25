@@ -477,12 +477,9 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               tegels eronder tegen gekleurd worden. */}
           {bereik && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: isMobile ? '0.6rem 0.5rem 0.2rem' : '0.7rem 0.75rem 0.25rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 900, color: '#fff' }}>Doel per week</span>
+              <span style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 900, color: '#fff' }}>Doel/w:</span>
               <span style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                 {bereik}<span style={{ fontSize: '0.55em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg</span>
-              </span>
-              <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-                {bandConfig.handmatig ? 'zelf ingesteld' : 'afgeleid van het weekdoel'}
               </span>
               {onBewerkDoel && (
                 <button onClick={onBewerkDoel} aria-label="Doel per week aanpassen" title="Aanpassen" style={{
@@ -802,7 +799,7 @@ function GrootBlok(props) {
         {actie}
       </div>
       <div style={{
-        fontSize: isMobile ? '1.45rem' : '1.8rem', fontWeight: 900, color: kleur,
+        fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: kleur,
         lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
@@ -928,7 +925,7 @@ function WekenStrook(props) {
             {i === 0 ? uitleg : null}
           </div>
           <div style={{
-            fontSize: isMobile ? '1.45rem' : '1.8rem', fontWeight: 900, color: w.kleur,
+            fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: w.kleur,
             lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
