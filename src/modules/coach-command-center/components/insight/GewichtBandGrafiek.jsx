@@ -393,7 +393,67 @@ export default function GewichtBandGrafiek({
       {/* Eén regel voor alles wat je hier kunt kiezen: welke fase je bekijkt
           (met onderin de knop voor een nieuwe) en of je de lijn of de cijfers
           wilt. De losse fase-regel bovenaan de kolom is hierin opgegaan. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, rowGap: 4, flexWrap: toonDoel ? 'wrap' : 'nowrap', marginBottom: 8 }}>
+      {/* Klantpagina: de kopregel als balk, tegen de randen, met lijntjes
+          tussen de delen — dezelfde opbouw als de tempo-strook eronder. */}
+      {toonDoel ? (() => {
+        const lijn = '1px solid rgba(255,255,255,0.08)'
+        const vak = { display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 16px', borderRight: lijn, minWidth: 0 }
+        const doel = !model.alles && !model.zonderBand && bereikTekst(config)
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'stretch', height: 40,
+            margin: isMobile ? '-0.5rem -0.75rem 0' : '-0.625rem -1rem 0',
+            borderTop: lijn, borderBottom: lijn,
+          }}>
+            <div style={vak}>
+              <KopKeuze
+                groot
+                waarde={gekozen || (perFase.find(f => f.id === fase?.id) ? fase.id : 'nu')}
+                opties={faseOpties}
+                onKies={(id) => {
+                  if (id === 'nieuw') { onNieuweFase?.(); return }
+                  setGekozen(id === 'nu' ? null : id)
+                }}
+              />
+            </div>
+            <div style={vak}>
+              <KopKeuze
+                waarde={weergave}
+                opties={[{ id: 'grafiek', label: 'Grafiek' }, { id: 'tabel', label: 'Tabel' }]}
+                onKies={setWeergave}
+                kleur="rgba(255,255,255,0.65)"
+              />
+            </div>
+            {/* Volgt de gekozen fase, want elke fase heeft zijn eigen tempo. */}
+            <div style={{ ...vak, flex: 1, justifyContent: 'center' }}>
+              {doel && (
+                <span style={{
+                  fontSize: '0.9rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap',
+                  overflow: 'hidden', textOverflow: 'ellipsis',
+                  letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums',
+                }}>
+                  Doel/w: {doel}
+                  <span style={{ fontSize: '0.7em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg</span>
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setUitleg(v => !v)}
+              title="Hoe deze band werkt"
+              aria-label="Uitleg"
+              style={{
+                width: 40, flexShrink: 0, padding: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Info size={14} strokeWidth={2.6} />
+            </button>
+          </div>
+        )
+      })() : (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <KopKeuze
           groot
           waarde={gekozen || (perFase.find(f => f.id === fase?.id) ? fase.id : 'nu')}
@@ -410,17 +470,6 @@ export default function GewichtBandGrafiek({
           kleur="rgba(255,255,255,0.65)"
         />
         <span style={{ flex: 1 }} />
-        {/* Zelfde letter als de fase-keuze links. Volgt de gekozen fase, want
-            elke fase heeft zijn eigen tempo. */}
-        {toonDoel && !model.alles && !model.zonderBand && bereikTekst(config) && (
-          <span style={{
-            fontSize: '0.9rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap',
-            letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums',
-          }}>
-            Doel/w: {bereikTekst(config)}
-            <span style={{ fontSize: '0.7em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg</span>
-          </span>
-        )}
         <button
           onClick={() => setUitleg(v => !v)}
           title="Hoe deze band werkt"
@@ -435,11 +484,12 @@ export default function GewichtBandGrafiek({
           <Info size={12} />
         </button>
       </div>
+      )}
 
       {uitleg && (
         <div style={{
           fontSize: '0.64rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)',
-          lineHeight: 1.45, marginBottom: 8,
+          lineHeight: 1.45, marginBottom: 8, marginTop: toonDoel ? 8 : 0,
           padding: '0.5rem 0.6rem', borderRadius: 8,
           background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
         }}>
