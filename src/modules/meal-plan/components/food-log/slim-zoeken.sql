@@ -125,6 +125,11 @@ begin
     select i.*, case when public.zoek_score(i.zoek_kern, q) = 100 and i.name ~ '\(' and i.barcode is not null then 88
                      else public.zoek_score(i.zoek_kern, q) end as basis
     from ai_ingredients i join kand on kand.id = i.id
+    -- Onmogelijke waarden niet tonen (25 okt 2026: "Ketchup" 1500 kcal,
+    -- "Omelet" 8000): meer dan 900 kcal of meer dan 100 g macro's per 100 g
+    -- kan niet; vaak kJ in het kcal-veld of een portie als 100 g ingevoerd.
+    where coalesce(i.calories_per_100g, 0) <= 900
+      and coalesce(i.protein_per_100g, 0) + coalesce(i.carbs_per_100g, 0) + coalesce(i.fat_per_100g, 0) <= 105
   ),
   pop as (
     select c.zoek_kern as k, count(*) as n, count(*) filter (where c.client_id = p_client) as eigen
