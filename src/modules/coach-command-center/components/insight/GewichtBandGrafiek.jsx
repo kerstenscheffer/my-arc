@@ -399,9 +399,11 @@ export default function GewichtBandGrafiek({
         const lijn = '1px solid rgba(255,255,255,0.08)'
         const vak = { display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 16px', borderRight: lijn, minWidth: 0 }
         const doel = !model.alles && !model.zonderBand && bereikTekst(config)
+        // Eén letter voor de hele balk: klein, wit, zonder hoofdletters.
+        const letter = { fontSize: '0.75rem', fontWeight: 800, color: '#fff', textTransform: 'lowercase', letterSpacing: '-0.01em' }
         return (
           <div style={{
-            display: 'flex', alignItems: 'stretch', height: 40,
+            display: 'flex', alignItems: 'stretch', height: 32,
             // Boven tegen de rand, behalve als de verwachting-melding erboven staat.
             margin: model.verwachting ? (isMobile ? '0 -0.75rem' : '0 -1rem')
               : (isMobile ? '-0.5rem -0.75rem 0' : '-0.625rem -1rem 0'),
@@ -409,7 +411,7 @@ export default function GewichtBandGrafiek({
           }}>
             <div style={vak}>
               <KopKeuze
-                groot
+                labelStijl={letter}
                 waarde={gekozen || (perFase.find(f => f.id === fase?.id) ? fase.id : 'nu')}
                 opties={faseOpties}
                 onKies={(id) => {
@@ -423,19 +425,17 @@ export default function GewichtBandGrafiek({
                 waarde={weergave}
                 opties={[{ id: 'grafiek', label: 'Grafiek' }, { id: 'tabel', label: 'Tabel' }]}
                 onKies={setWeergave}
-                kleur="rgba(255,255,255,0.65)"
+                labelStijl={letter}
               />
             </div>
             {/* Volgt de gekozen fase, want elke fase heeft zijn eigen tempo. */}
             <div style={{ ...vak, flex: 1, justifyContent: 'center' }}>
               {doel && (
                 <span style={{
-                  fontSize: '0.9rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                  letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums',
+                  ...letter, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  fontVariantNumeric: 'tabular-nums',
                 }}>
-                  Doel/w: {doel}
-                  <span style={{ fontSize: '0.7em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg</span>
+                  doel/w: {doel} kg
                 </span>
               )}
             </div>
@@ -444,13 +444,13 @@ export default function GewichtBandGrafiek({
               title="Hoe deze band werkt"
               aria-label="Uitleg"
               style={{
-                width: 40, flexShrink: 0, padding: 0,
+                width: 32, flexShrink: 0, padding: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)',
+                background: 'transparent', border: 'none', color: '#fff',
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Info size={14} strokeWidth={2.6} />
+              <Info size={13} strokeWidth={2.6} />
             </button>
           </div>
         )

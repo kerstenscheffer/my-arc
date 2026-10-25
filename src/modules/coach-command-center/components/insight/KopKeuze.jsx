@@ -16,7 +16,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
 import { ChevronDown, Check } from 'lucide-react'
 
-export default function KopKeuze({ waarde, opties, onKies, groot = false, kleur = '#fff' }) {
+// `labelStijl`: overschrijft de letter van het zichtbare label (de balk op de
+// trackingpagina wil alles klein, wit en zonder hoofdletters).
+export default function KopKeuze({ waarde, opties, onKies, groot = false, kleur = '#fff', labelStijl = null }) {
   const knopRef = useRef(null)
   const [open, setOpen] = useState(false)
   const [plek, setPlek] = useState(null)   // { top, left, breedte }
@@ -75,6 +77,7 @@ export default function KopKeuze({ waarde, opties, onKies, groot = false, kleur 
         <span style={{
           fontSize: groot ? '0.9rem' : '0.78rem', fontWeight: 900, color: kleur,
           letterSpacing: '-0.02em', whiteSpace: 'nowrap',
+          ...labelStijl,
         }}>
           {huidig?.label || opties[0]?.label}
         </span>
