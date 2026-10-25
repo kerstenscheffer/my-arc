@@ -1,6 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ExerciseHistory.jsx
-import { History, TrendingUp, ChevronDown } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { History, TrendingUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 
 // Eén kerncijfer in het kopblok: kopje, getal, regel eronder. Als component
 // zodat beide kolommen dezelfde opbouw hebben en op dezelfde hoogte staan.
@@ -27,6 +27,8 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [gekozenDag, setGekozenDag] = useState(null)
+  const [weekIdx, setWeekIdx] = useState(0)
+  const touchStartX = useRef(null)
 
   useEffect(() => {
     if ((expanded || forceLoad) && !historyLoaded && client?.id && db && exerciseName) {
@@ -138,6 +140,21 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
         volume: s.sets.reduce((n, x) => n + (x.weight || 0) * (x.reps || 0), 0),
       }))
 
+    // Week-navigatie: groepeer sessies per kalenderweek (maandag = start).
+    const getMondayOf = (iso) => {
+      const d = new Date(iso + 'T00:00:00')
+      const dag = d.getDay()
+      d.setDate(d.getDate() + (dag === 0 ? -6 : 1 - dag))
+      const p = (n) => String(n).padStart(2, '0')
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+    }
+    const weken = [...new Set(sessies.map(s => getMondayOf(s.dag)))].sort((a, b) => b.localeCompare(a))
+    const effectiefWeekIdx = Math.min(weekIdx, weken.length - 1)
+    const huidigeMaandag = weken[effectiefWeekIdx] || null
+    const sessiesDezeWeek = huidigeMaandag
+      ? sessies.filter(s => getMondayOf(s.dag) === huidigeMaandag)
+      : sessies
+
     // Zwaarste set ooit, en wanneer.
     const pr = sessies.reduce((best, s) =>
       !best || s.top.weight > best.top.weight ||
@@ -151,7 +168,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
     // Eerst het gewicht, en bij gelijk gewicht de reps — meer herhalingen op
     // hetzelfde gewicht is ook vooruitgang.
     const verschil = (i) => {
-      const nu = sessies[i]?.sets?.[0], vorige = sessies[i + 1]?.sets?.[0]
+      const nu = sessiesDezeWeek[i]?.sets?.[0], vorige = sessiesDezeWeek[i + 1]?.sets?.[0]
       if (!nu || !vorige) return null
       const dKg = (nu.weight || 0) - (vorige.weight || 0)
       if (dKg !== 0) return { tekst: `${dKg > 0 ? '+' : ''}${Number(dKg.toFixed(1))} kg`, op: dKg > 0 }
@@ -162,7 +179,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
 
     // Hoeveel set-kolommen de tabel krijgt. Vier is genoeg; wie er meer doet
     // ziet de rest achter een plusje.
-    const maxKolommen = Math.min(4, Math.max(...sessies.map(s => s.sets.length), 1))
+    const maxKolommen = Math.min(4, Math.max(...sessiesDezeWeek.map(s => s.sets.length), 1))
     const kolommen = `56px repeat(${maxKolommen}, minmax(0, 1fr)) 66px`
 
     // Verticale lijnen tussen de kolommen. Via een linkerrand op elke cel
@@ -275,6 +292,60 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
               )}
             </div>
 
+            {/* Week-navigatie boven de tabel. Swipe rechts = oudere week. */}
+            {weken.length > 1 && (
+              <div
+                onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
+                onTouchEnd={(e) => {
+                  if (touchStartX.current === null) return
+                  const dx = e.changedTouches[0].clientX - touchStartX.current
+                  touchStartX.current = null
+                  if (Math.abs(dx) < 40) return
+                  if (dx > 0) setWeekIdx(i => Math.min(i + 1, weken.length - 1))
+                  else setWeekIdx(i => Math.max(i - 1, 0))
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  margin: '0.6rem 0 0.25rem', padding: '0.3rem 0.5rem',
+                  background: 'rgba(255,255,255,0.04)', borderRadius: 8,
+                  userSelect: 'none', touchAction: 'pan-y',
+                }}
+              >
+                <button
+                  onClick={() => setWeekIdx(i => Math.min(i + 1, weken.length - 1))}
+                  disabled={effectiefWeekIdx >= weken.length - 1}
+                  style={{
+                    background: 'none', border: 'none', padding: '0.15rem 0.25rem', cursor: effectiefWeekIdx >= weken.length - 1 ? 'default' : 'pointer',
+                    color: effectiefWeekIdx >= weken.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.55)',
+                    display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  <ChevronLeft size={15} />
+                </button>
+                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.02em' }}>
+                  {(() => {
+                    if (!huidigeMaandag) return ''
+                    const eindD = new Date(huidigeMaandag + 'T00:00:00')
+                    eindD.setDate(eindD.getDate() + 6)
+                    const p = (n) => String(n).padStart(2, '0')
+                    const eindIso = `${eindD.getFullYear()}-${p(eindD.getMonth() + 1)}-${p(eindD.getDate())}`
+                    return `${formatDate(huidigeMaandag)} – ${formatDate(eindIso)}`
+                  })()}
+                </span>
+                <button
+                  onClick={() => setWeekIdx(i => Math.max(i - 1, 0))}
+                  disabled={effectiefWeekIdx === 0}
+                  style={{
+                    background: 'none', border: 'none', padding: '0.15rem 0.25rem', cursor: effectiefWeekIdx === 0 ? 'default' : 'pointer',
+                    color: effectiefWeekIdx === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.55)',
+                    display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            )}
+
             {/* Elke set een eigen kolom. Zo lees je verticaal wat set 1 door de
                 weken heen deed, en horizontaal hoe een sessie verliep. De
                 laatste kolom vergelijkt set 1 met set 1 van de vorige keer. */}
@@ -293,10 +364,10 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
             </div>
 
             <div>
-              {sessies.map((s, i) => {
+              {sessiesDezeWeek.map((s, i) => {
                 const v = verschil(i)
                 const maand = new Date(`${s.dag}T00:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
-                const vorigeMaand = i === 0 ? null : new Date(`${sessies[i - 1].dag}T00:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+                const vorigeMaand = i === 0 ? null : new Date(`${sessiesDezeWeek[i - 1].dag}T00:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
                 const nieuweMaand = maand !== vorigeMaand
                 return (
                   <div key={s.dag}>
