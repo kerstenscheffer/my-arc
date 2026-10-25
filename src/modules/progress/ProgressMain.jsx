@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { VoortgangSkelet } from '../../client/PaginaSkeletten'
 import usePaginaTerug from '../../client/usePaginaTerug'
 import { createPortal } from '../../client/paginaPortal'
-import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X } from 'lucide-react'
+import { Loader2, Camera, Calendar, Sparkles, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X } from 'lucide-react'
 
 import ProgressPhotos from '../progress-photos/ProgressPhotos'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
@@ -15,11 +15,11 @@ import CircumferenceMeasurements from '../weight-tracker/components/Circumferenc
 import RecentProgressPhotos from './components/RecentProgressPhotos'
 import CheckinHistoryCard from './components/CheckinHistoryCard'
 import SlaapKnop from './SlaapKnop'
-import BeforeAfterCard from './components/BeforeAfterCard'
 import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
 import GewichtBandGrafiek from '../coach-command-center/components/insight/GewichtBandGrafiek'
 import { useChallenge } from '../../hooks/useChallenge'
+import ChallengeProgressTab from '../challenge-monitor/ChallengeProgressTab'
 
 // Coach-tip bovenaan de tracking pagina — foto links, vaste boodschap rechts.
 // Vervangt de rotating daily-tip: deze tekst is een vast reminder over week-
@@ -27,6 +27,8 @@ import { useChallenge } from '../../hooks/useChallenge'
 // Dezelfde foto als de andere meldingen, lokaal in plaats van een gratis
 // image-host.
 const COACH_PHOTO_URL = '/coach-compliment.jpg'
+// Kopfoto, zelfde opbouw als de banner op de maaltijdpagina.
+const WEEG_BANNER_URL = 'https://images.unsplash.com/photo-1627903632132-ead7be18a56d?w=1200&h=700&fit=crop&q=80'
 const COACH_TRACKING_MESSAGE = 'Gewichtsschommelingen zijn normaal. We sturen op basis van het week op week gemiddelde.'
 
 function TrackingTipBlock({ isMobile }) {
@@ -204,11 +206,6 @@ export default function ProgressMain({ db, client }) {
 
   const showMessage = (text, type = 'success') => { setMessage({ text, type }); setTimeout(() => setMessage(null), 3000) }
 
-  // Terugval voor de hero: de laatste foto die er wél is, zodat er nooit een
-  // leeg vak bovenaan de pagina staat. Zonder foto's valt BeforeAfterCard terug
-  // op deze afbeelding met de MA-overlay eroverheen.
-  const heroFoto = (recentPhotos.find(p => p.photo_url) || {}).photo_url
-    || 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=1000&fit=crop&q=80'
 
   const progressPercent = weightStats?.current && client?.target_weight
     ? Math.round((weightStats.current / parseFloat(client.target_weight)) * 100) : 0
@@ -243,73 +240,82 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
-      {/* ═══ ZONE 0: PROGRESS FOTO'S — foto links, tekst en knop rechts ═══
-            De before/after over de volle breedte was mooi maar onleesbaar: van
-            een 4:5-kaart teruggesneden naar een band van 215 pixels hou je
-            plafond en muur over, niet de lichamen. Klein naast de tekst doet
-            hij wat hij moet doen — laten zien dat er foto's zijn en waar je
-            moet drukken. */}
-      {!photosOpen && (
-        <div
-          onClick={() => setPhotosOpen(true)}
-          style={{
-            marginTop: isMobile ? '0.75rem' : '1rem',
-            padding: isMobile ? '0 1rem' : '0 1.5rem',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
+      {/* ════ ZWARTE BALK BOVEN DE FOTO — zelfde als Meal en Workout ════
+          Alleen iconen, in het midden de challenge-stand. De progress-foto's
+          zaten als blok bovenaan de pagina; hier kosten ze geen ruimte. */}
+      {!photosOpen && (() => {
+        const knop = {
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          minWidth: isMobile ? 42 : 48, padding: isMobile ? '0 0.9rem' : '0 1.2rem',
+          background: 'transparent', border: 'none', color: '#fff',
+          fontFamily: 'inherit', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }
+        return (
           <div style={{
-            display: 'flex', alignItems: 'center',
-            gap: isMobile ? '0.75rem' : '1rem',
+            display: 'flex', alignItems: 'stretch',
+            height: isMobile ? 34 : 40,
+            paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
+            boxSizing: 'content-box', background: '#0a0a0a',
           }}>
-            <div style={{ width: isMobile ? 120 : 150, flexShrink: 0 }}>
-              <BeforeAfterCard
-                bare verbergDownload client={client} db={db} isMobile={isMobile}
-                fallbackUrl={heroFoto}
-              />
+            <button onClick={() => setPhotosOpen(true)} title="Progress foto's" aria-label="Progress foto's" style={knop}>
+              <Camera size={17} strokeWidth={2.6} />
+            </button>
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
+              <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
             </div>
-            <div style={{
-              flex: 1, minWidth: 0,
-              display: 'flex', flexDirection: 'column', justifyContent: 'center',
-            }}>
-              <div style={{
-                fontSize: isMobile ? '0.55rem' : '0.6rem',
-                fontWeight: 900, color: 'rgba(255,255,255,0.45)',
-                textTransform: 'uppercase', letterSpacing: '0.1em',
-                lineHeight: 1, marginBottom: 5,
-              }}>
-                Progressie
-              </div>
-              <h2 style={{
-                fontSize: isMobile ? '1.05rem' : '1.2rem',
-                fontWeight: 900, color: '#fff',
-                margin: 0, marginBottom: 5,
-                letterSpacing: '-0.02em', lineHeight: 1.15,
-              }}>
-                Progress foto's
-              </h2>
-              <div style={{
-                fontSize: isMobile ? '0.7rem' : '0.76rem',
-                color: 'rgba(255,255,255,0.55)', fontWeight: 700,
-              }}>
-                {photoCount > 0
-                  ? `${photoCount} ${photoCount === 1 ? 'foto' : "foto's"} · open om te bekijken`
-                  : 'Open om foto toe te voegen'}
-              </div>
-            </div>
-
-            <div style={{
-              flexShrink: 0,
-              width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
-              borderRadius: '50%', background: '#fff', color: '#0a0a0a',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
-            }}>
-              <ChevronDown size={isMobile ? 22 : 26} strokeWidth={3} />
-            </div>
+            <button onClick={() => setOmtrekOpen(true)} title="Omtrek" aria-label="Omtrek" style={knop}>
+              <Ruler size={17} strokeWidth={2.6} />
+            </button>
           </div>
+        )
+      })()}
+
+      {/* ════ KOP MET FOTO — zelfde vorm als Meal ════
+          De slider van het weegmoment schuift er onderaan een stukje overheen,
+          dus de foto loopt onderin helemaal uit in het zwart. */}
+      {!photosOpen && (
+        <div style={{ position: 'relative', width: '100%', height: isMobile ? 120 : 170 }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: `url(${WEEG_BANNER_URL})`,
+            backgroundSize: 'cover', backgroundPosition: 'center 60%',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(180deg, rgba(10,10,10,0.6) 0%, rgba(10,10,10,0.4) 25%, rgba(10,10,10,0.75) 55%, rgba(10,10,10,0.95) 78%, #0a0a0a 100%)',
+          }} />
+          <div style={{
+            position: 'absolute', left: 0, right: 0, top: isMobile ? 18 : 26,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          }}>
+            <span style={{
+              fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.02em', textShadow: '0 2px 10px rgba(0,0,0,0.6)',
+            }}>
+              Weegmoment
+            </span>
+            <span style={{
+              fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase',
+              padding: '3px 7px', borderRadius: 6, color: '#fff', border: '1px solid rgba(255,255,255,0.35)',
+            }}>
+              {todayEntry ? 'Gewogen' : 'Vandaag'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ ZONE 2: GEWICHT — Ring + Picker + Save ═══ */}
+      {/* Negatieve marge: het getal ligt half op de foto. Eigen laag, zodat
+          het boven de foto staat en je hem gewoon kunt vegen. */}
+      {!photosOpen && (
+        <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -52 : -64 }}>
+        <WeightProgressRing
+          weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
+          saving={saving} todayEntry={todayEntry} progressPercent={progressPercent}
+          isFriday={isFriday} isMobile={isMobile}
+          targetWeight={parseFloat(client?.target_weight) || 75}
+        />
         </div>
       )}
 
@@ -328,44 +334,12 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
-      {/* De regel over weekgemiddeldes staat vlak boven het weegmoment: dat is
-          waar je hem nodig hebt, net voordat je je gewicht van vandaag intikt. */}
+      {/* De regel over weekgemiddeldes staat vlak onder het weegmoment: je
+          leest hem net nadat je je gewicht van vandaag hebt ingetikt. */}
       {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '2.25rem' : '2.75rem' }}>
+        <div style={{ marginTop: isMobile ? '0.75rem' : '1rem' }}>
           <TrackingTipBlock isMobile={isMobile} />
         </div>
-      )}
-
-      {/* ═══ ZONE 2: GEWICHT — Ring + Picker + Save ═══ */}
-      {!photosOpen && (
-        <WeightProgressRing
-          weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
-          saving={saving} todayEntry={todayEntry} progressPercent={progressPercent}
-          isFriday={isFriday} isMobile={isMobile}
-          targetWeight={parseFloat(client?.target_weight) || 75}
-          extraKnop={(
-            <button
-              onClick={() => setOmtrekOpen(true)}
-              style={{
-                // Geen vlak eromheen: naast een slider die zelf alleen uit
-                // cijfers bestaat, is een witte knop een blok dat de aandacht
-                // van het gewicht wegtrekt. Icoon boven het woord, allebei wit
-                // en dik — dat is genoeg om een knop te zijn.
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: 3,
-                width: isMobile ? 52 : 58, minHeight: 52, padding: '0.4rem 0',
-                background: 'transparent', border: 'none', color: '#fff',
-                fontSize: isMobile ? '0.6rem' : '0.64rem', fontWeight: 900,
-                fontFamily: 'inherit', letterSpacing: '-0.01em',
-                cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Ruler size={20} strokeWidth={2.8} />
-              Omtrek
-            </button>
-          )}
-        />
       )}
 
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
