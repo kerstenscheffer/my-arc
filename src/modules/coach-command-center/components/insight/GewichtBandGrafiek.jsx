@@ -402,7 +402,9 @@ export default function GewichtBandGrafiek({
         return (
           <div style={{
             display: 'flex', alignItems: 'stretch', height: 40,
-            margin: isMobile ? '-0.5rem -0.75rem 0' : '-0.625rem -1rem 0',
+            // Boven tegen de rand, behalve als de verwachting-melding erboven staat.
+            margin: model.verwachting ? (isMobile ? '0 -0.75rem' : '0 -1rem')
+              : (isMobile ? '-0.5rem -0.75rem 0' : '-0.625rem -1rem 0'),
             borderTop: lijn, borderBottom: lijn,
           }}>
             <div style={vak}>
