@@ -87,6 +87,13 @@ begin
   return greatest(struct, fuzzy);
 end $$;
 
+-- Synoniemen: van (wat de klant typt) -> naar (waar we op zoeken).
+create table if not exists public.zoek_synoniemen (van text primary key, naar text not null);
+alter table public.zoek_synoniemen enable row level security;
+create policy zoek_synoniemen_lezen on public.zoek_synoniemen for select to anon, authenticated using (true);
+-- Startlijst (migratie zoek_synoniemen): bakkie/zwarte koffie -> koffie,
+-- expresso -> espresso, pils -> bier, patatje -> friet, coke -> cola, ...
+
 create or replace function public.zoek_ingredienten(p_q text, p_client uuid default null, p_limit int default 30)
 returns table (
   id uuid, name text, name_en text, calories_per_100g numeric, protein_per_100g numeric,
@@ -99,6 +106,9 @@ declare
   s text;
   w1 text;
 begin
+  -- Spreektaal en tikfouten die pg_trgm niet vangt ("bakkie", "expresso"),
+  -- uit zoek_synoniemen (25 okt 2026). Nieuwe synoniemen: gewoon een rij erbij.
+  q := coalesce((select public.zoek_norm(z.naar) from public.zoek_synoniemen z where public.zoek_norm(z.van) = q limit 1), q);
   if length(q) < 2 then return; end if;
   s := public.zoek_stam(q);
   w1 := split_part(s, ' ', 1);

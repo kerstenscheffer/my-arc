@@ -1,6 +1,7 @@
 // src/client/ClientDashboard.jsx - CLEAN VERSION v2.0
 // ✅ ONLY STYLING CHANGED - All logic, state, routing, auth IDENTICAL
 import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
+import PaginaVangnet from '../ui/PaginaVangnet'
 import lazy from '../lazyMetHerlaad'
 import LaadScherm from '../components/LaadScherm'
 import ruimOpslagOp from '../utils/opruimenOpslag'
@@ -486,6 +487,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             {PAGINAS.filter(id => bezocht.current.has(id)).map(id => (
               <div key={id} style={id === currentView ? undefined : { display: 'none' }}>
                 <PaginaZichtbaar.Provider value={id === currentView}>
+                {/* Vangnet: een fout op één pagina toont daar een melding, geen wit scherm. */}
+                <PaginaVangnet pagina={id} clientId={client?.id}>
                 <Suspense fallback={<PaginaSkelet pagina={id} isMobile={isMobile} />}>
                   {id === 'home' && <ClientHome client={client} db={db} setCurrentView={setCurrentView} />}
                   {id === 'workout' && <ClientWorkoutPlan client={client} schema={schema} db={db} onFocusChange={setWorkoutFocus} onClientUpdate={loadClientData} />}
@@ -496,6 +499,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
                   {id === 'calls' && <ClientCalls db={db} clientInfo={client} />}
                   {id === 'profile' && <ClientProfile client={client} user={user} db={db} onClientUpdate={handleClientUpdate} />}
                 </Suspense>
+                </PaginaVangnet>
                 </PaginaZichtbaar.Provider>
               </div>
             ))}
