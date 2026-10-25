@@ -22,45 +22,8 @@ import { useChallenge } from '../../hooks/useChallenge'
 import ChallengeProgressTab from '../challenge-monitor/ChallengeProgressTab'
 import WeegDagKiezer from './components/WeegDagKiezer'
 
-// Coach-tip bovenaan de tracking pagina — foto links, vaste boodschap rechts.
-// Vervangt de rotating daily-tip: deze tekst is een vast reminder over week-
-// gemiddeldes ipv dagelijkse schommelingen.
-// Dezelfde foto als de andere meldingen, lokaal in plaats van een gratis
-// image-host.
-const COACH_PHOTO_URL = '/coach-compliment.jpg'
 // Kopfoto, zelfde opbouw als de banner op de maaltijdpagina.
 const WEEG_BANNER_URL = 'https://images.unsplash.com/photo-1627903632132-ead7be18a56d?w=1200&h=700&fit=crop&q=80'
-const COACH_TRACKING_MESSAGE = 'Gewichtsschommelingen zijn normaal. We sturen op basis van het week op week gemiddelde.'
-
-function TrackingTipBlock({ isMobile }) {
-  // Eén dunne regel boven de slider: rond fotootje, zin ernaast, gecentreerd.
-  // Dit was een banner van 130 pixels hoog met de foto half over de pagina —
-  // mooi, maar hij duwde het weegmoment onder de vouw, en je leest die zin één
-  // keer.
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      gap: isMobile ? 8 : 10,
-      padding: isMobile ? '0.25rem 1rem' : '0.3rem 1.5rem',
-      maxWidth: 420, margin: '0 auto',
-    }}>
-      <div style={{
-        width: isMobile ? 24 : 26, height: isMobile ? 24 : 26, flexShrink: 0,
-        borderRadius: '50%', overflow: 'hidden',
-        backgroundImage: `url(${COACH_PHOTO_URL})`,
-        backgroundSize: 'cover', backgroundPosition: 'center 22%',
-      }} />
-      <div style={{
-        fontSize: isMobile ? '0.68rem' : '0.74rem',
-        fontWeight: 900, color: '#fff',
-        lineHeight: 1.3, letterSpacing: '-0.01em',
-        textAlign: 'center',
-      }}>
-        {COACH_TRACKING_MESSAGE}
-      </div>
-    </div>
-  )
-}
 
 export default function ProgressMain({ db, client }) {
   const [weightService] = useState(() => new WeightTrackerService(db))
@@ -352,13 +315,6 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
-      {/* De regel over weekgemiddeldes staat vlak onder het weegmoment: je
-          leest hem net nadat je je gewicht van vandaag hebt ingetikt. */}
-      {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '0.75rem' : '1rem' }}>
-          <TrackingTipBlock isMobile={isMobile} />
-        </div>
-      )}
 
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
       {!photosOpen && (
