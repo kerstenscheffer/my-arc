@@ -763,7 +763,6 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         foodLogTab={foodLogTab}
         weekOffset={weekOffset}
         dagRefreshKey={dagRefreshKey}
-        onDagBewaard={() => setDagRefreshKey(k => k + 1)}
         onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
       />
 

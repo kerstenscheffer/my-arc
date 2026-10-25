@@ -247,7 +247,7 @@ export default function DagTemplatePaneel({
           {uitleg && (
             <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: `1px solid ${LIJN}` }}>
               {[
-                ['Wat is een dag?', 'Een compleet dagmenu: alle maaltijden van één dag. Je coach zet er voor je klaar, en je bewaart je eigen dagen met "Dag bewaren" boven je maaltijden.'],
+                ['Wat is een dag?', 'Een compleet dagmenu: alle maaltijden van één dag. Je coach zet er voor je klaar.'],
                 ['Bekijken', 'Tik op een dag en je ziet alle maaltijden, zoals ze in je plan zouden staan.'],
                 ['Op je week zetten', 'Kies de dagen (Ma t/m Zo). "Alleen deze week" verdwijnt vanzelf na deze week. "Altijd" vervangt die dag voortaan in je plan.'],
                 ['Weghalen', 'Met het prullenbakje haal je een eigen dag weg. Je plan zelf verandert daar niet door.'],

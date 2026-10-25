@@ -63,9 +63,7 @@ export default function AIDaySchedule({
   // Telt op zodra er een dagtemplate is toegepast: dan opnieuw ophalen welke
   // dagen tijdelijk anders zijn, en de getoonde dag opnieuw opbouwen.
   dagRefreshKey = 0,
-  // Roept de ouder aan zodra de klant een dag bewaart, zodat het dagen-paneel
-  // hem meteen in de lijst heeft staan.
-  onDagBewaard, onOpenDagen,
+  onOpenDagen,
   // Callback waarmee AIMealDashboard op de hoogte gesteld wordt als een
   // verleden-dag-log gewijzigd is (zodat MacroHero-cache ongeldig gemaakt wordt).
   onPastDayUpdate,
@@ -805,7 +803,7 @@ export default function AIDaySchedule({
           floating ronde + FAB in AIMealDashboard (één log-knop per pagina). */}
 
       {/* Welke dag heb je voor je? Naam als het een bewaarde dag is, anders
-          de knop om 'm te bewaren. Staat boven de maaltijden, want het gaat
+          de weg naar de dagen. Staat boven de maaltijden, want het gaat
           over de dag als geheel. */}
       {!loading && displayMeals.length > 0 && (
         <DagBewaarBalk
@@ -814,7 +812,6 @@ export default function AIDaySchedule({
           maaltijden={displayMeals}
           isMobile={isMobile}
           verversSleutel={dagRefreshKey}
-          onBewaard={onDagBewaard}
           onOpenDagen={onOpenDagen}
         />
       )}
