@@ -189,14 +189,31 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
       || servingOptions.find(o => o.natuurlijk) || null)
     : null
 
+  // Hoeveelheid uit de zoekterm ("2 eieren", "150 g kip", "glas melk"; zie
+  // hoeveelheidUitZoekterm.js): open meteen op die portie en dat aantal.
+  const snel = item?._snel || null
+  const snelKeuze = (() => {
+    if (!snel) return null
+    if (!isPer100g) return { optie: servingOptions[0], aantal: snel.eenheid ? 1 : snel.aantal }
+    if (snel.eenheid === 'g' || snel.eenheid === 'ml') return { optie: servingOptions[0], aantal: snel.aantal }
+    const optie = snel.eenheid
+      ? (servingOptions.find(o => o.natuurlijk && o.enkel === snel.eenheid)
+        || servingOptions.find(o => o.natuurlijk && o.enkel.includes(snel.eenheid)))
+      : startNatuurlijk
+    // Geen passende portie (bv. "2 kipfilet"): aantal × de standaardportie in gram.
+    return optie
+      ? { optie, aantal: snel.aantal }
+      : { optie: servingOptions[0], aantal: Math.round(snel.aantal * (item?.defaultPortion || 100)) }
+  })()
+
   // Initial state
-  const [selectedServing, setSelectedServing] = useState(startNatuurlijk || servingOptions[0])
+  const [selectedServing, setSelectedServing] = useState(snelKeuze?.optie || startNatuurlijk || servingOptions[0])
   // Wanneer een portie-preset z'n eigen macros heeft (bv. "1 eiwit (los)"
   // gebruikt egg-white macros ipv het gemiddelde hele-ei profiel), zetten
   // we die hier neer. Math gebruikt deze macros als per-100g-basis ipv de
   // item-macros. Wordt geleegd zodra de gebruiker via de dropdown een
   // andere portie kiest.
-  const [baseMacrosOverride, setBaseMacrosOverride] = useState(startNatuurlijk?.override || null)
+  const [baseMacrosOverride, setBaseMacrosOverride] = useState((snelKeuze ? snelKeuze.optie?.override : startNatuurlijk?.override) || null)
 
   // De samenstelling komt in drie vormen binnen: met naam en macro's, met
   // ingredient_name/amount_gram, of als kale verwijzing {ingredient_id,
@@ -253,7 +270,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
     ? item._savedAmount
     : (isPer100g ? (item?.defaultPortion || 100) : 1)
 
-  const [quantity, setQuantity] = useState(startNatuurlijk ? 1 : initialQuantity)
+  const [quantity, setQuantity] = useState(snelKeuze ? snelKeuze.aantal : (startNatuurlijk ? 1 : initialQuantity))
   const [editingQty, setEditingQty] = useState(false)
   const [editQtyText, setEditQtyText] = useState('')
   const [portieOpen, setPortieOpen] = useState(false)

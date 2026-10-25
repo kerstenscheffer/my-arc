@@ -10,6 +10,7 @@ import FatSecretService from './FatSecretService'
 import { resolveFoodImage } from '../../foodImageFallback'
 import { vulZoekFotos } from './enrichImageFromOFF'
 import useZoekLog from './useZoekLog'
+import { hoeveelheidUitZoekterm } from './hoeveelheidUitZoekterm'
 
 // Relevance score: lower = better.
 // 0  exact match
@@ -33,6 +34,14 @@ const computeRelevance = (name, query) => {
   if (wb.test(n)) return 3
   if (n.includes(q)) return 4
   return 5
+}
+
+// "2 stuks", "150 g", "1 glas" boven de resultaten.
+const snelTekst = ({ aantal, eenheid }) => {
+  const n = String(aantal).replace('.', ',')
+  if (eenheid === 'g' || eenheid === 'ml') return `${n} ${eenheid}`
+  if (!eenheid) return aantal === 1 ? '1 stuk' : `${n} stuks`
+  return aantal === 1 ? `1 ${eenheid}` : `${n} × ${eenheid}`
 }
 
 // `bron` komt van de knoppenrij in het log-venster: 'alles' of 'favorieten'.
@@ -177,7 +186,17 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
     debounceRef.current = setTimeout(() => runSearch(value), 350)
   }
 
-  const runSearch = async (query) => {
+  // "2 eieren" / "150 g kip": zoek op het product, onthoud de hoeveelheid
+  // voor de portie-kiezer.
+  const [snel, setSnel] = useState(null)
+  const kies = (item, idx) => {
+    zoekLog.gekozen(item, idx)
+    onSelect(snel ? { ...item, _snel: snel } : item)
+  }
+
+  const runSearch = async (invoer) => {
+    const { term: query, hoeveelheid } = hoeveelheidUitZoekterm(invoer)
+    setSnel(hoeveelheid)
     setLoading(true)
     setSearched(true)
     setOffLoading(false)
@@ -503,6 +522,11 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       {/* SEARCH RESULTS — large card style */}
       {!loading && isSearching && (
         <div style={{ paddingBottom: '1rem' }}>
+          {snel && results.length > 0 && (
+            <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.25rem 0.5rem', fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>
+              Hoeveelheid: <span style={{ color: '#fff' }}>{snelTekst(snel)}</span>
+            </div>
+          )}
           {results.map((item, idx) => (
             <MealCard
               key={`${item.source}-${item.id}-${idx}`}
@@ -515,9 +539,9 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
               momentLabel={item.per100g ? (item.bereiding ? `${item.bereiding} · per 100g` : 'per 100g') : item.defaultPortion ? `${item.defaultPortion}g` : (item.sourceLabel || 'Product')}
               tijdLabel={item.brand || null}
               isMobile={isMobile}
-              onCheck={() => { zoekLog.gekozen(item, idx); onSelect(item) }}
+              onCheck={() => kies(item, idx)}
               hoekKnop={<SterKnop aan={isFavoriet(item)} onClick={() => wisselFavoriet(item)} />}
-              acties={[{ icon: <Plus size={11} strokeWidth={3} />, label: 'Kies', onClick: () => { zoekLog.gekozen(item, idx); onSelect(item) } }]}
+              acties={[{ icon: <Plus size={11} strokeWidth={3} />, label: 'Kies', onClick: () => kies(item, idx) }]}
             />
           ))}
         </div>
