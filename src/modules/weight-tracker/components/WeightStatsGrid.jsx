@@ -432,7 +432,9 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         genoeg,
         kleur: kleurVoor(z.verschil, genoeg),
         // Op zaterdag zelf ís de laatste zaterdag deze week.
-        kop: (i === 0 && z.zaterdag === isoVandaag) ? 'Deze week' : i === 0 ? 'Laatste zaterdag' : i === 1 ? 'Zaterdag ervoor' : `${i} zaterdagen terug`,
+        // De datum staat in de kop ('Za 24 okt'); een regel eronder is er niet meer.
+        kop: (i === 0 && z.zaterdag === isoVandaag) ? 'Deze week'
+          : `Za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`,
         onder: genoeg
           ? `za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
           : z.vorige.vanStart ? `vanaf start, ${z.nu.metingen} wegingen` : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
@@ -513,7 +515,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             </div>
 
             <GrootBlok
-              titel={fase ? 'Sinds fase' : 'Sinds start'}
+              titel={startDateLabel ? `Sinds ${startDateLabel}` : (fase ? 'Sinds fase' : 'Sinds start')}
               waarde={totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—'}
               eenheid="kg"
               kleur={totalChange !== null ? weightGoalColor(totalChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)'}
@@ -777,7 +779,8 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
 // alleen in tekst en kleur, en dan gaat er bij een wijziging altijd eentje
 // achterlopen.
 function GrootBlok(props) {
-  const { titel, waarde, eenheid, kleur, onder, isMobile, basis, actie, laatste, vast } = props
+  // Geen regel onder het getal: de datum staat waar nodig in de titel.
+  const { titel, waarde, eenheid, kleur, isMobile, basis, actie, laatste, vast } = props
   return (
     <div style={{
       flex: basis, minWidth: 0,
@@ -805,13 +808,6 @@ function GrootBlok(props) {
       }}>
         {waarde}
         <span style={{ fontSize: '0.42em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>{eenheid}</span>
-      </div>
-      <div style={{
-        fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
-        color: 'rgba(255,255,255,0.45)',
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-      }}>
-        {onder}
       </div>
     </div>
   )
@@ -931,13 +927,6 @@ function WekenStrook(props) {
           }}>
             {w.waarde != null ? `${w.waarde > 0 ? '+' : ''}${w.waarde}` : '—'}
             <span style={{ fontSize: '0.42em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg/wk</span>
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
-            color: 'rgba(255,255,255,0.45)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {w.onder}
           </div>
         </div>
       ))}
