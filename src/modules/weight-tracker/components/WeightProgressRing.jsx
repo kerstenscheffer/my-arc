@@ -2,7 +2,7 @@
 // v15.2 - Flush button styling, matching de rest van de pagina (geen dikke gevulde cards meer)
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Check, Loader2, X } from 'lucide-react'
+import { CircleCheck, Loader2, X } from 'lucide-react'
 
 const MIN = 30
 const MAX = 200
@@ -90,7 +90,8 @@ function HorizontalPicker({ value, onChange, disabled, gelogd = false }) {
   }
 
   // Hoger dan eerst: het gekozen getal ís nu de kop, dus dat mag groot.
-  const scrollerH = isMobile ? 86 : 100
+  // Compact: het getal past ruim, meer hoogte is alleen lege ruimte.
+  const scrollerH = isMobile ? 62 : 74
 
   return (
     <div style={{
@@ -117,13 +118,15 @@ function HorizontalPicker({ value, onChange, disabled, gelogd = false }) {
           overflow: 'hidden',
         }}
       >
+        {/* Vinkje in een rondje, half over de rechterbovenhoek van het getal. */}
         {gelogd && (
           <div style={{
-            position: 'absolute', top: isMobile ? 14 : 16,
-            left: `calc(50% + ${isMobile ? 30 : 38}px)`,
-            zIndex: 4, pointerEvents: 'none', color: '#10b981', display: 'flex',
+            position: 'absolute', top: isMobile ? 6 : 8,
+            left: `calc(50% + ${isMobile ? 22 : 28}px)`,
+            zIndex: 4, pointerEvents: 'none', display: 'flex',
+            background: '#0a0a0a', borderRadius: 999,
           }}>
-            <Check size={isMobile ? 18 : 20} strokeWidth={3.4} />
+            <CircleCheck size={isMobile ? 20 : 22} strokeWidth={2.8} color="#10b981" />
           </div>
         )}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />

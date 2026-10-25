@@ -291,7 +291,7 @@ export default function ProgressMain({ db, client }) {
       {/* Negatieve marge: het getal ligt half op de foto. Eigen laag, zodat
           het boven de foto staat en je hem gewoon kunt vegen. */}
       {!photosOpen && (
-        <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -52 : -64 }}>
+        <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -40 : -50 }}>
         <WeightProgressRing
           key={weegDatum}
           weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
