@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { VoortgangSkelet } from '../../client/PaginaSkeletten'
 import usePaginaTerug from '../../client/usePaginaTerug'
 import { createPortal } from '../../client/paginaPortal'
-import { Loader2, Camera, Calendar, Sparkles, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X, CalendarDays } from 'lucide-react'
+import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X, CalendarDays, ClipboardCheck } from 'lucide-react'
 
 import ProgressPhotos from '../progress-photos/ProgressPhotos'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
@@ -13,7 +13,8 @@ import WeightProgressRing from '../weight-tracker/components/WeightProgressRing'
 import WeightStatsGrid from '../weight-tracker/components/WeightStatsGrid'
 import CircumferenceMeasurements from '../weight-tracker/components/CircumferenceMeasurements'
 import RecentProgressPhotos from './components/RecentProgressPhotos'
-import CheckinHistoryCard from './components/CheckinHistoryCard'
+import CheckinHistoryModal from '../client-checkin/components/CheckinHistoryModal'
+import BeforeAfterCard from './components/BeforeAfterCard'
 import SlaapKnop from './SlaapKnop'
 import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
@@ -68,6 +69,7 @@ export default function ProgressMain({ db, client }) {
   const vandaagLokaal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const [weegDatum, setWeegDatum] = useState(vandaagLokaal)
   const [kalenderOpen, setKalenderOpen] = useState(false)
+  const [checkinsOpen, setCheckinsOpen] = useState(false)
   const entryVoorDatum = weegDatum === vandaagLokaal
     ? todayEntry
     : (weightHistory.find(r => String(r.date).slice(0, 10) === weegDatum) || null)
@@ -193,6 +195,12 @@ export default function ProgressMain({ db, client }) {
     finally { setSaving(false) }
   }
 
+  // Terugval voor de hero: de laatste foto die er wél is, zodat er nooit een
+  // leeg vak bovenaan de pagina staat. Zonder foto's valt BeforeAfterCard terug
+  // op deze afbeelding met de MA-overlay eroverheen.
+  const heroFoto = (recentPhotos.find(p => p.photo_url) || {}).photo_url
+    || 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=1000&fit=crop&q=80'
+
   const showMessage = (text, type = 'success') => { setMessage({ text, type }); setTimeout(() => setMessage(null), 3000) }
 
 
@@ -247,8 +255,10 @@ export default function ProgressMain({ db, client }) {
             paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
             boxSizing: 'content-box', background: '#0a0a0a',
           }}>
-            <button onClick={() => setPhotosOpen(true)} title="Progress foto's" aria-label="Progress foto's" style={knop}>
-              <Camera size={17} strokeWidth={2.6} />
+            {/* Je eigen check-ins teruglezen. Was een blok met foto onderaan de
+                pagina; de progress-foto's staan daar nu. */}
+            <button onClick={() => setCheckinsOpen(true)} title="Je check-ins" aria-label="Je check-ins" style={knop}>
+              <ClipboardCheck size={17} strokeWidth={2.6} />
             </button>
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
               <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
@@ -375,6 +385,10 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
+      {checkinsOpen && (
+        <CheckinHistoryModal db={db} client={client} isMobile={isMobile} onClose={() => setCheckinsOpen(false)} />
+      )}
+
       {/* Omtrekken horen bij het gewicht: de weegschaal staat stil terwijl de
           taille krimpt. Ze staan daarom achter de knop naast de slider, in een
           blad van onderen — niet meer als blok verderop de pagina. */}
@@ -424,21 +438,73 @@ export default function ProgressMain({ db, client }) {
         document.body
       )}
 
-      {/* ═══ ZONE 4: GEWICHT-CONTENT — alleen wanneer foto-dropdown gesloten ═══
-            Volgorde: histograaf bovenaan, daarna omtrekken. */}
+      {/* ═══ PROGRESS FOTO'S — foto links, tekst en knop rechts, onder de grafiek ═══
+            De before/after over de volle breedte was mooi maar onleesbaar: van
+            een 4:5-kaart teruggesneden naar een band van 215 pixels hou je
+            plafond en muur over, niet de lichamen. Klein naast de tekst doet
+            hij wat hij moet doen — laten zien dat er foto's zijn en waar je
+            moet drukken. */}
       {!photosOpen && (
-        <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>
-          {/* De lijst met alle weeglogs stond hier. Die staat al in het verloop
-              hierboven, en tweehonderd regels onder een grafiek leest niemand. */}
+        <div
+          onClick={() => setPhotosOpen(true)}
+          style={{
+            marginTop: isMobile ? '2rem' : '2.5rem',
+            padding: isMobile ? '0 1rem' : '0 1.5rem',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            gap: isMobile ? '0.75rem' : '1rem',
+          }}>
+            <div style={{ width: isMobile ? 120 : 150, flexShrink: 0 }}>
+              <BeforeAfterCard
+                bare verbergDownload client={client} db={db} isMobile={isMobile}
+                fallbackUrl={heroFoto}
+              />
+            </div>
+            <div style={{
+              flex: 1, minWidth: 0,
+              display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            }}>
+              <div style={{
+                fontSize: isMobile ? '0.55rem' : '0.6rem',
+                fontWeight: 900, color: 'rgba(255,255,255,0.45)',
+                textTransform: 'uppercase', letterSpacing: '0.1em',
+                lineHeight: 1, marginBottom: 5,
+              }}>
+                Progressie
+              </div>
+              <h2 style={{
+                fontSize: isMobile ? '1.05rem' : '1.2rem',
+                fontWeight: 900, color: '#fff',
+                margin: 0, marginBottom: 5,
+                letterSpacing: '-0.02em', lineHeight: 1.15,
+              }}>
+                Progress foto's
+              </h2>
+              <div style={{
+                fontSize: isMobile ? '0.7rem' : '0.76rem',
+                color: 'rgba(255,255,255,0.55)', fontWeight: 700,
+              }}>
+                {photoCount > 0
+                  ? `${photoCount} ${photoCount === 1 ? 'foto' : "foto's"} · open om te bekijken`
+                  : 'Open om foto toe te voegen'}
+              </div>
+            </div>
 
-          {/* Je eigen check-ins teruglezen — hoort bij het terugkijken dat je
-              op deze pagina toch al doet. */}
-          <CheckinHistoryCard db={db} client={client} isMobile={isMobile} />
-
-          {/* Het slaapblok met zijn eigen fotokop stond hier. Loggen en
-              terugkijken zitten nu allebei in het blad achter de maan-knop
-              linksonder; een tweede plek met dezelfde lijst maakte de pagina
-              alleen langer. */}
+            <div style={{
+              flexShrink: 0,
+              width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
+              borderRadius: '50%', background: '#fff', color: '#0a0a0a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
+            }}>
+              <ChevronDown size={isMobile ? 22 : 26} strokeWidth={3} />
+            </div>
+          </div>
         </div>
       )}
 
