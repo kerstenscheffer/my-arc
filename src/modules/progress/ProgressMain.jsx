@@ -449,7 +449,8 @@ export default function ProgressMain({ db, client }) {
           onClick={() => setPhotosOpen(true)}
           style={{
             marginTop: isMobile ? '2rem' : '2.5rem',
-            padding: isMobile ? '0 1rem' : '0 1.5rem',
+            // Op mobiel dicht tegen de linkerrand, zodat de foto groter kan.
+            padding: isMobile ? '0 1rem 0 0.5rem' : '0 1.5rem',
             cursor: 'pointer',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
@@ -459,7 +460,7 @@ export default function ProgressMain({ db, client }) {
             display: 'flex', alignItems: 'center',
             gap: isMobile ? '0.75rem' : '1rem',
           }}>
-            <div style={{ width: isMobile ? 120 : 150, flexShrink: 0 }}>
+            <div style={{ width: isMobile ? 168 : 150, flexShrink: 0 }}>
               <BeforeAfterCard
                 bare verbergDownload client={client} db={db} isMobile={isMobile}
                 fallbackUrl={heroFoto}
