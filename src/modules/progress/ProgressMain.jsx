@@ -317,15 +317,8 @@ export default function ProgressMain({ db, client }) {
 
 
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
-      {/* Tempo en grafiek in één kader: het zijn twee kanten van hetzelfde
-          verhaal (hoe snel gaat het, en hoe ziet dat eruit). De haarlijn onder
-          de tempo-strook is de scheiding; geen ruimte ertussen. */}
       {!photosOpen && (
-        <div style={{
-          margin: isMobile ? '16px 16px 0' : '24px 24px 0',
-          border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16,
-          background: '#0a0a0a', overflow: 'hidden',
-        }}>
+        <div style={{ marginTop: isMobile ? '1rem' : '1.25rem' }}>
           {/* Mét de lopende fase, dezelfde als de grafiek eronder en als het
               coachpaneel. Zonder fase viel de band terug op start-/doelgewicht
               en stond er bij een build een cut-doel (ks10k, 8 okt 2026:
@@ -348,7 +341,7 @@ export default function ProgressMain({ db, client }) {
           {/* Ook zonder wegingen: dan laat de grafiek zien wat de bedoeling is
               voor deze periode. Juist aan het begin is dat het meest waard. */}
           {(weightHistory.length > 0 || fases[0]) && (
-            <div style={{ paddingTop: 8 }}>
+            <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
               <GewichtBandGrafiek
                 client={client}
                 history={weightHistory}
