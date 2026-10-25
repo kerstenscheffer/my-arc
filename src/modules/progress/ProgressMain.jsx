@@ -20,6 +20,7 @@ import ProgressChallengeSidebar from '../../client/components/ProgressChallengeS
 import GewichtBandGrafiek from '../coach-command-center/components/insight/GewichtBandGrafiek'
 import { useChallenge } from '../../hooks/useChallenge'
 import ChallengeProgressTab from '../challenge-monitor/ChallengeProgressTab'
+import WeegDagKiezer from './components/WeegDagKiezer'
 
 // Coach-tip bovenaan de tracking pagina — foto links, vaste boodschap rechts.
 // Vervangt de rotating daily-tip: deze tekst is een vast reminder over week-
@@ -98,6 +99,25 @@ export default function ProgressMain({ db, client }) {
   const today = new Date()
   const isFriday = today.getDay() === 5
   const dateString = today.toISOString().split('T')[0]
+  // De dag waarvoor je weegt. Standaard vandaag; met de pijlen of de
+  // maandkalender op de kopfoto vul je een gemiste dag alsnog in.
+  // Lokale datum, niet toISOString: die geeft UTC.
+  const vandaagLokaal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const [weegDatum, setWeegDatum] = useState(vandaagLokaal)
+  const entryVoorDatum = weegDatum === vandaagLokaal
+    ? todayEntry
+    : (weightHistory.find(r => String(r.date).slice(0, 10) === weegDatum) || null)
+  const isWeegVrijdag = new Date(`${weegDatum}T12:00:00`).getDay() === 5
+
+  // Andere dag gekozen: de slider springt naar de weging van die dag, of
+  // anders naar de laatste weging daarvóór, zodat je niet vanaf 70 hoeft te vegen.
+  const kiesWeegDatum = (s) => {
+    setWeegDatum(s)
+    const eigen = weightHistory.find(r => String(r.date).slice(0, 10) === s)
+    const ervoor = weightHistory.find(r => String(r.date).slice(0, 10) < s)
+    const kg = Number((eigen || ervoor)?.weight)
+    if (kg > 0) setWeight(kg)
+  }
 
   useEffect(() => { if (client?.id) loadAllData() }, [client?.id])
   // Terug op Voortgang: op Home kan intussen een weging gelogd zijn.
@@ -199,7 +219,7 @@ export default function ProgressMain({ db, client }) {
   const handleSaveWeight = async () => {
     if (!weight || weight <= 0 || weight > 300) { showMessage('Geldig gewicht (1-300 kg)', 'error'); return }
     setSaving(true)
-    try { await weightService.saveWeight(client.id, weight, dateString); showMessage('Gewicht opgeslagen!'); await loadAllData() }
+    try { await weightService.saveWeight(client.id, weight, weegDatum); showMessage('Gewicht opgeslagen!'); await loadAllData() }
     catch { showMessage('Fout bij opslaan', 'error') }
     finally { setSaving(false) }
   }
@@ -285,22 +305,13 @@ export default function ProgressMain({ db, client }) {
             position: 'absolute', inset: 0, pointerEvents: 'none',
             background: 'linear-gradient(180deg, rgba(10,10,10,0.6) 0%, rgba(10,10,10,0.4) 25%, rgba(10,10,10,0.75) 55%, rgba(10,10,10,0.95) 78%, #0a0a0a 100%)',
           }} />
-          <div style={{
-            position: 'absolute', left: 0, right: 0, top: isMobile ? 18 : 26,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          }}>
-            <span style={{
-              fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 900, color: '#fff',
-              letterSpacing: '-0.02em', textShadow: '0 2px 10px rgba(0,0,0,0.6)',
-            }}>
-              Weegmoment
-            </span>
-            <span style={{
-              fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase',
-              padding: '3px 7px', borderRadius: 6, color: '#fff', border: '1px solid rgba(255,255,255,0.35)',
-            }}>
-              {todayEntry ? 'Gewogen' : 'Vandaag'}
-            </span>
+          <div style={{ position: 'absolute', left: 0, right: 0, top: isMobile ? 14 : 22 }}>
+            <WeegDagKiezer
+              datum={weegDatum}
+              onDatumChange={kiesWeegDatum}
+              history={weightHistory}
+              isMobile={isMobile}
+            />
           </div>
         </div>
       )}
@@ -311,9 +322,10 @@ export default function ProgressMain({ db, client }) {
       {!photosOpen && (
         <div style={{ position: 'relative', zIndex: 1, marginTop: isMobile ? -52 : -64 }}>
         <WeightProgressRing
+          key={weegDatum}
           weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
-          saving={saving} todayEntry={todayEntry} progressPercent={progressPercent}
-          isFriday={isFriday} isMobile={isMobile}
+          saving={saving} todayEntry={entryVoorDatum} progressPercent={progressPercent}
+          isFriday={isWeegVrijdag} isMobile={isMobile}
           targetWeight={parseFloat(client?.target_weight) || 75}
         />
         </div>
