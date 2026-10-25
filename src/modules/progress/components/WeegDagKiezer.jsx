@@ -7,7 +7,7 @@
 // dan vandaag: een weging van morgen bestaat nog niet.
 
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { createPortal } from '../../../client/paginaPortal'
 
 const DAGNAMEN = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
@@ -23,8 +23,9 @@ const lokaleDatum = (d) =>
 const naarDate = (s) => new Date(`${s}T12:00:00`)
 const schuif = (s, dagen) => { const d = naarDate(s); d.setDate(d.getDate() + dagen); return lokaleDatum(d) }
 
-export default function WeegDagKiezer({ datum, onDatumChange, history = [], isMobile }) {
-  const [kalenderOpen, setKalenderOpen] = useState(false)
+// De kalender kan ook open vanuit de balk bovenaan de pagina, dus de ouder
+// houdt bij of hij open staat.
+export default function WeegDagKiezer({ datum, onDatumChange, history = [], isMobile, kalenderOpen, setKalenderOpen }) {
   const vandaag = lokaleDatum(new Date())
   const d = naarDate(datum)
   const isVandaag = datum === vandaag
@@ -77,7 +78,6 @@ export default function WeegDagKiezer({ datum, onDatumChange, history = [], isMo
               {relatief}
             </span>
           )}
-          <CalendarDays size={isMobile ? 17 : 19} strokeWidth={2.8} style={{ flexShrink: 0, filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.8))' }} />
         </button>
 
         <button

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { VoortgangSkelet } from '../../client/PaginaSkeletten'
 import usePaginaTerug from '../../client/usePaginaTerug'
 import { createPortal } from '../../client/paginaPortal'
-import { Loader2, Camera, Calendar, Sparkles, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X } from 'lucide-react'
+import { Loader2, Camera, Calendar, Sparkles, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X, CalendarDays } from 'lucide-react'
 
 import ProgressPhotos from '../progress-photos/ProgressPhotos'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
@@ -104,6 +104,7 @@ export default function ProgressMain({ db, client }) {
   // Lokale datum, niet toISOString: die geeft UTC.
   const vandaagLokaal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const [weegDatum, setWeegDatum] = useState(vandaagLokaal)
+  const [kalenderOpen, setKalenderOpen] = useState(false)
   const entryVoorDatum = weegDatum === vandaagLokaal
     ? todayEntry
     : (weightHistory.find(r => String(r.date).slice(0, 10) === weegDatum) || null)
@@ -284,6 +285,9 @@ export default function ProgressMain({ db, client }) {
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'stretch' }}>
               <ChallengeProgressTab db={db} client={client} isMobile={isMobile} inline />
             </div>
+            <button onClick={() => setKalenderOpen(true)} title="Wegingen per maand" aria-label="Wegingen per maand" style={knop}>
+              <CalendarDays size={17} strokeWidth={2.6} />
+            </button>
             <button onClick={() => setOmtrekOpen(true)} title="Omtrek" aria-label="Omtrek" style={knop}>
               <Ruler size={17} strokeWidth={2.6} />
             </button>
@@ -311,6 +315,8 @@ export default function ProgressMain({ db, client }) {
               onDatumChange={kiesWeegDatum}
               history={weightHistory}
               isMobile={isMobile}
+              kalenderOpen={kalenderOpen}
+              setKalenderOpen={setKalenderOpen}
             />
           </div>
         </div>
