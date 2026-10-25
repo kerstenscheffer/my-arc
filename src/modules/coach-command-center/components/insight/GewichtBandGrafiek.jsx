@@ -393,8 +393,8 @@ export default function GewichtBandGrafiek({
       {/* Eén regel voor alles wat je hier kunt kiezen: welke fase je bekijkt
           (met onderin de knop voor een nieuwe) en of je de lijn of de cijfers
           wilt. De losse fase-regel bovenaan de kolom is hierin opgegaan. */}
-      {/* Klantpagina: de kopregel als balk, tegen de randen, met lijntjes
-          tussen de delen — dezelfde opbouw als de tempo-strook eronder. */}
+      {/* Klantpagina: de kopregel als balk, tegen de randen, met alleen
+          lijntjes tussen de delen (geen lijn erboven of eronder) — dezelfde opbouw als de tempo-strook eronder. */}
       {toonDoel ? (() => {
         const lijn = '1px solid rgba(255,255,255,0.08)'
         const vak = { display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 16px', borderRight: lijn, minWidth: 0 }
@@ -407,7 +407,6 @@ export default function GewichtBandGrafiek({
             // Boven tegen de rand, behalve als de verwachting-melding erboven staat.
             margin: model.verwachting ? (isMobile ? '0 -0.75rem' : '0 -1rem')
               : (isMobile ? '-0.5rem -0.75rem 0' : '-0.625rem -1rem 0'),
-            borderTop: lijn, borderBottom: lijn,
           }}>
             <div style={vak}>
               <KopKeuze
