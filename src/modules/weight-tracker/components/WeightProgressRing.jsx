@@ -2,7 +2,7 @@
 // v15.2 - Flush button styling, matching de rest van de pagina (geen dikke gevulde cards meer)
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Check, Loader2, Pencil, X } from 'lucide-react'
+import { Check, Loader2, X } from 'lucide-react'
 
 const MIN = 30
 const MAX = 200
@@ -11,7 +11,9 @@ const valToIdx = (v) => Math.round((parseFloat(v) - MIN) * 10)
 const idxToVal = (i) => Math.round((MIN * 10 + i)) / 10
 const TOTAL = valToIdx(MAX) + 1
 
-function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdit = null }) {
+// `gelogd`: groen vinkje rechtsboven het gekozen getal. Alleen zolang het
+// getal gelijk is aan wat er gelogd staat; sleep je weg, dan verdwijnt het.
+function HorizontalPicker({ value, onChange, disabled, gelogd = false }) {
   const isMobile = window.innerWidth <= 768
   const ref = useRef(null)
   const wrapRef = useRef(null)
@@ -115,60 +117,13 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
           overflow: 'hidden',
         }}
       >
-        {/* Potlood en vinkje midden onder het gelogde getal. Geen vak eromheen:
-            het getal is door zijn grootte al de markering. */}
-        {savedLabel && (
+        {gelogd && (
           <div style={{
-            position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 4, display: 'flex', alignItems: 'center', gap: 10,
+            position: 'absolute', top: isMobile ? 14 : 16,
+            left: `calc(50% + ${isMobile ? 30 : 38}px)`,
+            zIndex: 4, pointerEvents: 'none', color: '#10b981', display: 'flex',
           }}>
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                aria-label="Gewicht aanpassen"
-                style={{
-                  width: 26, height: 26, padding: 0,
-                  background: 'transparent', border: 'none',
-                  color: '#fff', opacity: 0.75,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', pointerEvents: 'auto',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <Pencil size={15} strokeWidth={2.6} />
-              </button>
-            )}
-            <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.25)' }} />
-            <Check size={16} strokeWidth={3.2} color="#fff" />
-          </div>
-        )}
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
-        {/* Potlood en vinkje midden onder het gelogde getal. Geen vak eromheen:
-            het getal is door zijn grootte al de markering. */}
-        {savedLabel && (
-          <div style={{
-            position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 4, display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                aria-label="Gewicht aanpassen"
-                style={{
-                  width: 26, height: 26, padding: 0,
-                  background: 'transparent', border: 'none',
-                  color: '#fff', opacity: 0.75,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', pointerEvents: 'auto',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <Pencil size={15} strokeWidth={2.6} />
-              </button>
-            )}
-            <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.25)' }} />
-            <Check size={16} strokeWidth={3.2} color="#fff" />
+            <Check size={isMobile ? 18 : 20} strokeWidth={3.4} />
           </div>
         )}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
@@ -200,7 +155,6 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
                 style={{
                   flexShrink: 0, width: `${ITEM_W}px`, height: '100%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  paddingBottom: savedLabel ? 20 : 0,
                   cursor: disabled ? 'default' : 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   fontSize: sel ? (isMobile ? '2.1rem' : '2.5rem') : (isMobile ? '0.8rem' : '0.9rem'),
@@ -234,14 +188,12 @@ export default function WeightProgressRing({
   // legacy props (niet meer gebruikt)
   progressPercent, targetWeight,
 }) {
+  // Gelogd: de slider blijft gewoon te slepen. Wijkt het getal af van wat er
+  // staat, dan vragen we of je echt wilt wijzigen; anders staat er alleen het
+  // groene vinkje en geen knoppen, zodat het blok smal blijft.
   const alreadyLogged = !!todayEntry
-  const [editing, setEditing] = useState(!alreadyLogged)
-  const originalWeight = useRef(weight)
-
-  useEffect(() => {
-    if (alreadyLogged) setEditing(false)
-    else setEditing(true)
-  }, [alreadyLogged])
+  const gelogdGewicht = alreadyLogged ? Number(todayEntry.weight) : null
+  const gewijzigd = alreadyLogged && Math.abs(weight - gelogdGewicht) >= 0.05
 
   const adjust = (delta) => {
     const newVal = Math.max(MIN, Math.min(MAX, weight + delta))
@@ -250,15 +202,8 @@ export default function WeightProgressRing({
     if (navigator.vibrate) navigator.vibrate(8)
   }
 
-  const startEdit = () => {
-    originalWeight.current = weight
-    setEditing(true)
-    if (navigator.vibrate) navigator.vibrate(8)
-  }
-
   const cancelEdit = () => {
-    onWeightChange(originalWeight.current)
-    setEditing(false)
+    onWeightChange(gelogdGewicht)
     if (navigator.vibrate) navigator.vibrate(8)
   }
 
@@ -266,8 +211,7 @@ export default function WeightProgressRing({
     onSave()
   }
 
-  const showSavedState = alreadyLogged && !editing
-  const showEditMode = alreadyLogged && editing
+  const showEditMode = gewijzigd
   const showInitialSave = !alreadyLogged
 
   // Shared button label styling (alle action rows)
@@ -300,9 +244,7 @@ export default function WeightProgressRing({
           <HorizontalPicker
             value={weight}
             onChange={onWeightChange}
-            disabled={showSavedState}
-            savedLabel={showSavedState}
-            onEdit={startEdit}
+            gelogd={alreadyLogged && !gewijzigd}
           />
         </div>
         {/* Over de volle hoogte van de slider en tegen de rechterrand, zoals
@@ -314,8 +256,8 @@ export default function WeightProgressRing({
         )}
       </div>
 
-      {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk */}
-      {!showSavedState && (
+      {/* Fijnregelen ±0.1 — alleen zolang er nog niet gelogd is */}
+      {showInitialSave && (
         <div style={{
           display: 'flex',
           gap: '0.4rem',
@@ -345,7 +287,7 @@ export default function WeightProgressRing({
 
       {/* Action row — flush, edge-to-edge, geen rounded card */}
       <div style={{
-        marginTop: showSavedState ? '0.875rem' : '0.75rem',
+        marginTop: '0.75rem',
         marginLeft: isMobile ? '-1rem' : '-1.5rem',
         marginRight: isMobile ? '-1rem' : '-1.5rem',
       }}>
@@ -370,8 +312,14 @@ export default function WeightProgressRing({
           </button>
         )}
 
-        {/* EDIT MODE — flush 2-column rij */}
+        {/* Weggesleept van het gelogde getal: eerst vragen. */}
         {showEditMode && (
+          <>
+          <div style={{
+            textAlign: 'center', fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 800, color: '#fff',
+          }}>
+            Gewicht wijzigen van {gelogdGewicht.toFixed(1)} naar {weight.toFixed(1)} kg?
+          </div>
           <div style={{ display: 'flex', minHeight: '48px' }}>
             <button onClick={cancelEdit} disabled={saving} style={{
               flex: 1,
@@ -408,9 +356,10 @@ export default function WeightProgressRing({
               opacity: saving ? 0.5 : 1,
               ...labelStyle,
             }}>
-              {saving ? 'Opslaan...' : 'Update Gewicht'}
+              {saving ? 'Opslaan...' : 'Wijzigen'}
             </button>
           </div>
+          </>
         )}
       </div>
 

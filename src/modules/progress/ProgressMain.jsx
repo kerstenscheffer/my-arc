@@ -110,7 +110,12 @@ export default function ProgressMain({ db, client }) {
       const counts = { progress: 0, meal: 0, workout: 0, victory: 0, total: 0 }
       tp.forEach(p => { const c = p.metadata?.category || 'progress'; counts[c] = (counts[c]||0)+1; counts.total++ })
       setTodayData({ photos: tp, counts })
-      if (stats?.current) setWeight(stats.current)
+      // Staat er voor de gekozen dag al een weging, dan die: anders zou de
+      // slider na opslaan op het laatste gewicht springen en om bevestiging
+      // vragen voor een wijziging die je niet deed.
+      const vanDag = (history || []).find(r => String(r.date).slice(0, 10) === weegDatum)
+      if (vanDag?.weight) setWeight(Number(vanDag.weight))
+      else if (stats?.current) setWeight(stats.current)
       else if (client?.current_weight) setWeight(client.current_weight)
     } catch (e) { console.error('Error:', e); showMessage('Fout bij laden', 'error') }
     finally { setLoading(false); ooitGeladen.current = true }
