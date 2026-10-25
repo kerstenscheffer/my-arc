@@ -9,6 +9,7 @@ import { Search, Loader, X, ChevronRight, Plus, Star } from 'lucide-react'
 import FatSecretService from './FatSecretService'
 import { resolveFoodImage } from '../../foodImageFallback'
 import { vulZoekFotos } from './enrichImageFromOFF'
+import useZoekLog from './useZoekLog'
 
 // Relevance score: lower = better.
 // 0  exact match
@@ -38,6 +39,8 @@ const computeRelevance = (name, query) => {
 export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, defaultMealMoment, bron = 'alles' }) {
   // Zoeken doet altijd producten; maaltijden en snel zitten in eigen knoppen.
   const mode = 'products'
+  // Elke zoekpoging naar zoek_log: wat zocht de klant, en klikte hij iets aan?
+  const zoekLog = useZoekLog({ db, client, modus: mode, context: bron })
   const [searchTerm, setSearchTerm] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -243,6 +246,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       }
       setResults(allResults)
       setLoading(false)
+      zoekLog.noteer(query, allResults)
       // Echte productfoto's ophalen voor wat bovenaan staat; niet wachten.
       vulZoekFotos(db, allResults, (id, url) => {
         setResults(prev => prev.map(r => (r.id === id ? { ...r, image_url: url } : r)))
@@ -279,6 +283,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       } catch {} finally { setOffLoading(false) }
     } catch (err) {
       console.error('Product search failed:', err)
+      zoekLog.noteer(query, [])
       setResults([])
       setLoading(false)
     }
@@ -359,6 +364,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       }
       setResults(allResults)
       setLoading(false)
+      zoekLog.noteer(query, allResults)
     } catch (err) {
       console.error('Meal search failed:', err)
       setResults([])
@@ -461,7 +467,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
           />
           {searchTerm && (
             <button
-              onClick={() => { setSearchTerm(''); setResults([]); setSearched(false) }}
+              onClick={() => { zoekLog.sluit('geen_klik'); setSearchTerm(''); setResults([]); setSearched(false) }}
               style={{
                 background: 'rgba(255,255,255,0.08)', border: 'none',
                 color: 'rgba(255, 255, 255, 0.6)', cursor: 'pointer',
@@ -503,9 +509,9 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
               momentLabel={item.per100g ? 'per 100g' : item.defaultPortion ? `${item.defaultPortion}g` : (item.sourceLabel || 'Product')}
               tijdLabel={item.brand || null}
               isMobile={isMobile}
-              onCheck={() => onSelect(item)}
+              onCheck={() => { zoekLog.gekozen(item, idx); onSelect(item) }}
               hoekKnop={<SterKnop aan={isFavoriet(item)} onClick={() => wisselFavoriet(item)} />}
-              acties={[{ icon: <Plus size={11} strokeWidth={3} />, label: 'Kies', onClick: () => onSelect(item) }]}
+              acties={[{ icon: <Plus size={11} strokeWidth={3} />, label: 'Kies', onClick: () => { zoekLog.gekozen(item, idx); onSelect(item) } }]}
             />
           ))}
         </div>
