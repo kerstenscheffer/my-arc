@@ -733,7 +733,6 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       {/* ════ TIMELINE (overhaul phase 5: direct AIDaySchedule, mode-aware) ════ */}
       <AIDaySchedule
         alleenKijken={alleenKijken}
-        onOpenDagen={() => setDagenOpen(true)}
         mode={mealMode || 'plan'}
         hideTotalsBar
         activePlan={dashboardData.activePlan}

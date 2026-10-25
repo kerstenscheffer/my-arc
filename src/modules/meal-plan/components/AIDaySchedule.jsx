@@ -10,7 +10,6 @@ import { ClientAgendaService } from '../../client-agenda/ClientAgendaService'
 import DaySelector from './day-schedule/DaySelector'
 import DailyTotalsBar from './day-schedule/DailyTotalsBar'
 import MealTimelineMobile from './day-schedule/MealTimelineMobile'
-import DagBewaarBalk from './DagBewaarBalk'
 import FoodLogModal from './food-log/FoodLogModal'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
 import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst } from '../../supplements/utils/supplementSchedule'
@@ -63,7 +62,6 @@ export default function AIDaySchedule({
   // Telt op zodra er een dagtemplate is toegepast: dan opnieuw ophalen welke
   // dagen tijdelijk anders zijn, en de getoonde dag opnieuw opbouwen.
   dagRefreshKey = 0,
-  onOpenDagen,
   // Callback waarmee AIMealDashboard op de hoogte gesteld wordt als een
   // verleden-dag-log gewijzigd is (zodat MacroHero-cache ongeldig gemaakt wordt).
   onPastDayUpdate,
@@ -802,19 +800,10 @@ export default function AIDaySchedule({
       {/* Wijde "+ Maaltijd loggen" knop weggehaald — vervangen door de
           floating ronde + FAB in AIMealDashboard (één log-knop per pagina). */}
 
-      {/* Welke dag heb je voor je? Naam als het een bewaarde dag is, anders
-          de weg naar de dagen. Staat boven de maaltijden, want het gaat
-          over de dag als geheel. */}
-      {!loading && displayMeals.length > 0 && (
-        <DagBewaarBalk
-          db={db}
-          client={client}
-          maaltijden={displayMeals}
-          isMobile={isMobile}
-          verversSleutel={dagRefreshKey}
-          onOpenDagen={onOpenDagen}
-        />
-      )}
+      {/* Hier stond DagBewaarBalk: de dagnaam + ingang naar het DAGEN-paneel.
+          Weggehaald okt 2026 omdat klanten het niet gebruikten; het systeem
+          (DagBewaarBalk, DagTemplatePaneel, DayTemplateService) staat er nog,
+          terugzetten = dit blok weer renderen met onOpenDagen. */}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Laden...</div>
