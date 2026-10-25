@@ -112,13 +112,41 @@ const getDefaultMoment = () => {
 const VASTE_GRAM = [30, 50, 100]
 const VASTE_ML = [50, 100]
 
-const buildGramOptions = (naam = '') => {
+// De eigen eenheid van het product uit de database (ai_ingredients.eenheid +
+// gram_per_eenheid), bv. een gerecht als "1 portie" van 450 g of een broodje
+// als "1 stuk". Bij gerechten en ketens gaat die voor de presets op naam.
+const eigenPortie = (item) => {
+  const gram = Number(item?.gramPerEenheid) || 0
+  const eh = item?.eenheid
+  if (!eh || eh === 'gram' || gram <= 1) return null
+  const labels = Array.isArray(item?.labels) ? item.labels : []
+  const gerecht = labels.includes('gerecht')
+  return { enkel: gerecht ? 'portie' : eh, grams: gram, altijd: gerecht || labels.includes('keten') }
+}
+
+const buildGramOptions = (naam = '', eigen = null, bereiding = null) => {
   const cfg = findPortionConfig(naam)
   const ml = cfg?.displayUnit === 'ml'
   const u = ml ? 'ml' : 'g'
   const result = [{ id: 'gram', label: ml ? '1 ml' : '1 gram', knop: `1 ${u}`, grams: 1, unit: u }]
-  const natuurlijk = (cfg?.presets || []).filter(p =>
-    p.grams > 1 && !/^(?!1\s)(\d|½)/.test(p.label) && !/^\d+\s?(g|ml)\b/i.test(p.label))
+  let natuurlijk = (cfg?.presets || []).filter(p =>
+    p.grams > 1 && !/^(?!1\s)(\d|½)/.test(p.label) && !/^\d+\s?(g|ml)\b/i.test(p.label)
+    // Gekookt gewogen: een portie "(droog)" van 75 g rijst klopt dan niet.
+    && !(['gekookt', 'gebakken'].includes(bereiding) && /droog/i.test(p.label)))
+  // Eigen eenheid alleen als die iets toevoegt: bij een gerecht of keten
+  // (presets op naam raden daar mis, "1 broodje" van 60 g bij een broodje
+  // gezond), of als er geen preset is. "1 ei" blijft "1 ei", geen "1 stuk".
+  if (eigen && (eigen.altijd || natuurlijk.length === 0)) {
+    // Gerecht of keten: alleen de eigen portie; "pasta bolognese" is geen
+    // "portie (droog)" pasta en een latte grande geen espresso.
+    natuurlijk = eigen.altijd ? [] : natuurlijk.filter(p => p.grams !== eigen.grams)
+    result.push({
+      id: 'eigen', label: `1 ${eigen.enkel}`, sub: `${eigen.grams} ${u}`, knop: eigen.enkel, grams: eigen.grams, unit: u,
+      natuurlijk: true, enkel: eigen.enkel, meer: meervoud(eigen.enkel), override: null,
+    })
+  } else {
+    eigen = null
+  }
   natuurlijk.forEach((p, i) => {
     const enkel = p.label.replace(/^1\s+/, '')
     result.push({
@@ -129,7 +157,7 @@ const buildGramOptions = (naam = '') => {
   // Alleen de vaste stappen; eigen logs (40 g, 75 g) maakten de lijst druk.
   const vast = [...(ml ? VASTE_ML : VASTE_GRAM)]
   vast
-    .filter(g => !natuurlijk.some(p => p.grams === g))
+    .filter(g => !natuurlijk.some(p => p.grams === g) && !(eigen && eigen.grams === g))
     .sort((x, y) => x - y)
     .forEach(g => result.push({ id: `g${g}`, label: `${g} ${ml ? 'ml' : 'gram'}`, knop: `${g} ${u}`, grams: g, unit: u }))
   return result
@@ -150,13 +178,14 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   // ontbrekend item; de render stopt eronder alsnog.
   const isPer100g = item?.per100g === true
 
-  const [gramOptions] = useState(() => buildGramOptions(item?.name))
+  const [gramOptions] = useState(() => buildGramOptions(item?.name, eigenPortie(item), item?.bereiding))
   const servingOptions = isPer100g ? gramOptions : MEAL_OPTIONS
 
   // Nieuw product met een natuurlijke portie: begin op "1 ei" / "1 snee" in
   // plaats van 100 gram. Een eerder gelogd item houdt zijn grammen.
   const startNatuurlijk = isPer100g && !(item?._savedAmount > 0)
-    ? (servingOptions.find(o => o.natuurlijk && String(item?.name || '').toLowerCase().includes(o.enkel.toLowerCase()))
+    ? (servingOptions.find(o => o.id === 'eigen')
+      || servingOptions.find(o => o.natuurlijk && String(item?.name || '').toLowerCase().includes(o.enkel.toLowerCase()))
       || servingOptions.find(o => o.natuurlijk) || null)
     : null
 

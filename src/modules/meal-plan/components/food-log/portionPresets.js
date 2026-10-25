@@ -133,10 +133,11 @@ const PORTION_PRESETS = [
     { label: '1 mok',         grams: 300 },
   ]},
   { match: /\b(koffie|coffee|cappuccino|latte|espresso)\b/i, displayUnit: 'ml', presets: [
-    { label: '1 espresso',  grams: 30 },
+    // Kop eerst: zonder treffer op naam begint de kiezer op de eerste.
     { label: '1 kop',       grams: 150 },
     { label: '1 mok',       grams: 250 },
     { label: '1 grote mok', grams: 400 },
+    { label: '1 espresso',  grams: 30 },
   ]},
   { match: /\b(thee|tea|kruidenthee)\b/i, displayUnit: 'ml', presets: [
     { label: '1 kop',  grams: 200 },

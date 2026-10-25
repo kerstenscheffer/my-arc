@@ -94,20 +94,22 @@ create policy zoek_synoniemen_lezen on public.zoek_synoniemen for select to anon
 -- Startlijst (migratie zoek_synoniemen): bakkie/zwarte koffie -> koffie,
 -- expresso -> espresso, pils -> bier, patatje -> friet, coke -> cola, ...
 
-create or replace function public.zoek_ingredienten(p_q text, p_client uuid default null, p_limit int default 30)
-returns table (
-  id uuid, name text, name_en text, calories_per_100g numeric, protein_per_100g numeric,
-  carbs_per_100g numeric, fat_per_100g numeric, default_portion_gram numeric, category text,
-  image_url text, brand text, log_count int, barcode text, source text, score numeric
-)
-language plpgsql volatile security invoker set search_path = public as $$
+-- Stand 25 okt 2026 (uit pg_get_functiondef): synoniemen, apostrof weg,
+-- onmogelijke waarden weg, bereiding (rauw/gekookt) als aparte variant,
+-- merkloze merkproducten zonder basis-voorrang, eenheid + labels mee terug.
+-- Return-type gewijzigd: eerst drop, dan create.
+drop function if exists public.zoek_ingredienten(text, uuid, integer);
+create or replace function public.zoek_ingredienten(p_q text, p_client uuid default null, p_limit integer default 30)
+ returns table(id uuid, name text, name_en text, calories_per_100g numeric, protein_per_100g numeric, carbs_per_100g numeric, fat_per_100g numeric, default_portion_gram numeric, category text, image_url text, brand text, log_count integer, barcode text, source text, score numeric, bereiding text, eenheid text, gram_per_eenheid numeric, labels jsonb)
+ language plpgsql
+ set search_path to 'public'
+as $function$
 declare
-  q text := public.zoek_norm(p_q);
+  q text := public.zoek_norm(regexp_replace(coalesce(p_q, ''), '[''’`]', '', 'g'));
   s text;
   w1 text;
 begin
-  -- Spreektaal en tikfouten die pg_trgm niet vangt ("bakkie", "expresso"),
-  -- uit zoek_synoniemen (25 okt 2026). Nieuwe synoniemen: gewoon een rij erbij.
+  -- Spreektaal en tikfouten die pg_trgm niet vangt ("bakkie", "expresso").
   q := coalesce((select public.zoek_norm(z.naar) from public.zoek_synoniemen z where public.zoek_norm(z.van) = q limit 1), q);
   if length(q) < 2 then return; end if;
   s := public.zoek_stam(q);
@@ -132,12 +134,13 @@ begin
   rij as materialized (
     -- Een merkproduct dat precies zo heet ("Kip (Cup A Soup)") is minder
     -- zeker het ding zelf dan een basisproduct: 88 in plaats van 100.
-    select i.*, case when public.zoek_score(i.zoek_kern, q) = 100 and i.name ~ '\(' and i.barcode is not null then 88
+    select i.*, case when public.zoek_score(i.zoek_kern, q) = 100 and i.barcode is not null then 88
+                     -- "rijst" -> "Rijst gekookt" direct onder de rauwe rijst.
+                     when i.bereiding in ('gekookt', 'gebakken') and public.zoek_score(regexp_replace(i.zoek_kern, ' (gekookt|gebakken)$', ''), q) = 100 then 96
                      else public.zoek_score(i.zoek_kern, q) end as basis
     from ai_ingredients i join kand on kand.id = i.id
     -- Onmogelijke waarden niet tonen (25 okt 2026: "Ketchup" 1500 kcal,
-    -- "Omelet" 8000): meer dan 900 kcal of meer dan 100 g macro's per 100 g
-    -- kan niet; vaak kJ in het kcal-veld of een portie als 100 g ingevoerd.
+    -- "Omelet" 8000): meer dan 900 kcal of meer dan 100 g macro's per 100 g.
     where coalesce(i.calories_per_100g, 0) <= 900
       and coalesce(i.protein_per_100g, 0) + coalesce(i.carbs_per_100g, 0) + coalesce(i.fat_per_100g, 0) <= 105
   ),
@@ -159,35 +162,36 @@ begin
         + least(12, ln(1 + coalesce(pop.n, 0) + coalesce(rij.log_count, 0))::numeric * 4)
         + case when coalesce(pop.eigen, 0) > 0 then 20 + least(10, pop.eigen * 2) else 0 end
         - least(12, length(rij.zoek_kern) / 4.0)
-        - case when rij.brand is not null or rij.name ~ '\(' then 6 else 0 end))::numeric as sc
+        -- Elk product met barcode, ook zonder merk ("Cappuccino" = poeder).
+        - case when rij.barcode is not null or rij.brand is not null or rij.name ~ '\(' then 6 else 0 end))::numeric as sc
     from rij left join pop on pop.k = rij.zoek_kern
     where rij.basis >= 35
   ),
   uniek as (
-    -- Eén basisproduct per naam (drie keer "Kaas" met net andere kcal is
-    -- ruis); merkproducten blijven per kcal-waarde apart.
-    -- Een merkproduct zonder merk in de naam ("Kaas") telt ook als die naam:
-    -- anders staat er twee keer exact hetzelfde woord bovenaan.
-    select distinct on (g.zoek_kern, case when g.barcode is null or g.name !~ '\(' then -1 else round(coalesce(g.calories_per_100g, 0)) end) g.*
+    -- Eén basisproduct per naam en bereiding (drie keer "Kaas" met net andere
+    -- kcal is ruis; "Zilvervliesrijst (gekookt)" en "(ongekookt)" niet).
+    -- Merkproducten blijven per kcal-waarde apart.
+    select distinct on (g.zoek_kern, coalesce(g.bereiding, ''), case when g.barcode is null or g.name !~ '\(' then -1 else round(coalesce(g.calories_per_100g, 0)) end) g.*
     from gescoord g
-    order by g.zoek_kern, case when g.barcode is null or g.name !~ '\(' then -1 else round(coalesce(g.calories_per_100g, 0)) end,
+    order by g.zoek_kern, coalesce(g.bereiding, ''), case when g.barcode is null or g.name !~ '\(' then -1 else round(coalesce(g.calories_per_100g, 0)) end,
              (g.barcode is null) desc, g.sc desc
   ),
   gespreid as (
     -- Variatie: elke volgende variant met dezelfde naam zakt 35 punten, zodat
     -- "Kaas (merk)" na "Kaas (merk)" plaatsmaakt voor geraspte kaas, roomkaas,
     -- 30+, enzovoort.
-    select u.*, u.sc - 35 * (row_number() over (partition by u.zoek_kern order by u.sc desc) - 1) as eind
+    select u.*, u.sc - 35 * (row_number() over (partition by u.zoek_kern, coalesce(u.bereiding, '') order by u.sc desc) - 1) as eind
     from uniek u
   )
   select u.id, u.name, u.name_en, u.calories_per_100g, u.protein_per_100g,
          u.carbs_per_100g, u.fat_per_100g, u.default_portion_gram::numeric, u.category,
-         u.image_url, u.brand, u.log_count, u.barcode, u.source, round(u.eind, 1)
+         u.image_url, u.brand, u.log_count, u.barcode, u.source, round(u.eind, 1), u.bereiding, u.eenheid, u.gram_per_eenheid, u.labels
   from gespreid u
   where u.sc >= 35
   order by u.eind desc
   limit p_limit;
-end $$;
+end $function$;
+grant execute on function public.zoek_ingredienten(text, uuid, integer) to anon, authenticated;
 
 create or replace function public.zoek_maaltijden(p_q text, p_client uuid default null, p_limit int default 20)
 returns table (meal jsonb, score numeric)

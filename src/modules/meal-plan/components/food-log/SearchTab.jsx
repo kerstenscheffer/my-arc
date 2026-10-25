@@ -241,7 +241,13 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
           category: ing.category, image_url: ing.image_url, barcode: ing.barcode || null,
           type: 'ingredient', source: 'myarc',
           sourceLabel: ing.barcode ? 'Product' : 'Basis',
-          per100g: true, isGeneric: !ing.barcode
+          per100g: true, isGeneric: !ing.barcode,
+          // Rauw of gekookt gewogen, en de eigen eenheid uit de database
+          // ("1 portie" bij een gerecht, "1 snee" bij brood) voor de kiezer.
+          bereiding: ing.bereiding || null,
+          eenheid: ing.eenheid || null,
+          gramPerEenheid: Number(ing.gram_per_eenheid) || null,
+          labels: Array.isArray(ing.labels) ? ing.labels : [],
         }))
       }
       setResults(allResults)
@@ -506,7 +512,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
                 calories: item.calories, protein: item.protein,
                 carbs: item.carbs, fat: item.fat,
               }}
-              momentLabel={item.per100g ? 'per 100g' : item.defaultPortion ? `${item.defaultPortion}g` : (item.sourceLabel || 'Product')}
+              momentLabel={item.per100g ? (item.bereiding ? `${item.bereiding} · per 100g` : 'per 100g') : item.defaultPortion ? `${item.defaultPortion}g` : (item.sourceLabel || 'Product')}
               tijdLabel={item.brand || null}
               isMobile={isMobile}
               onCheck={() => { zoekLog.gekozen(item, idx); onSelect(item) }}
