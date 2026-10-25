@@ -432,9 +432,9 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         genoeg,
         kleur: kleurVoor(z.verschil, genoeg),
         // Op zaterdag zelf ís de laatste zaterdag deze week.
-        // De datum staat in de kop ('Za 24 okt'); een regel eronder is er niet meer.
-        kop: (i === 0 && z.zaterdag === isoVandaag) ? 'Deze week'
-          : `Za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`,
+        // De week waar het tempo over gaat in de kop: zondag t/m zaterdag
+        // ('18–24 okt', over een maandgrens '28 sep–4 okt').
+        kop: (i === 0 && z.zaterdag === isoVandaag) ? 'Deze week' : weekBereik(z.zaterdag),
         onder: genoeg
           ? `za ${new Date(`${z.zaterdag}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
           : z.vorige.vanStart ? `vanaf start, ${z.nu.metingen} wegingen` : `${z.vorige.metingen} en ${z.nu.metingen} wegingen`,
@@ -811,6 +811,18 @@ function GrootBlok(props) {
       </div>
     </div>
   )
+}
+
+
+// '18–24 okt' voor de week van zondag t/m de gegeven zaterdag.
+function weekBereik(zaterdag) {
+  const tot = new Date(`${zaterdag}T00:00:00`)
+  const van = new Date(tot)
+  van.setDate(van.getDate() - 6)
+  const maand = (d) => d.toLocaleDateString('nl-NL', { month: 'short' }).replace('.', '')
+  return van.getMonth() === tot.getMonth()
+    ? `${van.getDate()}–${tot.getDate()} ${maand(tot)}`
+    : `${van.getDate()} ${maand(van)}–${tot.getDate()} ${maand(tot)}`
 }
 
 // De weken als horizontale strook: deze week vooraan, daarachter terug in de
