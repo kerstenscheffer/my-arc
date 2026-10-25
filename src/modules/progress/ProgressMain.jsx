@@ -251,9 +251,6 @@ export default function ProgressMain({ db, client }) {
             <button onClick={() => setKalenderOpen(true)} title="Wegingen per maand" aria-label="Wegingen per maand" style={knop}>
               <CalendarDays size={17} strokeWidth={2.6} />
             </button>
-            <button onClick={() => setOmtrekOpen(true)} title="Omtrek" aria-label="Omtrek" style={knop}>
-              <Ruler size={17} strokeWidth={2.6} />
-            </button>
           </div>
         )
       })()}
@@ -295,6 +292,25 @@ export default function ProgressMain({ db, client }) {
           weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
           saving={saving} todayEntry={entryVoorDatum} progressPercent={progressPercent}
           isFriday={isWeegVrijdag} isMobile={isMobile}
+          extraKnop={(
+            // Zelfde vorm als het vaste 'Sinds'-blok naast de tempo-strook:
+            // eigen vlak met een lijn links, witte titel.
+            <button
+              onClick={() => setOmtrekOpen(true)}
+              style={{
+                width: isMobile ? 76 : 88,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: 'rgba(255,255,255,0.045)', border: 'none',
+                borderLeft: '1px solid rgba(255,255,255,0.12)',
+                color: '#fff', fontFamily: 'inherit',
+                fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 900,
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Ruler size={20} strokeWidth={2.6} />
+              Omtrek
+            </button>
+          )}
           targetWeight={parseFloat(client?.target_weight) || 75}
         />
         </div>

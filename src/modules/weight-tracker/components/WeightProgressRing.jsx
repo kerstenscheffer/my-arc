@@ -305,7 +305,13 @@ export default function WeightProgressRing({
             onEdit={startEdit}
           />
         </div>
-        {extraKnop && <div style={{ flexShrink: 0 }}>{extraKnop}</div>}
+        {/* Over de volle hoogte van de slider en tegen de rechterrand, zoals
+            het vaste blok naast de tempo-strook. */}
+        {extraKnop && (
+          <div style={{ flexShrink: 0, alignSelf: 'stretch', display: 'flex', marginRight: isMobile ? '-1rem' : '-1.5rem' }}>
+            {extraKnop}
+          </div>
+        )}
       </div>
 
       {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk */}
