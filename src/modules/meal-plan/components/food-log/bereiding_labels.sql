@@ -38,3 +38,9 @@ set name = case
 where barcode is null
   and bereiding is not null
   and name !~* '(ongekookt|gekookt|gebakken|rauw|droog)';
+
+-- Synoniemen na het hernoemen: "kip" vond eerst Cup-a-Soup.
+update public.zoek_synoniemen set naar = 'kipfilet' where van in ('gebakken kip','gebakken kipfilet');
+insert into public.zoek_synoniemen (van, naar) values
+  ('kip','kipfilet'), ('kipfilet gebakken','kipfilet'), ('basmati','basmati rijst'), ('kip filet','kipfilet')
+on conflict (van) do update set naar = excluded.naar;
