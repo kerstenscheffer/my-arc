@@ -121,12 +121,12 @@ function HorizontalPicker({ value, onChange, disabled, gelogd = false }) {
         {/* Vinkje in een rondje, half over de rechterbovenhoek van het getal. */}
         {gelogd && (
           <div style={{
-            position: 'absolute', top: isMobile ? 6 : 8,
-            left: `calc(50% + ${isMobile ? 22 : 28}px)`,
+            position: 'absolute', top: isMobile ? 8 : 10,
+            left: `calc(50% + ${isMobile ? 24 : 30}px)`,
             zIndex: 4, pointerEvents: 'none', display: 'flex',
             background: '#0a0a0a', borderRadius: 999,
           }}>
-            <CircleCheck size={isMobile ? 20 : 22} strokeWidth={2.8} color="#10b981" />
+            <CircleCheck size={isMobile ? 16 : 18} strokeWidth={2.8} color="#10b981" />
           </div>
         )}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
