@@ -319,29 +319,26 @@ export default function ProgressMain({ db, client }) {
       {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
       {!photosOpen && (
         <div style={{ marginTop: isMobile ? '1rem' : '1.25rem' }}>
-          {/* Mét de lopende fase, dezelfde als de grafiek eronder en als het
-              coachpaneel. Zonder fase viel de band terug op start-/doelgewicht
-              en stond er bij een build een cut-doel (ks10k, 8 okt 2026:
-              -0,21 / -0,85 terwijl de fase +0,1 / +0,5 zegt). */}
-          <WeightStatsGrid
-            stats={weightStats}
-            client={client}
-            fridayData={fridayData}
-            history={weightHistory}
-            isMobile={isMobile}
-            toonGrafiek={false}
-            fase={fases[0] || null}
-          />
-          {/* De coaching-band: dezelfde grafiek die de coach ziet. Het losse
-              verloop dat hier stond (witte lijn, doel-streep) toonde alleen de
-              metingen — en daar valt niets aan af te lezen, want twee kilo
-              verschil tussen twee ochtenden is normaal. Hier staat de band
-              omheen waarin je hoort te blijven, met het 7-daags gemiddelde als
-              lijn: dat is waar het over gaat. */}
-          {/* Ook zonder wegingen: dan laat de grafiek zien wat de bedoeling is
-              voor deze periode. Juist aan het begin is dat het meest waard. */}
-          {(weightHistory.length > 0 || fases[0]) && (
-            <div style={{ marginTop: isMobile ? '1.25rem' : '1.5rem' }}>
+          {/* Eén blok: kopregel (fase, grafiek/tabel, doel per week), daaronder
+              de tempo-strook, daaronder de grafiek. De strook gaat mee als
+              `tussen`. Mét de lopende fase, dezelfde als het coachpaneel. */}
+          {(() => {
+            const strook = (
+              <WeightStatsGrid
+                stats={weightStats}
+                client={client}
+                fridayData={fridayData}
+                history={weightHistory}
+                isMobile={isMobile}
+                toonGrafiek={false}
+                fase={fases[0] || null}
+                zonderDoelRegel
+              />
+            )
+            // Ook zonder wegingen staat de grafiek er als er een fase is: dan
+            // laat hij zien wat de bedoeling is.
+            if (!(weightHistory.length > 0 || fases[0])) return strook
+            return (
               <GewichtBandGrafiek
                 client={client}
                 history={weightHistory}
@@ -349,9 +346,11 @@ export default function ProgressMain({ db, client }) {
                 fases={fases}
                 isMobile={isMobile}
                 klantModus
+                toonDoel
+                tussen={strook}
               />
-            </div>
-          )}
+            )
+          })()}
         </div>
       )}
 

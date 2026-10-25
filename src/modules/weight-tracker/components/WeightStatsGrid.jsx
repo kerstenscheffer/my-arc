@@ -25,7 +25,7 @@ const PERIODES = [
 // blijft het een zwevend kaartje binnen de bestaande opmaak.
 // `toonGrafiek` uit: de coach-kant heeft zijn eigen band-grafiek en zet dit
 // verloop achter een knop. De klant-kant laat hem gewoon staan.
-export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true, grafiekKnop = null, onBewerkDoel = null }) {
+export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, toonGrafiek = true, grafiekKnop = null, onBewerkDoel = null, zonderDoelRegel = false }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const [uitlegOpen, setUitlegOpen] = useState(false)
   // De cijferregel (huidig, gemiddelde, tempo fase, boven plan, sinds fase) is
@@ -477,7 +477,8 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               zakt eronder. Op een breed scherm staan ze met z'n drieën. */}
           {/* Doel per week bovenaan, als één regel: dit is de maat waar de
               tegels eronder tegen gekleurd worden. */}
-          {bereik && (
+          {/* zonderDoelRegel: de trackingpagina zet het doel in de kopregel van de grafiek. */}
+          {bereik && !zonderDoelRegel && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: isMobile ? '0.6rem 0.5rem 0.2rem' : '0.7rem 0.75rem 0.25rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 900, color: '#fff' }}>Doel/w:</span>
               <span style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>

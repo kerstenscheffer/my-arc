@@ -20,6 +20,7 @@ import KopKeuze from './KopKeuze'
 import {
   maakConfig, trendReeks, bepaalStart, lijnenOpDatum, planSegmenten,
   weekBeoordelingen, advies, ernstVan, kleurVoorErnst, weergaveStatus, STATUS_TEKST, STATUS_KLEUR,
+  bereikTekst,
 } from '../../../weight-tracker/utils/coachingBand'
 
 const kort = (d) => {
@@ -159,6 +160,9 @@ function WeekTabel({ weken, startDatum, isMobile }) {
 export default function GewichtBandGrafiek({
   client, history, fase = null, fases = [], onNieuweFase = null, onBijsturen = null, isMobile,
   klantModus = false,
+  // Trackingpagina van de klant: het weekdoel staat op dezelfde regel als de
+  // keuzes, en `tussen` (de tempo-strook) komt tussen die regel en de grafiek.
+  toonDoel = false, tussen = null,
 }) {
   const [uitleg, setUitleg] = useState(false)
   const [weergave, setWeergave] = useState('grafiek')   // 'grafiek' | 'tabel'
@@ -337,12 +341,15 @@ export default function GewichtBandGrafiek({
 
   if (model.leeg) {
     return (
+      <>
+      {tussen}
       <div style={{
         padding: '1.5rem 1rem', textAlign: 'center',
         color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem', fontWeight: 700,
       }}>
         Nog geen wegingen om een band op te tekenen.
       </div>
+      </>
     )
   }
 
@@ -386,7 +393,7 @@ export default function GewichtBandGrafiek({
       {/* Eén regel voor alles wat je hier kunt kiezen: welke fase je bekijkt
           (met onderin de knop voor een nieuwe) en of je de lijn of de cijfers
           wilt. De losse fase-regel bovenaan de kolom is hierin opgegaan. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, rowGap: 4, flexWrap: toonDoel ? 'wrap' : 'nowrap', marginBottom: 8 }}>
         <KopKeuze
           groot
           waarde={gekozen || (perFase.find(f => f.id === fase?.id) ? fase.id : 'nu')}
@@ -403,6 +410,17 @@ export default function GewichtBandGrafiek({
           kleur="rgba(255,255,255,0.65)"
         />
         <span style={{ flex: 1 }} />
+        {/* Zelfde letter als de fase-keuze links. Volgt de gekozen fase, want
+            elke fase heeft zijn eigen tempo. */}
+        {toonDoel && !model.alles && !model.zonderBand && bereikTekst(config) && (
+          <span style={{
+            fontSize: '0.9rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap',
+            letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums',
+          }}>
+            Doel/w: {bereikTekst(config)}
+            <span style={{ fontSize: '0.7em', fontWeight: 800, opacity: 0.55, marginLeft: 3 }}>kg</span>
+          </span>
+        )}
         <button
           onClick={() => setUitleg(v => !v)}
           title="Hoe deze band werkt"
@@ -444,6 +462,14 @@ export default function GewichtBandGrafiek({
             beoordelen we nooit op.</>
           )}
           {model.herijkt && ' Startgewicht is herijkt op de eerste betrouwbare weektrend.'}
+        </div>
+      )}
+
+      {/* Tegen de randen, net als op zichzelf: de strook heeft zijn eigen
+          binnenruimte en vervaging aan de zijkant. */}
+      {tussen && (
+        <div style={{ margin: isMobile ? '0 -0.75rem 12px' : '0 -1rem 12px' }}>
+          {tussen}
         </div>
       )}
 
