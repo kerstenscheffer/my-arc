@@ -478,8 +478,11 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
   const foto = resolveFoodImage(item)
 
   return (
+    // Scrollt zelf en de Loggen-knop plakt onderaan: bij een maaltijd met
+    // veel ingrediënten viel de knop anders onder het scherm.
     <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
+      flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+      display: 'flex', flexDirection: 'column',
       paddingTop: isMobile ? '3.5rem' : '4rem'
     }}>
       {/* Product */}
@@ -729,9 +732,10 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
 
       {/* Registreer */}
       <div style={{
+        position: 'sticky', bottom: 0, zIndex: 5, background: '#0a0a0a',
         padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
         borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-        paddingBottom: isMobile ? '2rem' : '1.5rem'
+        paddingBottom: isMobile ? 'calc(1rem + env(safe-area-inset-bottom, 0px))' : '1.5rem'
       }}>
         <button onClick={handleLog} disabled={saving || macros.calories === 0} style={{
           width: '100%', padding: isMobile ? '0.875rem' : '1rem',
