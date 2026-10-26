@@ -68,6 +68,7 @@ function parseIngredients(ingredients) {
 export default function MealCard({
   db, meal, slot, dayIndex, mealSchedule, isPreWorkout,
   isEmpty, onSwap, onDelete, onAdd, onCreate, onUpdateMeal, onApplyToDays, conflicts, isMobile,
+  trainingDagen = [],
   // Opslaan vanuit de bewerk-modal of de portie-schaler. Valt terug op
   // onUpdateMeal; de analyzer hangt hier de vraag "waar geldt dit?" aan.
   onEditSave = null,
@@ -95,6 +96,7 @@ export default function MealCard({
   const [moreOpen, setMoreOpen] = useState(false)
   // Venster 'moment bewerken' (soort maaltijd + tijd), via tik op de foto.
   const [momentOpen, setMomentOpen] = useState(null)   // null of de positie van de foto
+  const [dagenOpen, setDagenOpen] = useState(null)     // null of de positie van de Meer-knop
   // Naam bewerken: null = niet bezig; naamKeuze = vraag 'deze dag of elke dag'.
   const [naamEdit, setNaamEdit] = useState(null)
   const [naamKeuze, setNaamKeuze] = useState(false)
@@ -388,21 +390,31 @@ export default function MealCard({
         <ActionCell
           icon={<MoreHorizontal size={m ? 13 : 14} />}
           label="Meer"
-          onClick={(e) => { e.stopPropagation(); setMoreOpen(p => !p) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            // Positie van de knop onthouden: het menu zweeft los van de kaart
+            // (die knipt af met overflow hidden) en klapt naar onder of boven,
+            // waar het past.
+            const r = e.currentTarget.getBoundingClientRect()
+            setMoreOpen(p => p ? false : { boven: r.top, onder: r.bottom, rechts: window.innerWidth - r.right })
+          }}
           m={m}
-          active={moreOpen}
+          active={!!moreOpen}
         />
-        {moreOpen && (
+        {moreOpen && createPortal(
+          <div onClick={(e) => { e.stopPropagation(); setMoreOpen(false) }} style={{ position: 'fixed', inset: 0, zIndex: 10040 }}>
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: 'absolute', bottom: '100%', right: 0,
+              position: 'fixed', right: Math.max(8, moreOpen.rechts),
+              ...(window.innerHeight - moreOpen.onder > 170
+                ? { top: moreOpen.onder + 4 }
+                : { bottom: window.innerHeight - moreOpen.boven + 4 }),
               background: '#1a1a1a',
               border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 8,
               overflow: 'hidden',
               minWidth: 140,
-              zIndex: 100,
               boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
             }}
           >
@@ -410,7 +422,12 @@ export default function MealCard({
               <MoreMenuItem
                 icon={<CalendarDays size={13} />}
                 label="Dagen"
-                onClick={() => { setMoreOpen(false); onApplyToDays(dayIndex, slot, meal) }}
+                onClick={() => {
+                  // Klein venster bij de knop, net als Moment; niet meer het
+                  // grote dock-vak (dat bleef achter de swap verstopt).
+                  setDagenOpen({ top: moreOpen.onder + 6, boven: moreOpen.boven, rechts: moreOpen.rechts })
+                  setMoreOpen(false)
+                }}
               />
             )}
             {ingredientList.length > 0 && (
@@ -428,6 +445,7 @@ export default function MealCard({
               danger
             />
           </div>
+          </div>, modalHost
         )}
       </div>
 
@@ -608,6 +626,15 @@ export default function MealCard({
         </>
       )}
 
+      {dagenOpen && createPortal(
+        <DagenVenster
+          dayIndex={dayIndex} trainingDagen={trainingDagen} pos={dagenOpen}
+          onClose={() => setDagenOpen(null)}
+          onSave={(dagen) => { setDagenOpen(null); onApplyToDays && onApplyToDays(dayIndex, slot, meal, dagen) }}
+        />,
+        modalHost
+      )}
+
       {momentOpen && createPortal(
         <MomentVenster
           label={slotLabel} tijd={slotTime} isMobile={m} pos={momentOpen}
@@ -723,6 +750,62 @@ function scalerBtnStyle(m, disabled, color) {
 
 // Moment van de maaltijd aanpassen: soort (Ontbijt, Lunch, Pre workout…) en
 // tijd, voor alleen deze dag of overal waar deze maaltijd in de week staat.
+// Op welke dagen deze maaltijd (met zijn aanpassingen) ook komt. Zelfde soort
+// venster als Moment: klein, bij de knop, binnen het scherm gehouden.
+const DAG_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+function DagenVenster({ dayIndex, trainingDagen, pos, onClose, onSave }) {
+  const BREED = 300, HOOG = 200
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  const left = Math.max(8, Math.min(vw - (pos?.rechts || 8) - BREED, vw - BREED - 8))
+  const top = (pos?.top || 8) + HOOG > vh - 8 ? Math.max(8, (pos?.boven || 0) - HOOG - 6) : (pos?.top || 8)
+  const [dagen, setDagen] = useState(() => dayIndex != null ? [dayIndex] : [])
+  const wissel = (i) => setDagen(d => d.includes(i) ? d.filter(x => x !== i) : [...d, i].sort((a, b) => a - b))
+  const snel = [
+    { id: '', label: 'Snelkeuze' },
+    { id: 'alle', label: 'Alle dagen', dagen: [0, 1, 2, 3, 4, 5, 6] },
+    ...(trainingDagen?.length ? [{ id: 'training', label: 'Trainingsdagen', dagen: [...trainingDagen] }] : []),
+    ...(trainingDagen?.length ? [{ id: 'rust', label: 'Rustdagen', dagen: [0, 1, 2, 3, 4, 5, 6].filter(i => !trainingDagen.includes(i)) }] : []),
+    { id: 'werk', label: 'Werkdagen', dagen: [0, 1, 2, 3, 4] },
+    { id: 'weekend', label: 'Weekend', dagen: [5, 6] },
+  ]
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'transparent' }}>
+      <style>{'@keyframes momentIn { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }'}</style>
+      <div onClick={e => e.stopPropagation()} style={{ position: 'fixed', top, left, width: BREED, maxWidth: 'calc(100vw - 16px)', background: '#141414', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, padding: '0.75rem', boxShadow: '0 18px 44px rgba(0,0,0,0.7)', fontFamily: "'DM Sans', sans-serif", animation: 'momentIn 0.16s ease' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ flex: 1, fontSize: '0.88rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>Ook op deze dagen</div>
+          <select value="" onChange={e => { const k = snel.find(o => o.id === e.target.value); if (k?.dagen) setDagen(k.dagen) }}
+            style={{ height: 26, padding: '0 0.3rem', borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '0.72rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark', cursor: 'pointer' }}>
+            {snel.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+          <button onClick={onClose} aria-label="Sluiten" style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 10 }}>
+          {DAG_KORT.map((d, i) => {
+            const aan = dagen.includes(i)
+            return (
+              <button key={d} onClick={() => wissel(i)} style={{
+                minHeight: 34, borderRadius: 8, fontFamily: 'inherit', cursor: 'pointer',
+                background: aan ? '#fff' : 'rgba(255,255,255,0.04)', border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
+                color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.7)', fontSize: '0.74rem', fontWeight: 900,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>{d}</button>
+            )
+          })}
+        </div>
+        <button onClick={() => dagen.length && onSave(dagen)} disabled={!dagen.length} style={{
+          width: '100%', minHeight: 34, borderRadius: 8, border: 'none', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900,
+          background: dagen.length ? '#fff' : 'rgba(255,255,255,0.08)', color: dagen.length ? '#0a0a0a' : 'rgba(255,255,255,0.35)',
+          cursor: dagen.length ? 'pointer' : 'default',
+        }}>
+          Toepassen op {dagen.length} dag{dagen.length === 1 ? '' : 'en'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function MomentVenster({ label, tijd, isMobile, pos, onClose, onSave }) {
   // Klein venster direct onder de foto (of erboven als er onder te weinig
   // ruimte is), binnen het scherm gehouden. Niet meer midden in beeld.

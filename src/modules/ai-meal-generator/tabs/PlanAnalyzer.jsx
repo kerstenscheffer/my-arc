@@ -1157,9 +1157,14 @@ export default function PlanAnalyzer({
   // "Dagen"-knop op een meal-card: open de dag-picker in het dock-vak.
   // Een pre-workout hoort in de plan-kolom (één maaltijd, volgt de
   // trainingsdagen), niet als slot per dag: dan staat hij ook op rustdagen.
-  const handleApplyToDays = (dayIndex, slot, meal) => {
+  // Met `dagen` (uit het kleine Dagen-venster op de kaart) meteen toepassen.
+  // Zonder: het oude dock-vak. Dat ging achter een open swap schuil, dus
+  // swap en maker eerst dicht.
+  const handleApplyToDays = (dayIndex, slot, meal, dagen = null) => {
     if (!meal) return
     if (slot === PRE_WORKOUT_SLOT) { bewaarPreWorkout(meal); return }
+    setSwapState(null); setMakerState(null)
+    if (Array.isArray(dagen)) { pasToeOpDagen(meal, slot, dagen); return }
     setApplyDaysState({ dayIndex, slot, meal })
   }
   // Pas de gekozen meal (met huidige aanpassingen) toe op de geselecteerde dagen.
@@ -1167,6 +1172,10 @@ export default function PlanAnalyzer({
     if (!applyDaysState || !weekData) return
     const { meal, slot } = applyDaysState
     if (slot === PRE_WORKOUT_SLOT) { await bewaarPreWorkout(meal); setApplyDaysState(null); return }
+    await pasToeOpDagen(meal, slot, dayIndices)
+  }
+  const pasToeOpDagen = async (meal, slot, dayIndices) => {
+    if (!weekData || !dayIndices?.length) return
     const updated = [...weekData]
     dayIndices.forEach(di => {
       updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: withSlotTiming(meal, slot, updated[di].meals[slot]) } }
@@ -2407,7 +2416,7 @@ export default function PlanAnalyzer({
                     mealSchedule={mealSchedule} isPreWorkout={isPreWorkout}
                     isEmpty={!meal} onSwap={handleSwap} onDelete={handleDelete}
                     onAdd={handleAdd} onCreate={(di, sl) => setMakerState({ dayIndex: di, slot: sl })}
-                    onUpdateMeal={handleUpdateMeal} onEditSave={handleEditSave} onApplyToDays={handleApplyToDays}
+                    onUpdateMeal={handleUpdateMeal} onEditSave={handleEditSave} onApplyToDays={handleApplyToDays} trainingDagen={trainingDayIndices}
                     conflicts={conflicts} isMobile={m} />
                 )
               })}
