@@ -13,7 +13,7 @@ import WorkoutService from '../../../services/WorkoutService'
 
 const LEEG_SCHEMA = { id: null, name: 'Nog geen plan', week_structure: {} }
 
-export default function KlantWeekrooster({ client, db, isMobile = false, onSwitchPlan = null, refreshKey = 0, zonderKop = false }) {
+export default function KlantWeekrooster({ client, db, isMobile = false, onSwitchPlan = null, refreshKey = 0, zonderKop = false, onKiesTraining = null }) {
   const [schema, setSchema] = useState(null)
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
   const [weekOffset, setWeekOffset] = useState(0)
@@ -46,8 +46,9 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
       selectedWorkout={selectedWorkout}
       completedWorkouts={[]}
       todayIndex={todayIndex}
-      // De coach opent geen training vanuit het rooster; tikken doet niets.
-      onDayClick={() => {}}
+      // Tik op een training: in de Workout Builder opent die dag. Verder
+      // opent de coach vanuit het rooster niets.
+      onDayClick={(_dag, key) => { if (onKiesTraining && key) onKiesTraining(key) }}
       clientId={client.id}
       db={db}
       workoutService={workoutService}

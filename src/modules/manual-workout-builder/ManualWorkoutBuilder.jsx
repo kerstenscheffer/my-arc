@@ -53,7 +53,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showPlanToevoegen, setShowPlanToevoegen] = useState(false)
   // Titel in de kopbalk aanpassen: null = niet aan het bewerken.
   const [titelBewerk, setTitelBewerk] = useState(null)
-  const [agendaWeergave, setAgendaWeergave] = useState('rooster') // 'rooster' | 'uren'
+  // Het weekrooster staat sinds 26 okt altijd bovenaan; het Agenda-vak opent daarom op de uren.
+  const [agendaWeergave, setAgendaWeergave] = useState('uren') // 'rooster' | 'uren'
   const [agendaKey, setAgendaKey] = useState(0)
   useEffect(() => {
     const bump = () => setAgendaKey(k => k + 1)
@@ -652,9 +653,13 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
       {/* ══════════════ KOPBALK ══════════════
           Linksboven vrij: daar zweeft de Terug-knop van CoachHub. */}
+      <div style={{ flexShrink: 0, borderBottom: LIJN, padding: m ? 0 : '0 1rem' }}>
+      {/* Inhoud in dezelfde 1200 px als de rest van de pagina; links minstens
+          110 px vrij voor de Terug-knop als het scherm smal is. */}
       <div style={{
-        flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: m ? 'wrap' : 'nowrap',
-        minHeight: 52, padding: m ? '0.5rem 0.75rem' : '0 1rem 0 110px', borderBottom: LIJN,
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: m ? 'wrap' : 'nowrap',
+        minHeight: 52, maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box',
+        padding: m ? '0.5rem 0.75rem' : '0 0 0 max(0px, calc(110px - (100vw - 1200px) / 2))',
       }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button onClick={() => setShowClientPicker(v => !v)} style={{ background: 'none', border: 'none', padding: '4px 2px', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
@@ -727,11 +732,12 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan' : effectiveClient?.id ? (clientSchemas.length > 0 ? 'Opslaan als extra plan' : `Eerste plan voor ${effectiveClient.first_name || 'klant'}`) : 'Opslaan'}
         </button>
       </div>
+      </div>
 
       {/* ══════════════ DAGEN ══════════════
-          Zoals de ma–zo-balk in de Plan Analyzer: per dag naam en omvang,
-          tik = die dag openen. */}
-      <div style={{ flexShrink: 0, borderBottom: DUN }}>
+          Alleen zonder klant (een template bouwen). Met een klant is het
+          weekrooster de dagkiezer: tik op een training = die dag openen. */}
+      {!effectiveClient && <div style={{ flexShrink: 0, borderBottom: DUN }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', padding: m ? '0.5rem' : '0.6rem 1rem', display: 'flex', gap: m ? 4 : 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {workoutPlan.days.map((day, index) => {
             const aan = day.id === activeDay
@@ -763,24 +769,53 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             <Plus size={15} strokeWidth={2.8} /> Nieuwe dag
           </button>
         </div>
-      </div>
+      </div>}
 
-      {/* ══════════════ DAG ══════════════ */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: m ? 120 : 130 }}>
-        {/* De week van de klant bovenaan, zoals hij hem zelf ziet: alleen de
-            dagen en de stappen. Plan wisselen en opslaan zitten in de kopbalk. */}
-        {effectiveClient && (
-          <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.5rem' : '0.75rem', borderBottom: DUN }}>
-            <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} zonderKop />
+      {/* ══════════════ WEEK + DAG ══════════════
+          Desktop: alles staat vast behalve de oefeningen (en de linkerkolom
+          als die langer is dan het scherm). Mobiel scrollt de pagina als geheel. */}
+      {/* De week van de klant bovenaan, zoals hij hem zelf ziet: alleen de
+          dagen en de stappen. Plan wisselen en opslaan zitten in de kopbalk. */}
+      {effectiveClient && (
+        <div style={{ flexShrink: 0, borderBottom: DUN }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.5rem' : '0.75rem' }}>
+            <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} zonderKop
+              onKiesTraining={(key) => {
+                // Rooster-sleutel 'dag2' = de tweede dag van het plan (zelfde
+                // volgorde als loadSchemaIntoBuilder). Bestaat die niet, niets.
+                const n = parseInt(String(key).replace(/\D/g, ''), 10)
+                const dag = Number.isFinite(n) ? workoutPlan.days[n - 1] : null
+                if (dag) setActiveDay(dag.id)
+              }} />
           </div>
-        )}
+        </div>
+      )}
+      <div style={m
+        ? { paddingBottom: 120 }
+        : { flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <div style={{
           maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box',
-          display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'flex-start',
-          gap: m ? 0 : 28, padding: m ? 0 : '1rem 1rem 0',
+          display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: m ? 'flex-start' : 'stretch',
+          gap: m ? 0 : 28, padding: m ? 0 : '0 1rem', height: m ? undefined : '100%',
         }}>
           {/* ── LINKS: de dag, intake en gereedschap ── */}
-          <div style={{ width: m ? '100%' : 340, flexShrink: 0, boxSizing: 'border-box', position: m ? 'static' : 'sticky', top: '1rem', padding: m ? '0.75rem 0.75rem 0' : 0 }}>
+          <div style={{ width: m ? '100%' : 340, flexShrink: 0, boxSizing: 'border-box', padding: m ? '0.75rem 0.75rem 0' : '1rem 0 130px', overflowY: m ? undefined : 'auto', scrollbarWidth: 'none' }}>
+            {/* Welke dag: ook dagen die (nog) niet in de week staan. */}
+            {effectiveClient && (
+              <div style={{ display: 'flex', gap: 6, marginBottom: '0.75rem' }}>
+                {workoutPlan.days.length > 0 && (
+                  <select value={activeDay ?? ''} onChange={e => { const d = workoutPlan.days.find(x => String(x.id) === e.target.value); if (d) setActiveDay(d.id) }}
+                    style={{ ...cSelect, flex: 1, minWidth: 0, fontWeight: 800, colorScheme: 'dark' }}>
+                    {workoutPlan.days.map((d, i) => (
+                      <option key={d.id} value={d.id}>Dag {i + 1} · {d.name || `Dag ${i + 1}`} ({(d.exercises || []).length} oef)</option>
+                    ))}
+                  </select>
+                )}
+                <button onClick={() => setShowDayPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 36, padding: '0 0.75rem', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flex: workoutPlan.days.length ? 'none' : 1, justifyContent: 'center' }}>
+                  <Plus size={14} strokeWidth={2.8} /> Nieuwe dag
+                </button>
+              </div>
+            )}
             {actieveDag && (
               <DagKop dag={actieveDag} index={actieveIndex} aantal={workoutPlan.days.length} isMobile={m}
                 sets={setsVan(actieveDag)} minuten={minutenVan(actieveDag)}
@@ -886,7 +921,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </div>
 
           {/* ── RECHTS: de oefeningen ── */}
-          <div style={{ flex: 1, minWidth: 0, maxWidth: m ? undefined : 640, width: '100%', paddingTop: m ? '0.5rem' : 0 }}>
+          <div style={{ flex: 1, minWidth: 0, maxWidth: m ? undefined : 640, width: '100%', padding: m ? '0.5rem 0 0' : '1rem 0 130px', boxSizing: 'border-box', overflowY: m ? undefined : 'auto', WebkitOverflowScrolling: 'touch' }}>
             {/* Cardio is ook een workout: altijd zichtbaar als de klant het heeft. */}
             {effectiveClient && (
               <KlantCardioOverzicht client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} onOpen={() => setShowCardio(true)} />
