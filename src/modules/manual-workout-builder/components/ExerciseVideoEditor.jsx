@@ -12,10 +12,12 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
-import { X, Video, Image as ImageIcon, Trash2, Save, ExternalLink } from 'lucide-react'
+import { X, Trash2, Play, ExternalLink } from 'lucide-react'
 import ExerciseService from '../../../services/ExerciseService'
+import { colors, radius, space, overlay } from '../../../ui/tokens'
+import { getVideoSource, getYouTubeEmbedUrl } from '../../videos/utils/youtubeHelpers'
 
-const GOLD = '#FFD700'
+const LIJN = '1px solid rgba(255,255,255,0.12)'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v)
@@ -29,25 +31,67 @@ const deriveYoutubeThumb = (url) => {
   return `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg`
 }
 
+// De rij uit de builder draagt vaak alleen naam + sets: video, thumbnail en
+// foto staan in exercises (of custom_exercises). Die halen we er zelf bij,
+// anders opende dit venster leeg terwijl de oefening al een video had.
+async function laadOefening(exercise) {
+  const sb = ExerciseService.supabase
+  if (!sb || !exercise) return null
+  const kolommen = 'id, name, image_url, video_url, thumbnail_url'
+  const tabel = exercise._source === 'custom_exercises' ? 'custom_exercises' : 'exercises'
+  if (isUuid(exercise.id)) {
+    const { data } = await sb.from(tabel).select(kolommen).eq('id', exercise.id).maybeSingle().then(r => r, () => ({ data: null }))
+    if (data) return data
+  }
+  const naam = String(exercise.name || '').trim()
+  if (!naam) return null
+  for (const t of ['exercises', 'custom_exercises']) {
+    const { data } = await sb.from(t).select(kolommen).ilike('name', naam).limit(1).then(r => r, () => ({ data: [] }))
+    if (data?.length) return data[0]
+  }
+  return null
+}
+
 export default function ExerciseVideoEditor({
   isOpen, onClose, exercise, isMobile = false, onSaved,
 }) {
   const modalHost = useModalHost()
   const [videoUrl, setVideoUrl] = useState('')
   const [thumbnailUrl, setThumbnailUrl] = useState('')
+  const [fotoUrl, setFotoUrl] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [speelt, setSpeelt] = useState(false)
+  const [toon, setToon] = useState('video') // 'video' | 'foto'
 
   useEffect(() => {
     if (!isOpen) return
     setVideoUrl(exercise?.video_url || '')
     setThumbnailUrl(exercise?.thumbnail_url || '')
-    setSaving(false)
-  }, [isOpen, exercise?.id])
+    setFotoUrl(exercise?.image_url || null)
+    setSaving(false); setSpeelt(false); setToon('video')
+    let weg = false
+    laadOefening(exercise).then(rij => {
+      if (weg || !rij) return
+      // Alleen aanvullen wat de rij uit de builder mist.
+      setVideoUrl(v => v || rij.video_url || '')
+      setThumbnailUrl(t => t || rij.thumbnail_url || '')
+      setFotoUrl(f => f || rij.image_url || null)
+    })
+    return () => { weg = true }
+  }, [isOpen, exercise?.id, exercise?.name])
 
   if (!isOpen || !exercise) return null
 
   const derivedThumb = deriveYoutubeThumb(videoUrl)
-  const effectiveThumb = thumbnailUrl || derivedThumb || exercise.image_url || null
+  const videoThumb = thumbnailUrl || derivedThumb || fotoUrl || null
+  const bron = getVideoSource(videoUrl.trim())
+  const embed = bron.kind === 'youtube' ? getYouTubeEmbedUrl(bron.youtubeId)
+    : bron.kind === 'zoom-embed' || bron.kind === 'instagram-embed' ? bron.embedUrl : null
+  const isMp4 = /\.(mp4|webm|mov)(\?|$)/i.test(videoUrl)
+  const heeftVideo = !!videoUrl.trim()
+  const heeftFoto = !!fotoUrl
+  const beide = heeftVideo && heeftFoto
+  const opVideo = heeftVideo && (toon === 'video' || !heeftFoto)
 
   // The DayBuilder generates a local timestamp id per row for React keys —
   // that's NOT the real exercises.id (uuid). Only pass it to the service
@@ -92,6 +136,7 @@ export default function ExerciseVideoEditor({
       await ExerciseService.updateExerciseVideo({
         exerciseId: realId,
         exerciseName: exercise.name,
+        source: exercise._source || null,
         videoUrl: null,
         thumbnailUrl: null,
       })
@@ -104,228 +149,146 @@ export default function ExerciseVideoEditor({
     }
   }
 
-  const inputStyle = {
-    width: '100%', boxSizing: 'border-box',
-    padding: '0.55rem 0.7rem',
-    background: 'rgba(0,0,0,0.4)',
-    border: `1px solid ${GOLD}33`,
-    borderRadius: 6,
-    color: '#fff', fontSize: '0.8rem',
-    fontFamily: 'monospace', outline: 'none',
+  const veld = {
+    width: '100%', boxSizing: 'border-box', height: 44,
+    padding: `0 ${space[3]}px`,
+    background: colors.surface, border: LIJN, borderRadius: radius.btn,
+    color: colors.textPrimary, fontSize: '0.85rem', fontWeight: 600,
+    fontFamily: 'inherit', outline: 'none',
   }
-  const labelStyle = {
-    display: 'flex', alignItems: 'center', gap: 5,
-    fontSize: '0.6rem', fontWeight: 800,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: '0.04em', textTransform: 'uppercase',
-    marginBottom: 4,
-  }
+  const label = { fontSize: '0.8rem', fontWeight: 800, color: colors.textPrimary, marginBottom: space[2] }
+  const hint = { fontSize: '0.74rem', fontWeight: 600, color: colors.textSecondary, marginTop: space[1] }
+  const balkKnop = (kant) => ({
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: space[2],
+    padding: `0 ${space[4]}px`, background: 'transparent', border: 'none',
+    [kant === 'links' ? 'borderRight' : 'borderLeft']: LIJN,
+    color: colors.textPrimary, fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+    cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
 
   return createPortal(
     <div
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
       style={{
         position: 'fixed', inset: 0, zIndex: 2147483560,
-        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
+        background: overlay.color, backdropFilter: overlay.blur, WebkitBackdropFilter: overlay.blur,
         display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
-        padding: isMobile ? 0 : '1rem',
+        padding: isMobile ? 0 : space[4],
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: 480,
-          maxHeight: isMobile ? '92vh' : '85vh',
-          background: '#0a0a0a',
-          border: `1px solid ${GOLD}33`,
-          borderRadius: isMobile ? '14px 14px 0 0' : 12,
-          display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: `0 14px 50px rgba(0,0,0,0.7), 0 0 24px ${GOLD}22`,
+          width: '100%', maxWidth: 560,
+          maxHeight: isMobile ? '94vh' : '90vh',
+          background: colors.bg, border: LIJN,
+          borderRadius: isMobile ? `${radius.card}px ${radius.card}px 0 0` : radius.card,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.55rem',
-          padding: '0.85rem 1rem',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          background: `${GOLD}10`,
-        }}>
-          <Video size={17} color={GOLD} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: '0.55rem', fontWeight: 800,
-              color: GOLD, letterSpacing: '0.06em', textTransform: 'uppercase',
-            }}>
-              Video bij oefening
-            </div>
-            <div style={{
-              fontSize: '0.85rem', fontWeight: 800, color: '#fff', marginTop: 2,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {exercise.name}
-            </div>
+        {/* Balk: naam links, sluiten rechts. Zelfde vorm als de maaltijd-info. */}
+        <div style={{ display: 'flex', alignItems: 'stretch', height: 48, flexShrink: 0, borderBottom: LIJN }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', padding: `0 ${space[4]}px`, fontSize: '0.95rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {exercise.name}
           </div>
-          <button onClick={onClose} title="Sluiten" style={{
-            width: 28, height: 28, padding: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 6, color: 'rgba(255,255,255,0.5)',
-            cursor: 'pointer', touchAction: 'manipulation',
-          }}>
-            <X size={14} />
+          <button onClick={onClose} aria-label="Sluiten" title="Sluiten" style={{ ...balkKnop('rechts'), padding: 0, width: 48 }}>
+            <X size={18} strokeWidth={2.8} />
           </button>
         </div>
 
-        {/* Body */}
-        <div style={{
-          flex: 1, overflowY: 'auto',
-          padding: '0.85rem 1rem',
-          display: 'flex', flexDirection: 'column', gap: '0.8rem',
-        }}>
-          <div>
-            <div style={labelStyle}>
-              <Video size={10} /> Video URL
-            </div>
-            <input
-              type="text"
-              value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
-              placeholder="bv. https://youtube.com/watch?v=… of https://cdn.../squat.mp4"
-              style={inputStyle}
-            />
-            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-              Werkt met YouTube, Vimeo, Supabase Storage of een directe MP4-link.
-            </div>
-          </div>
-
-          <div>
-            <div style={labelStyle}>
-              <ImageIcon size={10} /> Thumbnail URL <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 600, marginLeft: 4 }}>(optioneel)</span>
-            </div>
-            <input
-              type="text"
-              value={thumbnailUrl}
-              onChange={(e) => setThumbnailUrl(e.target.value)}
-              placeholder={derivedThumb ? `auto · ${derivedThumb}` : 'https://cdn.../thumb.jpg'}
-              style={inputStyle}
-            />
-            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-              {derivedThumb
-                ? 'YouTube thumbnail wordt automatisch afgeleid als je dit leeg laat.'
-                : 'Leeg = de bestaande exercise-image wordt gebruikt.'}
-            </div>
-          </div>
-
-          {/* Preview */}
-          {effectiveThumb && (
-            <div style={{
-              display: 'flex', flexDirection: 'column', gap: 5,
-            }}>
-              <div style={labelStyle}>Preview</div>
-              <div style={{
-                position: 'relative',
-                aspectRatio: '16 / 9',
-                background: '#000',
-                borderRadius: 8,
-                overflow: 'hidden',
-                border: '1px solid rgba(255,255,255,0.06)',
-              }}>
-                <img
-                  src={effectiveThumb}
-                  alt="thumbnail preview"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={(e) => { e.currentTarget.style.display = 'none' }}
-                />
-                {videoUrl && (
-                  <div style={{
-                    position: 'absolute', inset: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(0,0,0,0.25)',
-                  }}>
-                    <div style={{
-                      width: 52, height: 52, borderRadius: '50%',
-                      background: 'rgba(255,0,0,0.85)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
-                    }}>
-                      <div style={{
-                        width: 0, height: 0,
-                        borderLeft: '14px solid #fff',
-                        borderTop: '9px solid transparent',
-                        borderBottom: '9px solid transparent',
-                        marginLeft: 4,
-                      }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-              {videoUrl && (
-                <a
-                  href={videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    fontSize: '0.65rem', color: GOLD, fontWeight: 700,
-                    textDecoration: 'none', alignSelf: 'flex-start',
-                  }}
-                >
-                  <ExternalLink size={10} /> Test link openen
-                </a>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {/* Beeld: video (speelt hier af) of de foto van de oefening. */}
+          {(heeftVideo || heeftFoto) && (
+            <div style={{ position: 'relative', aspectRatio: '16 / 9', background: '#000', borderBottom: LIJN }}>
+              {opVideo && speelt && (embed
+                ? <iframe src={embed} title={exercise.name} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
+                : isMp4
+                  ? <video src={videoUrl} controls autoPlay playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
+                  : null)}
+              {!(opVideo && speelt && (embed || isMp4)) && (
+                <>
+                  {(opVideo ? videoThumb : fotoUrl) && (
+                    <img src={opVideo ? videoThumb : fotoUrl} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: opVideo ? 'cover' : 'contain', background: '#000' }} />
+                  )}
+                  {opVideo && (
+                    <button
+                      onClick={() => { if (embed || isMp4) setSpeelt(true); else window.open(videoUrl, '_blank', 'noopener') }}
+                      aria-label="Video afspelen"
+                      style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', border: 'none', cursor: 'pointer' }}>
+                      <span style={{ width: 60, height: 60, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 18px rgba(0,0,0,0.5)' }}>
+                        {embed || isMp4 ? <Play size={24} color="#000" fill="#000" style={{ marginLeft: 3 }} /> : <ExternalLink size={22} color="#000" />}
+                      </span>
+                    </button>
+                  )}
+                </>
+              )}
+              {/* Video / Foto: alleen als er allebei is. */}
+              {beide && (
+                <div style={{ position: 'absolute', top: space[3], left: space[3], display: 'flex', height: 32, borderRadius: radius.btn, overflow: 'hidden', background: 'rgba(0,0,0,0.7)', border: LIJN }}>
+                  {[{ id: 'video', label: 'Video' }, { id: 'foto', label: 'Foto' }].map((o, i) => (
+                    <button key={o.id} onClick={() => { setToon(o.id); setSpeelt(false) }} style={{
+                      padding: `0 ${space[3]}px`, border: 'none', borderLeft: i ? LIJN : 'none',
+                      background: toon === o.id ? '#fff' : 'transparent', color: toon === o.id ? '#000' : '#fff',
+                      fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                    }}>{o.label}</button>
+                  ))}
+                </div>
               )}
             </div>
           )}
+
+          <div style={{ padding: space[4], display: 'flex', flexDirection: 'column', gap: space[4] }}>
+            <div>
+              <div style={label}>Video-link</div>
+              <input
+                type="text"
+                value={videoUrl}
+                onChange={(e) => { setVideoUrl(e.target.value); setSpeelt(false) }}
+                placeholder="YouTube, Vimeo of een MP4-link"
+                style={veld}
+              />
+            </div>
+
+            <div>
+              <div style={label}>Thumbnail</div>
+              <input
+                type="text"
+                value={thumbnailUrl}
+                onChange={(e) => setThumbnailUrl(e.target.value)}
+                placeholder={derivedThumb ? 'Leeg = de YouTube-thumbnail' : 'Leeg = de foto van de oefening'}
+                style={veld}
+              />
+              {!thumbnailUrl && (
+                <div style={hint}>{derivedThumb ? 'Leeg laten: de thumbnail komt van YouTube.' : 'Leeg laten: de foto van de oefening wordt gebruikt.'}</div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div style={{
-          display: 'flex', gap: 6,
-          padding: '0.7rem 1rem',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          flexShrink: 0,
-        }}>
-          <button
-            onClick={handleClear}
-            disabled={saving || (!videoUrl && !thumbnailUrl && !exercise.video_url && !exercise.thumbnail_url)}
-            title="Video weghalen"
-            style={{
-              padding: '0.55rem 0.75rem',
-              display: 'flex', alignItems: 'center', gap: 5,
-              background: 'rgba(239,68,68,0.08)',
-              border: '1px solid rgba(239,68,68,0.25)',
-              borderRadius: 6,
-              color: '#fca5a5', fontSize: '0.7rem', fontWeight: 700,
-              cursor: 'pointer', touchAction: 'manipulation',
-            }}
-          >
-            <Trash2 size={11} /> Weghalen
-          </button>
-          <button onClick={onClose} style={{
-            flex: 1, padding: '0.6rem',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 6,
-            color: 'rgba(255,255,255,0.45)',
-            fontSize: '0.75rem', fontWeight: 700,
-            cursor: 'pointer',
-          }}>Annuleer</button>
+        {/* Eén primaire actie; weghalen klein links. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: space[3], padding: space[4], borderTop: LIJN, flexShrink: 0 }}>
+          {(exercise.video_url || exercise.thumbnail_url || videoUrl || thumbnailUrl) && (
+            <button
+              onClick={handleClear}
+              disabled={saving}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: space[2], height: 44, padding: `0 ${space[2]}px`, background: 'transparent', border: 'none', color: colors.danger, fontSize: '0.82rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}
+            >
+              <Trash2 size={15} strokeWidth={2.4} /> Weghalen
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
           <button
             onClick={handleSave}
             disabled={saving}
             style={{
-              flex: 2, padding: '0.6rem',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              background: GOLD,
-              border: `1px solid ${GOLD}`,
-              borderRadius: 6,
-              color: '#000', fontSize: '0.8rem', fontWeight: 800,
-              cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.6 : 1,
+              height: 44, padding: `0 ${space[6]}px`,
+              background: '#fff', border: 'none', borderRadius: radius.btn,
+              color: '#000', fontSize: '0.9rem', fontWeight: 900, fontFamily: 'inherit',
+              cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1,
             }}
           >
-            <Save size={13} /> {saving ? 'Opslaan…' : 'Opslaan'}
+            {saving ? 'Opslaan…' : 'Opslaan'}
           </button>
         </div>
       </div>
