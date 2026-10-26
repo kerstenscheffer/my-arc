@@ -17,6 +17,11 @@ export default class AIMealPlanService {
     this.db = db
     this.supabase = db.supabase
   }
+
+  // Lokale datum als YYYY-MM-DD — voorkomt UTC-afwijking 00:00–02:00 NL-tijd.
+  _lokaleDatum(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
   // ========================================
   // MAIN DASHBOARD DATA LOADING
   // ========================================
@@ -24,9 +29,8 @@ async loadAIDashboardData(clientId) {
   try {
     console.log('🚀 Loading AI dashboard data for client:', clientId)
     
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    
+    const todayStr = this._lokaleDatum()
+
     const [
       activePlan,
       todayProgress,
@@ -443,7 +447,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
   }
   async checkAIMeal(clientId, planId, slot, mealData) {
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = this._lokaleDatum()
       
       let progress = await this.getAIProgress(clientId, today)
       
@@ -509,7 +513,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
   }
   async uncheckAIMeal(clientId, planId, slot) {
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = this._lokaleDatum()
       
       let progress = await this.getAIProgress(clientId, today)
       
@@ -571,7 +575,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
   }
   async logManualIntake(clientId, planId, intakeData) {
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = this._lokaleDatum()
       let progress = await this.getAIProgress(clientId, today)
       
       // ROUND all manual intake values
@@ -672,7 +676,7 @@ async getAIWaterIntake(clientId, date) {
 }
 async updateAIWaterIntake(clientId, milliliters) {
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const today = this._lokaleDatum()
     const roundedMilliliters = Math.round(milliliters)
     const liters = roundedMilliliters / 1000
     
@@ -764,7 +768,7 @@ async updateAIWaterIntake(clientId, milliliters) {
 // Vervang de hele logAIMood method met deze:
 async logAIMood(clientId, moodData) {
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const today = this._lokaleDatum()
     
     // First check if mood exists for today
     const { data: existingMood } = await this.supabase
@@ -937,7 +941,7 @@ async logAIMood(clientId, moodData) {
   }
   async swapAIMeal(clientId, planId, day, slot, newMealId) {
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = this._lokaleDatum()
       
       // Get new meal data
       const newMeal = await this.getMealById(newMealId)
@@ -1177,9 +1181,8 @@ async logAIMood(clientId, moodData) {
   // sleutel die de vandaag-weergave al leest; andere dagen hun lokale datum,
   // zoals laadDagAanpassingen ze opzoekt.
   dagSleutel(datumIso) {
-    const nu = new Date()
-    const lokaalVandaag = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, '0')}-${String(nu.getDate()).padStart(2, '0')}`
-    if (!datumIso || datumIso === lokaalVandaag) return nu.toISOString().split('T')[0]
+    const lokaalVandaag = this._lokaleDatum()
+    if (!datumIso || datumIso === lokaalVandaag) return lokaalVandaag
     return datumIso
   }
   // ========================================
@@ -1315,12 +1318,12 @@ async logAIMood(clientId, moodData) {
   async logToAIHistory(clientId, slot, mealData) {
     try {
       const now = new Date()
-      
+
       const { data, error } = await this.supabase
         .from('ai_meal_history')
         .insert({
           client_id: clientId,
-          date: now.toISOString().split('T')[0],
+          date: this._lokaleDatum(now),
           time: now.toTimeString().split(' ')[0],
           meal_slot: slot,
           meal_id: mealData.meal_id || mealData.id,
@@ -1447,7 +1450,7 @@ async calculateDailyTotals(clientId, meals, progress, activePlan) {
   let sourceType = 'none'
   
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const today = this._lokaleDatum()
     console.log('🔍 [calculateDailyTotals] Today:', today)
     
     let quickIntakeTime = null
@@ -1615,7 +1618,7 @@ async calculateDailyTotals(clientId, meals, progress, activePlan) {
       favorites: [],
       customMeals: [],
       recentHistory: [],
-      todayDate: new Date().toISOString().split('T')[0],
+      todayDate: this._lokaleDatum(),
       dayName: this.getDayName(new Date())
     }
   }
