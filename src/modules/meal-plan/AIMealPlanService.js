@@ -29,7 +29,9 @@ async loadAIDashboardData(clientId) {
   try {
     console.log('🚀 Loading AI dashboard data for client:', clientId)
     
-    const todayStr = this._lokaleDatum()
+    // `today` is ook nodig voor de tijdelijke dag en de dagnaam hieronder.
+    const today = new Date()
+    const todayStr = this._lokaleDatum(today)
 
     const [
       activePlan,
