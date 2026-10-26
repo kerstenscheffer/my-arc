@@ -7,6 +7,7 @@ import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, Plus, Trash2, Save, Copy, Zap, ChefHat, Check } from 'lucide-react'
 import { resolveFoodImage } from '../../../meal-plan/foodImageFallback'
 import { portieInfo, stapPortie, portieLabel, isHelePortie, portieUitleg } from './portie'
+import useZoekLog from '../../../meal-plan/components/food-log/useZoekLog'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -38,6 +39,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
   const [searchFullBase, setSearchFullBase] = useState(false)
   const searchRef = useRef(null)
   const debounceRef = useRef(null)
+  const zoekLog = useZoekLog({ db, client: null, modus: 'products', context: 'ingredient_edit' })
   const [showLabels, setShowLabels] = useState(false)
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState(null)
@@ -141,6 +143,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
     if (!fullBase) query = query.eq('source', 'coach')
     const { data } = await query.order('source', { ascending: true }).limit(fullBase ? 40 : 20)
     setSearchResults(data || []); setSearching(false)
+    zoekLog.noteer(val, data || [])
   }
 
   const handleSearch = (val) => {
@@ -157,6 +160,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
 
   const addIngredient = (row) => {
     if (ingredients.some(i => i.ingredient_id === row.id)) return
+    zoekLog.gekozen(row, searchResults.indexOf(row))
     setIngredients(prev => [...prev, { ingredient_id: row.id, name: row.name, amount: row.default_portion_gram||100, unit: 'gram', cal: row.calories_per_100g, prot: row.protein_per_100g, carbs: row.carbs_per_100g, fat: row.fat_per_100g, min: 0, max: Infinity, scalable: row.scalable!==false, portie: portieInfo(row) }])
     setDbCache(prev => ({ ...prev, [row.id]: row }))
     setSearchQuery(''); setSearchResults([]); setShowSearch(false)

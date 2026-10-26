@@ -1,7 +1,8 @@
 // src/modules/meal-plan/components/AIAlternativesModal.jsx
 // 🎯 v2.0 - Clean swap modal with smart suggestions & compare
 // Props IDENTIEK: { isOpen, onClose, currentMeal, onSelectMeal, db, service }
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import useZoekLog from './food-log/useZoekLog'
 import MealCard from './day-schedule/MealCard'
 import Keuze from './Keuze'
 import { foodImageFallback } from '../foodImageFallback'
@@ -69,6 +70,8 @@ export default function AIAlternativesModal({
   onKiesMaaltijd,
 }) {
   const isMobile = window.innerWidth <= 768
+  const zoekLog = useZoekLog({ db, client, modus: 'products', context: 'wissel' })
+  const filteredMealsRef = useRef([])
   const [searchTerm, setSearchTerm] = useState('')
   // Drie keuzes in plaats van één rij chips: welk moment, waar zoeken, en de
   // volgorde. De eerste twee snijden de lijst bij, de derde bepaalt alleen de
@@ -609,6 +612,9 @@ export default function AIAlternativesModal({
   // Kiezen: in het log-venster meteen door naar de portie, anders eerst het
   // vergelijk-blad.
   const kies = (meal) => {
+    if (searchTerm.trim().length >= 2) {
+      zoekLog.gekozen(meal, filteredMealsRef.current.indexOf(meal))
+    }
     if (embedded) { onKiesMaaltijd?.(meal); return }
     setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)
   }
@@ -698,6 +704,11 @@ export default function AIAlternativesModal({
   }
 
   const filteredMeals = getFilteredMeals()
+  filteredMealsRef.current = filteredMeals
+
+  // Zoekterm loggen zodra de gebruiker typt (wissel-context).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (searchTerm.trim().length >= 2) zoekLog.noteer(searchTerm, filteredMealsRef.current) }, [searchTerm])
 
   if (!isOpen && !embedded) return null
 
