@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Bookmark, Trash2, Download, Check } from 'lucide-react'
+import { X, Bookmark, Trash2, Download, Check, Search } from 'lucide-react'
 import { Placeholder, Meta, PrimairKnop, SecundairKnop, IconKnop } from './PlanSwitcherModal'
 import { supplementenVoorSjabloon, extrasSamenvatting } from './sjabloonExtras'
 
@@ -15,6 +15,8 @@ export default function PlanLibraryModal({
   // Gaan mee in het sjabloon: de plan-brede pre-workout maaltijd en de
   // supplementen van de klant (met trainingsdagen als regel, niet letterlijk).
   preWorkoutMeal = null, supplementen = [], trainingDayKeys = [],
+  // Targets van de klant: voor "dichtst bij doel" en het verschil per sjabloon.
+  doelKcal = 0, doelEiwit = 0,
   onLoad, onClose, isMobile, embedded = false,
 }) {
   const modalHost = useModalHost()
@@ -30,6 +32,11 @@ export default function PlanLibraryModal({
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
+  // Filters om voor een klant het passende sjabloon te vinden.
+  const [zoek, setZoek] = useState('')
+  const [kcalFilter, setKcalFilter] = useState('alle')
+  const [maaltijdenFilter, setMaaltijdenFilter] = useState('alle')
+  const [sortering, setSortering] = useState(() => doelKcal > 0 ? 'doel' : 'nieuw')
 
   const loadList = async () => {
     setLoading(true)
@@ -110,6 +117,52 @@ export default function PlanLibraryModal({
     catch { return '' }
   }
 
+  // Filteren en sorteren. Kcal "rond doel" = binnen 150 kcal van de klant.
+  const KCAL_OPTIES = [
+    { id: 'alle', label: 'Alle kcal' },
+    ...(doelKcal > 0 ? [{ id: 'doel', label: `Rond doel (${doelKcal} ±150)` }] : []),
+    { id: '<1800', label: 'Tot 1800', test: k => k < 1800 },
+    { id: '1800', label: '1800 – 2200', test: k => k >= 1800 && k < 2200 },
+    { id: '2200', label: '2200 – 2600', test: k => k >= 2200 && k < 2600 },
+    { id: '2600', label: '2600 – 3000', test: k => k >= 2600 && k < 3000 },
+    { id: '3000', label: '3000+', test: k => k >= 3000 },
+  ]
+  const maaltijdOpties = [...new Set(plans.map(p => p.meals_per_day).filter(Boolean))].sort((a, b) => a - b)
+  const woorden = zoek.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const zichtbaar = plans.filter(p => {
+    const naam = `${p.name || ''} ${p.template_name || ''}`.toLowerCase()
+    if (woorden.some(w => !naam.includes(w))) return false
+    const k = Number(p.daily_calories) || 0
+    if (kcalFilter === 'doel' && Math.abs(k - doelKcal) > 150) return false
+    const optie = KCAL_OPTIES.find(o => o.id === kcalFilter)
+    if (optie?.test && !optie.test(k)) return false
+    if (maaltijdenFilter !== 'alle' && String(p.meals_per_day) !== maaltijdenFilter) return false
+    return true
+  }).sort((a, b) => {
+    const ka = Number(a.daily_calories) || 0, kb = Number(b.daily_calories) || 0
+    if (sortering === 'doel') {
+      // Kcal telt, eiwit weegt mee: 10 g eiwit te weinig ≈ 40 kcal.
+      const afstand = (p, k) => Math.abs(k - doelKcal) + (doelEiwit > 0 ? Math.abs((Number(p.daily_protein) || 0) - doelEiwit) * 4 : 0)
+      return afstand(a, ka) - afstand(b, kb)
+    }
+    if (sortering === 'laag') return ka - kb
+    if (sortering === 'hoog') return kb - ka
+    if (sortering === 'eiwit') return (Number(b.daily_protein) || 0) - (Number(a.daily_protein) || 0)
+    return String(b.created_at || '').localeCompare(String(a.created_at || ''))
+  })
+  const gefilterd = zoek.trim() || kcalFilter !== 'alle' || maaltijdenFilter !== 'alle'
+  const verschil = (p) => {
+    if (!(doelKcal > 0) || !p.daily_calories) return null
+    const d = Math.round(p.daily_calories - doelKcal)
+    return `${d > 0 ? '+' : d < 0 ? '−' : '±'}${Math.abs(d)} t.o.v. doel`
+  }
+  const keuze = {
+    height: 36, minWidth: 0, padding: '0 0.5rem', borderRadius: 10,
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)',
+    color: '#fff', fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none',
+    colorScheme: 'dark', cursor: 'pointer',
+  }
+
   const pad = m ? '0.75rem 1rem' : '0.85rem 1.5rem'
   const extras = extrasSamenvatting({ pre_workout_meal: preWorkoutMeal, supplements: supplementen })
 
@@ -167,12 +220,39 @@ export default function PlanLibraryModal({
 
       {/* Bestaande weekplan-sjablonen. */}
       <div style={{ padding: m ? '0.75rem 1rem 0.35rem' : '0.85rem 1.5rem 0.35rem', fontSize: '0.86rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>
-        Weekplan-sjablonen{plans.length > 0 ? ` (${plans.length})` : ''}
+        Weekplan-sjablonen{plans.length > 0 ? ` (${gefilterd ? `${zichtbaar.length} van ${plans.length}` : plans.length})` : ''}
       </div>
+      {/* Zoeken + filters: één regel, dropdowns in plaats van knoppenrijen. */}
+      {plans.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: m ? '0.25rem 1rem 0.6rem' : '0.25rem 1.5rem 0.7rem', flexShrink: 0 }}>
+          <div style={{ position: 'relative', flex: '1 1 160px', minWidth: 0 }}>
+            <Search size={14} color="rgba(255,255,255,0.5)" style={{ position: 'absolute', left: 10, top: 11, pointerEvents: 'none' }} />
+            <input value={zoek} onChange={e => setZoek(e.target.value)} placeholder="Zoek op naam"
+              style={{ ...keuze, width: '100%', boxSizing: 'border-box', paddingLeft: 30, cursor: 'text' }} />
+          </div>
+          <select value={kcalFilter} onChange={e => setKcalFilter(e.target.value)} style={keuze} title="Kcal per dag">
+            {KCAL_OPTIES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+          {maaltijdOpties.length > 1 && (
+            <select value={maaltijdenFilter} onChange={e => setMaaltijdenFilter(e.target.value)} style={keuze} title="Maaltijden per dag">
+              <option value="alle">Alle maaltijden</option>
+              {maaltijdOpties.map(n => <option key={n} value={String(n)}>{n}x per dag</option>)}
+            </select>
+          )}
+          <select value={sortering} onChange={e => setSortering(e.target.value)} style={keuze} title="Sorteren">
+            {doelKcal > 0 && <option value="doel">Dichtst bij doel</option>}
+            <option value="nieuw">Nieuwste eerst</option>
+            <option value="laag">Kcal laag → hoog</option>
+            <option value="hoog">Kcal hoog → laag</option>
+            <option value="eiwit">Meeste eiwit</option>
+          </select>
+        </div>
+      )}
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {loading && <Placeholder text="Laden…" />}
         {!loading && plans.length === 0 && <Placeholder text="Nog geen sjablonen bewaard." />}
-        {!loading && plans.map(p => {
+        {!loading && plans.length > 0 && zichtbaar.length === 0 && <Placeholder text="Geen sjabloon past bij deze filters." />}
+        {!loading && zichtbaar.map(p => {
           const isConfirmDel = confirmDelete === p.id
           return (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: pad, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
@@ -180,7 +260,7 @@ export default function PlanLibraryModal({
                 <div style={{ fontSize: m ? '0.92rem' : '0.98rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.name || p.template_name || 'Naamloos plan'}
                 </div>
-                <Meta items={[p.daily_calories && `${p.daily_calories} kcal`, p.daily_protein && `${p.daily_protein}g eiwit`, p.meals_per_day && `${p.meals_per_day}x per dag`, fmtDate(p.created_at)]} />
+                <Meta items={[p.daily_calories && `${p.daily_calories} kcal`, verschil(p), p.daily_protein && `${p.daily_protein}g eiwit`, p.meals_per_day && `${p.meals_per_day}x per dag`, fmtDate(p.created_at)]} />
                 {extrasSamenvatting(p) && (
                   <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', marginTop: 2, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {extrasSamenvatting(p)}

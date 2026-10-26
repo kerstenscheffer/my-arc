@@ -1805,6 +1805,7 @@ export default function PlanAnalyzer({
             weekData={weekData} planMeta={planMeta}
             preWorkoutMeal={preWorkoutMeal} supplementen={supplementen} trainingDayKeys={trainingDayKeys}
             clientName={clientRecord?.first_name || ''}
+            doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0}
             onLoad={handleLoadSavedPlan}
             onClose={() => setShowPlanLibrary(false)} />
         )}
@@ -2565,6 +2566,7 @@ export default function PlanAnalyzer({
           weekData={weekData} planMeta={planMeta}
           preWorkoutMeal={preWorkoutMeal} supplementen={supplementen} trainingDayKeys={trainingDayKeys}
           clientName={clientRecord?.first_name || ''}
+          doelKcal={Number(targets?.calories) || 0} doelEiwit={Number(targets?.protein) || 0}
           onLoad={handleLoadSavedPlan}
           onClose={() => setShowPlanLibrary(false)} />
       )}
