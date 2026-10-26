@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { voorstelPlan } from './dagTitel'
 import { createPortal } from '../../client/paginaPortal'
 import useHistoryState from './hooks/useHistoryState'
-import { Undo2, Redo2 } from 'lucide-react'
+import { Undo2, Redo2, CircleCheck } from 'lucide-react'
 import DayBuilder from './components/DayBuilder'
 import ExerciseSelector from './components/ExerciseSelector'
 import TemplateManager from './components/TemplateManager'
@@ -64,6 +64,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
   const [showCardio, setShowCardio] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Opslaan-status op de knop: de laatst bewaarde stand van het plan (null =
+  // neem de volgende render als bewaard, na het laden) en een korte
+  // "Opgeslagen"-flits. Eerst kwam er alleen een alert, die je makkelijk mist.
+  const [bewaardeStand, setBewaardeStand] = useState(null)
+  const [netOpgeslagen, setNetOpgeslagen] = useState(false)
   const [templates, setTemplates] = useState([])
   const [dayTemplates, setDayTemplates] = useState([])
   const [showDayPicker, setShowDayPicker] = useState(false)
@@ -161,6 +166,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     history.reset({ name: '', description: '', primary_goal: 'muscle_gain', experience_level: 'intermediate', split_type: 'custom', days_per_week: 0, equipment: [], days: [] })
     setSelectedSchemaId(null)
     setActiveDay(null)
+    setBewaardeStand(null)
   }
 
   // Titel uit de kopbalk bewaren: in de builder, en meteen in de database
@@ -233,6 +239,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       _schemaId: schema.id
     })
     setSelectedSchemaId(schema.id)
+    setBewaardeStand(null)
   }
 
   const loadTemplates = async () => {
@@ -439,7 +446,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     if (workoutPlan.days.length === 0) { alert('Voeg minimaal één dag toe'); return }
 
     if (selectedSchemaId) {
-      if (!confirm('Weet je zeker dat je dit client plan wilt overschrijven?')) return
       setSaving(true)
       try {
         const { error } = await db.supabase.from('workout_schemas').update({
@@ -448,7 +454,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           updated_at: new Date().toISOString()
         }).eq('id', selectedSchemaId)
         if (error) throw error
-        alert('✅ Client plan opgeslagen!')
+        setBewaardeStand(huidigeStand)
+        setNetOpgeslagen(true)
+        setTimeout(() => setNetOpgeslagen(false), 2500)
       } catch (e) { alert('❌ Fout bij opslaan: ' + e.message) }
       finally { setSaving(false) }
       return
@@ -625,6 +633,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
   const geenDoel = !selectedSchemaId && !effectiveClient?.id
+  // De naam telt niet mee: die bewaart de kopbalk zelf al (bewaarTitel).
+  const huidigeStand = JSON.stringify([workoutPlan.description || '', buildWeekStructure()])
+  const nietOpgeslagen = !!selectedSchemaId && bewaardeStand !== null && bewaardeStand !== huidigeStand
+  const isOpgeslagen = !!selectedSchemaId && !saving && !nietOpgeslagen
   const leegPlan = workoutPlan.days.length === 0
   const opslaanKnop = (vol) => ({
     height: 36, padding: '0 0.9rem', borderRadius: 9, flexShrink: 0,
@@ -634,6 +646,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', whiteSpace: 'nowrap',
     cursor: saving ? 'wait' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
+  useEffect(() => {
+    if (bewaardeStand === null) setBewaardeStand(huidigeStand)
+  }, [bewaardeStand, huidigeStand])
   const setsVan = (d) => (d?.exercises || []).reduce((n, ex) => n + (Number(ex.sets) || 0), 0)
   const minutenVan = (d) => parseInt(d?.geschatteTijd, 10) || 60
   const gereedschap = [
@@ -727,9 +742,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               ? `Nieuw plan voor ${effectiveClient.first_name || 'deze klant'}: komt naast het huidige plan; actief maken doe je met de wisselknop.`
               : `${effectiveClient.first_name || 'Deze klant'} heeft nog geen plan. Opslaan maakt het aan en zet het meteen actief.`)
             : undefined}
-          style={{ ...opslaanKnop(true), opacity: (geenDoel || leegPlan) ? 0.45 : 1, cursor: geenDoel ? 'not-allowed' : undefined }}>
-          <Save size={14} strokeWidth={2.6} />
-          {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan' : effectiveClient?.id ? (clientSchemas.length > 0 ? 'Opslaan als extra plan' : `Eerste plan voor ${effectiveClient.first_name || 'klant'}`) : 'Opslaan'}
+          style={{ ...opslaanKnop(!isOpgeslagen), ...(isOpgeslagen ? { color: '#10b981', borderColor: netOpgeslagen ? '#10b981' : 'rgba(16,185,129,0.35)' } : {}), opacity: (geenDoel || leegPlan) ? 0.45 : 1, cursor: geenDoel ? 'not-allowed' : undefined }}>
+          {isOpgeslagen ? <CircleCheck size={14} strokeWidth={2.6} /> : <Save size={14} strokeWidth={2.6} />}
+          {saving ? 'Opslaan…' : isOpgeslagen ? 'Opgeslagen' : nietOpgeslagen ? <>Opslaan<span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', marginLeft: 2 }} /></> : selectedSchemaId ? 'Opslaan' : effectiveClient?.id ? (clientSchemas.length > 0 ? 'Opslaan als extra plan' : `Eerste plan voor ${effectiveClient.first_name || 'klant'}`) : 'Opslaan'}
         </button>
       </div>
       </div>
