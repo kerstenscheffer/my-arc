@@ -13,8 +13,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, Download, ArrowLeftRight, Loader } from 'lucide-react'
-import { tekenTransformatie } from './transformatieKaart'
+import { X, Download, ArrowLeftRight, Loader, Crop, RotateCcw } from 'lucide-react'
+import { tekenTransformatie, FORMATEN } from './transformatieKaart'
 
 const angleOf = (p) => (p?.metadata?.subtype || 'overig')
 const ANGLE_LABEL = { front: 'Voorkant', side: 'Zijkant', back: 'Achterkant', overig: 'Overig' }
@@ -82,24 +82,78 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
     return d || null
   }, [photos])
 
+  // Formaat van de kaart en de uitsnede per foto (op foto-id, zodat hij
+  // meegaat als je links en rechts omdraait). Standaard staat elke foto
+  // passend in zijn vak: heel in beeld, met een vage rand. Eerder werd hij
+  // bijgesneden tot hij het smalle vak vulde, en dat zag eruit als inzoomen.
+  const [formaat, setFormaat] = useState('4:5')
+  const [uitsnedes, setUitsnedes] = useState({}) // { [fotoId]: { zoom, x, y } }
+  const [aanpassen, setAanpassen] = useState(false)
+  const uitsnedeVan = (foto) => (foto && uitsnedes[foto.id]) || { zoom: 1, x: 0, y: 0 }
+  const zetUitsnede = (foto, patch) => foto && setUitsnedes(u => ({ ...u, [foto.id]: { ...uitsnedeVan(foto), ...patch } }))
+
   // Het resultaat tekenen zodra de keuze verandert.
   const canvasRef = useRef(null)
   const [beeld, setBeeld] = useState('laden') // laden | klaar | fout
+  const getekendRef = useRef('')
   useEffect(() => {
     if (!left || !right || left.id === right.id || !canvasRef.current) return
     let weg = false
-    setBeeld('laden')
+    // Alleen "Laden…" als er andere foto's komen; bij slepen en zoomen blijft
+    // het vorige beeld staan tot het nieuwe er is.
+    const sleutel = `${left.id}|${right.id}`
+    if (getekendRef.current !== sleutel) setBeeld('laden')
     ;(async () => {
       try {
-        const klaar = await tekenTransformatie(canvasRef.current, left, right, { startDatum, afgebroken: () => weg })
-        if (klaar && !weg) setBeeld('klaar')
+        const klaar = await tekenTransformatie(canvasRef.current, left, right, {
+          startDatum, afgebroken: () => weg, formaat,
+          uitsnede: { links: uitsnedeVan(left), rechts: uitsnedeVan(right) },
+        })
+        if (klaar && !weg) { getekendRef.current = sleutel; setBeeld('klaar') }
       } catch (e) {
         console.error('Vergelijking tekenen mislukt:', e)
         if (!weg) setBeeld('fout')
       }
     })()
     return () => { weg = true }
-  }, [left?.id, right?.id, left?.photo_url, right?.photo_url, startDatum]) // eslint-disable-line
+  }, [left?.id, right?.id, left?.photo_url, right?.photo_url, startDatum, formaat, JSON.stringify(uitsnedes)]) // eslint-disable-line
+
+  // Slepen in het voorbeeld schuift de foto in de helft waar je begon;
+  // scrollen (of de schuif eronder) zoomt.
+  const sleepRef = useRef(null)
+  const kantOnder = (e) => {
+    const r = canvasRef.current.getBoundingClientRect()
+    return (e.clientX - r.left) < r.width / 2 ? left : right
+  }
+  const sleepStart = (e) => {
+    if (!aanpassen || !canvasRef.current) return
+    const foto = kantOnder(e)
+    const r = canvasRef.current.getBoundingClientRect()
+    sleepRef.current = { foto, x: e.clientX, y: e.clientY, b: r.width / 2, h: r.height, start: uitsnedeVan(foto) }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  const sleepBeweeg = (e) => {
+    const sl = sleepRef.current
+    if (!sl) return
+    const nx = sl.start.x + (e.clientX - sl.x) / sl.b
+    const ny = sl.start.y + (e.clientY - sl.y) / sl.h
+    zetUitsnede(sl.foto, { x: Math.max(-1, Math.min(1, nx)), y: Math.max(-1, Math.min(1, ny)) })
+  }
+  const sleepEind = () => { sleepRef.current = null }
+  const wiel = (e) => {
+    if (!aanpassen || !canvasRef.current) return
+    e.preventDefault()
+    const foto = kantOnder(e)
+    const z = uitsnedeVan(foto).zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06)
+    zetUitsnede(foto, { zoom: Math.max(1, Math.min(4, z)) })
+  }
+  // Wiel-listener niet-passief, anders mag preventDefault niet en scrollt de pagina mee.
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return undefined
+    el.addEventListener('wheel', wiel, { passive: false })
+    return () => el.removeEventListener('wheel', wiel)
+  })
 
   // Hoek van een foto verzetten. Klanten kiezen bij het uploaden nog wel eens
   // de verkeerde kant; dan staat een zijkant tussen de voorkanten. De foto
@@ -243,8 +297,13 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
             ) : (
               <div style={{ maxWidth: 480, margin: '0 auto' }}>
                 {/* Het eindresultaat, zoals het gedownload wordt. */}
-                <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', borderRadius: 14, overflow: 'hidden', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: beeld === 'klaar' ? 'block' : 'none' }} />
+                <div style={{ position: 'relative', width: '100%', aspectRatio: `${FORMATEN[formaat].W} / ${FORMATEN[formaat].H}`, maxHeight: formaat === '9:16' ? '70vh' : undefined, margin: '0 auto', borderRadius: 14, overflow: 'hidden', background: '#000', border: `1px solid ${aanpassen ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}` }}>
+                  <canvas ref={canvasRef}
+                    onPointerDown={sleepStart} onPointerMove={sleepBeweeg} onPointerUp={sleepEind} onPointerCancel={sleepEind}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: beeld === 'klaar' ? 'block' : 'none', cursor: aanpassen ? 'grab' : 'default', touchAction: aanpassen ? 'none' : 'auto' }} />
+                  {aanpassen && beeld === 'klaar' && (
+                    <div style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, background: 'rgba(255,255,255,0.35)', pointerEvents: 'none' }} />
+                  )}
                   {left?.id === right?.id ? (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', fontWeight: 700 }}>Kies links en rechts een andere foto.</div>
                   ) : beeld === 'laden' ? (
@@ -255,6 +314,36 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', fontWeight: 700 }}>Voorbeeld lukt niet. Download opent de twee foto's los.</div>
                   ) : null}
                 </div>
+                {/* Formaat en uitsnede: één regel. */}
+                <div style={{ display: 'flex', gap: 8, marginTop: '0.8rem', alignItems: 'center' }}>
+                  <select value={formaat} onChange={e => setFormaat(e.target.value)} title="Formaat van de afbeelding"
+                    style={{ ...selectStyle, marginTop: 0, flex: 1, height: 40, colorScheme: 'dark' }}>
+                    {Object.entries(FORMATEN).map(([k, f]) => <option key={k} value={k} style={{ background: '#111' }}>{f.label}</option>)}
+                  </select>
+                  <button onClick={() => setAanpassen(v => !v)} style={{ ...knop(aanpassen), flexShrink: 0 }}>
+                    <Crop size={15} strokeWidth={2.6} /> {aanpassen ? 'Klaar' : 'Uitsnede aanpassen'}
+                  </button>
+                </div>
+                {aanpassen && left && right && (
+                  <div style={{ marginTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
+                      Sleep een foto om hem te verschuiven. Zoom met de schuif{m ? '' : ' of door te scrollen boven de foto'}.
+                    </div>
+                    {[{ label: 'Voor', foto: left }, { label: 'Na', foto: right }].map(({ label, foto }) => (
+                      <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ width: 36, fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>{label}</span>
+                        <input type="range" min="1" max="4" step="0.01" value={uitsnedeVan(foto).zoom}
+                          onChange={e => zetUitsnede(foto, { zoom: Number(e.target.value) })}
+                          style={{ flex: 1, accentColor: '#fff' }} />
+                        <span style={{ width: 40, textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', fontVariantNumeric: 'tabular-nums' }}>{uitsnedeVan(foto).zoom.toFixed(1)}×</span>
+                      </label>
+                    ))}
+                    <button onClick={() => setUitsnedes(u => { const n = { ...u }; delete n[left.id]; delete n[right.id]; return n })}
+                      style={{ ...knop(false), alignSelf: 'flex-start', height: 34 }}>
+                      <RotateCcw size={14} strokeWidth={2.6} /> Terug naar passend
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: m ? '0.6rem' : '0.8rem', marginTop: '0.8rem' }}>
                   <Keuze label="VOOR" photo={left} value={leftId} onChange={setLeftId} />
                   <Keuze label="NA" photo={right} value={rightId} onChange={setRightId} />
