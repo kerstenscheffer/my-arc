@@ -13,7 +13,7 @@ import WorkoutService from '../../../services/WorkoutService'
 
 const LEEG_SCHEMA = { id: null, name: 'Nog geen plan', week_structure: {} }
 
-export default function KlantWeekrooster({ client, db, isMobile = false, onSwitchPlan = null, refreshKey = 0 }) {
+export default function KlantWeekrooster({ client, db, isMobile = false, onSwitchPlan = null, refreshKey = 0, zonderKop = false }) {
   const [schema, setSchema] = useState(null)
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
   const [weekOffset, setWeekOffset] = useState(0)
@@ -58,6 +58,7 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
       onWeekOffsetChange={setWeekOffset}
       client={client}
       isMobile={isMobile}
+      zonderKop={zonderKop}
     />
   )
 }

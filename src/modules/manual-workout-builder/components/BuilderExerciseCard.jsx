@@ -33,6 +33,9 @@ const EQUIPMENT_OPTIONS = [
 
 export default function BuilderExerciseCard({
   exercise, index, isMobile, db, client, greep, onField, onDelete, onVideo,
+  // Zelfde vorm als de maaltijdkaart in de Plan Analyzer: foto links met het
+  // nummer, naam en sets rechts, en een knoppenrij eronder.
+  kaartStijl = false,
 }) {
   const { imageUrl, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
   const photoSize = isMobile ? 64 : 76
@@ -66,6 +69,98 @@ export default function BuilderExerciseCard({
   const statText = isCardio
     ? [exercise.duration, exercise.distance, exercise.intensity].filter(Boolean).join(' · ') || 'Cardio'
     : `${exercise.sets ?? 2} × ${exercise.reps ?? '8-12'}  ·  ${exercise.rust ?? exercise.rest ?? '2 min'} rust`
+
+  if (kaartStijl) {
+    const m = isMobile
+    // Twee regels tekst: de foto hoeft niet hoger dan dat.
+    const foto = m ? 60 : 66
+    const DIV = 'rgba(255,255,255,0.06)'
+    const actie = (kleur) => ({
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+      padding: m ? '0.4rem 0.3rem' : '0.45rem 0.4rem', background: 'transparent', border: 'none',
+      color: kleur || 'rgba(255,255,255,0.75)', fontSize: m ? '0.7rem' : '0.74rem', fontWeight: 800,
+      cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    })
+    return (
+      <div {...greep} onClick={stop} style={{
+        ...greep?.style,
+        margin: m ? '0 0.5rem' : '0 0.75rem',
+        background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12,
+        overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
+          {/* Foto: tik = video bekijken of koppelen. */}
+          <div data-geen-sleep onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video bekijken' : 'Video koppelen'} style={{
+            width: foto, height: foto, flexShrink: 0, position: 'relative', overflow: 'hidden', cursor: 'pointer', background: '#1a1a1a',
+          }}>
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%)' }} />
+            {loadingImage && (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'mwb-spin 0.7s linear infinite' }} />
+              </div>
+            )}
+            <span style={{ position: 'absolute', left: 6, bottom: 5, fontSize: '0.72rem', fontWeight: 900, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{index + 1}</span>
+            {hasVid && !loadingImage && (
+              <span style={{ position: 'absolute', right: 5, bottom: 5, width: 20, height: 20, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="8" height="8" viewBox="0 0 10 10" fill="#000"><polygon points="2,1 9,5 2,9" /></svg>
+              </span>
+            )}
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, padding: m ? '0.4rem 0.65rem' : '0.45rem 0.85rem' }}>
+            {/* Spiergroep en apparaat achter de naam, niet op een eigen regel:
+                zo blijft de kaart twee regels hoog. */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+              <span style={{ flexShrink: 1, minWidth: 0, fontSize: m ? '0.95rem' : '1.02rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {exercise.name || (isCardio ? 'Cardio' : 'Oefening')}
+              </span>
+              {(exercise.primairSpieren || exercise.muscle || (!isCardio && exercise.equipment)) && (
+                <span style={{ flexShrink: 100, minWidth: 0, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textTransform: 'capitalize' }}>
+                  {[exercise.primairSpieren || exercise.muscle, !isCardio && exercise.equipment].filter(Boolean).join(' · ')}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', fontVariantNumeric: 'tabular-nums' }}>
+              {isCardio ? (
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{statText}</span>
+              ) : (<>
+                {[{ v: exercise.sets ?? 2, l: 'sets' }, { v: exercise.reps ?? '8-12', l: 'reps' }, { v: exercise.rust ?? exercise.rest ?? '2 min', l: 'rust' }].map(x => (
+                  <span key={x.l} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff' }}>{x.v}</span>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>{x.l}</span>
+                  </span>
+                ))}
+              </>)}
+            </div>
+          </div>
+
+          {/* De hele kaart is de greep; dit is alleen de hint. */}
+          <div aria-hidden style={{ width: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.25)' }}>
+            <GripVertical size={16} strokeWidth={2.4} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', borderTop: `1px solid ${DIV}` }}>
+          <button onClick={(e) => { stop(e); onVideo() }} style={actie()}><Video size={m ? 13 : 14} /> {hasVid ? 'Video' : 'Video +'}</button>
+          <div style={{ width: 1, background: DIV }} />
+          <button onClick={(e) => { stop(e); setEditing(true) }} style={actie()}><Pencil size={m ? 13 : 14} /> Edit</button>
+          <div style={{ width: 1, background: DIV }} />
+          <button onClick={(e) => { stop(e); onDelete() }} style={actie('#ef4444')}><Trash2 size={m ? 13 : 14} /> Wis</button>
+        </div>
+
+        {editing && (
+          <ExerciseEditModal
+            exercise={exercise} isCardio={isCardio} isMobile={isMobile}
+            hasVid={hasVid} onField={onField} onVideo={onVideo}
+            coachEquip={coachEquip}
+            onClose={() => setEditing(false)}
+          />
+        )}
+        <style>{`@keyframes mwb-spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
 
   return (
     <div

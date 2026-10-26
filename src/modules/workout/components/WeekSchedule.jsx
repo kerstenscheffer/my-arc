@@ -43,6 +43,9 @@ export default function WeekSchedule({
   // plek staat. Stond eerst tussen de dagen en de weekbalk in, maar dan raakt
   // die balk los van de dagen die hij bedient.
   tussenBlok = null,
+  // Alleen de dagen en de stappen, zonder plannaam, wisselknop en
+  // "+ Training" (de Workout Builder heeft die al in zijn eigen kopbalk).
+  zonderKop = false,
 }) {
   const isMobile = useIsMobile()
   const [localSwapMode, setLocalSwapMode] = useState(false)
@@ -680,7 +683,7 @@ export default function WeekSchedule({
 
       {/* Titelrij: plannaam met het wissel-icoon er direct achter, rechts
           de knop om een training toe te voegen. Geen label erboven. */}
-      <div style={{
+      {!zonderKop && <div style={{
         padding: isMobile ? '0.5rem 1rem 0.875rem' : '0.5rem 1.25rem 1rem',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
@@ -714,7 +717,7 @@ export default function WeekSchedule({
             <Plus size={16} strokeWidth={3} /> Training
           </button>
         )}
-      </div>
+      </div>}
 
       {/* Weeknavigatie — vorige/volgende week */}
       {(() => {

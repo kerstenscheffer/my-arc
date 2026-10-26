@@ -8,7 +8,11 @@ import { voorstelDag } from '../dagTitel'
 
 export default function DayBuilder({
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate, onSaveTemplate,
-  onAddExercise, onUpdateExercise, onDeleteExercise, isMobile, db, client
+  onAddExercise, onUpdateExercise, onDeleteExercise, isMobile, db, client,
+  // Indeling als de Plan Analyzer (26 okt 2026): de kop (naam, spiergroep,
+  // cijfers, dag-acties) staat dan in de linkerkolom; hier alleen de
+  // oefeningen, zonder kader eromheen en zonder eigen scrollvak.
+  zonderKop = false,
 }) {
   const [editingName, setEditingName] = useState(false)
   const [editingFocus, setEditingFocus] = useState(false)
@@ -85,6 +89,72 @@ export default function DayBuilder({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }
+
+  if (zonderKop) return (
+    <div>
+      {day.exercises.length > 0 && (
+        <div style={{ margin: isMobile ? '0 0.5rem 0.5rem' : '0 0.75rem 0.55rem' }}>
+          <button onClick={() => setBulkOpen(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 0.7rem', background: bulkOpen ? '#fff' : 'transparent', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 9, color: bulkOpen ? '#0a0a0a' : '#fff', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            <SlidersHorizontal size={13} strokeWidth={2.6} /> Alle oefeningen tegelijk
+          </button>
+          {bulkOpen && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>
+              {[['Sets', bulkSets, setBulkSets, 'number', '4'], ['Reps', bulkReps, setBulkReps, 'text', '8-12'], ['Rust', bulkRest, setBulkRest, 'text', '90s']].map(([label, val, setter, type, ph]) => (
+                <label key={label} style={{ flex: '1 1 70px', minWidth: 0 }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>{label}</div>
+                  <input type={type} inputMode={type === 'number' ? 'numeric' : 'text'} value={val} onChange={e => setter(e.target.value)} placeholder={ph}
+                    style={{ width: '100%', boxSizing: 'border-box', height: 36, padding: '0 0.5rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 9, color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none' }} />
+                </label>
+              ))}
+              <button onClick={applyBulk} disabled={!bulkSets && !bulkReps && !bulkRest} style={{ height: 36, padding: '0 0.9rem', borderRadius: 9, border: 'none', background: (!bulkSets && !bulkReps && !bulkRest) ? 'rgba(255,255,255,0.1)' : '#fff', color: (!bulkSets && !bulkReps && !bulkRest) ? 'rgba(255,255,255,0.4)' : '#0a0a0a', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
+                Toepassen
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div ref={sleep.lijstRef} style={{ display: 'flex', flexDirection: 'column', gap: 10, overflow: sleep.bezig ? 'hidden' : 'visible' }}>
+        {day.exercises.map((exercise, index) => (
+          <div key={exercise.id} data-sleep-index={index} style={sleep.kaartStijl(index)}>
+            <BuilderExerciseCard
+              exercise={exercise} index={index} isMobile={isMobile} db={db} client={client}
+              greep={sleep.greep(index)}
+              onField={(field, value) => handleExerciseField(exercise.id, field, value)}
+              onDelete={() => onDeleteExercise(exercise.id)}
+              onVideo={() => setVideoEditing(exercise)}
+              kaartStijl
+            />
+          </div>
+        ))}
+        {day.exercises.length === 0 && (
+          <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.88rem', fontWeight: 700 }}>
+            Nog geen oefeningen op deze dag
+          </div>
+        )}
+      </div>
+
+      <button onClick={onAddExercise} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        width: isMobile ? 'calc(100% - 1rem)' : 'calc(100% - 1.5rem)', margin: isMobile ? '0.55rem 0.5rem 0' : '0.7rem 0.75rem 0',
+        minHeight: 44, borderRadius: 12, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent',
+        color: '#fff', fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}>
+        <Plus size={16} strokeWidth={2.8} /> Oefening toevoegen
+      </button>
+
+      <ExerciseVideoEditor
+        isOpen={!!videoEditing}
+        exercise={videoEditing}
+        isMobile={isMobile}
+        onClose={() => setVideoEditing(null)}
+        onSaved={(updated) => {
+          if (onUpdateExercise) onUpdateExercise(updated.id, { video_url: updated.video_url, thumbnail_url: updated.thumbnail_url })
+        }}
+      />
+    </div>
+  )
 
   return (
     <div

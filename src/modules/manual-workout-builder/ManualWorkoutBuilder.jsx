@@ -25,7 +25,7 @@ import KlantWeekrooster from './components/KlantWeekrooster'
 import PlanSwitchModal from '../workout/components/PlanSwitchModal'
 import PlanToevoegenModal from './components/PlanToevoegenModal'
 import KlantCardioOverzicht from './components/KlantCardioOverzicht'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronUp } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays, Heart, Calendar, RefreshCw, ChevronRight, ChevronLeft, BookmarkPlus, Copy } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -603,404 +603,349 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setActiveDay(nieuweDagen[0].id)
   }
 
-  // Zijpaneel-knop: plat, volle breedte, geen vakje eromheen.
-  const zijKnop = (extra = {}) => ({
-    display: 'flex', alignItems: 'center', gap: 7,
-    width: '100%', padding: '0.3rem 0',
-    background: 'none', border: 'none', fontFamily: 'inherit',
-    fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)',
-    cursor: 'pointer', textAlign: 'left',
-    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-    ...extra,
-  })
-
   const actieveDag = workoutPlan.days.find(d => d.id === activeDay) || null
   const actieveIndex = workoutPlan.days.findIndex(d => d.id === activeDay)
 
+  // ── Opbouw als de Plan Analyzer (26 okt 2026) ─────────────────────────
+  // Boven een kopbalk (klant, plan, opslaan), daaronder de dagen als balk
+  // over de volle breedte, en dan twee kolommen in een vak van max. 1200 px:
+  // links de dag (naam, cijfers, acties), de intake en het gereedschap;
+  // rechts de oefeningen als kaarten. Kersten wilde dezelfde rust als in de
+  // voedingskant.
+  const m = isMobile
+  const LIJN = '1px solid rgba(255,255,255,0.12)'
+  const DUN = '1px solid rgba(255,255,255,0.06)'
+  const iconKnop = (gevaar) => ({
+    width: 34, height: 34, flexShrink: 0, borderRadius: 9,
+    background: gevaar ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.06)',
+    border: `1px solid ${gevaar ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.12)'}`,
+    color: gevaar ? '#ef4444' : '#fff', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
+  const geenDoel = !selectedSchemaId && !effectiveClient?.id
+  const leegPlan = workoutPlan.days.length === 0
+  const opslaanKnop = (vol) => ({
+    height: 36, padding: '0 0.9rem', borderRadius: 9, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    background: vol ? '#fff' : 'transparent', color: vol ? '#0a0a0a' : '#fff',
+    border: vol ? 'none' : '1px solid rgba(255,255,255,0.25)',
+    fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', whiteSpace: 'nowrap',
+    cursor: saving ? 'wait' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
+  const setsVan = (d) => (d?.exercises || []).reduce((n, ex) => n + (Number(ex.sets) || 0), 0)
+  const minutenVan = (d) => parseInt(d?.geschatteTijd, 10) || 60
+  const gereedschap = [
+    { id: 'week', icon: <CalendarDays size={16} />, label: 'Trainingsweek', onClick: () => setShowAgenda(true), uit: !effectiveClient || !selectedSchemaId, titel: !effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'De week van deze klant plannen' },
+    { id: 'agenda', icon: <Calendar size={16} />, label: 'Agenda', onClick: () => setShowWeekAgenda(v => !v), uit: !effectiveClient, actief: showWeekAgenda && !!effectiveClient },
+    { id: 'cardio', icon: <Heart size={16} />, label: 'Cardio', onClick: () => setShowCardio(true), uit: !effectiveClient },
+    { id: 'templates', icon: <FileText size={16} />, label: 'Templates', onClick: () => setShowTemplateManager(true), badge: templates.length || null },
+    { id: 'videos', icon: <Video size={16} />, label: "Video's", onClick: () => setShowExerciseLibrary(true) },
+    { id: 'instellingen', icon: <ChevronDown size={16} style={{ transform: instellingenOpen ? 'rotate(180deg)' : 'none' }} />, label: 'Planinstellingen', onClick: () => setInstellingenOpen(v => !v), actief: instellingenOpen },
+  ]
+
   return (
-    /* ══ 3/7-indeling — links sturen, rechts werken ══════════════════════
-       Was één brede kopkaart met vier regels velden en tien knoppen op een
-       rij, met daaronder een raster van dagkaarten van 350px. Bij zes dagen
-       stond je te scrollen tussen even brede kolommen zonder te weten waar je
-       was. Nu links het plan en de dagenlijst, rechts de dag waar je aan
-       werkt over de volle breedte — zelfde patroon als de Plan Analyzer en
-       het inzichtscherm. */
     <div style={{
-      display: 'flex', flexDirection: isMobile ? 'column' : 'row',
-      alignItems: 'stretch',
-      height: isMobile ? 'auto' : 'calc(100vh - 120px)',
-      overflow: 'hidden',
+      display: 'flex', flexDirection: 'column',
+      height: m ? 'auto' : 'calc(100vh - 120px)', overflow: 'hidden', background: '#0a0a0a',
     }}>
 
-      {/* ══════════════ LINKS (3) ══════════════ */}
+      {/* ══════════════ KOPBALK ══════════════
+          Linksboven vrij: daar zweeft de Terug-knop van CoachHub. */}
       <div style={{
-        flex: isMobile ? 'none' : '3 1 0',
-        minWidth: 0,
-        maxWidth: isMobile ? '100%' : 420,
-        borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
-        borderBottom: isMobile ? '1px solid rgba(255,255,255,0.08)' : 'none',
-        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        padding: isMobile ? '0.6rem 0.75rem' : '0.75rem 0.85rem',
-        display: 'flex', flexDirection: 'column', gap: '0.5rem',
+        flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: m ? 'wrap' : 'nowrap',
+        minHeight: 52, padding: m ? '0.5rem 0.75rem' : '0 1rem 0 110px', borderBottom: LIJN,
       }}>
-
-        {/* Klant + schema */}
-        {/* Linksboven blijft leeg: daar zweeft de Terug-knop van CoachHub. */}
-        <div style={{ minHeight: 34 }} />
-
-        {clientSchemas.length > 1 && (
-          <select value={selectedSchemaId || ''} onChange={(e) => {
-            const s = clientSchemas.find(x => x.id === e.target.value)
-            if (s) loadSchemaIntoBuilder(s)
-          }} style={cSelect}>
-            {clientSchemas.map(s => (
-              <option key={s.id} value={s.id} style={{ background: '#0a0a0a' }}>
-                {s._label || s.name}{s.is_client_edited ? ' · door client aangepast' : ''}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* ── Intake — de antwoorden van de klant, naast je werk ──────── */}
-        {intake && (intake.regels.length > 0 || intake.blessures) && (
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.35rem' }}>
-            <button onClick={() => setIntakeOpen(v => !v)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
-              <ChevronDown size={14} style={{ transform: intakeOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-              Intake
-              {intake.blessures && (
-                <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b' }}>
-                  <AlertTriangle size={12} /> blessure
-                </span>
-              )}
-            </button>
-
-            {intakeOpen && (
-              <div style={{ marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {/* Blessures bovenaan en in amber: dat is een beperking op wat
-                    je in het schema mag zetten, geen achtergrondinformatie. */}
-                {intake.blessures && (
-                  <div style={{
-                    display: 'flex', gap: 6, alignItems: 'flex-start',
-                    padding: '0.4rem 0', marginBottom: 2,
-                    fontSize: '0.8rem', fontWeight: 700, color: '#f59e0b', lineHeight: 1.35,
-                  }}>
-                    <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 2 }} />
-                    <span>{intake.blessures}</span>
-                  </div>
-                )}
-
-                {intake.regels.map(r => (
-                  <div key={r.label} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: '0.8rem' }}>
-                    <span style={{ flexShrink: 0, minWidth: 88, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{r.label}</span>
-                    <span style={{ flex: 1, minWidth: 0, fontWeight: 800, color: '#fff' }}>{r.waarde}</span>
-                  </div>
-                ))}
-
-                {/* Eén actie: het aantal dagen uit de intake overnemen. Vult
-                    alleen aan tot dat aantal; bestaande dagen blijven staan. */}
-                {intake.dagenPerWeek > workoutPlan.days.length && (
-                  <button onClick={neemDagenOver} style={zijKnop({ marginTop: 4, color: '#fff', fontWeight: 900 })}>
-                    <Plus size={13} strokeWidth={2.8} />
-                    Vul aan naar {intake.dagenPerWeek} dagen
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button onClick={() => setShowClientPicker(v => !v)} style={{ background: 'none', border: 'none', padding: '4px 2px', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            <Users size={14} /> {clientName || 'Kies een klant'} <ChevronDown size={14} strokeWidth={2.8} />
+          </button>
+          {showClientPicker && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden', width: 280, maxHeight: 360, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+              <div style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Search size={12} color="rgba(255,255,255,0.4)" />
+                <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Zoek klant…" style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 700, flex: 1, fontFamily: 'inherit' }} />
+                {clientSearch && <button onClick={() => setClientSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.4)' }}><X size={12} /></button>}
+              </div>
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {filteredClients.length === 0 && <div style={{ padding: '0.6rem 0.85rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.78rem' }}>Geen klanten gevonden</div>}
+                {filteredClients.map((c, i) => (
+                  <button key={c.id} onClick={() => handleSelectLocalClient(c)}
+                    style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', borderBottom: i < filteredClients.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', color: '#fff', fontSize: '0.85rem', fontWeight: effectiveClient?.id === c.id ? 900 : 600, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', touchAction: 'manipulation' }}>
+                    {c.first_name} {c.last_name}
                   </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Plan: naam (tik = aanpassen), wissel, extra plan, verwijderen. */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {titelBewerk !== null ? (
+            <input autoFocus value={titelBewerk} onChange={e => setTitelBewerk(e.target.value)} onBlur={bewaarTitel}
+              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setTitelBewerk(null) }}
+              placeholder={voorstelPlan(workoutPlan.days) || 'Naam van het plan'}
+              style={{ flex: 1, minWidth: 0, maxWidth: 420, height: 34, fontSize: '1rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '0 0.5rem', outline: 'none', fontFamily: 'inherit' }} />
+          ) : (
+            <button onClick={() => setTitelBewerk(workoutPlan.name || huidigPlan?.name || '')} title="Klik om de naam aan te passen" style={{ minWidth: 0, background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', cursor: 'text', fontSize: m ? '1rem' : '1.1rem', fontWeight: 900, letterSpacing: '-0.02em', color: (workoutPlan.name || huidigPlan?.name) ? '#fff' : 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
+              {workoutPlan.name || huidigPlan?.name || (workoutPlan.days.length > 0 ? 'Naam van het plan…' : 'Nog geen plan')}
+            </button>
+          )}
+          {clientSchemas.length > 1 && (
+            <select value={selectedSchemaId || ''} onChange={(e) => {
+              const sch = clientSchemas.find(x => x.id === e.target.value)
+              if (sch) loadSchemaIntoBuilder(sch)
+            }} title="Ander plan van deze klant openen" style={{ ...cSelect, flex: 'none', minWidth: 0, maxWidth: 180, height: 34, minHeight: 34, padding: '0 0.4rem', fontWeight: 800, colorScheme: 'dark' }}>
+              {clientSchemas.map(sc => (
+                <option key={sc.id} value={sc.id} style={{ background: '#0a0a0a' }}>
+                  {sc._label || sc.name}{sc.is_client_edited ? ' · door client aangepast' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          {effectiveClient && (<>
+            <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={iconKnop()}><RefreshCw size={15} strokeWidth={2.6} /></button>
+            <button onClick={() => setShowPlanToevoegen(true)} title="Extra plan toevoegen" aria-label="Extra plan toevoegen" style={iconKnop()}><Plus size={16} strokeWidth={2.8} /></button>
+            <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{ ...iconKnop(true), opacity: huidigPlan ? 1 : 0.4, cursor: huidigPlan ? 'pointer' : 'not-allowed' }}><Trash2 size={15} strokeWidth={2.6} /></button>
+          </>)}
+        </div>
+
+        <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken" aria-label="Ongedaan maken" style={{ ...iconKnop(), background: 'transparent', border: 'none', opacity: history.canUndo ? 1 : 0.3 }}><Undo2 size={16} /></button>
+        <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw" aria-label="Opnieuw" style={{ ...iconKnop(), background: 'transparent', border: 'none', opacity: history.canRedo ? 1 : 0.3 }}><Redo2 size={16} /></button>
+        <button onClick={() => setTemplateNaam(workoutPlan.name || '')} disabled={saving || leegPlan} style={{ ...opslaanKnop(false), opacity: leegPlan ? 0.45 : 1 }}>
+          <Save size={14} strokeWidth={2.6} /> Als template
+        </button>
+        <button onClick={saveToClientSchema} disabled={saving || geenDoel || leegPlan}
+          title={geenDoel ? 'Kies eerst een klant' : !selectedSchemaId && effectiveClient?.id
+            ? (clientSchemas.length > 0
+              ? `Nieuw plan voor ${effectiveClient.first_name || 'deze klant'}: komt naast het huidige plan; actief maken doe je met de wisselknop.`
+              : `${effectiveClient.first_name || 'Deze klant'} heeft nog geen plan. Opslaan maakt het aan en zet het meteen actief.`)
+            : undefined}
+          style={{ ...opslaanKnop(true), opacity: (geenDoel || leegPlan) ? 0.45 : 1, cursor: geenDoel ? 'not-allowed' : undefined }}>
+          <Save size={14} strokeWidth={2.6} />
+          {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan' : effectiveClient?.id ? (clientSchemas.length > 0 ? 'Opslaan als extra plan' : `Eerste plan voor ${effectiveClient.first_name || 'klant'}`) : 'Opslaan'}
+        </button>
+      </div>
+
+      {/* ══════════════ DAGEN ══════════════
+          Zoals de ma–zo-balk in de Plan Analyzer: per dag naam en omvang,
+          tik = die dag openen. */}
+      <div style={{ flexShrink: 0, borderBottom: DUN }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', padding: m ? '0.5rem' : '0.6rem 1rem', display: 'flex', gap: m ? 4 : 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {workoutPlan.days.map((day, index) => {
+            const aan = day.id === activeDay
+            return (
+              <button key={day.id} onClick={() => setActiveDay(day.id)} aria-pressed={aan} style={{
+                flex: '1 1 0', minWidth: m ? 96 : 120, maxWidth: 240,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                padding: m ? '0.45rem 0.4rem' : '0.55rem 0.5rem', borderRadius: 12,
+                background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
+                border: `1px solid ${aan ? 'rgba(255,255,255,0.35)' : 'transparent'}`,
+                color: '#fff', fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: aan ? '#fff' : 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dag {index + 1}</span>
+                <span style={{ maxWidth: '100%', fontSize: m ? '0.86rem' : '0.95rem', fontWeight: 900, letterSpacing: '-0.015em', color: aan ? '#fff' : 'rgba(255,255,255,0.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {day.name || `Dag ${index + 1}`}
+                </span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>
+                  {(day.exercises || []).length} oef · {setsVan(day)} sets
+                </span>
+              </button>
+            )
+          })}
+          <button onClick={() => setShowDayPicker(true)} style={{
+            flex: '0 0 auto', minWidth: m ? 96 : 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            borderRadius: 12, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent',
+            color: '#fff', fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', padding: '0 0.75rem',
+          }}>
+            <Plus size={15} strokeWidth={2.8} /> Nieuwe dag
+          </button>
+        </div>
+      </div>
+
+      {/* ══════════════ DAG ══════════════ */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: m ? 120 : 130 }}>
+        {/* De week van de klant bovenaan, zoals hij hem zelf ziet: alleen de
+            dagen en de stappen. Plan wisselen en opslaan zitten in de kopbalk. */}
+        {effectiveClient && (
+          <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.5rem' : '0.75rem', borderBottom: DUN }}>
+            <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} zonderKop />
+          </div>
+        )}
+        <div style={{
+          maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box',
+          display: 'flex', flexDirection: m ? 'column' : 'row', alignItems: 'flex-start',
+          gap: m ? 0 : 28, padding: m ? 0 : '1rem 1rem 0',
+        }}>
+          {/* ── LINKS: de dag, intake en gereedschap ── */}
+          <div style={{ width: m ? '100%' : 340, flexShrink: 0, boxSizing: 'border-box', position: m ? 'static' : 'sticky', top: '1rem', padding: m ? '0.75rem 0.75rem 0' : 0 }}>
+            {actieveDag && (
+              <DagKop dag={actieveDag} index={actieveIndex} aantal={workoutPlan.days.length} isMobile={m}
+                sets={setsVan(actieveDag)} minuten={minutenVan(actieveDag)}
+                onUpdate={(patch) => updateDay(actieveDag.id, { ...actieveDag, ...patch })}
+                onVerplaats={(r) => verplaatsDag(actieveIndex, r)}
+                onTemplate={() => saveDayAsTemplate(actieveDag)}
+                onDupliceer={() => duplicateDay(actieveDag.id)}
+                onVerwijder={() => { if (window.confirm('Weet je zeker dat je deze dag wilt verwijderen?')) deleteDay(actieveDag.id) }} />
+            )}
+
+            {/* Intake: de antwoorden van de klant, naast je werk. */}
+            {intake && (intake.regels.length > 0 || intake.blessures) && (
+              <div style={{ marginTop: '0.75rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, overflow: 'hidden' }}>
+                <button onClick={() => setIntakeOpen(v => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, minHeight: 42, padding: '0 0.85rem', background: 'transparent', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ flex: 1 }}>Intake</span>
+                  {intake.blessures && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b' }}>
+                      <AlertTriangle size={12} /> blessure
+                    </span>
+                  )}
+                  <ChevronDown size={15} color="rgba(255,255,255,0.4)" style={{ transform: intakeOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
+                {intakeOpen && (
+                  <div style={{ padding: '0 0.85rem 0.7rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {intake.blessures && (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '0.2rem 0 0.3rem', fontSize: '0.8rem', fontWeight: 700, color: '#f59e0b', lineHeight: 1.35 }}>
+                        <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span>{intake.blessures}</span>
+                      </div>
+                    )}
+                    {intake.regels.map(r => (
+                      <div key={r.label} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: '0.8rem' }}>
+                        <span style={{ flexShrink: 0, minWidth: 92, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{r.label}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontWeight: 800, color: '#fff' }}>{r.waarde}</span>
+                      </div>
+                    ))}
+                    {intake.dagenPerWeek > workoutPlan.days.length && (
+                      <button onClick={neemDagenOver} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: 0, background: 'none', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer' }}>
+                        <Plus size={13} strokeWidth={2.8} /> Vul aan naar {intake.dagenPerWeek} dagen
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* ── Dagen — dit is de navigatie ─────────────────────────────── */}
-        <div>
-          <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
-            {workoutPlan.days.length} {workoutPlan.days.length === 1 ? 'dag' : 'dagen'}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {workoutPlan.days.map((day, index) => {
-              const aan = day.id === activeDay
-              const aantal = (day.exercises || []).length
-              return (
-                <div key={day.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <button onClick={() => setActiveDay(day.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    flex: 1, minWidth: 0, padding: '0.3rem 0.5rem', borderRadius: 7,
-                    background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    border: `1px solid ${aan ? 'rgba(255,255,255,0.2)' : 'transparent'}`,
-                    color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}>
-                  <span style={{
-                    flexShrink: 0, minWidth: 20, height: 20, borderRadius: 5,
-                    background: aan ? '#fff' : 'rgba(255,255,255,0.08)',
-                    color: aan ? '#000' : 'rgba(255,255,255,0.6)',
-                    fontSize: '0.72rem', fontWeight: 900,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>{index + 1}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: aan ? 900 : 700, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {day.name || `Dag ${index + 1}`}
-                  </span>
-                  <span style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
-                    {aantal}
-                  </span>
+            {/* Gereedschap: dezelfde lijst als in de Plan Analyzer. Mobiel
+                een rij om door te vegen. */}
+            <div style={m ? {
+              display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', padding: '0.6rem 0.75rem', margin: '0 -0.75rem',
+            } : {
+              marginTop: '0.75rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, overflow: 'hidden',
+            }}>
+              {gereedschap.map((g, i) => (
+                <button key={g.id} onClick={g.uit ? undefined : g.onClick} disabled={g.uit} title={g.titel || (g.uit ? 'Kies eerst een klant' : undefined)} style={m ? {
+                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 0.75rem', borderRadius: 999,
+                  background: g.actief ? '#fff' : 'rgba(255,255,255,0.06)', border: `1px solid ${g.actief ? '#fff' : 'rgba(255,255,255,0.14)'}`,
+                  color: g.actief ? '#0a0a0a' : '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: g.uit ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', opacity: g.uit ? 0.35 : 1,
+                } : {
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 10, minHeight: 42, padding: '0 0.85rem',
+                  background: g.actief ? 'rgba(255,255,255,0.08)' : 'transparent', border: 'none',
+                  borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                  color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', cursor: g.uit ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: g.uit ? 0.35 : 1,
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  <span style={{ display: 'flex', color: g.actief && m ? '#0a0a0a' : 'rgba(255,255,255,0.7)' }}>{g.icon}</span>
+                  <span style={{ flex: m ? undefined : 1 }}>{g.label}</span>
+                  {g.badge != null && <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)' }}>{g.badge}</span>}
+                  {!m && g.id !== 'instellingen' && <ChevronRight size={15} color="rgba(255,255,255,0.3)" />}
                 </button>
-                {/* Omhoog / omlaag: volgorde van de dagen in het plan. */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flexShrink: 0 }}>
-                  {[{ r: -1, I: ChevronUp, l: 'Dag omhoog', uit: index === 0 }, { r: 1, I: ChevronDown, l: 'Dag omlaag', uit: index === workoutPlan.days.length - 1 }].map(k => (
-                    <button key={k.r} onClick={() => verplaatsDag(index, k.r)} disabled={k.uit} aria-label={k.l} title={k.l} style={{
-                      width: 22, height: 15, padding: 0, background: 'none', border: 'none', cursor: k.uit ? 'default' : 'pointer',
-                      color: k.uit ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}><k.I size={13} strokeWidth={3} /></button>
-                  ))}
-                </div>
-                </div>
-              )
-            })}
-            <button onClick={() => setShowDayPicker(true)} style={zijKnop({ padding: '0.3rem 0.5rem', color: '#fff', fontWeight: 900 })}>
-              <Plus size={14} strokeWidth={2.8} /> Nieuwe dag
-            </button>
-          </div>
-        </div>
-
-        {/* ── Planinstellingen — dichtgeklapt; je stelt ze één keer in ─── */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.35rem' }}>
-          <button onClick={() => setInstellingenOpen(v => !v)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
-            <ChevronDown size={14} style={{ transform: instellingenOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-            Planinstellingen
-          </button>
-          {instellingenOpen && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.4rem' }}>
-              <input type="text" placeholder="Workout naam *" value={workoutPlan.name}
-                onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={cInput}  placeholder={voorstelPlan(workoutPlan.days) || 'Naam van het plan'}/>
-              <input type="text" placeholder="Beschrijving" value={workoutPlan.description}
-                onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={cInput} />
-              <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={{ ...cSelect, flex: 'none' }}>
-                <option value="muscle_gain">Muscle Gain</option>
-                <option value="fat_loss">Fat Loss</option>
-                <option value="strength">Strength</option>
-                <option value="endurance">Endurance</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="recomp">Body Recomposition</option>
-              </select>
-              <select value={workoutPlan.experience_level} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, experience_level: e.target.value }))} style={{ ...cSelect, flex: 'none' }}>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* ── Acties — onder elkaar i.p.v. tien knoppen op een rij ─────── */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {/* Trainingsweek — de zeven dagen naast elkaar, per dag bladeren
-              met pijltjes. Was een wizard van vier stappen; bij het plannen
-              van een week wil je juist alles tegelijk zien, want je kijkt
-              naar de spreiding en niet naar één dag.
-              Vereist een klant én een opgeslagen schema: de dagen worden
-              gekoppeld aan week_structure-sleutels van dat schema. */}
-          <button onClick={() => setShowAgenda(true)}
-            disabled={!effectiveClient || !selectedSchemaId}
-            title={!effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'De week van deze klant plannen'}
-            style={zijKnop({ opacity: (!effectiveClient || !selectedSchemaId) ? 0.35 : 1, cursor: (!effectiveClient || !selectedSchemaId) ? 'not-allowed' : 'pointer' })}>
-            <CalendarDays size={14} /> Trainingsweek
-          </button>
-          {/* Weekagenda van de klant: wat er al staat (trainingen, cardio,
-              werk) voordat je iets inplant. */}
-          <button onClick={() => setShowWeekAgenda(v => !v)}
-            disabled={!effectiveClient}
-            title={!effectiveClient ? 'Kies eerst een klant' : 'De week van deze klant'}
-            style={zijKnop({ opacity: effectiveClient ? 1 : 0.35, cursor: effectiveClient ? 'pointer' : 'not-allowed', background: showWeekAgenda && effectiveClient ? 'rgba(255,255,255,0.1)' : 'none' })}>
-            <Calendar size={14} /> Agenda
-          </button>
-          {/* Cardio hangt aan de klant, niet aan het schema: wandelen of
-              fietsen wil je juist op de dagen dat er geen training staat. */}
-          <button onClick={() => setShowCardio(true)}
-            disabled={!effectiveClient}
-            title={!effectiveClient ? 'Kies eerst een klant' : 'Cardio voor deze klant'}
-            style={zijKnop({ opacity: effectiveClient ? 1 : 0.35, cursor: effectiveClient ? 'pointer' : 'not-allowed' })}>
-            <Heart size={14} /> Cardio
-          </button>
-          <button onClick={() => setShowTemplateManager(true)} style={zijKnop()}>
-            <FileText size={14} /> Templates
-          </button>
-          <button onClick={() => setShowExerciseLibrary(true)} style={zijKnop()}>
-            <Video size={14} /> Video's
-          </button>
-          <button onClick={clearPlan} disabled={workoutPlan.days.length === 0 && !workoutPlan.name}
-            style={zijKnop({ color: '#ef4444', opacity: (workoutPlan.days.length === 0 && !workoutPlan.name) ? 0.35 : 1 })}>
-            <Trash2 size={14} /> Leegmaken
-          </button>
-
-          <div style={{ display: 'flex', gap: 6, marginTop: '0.25rem' }}>
-            <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken"
-              style={{ ...zijKnop({ width: 'auto', padding: '0.4rem 0.55rem' }), opacity: history.canUndo ? 1 : 0.3 }}>
-              <Undo2 size={15} />
-            </button>
-            <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw"
-              style={{ ...zijKnop({ width: 'auto', padding: '0.4rem 0.55rem' }), opacity: history.canRedo ? 1 : 0.3 }}>
-              <Redo2 size={15} />
-            </button>
-          </div>
-
-        </div>
-      </div>
-
-      {/* ══════════════ RECHTS (7) ══════════════ */}
-      <div style={{
-        flex: isMobile ? 'none' : '7 1 0',
-        minWidth: 0,
-        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        padding: isMobile ? '0.75rem' : '1rem',
-      }}>
-        {/* ── Kopbalk, centraal: klant (tik = andere klant), plan, wissel,
-            verwijder, plus (extra plan). Alles wat over "wie en welk plan"
-            gaat staat hier; de zijbalk is voor het bouwen zelf. ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: isMobile ? '0.25rem 0 0.9rem' : '0.4rem 0 1.1rem' }}>
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowClientPicker(v => !v)} style={{ background: 'none', border: 'none', padding: '2px 6px', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.12em', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Users size={12} /> {clientName || 'Kies een klant'} <ChevronDown size={12} strokeWidth={2.8} />
-            </button>
-            {showClientPicker && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', zIndex: 200, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden', width: 280, maxHeight: 360, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                <div style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Search size={12} color="rgba(255,255,255,0.4)" />
-                  <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Zoek klant…" style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 700, flex: 1, fontFamily: 'inherit' }} />
-                  {clientSearch && <button onClick={() => setClientSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.4)' }}><X size={12} /></button>}
-                </div>
-                <div style={{ overflowY: 'auto', flex: 1 }}>
-                  {filteredClients.length === 0 && <div style={{ padding: '0.6rem 0.85rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.78rem' }}>Geen klanten gevonden</div>}
-                  {filteredClients.map((c, i) => (
-                    <button key={c.id} onClick={() => handleSelectLocalClient(c)}
-                      style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', borderBottom: i < filteredClients.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', color: '#fff', fontSize: '0.85rem', fontWeight: effectiveClient?.id === c.id ? 900 : 600, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', touchAction: 'manipulation' }}>
-                      {c.first_name} {c.last_name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          {effectiveClient && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, maxWidth: '100%' }}>
-              {titelBewerk !== null ? (
-                <input autoFocus value={titelBewerk} onChange={e => setTitelBewerk(e.target.value)} onBlur={bewaarTitel}
-                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setTitelBewerk(null) }}
-                  placeholder={voorstelPlan(workoutPlan.days) || 'Naam van het plan'}
-                  style={{ minWidth: 0, width: isMobile ? 220 : 320, fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '0.1rem 0.5rem', outline: 'none', fontFamily: 'inherit', textAlign: 'center' }} />
-              ) : (
-                <button onClick={() => setTitelBewerk(workoutPlan.name || huidigPlan?.name || '')} title="Klik om de naam aan te passen" style={{ minWidth: 0, background: 'none', border: 'none', padding: '0.1rem 0.5rem', borderRadius: 8, fontFamily: 'inherit', cursor: 'text', fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, color: (workoutPlan.name || huidigPlan?.name) ? '#fff' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                  {workoutPlan.name || huidigPlan?.name || (workoutPlan.days.length > 0 ? 'Naam van het plan…' : 'Nog geen plan')}
+              ))}
+              {!m && (
+                <button onClick={clearPlan} disabled={leegPlan && !workoutPlan.name} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 10, minHeight: 42, padding: '0 0.85rem',
+                  background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)',
+                  color: '#ef4444', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit', textAlign: 'left',
+                  cursor: 'pointer', opacity: (leegPlan && !workoutPlan.name) ? 0.35 : 1,
+                }}>
+                  <Trash2 size={16} /> Leegmaken
                 </button>
               )}
-              <button onClick={() => setShowPlanSwitch(true)} title="Wissel van plan (zelfde als bij de klant)" aria-label="Wissel van plan" style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><RefreshCw size={15} strokeWidth={2.6} /></button>
-              <button onClick={() => setShowPlanToevoegen(true)} title="Extra plan toevoegen" aria-label="Extra plan toevoegen" style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Plus size={16} strokeWidth={2.8} /></button>
-              <button onClick={verwijderHuidigPlan} disabled={!huidigPlan} title="Dit plan verwijderen voor deze klant" aria-label="Plan verwijderen" style={{ ...{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', cursor: huidigPlan ? 'pointer' : 'not-allowed', opacity: huidigPlan ? 1 : 0.4 }}><Trash2 size={15} strokeWidth={2.6} /></button>
             </div>
-          )}
 
-          {/* Opslaan hoort bij "welk plan": twee losse knoppen, geen schakelaar
-              die van betekenis verandert. Hier onder de titel, niet meer in
-              de zijbalk tussen de bouwknoppen. */}
-          {(() => {
-            const geenDoel = !selectedSchemaId && !effectiveClient?.id
-            const leeg = workoutPlan.days.length === 0
-            const knop = (vol) => ({
-              minHeight: 38, padding: '0 0.95rem', borderRadius: 9,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              background: vol ? '#fff' : 'transparent', color: vol ? '#0a0a0a' : '#fff',
-              border: vol ? 'none' : '1px solid rgba(255,255,255,0.25)',
-              fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', whiteSpace: 'nowrap',
-              cursor: saving ? 'wait' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            })
-            return (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <button onClick={saveToClientSchema} disabled={saving || geenDoel || leeg}
-                  title={geenDoel ? 'Kies eerst een klant' : undefined}
-                  style={{ ...knop(true), opacity: (geenDoel || leeg) ? 0.45 : 1, cursor: geenDoel ? 'not-allowed' : undefined }}>
-                  <Save size={14} strokeWidth={2.6} />
-                  {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan in klantplan' : effectiveClient?.id ? (clientSchemas.length > 0 ? 'Opslaan als extra plan' : `Eerste plan voor ${effectiveClient.first_name || 'klant'}`) : 'Opslaan in klantplan'}
-                </button>
-                <button onClick={() => setTemplateNaam(workoutPlan.name || '')} disabled={saving || leeg}
-                  style={{ ...knop(false), opacity: leeg ? 0.45 : 1 }}>
-                  <Save size={14} strokeWidth={2.6} /> Opslaan als template
-                </button>
-              </div>
-            )
-          })()}
-          {!selectedSchemaId && (
-            <div style={{ marginTop: 6, fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4, maxWidth: 420 }}>
-              {effectiveClient?.id
-                ? (clientSchemas.length > 0
-                  ? `Nieuw plan voor ${effectiveClient.first_name || 'deze klant'}. Opslaan zet het naast het huidige plan; actief maken doe je met de wisselknop.`
-                  : `${effectiveClient.first_name || 'Deze klant'} heeft nog geen plan. Opslaan maakt het aan en zet het meteen actief.`)
-                : 'Geen klant gekozen. Je wijzigingen gaan nergens heen tot je ze als template opslaat.'}
-            </div>
-          )}
-        </div>
-        {/* Cardio is ook een workout: altijd zichtbaar als de klant het heeft,
-            ook (juist) zonder krachtplan. */}
-        {effectiveClient && (
-          <KlantCardioOverzicht client={effectiveClient} db={db} isMobile={isMobile} refreshKey={agendaKey} onOpen={() => setShowCardio(true)} />
-        )}
-        {showWeekAgenda && effectiveClient && (
-          <div style={{ margin: isMobile ? '0.5rem' : '0.75rem 1rem 0', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>
-                  Week van {effectiveClient.first_name || 'de klant'}
-                </div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {[{ id: 'rooster', label: 'Weekrooster' }, { id: 'uren', label: 'Agenda' }].map(w => (
-                    <button key={w.id} onClick={() => setAgendaWeergave(w.id)} style={{
-                      padding: '0.3rem 0.65rem', borderRadius: 8, fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
-                      background: agendaWeergave === w.id ? '#fff' : 'rgba(255,255,255,0.06)', color: agendaWeergave === w.id ? '#000' : 'rgba(255,255,255,0.7)',
-                      border: `1px solid ${agendaWeergave === w.id ? '#fff' : 'rgba(255,255,255,0.12)'}`,
-                    }}>{w.label}</button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={() => setShowWeekAgenda(false)} aria-label="Agenda sluiten" style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={14} strokeWidth={2.6} />
-              </button>
-            </div>
-            {agendaWeergave === 'rooster' ? (
-              <div key={`rooster-${agendaKey}`} style={{ padding: isMobile ? '0.25rem 0 0.5rem' : '0.5rem 0 0.75rem' }}>
-                <KlantWeekrooster client={effectiveClient} db={db} isMobile={isMobile} refreshKey={agendaKey} onSwitchPlan={() => setShowPlanSwitch(true)} />
-              </div>
-            ) : (
-              <div style={{ height: isMobile ? 460 : 560, overflow: 'auto' }}>
-                <ClientAgendaView client={effectiveClient} db={db} isMobile={isMobile} viewerRole="coach" refreshKey={agendaKey} />
+            {instellingenOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: '0.6rem' }}>
+                <input type="text" value={workoutPlan.description} placeholder="Beschrijving"
+                  onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={{ ...cInput, fontFamily: 'inherit', fontWeight: 700 }} />
+                <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={{ ...cSelect, flex: 'none', fontWeight: 800, colorScheme: 'dark' }}>
+                  <option value="muscle_gain">Spieropbouw</option>
+                  <option value="fat_loss">Vetverlies</option>
+                  <option value="strength">Kracht</option>
+                  <option value="endurance">Uithoudingsvermogen</option>
+                  <option value="maintenance">Onderhoud</option>
+                  <option value="recomp">Recomp</option>
+                </select>
+                <select value={workoutPlan.experience_level} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, experience_level: e.target.value }))} style={{ ...cSelect, flex: 'none', fontWeight: 800, colorScheme: 'dark' }}>
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Gemiddeld</option>
+                  <option value="advanced">Gevorderd</option>
+                </select>
               </div>
             )}
           </div>
-        )}
-        {actieveDag ? (
-          <DayBuilder
-            key={actieveDag.id} day={actieveDag} dayNumber={actieveIndex + 1} isActive
-            onActivate={() => setActiveDay(actieveDag.id)}
-            onUpdate={(updates) => updateDay(actieveDag.id, updates)}
-            onDelete={() => deleteDay(actieveDag.id)}
-            onDuplicate={() => duplicateDay(actieveDag.id)}
-            onSaveTemplate={() => saveDayAsTemplate(actieveDag)}
-            onAddExercise={() => { setActiveDay(actieveDag.id); setShowExerciseSelector(true) }}
-            onUpdateExercise={(exerciseId, updates) => updateExercise(actieveDag.id, exerciseId, updates)}
-            onDeleteExercise={(exerciseId) => deleteExercise(actieveDag.id, exerciseId)}
-            isMobile={isMobile} db={db} client={effectiveClient}
-          />
-        ) : (
-          <div style={{ padding: '2rem 1rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginBottom: '0.5rem' }}>Nog geen trainingsdagen</div>
-            <button onClick={() => setShowDayPicker(true)} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.6rem 1rem',
-              borderRadius: 8, border: 'none', background: '#fff', color: '#0a0a0a',
-              fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-            }}>
-              <Plus size={15} strokeWidth={2.8} /> Eerste dag toevoegen
-            </button>
-          </div>
-        )}
-      </div>
 
+          {/* ── RECHTS: de oefeningen ── */}
+          <div style={{ flex: 1, minWidth: 0, maxWidth: m ? undefined : 640, width: '100%', paddingTop: m ? '0.5rem' : 0 }}>
+            {/* Cardio is ook een workout: altijd zichtbaar als de klant het heeft. */}
+            {effectiveClient && (
+              <KlantCardioOverzicht client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} onOpen={() => setShowCardio(true)} />
+            )}
+            {showWeekAgenda && effectiveClient && (
+              <div style={{ margin: m ? '0 0.5rem 0.6rem' : '0 0.75rem 0.7rem', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>
+                      Week van {effectiveClient.first_name || 'de klant'}
+                    </div>
+                    <select value={agendaWeergave} onChange={e => setAgendaWeergave(e.target.value)} style={{ ...cSelect, flex: 'none', minWidth: 0, height: 30, minHeight: 30, padding: '0 0.4rem', fontWeight: 800, colorScheme: 'dark' }}>
+                      <option value="rooster">Weekrooster</option>
+                      <option value="uren">Agenda</option>
+                    </select>
+                  </div>
+                  <button onClick={() => setShowWeekAgenda(false)} aria-label="Agenda sluiten" style={{ ...iconKnop(), width: 30, height: 30 }}>
+                    <X size={14} strokeWidth={2.6} />
+                  </button>
+                </div>
+                {agendaWeergave === 'rooster' ? (
+                  <div key={`rooster-${agendaKey}`} style={{ padding: m ? '0.25rem 0 0.5rem' : '0.5rem 0 0.75rem' }}>
+                    <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} onSwitchPlan={() => setShowPlanSwitch(true)} />
+                  </div>
+                ) : (
+                  <div style={{ height: m ? 460 : 560, overflow: 'auto' }}>
+                    <ClientAgendaView client={effectiveClient} db={db} isMobile={m} viewerRole="coach" refreshKey={agendaKey} />
+                  </div>
+                )}
+              </div>
+            )}
+            {actieveDag ? (
+              <DayBuilder
+                key={actieveDag.id} day={actieveDag} dayNumber={actieveIndex + 1} isActive zonderKop
+                onActivate={() => setActiveDay(actieveDag.id)}
+                onUpdate={(updates) => updateDay(actieveDag.id, updates)}
+                onDelete={() => deleteDay(actieveDag.id)}
+                onDuplicate={() => duplicateDay(actieveDag.id)}
+                onSaveTemplate={() => saveDayAsTemplate(actieveDag)}
+                onAddExercise={() => { setActiveDay(actieveDag.id); setShowExerciseSelector(true) }}
+                onUpdateExercise={(exerciseId, updates) => updateExercise(actieveDag.id, exerciseId, updates)}
+                onDeleteExercise={(exerciseId) => deleteExercise(actieveDag.id, exerciseId)}
+                isMobile={m} db={db} client={effectiveClient}
+              />
+            ) : (
+              <div style={{ padding: '2rem 1rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginBottom: '0.75rem' }}>Nog geen trainingsdagen</div>
+                <button onClick={() => setShowDayPicker(true)} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, height: 44, padding: '0 1rem',
+                  borderRadius: 12, border: 'none', background: '#fff', color: '#0a0a0a',
+                  fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                }}>
+                  <Plus size={15} strokeWidth={2.8} /> Eerste dag toevoegen
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {/* Titel-venster voor een nieuwe template. Bewust een eigen naam: het plan
@@ -1119,6 +1064,76 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       />
 
       <PDFExportButton workoutPlan={workoutPlan} db={db} isMobile={isMobile} />
+    </div>
+  )
+}
+
+// De dag in de linkerkolom: naam en spiergroep (tik = aanpassen), de cijfers
+// en de dag-acties. Stond eerst als kopregel boven de oefeningen in DayBuilder.
+function DagKop({ dag, index, aantal, isMobile, sets, minuten, onUpdate, onVerplaats, onTemplate, onDupliceer, onVerwijder }) {
+  const [naam, setNaam] = useState(null)
+  const [focus, setFocus] = useState(null)
+  const [min, setMin] = useState(null)
+  const m = isMobile
+  const veld = { height: 34, padding: '0 0.5rem', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontWeight: 900, fontFamily: 'inherit', outline: 'none' }
+  const knop = (gevaar, uit) => ({
+    width: 34, height: 34, borderRadius: 9, flexShrink: 0, padding: 0,
+    background: 'transparent', border: '1px solid rgba(255,255,255,0.14)',
+    color: gevaar ? '#ef4444' : '#fff', cursor: uit ? 'default' : 'pointer', opacity: uit ? 0.3 : 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
+  // Zelf getypt wint: vanaf dan volgt de naam de oefeningen niet meer.
+  const bewaarNaam = () => { if (naam !== null) onUpdate({ name: naam.trim() || `Dag ${index + 1}`, _autoNaam: false }); setNaam(null) }
+  const bewaarFocus = () => { if (focus !== null) onUpdate({ focus: focus.trim(), _autoFocus: false }); setFocus(null) }
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, minWidth: 0 }}>
+        {naam !== null ? (
+          <input autoFocus value={naam} onChange={e => setNaam(e.target.value)} onBlur={bewaarNaam}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setNaam(null) }}
+            placeholder="Push, Legs…" style={{ ...veld, flex: 1, minWidth: 0, fontSize: m ? '1.05rem' : '1.15rem' }} />
+        ) : (
+          <button onClick={() => setNaam(dag.name || '')} title="Naam aanpassen" style={{ minWidth: 0, background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', cursor: 'text', fontSize: m ? '1.15rem' : '1.3rem', fontWeight: 900, color: dag.name ? '#fff' : 'rgba(255,255,255,0.45)', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
+            {dag.name || `Dag ${index + 1}`}
+          </button>
+        )}
+        {focus !== null ? (
+          <input autoFocus value={focus} onChange={e => setFocus(e.target.value)} onBlur={bewaarFocus}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setFocus(null) }}
+            placeholder="Borst, triceps…" style={{ ...veld, width: 130, height: 26, fontSize: '0.72rem' }} />
+        ) : (
+          <button onClick={() => setFocus(dag.focus || '')} title="Spiergroep aanpassen" style={{ flexShrink: 1, minWidth: 0, maxWidth: 150, fontSize: '0.66rem', fontWeight: 900, color: dag.focus ? '#0a0a0a' : 'rgba(255,255,255,0.5)', background: dag.focus ? '#fff' : 'transparent', border: dag.focus ? 'none' : '1px dashed rgba(255,255,255,0.25)', padding: '2px 7px', borderRadius: 5, letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', fontFamily: 'inherit' }}>
+            {dag.focus || 'Spiergroep'}
+          </button>
+        )}
+      </div>
+
+      {/* Cijfers op één regel; de minuten zijn een schatting die je zelf zet. */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontVariantNumeric: 'tabular-nums' }}>
+        {[{ v: (dag.exercises || []).length, l: 'oefeningen' }, { v: sets, l: 'sets' }].map(x => (
+          <span key={x.l} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
+            <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff' }}>{x.v}</span>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>{x.l}</span>
+          </span>
+        ))}
+        <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
+          <input type="number" min="5" max="240" step="5" value={min !== null ? min : minuten}
+            onChange={e => { setMin(e.target.value); const n = parseInt(e.target.value, 10); if (Number.isFinite(n) && n > 0) onUpdate({ geschatteTijd: `${n} minutes` }) }}
+            onBlur={() => setMin(null)} title="Geschatte duur"
+            style={{ width: 48, background: 'transparent', border: 'none', borderBottom: '1px dashed rgba(255,255,255,0.3)', outline: 'none', padding: 0, fontFamily: 'inherit', fontSize: '1.05rem', fontWeight: 900, color: '#fff', textAlign: 'right', MozAppearance: 'textfield' }} />
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>min</span>
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={() => index > 0 && onVerplaats(-1)} disabled={index === 0} title="Dag naar links" aria-label="Dag naar links" style={knop(false, index === 0)}><ChevronLeft size={16} strokeWidth={2.8} /></button>
+        <button onClick={() => index < aantal - 1 && onVerplaats(1)} disabled={index >= aantal - 1} title="Dag naar rechts" aria-label="Dag naar rechts" style={knop(false, index >= aantal - 1)}><ChevronRight size={16} strokeWidth={2.8} /></button>
+        <div style={{ flex: 1 }} />
+        <button onClick={onTemplate} title="Bewaar als dag-template" aria-label="Bewaar als dag-template" style={knop()}><BookmarkPlus size={15} /></button>
+        <button onClick={onDupliceer} title="Dag dupliceren" aria-label="Dag dupliceren" style={knop()}><Copy size={15} /></button>
+        <button onClick={onVerwijder} title="Dag verwijderen" aria-label="Dag verwijderen" style={knop(true)}><Trash2 size={15} /></button>
+      </div>
     </div>
   )
 }
