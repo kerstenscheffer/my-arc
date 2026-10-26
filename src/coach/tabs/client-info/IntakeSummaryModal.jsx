@@ -658,6 +658,11 @@ const OPTIONEEL_SINDS = {
   lichaam_omschrijving: '2026-05-03',
   quick_win_2weeks: '2026-09-03',
   motivation_verbatim: '2026-09-03',
+  // In eigen woorden: allemaal vrij in te vullen, niets verplicht.
+  intake_slotwoord: '2026-09-03',      // "Overslaan en afronden"
+  agenda_toelichting: '2026-09-03',    // tekstvak onder de weekplanner
+  eigen_blokken: '2026-09-03',         // eigen blokken in de weekplanner
+  supplementen_nu: '2026-09-03',       // tekstvak in de voedingsintake
 }
 const CARDIO_VERVOLG = ['cardio_types', 'cardio_frequency', 'cardio_duration']
 // Alleen ervaren sporters krijgen deze (ExperienceFlow/CurrentTrainingFlow);
