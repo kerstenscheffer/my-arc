@@ -480,7 +480,8 @@ const PART3_SECTIONS = [
     title: 'Beperkingen',
     fields: [
       { key: 'injuries', label: 'Blessures' },
-      { key: 'avoided_exercises', label: 'Vermijdt oefeningen' },
+      // Ontdubbelen: oudere intakes schreven de gekozen oefeningen twee keer weg.
+      { key: 'avoided_exercises', label: 'Vermijdt oefeningen', fmt: (v) => [...new Set(String(v).split(',').map(x => x.trim()).filter(Boolean))].join(', ') },
       { key: 'other_limitations', label: 'Overige beperkingen' }
     ]
   }
@@ -637,6 +638,62 @@ function WeekInTekst({ client }) {
   )
 }
 
+// ---- waarom is een vraag leeg? ---------------------------------------------
+//
+// "niet ingevuld" zei niets: was de vraag overgeslagen, kreeg de klant hem
+// niet te zien (andere route), of bestond hij nog niet toen de klant de
+// intake deed? De routes volgen public-intake/components/phase1/GoalFlow en
+// phase3/* (training) en nutrition-intake/components/nutrition-flow.
+
+// Per hoofddoel de vragen die op die route niet gesteld worden.
+const NIET_OP_ROUTE = {
+  fat_loss: ['has_weight_goal', 'muscle_goal_type', 'lichaam_omschrijving', 'fitness_doel_tags'],
+  muscle_gain: ['target_body_fat', 'fitness_doel_tags'],
+  general_fitness: ['muscle_goal_type', 'lichaam_omschrijving'],
+  recomp: ['target_weight', 'has_weight_goal', 'muscle_goal_type', 'lichaam_omschrijving', 'fitness_doel_tags'],
+}
+// Vragen met een "Overslaan"-knop of een optioneel veld, met de datum waarop
+// ze in de intake kwamen (eerste commit). Wie eerder invulde kreeg ze niet.
+const OPTIONEEL_SINDS = {
+  lichaam_omschrijving: '2026-05-03',
+  quick_win_2weeks: '2026-09-03',
+  motivation_verbatim: '2026-09-03',
+}
+const CARDIO_VERVOLG = ['cardio_types', 'cardio_frequency', 'cardio_duration']
+// Alleen ervaren sporters krijgen deze (ExperienceFlow/CurrentTrainingFlow);
+// wie 'ik ga beginnen' kiest slaat ze over.
+const ALLEEN_ERVAREN = ['default_experience_level', '_split_pref', 'does_cardio']
+// "Nee" wordt in de trainingsintake als leeg opgeslagen (LimitationsFlow).
+const NEE_ALS_LEEG = ['injuries', 'other_limitations']
+
+const nietGezien = (reden) => ({ tekst: `Klant heeft deze vraag niet gezien · ${reden}`, soort: 'route' })
+
+function waaromLeeg(key, data) {
+  // Persoonlijk: hoofddoel bepaalt de route.
+  const doel = data?.primary_goal
+  if (doel && NIET_OP_ROUTE[doel]?.includes(key)) {
+    return nietGezien(`koos ${(MAPS.goal[doel] || doel).toLowerCase()}`)
+  }
+
+  // Training: bereidheid, ervaring, cardio, locatie.
+  const wil = data?.training_willingness
+  if (wil === 'no' && !['training_willingness', 'no_training_reason'].includes(key)) return nietGezien('wil niet trainen')
+  if (key === 'no_training_reason' && wil && wil !== 'no') return nietGezien('wil wel trainen')
+  if (wil === 'starting' && ALLEEN_ERVAREN.includes(key)) return nietGezien('begint net met trainen')
+  if (CARDIO_VERVOLG.includes(key) && data?.cardio_interest === 'no') return nietGezien('geen interesse in cardio')
+  if (key === 'gym_name' && data?.training_location && data.training_location !== 'gym') return nietGezien('traint niet in een sportschool')
+  if (NEE_ALS_LEEG.includes(key) && wil && wil !== 'no') return { tekst: 'Nee', soort: 'nee' }
+
+  // Voeding: toelichting alleen na "ja".
+  if (key === 'intake_wat_werkte_toelichting' && data?.intake_wat_werkte && data.intake_wat_werkte !== 'ja') return nietGezien('had geen eerdere goede periode')
+
+  const sinds = OPTIONEEL_SINDS[key]
+  const ingevuld = data?.created_at ? String(data.created_at).slice(0, 10) : null
+  if (sinds && ingevuld && ingevuld < sinds) return nietGezien('stond nog niet in de intake')
+  if (sinds) return { tekst: 'Overgeslagen', soort: 'overgeslagen' }
+  return { tekst: 'niet ingevuld', soort: 'leeg' }
+}
+
 // ---- render helpers --------------------------------------------------------
 
 function renderSections(sections, data, toonLeeg = true) {
@@ -650,10 +707,12 @@ function renderSections(sections, data, toonLeeg = true) {
           // Onbeantwoorde vragen blijven staan: de coach wil zien wát er
           // gevraagd is, ook als de klant het heeft overgeslagen.
           if ((leeg || isEmpty(value)) && !toonLeeg) return null
+          const isLeeg = leeg || isEmpty(value)
           return {
             label: f.label,
             vraag: VRAGEN[f.key] || f.label,
-            value: (leeg || isEmpty(value)) ? null : value,
+            value: isLeeg ? null : value,
+            leeg: isLeeg ? waaromLeeg(f.key, data) : null,
           }
         })
         .filter(Boolean)
@@ -726,16 +785,18 @@ function renderSections(sections, data, toonLeeg = true) {
             <span
               style={{
                 fontSize: '0.8rem',
-                color: row.value ? '#fff' : 'rgba(255,255,255,0.25)',
-                fontWeight: row.value ? 700 : 600,
-                fontStyle: row.value ? 'normal' : 'italic',
+                // Overgeslagen valt op (oranje): daar koos de klant bewust
+                // niets. Niet gevraagd is grijs, daar valt niets te lezen.
+                color: (row.value || row.leeg?.soort === 'nee') ? '#fff' : row.leeg?.soort === 'overgeslagen' ? '#f59e0b' : 'rgba(255,255,255,0.25)',
+                fontWeight: (row.value || row.leeg?.soort === 'nee') ? 700 : 600,
+                fontStyle: (row.value || row.leeg?.soort === 'nee') ? 'normal' : 'italic',
                 wordBreak: 'break-word',
                 whiteSpace: 'pre-wrap',
                 letterSpacing: '-0.01em',
                 lineHeight: 1.4,
               }}
             >
-              {row.value || 'niet ingevuld'}
+              {row.value || row.leeg?.tekst || 'niet ingevuld'}
             </span>
           </div>
         ))}

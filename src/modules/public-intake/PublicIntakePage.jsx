@@ -209,12 +209,15 @@ function buildWorkoutPrefs(data = {}, personalData = {}) {
 
   // avoided_exercises kan een array (pills, evt. al samengevoegd) of los tekst
   // veld zijn → altijd platslaan tot één tekst.
-  const avoidedParts = Array.isArray(data.avoided_exercises)
+  // IntakePhase3 zet de pills al mee in avoided_exercises (als tekst); hier
+  // kwamen ze er dan nog een keer bij ("Lunges, Deadlift, Lunges, Deadlift").
+  // Daarom op komma splitsen en ontdubbelen.
+  const avoidedParts = [...new Set((Array.isArray(data.avoided_exercises)
     ? data.avoided_exercises
     : [
         ...(Array.isArray(data.avoided_exercises_pills) ? data.avoided_exercises_pills : []),
         ...(data.avoided_exercises ? [data.avoided_exercises] : []),
-      ]
+      ]).flatMap(x => String(x).split(',')).map(x => x.trim()).filter(Boolean))]
 
   return {
     default_experience_level: toText(data.experience_level),
