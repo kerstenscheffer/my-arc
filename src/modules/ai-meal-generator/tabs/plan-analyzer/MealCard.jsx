@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X, BookOpen } from 'lucide-react'
+import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays, List, X, BookOpen, MoreHorizontal } from 'lucide-react'
 import { portieInfo, stapPortie, portieLabel, portieUitleg } from './portie'
 import MealEditModal from './MealEditModal'
 import ReceptBlad from './ReceptBlad'
@@ -91,6 +91,8 @@ export default function MealCard({
   const m = isMobile
   // Custom label uit meal.display_label gaat voor de slot-default.
   const slotLabel = meal?.display_label || SLOT_LABELS[slot] || slot
+  // ⋯-menu: Dagen / Ingrediënten / Wis
+  const [moreOpen, setMoreOpen] = useState(false)
   // Venster 'moment bewerken' (soort maaltijd + tijd), via tik op de foto.
   const [momentOpen, setMomentOpen] = useState(null)   // null of de positie van de foto
   // Naam bewerken: null = niet bezig; naamKeuze = vraag 'deze dag of elke dag'.
@@ -357,12 +359,8 @@ export default function MealCard({
         </div>
       </div>
 
-      {/* Acties — zelfde divider-stijl als client card. 4 cellen voor coach
-          (Swap / Edit / Scale / Delete). */}
-      <div style={{
-        display: 'flex',
-        borderTop: `1px solid ${DIVIDER}`,
-      }}>
+      {/* Acties: Swap | ✎ | Recept | ⋯ (Dagen / Ingrediënten / Wis in dropdown) */}
+      <div style={{ display: 'flex', borderTop: `1px solid ${DIVIDER}`, position: 'relative' }}>
         <ActionCell
           icon={<Shuffle size={m ? 13 : 14} />}
           label="Swap"
@@ -377,28 +375,6 @@ export default function MealCard({
           m={m}
           active={showEditModal}
         />
-        {/* "Dagen" alleen tonen als er iets mee te doen valt. De pre-workout
-            maaltijd geeft deze prop niet mee — die geldt al voor élke
-            trainingsdag, dus daar zou de knop niets doen. */}
-        {onApplyToDays && (<>
-          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
-          <ActionCell
-            icon={<CalendarDays size={m ? 13 : 14} />}
-            label="Dagen"
-            onClick={(e) => { e.stopPropagation(); onApplyToDays(dayIndex, slot, meal) }}
-            m={m}
-          />
-        </>)}
-        {ingredientList.length > 0 && (<>
-          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
-          <ActionCell
-            icon={<List size={m ? 13 : 14} />}
-            label={`${ingredientList.length} ingr.`}
-            onClick={(e) => { e.stopPropagation(); setExpanded(p => !p) }}
-            m={m}
-            active={expanded}
-          />
-        </>)}
         <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
         <ActionCell
           icon={<BookOpen size={m ? 13 : 14} />}
@@ -408,13 +384,51 @@ export default function MealCard({
           active={receptOpen}
         />
         <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
+        {/* ⋯ menu: Dagen / Ingrediënten / Wis */}
         <ActionCell
-          icon={<Trash2 size={m ? 13 : 14} />}
-          label="Wis"
-          onClick={(e) => { e.stopPropagation(); onDelete?.(dayIndex, slot) }}
+          icon={<MoreHorizontal size={m ? 13 : 14} />}
+          label="Meer"
+          onClick={(e) => { e.stopPropagation(); setMoreOpen(p => !p) }}
           m={m}
-          danger
+          active={moreOpen}
         />
+        {moreOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute', bottom: '100%', right: 0,
+              background: '#1a1a1a',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8,
+              overflow: 'hidden',
+              minWidth: 140,
+              zIndex: 100,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            }}
+          >
+            {onApplyToDays && (
+              <MoreMenuItem
+                icon={<CalendarDays size={13} />}
+                label="Dagen"
+                onClick={() => { setMoreOpen(false); onApplyToDays(dayIndex, slot, meal) }}
+              />
+            )}
+            {ingredientList.length > 0 && (
+              <MoreMenuItem
+                icon={<List size={13} />}
+                label={`${ingredientList.length} ingrediënten`}
+                onClick={() => { setMoreOpen(false); setExpanded(p => !p) }}
+                active={expanded}
+              />
+            )}
+            <MoreMenuItem
+              icon={<Trash2 size={13} />}
+              label="Wis"
+              onClick={() => { setMoreOpen(false); onDelete?.(dayIndex, slot) }}
+              danger
+            />
+          </div>
+        )}
       </div>
 
       {/* Kliks in het blad (een portal) lopen in React terug naar de kaart;
@@ -643,6 +657,27 @@ function MacroBit({ val, label, m }) {
         {label}
       </span>
     </div>
+  )
+}
+
+// Rij in het ⋯-dropdown-menu.
+function MoreMenuItem({ icon, label, onClick, active, danger }) {
+  const color = danger ? '#ef4444' : active ? GOLD : 'rgba(255,255,255,0.75)'
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        width: '100%', padding: '0.5rem 0.75rem',
+        background: 'transparent', border: 'none',
+        color, fontSize: '0.7rem', fontWeight: 700,
+        cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   )
 }
 

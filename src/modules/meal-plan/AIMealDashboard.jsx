@@ -314,8 +314,9 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   
   const handleMealLogged = async (loggedData) => {
     console.log('✅ [OPTIMISTIC] Meal logged:', loggedData)
-    
+
     setDashboardData(prev => {
+      if (!prev?.dailyTotals) return prev
       const newConsumed = {
         calories: prev.dailyTotals.consumed.calories + (loggedData.calories || 0),
         protein: prev.dailyTotals.consumed.protein + (loggedData.protein || 0),
@@ -345,8 +346,9 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   
   const handleCheckMeal = async (slot, mealData) => {
     console.log('✅ [OPTIMISTIC] Checking meal:', slot, mealData)
-    
+
     setDashboardData(prev => {
+      if (!prev?.dailyTotals) return prev
       const newConsumed = {
         calories: prev.dailyTotals.consumed.calories + (mealData.calories || 0),
         protein: prev.dailyTotals.consumed.protein + (mealData.protein || 0),
@@ -415,6 +417,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     }
     
     setDashboardData(prev => {
+      if (!prev?.dailyTotals) return prev
       const newConsumed = {
         calories: Math.max(0, prev.dailyTotals.consumed.calories - (mealToUncheck.calories || 0)),
         protein: Math.max(0, prev.dailyTotals.consumed.protein - (mealToUncheck.protein || 0)),
