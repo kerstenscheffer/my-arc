@@ -67,7 +67,7 @@ import ChallengeProgressTab from '../challenge-monitor/ChallengeProgressTab'
 import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 
 // Modals
-import AIAlternativesModal from './components/AIAlternativesModal'
+import AIAlternativesModal, { voorladenWisselPool } from './components/AIAlternativesModal'
 import { resolveFoodImage } from './foodImageFallback'
 import DagenKiezer from './components/DagenKiezer'
 import WisselStappen from './components/WisselStappen'
@@ -169,6 +169,8 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   useEffect(() => {
     if (client?.id) {
       loadDashboardData()
+      // Wisselvenster alvast vullen, dan staat het er direct bij de eerste tik.
+      voorladenWisselPool(db?.supabase)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id])

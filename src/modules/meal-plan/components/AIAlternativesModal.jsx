@@ -15,6 +15,40 @@ import BladModal from '../../workout/components/todays-workout/components/BladMo
 import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils, ChevronDown, RefreshCw, Pencil } from 'lucide-react'
 import { createPortal } from '../../../client/paginaPortal'
 
+// Gedeelde cache voor wat voor iedereen gelijk is: alle maaltijden (~1,5 MB)
+// en de dagmenu's/wisselopties per niveau. Tien minuten geldig; een mislukte
+// ophaalpoging wordt meteen vergeten zodat de volgende het opnieuw probeert.
+const GEDEELD_TTL = 10 * 60 * 1000
+const gedeeld = new Map()
+function haalGedeeld(sleutel, haal) {
+  const rij = gedeeld.get(sleutel)
+  if (rij && Date.now() - rij.tijd < GEDEELD_TTL) return rij.belofte
+  const belofte = haal().catch(e => { gedeeld.delete(sleutel); throw e })
+  gedeeld.set(sleutel, { tijd: Date.now(), belofte })
+  return belofte
+}
+const haalPool = (sb) => haalGedeeld('pool', async () => {
+  const { data, error } = await sb.from('ai_meals').select('*')
+    .gt('calories', 0)
+    .or('needs_review.is.null,needs_review.eq.false')
+  if (error) throw error
+  return data || []
+})
+const haalOpNaam = (sb, patroon) => haalGedeeld(patroon, async () => {
+  const { data, error } = await sb.from('ai_meals').select('*').like('internal_name', patroon)
+  if (error) throw error
+  return data || []
+})
+// Laatste uitkomst per klant + slot: opnieuw openen toont direct de lijst.
+const klantCache = new Map()
+
+// Vooraf laden zodra de maaltijdpagina opent, zodat het eerste wisselen ook
+// meteen staat.
+// eslint-disable-next-line react-refresh/only-export-components
+export function voorladenWisselPool(sb) {
+  if (sb) haalPool(sb).catch(() => {})
+}
+
 // De secties van "Mijn maaltijden" heten anders dan de log-momenten hier.
 const MOMENT_NAAR_SECTIE = {
   breakfast: 'ontbijt', lunch: 'lunch', dinner: 'diner',
@@ -201,193 +235,183 @@ export default function AIAlternativesModal({
     }
   }, [isOpen, currentMeal])
 
+  // Pagina eronder vastzetten zolang het venster open is. Anders pakte iOS
+  // de eerste veeg voor de maaltijdpagina en scrolde de lijst pas bij de
+  // tweede (Kersten, 27 okt 2026).
+  useEffect(() => {
+    if (!isOpen || embedded) return
+    const html = document.documentElement, body = document.body
+    const oud = [html.style.overflow, body.style.overflow]
+    html.style.overflow = 'hidden'; body.style.overflow = 'hidden'
+    return () => { html.style.overflow = oud[0]; body.style.overflow = oud[1] }
+  }, [isOpen, embedded])
+
   const loadAlternatives = async () => {
-    setLoading(true)
+    // Al eerder geladen (zelfde sessie)? Dan staat de lijst er direct en
+    // verversen we op de achtergrond, zonder laadscherm.
+    const sleutel = `${client?.id || currentMeal?.client_id || ''}|${slotKey}`
+    const vorige = klantCache.get(sleutel)
+    if (vorige) zetLijsten(vorige)
+    setLoading(!vorige)
     try {
-      const smartAlts = await service.getSmartAlternatives(
-        currentMeal,
-        slotKey
-      )
-      
-      // Favorieten worden hier niet meer opgehaald: dat filter is vervangen
-      // door de drie keuzelijsten, en de query kostte een ronde naar de
-      // database zonder dat er nog iets mee gebeurde.
-
-      // Pool voor de handmatige filters (Zelfde kcal / Meer eiwit / Minder
-      // kcal / Alles). Twee dingen aangepast:
-      //
-      // - needs_review eruit, om dezelfde reden als in getSmartAlternatives:
-      //   bij die maaltijden loopt de opgegeven kcal uit de pas met hun
-      //   ingrediënten, en juist deze filters beloven een kcal-vergelijking.
-      // - De .limit(200) is weg. Die kapte 482 maaltijden af zonder ORDER BY,
-      //   dus "Zelfde kcal" sorteerde een willekeurige greep op kcal en zei
-      //   daar "beste match" bij.
-      const { data: meals } = await db.supabase
-        .from('ai_meals')
-        .select('*')
-        .gt('calories', 0)
-        .or('needs_review.is.null,needs_review.eq.false')
-
-      // Door de coach gecureerde swaps voor dit slot.
-      // Via get_effective_swap_options i.p.v. rechtstreeks client_swap_options:
-      // die RPC past de laag eronder toe — heeft de coach niets voor DEZE klant
-      // ingesteld, dan gelden zijn standaard-swaps (coach_swap_defaults). Zo
-      // hoeft de fallback niet apart in deze modal, de PDF-export én de
-      // coach-modal geïmplementeerd te staan.
-      let curated = []
-      let perMoment = {}
-      try {
-        const clientId = client?.id || currentMeal?.client_id || null
-        let alleSlots = {}
-        if (clientId) {
-          const { data } = await db.supabase
-            .rpc('get_effective_swap_options', { p_client_id: clientId })
-          alleSlots = data || {}
-        }
-        // Alle id's uit álle slots in één keer ophalen: de coach heeft ook
-        // lijsten voor de andere momenten en die wil je kunnen kiezen.
-        const alleIds = [...new Set(
-          Object.values(alleSlots).flatMap(v => v?.meal_ids || [])
-        )]
-        if (alleIds.length > 0) {
-          const { data: curatedMeals } = await db.supabase.from('ai_meals').select('*').in('id', alleIds)
-          const opId = new Map((curatedMeals || []).map(m => [m.id, m]))
-          // Behoud per slot de volgorde waarin de coach ze koos.
-          Object.entries(alleSlots).forEach(([slot, v]) => {
-            const lijst = (v?.meal_ids || []).map(id => opId.get(id)).filter(Boolean)
-            if (lijst.length === 0) return
-            const moment = swapSlotNaarMoment(slot)
-            perMoment[moment] = [...(perMoment[moment] || []), ...lijst]
-          })
-          // Avondsnack zonder eigen lijst valt terug op de snacklijst.
-          const eigenIds = alleSlots?.[slotKey]?.meal_ids?.length ? alleSlots[slotKey].meal_ids : (alleSlots?.[basisMoment(slotKey)]?.meal_ids || [])
-          curated = eigenIds.map(id => opId.get(id)).filter(Boolean)
-        }
-      } catch (e) { /* geen curatie → gewoon de normale pool */ }
-
-      // Dagmenu's als vaste suggesties. Elk moment heeft binnen een niveau
-      // vijf gerechten met vrijwel dezelfde macro's, dus ze zijn onderling
-      // inwisselbaar — precies wat je zoekt als je wisselt. Welk niveau?
-      // Dat wat het dichtst bij het caloriedoel van deze klant ligt, zodat
-      // iemand van 2200 de ontbijten van het 2000-menu krijgt en niet die van
-      // 3000. De coach hoeft hier niets voor in te stellen.
-      try {
-        let doel = client?.target_calories || doelKcal
-        if (!doel && client?.id) {
-          const { data: rij } = await db.supabase
-            .from('clients').select('target_calories').eq('id', client.id).maybeSingle()
-          doel = rij?.target_calories || null
-          if (doel) setDoelKcal(doel)
-        }
-        const niveau = niveauVoorDoel(doel)
-        if (niveau) {
-          // Op internal_name (dagmenu3000_kwarkbowl) in plaats van op het
-          // label: een gewone tekstvergelijking, geen jsonb-containment.
-          const { data: dagmenu, error: dagmenuFout } = await db.supabase
-            .from('ai_meals')
-            .select('*')
-            .like('internal_name', `dagmenu${niveau}_%`)
-          if (dagmenuFout) console.warn('Dagmenu-suggesties:', dagmenuFout.message)
-          const alGekozen = new Set([...(curated || []).map(m => m.id)])
-          ;(dagmenu || []).forEach(m => {
-            const moment = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
-            // Achteraan: wat de coach zelf koos staat voorop.
-            if (!(perMoment[moment] || []).some(x => x.id === m.id)) {
-              perMoment[moment] = [...(perMoment[moment] || []), m]
-            }
-            if (moment === basisMoment(slotKey) && !alGekozen.has(m.id)) {
-              curated = [...curated, m]
-              alGekozen.add(m.id)
-            }
-          })
-        }
-      } catch (e) { console.warn('Dagmenu-suggesties laden mislukt:', e?.message) }
-
-      // Wisselopties: per niveau en moment een vaste set gerechten die binnen
-      // dezelfde kcal-band vallen. Geen schalen: elk niveau heeft zijn eigen
-      // porties in hele eenheden.
-      let wissel = {}
-      try {
-        const wNiveau = wisselNiveauVoorDoel(client?.target_calories || doelKcal || (await (async () => {
-          if (!client?.id) return null
-          const { data: rij } = await db.supabase.from('clients').select('target_calories').eq('id', client.id).maybeSingle()
-          return rij?.target_calories || null
-        })()))
-        if (wNiveau) {
-          const { data: opties, error: wFout } = await db.supabase
-            .from('ai_meals').select('*').like('internal_name', `wissel${wNiveau}_%`)
-          if (wFout) console.warn('Wisselopties:', wFout.message)
-          ;(opties || []).forEach(m => {
-            const mo = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
-            wissel[mo] = [...(wissel[mo] || []), m]
-          })
-          Object.values(wissel).forEach(lijst => lijst.sort((a, b) => {
-            const ga = GROEP_VOLGORDE.indexOf(groepVan(a)), gb = GROEP_VOLGORDE.indexOf(groepVan(b))
-            return ga !== gb ? ga - gb : String(a.name).localeCompare(String(b.name))
-          }))
-        }
-      } catch (e) { console.warn('Wisselopties laden mislukt:', e?.message) }
-
-      // Eigen maaltijden van de klant (ai_custom_meals), zodat je ook daarnaar
-      // kunt wisselen. getMealById ondersteunt al custom-meal-IDs.
-      let custom = []
-      try {
-        const clientId = client?.id
-        if (clientId) {
-          const { data: customData } = await db.supabase
-            .from('ai_custom_meals')
-            .select('id, name, calories, protein, carbs, fat, image_url, section, meal_type, ingredients_list')
-            .eq('client_id', clientId)
-            .eq('is_active', true)
-          custom = (customData || []).map(m => ({ ...m, _isCustom: true }))
-
-          // Bij welk moment hoort een eigen maaltijd zonder sectie? 81 van de
-          // ~106 hebben er geen, en die stonden dan onder elk moment (bij
-          // Diner ook je ontbijtwrap; Kersten, 27 okt 2026). Afgeleid uit
-          // waar de klant hem logde: elk moment met minstens een kwart van
-          // zijn logs telt. Geen logs = blijft overal staan.
-          const zonder = custom.filter(m => !m.section)
-          if (zonder.length) {
-            const { data: logs } = await db.supabase
-              .from('consumed_meals').select('meal_id, meal_name, meal_type')
-              .eq('client_id', clientId)
-              .gte('consumed_at', new Date(Date.now() - 365 * 864e5).toISOString())
-              .then(r => r, () => ({ data: [] }))
-            const NAAR = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'snack', pre_workout: 'pre_workout', post_workout: 'post_workout', avondsnack: 'avondsnack' }
-            zonder.forEach(m => {
-              const tel = {}
-              let totaal = 0
-              ;(logs || []).forEach(l => {
-                const zelfde = l.meal_id === m.id || (l.meal_name || '').trim().toLowerCase() === (m.name || '').trim().toLowerCase()
-                const mo = NAAR[String(l.meal_type || '').toLowerCase()]
-                if (!zelfde || !mo) return
-                tel[mo] = (tel[mo] || 0) + 1; totaal++
-              })
-              const momenten = Object.entries(tel).filter(([, n]) => n / totaal >= 0.25).map(([mo]) => mo)
-              if (momenten.length) m._momenten = momenten
-            })
-          }
-        }
-      } catch {}
-
-      setAlternatives(smartAlts || [])
-      // Partnergerechten die niet meer leverbaar zijn horen er niet tussen.
-      setAllMeals((meals || []).filter(m => !m.partner || m.partner_actief !== false))
-      setCustomMeals(custom)
-      setCoachOptions(curated)
-      setCoachPerMoment(perMoment)
-      setWisselPerMoment(wissel)
-      // Wissel je een ontbijt, dan wil je bijna altijd een ander ontbijt zien.
-      // "Alle maaltijden" is één tik weg.
-      setMoment(slotKey)
-      // Wisselopties voor dit moment gaan voor: dat is waar je voor wisselt.
-      // Anders wat de coach voor dit slot heeft ingesteld.
-      // Eén lijst voor alles (zie getFilteredMeals); geen bron meer kiezen.
-      setBron('alles')
+      const uitkomst = await haalAlles()
+      klantCache.set(sleutel, uitkomst)
+      zetLijsten(uitkomst)
     } catch (error) {
       console.error('Failed to load alternatives:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const zetLijsten = (u) => {
+    setAlternatives(u.smartAlts)
+    setAllMeals(u.meals)
+    setCustomMeals(u.custom)
+    setCoachOptions(u.curated)
+    setCoachPerMoment(u.perMoment)
+    setWisselPerMoment(u.wissel)
+    if (u.doel) setDoelKcal(u.doel)
+    // Wissel je een ontbijt, dan wil je bijna altijd een ander ontbijt zien.
+    setMoment(slotKey)
+    // Eén lijst voor alles (zie getFilteredMeals); geen bron meer kiezen.
+    setBron('alles')
+  }
+
+  // Alles tegelijk ophalen: vroeger stonden hier acht rondes naar de
+  // database ná elkaar, met elke keer ~1,5 MB aan maaltijden. Dat wat voor
+  // iedereen gelijk is (alle maaltijden, dagmenu's, wisselopties) komt uit
+  // de gedeelde cache bovenaan dit bestand (Kersten, 27 okt 2026: "laadt
+  // een beetje sloom").
+  const haalAlles = async () => {
+    const sb = db.supabase
+    const clientId = client?.id || currentMeal?.client_id || null
+
+    // Het caloriedoel bepaalt welk dagmenu- en wisselniveau je ziet. Het zit
+    // niet altijd op het client-object, dus zo nodig zelf ophalen.
+    const doelBelofte = (async () => {
+      const doel = client?.target_calories || doelKcal
+      if (doel || !client?.id) return doel || null
+      const { data: rij } = await sb.from('clients').select('target_calories').eq('id', client.id).maybeSingle()
+      return rij?.target_calories || null
+    })().then(r => r, () => null)
+
+    const [smartAlts, meals, swapSlots, dagmenu, opties, customRuw] = await Promise.all([
+      service.getSmartAlternatives(currentMeal, slotKey).then(r => r || [], () => []),
+      // needs_review eruit: daar loopt de kcal uit de pas met de
+      // ingrediënten, en juist deze lijst belooft een kcal-vergelijking.
+      haalPool(sb),
+      // Door de coach gecureerde swaps; de RPC past zijn standaard-swaps toe
+      // als er voor deze klant niets is ingesteld.
+      clientId
+        ? sb.rpc('get_effective_swap_options', { p_client_id: clientId }).then(r => r.data || {}, () => ({}))
+        : Promise.resolve({}),
+      // Dagmenu's: elk moment heeft binnen een niveau vijf onderling
+      // inwisselbare gerechten. Niveau = dichtst bij het doel van de klant.
+      doelBelofte.then(doel => {
+        const niveau = niveauVoorDoel(doel)
+        return niveau ? haalOpNaam(sb, `dagmenu${niveau}_%`) : []
+      }).then(r => r, e => { console.warn('Dagmenu-suggesties:', e?.message); return [] }),
+      // Wisselopties: per niveau en moment een vaste set binnen dezelfde
+      // kcal-band, in hele porties.
+      doelBelofte.then(doel => {
+        const wNiveau = wisselNiveauVoorDoel(doel)
+        return wNiveau ? haalOpNaam(sb, `wissel${wNiveau}_%`) : []
+      }).then(r => r, e => { console.warn('Wisselopties:', e?.message); return [] }),
+      // Eigen maaltijden van de klant; getMealById kent custom-meal-IDs al.
+      client?.id
+        ? sb.from('ai_custom_meals')
+            .select('id, name, calories, protein, carbs, fat, image_url, section, meal_type, ingredients_list')
+            .eq('client_id', client.id)
+            .eq('is_active', true)
+            .then(r => r.data || [], () => [])
+        : Promise.resolve([]),
+    ])
+    const doel = await doelBelofte
+
+    // Coach-lijsten: alle id's uit álle slots in één keer, zodat je ook de
+    // lijsten van andere momenten kunt kiezen. Meestal staan ze al in de
+    // pool; alleen wat daar ontbreekt halen we nog op.
+    let curated = []
+    const perMoment = {}
+    try {
+      const alleIds = [...new Set(Object.values(swapSlots).flatMap(v => v?.meal_ids || []))]
+      if (alleIds.length > 0) {
+        const opId = new Map(meals.filter(m => alleIds.includes(m.id)).map(m => [m.id, m]))
+        const mist = alleIds.filter(id => !opId.has(id))
+        if (mist.length) {
+          const { data: extra } = await sb.from('ai_meals').select('*').in('id', mist)
+          ;(extra || []).forEach(m => opId.set(m.id, m))
+        }
+        // Behoud per slot de volgorde waarin de coach ze koos.
+        Object.entries(swapSlots).forEach(([slot, v]) => {
+          const lijst = (v?.meal_ids || []).map(id => opId.get(id)).filter(Boolean)
+          if (lijst.length === 0) return
+          const moment = swapSlotNaarMoment(slot)
+          perMoment[moment] = [...(perMoment[moment] || []), ...lijst]
+        })
+        // Avondsnack zonder eigen lijst valt terug op de snacklijst.
+        const eigenIds = swapSlots?.[slotKey]?.meal_ids?.length ? swapSlots[slotKey].meal_ids : (swapSlots?.[basisMoment(slotKey)]?.meal_ids || [])
+        curated = eigenIds.map(id => opId.get(id)).filter(Boolean)
+      }
+    } catch (e) { /* geen curatie → gewoon de normale pool */ }
+
+    // Dagmenu's achter wat de coach zelf koos.
+    const alGekozen = new Set(curated.map(m => m.id))
+    dagmenu.forEach(m => {
+      const moment = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
+      if (!(perMoment[moment] || []).some(x => x.id === m.id)) {
+        perMoment[moment] = [...(perMoment[moment] || []), m]
+      }
+      if (moment === basisMoment(slotKey) && !alGekozen.has(m.id)) {
+        curated = [...curated, m]
+        alGekozen.add(m.id)
+      }
+    })
+
+    const wissel = {}
+    opties.forEach(m => {
+      const mo = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
+      wissel[mo] = [...(wissel[mo] || []), m]
+    })
+    Object.values(wissel).forEach(lijst => lijst.sort((a, b) => {
+      const ga = GROEP_VOLGORDE.indexOf(groepVan(a)), gb = GROEP_VOLGORDE.indexOf(groepVan(b))
+      return ga !== gb ? ga - gb : String(a.name).localeCompare(String(b.name))
+    }))
+
+    const custom = customRuw.map(m => ({ ...m, _isCustom: true }))
+    // Bij welk moment hoort een eigen maaltijd zonder sectie? Afgeleid uit
+    // waar de klant hem logde: elk moment met minstens een kwart van zijn
+    // logs telt. Geen logs = blijft overal staan (Kersten, 27 okt 2026).
+    try {
+      const zonder = custom.filter(m => !m.section)
+      if (zonder.length && client?.id) {
+        const { data: logs } = await sb
+          .from('consumed_meals').select('meal_id, meal_name, meal_type')
+          .eq('client_id', client.id)
+          .gte('consumed_at', new Date(Date.now() - 365 * 864e5).toISOString())
+          .then(r => r, () => ({ data: [] }))
+        const NAAR = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'snack', pre_workout: 'pre_workout', post_workout: 'post_workout', avondsnack: 'avondsnack' }
+        zonder.forEach(m => {
+          const tel = {}
+          let totaal = 0
+          ;(logs || []).forEach(l => {
+            const zelfde = l.meal_id === m.id || (l.meal_name || '').trim().toLowerCase() === (m.name || '').trim().toLowerCase()
+            const mo = NAAR[String(l.meal_type || '').toLowerCase()]
+            if (!zelfde || !mo) return
+            tel[mo] = (tel[mo] || 0) + 1; totaal++
+          })
+          const momenten = Object.entries(tel).filter(([, n]) => n / totaal >= 0.25).map(([mo]) => mo)
+          if (momenten.length) m._momenten = momenten
+        })
+      }
+    } catch {}
+
+    return {
+      smartAlts,
+      // Partnergerechten die niet meer leverbaar zijn horen er niet tussen.
+      meals: meals.filter(m => !m.partner || m.partner_actief !== false),
+      custom, curated, perMoment, wissel, doel,
     }
   }
 
@@ -1094,7 +1118,9 @@ export default function AIAlternativesModal({
         {/* ── Meal List ── */}
         <div style={{
           flex: 1,
+          minHeight: 0,
           overflowY: 'auto',
+          overscrollBehavior: 'contain',
           WebkitOverflowScrolling: 'touch'
         }}>
           {waarInhoud ? (
