@@ -73,16 +73,17 @@ export default function DagenKiezer({
       .then(keys => { if (!weg) setAanwezig(new Set(keys || [])) }, () => { if (!weg) setAanwezig(new Set()) })
     return () => { weg = true }
   }, [modus, week]) // eslint-disable-line react-hooks/exhaustive-deps
-  const zetAanwezig = () => setGekozen(new Set(aanwezig))
-  const alleenAanwezig = aanwezig.size > 0 && gekozen.size === aanwezig.size && [...aanwezig].every(k => gekozen.has(k))
+  // "Alle dagen": waar deze maaltijd staat, of zonder die info de hele week.
+  // Nog een keer tikken = terug naar alleen de bekeken dag.
+  const doelDagen = aanwezig.size > 0 ? aanwezig : new Set(DAGEN.map(d => d.key))
+  const alleDagenAan = gekozen.size === doelDagen.size && [...doelDagen].every(k => gekozen.has(k))
+  const zetAlleDagen = () => setGekozen(alleDagenAan ? new Set(dagKey ? [dagKey] : []) : new Set(doelDagen))
 
   const wissel = (key) => setGekozen(prev => {
     const n = new Set(prev)
     if (n.has(key)) n.delete(key); else n.add(key)
     return n
   })
-  const alles = gekozen.size === 7
-  const zetAlles = () => setGekozen(alles ? new Set(dagKey ? [dagKey] : []) : new Set(DAGEN.map(d => d.key)))
 
   const lijst = DAGEN.filter(d => gekozen.has(d.key))
   const moment = SLOT_KORT[slot] || slot || 'maaltijd'
@@ -127,34 +128,26 @@ export default function DagenKiezer({
           })}
         </div>
 
-        {/* Welke week, alleen bij "Eén week": één regel met pijltjes. */}
-        {modus === 'week' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button onClick={() => setWeek(w => Math.max(0, w - 1))} disabled={bezig || week === 0}
-              aria-label="Vorige week" style={{ ...pijl, opacity: week === 0 ? 0.25 : 1 }}><ChevronLeft size={18} strokeWidth={2.6} /></button>
-            <div style={{ flex: 1, textAlign: 'center', fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
-              Alleen {kortDatum(weekMaandag)} – {kortDatum(plus(weekMaandag, 6))}
-            </div>
-            <button onClick={() => setWeek(w => Math.min(2, w + 1))} disabled={bezig || week === 2}
-              aria-label="Volgende week" style={{ ...pijl, opacity: week === 2 ? 0.25 : 1 }}><ChevronRight size={18} strokeWidth={2.6} /></button>
-          </div>
-        )}
-
-        {/* De zeven dagen */}
+        {/* De zeven dagen. Erboven één regel: links de week (alleen bij "Eén
+            week", met losse pijltjes), rechts "Alle dagen" = alle dagen waar
+            deze maaltijd staat (zonder die info: de hele week). */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', marginBottom: 6 }}>
-            <span style={{ display: 'flex', gap: 14 }}>
-              {aanwezig.size > 0 && !alleenAanwezig && (
-                <button onClick={zetAanwezig} disabled={bezig} style={{
-                  background: 'none', border: 'none', color: '#fff', fontSize: '0.72rem', fontWeight: 800,
-                  cursor: 'pointer', padding: 0, fontFamily: 'inherit',
-                }}>● {aanwezig.size} dagen</button>
-              )}
-              <button onClick={zetAlles} disabled={bezig} style={{
-                background: 'none', border: 'none', color: '#fff', fontSize: '0.72rem', fontWeight: 800,
-                cursor: 'pointer', padding: 0, fontFamily: 'inherit',
-              }}>{alles ? 'Alleen deze dag' : 'Hele week'}</button>
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, minHeight: 24 }}>
+            {modus === 'week' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <button onClick={() => setWeek(w => Math.max(0, w - 1))} disabled={bezig || week === 0}
+                  aria-label="Vorige week" style={{ ...pijl, opacity: week === 0 ? 0.25 : 1 }}><ChevronLeft size={18} strokeWidth={2.8} /></button>
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>
+                  Alleen {kortDatum(weekMaandag)} – {kortDatum(plus(weekMaandag, 6))}
+                </span>
+                <button onClick={() => setWeek(w => Math.min(2, w + 1))} disabled={bezig || week === 2}
+                  aria-label="Volgende week" style={{ ...pijl, opacity: week === 2 ? 0.25 : 1 }}><ChevronRight size={18} strokeWidth={2.8} /></button>
+              </div>
+            ) : <span />}
+            <button onClick={zetAlleDagen} disabled={bezig} style={{
+              background: 'none', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 900,
+              cursor: 'pointer', padding: 0, fontFamily: 'inherit', whiteSpace: 'nowrap',
+            }}>{alleDagenAan ? 'Alleen deze dag' : 'Alle dagen'}</button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
             {DAGEN.map((d, i) => {
@@ -162,8 +155,8 @@ export default function DagenKiezer({
               return (
                 <button key={d.key} onClick={() => wissel(d.key)} disabled={bezig} style={{
                   padding: '0.55rem 0', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
-                  background: aan ? '#10b981' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${aan ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
+                  background: aan ? '#fff' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.1)'}`,
                   color: aan ? '#000' : 'rgba(255,255,255,0.7)',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -306,8 +299,8 @@ export default function DagenKiezer({
 }
 
 const pijl = {
-  width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer',
+  width: 24, height: 24, flexShrink: 0, padding: 0, background: 'none',
+  border: 'none', color: '#fff', cursor: 'pointer',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
