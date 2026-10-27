@@ -12,15 +12,15 @@
 //   { modus: 'week',   dagen: [...], datums: ['2026-10-20', ...] }
 // Wat ermee gebeurt (weekplan of losse datum) bepaalt de aanroeper.
 //
-// `volScherm`: zelfde keuzes, maar als volledig scherm in de stijl van het
-// logscherm (ronde foto, grote vraag, knop vast onderaan). Voor verwijderen:
-// een schuifvenstertje onderaan voelde te licht voor iets dat je plan wijzigt.
+// `volScherm`: zelfde keuzes, maar groot: pop-up van onder over een geblurde
+// pagina, met ronde foto en grote vraag (stijl van het logscherm). Eerst een
+// volledig scherm; met zo weinig tekst bleef de helft leeg (27 okt 2026).
 //
 // `dagenMetMaaltijd(maandag | null)`: optioneel, geeft (async) de dag-keys
 // terug waar deze maaltijd op dit moment staat; null = het vaste weekplan.
 // Die dagen krijgen een stip, zodat je ziet waar hij terugkomt.
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Repeat, CalendarDays, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Repeat, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { lokaleIso } from '../utils/dagVenster'
 
 const DAGEN = [
@@ -203,53 +203,63 @@ export default function DagenKiezer({
   )
 
   if (volScherm) {
+    // Pop-up van onder over een geblurde pagina: je ziet nog waar je zat.
+    // Tik naast de pop-up = sluiten.
     return (
-      <div style={{ position: 'fixed', inset: 0, background: '#0a0a0a', display: 'flex', flexDirection: 'column', zIndex: 1 }}>
-        <button onClick={onClose} disabled={bezig} aria-label="Terug" style={{
-          position: 'absolute', top: isMobile ? 'calc(0.75rem + env(safe-area-inset-top, 0px))' : '1rem', left: isMobile ? '0.75rem' : '1rem',
-          width: 36, height: 36, borderRadius: 10, zIndex: 2,
-          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
-          color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}><ArrowLeft size={16} /></button>
-
-        <div style={{
-          flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-          paddingTop: isMobile ? 'calc(3.5rem + env(safe-area-inset-top, 0px))' : '4rem',
+      <div onClick={() => !bezig && onClose?.()} style={{
+        position: 'fixed', inset: 0, zIndex: 1,
+        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        animation: 'dkFade 0.2s ease',
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          position: 'relative', background: '#0a0a0a',
+          borderTop: '1px solid rgba(255,255,255,0.1)', borderTopLeftRadius: 22, borderTopRightRadius: 22,
+          width: '100%', maxWidth: 560, margin: '0 auto', maxHeight: '92vh',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          animation: 'dkOmhoog 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)',
         }}>
-          <div style={{ maxWidth: 520, margin: '0 auto', padding: isMobile ? '0.5rem 1rem 1.25rem' : '0.75rem 1.5rem 1.5rem' }}>
-            <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.4rem' : '1.75rem' }}>
-              {foto && (
-                <img src={foto} alt="" style={{
-                  width: 96, height: 96, borderRadius: '50%', objectFit: 'cover',
-                  border: '1px solid rgba(255,255,255,0.12)', display: 'block', margin: '0 auto 0.9rem',
-                }} />
-              )}
-              <div style={{
-                fontSize: isMobile ? '1.45rem' : '1.6rem', fontWeight: 900, color: '#fff',
-                letterSpacing: '-0.025em', lineHeight: 1.2,
-              }}>{vraag}</div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>
-                {titel}{subtitel ? ` · ${subtitel}` : ''}
+          <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.18)', margin: '8px auto 0', flexShrink: 0 }} />
+          <button onClick={onClose} disabled={bezig} aria-label="Sluiten" style={{
+            position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 10, zIndex: 2,
+            background: 'rgba(255,255,255,0.05)', border: 'none', color: 'rgba(255,255,255,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}><X size={16} /></button>
+
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ padding: isMobile ? '1rem 1rem 1rem' : '1.25rem 1.5rem 1.25rem' }}>
+              <div style={{ textAlign: 'center', marginBottom: '1.2rem' }}>
+                {foto && (
+                  <img src={foto} alt="" style={{
+                    width: 84, height: 84, borderRadius: '50%', objectFit: 'cover',
+                    border: '1px solid rgba(255,255,255,0.12)', display: 'block', margin: '0 auto 0.8rem',
+                  }} />
+                )}
+                <div style={{
+                  fontSize: isMobile ? '1.3rem' : '1.45rem', fontWeight: 900, color: '#fff',
+                  letterSpacing: '-0.025em', lineHeight: 1.2, padding: '0 2rem',
+                }}>{vraag}</div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>
+                  {titel}{subtitel ? ` · ${subtitel}` : ''}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                {keuzes}
+                {foutBlok}
+                {extra}
               </div>
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              {keuzes}
-              {foutBlok}
-              {extra}
-            </div>
           </div>
-        </div>
 
-        <div style={{
-          flexShrink: 0, background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.06)',
-          padding: isMobile ? '0.75rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px))' : '1rem 1.5rem 1.5rem',
-          display: 'flex', flexDirection: 'column', gap: 8,
-        }}>
-          <div style={{ maxWidth: 520, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column' }}>{knop}</div>
+          <div style={{
+            flexShrink: 0, background: '#0a0a0a',
+            padding: isMobile ? '0.25rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px))' : '0.25rem 1.5rem 1.5rem',
+            display: 'flex', flexDirection: 'column',
+          }}>{knop}</div>
         </div>
-        <style>{'@keyframes cmeSpin { to { transform: rotate(360deg); } }'}</style>
+        <style>{'@keyframes cmeSpin { to { transform: rotate(360deg); } } @keyframes dkFade { from { opacity: 0 } to { opacity: 1 } } @keyframes dkOmhoog { from { transform: translateY(100%) } to { transform: translateY(0) } }'}</style>
       </div>
     )
   }
