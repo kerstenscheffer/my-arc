@@ -4,8 +4,10 @@
 --
 -- 1. Eigen product eerst. De eigen-historie-bonus gold per kernwoord, dus
 --    "Ei (heel)" en "Ei (Lidl)" kregen hem allebei en Erwin moest elke keer
---    plek 2 tikken ("Ei (Lidl)", "Kwark (Milbona)" op 3). Nu krijgt het exacte
---    product dat je eerder logde (consumed_meals.meal_id = ingredient-id) +30.
+--    plek 2 tikken ("Ei (Lidl)", "Kwark (Milbona)" op 3). Nu staat het product
+--    dat je zelf het vaakst logde (consumed_meals.meal_id = ingredient-id)
+--    direct boven de rest van zijn soort. Een bonus in punten was niet genoeg:
+--    een basisproduct heeft ~45 punten vaste voorsprong op een merkproduct.
 -- 2. Verwisselde letters. "baluwe" gaf 0 resultaten (pg_trgm vangt geen
 --    omwisseling). Bij 0 resultaten proberen we elke omwisseling van twee
 --    naast elkaar staande letters ("blauwe").
@@ -62,7 +64,7 @@ begin
   ),
   -- Precies dit product eerder gelogd door deze klant.
   pop_id as (
-    select c.meal_id as mid, count(*) as n
+    select c.meal_id as mid, count(*) as n, max(c.consumed_at) as laatst
     from consumed_meals c
     where p_client is not null and c.client_id = p_client
       and c.consumed_at > now() - interval '180 days'
@@ -77,9 +79,9 @@ begin
         + case when rij.source = 'coach' then 5 else 0 end
         + least(12, ln(1 + coalesce(pop.n, 0) + coalesce(rij.log_count, 0))::numeric * 4)
         + case when coalesce(pop.eigen, 0) > 0 then 20 + least(10, pop.eigen * 2) else 0 end
-        + case when coalesce(pop_id.n, 0) > 0 then 30 else 0 end
         - least(12, length(rij.zoek_kern) / 4.0)
-        - case when rij.barcode is not null or rij.brand is not null or rij.name ~ '\(' then 6 else 0 end))::numeric as sc
+        - case when rij.barcode is not null or rij.brand is not null or rij.name ~ '\(' then 6 else 0 end))::numeric as sc,
+      pop_id.n as eigen_n, pop_id.laatst as eigen_laatst
     from rij left join pop on pop.k = rij.zoek_kern
              left join pop_id on pop_id.mid = rij.id
     where rij.basis >= 35
@@ -91,15 +93,22 @@ begin
              (g.barcode is null) desc, g.sc desc
   ),
   gespreid as (
-    select u.*, u.sc - 35 * (row_number() over (partition by u.zoek_kern, coalesce(u.bereiding, '') order by u.sc desc) - 1) as eind
+    select u.*, u.sc - 35 * (row_number() over (partition by u.zoek_kern, coalesce(u.bereiding, '') order by u.sc desc) - 1) as eind,
+      row_number() over (partition by u.zoek_kern order by u.eigen_n desc nulls last, u.eigen_laatst desc nulls last) as eigen_rang
     from uniek u
+  ),
+  eigen_eerst as (
+    select g.*, case when g.eigen_n > 0 and g.eigen_rang = 1
+                     then greatest(g.eind, max(g.eind) over (partition by g.zoek_kern) + 1)
+                     else g.eind end as eind2
+    from gespreid g
   )
   select u.id, u.name, u.name_en, u.calories_per_100g, u.protein_per_100g,
          u.carbs_per_100g, u.fat_per_100g, u.default_portion_gram::numeric, u.category,
-         u.image_url, u.brand, u.log_count, u.barcode, u.source, round(u.eind, 1), u.bereiding, u.eenheid, u.gram_per_eenheid, u.labels
-  from gespreid u
+         u.image_url, u.brand, u.log_count, u.barcode, u.source, round(u.eind2, 1), u.bereiding, u.eenheid, u.gram_per_eenheid, u.labels
+  from eigen_eerst u
   where u.sc >= 35
-  order by u.eind desc
+  order by u.eind2 desc
   limit p_limit;
 end $function$;
 
@@ -128,6 +137,7 @@ end $function$;
 
 -- Gamba's rauw (USDA FoodData Central, garnaal rauw: 85 kcal, 20,1 g eiwit,
 -- 0 g koolhydraten, 0,5 g vet per 100 g).
-insert into public.ai_ingredients (name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, bereiding, category, source)
-select 'Gamba''s (rauw)', 85, 20.1, 0, 0.5, 'rauw', 'vis', 'myarc'
+insert into public.ai_ingredients (name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, bereiding, category, source, default_portion_gram, image_url)
+select 'Gamba''s (rauw)', 85, 20.1, 0, 0.5, 'rauw', 'protein', 'coach', 120,
+       'https://xlaycpwpnhjmulfsnynh.supabase.co/storage/v1/object/public/ingredient-photos/garnalen.png'
 where not exists (select 1 from public.ai_ingredients where name = 'Gamba''s (rauw)');
