@@ -322,7 +322,7 @@ export default function AIAlternativesModal({
         if (clientId) {
           const { data: customData } = await db.supabase
             .from('ai_custom_meals')
-            .select('id, name, calories, protein, carbs, fat, image_url, section, meal_type')
+            .select('id, name, calories, protein, carbs, fat, image_url, section, meal_type, ingredients_list')
             .eq('client_id', clientId)
             .eq('is_active', true)
           custom = (customData || []).map(m => ({ ...m, _isCustom: true }))
@@ -679,6 +679,34 @@ export default function AIAlternativesModal({
       }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
     : infoMeal
 
+  // Eigen maaltijd aangepast: die overschrijven (27 okt 2026). Met `kiezen`
+  // daarna ook kiezen, anders alleen opslaan en het blad sluiten.
+  const bewaarEigen = async (kiezen) => {
+    if (!infoMeal?._isCustom || !db?.supabase) return
+    setInfoBezig(true)
+    try {
+      const wijziging = {
+        calories: Math.round(infoTotaal.calories || 0),
+        protein: Math.round(infoTotaal.protein || 0),
+        carbs: Math.round(infoTotaal.carbs || 0),
+        fat: Math.round(infoTotaal.fat || 0),
+        ingredients_list: infoRegels.filter(r => r.amount > 0),
+        updated_at: new Date().toISOString(),
+      }
+      const { error } = await db.supabase.from('ai_custom_meals').update(wijziging).eq('id', infoMeal.id)
+      if (error) throw error
+      const nieuw = { ...infoMeal, ...wijziging }
+      setCustomMeals(prev => prev.map(m => m.id === nieuw.id ? nieuw : m))
+      setInfoMeal(null); setInfoIngredienten(null); setInfoGram({})
+      if (kiezen) kies(nieuw)
+    } catch (e) {
+      console.error('Eigen maaltijd bijwerken mislukt:', e)
+      alert('Kon je maaltijd niet opslaan.')
+    } finally {
+      setInfoBezig(false)
+    }
+  }
+
   // Aangepast? Dan een eigen kopie in Mijn maaltijden van deze klant, en die
   // kiezen (loggen of wisselen). Het origineel van de coach blijft staan.
   const kiesUitInfo = async () => {
@@ -689,6 +717,7 @@ export default function AIAlternativesModal({
       kies(m)
       return
     }
+    if (infoMeal._isCustom) { await bewaarEigen(true); return }
     if (!client?.id || !db?.supabase) return
     setInfoBezig(true)
     try {
@@ -1077,23 +1106,19 @@ export default function AIAlternativesModal({
       >
         {infoMeal && (
           <>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            {/* Macro's: vier getallen met een stipje, geen vakken (zoals loggen). */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginBottom: '1.1rem' }}>
               {[
-                { label: 'kcal', waarde: Math.round(infoTotaal?.calories || 0) },
-                { label: 'eiwit', waarde: `${Math.round(infoTotaal?.protein || 0)}g` },
-                { label: 'koolh', waarde: `${Math.round(infoTotaal?.carbs || 0)}g` },
-                { label: 'vet', waarde: `${Math.round(infoTotaal?.fat || 0)}g` },
+                { label: 'kcal', waarde: Math.round(infoTotaal?.calories || 0), kleur: '#10b981' },
+                { label: 'eiwit', waarde: `${Math.round(infoTotaal?.protein || 0)}g`, kleur: '#3b82f6' },
+                { label: 'koolh', waarde: `${Math.round(infoTotaal?.carbs || 0)}g`, kleur: '#ec4899' },
+                { label: 'vet', waarde: `${Math.round(infoTotaal?.fat || 0)}g`, kleur: '#f59e0b' },
               ].map(m => (
-                <div key={m.label} style={{
-                  flex: 1, minWidth: 0, textAlign: 'center',
-                  padding: '0.5rem 0.25rem',
-                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
-                }}>
-                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>{m.waarde}</div>
-                  <div style={{
-                    fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
-                    textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2,
-                  }}>{m.label}</div>
+                <div key={m.label} style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{m.waarde}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 4, fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.kleur }} />{m.label}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1143,7 +1168,7 @@ export default function AIAlternativesModal({
             )}
 
             <PartnerBestellen meal={infoMeal} isMobile={isMobile} style={{ marginBottom: '0.75rem' }} />
-            {infoAangepast && (
+            {infoAangepast && !infoMeal._isCustom && (
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '0.6rem', lineHeight: 1.4 }}>
                 Aangepast: wordt opgeslagen als "{/\(aangepast\)$/.test(infoMeal.name || '') ? infoMeal.name : `${infoMeal.name} (aangepast)`}" in Mijn maaltijden.
               </div>
@@ -1161,8 +1186,18 @@ export default function AIAlternativesModal({
               }}
             >
               <Check size={15} strokeWidth={3} />
-              {infoBezig ? 'Opslaan…' : infoAangepast ? 'Opslaan in mijn maaltijden en kies' : (embedded ? 'Loggen' : 'Kies deze')}
+              {infoBezig ? 'Opslaan…'
+                : infoAangepast ? (infoMeal._isCustom ? 'Opslaan en kies' : 'Opslaan in mijn maaltijden en kies')
+                : (embedded ? 'Loggen' : 'Kies deze')}
             </button>
+            {/* Eigen maaltijd aangepast: ook alleen opslaan, zonder te kiezen. */}
+            {infoAangepast && infoMeal._isCustom && (
+              <button onClick={() => bewaarEigen(false)} disabled={infoBezig} style={{
+                width: '100%', minHeight: 42, marginTop: 6, background: 'none', border: 'none',
+                color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>Alleen opslaan</button>
+            )}
           </>
         )}
       </BladModal>
