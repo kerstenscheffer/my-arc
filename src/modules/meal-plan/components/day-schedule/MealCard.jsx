@@ -190,7 +190,8 @@ export default function MealCard({
           paddingBottom: compact ? (isMobile ? '0.25rem' : '0.3rem') : (isMobile ? '0.2rem' : '0.3rem'),
           paddingLeft: compact ? (isMobile ? '0.65rem' : '0.8rem') : (isMobile ? '0.7rem' : '0.95rem'),
           // Ruimte voor het prullenbakje, anders loopt de naam eronder.
-          paddingRight: onVerwijder && !hoekKnop
+          // Ook voor het hoekknopje (hartje, info): anders loopt de naam eronder.
+          paddingRight: (onVerwijder && !hoekKnop) || hoekKnop
             ? (isMobile ? '2rem' : '2.4rem')
             : (compact ? (isMobile ? '0.65rem' : '0.8rem') : (isMobile ? '0.7rem' : '0.95rem')),
         }}>

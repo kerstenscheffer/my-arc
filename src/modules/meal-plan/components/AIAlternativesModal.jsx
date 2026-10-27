@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import useZoekLog from './food-log/useZoekLog'
 import MealCard from './day-schedule/MealCard'
 import Keuze from './Keuze'
-import { foodImageFallback } from '../foodImageFallback'
+import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
 import { niveauVoorDoel, wisselNiveauVoorDoel } from '../DayTemplateService'
 import { stukVan } from './food-log/portionPresets'
 import PartnerBestellen, { PartnerLabel } from './PartnerBestellen'
@@ -13,7 +13,8 @@ import GramInvoer from './GramInvoer'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Plus, Info, SlidersHorizontal } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal } from 'lucide-react'
+import { createPortal } from '../../../client/paginaPortal'
 
 // De secties van "Mijn maaltijden" heten anders dan de log-momenten hier.
 const MOMENT_NAAR_SECTIE = {
@@ -150,8 +151,10 @@ export default function AIAlternativesModal({
 
   const bronOpties = [
     { id: 'alles', label: 'Overal zoeken' },
-    ...(Object.keys(wisselPerMoment).length > 0 ? [{ id: 'wissel', label: 'Wisselopties' }] : []),
-    ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Coach-suggesties' }] : []),
+    // 'Wisselopties' zei een klant niets: het is de vaste set die bij jouw
+    // niveau en dit moment past.
+    ...(Object.keys(wisselPerMoment).length > 0 ? [{ id: 'wissel', label: 'Aanraders' }] : []),
+    ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Van je coach' }] : []),
     ...(customMeals.length > 0 ? [{ id: 'mine', label: 'Mijn maaltijden' }] : []),
     // Kant-en-klaar te bestellen (PrepMyMeal).
     ...(allMeals.some(m => m.partner) ? [{ id: 'partner', label: 'Kant-en-klaar (PrepMyMeal)' }] : []),
@@ -616,7 +619,9 @@ export default function AIAlternativesModal({
       zoekLog.gekozen(meal, filteredMealsRef.current.indexOf(meal))
     }
     if (embedded) { onKiesMaaltijd?.(meal); return }
-    setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)
+    // Direct door naar de pop-up oud -> nieuw (daar kies je ook waar). Het
+    // tussenblad "Wissel hiermee?" was een tweede bevestiging van hetzelfde.
+    onSelectMeal?.(meal.id)
   }
 
   const openInfo = async (meal) => {
@@ -712,7 +717,9 @@ export default function AIAlternativesModal({
 
   if (!isOpen && !embedded) return null
 
-  return (
+  // Los venster via een portal: binnen de maaltijdlaag (z-index 1) zweefden
+  // de LOG-knop en de onderbalk eroverheen (27 okt 2026).
+  const inhoud = (
     <>
     <div
       onClick={embedded ? undefined : onClose}
@@ -763,41 +770,28 @@ export default function AIAlternativesModal({
               onClick={onClose}
               aria-label="Sluit"
               style={{
-                width: '36px', height: '36px', flexShrink: 0,
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '10px', color: '#fff',
+                width: '36px', height: '36px', flexShrink: 0, padding: 0, marginRight: -6,
+                background: 'none', border: 'none', color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <X size={16} strokeWidth={2.5} />
+              <X size={22} strokeWidth={2.4} />
             </button>
           </div>
 
-          {/* De maaltijd die je gaat wisselen als kaart, niet als losse naam:
-              dezelfde kaart als in de dagplanning, zonder knoppen. */}
-          <div style={{ margin: isMobile ? '0 -1rem 0.7rem' : '0 -1.5rem 0.8rem' }}>
-            <MealCard
-              meal={{
-                name: currentMeal?.name || currentMeal?.meal_name,
-                image_url: currentMeal?.image_url,
-                slot: currentMeal?.slot,
-                timing: currentMeal?.timing,
-                calories: currentMeal?.calories, protein: currentMeal?.protein,
-                carbs: currentMeal?.carbs, fat: currentMeal?.fat,
-              }}
-              isMobile={isMobile}
-              acties={[]}
-            />
-          </div>
-
-          <div style={{
-            fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.02em', marginBottom: '0.5rem',
-          }}>
-            Wissel voor:
+          {/* De maaltijd die je wisselt: één regel, geen kaart. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.75rem' }}>
+            <img src={resolveFoodImage(currentMeal || {}, { size: 120 })} alt=""
+              onError={e => { e.currentTarget.style.visibility = 'hidden' }}
+              style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, background: 'rgba(255,255,255,0.06)' }} />
+            <div style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ color: 'rgba(255,255,255,0.45)' }}>Nu · </span>{currentMeal?.name || currentMeal?.meal_name}
+            </div>
+            <div style={{ flexShrink: 0, fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
+              {Math.round(currentMeal?.calories || 0)} <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)' }}>kcal</span>
+            </div>
           </div>
           </>)}
 
@@ -810,37 +804,48 @@ export default function AIAlternativesModal({
                 left: '0.75rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: 'rgba(255, 255, 255, 0.2)'
+                color: 'rgba(255, 255, 255, 0.4)'
               }}
             />
             <input
               type="text"
-              placeholder="Zoek maaltijd..."
+              placeholder="Zoek maaltijd"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
                 width: '100%',
                 padding: '0.6rem 0.75rem 0.6rem 2.25rem',
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.07)',
+                border: 'none',
+                borderRadius: '12px',
                 color: 'white',
-                fontSize: isMobile ? '0.8rem' : '0.85rem',
+                fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 600,
                 outline: 'none',
-                minHeight: '40px',
-                boxSizing: 'border-box'
+                minHeight: '42px',
+                boxSizing: 'border-box', fontFamily: 'inherit',
               }}
-              onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
-              onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)'}
             />
           </div>
 
           {/* Drie keuzes: welk moment, waar zoeken, welke volgorde. Losse
               tekst met een pijltje, gescheiden door een lijntje — geen vakken,
               die maakten van de kop een formulier. */}
+          {/* Moment als pilletjes (zoals het logscherm); de gekozen wit. */}
+          <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', margin: isMobile ? '0 -1rem 0.35rem' : '0 -1.5rem 0.4rem', padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+            {momentOpties.map(o => {
+              const aan = moment === o.id
+              return (
+                <button key={o.id} onClick={() => setMoment(o.id)} style={{
+                  flexShrink: 0, height: 32, padding: '0 0.8rem', borderRadius: 999, border: 'none',
+                  background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                  fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>{o.id === 'alles' ? 'Alles' : o.label}</button>
+              )
+            })}
+          </div>
+          {/* Waar zoeken en volgorde: twee losse keuzes op één regel. */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Keuze waarde={moment} opties={momentOpties} zet={setMoment} isMobile={isMobile} />
-            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
             <Keuze waarde={bron} opties={bronOpties} zet={setBron} isMobile={isMobile} />
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
             <Keuze waarde={sortering} opties={sorteerOpties} zet={setSortering} isMobile={isMobile} uitlijning="rechts" />
@@ -1262,6 +1267,7 @@ export default function AIAlternativesModal({
       `}</style>
     </>
   )
+  return embedded ? inhoud : createPortal(inhoud, document.body)
 }
 
 // ── Single meal row in the list ──
@@ -1271,12 +1277,26 @@ export default function AIAlternativesModal({
 // eronder. Dat zijn de twee waarop je een maaltijd inruilt. Geen "Eigen"-label
 // meer voor eigen maaltijden: dat duwde het kcal-verschil van de foto af, en
 // die staan al onder hun eigen filter.
+//
+// 27 okt 2026: compacter. Geen knoppenrij meer (tik op de kaart = kiezen,
+// daarna de pop-up oud -> nieuw); info en hartje klein rechtsboven; het
+// verschil met de huidige maaltijd als regel onder de naam in plaats van klein
+// op de foto — dat is waar je op kiest.
 function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inMijnMaaltijden, onSter, onInfo, zonderVerschil = false }) {
-  const teken = (n) => `${n > 0 ? '+' : ''}${n}`
+  const teken = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)}`
   const kcalOp = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
   const eiwitOp = Math.round((meal.protein || 0) - (currentMeal?.protein || 0))
-  const kcalLabel = kcalOp === 0 ? 'Zelfde kcal' : `${teken(kcalOp)} kcal`
-  const eiwitLabel = eiwitOp === 0 ? 'zelfde eiwit' : `${teken(eiwitOp)}g eiwit`
+  const verschil = zonderVerschil ? null : (
+    <span>
+      <span style={{ color: '#fff' }}>{kcalOp === 0 ? 'zelfde kcal' : `${teken(kcalOp)} kcal`}</span>
+      {' · '}{eiwitOp === 0 ? 'zelfde eiwit' : `${teken(eiwitOp)}g eiwit`}
+    </span>
+  )
+  const hoek = {
+    width: 30, height: 30, padding: 0, background: 'transparent', border: 'none',
+    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
 
   return (
     <MealCard
@@ -1290,37 +1310,33 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inM
       // Bij loggen is er geen maaltijd om mee te vergelijken: dan het moment
       // op de foto in plaats van "+520 kcal".
       label={meal.partner ? <PartnerLabel meal={meal} /> : null}
-      momentLabel={zonderVerschil ? null : kcalLabel}
-      tijdLabel={zonderVerschil ? null : eiwitLabel}
+      momentLabel={zonderVerschil ? null : ''}
+      ondertitel={verschil}
+      compact
       isMobile={isMobile}
       geselecteerd={isSelected}
       onCheck={onSelect}
-      hoekKnop={
-        <button
-          onClick={(e) => { e.stopPropagation(); if (!inMijnMaaltijden) onSter?.() }}
-          aria-label={inMijnMaaltijden ? 'Staat in jouw maaltijden' : 'Zet bij mijn maaltijden'}
-          title={inMijnMaaltijden ? 'Staat al in jouw maaltijden' : 'Zet bij mijn maaltijden'}
-          style={{
-            width: 28, height: 28, padding: 0,
-            background: 'transparent', border: 'none', borderRadius: 7,
-            color: '#fff', opacity: inMijnMaaltijden ? 1 : 0.55,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: inMijnMaaltijden ? 'default' : 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Star size={14} strokeWidth={2.6} fill={inMijnMaaltijden ? '#fff' : 'none'} />
+      onTik={onSelect}
+      // Info rechts in het midden, het hartje in de hoek: twee knopjes naast
+      // elkaar in de hoek liepen over de naam.
+      rechts={
+        <button onClick={(e) => { e.stopPropagation(); onInfo?.() }} aria-label="Info" style={{ ...hoek, opacity: 0.55, cursor: 'pointer', marginTop: 14 }}>
+          <Info size={16} strokeWidth={2.4} />
         </button>
       }
-      acties={[
-        { icon: <Info size={isMobile ? 11 : 12} />, label: 'Info', onClick: onInfo },
-        {
-          icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />,
-          label: zonderVerschil ? 'Loggen' : (isSelected ? 'Gekozen' : 'Kies'),
-          onClick: onSelect,
-          checked: isSelected,
-        },
-      ]}
+      hoekKnop={
+        <div style={{ display: 'flex' }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); if (!inMijnMaaltijden) onSter?.() }}
+            aria-label={inMijnMaaltijden ? 'Staat in jouw maaltijden' : 'Zet bij mijn maaltijden'}
+            title={inMijnMaaltijden ? 'Staat al in jouw maaltijden' : 'Zet bij mijn maaltijden'}
+            style={{ ...hoek, opacity: inMijnMaaltijden ? 1 : 0.55, cursor: inMijnMaaltijden ? 'default' : 'pointer' }}
+          >
+            <Heart size={15} strokeWidth={2.6} fill={inMijnMaaltijden ? '#fff' : 'none'} />
+          </button>
+        </div>
+      }
+      acties={[]}
     />
   )
 }
