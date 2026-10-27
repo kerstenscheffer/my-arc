@@ -525,7 +525,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       }
       const velden = { display_label: label || null }
       if (meal.slot !== PRE_WORKOUT_SLOT && tijd) velden.timing = tijd
-      await zetMomentOpDagen(db.supabase, dashboardData.activePlan.id, dagen, meal.slot, velden)
+      await zetMomentOpDagen(db.supabase, dashboardData.activePlan.id, dagen, meal.slot, velden, { overal: bereik === 'overal' })
       setMomentKeuze(null)
       setPastDayRefreshKey(k => k + 1)
       await loadDashboardData()
@@ -1077,6 +1077,8 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           // Ook de week telt: dezelfde weekdag volgende week is niet vandaag.
           isToday={weekOffset === 0 && dayKeyToIndex(selectedDay) === getTodayIndex()}
           datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
+          dagenMetMaaltijd={modals.info ? dagenMetMaaltijd(modals.info) : null}
+          trainingsdagen={trainingsdagenVoor(modals.info)}
           // Ook de ringen van een andere dag verversen: een aanpassing achteraf
           // werkt de log van die dag bij, en MacroHero hield de oude som vast.
           onSaved={() => { setModals(prev => ({ ...prev, info: null })); setPastDayRefreshKey(k => k + 1); loadDashboardData() }}

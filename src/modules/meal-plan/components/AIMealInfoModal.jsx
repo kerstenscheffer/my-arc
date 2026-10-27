@@ -12,7 +12,7 @@ import PartnerBestellen from './PartnerBestellen'
 import SausBlok from './SausBlok'
 import IngredientDetail from './IngredientDetail'
 
-export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, datum, onSaved }) {
+export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, datum, onSaved, dagenMetMaaltijd = null, trainingsdagen = null }) {
   const isMobile = window.innerWidth <= 768
   const [activeTab, setActiveTab] = useState('info')
   const [ingredients, setIngredients] = useState([])
@@ -284,6 +284,8 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
           isToday={isToday}
           datum={datum}
           clientId={client.id}
+          dagenMetMaaltijd={dagenMetMaaltijd}
+          trainingsdagen={trainingsdagen}
           isMobile={isMobile}
           onClose={() => setShowEdit(false)}
           onSaved={() => { setShowEdit(false); onSaved?.() }}

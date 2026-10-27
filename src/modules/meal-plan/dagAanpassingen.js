@@ -204,25 +204,48 @@ export async function haalMaaltijdWegOpDagen(supabase, planId, dagen, slot) {
 // Moment van een maaltijd aanpassen door de klant (27 okt 2026): eigen titel
 // (display_label) en/of kloktijd (timing) op de gekozen weekdagen, blijvend.
 // Alleen dagen waar het slot echt staat; de maaltijd zelf blijft gelijk.
-// Een pre-workout van het plan (niet per dag) krijgt het label op de
-// plan-kolom.
-export async function zetMomentOpDagen(supabase, planId, dagen, slot, velden) {
+// Pre-workout van het plan (niet per dag): `overal` zet het op de
+// plan-kolom (alle trainingsdagen); alleen deze dag maakt op die dag een
+// eigen pre-workout-slot met het nieuwe moment (dag-slot wint). Vroeger ging
+// ook "alleen deze dag" naar de plan-kolom en veranderde elke trainingsdag
+// mee (27 okt 2026).
+export async function zetMomentOpDagen(supabase, planId, dagen, slot, velden, { overal = false } = {}) {
   if (!supabase || !planId || !slot || !dagen?.length || !velden) return
   const { data: plan, error: leesFout } = await supabase
     .from('client_meal_plans').select('week_structure, pre_workout_meal').eq('id', planId).single()
   if (leesFout) throw leesFout
   const week = { ...(plan?.week_structure || {}) }
   let raakt = false
+  const planPre = slot === PRE_WORKOUT_SLOT && plan?.pre_workout_meal && typeof plan.pre_workout_meal === 'object'
+    ? plan.pre_workout_meal : null
   dagen.forEach(dag => {
     const oud = week[dag]?.[slot]
-    if (!oud || typeof oud !== 'object') return
-    week[dag] = { ...week[dag], [slot]: { ...oud, ...velden } }
+    if (oud && typeof oud === 'object') {
+      week[dag] = { ...week[dag], [slot]: { ...oud, ...velden } }
+      raakt = true
+      return
+    }
+    if (!planPre || overal) return
+    // Eigen slot voor deze dag, als kopie van de plan-pre-workout.
+    const kopie = { ...planPre, ...velden }
+    delete kopie.uit_dagen
+    const dagPlan = { ...(week[dag] || {}), [slot]: kopie }
+    const maaltijden = Object.entries(dagPlan)
+      .filter(([k, m]) => k !== 'totals' && m && typeof m === 'object' && m.calories)
+      .map(([, m]) => m)
+    dagPlan.totals = {
+      kcal: maaltijden.reduce((s, m) => s + (m.calories || 0), 0),
+      protein: maaltijden.reduce((s, m) => s + (m.protein || 0), 0),
+      carbs: maaltijden.reduce((s, m) => s + (m.carbs || 0), 0),
+      fat: maaltijden.reduce((s, m) => s + (m.fat || 0), 0),
+    }
+    week[dag] = dagPlan
     raakt = true
   })
   const wijziging = { updated_at: new Date().toISOString() }
   if (raakt) wijziging.week_structure = week
-  if (!raakt && slot === PRE_WORKOUT_SLOT && plan?.pre_workout_meal) {
-    wijziging.pre_workout_meal = { ...plan.pre_workout_meal, ...velden }
+  if (planPre && overal) {
+    wijziging.pre_workout_meal = { ...planPre, ...velden }
   }
   if (Object.keys(wijziging).length === 1) return
   const { error } = await supabase.from('client_meal_plans').update(wijziging).eq('id', planId)
