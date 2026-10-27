@@ -929,14 +929,14 @@ export default function AIAlternativesModal({
               </div>
               {/* Doorgaan: wit wissel-icoon rechts op de macro-regel. */}
               {!waarInhoud && (
-                <button onClick={() => onSelectMeal?.(gekozen.id)} aria-label="Wissel" style={{
-                  flexShrink: 0, padding: '0.2rem 0.3rem', background: 'none', border: 'none', color: '#fff',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                  fontSize: '0.7rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                <button onClick={() => onSelectMeal?.(gekozen.id)} aria-label="Wissel" title="Wissel" style={{
+                  // Zo hoog als een macro (getal + label ernaast).
+                  flexShrink: 0, width: 40, height: 40, borderRadius: '50%', padding: 0,
+                  background: '#fff', border: 'none', color: '#0a0a0a',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}>
-                  <RefreshCw size={28} strokeWidth={3} />
-                  Wissel
+                  <RefreshCw size={20} strokeWidth={3} />
                 </button>
               )}
               </div>
