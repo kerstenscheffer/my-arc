@@ -81,6 +81,9 @@ export default function MealCard({
   label = null,
   // Prullenbakje rechtsboven op een planmaaltijd: uit het plan halen.
   onVerwijder = null,
+  // Grijze tekst direct achter de naam, op dezelfde regel (de dosering van
+  // een supplement).
+  naNaam = null,
 }) {
   const photoSize = compact ? (isMobile ? 60 : 66) : (isMobile ? 78 : 90)
   // Een lege string betekent bewust geen label op de foto (ingrediënten).
@@ -208,6 +211,7 @@ export default function MealCard({
             marginBottom: compact ? 2 : 1,
           }}>
             {meal.meal_name || meal.name || 'Maaltijd'}
+            {naNaam && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginLeft: 6 }}>{naNaam}</span>}
           </div>
 
           {label && <div style={{ display: 'flex', marginBottom: compact ? 3 : 5 }}>{label}</div>}

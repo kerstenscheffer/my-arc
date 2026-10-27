@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { getOverrides, lokaleDatum } from '../DayTemplateService'
 import { laadDagAanpassingen } from '../dagAanpassingen'
-import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd } from '../utils/preWorkoutMeal'
+import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd, isTrainingsdag } from '../utils/preWorkoutMeal'
 import { ClientAgendaService } from '../../client-agenda/ClientAgendaService'
 import DaySelector from './day-schedule/DaySelector'
 import DailyTotalsBar from './day-schedule/DailyTotalsBar'
@@ -527,6 +527,20 @@ export default function AIDaySchedule({
         })
       }
 
+      // Eenmalig toegevoegd op een moment dat niet in het plan staat.
+      for (const [slot, m] of Object.entries(aangepast)) {
+        if (!m || m.verwijderd || dayPlan[slot] || meals.some(x => x.slot === slot)) continue
+        const meta = SLOT_META[slot] || (slot === PRE_WORKOUT_SLOT ? { label: 'Pre-workout', time: 15.5 } : {})
+        meals.push({
+          ...m, slot,
+          timeSlot: meta.label || pretty(slot),
+          plannedTime: meta.time ?? 12,
+          timing: null,
+          meal_name: m.name || m.meal_name || meta.label || pretty(slot),
+          meal_id: m.id || m.meal_id,
+        })
+      }
+
       // Op geplande tijd sorteren zodat de volgorde klopt (ook voor custom slots).
       meals.sort((a, b) => (a.plannedTime ?? 12) - (b.plannedTime ?? 12))
       setDisplayMeals(meals)
@@ -534,6 +548,28 @@ export default function AIDaySchedule({
     finally { setLoading(false) }
   }
   
+  // Vaste momenten (27 okt 2026): ontbreekt er een (permanent weggehaald),
+  // dan een lege plek "+ Diner toevoegen" in plaats van niets. Zonder dit
+  // wist een klant niet hoe hij een avondmaaltijd terug in zijn plan kreeg.
+  // Snack telt als er een snack-moment is; pre-workout alleen op een
+  // trainingsdag zonder pre-workout.
+  const legeMomenten = (() => {
+    if (isFreeMode || alleenKijken || !activePlan?.week_structure) return []
+    const dagSleutel = daysOfWeek[currentDay]?.key
+    const heeft = (slot) => displayMeals.some(m => slot === 'snack' ? String(m.slot || '').startsWith('snack') : m.slot === slot)
+    const lijst = [
+      { slot: 'breakfast', label: 'Ontbijt', min: 8 * 60, zoek: 'breakfast' },
+      { slot: 'lunch', label: 'Lunch', min: 12 * 60 + 30, zoek: 'lunch' },
+      { slot: 'snack1', label: 'Snack', min: 15 * 60, zoek: 'snack' },
+      { slot: 'dinner', label: 'Diner', min: 18 * 60 + 30, zoek: 'dinner' },
+    ]
+    if (isTrainingsdag(workoutSchedule ?? client?.workout_schedule, dagSleutel, activePlan.week_structure?.[dagSleutel])) {
+      const t = trainingStarts[dagSleutel]
+      lijst.push({ slot: PRE_WORKOUT_SLOT, label: 'Pre-workout', min: Number.isFinite(t) ? Math.max(0, t - 60) : 15 * 60 + 30, zoek: PRE_WORKOUT_SLOT })
+    }
+    return lijst.filter(p => !heeft(p.zoek))
+  })()
+
   const handleDayClick = (dayIndex) => {
     setCurrentDay(dayIndex)
     if (onDayChange) onDayChange(daysOfWeek[dayIndex].key)
@@ -818,6 +854,11 @@ export default function AIDaySchedule({
       ) : (
         <MealTimelineMobile
           meals={displayMeals}
+          legeMomenten={legeMomenten}
+          onVoegToe={alleenKijken ? null : (plek) => onOpenAlternatives?.({
+            slot: plek.slot, _leeg: true, name: plek.label, display_label: plek.label,
+            calories: 0, protein: 0, carbs: 0, fat: 0, timing: null,
+          })}
           checkedMeals={checkedMeals}
           supplementenPerMoment={supplementenPerMoment}
           supplementLogs={suppLogs}

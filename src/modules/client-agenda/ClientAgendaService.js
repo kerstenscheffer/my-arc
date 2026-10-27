@@ -523,7 +523,13 @@ export class ClientAgendaService {
         const dayData = mealWeek[day]
         if (!dayData) return
         const aangepast = maaltijdAanpassingen?.[toIsoDate(dateForDay(anchor, day))] || {}
-        Object.entries(dayData).forEach(([slot, planMeal]) => {
+        // Eenmalig toegevoegd op een moment dat niet in het plan staat (lege
+        // plek "+ Diner toevoegen", 27 okt 2026): die meenemen alsof het plan
+        // hem had, zonder eigen kloktijd (dan de standaardtijd van het slot).
+        const extra = Object.entries(aangepast)
+          .filter(([slot, m]) => m && !m.verwijderd && !(slot in dayData))
+          .map(([slot, m]) => [slot, { ...m, timing: null }])
+        ;[...Object.entries(dayData), ...extra].forEach(([slot, planMeal]) => {
           if (slot === 'totals' || slot === 'is_training_day') return
           if (!planMeal || typeof planMeal !== 'object') return
           // Eenmalig weggehaald op deze datum (prullenbakje, "één week").

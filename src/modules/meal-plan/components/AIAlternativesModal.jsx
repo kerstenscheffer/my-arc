@@ -870,7 +870,7 @@ export default function AIAlternativesModal({
               fontSize: isMobile ? '1.15rem' : '1.3rem',
               fontWeight: 900, color: '#fff', letterSpacing: '-0.025em',
             }}>
-              Wissel maaltijd
+              {currentMeal?._leeg ? 'Maaltijd toevoegen' : 'Wissel maaltijd'}
             </div>
             <button
               onClick={onClose}
@@ -892,11 +892,21 @@ export default function AIAlternativesModal({
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 6, margin: '0.2rem 0 1rem' }}>
             {/* Nu: foto met naam en macro's eronder */}
             <div style={{ flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-              <img src={resolveFoodImage(currentMeal || {}, { size: 200 })} alt=""
-                onError={e => { e.currentTarget.style.visibility = 'hidden' }}
-                style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', opacity: 0.6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+              {currentMeal?._leeg ? (
+                // Leeg moment: niets om te wisselen, alleen toevoegen.
+                <div style={{
+                  width: 60, height: 60, borderRadius: '50%', border: '1.5px dashed rgba(255,255,255,0.25)', boxSizing: 'border-box',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.45)',
+                }}>
+                  <Plus size={20} strokeWidth={2.4} />
+                </div>
+              ) : (
+                <img src={resolveFoodImage(currentMeal || {}, { size: 200 })} alt=""
+                  onError={e => { e.currentTarget.style.visibility = 'hidden' }}
+                  style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', opacity: 0.6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+              )}
               <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginTop: '0.5rem' }}>
-                {Math.round(currentMeal?.calories || 0)} kcal · {Math.round(currentMeal?.protein || 0)}g eiwit
+                {currentMeal?._leeg ? 'Nu leeg' : `${Math.round(currentMeal?.calories || 0)} kcal · ${Math.round(currentMeal?.protein || 0)}g eiwit`}
               </div>
               <div style={{
                 fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.25,

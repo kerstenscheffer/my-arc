@@ -6,7 +6,7 @@
 // "Voedingsmiddel toevoegen" per section
 import React, { useState } from 'react'
 import MealCard from './MealCard'
-import { Trash2, Edit3, Info, Check } from 'lucide-react'
+import { Trash2, Edit3, Info, Check, Plus } from 'lucide-react'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
 import { useProductFotos } from '../../../supplements/utils/productFoto'
 
@@ -42,6 +42,10 @@ export default function MealTimelineMobile({
   supplementLogs,
   onSupplementCheck,
   onSupplementInfo,
+  // Vaste momenten die vandaag ontbreken: [{ slot, label, min }]. Een lege
+  // plek met "+ toevoegen" (opent het wisselscherm als toevoegen).
+  legeMomenten = [],
+  onVoegToe = null,
 }) {
   const [showPlan, setShowPlan] = useState(true)
   const productFotos = useProductFotos()
@@ -97,9 +101,13 @@ export default function MealTimelineMobile({
     min: Number.isFinite(sp.sorteerMin) ? sp.sorteerMin : 12 * 60,
   }))
 
+  if (onVoegToe) (legeMomenten || []).forEach(p => items.push({
+    soort: 'leeg', sleutel: `leeg-${p.slot}`, data: p, min: p.min,
+  }))
+
   // Bij een gelijke tijd eerst het plan, dan het supplement, dan wat er
   // gelogd is — zo staat de bedoeling boven de uitvoering.
-  const RANG = { plan: 0, supplement: 1, gelogd: 2 }
+  const RANG = { plan: 0, leeg: 0, supplement: 1, gelogd: 2 }
   items.sort((a, b) => (a.min - b.min) || (RANG[a.soort] - RANG[b.soort]))
 
   const klok = (min) =>
@@ -168,8 +176,26 @@ export default function MealTimelineMobile({
           )
         }
 
-        // Supplement — nu letterlijk dezelfde kaart als een maaltijd, met de
-        // dosering op de plek van de macro's en de tijd op de foto.
+        // Lege plek: dit vaste moment staat niet (meer) in het plan.
+        if (item.soort === 'leeg') {
+          const p = item.data
+          return (
+            <button key={item.sleutel} onClick={() => onVoegToe?.(p)} style={{
+              margin: '0 0.9rem 0.55rem', minHeight: 54, borderRadius: 12,
+              border: '1.5px dashed rgba(255,255,255,0.22)', background: 'transparent',
+              display: 'flex', alignItems: 'center', gap: 10, padding: '0 0.9rem',
+              color: 'rgba(255,255,255,0.7)', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <Plus size={18} strokeWidth={2.8} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 900 }}>{p.label} toevoegen</span>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>{klok(p.min)}</span>
+            </button>
+          )
+        }
+
+        // Supplement — compact (27 okt 2026): dosering achter de naam, geen
+        // knoppenrij. Tik op de kaart = info, het vinkje rechts = genomen.
         const sp = item.data
         const afgevinkt = !!supplementLogs?.has?.(sp.id)
         return (
@@ -177,21 +203,26 @@ export default function MealTimelineMobile({
             key={item.sleutel}
             meal={{ name: sp.naam, image_url: productFotos[sp.id] || supplementFoto(sp, 240) }}
             productFoto={!!productFotos[sp.id]}
-            momentLabel="Supplement"
+            momentLabel=""
             tijdLabel={Number.isFinite(item.min) ? klok(item.min) : null}
-            ondertitel={sp.dosering || null}
+            ondertitel={null}
+            naNaam={sp.dosering || null}
+            compact
             isChecked={afgevinkt}
             isMobile={true}
             onCheck={() => onSupplementCheck?.(sp)}
-            acties={[
-              { icon: <Info size={11} />, label: 'Info', onClick: () => onSupplementInfo?.(sp) },
-              {
-                icon: <Check size={11} strokeWidth={2.6} />,
-                label: afgevinkt ? 'Genomen' : 'Afronden',
-                onClick: () => onSupplementCheck?.(sp),
-                checked: afgevinkt,
-              },
-            ]}
+            onTik={() => onSupplementInfo?.(sp)}
+            rechts={
+              <button onClick={(e) => { e.stopPropagation(); onSupplementCheck?.(sp) }} aria-label={afgevinkt ? 'Genomen' : 'Afvinken'} style={{
+                width: 30, height: 30, borderRadius: '50%', padding: 0,
+                background: afgevinkt ? '#fff' : 'transparent', border: `1.5px solid ${afgevinkt ? '#fff' : 'rgba(255,255,255,0.35)'}`,
+                color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                {afgevinkt && <Check size={16} strokeWidth={3} />}
+              </button>
+            }
+            acties={[]}
           />
         )
       })}

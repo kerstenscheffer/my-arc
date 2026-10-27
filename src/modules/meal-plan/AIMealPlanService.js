@@ -339,6 +339,19 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         meals.push(entry)
       }
 
+      // Eenmalig toegevoegd op een moment dat niet in het plan staat (lege
+      // plek "+ Diner toevoegen", 27 okt 2026). De lussen hierboven lopen
+      // alleen over het dagplan en zagen deze niet.
+      for (const [slot, sw] of Object.entries(swaps)) {
+        if (!sw?.was_swapped || sw.verwijderd || !sw.edited_meal) continue
+        if (dayPlan[slot] || meals.some(m => m.slot === slot)) continue
+        meals.push(buildMealEntry(
+          sw.edited_meal, sw.edited_meal, slot,
+          this.formatSlotName(slot) === slot ? leesbaar(slot) : this.formatSlotName(slot),
+          this.getPlannedTime(slot), slot,
+        ))
+      }
+
       return meals
     } catch (error) {
       console.error('Error extracting today meals:', error)
