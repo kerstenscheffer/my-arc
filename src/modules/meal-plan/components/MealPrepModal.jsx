@@ -188,9 +188,9 @@ export default function MealPrepModal({ meal, ingredients = [], client, db, onCl
                 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ing.name}</div>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{toHumanAmount(ing.name, Number(ing.amount) || 0)} per bakje</div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{toHumanAmount(ing.name, Number(ing.amount) || 0, ing)} per bakje</div>
                 </div>
-                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>{toHumanAmount(ing.name, totaal)}</div>
+                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>{toHumanAmount(ing.name, totaal, ing)}</div>
               </div>
             )
           }) : (

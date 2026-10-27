@@ -95,7 +95,7 @@ export default function IngredientDetail({ ing, onTerug, onClose, isMobile }) {
               {ing.display || ing.name}
             </div>
             <div style={{ display: 'flex', gap: '0.875rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>{toHumanAmount(ing.name, ing.amount)}</span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>{toHumanAmount(ing.name, ing.amount, ing)}</span>
               {portie.map(m => (
                 <div key={m.label} style={{ display: 'flex', alignItems: 'baseline', gap: '0.15rem' }}>
                   <span style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>{rond(m.val, m.d ?? 0)}</span>

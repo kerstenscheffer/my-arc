@@ -1,3 +1,5 @@
+import { portieInfo, portieLabel } from '../tabs/plan-analyzer/portie'
+
 // src/modules/ai-meal-generator/utils/unitConverter.js
 // v2.0 — Fuzzy keyword matching, wetenschappelijke portie data
 
@@ -17,7 +19,9 @@ const UNIT_RULES = [
     // wrap, pasta, rijst en couscous. Stonden ze hier wel, dan werd een
     // volkoren wrap van 120 gram geteld als vier sneetjes.
     keywords: ['brood', 'bread', 'toast', 'boterham', 'snee', 'witbrood', 'bruinbrood', 'stokbrood'],
-    gramsPerUnit: 30,
+    // 35, gelijk aan gram_per_eenheid van de broden in ai_ingredients: met 30
+    // werd 140 g (4 sneeën) "~5 sneetjes" (Kersten, 27 okt 2026).
+    gramsPerUnit: 35,
     unit: 'sneetje', unitPlural: 'sneetjes',
     // Bron: Voedingscentrum, 1 sneetje brood ≈ 25-35g
   },
@@ -133,14 +137,24 @@ const BOUNDARY_KEYWORDS = new Set(['ei', 'egg'])
 // Grammen zijn leidend; het aantal stuks is een schatting uit een gemiddeld
 // gewicht per stuk en krijgt daarom een ~ (Kersten, 27 okt 2026: "2 wraps"
 // klopte niet per se). Geeft { gram: '100g', stuks: '~2 wraps' | null }.
-export function hoeveelheidDelen(name, grams) {
-  const gram = `${Math.round(Number(grams) || 0)}g`
-  const stuks = schatStuks(name, Number(grams) || 0)
-  return { gram, stuks }
+//
+// `ing` (optioneel) = de rij uit ai_ingredients. Heeft die een eigen eenheid
+// (snee, plakje, stuk) met gram_per_eenheid, dan wint die van de regels
+// hieronder: dat is per product vastgelegd, de regels zijn een gok op naam.
+export function hoeveelheidDelen(name, grams, ing = null) {
+  const g = Number(grams) || 0
+  const gram = `${Math.round(g)}g`
+  const info = portieInfo(ing)
+  if (info && g > 0) {
+    // Op halve porties afgerond: "~4 sneeën", niet "~3,9 snee".
+    const n = Math.round((g / info.gram) * 2) / 2
+    return { gram, stuks: n > 0 ? `~${portieLabel(n * info.gram, info)}` : null }
+  }
+  return { gram, stuks: schatStuks(name, g) }
 }
 
-export function toHumanAmount(name, grams) {
-  const { gram, stuks } = hoeveelheidDelen(name, grams)
+export function toHumanAmount(name, grams, ing = null) {
+  const { gram, stuks } = hoeveelheidDelen(name, grams, ing)
   return stuks ? `${gram} (${stuks})` : gram
 }
 

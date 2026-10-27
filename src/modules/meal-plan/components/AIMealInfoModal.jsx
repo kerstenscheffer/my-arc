@@ -341,7 +341,7 @@ function InfoTab({ meal, ingredients, loading, calcMacros, isMobile, db, clientI
                     carbs: macros.carbs, fat: macros.fat,
                   }}
                   momentLabel=""
-                  rechts={<Hoeveelheid naam={ing.name} gram={ing.amount} />}
+                  rechts={<Hoeveelheid naam={ing.name} gram={ing.amount} ing={ing} />}
                   isMobile={isMobile}
                   acties={[]}
                   onTik={() => onIngredient?.(ing)}
@@ -515,8 +515,8 @@ function TipsTab({ meal, isMobile }) {
 }
 
 // Grammen groot, het geschatte aantal stuks klein eronder.
-function Hoeveelheid({ naam, gram }) {
-  const { gram: g, stuks } = hoeveelheidDelen(naam, gram)
+function Hoeveelheid({ naam, gram, ing }) {
+  const { gram: g, stuks } = hoeveelheidDelen(naam, gram, ing)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
       <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff' }}>{g}</span>
