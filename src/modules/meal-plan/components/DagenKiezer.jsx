@@ -28,7 +28,7 @@
 //
 // `fotoNaar`: bij wisselen twee foto's, oud -> nieuw.
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Repeat, CalendarDays, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
+import { X, Repeat, CalendarDays, ChevronLeft, ChevronRight, ArrowRight, RefreshCw } from 'lucide-react'
 import { lokaleIso } from '../utils/dagVenster'
 
 const DAGEN = [
@@ -227,7 +227,21 @@ export default function DagenKiezer({
         {keuzes}
         {foutBlok}
         {extra}
-        {knop}
+        {/* Grote ronde knop met het wissel-icoon en de tekst erin. */}
+        <button onClick={kies} disabled={bezig || !lijst.length} aria-label={knopTekst} style={{
+          alignSelf: 'center', width: 104, height: 104, borderRadius: '50%', border: 'none', marginTop: '0.4rem',
+          background: lijst.length ? '#fff' : 'rgba(255,255,255,0.15)', color: lijst.length ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+          fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit',
+          cursor: bezig || !lijst.length ? 'default' : 'pointer',
+          boxShadow: lijst.length ? '0 10px 30px rgba(255,255,255,0.12)' : 'none',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          {bezig
+            ? <span style={{ width: 22, height: 22, border: '2.5px solid rgba(0,0,0,0.2)', borderTopColor: '#000', borderRadius: '50%', animation: 'cmeSpin 0.8s linear infinite' }} />
+            : <RefreshCw size={28} strokeWidth={2.6} />}
+          {knopTekst}
+        </button>
         {onTerug && (
           <button onClick={onTerug} disabled={bezig} style={{
             background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: '0.82rem', fontWeight: 800,

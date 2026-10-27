@@ -1138,7 +1138,7 @@ export default function AIAlternativesModal({
               lijst waar je 'm mist. */}
           {/* Eigen maaltijd maken: onderaan de lijst, nu er geen aparte
               'Mijn maaltijden'-lijst meer is. */}
-          {onMaaltijdAanmaken && !loading && !searchTerm.trim() && (
+          {onMaaltijdAanmaken && !loading && !searchTerm.trim() && !waarInhoud && (
             <div style={{ padding: isMobile ? '0.75rem 1rem 1.5rem' : '1rem 1.5rem 2rem' }}>
               <button
                 onClick={onMaaltijdAanmaken}
