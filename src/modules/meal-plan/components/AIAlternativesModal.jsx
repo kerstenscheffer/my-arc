@@ -12,7 +12,7 @@ import GramInvoer from './GramInvoer'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils, ChevronDown, RefreshCw } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils, ChevronDown, RefreshCw, Pencil } from 'lucide-react'
 import { createPortal } from '../../../client/paginaPortal'
 
 // De secties van "Mijn maaltijden" heten anders dan de log-momenten hier.
@@ -94,6 +94,12 @@ export default function AIAlternativesModal({
   // Aangetikte maaltijd: verschijnt in de cirkel bovenaan, met een knop
   // onderaan om door te gaan (27 okt 2026).
   const [gekozen, setGekozen] = useState(null)
+  // Bewerkstand voor de gekozen maaltijd: grammen per ingrediënt aanpassen
+  // terwijl de macro's bovenin meelopen. De aangepaste versie gaat alleen
+  // naar het plan van deze klant; de maaltijd in de database blijft gelijk.
+  const [bewerk, setBewerk] = useState(false)
+  const [bewerkIngr, setBewerkIngr] = useState(null) // uitgeschreven regels
+  const [bewerkGram, setBewerkGram] = useState({})
   // Ingeklapte groepen in de lijst (op kopje).
   const [dicht, setDicht] = useState(() => new Set())
   // Groep per maaltijd uit de laatste lijst (0 eigen, 1 aanrader, 2 rest),
@@ -187,6 +193,7 @@ export default function AIAlternativesModal({
     return () => {
       setSelectedMeal(null)
       setGekozen(null)
+      setBewerk(false); setBewerkIngr(null); setBewerkGram({})
       setSearchTerm('')
       setMoment('alles')
       setBron('alles')
@@ -654,6 +661,7 @@ export default function AIAlternativesModal({
     // In de cirkel bovenaan; nog een keer tikken haalt hem eruit. Door naar
     // de pop-up oud -> nieuw gaat met de knop onderaan.
     setGekozen(prev => (prev?.id === meal.id ? null : meal))
+    setBewerk(false); setBewerkIngr(null); setBewerkGram({})
   }
 
   const openInfo = async (meal) => {
@@ -769,6 +777,34 @@ export default function AIAlternativesModal({
     return { text: '0', color: 'rgba(255,255,255,0.3)', Icon: Minus }
   }
 
+  // Gekozen maaltijd met de aangepaste grammen (zelfde rekensom als het
+  // info-blad: elke regel schaalt lineair met zijn eigen hoeveelheid).
+  const bewerkRegels = (bewerkIngr || []).map((ing, i) => {
+    const orig = Number(ing.amount) || 0
+    const nu = bewerkGram[i] !== undefined ? Math.max(0, Number(bewerkGram[i]) || 0) : orig
+    const f = orig > 0 ? nu / orig : 0
+    const r1 = (x) => Math.round((Number(x) || 0) * f * 10) / 10
+    return { ...ing, amount: nu, calories: Math.round((Number(ing.calories) || 0) * f), protein: r1(ing.protein), carbs: r1(ing.carbs), fat: r1(ing.fat) }
+  })
+  const bewerkAangepast = Object.keys(bewerkGram).some(i => Number(bewerkGram[i]) !== Number(bewerkIngr?.[i]?.amount))
+  const gekozenNu = gekozen && bewerkAangepast ? {
+    ...gekozen,
+    ...bewerkRegels.reduce((t, r) => ({
+      calories: t.calories + r.calories, protein: t.protein + r.protein, carbs: t.carbs + r.carbs, fat: t.fat + r.fat,
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0 }),
+    ingredients_list: bewerkRegels.filter(r => r.amount > 0).map(r => ({
+      ...(r.ingredient_id ? { ingredient_id: r.ingredient_id } : {}),
+      name: r.name, amount: r.amount, unit: r.unit || 'gram',
+      calories: r.calories, protein: r.protein, carbs: r.carbs, fat: r.fat,
+    })),
+    _aangepast: true,
+  } : gekozen
+  const openBewerk = async () => {
+    if (!gekozen) return
+    setBewerk(true)
+    if (bewerkIngr === null) setBewerkIngr((await schrijfIngredientenUit(gekozen.ingredients_list)) || [])
+  }
+
   const filteredMeals = getFilteredMeals()
   // Kopje boven een groep in de lijst: eigen maaltijden, de groep van een
   // aanrader (Op brood, Wrap, …), of de rest.
@@ -877,11 +913,25 @@ export default function AIAlternativesModal({
             <div style={{ flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               {gekozen ? (
                 <div key={gekozen.id} style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'altPopIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
-                  <img src={resolveFoodImage(gekozen, { size: 200 })} alt=""
-                    onError={e => { e.currentTarget.style.visibility = 'hidden' }}
-                    style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', boxSizing: 'border-box' }} />
+                  <div style={{ position: 'relative', width: 60, height: 60 }}>
+                    <img src={resolveFoodImage(gekozen, { size: 200 })} alt=""
+                      onError={e => { e.currentTarget.style.visibility = 'hidden' }}
+                      style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', boxSizing: 'border-box' }} />
+                    {/* Potloodje: grammen aanpassen, macro's lopen live mee. */}
+                    {!embedded && !gekozen.partner && !waarInhoud && (
+                      <button onClick={() => (bewerk ? setBewerk(false) : openBewerk())} aria-label="Bewerk" title="Hoeveelheden aanpassen" style={{
+                        position: 'absolute', top: -4, right: -8, width: 26, height: 26, borderRadius: '50%', padding: 0,
+                        background: bewerk ? '#0a0a0a' : '#fff', color: bewerk ? '#fff' : '#0a0a0a',
+                        border: bewerk ? '1.5px solid #fff' : '2px solid #0a0a0a', boxSizing: 'border-box',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}>
+                        <Pencil size={12} strokeWidth={3} />
+                      </button>
+                    )}
+                  </div>
                   <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginTop: '0.5rem' }}>
-                    {Math.round(gekozen.calories || 0)} kcal · {Math.round(gekozen.protein || 0)}g eiwit
+                    {Math.round(gekozenNu.calories || 0)} kcal · {Math.round(gekozenNu.protein || 0)}g eiwit
                   </div>
                   <div style={{
                     fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.25,
@@ -909,10 +959,10 @@ export default function AIAlternativesModal({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 16 : 22 }}>
               <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 16 : 26 }}>
                 {[
-                  { label: 'kcal', n: (gekozen.calories || 0) - (currentMeal?.calories || 0), kleur: '#10b981', g: '' },
-                  { label: 'eiwit', n: (gekozen.protein || 0) - (currentMeal?.protein || 0), kleur: '#3b82f6', g: 'g' },
-                  { label: 'koolh', n: (gekozen.carbs || 0) - (currentMeal?.carbs || 0), kleur: '#ec4899', g: 'g' },
-                  { label: 'vet', n: (gekozen.fat || 0) - (currentMeal?.fat || 0), kleur: '#f59e0b', g: 'g' },
+                  { label: 'kcal', n: (gekozenNu.calories || 0) - (currentMeal?.calories || 0), kleur: '#10b981', g: '' },
+                  { label: 'eiwit', n: (gekozenNu.protein || 0) - (currentMeal?.protein || 0), kleur: '#3b82f6', g: 'g' },
+                  { label: 'koolh', n: (gekozenNu.carbs || 0) - (currentMeal?.carbs || 0), kleur: '#ec4899', g: 'g' },
+                  { label: 'vet', n: (gekozenNu.fat || 0) - (currentMeal?.fat || 0), kleur: '#f59e0b', g: 'g' },
                 ].map(m => {
                   const v = Math.round(m.n)
                   return (
@@ -929,7 +979,7 @@ export default function AIAlternativesModal({
               </div>
               {/* Doorgaan: wit wissel-icoon rechts op de macro-regel. */}
               {!waarInhoud && (
-                <button onClick={() => onSelectMeal?.(gekozen.id)} aria-label="Wissel" title="Wissel" style={{
+                <button onClick={() => { setBewerk(false); onSelectMeal?.(gekozen.id, gekozenNu?._aangepast ? gekozenNu : null) }} aria-label="Wissel" title="Wissel" style={{
                   // Zo hoog als een macro (getal + label ernaast).
                   flexShrink: 0, width: 40, height: 40, borderRadius: '50%', padding: 0,
                   background: '#fff', border: 'none', color: '#0a0a0a',
@@ -944,7 +994,7 @@ export default function AIAlternativesModal({
           )}
           </>)}
 
-          {!waarInhoud && (<>
+          {!waarInhoud && !bewerk && (<>
           {/* Search */}
           <div style={{ position: 'relative', marginBottom: '0.625rem' }}>
             <Search
@@ -1040,6 +1090,53 @@ export default function AIAlternativesModal({
           {waarInhoud ? (
             <div style={{ padding: isMobile ? '0.9rem 1rem calc(1.2rem + env(safe-area-inset-bottom, 0px))' : '1rem 1.5rem 1.5rem', animation: 'altFadeIn 0.2s ease both' }}>
               {waarInhoud}
+            </div>
+          ) : bewerk ? (
+            <div style={{ padding: isMobile ? '0.6rem 0 calc(1.2rem + env(safe-area-inset-bottom, 0px))' : '0.8rem 0 1.5rem', animation: 'altFadeIn 0.2s ease both' }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: isMobile ? '0 1rem 0.5rem' : '0 1.5rem 0.6rem' }}>
+                Hoeveelheden
+              </div>
+              {bewerkIngr === null ? (
+                <div style={{ padding: '1rem', color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', textAlign: 'center' }}>Laden…</div>
+              ) : bewerkIngr.length === 0 ? (
+                <div style={{ padding: '1rem', color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', fontWeight: 700, textAlign: 'center' }}>
+                  Van deze maaltijd staan geen ingrediënten in de database.
+                </div>
+              ) : bewerkRegels.map((ing, i) => (
+                <MealCard
+                  key={`${ing.name}-${i}`}
+                  meal={{ name: ing.name, image_url: foodImageFallback(ing.name, null, 200), calories: ing.calories, protein: ing.protein, carbs: ing.carbs, fat: ing.fat }}
+                  momentLabel=""
+                  compact
+                  rechts={
+                    <GramInvoer
+                      waarde={ing.amount}
+                      eenheid={ing.unit === 'gram' || ing.unit === 'g' || !ing.unit ? 'g' : ing.unit}
+                      stap={ing.unit === 'gram' || ing.unit === 'g' || !ing.unit ? (stukVan(ing.name)?.grams || 10) : 1}
+                      stuk={ing.unit === 'gram' || ing.unit === 'g' || !ing.unit ? stukVan(ing.name) : null}
+                      zet={(v) => setBewerkGram(prev => ({ ...prev, [i]: v }))}
+                    />
+                  }
+                  isMobile={isMobile}
+                  acties={[]}
+                />
+              ))}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: isMobile ? '0.8rem 1rem 0' : '1rem 1.5rem 0' }}>
+                <button onClick={() => setBewerk(false)} style={{
+                  width: '100%', minHeight: 46, borderRadius: 12, border: 'none', background: '#fff', color: '#0a0a0a',
+                  fontSize: '0.9rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>Klaar</button>
+                {bewerkAangepast && (
+                  <button onClick={() => setBewerkGram({})} style={{
+                    background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 800,
+                    fontFamily: 'inherit', cursor: 'pointer', padding: '0.5rem',
+                  }}>Terug naar origineel</button>
+                )}
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 4 }}>
+                  Alleen voor jouw plan. De maaltijd zelf blijft gelijk.
+                </div>
+              </div>
             </div>
           ) : loading ? (
             <div style={{

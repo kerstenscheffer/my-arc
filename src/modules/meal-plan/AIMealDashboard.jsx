@@ -480,14 +480,24 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
 
   // `inline`: vanuit het wisselscherm. Dat blijft open en toont de keuze
   // waar het geldt zelf (27 okt 2026); anders de losse pop-up.
-  const kiesWissel = async (originalMeal, newMealId, { inline = false } = {}) => {
+  // `aangepast`: de klant paste in het wisselscherm de grammen aan. Die versie
+  // (macro's + ingrediënten) gaat in het plan; ai_meals blijft ongemoeid.
+  const kiesWissel = async (originalMeal, newMealId, { inline = false, aangepast = null } = {}) => {
     if (!inline) {
       setModals(prev => ({ ...prev, alternatives: null, favorites: false }))
       setNaWisselSchild(true)
       setTimeout(() => setNaWisselSchild(false), 500)
     }
-    const nieuw = await service.getMealById(newMealId)
-    if (!nieuw) { console.error('Wissel: maaltijd niet gevonden', newMealId); return }
+    const opgehaald = await service.getMealById(newMealId)
+    if (!opgehaald) { console.error('Wissel: maaltijd niet gevonden', newMealId); return }
+    const nieuw = aangepast ? {
+      ...opgehaald,
+      calories: Math.round(aangepast.calories || 0),
+      protein: Math.round((aangepast.protein || 0) * 10) / 10,
+      carbs: Math.round((aangepast.carbs || 0) * 10) / 10,
+      fat: Math.round((aangepast.fat || 0) * 10) / 10,
+      ingredients_list: aangepast.ingredients_list,
+    } : opgehaald
     setWisselFout(null)
     setWisselKeuze({ meal: originalMeal, nieuw, inline })
   }
@@ -898,7 +908,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           isOpen={!!modals.alternatives}
           onClose={() => { if (wisselBezig) return; setModals(prev => ({ ...prev, alternatives: null })); setWisselKeuze(null) }}
           currentMeal={modals.alternatives}
-          onSelectMeal={(newMealId) => kiesWissel(modals.alternatives, newMealId, { inline: true })}
+          onSelectMeal={(newMealId, aangepast) => kiesWissel(modals.alternatives, newMealId, { inline: true, aangepast })}
           waarInhoud={wisselKeuze?.inline ? (
             <DagenKiezer
               inline
