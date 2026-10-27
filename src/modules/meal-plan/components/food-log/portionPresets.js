@@ -814,7 +814,9 @@ export const stukTekst = (gram, stuk) => {
   const n = Math.round((gram / stuk.grams) * 2) / 2
   if (n <= 0) return null
   const tal = String(n).replace('.', ',')
-  return `${tal} ${n === 1 ? stuk.enkel : stuk.meer}`
+  // ~ : het aantal is geschat uit een gemiddeld gewicht per stuk; de grammen
+  // zijn leidend (Kersten, 27 okt 2026).
+  return `~${tal} ${n === 1 ? stuk.enkel : stuk.meer}`
 }
 
 export default PORTION_PRESETS

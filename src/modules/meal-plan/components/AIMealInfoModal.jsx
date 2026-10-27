@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCircle, Sparkles, Pencil, HelpCircle } from 'lucide-react'
-import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
+import { hoeveelheidDelen } from '../../ai-meal-generator/utils/unitConverter'
 import ClientMealEditModal from './ClientMealEditModal'
 import MealCard from './day-schedule/MealCard'
 import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
@@ -336,7 +336,7 @@ function InfoTab({ meal, ingredients, loading, calcMacros, isMobile, db, clientI
                     carbs: macros.carbs, fat: macros.fat,
                   }}
                   momentLabel=""
-                  rechts={toHumanAmount(ing.name, ing.amount)}
+                  rechts={<Hoeveelheid naam={ing.name} gram={ing.amount} />}
                   isMobile={isMobile}
                   acties={[]}
                   onTik={() => onIngredient?.(ing)}
@@ -505,6 +505,17 @@ function TipsTab({ meal, isMobile }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Grammen groot, het geschatte aantal stuks klein eronder.
+function Hoeveelheid({ naam, gram }) {
+  const { gram: g, stuks } = hoeveelheidDelen(naam, gram)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+      <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff' }}>{g}</span>
+      {stuks && <span style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{stuks}</span>}
     </div>
   )
 }

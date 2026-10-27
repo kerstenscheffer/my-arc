@@ -130,8 +130,22 @@ const BOUNDARY_KEYWORDS = new Set(['ei', 'egg'])
  * Matching: INCLUDES check op lowercase — herkent merknamen, varianten etc.
  * Uitzondering: korte keywords in BOUNDARY_KEYWORDS gebruiken word-boundary regex.
  */
+// Grammen zijn leidend; het aantal stuks is een schatting uit een gemiddeld
+// gewicht per stuk en krijgt daarom een ~ (Kersten, 27 okt 2026: "2 wraps"
+// klopte niet per se). Geeft { gram: '100g', stuks: '~2 wraps' | null }.
+export function hoeveelheidDelen(name, grams) {
+  const gram = `${Math.round(Number(grams) || 0)}g`
+  const stuks = schatStuks(name, Number(grams) || 0)
+  return { gram, stuks }
+}
+
 export function toHumanAmount(name, grams) {
-  if (!name || !grams || grams <= 0) return `${Math.round(grams)}g`
+  const { gram, stuks } = hoeveelheidDelen(name, grams)
+  return stuks ? `${gram} (${stuks})` : gram
+}
+
+function schatStuks(name, grams) {
+  if (!name || !grams || grams <= 0) return null
 
   const nameLower = name.toLowerCase()
 
@@ -157,16 +171,16 @@ export function toHumanAmount(name, grams) {
     }
   }
 
-  if (!rule) return `${Math.round(grams)}g`
+  if (!rule) return null
 
   // Check maxGrams limiet
-  if (rule.maxGrams && grams > rule.maxGrams) return `${Math.round(grams)}g`
+  if (rule.maxGrams && grams > rule.maxGrams) return null
 
   const count = Math.round(grams / rule.gramsPerUnit)
-  if (count < 1) return `${Math.round(grams)}g`
+  if (count < 1) return null
 
   const label = count === 1 ? rule.unit : rule.unitPlural
-  return `${count} ${label} (${Math.round(grams)}g)`
+  return `~${count} ${label}`
 }
 
 export default toHumanAmount
