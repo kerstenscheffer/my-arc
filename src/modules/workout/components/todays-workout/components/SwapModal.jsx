@@ -172,10 +172,16 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
       .map(([d]) => String(d).toLowerCase())
       .sort((a, b) => DAG_VOLGORDE.indexOf(a) - DAG_VOLGORDE.indexOf(b))
       .map(d => DAG_KORT[d]).filter(Boolean)
+    // Zelfde training = zelfde naam (Pull en "Pull "). Daar telt ook dezelfde
+    // plek mee als de oefening er al anders heet: was die eerder gewisseld,
+    // dan vond de naam niets terwijl het dezelfde training is (Kersten, 27 okt).
+    const zelfdeTraining = (dagPlan) => normNaam(dagPlan?.name) && normNaam(dagPlan?.name) === normNaam(schema?.week_structure?.[workoutDayKey]?.name)
     return Object.entries(schema?.week_structure || {})
       .filter(([dk]) => dk !== workoutDayKey)
       .map(([dk, dagPlan]) => {
-        const i = (dagPlan?.exercises || []).findIndex(e => normNaam(e?.name) === doelNaam)
+        const lijst = dagPlan?.exercises || []
+        let i = lijst.findIndex(e => normNaam(e?.name) === doelNaam)
+        if (i < 0 && zelfdeTraining(dagPlan) && lijst[exerciseIndex] && lijst[exerciseIndex]?.type !== 'cardio') i = exerciseIndex
         if (i < 0) return null
         return { dk, i, ex: dagPlan.exercises[i], naam: String(dagPlan?.name || dk).trim(), dagen: weekdagenVan(dk) }
       })
@@ -530,6 +536,11 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
                       ? `Ook in ${andereTrainingen[0].naam}${andereTrainingen[0].dagen.length ? ` (${andereTrainingen[0].dagen.join(' + ')})` : ''}?`
                       : 'Ook in je andere trainingen?'}
                   </div>
+                  {andereTrainingen.length === 1 && normNaam(andereTrainingen[0].ex?.name) !== doelNaam && (
+                    <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: -4 }}>
+                      Daar staat nu {andereTrainingen[0].ex?.name}.
+                    </div>
+                  )}
                   {andereTrainingen.length > 1 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
                       {andereTrainingen.map(a => {
