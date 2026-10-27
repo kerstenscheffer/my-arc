@@ -13,7 +13,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, Download, ArrowLeftRight, Loader, Crop, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Download, ArrowLeftRight, Loader, Crop, RotateCcw, ChevronLeft, ChevronRight, ChevronDown, Check } from 'lucide-react'
 import { tekenTransformatie, FORMATEN } from './transformatieKaart'
 
 const angleOf = (p) => (p?.metadata?.subtype || 'overig')
@@ -278,6 +278,41 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
     )
   }
 
+  // Hoek van een foto: eigen mini-dropdown die boven de knop openklapt. De
+  // systeem-keuzelijst verscheen op een rare plek in het venster.
+  const [hoekOpen, setHoekOpen] = useState(null) // foto-id
+  const HoekKeuze = ({ foto }) => {
+    const opties = ['front', 'side', 'back', ...(['front', 'back', 'side'].includes(angleOf(foto)) ? [] : [angleOf(foto)])]
+    const open = hoekOpen === foto.id
+    return (
+      <div style={{ position: 'relative' }}>
+        <button onClick={() => setHoekOpen(open ? null : foto.id)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, height: 32, padding: '0 0.6rem', borderRadius: 9, border: 'none',
+          background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+        }}>
+          {angleLabel(angleOf(foto))}
+          <ChevronDown size={14} strokeWidth={3} style={{ transition: 'transform 0.15s ease', transform: open ? 'rotate(180deg)' : 'none' }} />
+        </button>
+        {open && (
+          <div style={{
+            position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, zIndex: 3, minWidth: 140,
+            background: '#1c1c1c', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: 4,
+            boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+          }}>
+            {opties.map(a => (
+              <button key={a} onClick={() => { setHoekOpen(null); zetHoek(foto, a) }} style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                height: 34, padding: '0 0.6rem', borderRadius: 7, border: 'none',
+                background: a === angleOf(foto) ? 'rgba(255,255,255,0.1)' : 'transparent', color: '#fff',
+                fontSize: '0.84rem', fontWeight: a === angleOf(foto) ? 900 : 700, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+              }}>{angleLabel(a)}{a === angleOf(foto) && <Check size={14} strokeWidth={3} />}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const knop = (vol) => ({
     height: 44, padding: '0 0.9rem', borderRadius: 12,
     background: vol ? '#fff' : 'rgba(255,255,255,0.07)',
@@ -384,11 +419,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                     {[{ label: 'Voor', foto: left }, { label: 'Na', foto: right }].map(({ label, foto }) => (
                       <div key={label} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
-                        <select value={angleOf(foto)} onChange={e => zetHoek(foto, e.target.value)} title="Hoek van deze foto"
-                          style={{ background: 'rgba(255,255,255,0.07)', color: '#fff', border: 'none', borderRadius: 8, fontSize: '0.72rem', fontWeight: 800, padding: '0.35rem 0.4rem', fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }}>
-                          {['front', 'back', 'side'].map(a => <option key={a} value={a}>{angleLabel(a)}</option>)}
-                          {!['front', 'back', 'side'].includes(angleOf(foto)) && <option value={angleOf(foto)}>{angleLabel(angleOf(foto))}</option>}
-                        </select>
+                        <HoekKeuze foto={foto} />
                       </div>
                     ))}
                     </div>
