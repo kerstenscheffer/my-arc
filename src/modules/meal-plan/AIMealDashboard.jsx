@@ -478,14 +478,18 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   const [wisselBezig, setWisselBezig] = useState(false)
   const [wisselFout, setWisselFout] = useState(null)
 
-  const kiesWissel = async (originalMeal, newMealId) => {
-    setModals(prev => ({ ...prev, alternatives: null, favorites: false }))
-    setNaWisselSchild(true)
-    setTimeout(() => setNaWisselSchild(false), 500)
+  // `inline`: vanuit het wisselscherm. Dat blijft open en toont de keuze
+  // waar het geldt zelf (27 okt 2026); anders de losse pop-up.
+  const kiesWissel = async (originalMeal, newMealId, { inline = false } = {}) => {
+    if (!inline) {
+      setModals(prev => ({ ...prev, alternatives: null, favorites: false }))
+      setNaWisselSchild(true)
+      setTimeout(() => setNaWisselSchild(false), 500)
+    }
     const nieuw = await service.getMealById(newMealId)
     if (!nieuw) { console.error('Wissel: maaltijd niet gevonden', newMealId); return }
     setWisselFout(null)
-    setWisselKeuze({ meal: originalMeal, nieuw })
+    setWisselKeuze({ meal: originalMeal, nieuw, inline })
   }
 
   // Prullenbakje op een planmaaltijd: zelfde dagkiezer, dan weghalen.
@@ -573,6 +577,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         for (const d of keuze.datums) await service.overrideMealForDate(client.id, slot, snap, d)
       }
       setWisselKeuze(null)
+      setModals(prev => ({ ...prev, alternatives: null }))
       setPastDayRefreshKey(k => k + 1)
       await loadDashboardData()
     } catch (e) {
@@ -891,9 +896,28 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       {modals.alternatives && (
         <AIAlternativesModal
           isOpen={!!modals.alternatives}
-          onClose={() => setModals(prev => ({ ...prev, alternatives: null }))}
+          onClose={() => { if (wisselBezig) return; setModals(prev => ({ ...prev, alternatives: null })); setWisselKeuze(null) }}
           currentMeal={modals.alternatives}
-          onSelectMeal={(newMealId) => kiesWissel(modals.alternatives, newMealId)}
+          onSelectMeal={(newMealId) => kiesWissel(modals.alternatives, newMealId, { inline: true })}
+          waarInhoud={wisselKeuze?.inline ? (
+            <DagenKiezer
+              inline
+              vraag="Waar wil je wisselen?"
+              knopTekst="Wisselen"
+              datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
+              dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
+              slot={wisselKeuze.meal.slot}
+              dagenMetMaaltijd={dagenMetMaaltijd(wisselKeuze.meal)}
+              trainingsdagen={trainingsdagenVoor(wisselKeuze.meal)}
+              vastAltijd
+              bezig={wisselBezig}
+              fout={wisselFout}
+              isMobile={isMobile}
+              onKies={voerWisselUit}
+              onTerug={() => !wisselBezig && setWisselKeuze(null)}
+              terugTekst="← Andere maaltijd"
+            />
+          ) : null}
           onMaaltijdAanmaken={() => {
             setModals(prev => ({ ...prev, alternatives: null }))
             setFoodLogTab('meals')
@@ -905,7 +929,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         />
       )}
       
-      {wisselKeuze && createPortal(
+      {wisselKeuze && !wisselKeuze.inline && createPortal(
         // Zelfde pop-up als verwijderen: oud -> nieuw, dan waar.
         <div style={{ position: 'fixed', inset: 0, zIndex: 11000 }}>
           <DagenKiezer

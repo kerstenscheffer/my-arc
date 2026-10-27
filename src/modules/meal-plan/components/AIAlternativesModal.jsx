@@ -69,6 +69,9 @@ export default function AIAlternativesModal({
   // onKiesMaaltijd (de portie kies je daarna in het log-venster).
   embedded = false,
   onKiesMaaltijd,
+  // Na 'Wissel': de keuze waar het geldt (dagkiezer), in dit venster in
+  // plaats van de lijst. Komt van de ouder, die ook het opslaan doet.
+  waarInhoud = null,
 }) {
   const isMobile = window.innerWidth <= 768
   const zoekLog = useZoekLog({ db, client, modus: 'products', context: 'wissel' })
@@ -923,18 +926,19 @@ export default function AIAlternativesModal({
                   )
                 })}
               </div>
-              <button onClick={() => onSelectMeal?.(gekozen.id)} style={{
+              {!waarInhoud && <button onClick={() => onSelectMeal?.(gekozen.id)} style={{
                 width: '100%', minHeight: 46, borderRadius: 12, border: 'none', background: '#fff', color: '#0a0a0a',
                 fontSize: '0.92rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
                 <Check size={16} strokeWidth={3} /> Wissel
-              </button>
+              </button>}
             </div>
           )}
           </>)}
 
+          {!waarInhoud && (<>
           {/* Search */}
           <div style={{ position: 'relative', marginBottom: '0.625rem' }}>
             <Search
@@ -1018,6 +1022,7 @@ export default function AIAlternativesModal({
               ))}
             </div>
           )}
+          </>)}
         </div>
 
         {/* ── Meal List ── */}
@@ -1026,7 +1031,11 @@ export default function AIAlternativesModal({
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch'
         }}>
-          {loading ? (
+          {waarInhoud ? (
+            <div style={{ padding: isMobile ? '0.9rem 1rem calc(1.2rem + env(safe-area-inset-bottom, 0px))' : '1rem 1.5rem 1.5rem', animation: 'altFadeIn 0.2s ease both' }}>
+              {waarInhoud}
+            </div>
+          ) : loading ? (
             <div style={{
               display: 'flex',
               justifyContent: 'center',
