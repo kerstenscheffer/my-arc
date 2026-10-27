@@ -35,7 +35,7 @@ export default function MomentVenster({ label, tijd, metTijd = true, pos, bezig 
         {/* Soort en tijd op één regel, zonder vakken: bold witte tekst. De
             soort klapt een mini-lijstje uit; de tijd is het systeem-tijdveld
             zonder klokje (tikken opent het wiel). */}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, margin: '4px 0 12px' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 18, margin: '4px 0 12px' }}>
           <button onClick={() => setLijstOpen(v => !v)} style={{
             display: 'flex', alignItems: 'center', gap: 5, padding: 0, background: 'none', border: 'none',
             color: '#fff', fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', minWidth: 0,
@@ -44,10 +44,14 @@ export default function MomentVenster({ label, tijd, metTijd = true, pos, bezig 
             <ChevronDown size={16} strokeWidth={3} style={{ flexShrink: 0, transition: 'transform 0.15s ease', transform: lijstOpen ? 'rotate(180deg)' : 'none' }} />
           </button>
           {metTijd && (
-            <input className="mv-tijd" type="time" value={t} onChange={e => setT(e.target.value)} style={{
-              width: 70, padding: 0, background: 'none', border: 'none', color: '#fff', textAlign: 'right',
-              fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark',
-            }} />
+            // Tijd direct achter de soort, met hetzelfde pijltje: ook een keuze.
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+              <input className="mv-tijd" type="time" value={t} onChange={e => setT(e.target.value)} style={{
+                width: 52, padding: 0, background: 'none', border: 'none', color: '#fff',
+                fontSize: '1rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark', cursor: 'pointer',
+              }} />
+              <ChevronDown size={16} strokeWidth={3} color="#fff" style={{ flexShrink: 0 }} />
+            </label>
           )}
           {lijstOpen && (
             <div style={{
