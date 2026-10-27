@@ -92,7 +92,7 @@ export default function ClientMealEditModal({
   }
 
   const overlay = (
-    <div style={{
+    <div onClick={(e) => e.stopPropagation()} style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)',
       zIndex: 11000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
     }}>

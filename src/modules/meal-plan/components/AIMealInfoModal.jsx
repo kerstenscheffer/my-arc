@@ -167,7 +167,10 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
   ]
 
   return createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', zIndex: 10500, animation: 'infoFadeIn 0.2s ease' }}>
+    // Alleen een tik op de achtergrond zelf sluit. Klikken in de vensters
+    // die hieruit openen (Aanpassen, Meal prep) borrelen via React door
+    // naar deze div, en sloten dan alles (27 okt 2026: dag kiezen = weg).
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', zIndex: 10500, animation: 'infoFadeIn 0.2s ease' }}>
       <div onClick={e => e.stopPropagation()} style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: isMobile ? '100%' : '600px', width: '100%', margin: '0 auto', background: '#0a0a0a', overflow: 'hidden' }}>
         {openIng ? (
           <IngredientDetail ing={openIng} onTerug={() => setOpenIng(null)} onClose={onClose} isMobile={isMobile} />
