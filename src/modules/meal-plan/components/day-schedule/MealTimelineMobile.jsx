@@ -186,25 +186,24 @@ export default function MealTimelineMobile({
           const Icoon = LEEG_ICOON[p.slot] || LEEG_ICOON.snack1
           return (
             <button key={item.sleutel} onClick={() => onVoegToe?.(p)} style={{
-              margin: '0 0.9rem 0.55rem', minHeight: 78, borderRadius: 12, padding: 0, overflow: 'hidden',
+              margin: '0 0.9rem 0.55rem', minHeight: 56, borderRadius: 12, padding: 0, overflow: 'hidden',
               background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)',
               display: 'flex', alignItems: 'stretch', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
               <div style={{
-                width: 78, flexShrink: 0, background: 'rgba(255,255,255,0.05)', position: 'relative',
+                width: 60, flexShrink: 0, background: 'rgba(255,255,255,0.05)', position: 'relative',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.45)',
               }}>
-                <Icoon size={26} strokeWidth={2} />
-                <span style={{ position: 'absolute', left: 6, bottom: 5, fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>{klok(p.min)}</span>
+                <Icoon size={20} strokeWidth={2} />
               </div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 0.8rem' }}>
                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{p.label}</span>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Nog niets gepland</span>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{klok(p.min)} · nog niets gepland</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', paddingRight: '0.9rem', color: '#fff' }}>
-                <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#fff', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Plus size={17} strokeWidth={3} />
+                <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#fff', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Plus size={15} strokeWidth={3} />
                 </span>
               </div>
             </button>
