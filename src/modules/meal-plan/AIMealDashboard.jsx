@@ -70,6 +70,7 @@ import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 import AIAlternativesModal from './components/AIAlternativesModal'
 import { resolveFoodImage } from './foodImageFallback'
 import DagenKiezer from './components/DagenKiezer'
+import WisselStappen from './components/WisselStappen'
 import { weekplanVoorWeek } from './DayTemplateService'
 import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen, zetPreWorkoutOpTrainingsdagen } from './dagAanpassingen'
 import { isTrainingsdag, preWorkoutUitDag, PRE_WORKOUT_SLOT } from './utils/preWorkoutMeal'
@@ -910,10 +911,9 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           currentMeal={modals.alternatives}
           onSelectMeal={(newMealId, aangepast) => kiesWissel(modals.alternatives, newMealId, { inline: true, aangepast })}
           waarInhoud={wisselKeuze?.inline ? (
-            <DagenKiezer
-              inline
-              vraag="Waar wil je wisselen?"
-              knopTekst="Wisselen"
+            <WisselStappen
+              oudNaam={wisselKeuze.meal.name || wisselKeuze.meal.meal_name}
+              nieuwNaam={wisselKeuze.nieuw.name || wisselKeuze.nieuw.meal_name}
               datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
               dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
               slot={wisselKeuze.meal.slot}
@@ -925,7 +925,6 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
               isMobile={isMobile}
               onKies={voerWisselUit}
               onTerug={() => !wisselBezig && setWisselKeuze(null)}
-              terugTekst="← Andere maaltijd"
             />
           ) : null}
           onMaaltijdAanmaken={() => {
