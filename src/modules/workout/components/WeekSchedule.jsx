@@ -11,7 +11,9 @@ import ActionButtons from './week-schedule/ActionButtons'
 import CardioService, { normaliseerSoort } from '../services/CardioService'
 import TrainingToevoegen from './TrainingToevoegen'
 import { ontleedPlanKey } from '../utils/planKey'
-import { voegTrainingToe, verwijderTrainingVanDag } from '../utils/extraTrainingen'
+import { voegTrainingToe, verwijderTrainingVanDag, extraSleutels, trainingenVanDag } from '../utils/extraTrainingen'
+import DagenKiezer from '../../meal-plan/components/DagenKiezer'
+import workoutFoto from '../utils/workoutFoto'
 import RealiteitBlad from '../../client-agenda/RealiteitBlad'
 import CardioGedaanBlad from './CardioGedaanBlad'
 import TrainingInfoBlad, { CardioInfoBlad } from './week-schedule/TrainingInfoBlad'
@@ -84,7 +86,7 @@ export default function WeekSchedule({
   const [buurWeken, setBuurWeken] = useState({})
   // Het vaste rooster (clients.workout_schedule), om te weten of een training
   // 'permanent' in het plan staat of alleen in deze week.
-  const [vastRooster, setVastRooster] = useState({})
+  const [, setVastRooster] = useState({})
   // Vraag na een tik op de prullenbak: { soort, titel, permanent, item }
   const [verwijderVraag, setVerwijderVraag] = useState(null)
 
@@ -97,6 +99,81 @@ export default function WeekSchedule({
   const isHuidigeWeek = weekOffset === 0
   const isToekomst = weekOffset > 0
   const kanPlannen = isHuidigeWeek || isToekomst
+
+  // ── Training weghalen: zelfde pop-up als een maaltijd weghalen ──
+  // Altijd = uit de vaste indeling (en uit weken die al vooruit gepland
+  // staan); Eenmalig = alleen die week. Ook trainingen van de coach mogen
+  // altijd weg (Kersten, 27 okt 2026; eerst stond dat op slot).
+  const [trainingWeg, setTrainingWeg] = useState(null) // { key, day, titel, workout }
+  const [trainingWegBezig, setTrainingWegBezig] = useState(false)
+  const [trainingWegFout, setTrainingWegFout] = useState(null)
+  const huidigeWeekSleutel = WorkoutServiceNew.datumSleutel(getThisMonday())
+  const DAG_EN = { monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' }
+  // Deze training van de gekozen dagen af (hoofdtraining en extra's).
+  const zonderTraining = (schedule, dagenEn, key) => {
+    let sch = { ...(schedule || {}) }
+    dagenEn.forEach(Dag => {
+      extraSleutels(sch, Dag).filter(k => sch[k] === key).forEach(k => { sch = verwijderTrainingVanDag(sch, Dag, k) })
+      if (sch[Dag] === key) sch = verwijderTrainingVanDag(sch, Dag, null)
+    })
+    return sch
+  }
+  const dagenMetTraining = (schedule, key) =>
+    weekDays.filter(D => trainingenVanDag(schedule || {}, D).includes(key)).map(D => D.toLowerCase())
+  const maandagSleutelVan = (iso) => {
+    const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    return WorkoutServiceNew.datumSleutel(d)
+  }
+  const dagenMetDezeTraining = (key) => async (maandag) => {
+    const vast = (await db.getClientWorkoutSchedule(clientId)) || {}
+    if (!maandag) return dagenMetTraining(vast, key)
+    const wk = WorkoutServiceNew.datumSleutel(maandag)
+    const sch = wk === huidigeWeekSleutel ? vast : await WorkoutServiceNew.getPlanningVoorWeek(clientId, wk, vast, db)
+    return dagenMetTraining(sch, key)
+  }
+  const voerTrainingWegUit = async (keuze) => {
+    const t = trainingWeg
+    if (!t) return
+    setTrainingWegBezig(true); setTrainingWegFout(null)
+    try {
+      const dagenEn = keuze.dagen.map(d => DAG_EN[d])
+      const vast = (await db.getClientWorkoutSchedule(clientId)) || {}
+      if (keuze.modus === 'altijd') {
+        await db.updateClientWorkoutSchedule(clientId, zonderTraining(vast, dagenEn, t.key))
+        const { data: weken } = await db.supabase.from('client_week_schedules')
+          .select('week_start, schedule').eq('client_id', clientId).gte('week_start', huidigeWeekSleutel)
+          .then(r => r, () => ({ data: [] }))
+        for (const w of weken || []) {
+          const nieuw = zonderTraining(w.schedule, dagenEn, t.key)
+          if (JSON.stringify(nieuw) !== JSON.stringify(w.schedule || {})) {
+            await WorkoutServiceNew.saveWeekPlanning(clientId, w.week_start, nieuw, db)
+          }
+        }
+      } else {
+        const wk = maandagSleutelVan(keuze.datums[0])
+        if (wk === huidigeWeekSleutel) {
+          // Deze week: de vaste indeling nu aanpassen (zo klopt de workout van
+          // vandaag) en de oude klaarzetten voor volgende week, zoals
+          // verwijderTraining doet.
+          const volgende = (() => { const d = getThisMonday(); d.setDate(d.getDate() + 7); return WorkoutServiceNew.datumSleutel(d) })()
+          const eigenVolgende = await WorkoutServiceNew.getWeekPlanning(clientId, volgende, db)
+          if (!eigenVolgende) await WorkoutServiceNew.saveWeekPlanning(clientId, volgende, vast, db)
+          await db.updateClientWorkoutSchedule(clientId, zonderTraining(vast, dagenEn, t.key))
+        } else {
+          const plan = await WorkoutServiceNew.getPlanningVoorWeek(clientId, wk, vast, db)
+          const ok = await WorkoutServiceNew.saveWeekPlanning(clientId, wk, zonderTraining(plan, dagenEn, t.key), db)
+          if (!ok) throw new Error('Opslaan mislukt')
+        }
+      }
+      setTrainingWeg(null)
+      await loadSavedSchedule()
+    } catch (e) {
+      console.error('training weghalen mislukt:', e)
+      setTrainingWegFout(e?.message || 'Weghalen mislukt')
+    } finally {
+      setTrainingWegBezig(false)
+    }
+  }
 
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const weekDaysDutch = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -515,9 +592,9 @@ export default function WeekSchedule({
   const vraagTraining = (day, rosterKey = null) => {
     const key = tempSchedule[rosterKey || day]
     const w = getWorkoutData(key)
-    // Eigen training (custom_…): die mag de klant wél voorgoed uit zijn
-    // plan halen; dagen uit het plan van de coach niet.
-    setVerwijderVraag({ soort: 'training', titel: w?.name || w?.focus || 'Training', permanent: !!key && vastRooster[rosterKey || day] === key, item: day, rosterKey, eigen: String(key || '').startsWith('custom_'), key })
+    if (!key) return
+    setTrainingWegFout(null)
+    setTrainingWeg({ key, day, titel: w?.name || w?.focus || 'Training', workout: w })
   }
   const vraagCardio = (c) => setVerwijderVraag({ soort: 'cardio', titel: c.soort, permanent: !c.eenmalig, item: c })
   const voerUit = async (hoe) => {
@@ -882,6 +959,29 @@ export default function WeekSchedule({
         <CardioGedaanBlad log={cardioBlad.log} soort={cardioBlad.soort} gepland={cardioBlad.gepland} db={db} isMobile={isMobile}
           onClose={() => setCardioBlad(null)}
           onVerwijderd={() => { setCardioVersie(v => v + 1); window.dispatchEvent(new CustomEvent('myarc:cardio-changed')) }} />
+      )}
+
+      {trainingWeg && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2147483600 }}>
+          <DagenKiezer
+            volScherm
+            foto={workoutFoto(trainingWeg.workout)}
+            vraag="Waar wil je deze training verwijderen?"
+            titel={trainingWeg.titel}
+            subtitel={Array.isArray(trainingWeg.workout?.exercises) ? `${trainingWeg.workout.exercises.length} oefeningen` : null}
+            knopTekst="Verwijderen"
+            gevaar
+            datum={(() => { const d = new Date(getoondeMaandag); d.setDate(d.getDate() + weekDays.indexOf(trainingWeg.day)); return d })()}
+            dagKey={trainingWeg.day.toLowerCase()}
+            dagenMetMaaltijd={dagenMetDezeTraining(trainingWeg.key)}
+            bezig={trainingWegBezig}
+            fout={trainingWegFout}
+            isMobile={isMobile}
+            onKies={voerTrainingWegUit}
+            onClose={() => !trainingWegBezig && setTrainingWeg(null)}
+          />
+        </div>,
+        document.body
       )}
 
       {verwijderVraag && createPortal(
