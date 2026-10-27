@@ -12,12 +12,10 @@
 // begint bij een maaltijd die er al staat.
 
 import React, { useState } from 'react'
-import { X, ChefHat, Check, Loader, Package, Snowflake, Lightbulb } from 'lucide-react'
+import { X, Check, Loader, Snowflake } from 'lucide-react'
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
 import { foodImageFallback } from '../foodImageFallback'
 
-const GROEN = '#10b981'
-const GOUD = '#FFD700'
 
 // Bewaaradvies hangt aan wat er in de bak zit, niet aan een vast getal. Vis en
 // rijst zijn de twee die mensen te lang laten staan; die krijgen een kortere
@@ -107,178 +105,138 @@ export default function MealPrepModal({ meal, ingredients = [], client, db, onCl
     setBewaren(false)
   }
 
-  const kop = (icoon, tekst) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}>
-      {icoon}
-      <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tekst}</span>
-    </div>
+  // Stijl gelijk aan loggen en wisselen (27 okt 2026): pop-up van onder,
+  // geen vakken of goud/groen, macro's met een stipje, witte knop onderaan.
+  const kop = (tekst) => (
+    <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '1.5rem 0 0.6rem' }}>{tekst}</div>
   )
-
-  const vak = { padding: isMobile ? '0.9rem 1rem' : '1.1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }
+  const plusMin = {
+    width: 44, height: 52, padding: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)',
+    fontSize: '2.2rem', fontWeight: 800, lineHeight: 1, fontFamily: 'inherit', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+  const foto = meal?.image_url || foodImageFallback(naam, null, 300)
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', zIndex: 10600 }}>
-      <div onClick={e => e.stopPropagation()} style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: isMobile ? '100%' : 600, width: '100%', margin: '0 auto', background: '#0a0a0a', overflow: 'hidden' }}>
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 10600, background: 'rgba(0,0,0,0.55)',
+      backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        position: 'relative', width: '100%', maxWidth: 560, margin: '0 auto', maxHeight: '94vh',
+        background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.1)', borderTopLeftRadius: 22, borderTopRightRadius: 22,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'prepOmhoog 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)',
+      }}>
+        <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.18)', margin: '8px auto 0', flexShrink: 0 }} />
+        <button onClick={onClose} aria-label="Sluiten" style={{
+          position: 'absolute', top: 12, right: 12, width: 36, height: 36, padding: 0, zIndex: 2,
+          background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+        }}><X size={22} strokeWidth={2.4} /></button>
 
-        {/* Kop */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.5rem', borderBottom: `1px solid rgba(16,185,129,0.25)`, flexShrink: 0 }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: GROEN, fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              <ChefHat size={13} /> Meal preppen
-            </div>
-            <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {naam}
-            </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '0.9rem 1rem 1rem' : '1rem 1.5rem 1.25rem' }}>
+          {/* Kop: foto, naam */}
+          <div style={{ textAlign: 'center' }}>
+            <img src={foto} alt="" onError={e => { e.currentTarget.style.visibility = 'hidden' }} style={{
+              width: 84, height: 84, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
+            }} />
+            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '0.7rem' }}>Meal prep</div>
+            <div style={{ fontSize: isMobile ? '1.25rem' : '1.4rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.2, marginTop: 2, padding: '0 1.5rem' }}>{naam}</div>
           </div>
-          <button onClick={onClose} style={{ width: 36, height: 36, flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={18} /></button>
-        </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* Aantal bakjes: − 3 + */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: '1.2rem' }}>
+            <button aria-label="Minder" style={{ ...plusMin, opacity: dagen <= 1 ? 0.3 : 1 }} onClick={() => setDagen(d => Math.max(1, d - 1))}>−</button>
+            <div style={{ fontSize: isMobile ? '3.2rem' : '3.6rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1, minWidth: '1.4ch', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{dagen}</div>
+            <button aria-label="Meer" style={{ ...plusMin, opacity: dagen >= 7 ? 0.3 : 1 }} onClick={() => setDagen(d => Math.min(7, d + 1))}>+</button>
+          </div>
+          <div style={{ textAlign: 'center', fontSize: '1rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>bakje{dagen !== 1 ? 's' : ''}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, fontSize: '0.72rem', fontWeight: 700, color: teLang ? '#fff' : 'rgba(255,255,255,0.4)' }}>
+            <Snowflake size={13} strokeWidth={2.4} />
+            {teLang ? `Koelkast ${houdbaar} dagen · vries de rest in` : `${houdbaar} dagen goed in de koelkast`}
+          </div>
 
-          {/* Hoeveel dagen */}
-          <div style={vak}>
-            {kop(<Package size={12} color="rgba(255,255,255,0.35)" />, 'Voor hoeveel dagen?')}
-            <div style={{ display: 'flex', gap: '0.3rem' }}>
-              {[1, 2, 3, 4, 5, 6, 7].map(n => {
-                const aan = n === dagen
-                return (
-                  <button key={n} onClick={() => setDagen(n)} style={{
-                    flex: 1, padding: isMobile ? '0.65rem 0' : '0.7rem 0',
-                    background: aan ? 'rgba(16,185,129,0.16)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${aan ? GROEN : 'rgba(255,255,255,0.1)'}`,
-                    borderRadius: 9, color: aan ? GROEN : 'rgba(255,255,255,0.55)',
-                    fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 800,
-                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    minHeight: 42, fontFamily: 'inherit',
-                  }}>{n}</button>
-                )
-              })}
-            </div>
-            {teLang && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', marginTop: '0.6rem', padding: '0.5rem 0.6rem', background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: 8 }}>
-                <Snowflake size={13} color={GOUD} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'rgba(255,215,0,0.85)', lineHeight: 1.4 }}>
-                  {houdbaar} dagen in de koelkast met deze ingrediënten. Vries de bakjes vanaf dag {houdbaar + 1} in.
-                </span>
+          {/* Per bakje: vier getallen, geen vakken */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 22 : 34, marginTop: '1.4rem', paddingTop: '1.1rem', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            {[
+              { label: 'kcal', waarde: perBakje.calories, kleur: '#10b981' },
+              { label: 'eiwit', waarde: `${perBakje.protein}g`, kleur: '#3b82f6' },
+              { label: 'koolh', waarde: `${perBakje.carbs}g`, kleur: '#ec4899' },
+              { label: 'vet', waarde: `${perBakje.fat}g`, kleur: '#f59e0b' },
+            ].map(m => (
+              <div key={m.label} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: isMobile ? '1.3rem' : '1.45rem', fontWeight: 900, color: '#fff', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{m.waarde}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 4, fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.kleur }} />{m.label}
+                </div>
               </div>
-            )}
+            ))}
+          </div>
+          <div style={{ textAlign: 'center', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: '0.6rem' }}>
+            per bakje · totaal {perBakje.calories * dagen} kcal
           </div>
 
           {/* Boodschappen */}
-          <div style={vak}>
-            {kop(<Package size={12} color="rgba(255,255,255,0.35)" />, `Wat je nodig hebt · ${dagen} portie${dagen !== 1 ? 's' : ''}`)}
-            {ingredients.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {ingredients.map((ing, i) => {
-                  const totaal = (Number(ing.amount) || 0) * dagen
-                  return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0', borderBottom: i < ingredients.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <img src={ing.image_url || foodImageFallback(ing.name, null, 120)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ing.name}</div>
-                        <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>
-                          {toHumanAmount(ing.name, Number(ing.amount) || 0)} per bakje
-                        </div>
-                      </div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: GROEN, flexShrink: 0 }}>
-                        {toHumanAmount(ing.name, totaal)}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.25)', padding: '0.4rem 0' }}>
-                Voor deze maaltijd staan geen ingrediënten in het plan — het stappenplan hieronder werkt wel.
-              </div>
-            )}
-          </div>
-
-          {/* Macro's per bakje */}
-          <div style={vak}>
-            {kop(<Check size={12} color="rgba(255,255,255,0.35)" />, 'Per bakje')}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {[
-                { val: perBakje.calories, label: 'kcal' },
-                { val: perBakje.protein, label: 'eiwit' },
-                { val: perBakje.carbs, label: 'koolh' },
-                { val: perBakje.fat, label: 'vet' },
-              ].map(x => (
-                <div key={x.label} style={{ flex: 1, padding: '0.55rem 0', textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 9 }}>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff' }}>{x.val}</div>
-                  <div style={{ fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 1 }}>{x.label}</div>
+          {kop(`Wat je nodig hebt · ${dagen} bakje${dagen !== 1 ? 's' : ''}`)}
+          {ingredients.length > 0 ? ingredients.map((ing, i) => {
+            const totaal = (Number(ing.amount) || 0) * dagen
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <img src={ing.image_url || foodImageFallback(ing.name, null, 120)} alt="" onError={e => { e.currentTarget.style.visibility = 'hidden' }} style={{
+                  width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, background: 'rgba(255,255,255,0.05)',
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ing.name}</div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{toHumanAmount(ing.name, Number(ing.amount) || 0)} per bakje</div>
                 </div>
-              ))}
-            </div>
-            <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginTop: '0.5rem' }}>
-              Totaal over {dagen} bakje{dagen !== 1 ? 's' : ''}: {perBakje.calories * dagen} kcal · {perBakje.protein * dagen}g eiwit
-            </div>
-          </div>
+                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff', flexShrink: 0 }}>{toHumanAmount(ing.name, totaal)}</div>
+              </div>
+            )
+          }) : (
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Voor deze maaltijd staan geen ingrediënten in het plan.</div>
+          )}
 
           {/* Stappenplan */}
-          <div style={vak}>
-            {kop(<ChefHat size={12} color="rgba(255,255,255,0.35)" />, 'Stappenplan')}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {[...stappen, ...prepStappen].map((stap, i) => (
-                <div key={i} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
-                  <div style={{
-                    width: 20, height: 20, flexShrink: 0, borderRadius: 6,
-                    background: i < stappen.length ? 'rgba(255,255,255,0.06)' : 'rgba(16,185,129,0.14)',
-                    color: i < stappen.length ? 'rgba(255,255,255,0.45)' : GROEN,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.62rem', fontWeight: 800, marginTop: 1,
-                  }}>{i + 1}</div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 500, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45 }}>{stap}</div>
-                </div>
-              ))}
-            </div>
+          {kop('Stappenplan')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+            {[...stappen, ...prepStappen].map((stap, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                <span style={{ width: 18, flexShrink: 0, fontSize: '0.85rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', lineHeight: 1.45, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>{stap}</span>
+              </div>
+            ))}
           </div>
 
           {/* Tips */}
-          <div style={vak}>
-            {kop(<Lightbulb size={12} color="rgba(255,255,255,0.35)" />, 'Zo blijft het goed')}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-              {meal?.tips && (
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,215,0,0.8)', lineHeight: 1.45, paddingBottom: '0.25rem' }}>
-                  {meal.tips}
-                </div>
-              )}
-              {tips.map((t, i) => (
-                <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.78rem', lineHeight: 1.45 }}>·</span>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>{t}</span>
-                </div>
-              ))}
-            </div>
+          {kop('Zo blijft het goed')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            {meal?.tips && <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#fff', lineHeight: 1.45 }}>{meal.tips}</div>}
+            {tips.map((t, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.4)', flexShrink: 0, marginTop: 8 }} />
+                <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45 }}>{t}</span>
+              </div>
+            ))}
           </div>
-
-          <div style={{ height: '1rem' }} />
         </div>
 
-        {/* Opslaan */}
-        <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.9rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, background: '#0a0a0a' }}>
-          {fout && <div style={{ fontSize: '0.68rem', color: '#ef4444', marginBottom: '0.4rem' }}>{fout}</div>}
-          <button onClick={opslaan} disabled={bewaren} style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-            padding: isMobile ? '0.8rem' : '0.9rem',
-            background: bewaard ? 'rgba(16,185,129,0.18)' : GROEN,
-            border: `1px solid ${bewaard ? GROEN : 'transparent'}`,
-            borderRadius: 10, color: bewaard ? GROEN : '#04140e',
-            fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800,
-            cursor: bewaren ? 'default' : 'pointer', minHeight: 48,
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit',
+        {/* Opslaan: vast onderaan */}
+        <div style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '0.7rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px))' : '0.8rem 1.5rem 1.2rem' }}>
+          {fout && <div style={{ fontSize: '0.72rem', color: '#ef4444', marginBottom: '0.45rem', textAlign: 'center' }}>{fout}</div>}
+          <button onClick={opslaan} disabled={bewaren || bewaard} style={{
+            width: '100%', minHeight: 50, borderRadius: 12, fontFamily: 'inherit', fontSize: '0.92rem', fontWeight: 900,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, cursor: bewaren ? 'wait' : 'pointer',
+            background: bewaard ? 'transparent' : '#fff', color: bewaard ? '#fff' : '#0a0a0a',
+            border: bewaard ? '1.5px solid rgba(255,255,255,0.4)' : 'none',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
-            {bewaren ? <Loader size={15} style={{ animation: 'prepSpin 1s linear infinite' }} /> : (bewaard ? <Check size={15} /> : <Package size={15} />)}
-            {bewaard ? 'Staat in Mijn maaltijden ✓' : (bewaren ? 'Bewaren…' : 'Bewaar bakje in Mijn maaltijden')}
+            {bewaren ? <Loader size={16} style={{ animation: 'prepSpin 1s linear infinite' }} /> : <Check size={16} strokeWidth={3} />}
+            {bewaard ? 'Staat in Mijn maaltijden' : (bewaren ? 'Bewaren…' : 'Bewaar bakje in Mijn maaltijden')}
           </button>
-          <div style={{ fontSize: '0.62rem', fontWeight: 600, color: 'rgba(255,255,255,0.28)', textAlign: 'center', marginTop: '0.4rem', lineHeight: 1.35 }}>
-            Eén bakje, met macro's en stappen. Log je later in twee tikken via Mijn maaltijden.
-          </div>
         </div>
       </div>
-      <style>{`@keyframes prepSpin { to { transform: rotate(360deg); } }`}</style>
+      <style>{'@keyframes prepSpin { to { transform: rotate(360deg); } } @keyframes prepOmhoog { from { transform: translateY(100%) } to { transform: translateY(0) } }'}</style>
     </div>
   )
 }
