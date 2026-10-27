@@ -87,8 +87,9 @@ export default function AIAlternativesModal({
   // Filters achter één knop (27 okt 2026): in beeld alleen het moment, de
   // rest in een blad. Wat afwijkt van de standaard staat als chipje in beeld.
   const [filterOpen, setFilterOpen] = useState(false)
-  // Waar het venster mee opent (Aanraders, anders Van je coach, anders alles).
-  const [standaardBron, setStandaardBron] = useState('alles')
+  // Groep per maaltijd uit de laatste lijst (0 eigen, 1 aanrader, 2 rest),
+  // voor de kopjes in de lijst.
+  const laagRef = useRef(new Map())
   // Het caloriedoel bepaalt welk dagmenu-niveau je ziet. Het zit niet altijd
   // op het client-object dat dit venster binnenkrijgt, dus halen we het er zo
   // nodig zelf bij — anders valt het hele niveau weg en blijft er van de
@@ -152,17 +153,6 @@ export default function AIAlternativesModal({
     { id: 'post_workout', label: 'Post-workout' },
   ]
 
-  const bronOpties = [
-    { id: 'alles', label: 'Overal zoeken' },
-    // 'Wisselopties' zei een klant niets: het is de vaste set die bij jouw
-    // niveau en dit moment past.
-    ...(Object.keys(wisselPerMoment).length > 0 ? [{ id: 'wissel', label: 'Aanraders' }] : []),
-    ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Van je coach' }] : []),
-    ...(customMeals.length > 0 ? [{ id: 'mine', label: 'Mijn maaltijden' }] : []),
-    // Kant-en-klaar te bestellen (PrepMyMeal).
-    ...(allMeals.some(m => m.partner) ? [{ id: 'partner', label: 'Kant-en-klaar (PrepMyMeal)' }] : []),
-    { id: 'db', label: 'Maaltijden-database' },
-  ]
 
   // Vier in plaats van zeven: meer kcal, zelfde eiwit en minder eiwit koos
   // bijna niemand (de sorteringen zelf blijven bestaan, zie hieronder).
@@ -175,7 +165,6 @@ export default function AIAlternativesModal({
 
   // Wat staat er anders dan standaard? Die worden chipjes met een kruisje.
   const afwijkingen = [
-    bron !== standaardBron && { id: 'bron', label: bronOpties.find(o => o.id === bron)?.label || bron, terug: () => setBron(standaardBron) },
     sortering !== 'smart' && { id: 'sort', label: sorteerOpties.find(o => o.id === sortering)?.label || 'Volgorde', terug: () => setSortering('smart') },
     maxKcal && { id: 'kcal', label: `max ${maxKcal} kcal`, terug: () => setMaxKcal('') },
     minEiwit && { id: 'eiwit', label: `min ${minEiwit}g eiwit`, terug: () => setMinEiwit('') },
@@ -191,7 +180,6 @@ export default function AIAlternativesModal({
       setSearchTerm('')
       setMoment('alles')
       setBron('alles')
-      setStandaardBron('alles')
       setSortering('smart')
     }
   }, [isOpen, currentMeal])
@@ -350,9 +338,8 @@ export default function AIAlternativesModal({
       setMoment(slotKey)
       // Wisselopties voor dit moment gaan voor: dat is waar je voor wisselt.
       // Anders wat de coach voor dit slot heeft ingesteld.
-      const startBron = (wissel[basisMoment(slotKey)] || []).length > 0 ? 'wissel' : curated.length > 0 ? 'coach' : 'alles'
-      setBron(startBron)
-      setStandaardBron(startBron)
+      // Eén lijst voor alles (zie getFilteredMeals); geen bron meer kiezen.
+      setBron('alles')
     } catch (error) {
       console.error('Failed to load alternatives:', error)
     } finally {
@@ -401,44 +388,34 @@ export default function AIAlternativesModal({
     const currentProt = currentMeal?.protein || 0
     const nietZelf = (m) => m.id !== currentMeal?.id
 
-    // 1. Waar zoeken we?
-    let pool
-    if (bron === 'wissel') {
-      pool = (moment !== 'alles'
-        ? (wisselPerMoment[basisMoment(moment)] || [])
-        : Object.values(wisselPerMoment).flat()
-      ).filter(nietZelf)
+    // 1. Eén lijst (27 okt 2026, Kersten): geen keuze meer waar je zoekt.
+    //    Eerst je eigen maaltijden, dan de aanraders (vaste wisselopties en
+    //    wat je coach zette: voor de klant hetzelfde), dan de rest van de
+    //    database (kant-en-klaar zit daartussen). `laag` onthoudt de groep
+    //    voor de volgorde en de kopjes. Het moment filtert eigen maaltijden
+    //    en de database op timing; aanraders zijn al per moment gekozen.
+    const pastMoment = (m) => {
+      if (moment === 'alles') return true
+      const set = momentenVan(m)
+      return set.size === 0 || set.has(moment) || set.has(basisMoment(moment))
     }
-    else if (bron === 'coach') {
-      // Kies je een moment, dan zie je de lijst die de coach voor dát moment
-      // heeft gezet. Zonder moment: eerst de lijst van het slot dat je
-      // wisselt, daarna de rest.
-      if (moment !== 'alles') {
-        // Geen eigen avondsnack-lijst? Dan de snacklijst.
-        const lijst = coachPerMoment[moment]?.length ? coachPerMoment[moment] : (coachPerMoment[basisMoment(moment)] || [])
-        pool = lijst.filter(nietZelf)
-      } else {
-        const gezien = new Set()
-        pool = [...coachOptions, ...Object.values(coachPerMoment).flat()].filter(m => {
-          if (!nietZelf(m) || gezien.has(m.id)) return false
-          gezien.add(m.id)
-          return true
-        })
-      }
-    }
-    else if (bron === 'mine') pool = customMeals.filter(nietZelf)
-    else if (bron === 'partner') pool = allMeals.filter(m => m.partner && nietZelf(m))
-    else if (bron === 'db') pool = allMeals.filter(nietZelf)
-    else {
-      // Overal: coach eerst, dan eigen maaltijden, dan de database. Dubbele
-      // id's eruit, want een coach-optie komt ook in de database voor.
-      const gezien = new Set()
-      pool = [...coachOptions, ...customMeals, ...allMeals].filter(m => {
-        if (!nietZelf(m) || gezien.has(m.id)) return false
-        gezien.add(m.id)
-        return true
-      })
-    }
+    const aanraders = moment !== 'alles'
+      ? [...(wisselPerMoment[basisMoment(moment)] || []),
+         ...(coachPerMoment[moment]?.length ? coachPerMoment[moment] : (coachPerMoment[basisMoment(moment)] || []))]
+      : [...Object.values(wisselPerMoment).flat(), ...coachOptions, ...Object.values(coachPerMoment).flat()]
+    const gezienPool = new Set()
+    const laag = new Map()
+    const neem = (lijst, l) => lijst.filter(m => {
+      if (!m || !nietZelf(m) || gezienPool.has(m.id)) return false
+      gezienPool.add(m.id); laag.set(m.id, l)
+      return true
+    })
+    laagRef.current = laag
+    let pool = [
+      ...neem(customMeals.filter(pastMoment), 0),
+      ...neem(aanraders, 1),
+      ...neem(allMeals.filter(pastMoment), 2),
+    ]
 
     // 2. Zoekterm gaat vóór het moment-filter én vóór de bron: typ je iets,
     // dan wil je het vinden, ook als het bij een ander moment of in een
@@ -475,12 +452,6 @@ export default function AIAlternativesModal({
     // maaltijd overheen leggen zou precies de suggesties wegfilteren die de
     // coach bewust op die plek zette.
     let meals = pool
-    if (moment !== 'alles' && bron !== 'coach' && bron !== 'wissel') {
-      meals = pool.filter(m => {
-        const set = momentenVan(m)
-        return set.size === 0 || set.has(moment) || set.has(basisMoment(moment))
-      })
-    }
 
     // Zit je in een dagmenu, dan vallen de andere niveaus weg. Eet je niet uit
     // een dagmenu, dan blijft alles staan zoals het was.
@@ -516,7 +487,6 @@ export default function AIAlternativesModal({
     const opProt = (m) => m.protein || 0
     // Wisselopties staan op groep (Op brood, Wrap, Warm, …); die volgorde is
     // al gezet bij het laden.
-    if (bron === 'wissel' && sortering === 'smart') return meals
     switch (sortering) {
       case 'same-cal':
         return [...meals].sort((a, b) => Math.abs(opCal(a) - currentCal) - Math.abs(opCal(b) - currentCal))
@@ -534,8 +504,14 @@ export default function AIAlternativesModal({
         // Beste match: de volgorde die de service al bedacht (kcal + eiwit
         // tegen elkaar afgewogen), voor zover die maaltijden in de pool
         // zitten; de rest erachter op kcal-verschil.
+        // Per groep: eigen maaltijden, aanraders (in hun eigen volgorde,
+        // die staat op groep: Op brood, Wrap, …), dan de rest.
         const rang = new Map((alternatives || []).map((m, i) => [m.id, i]))
+        const volg = new Map(meals.map((m, i) => [m.id, i]))
         return [...meals].sort((a, b) => {
+          const la = laag.get(a.id) ?? 2, lb = laag.get(b.id) ?? 2
+          if (la !== lb) return la - lb
+          if (la === 1) return volg.get(a.id) - volg.get(b.id)
           const ra = rang.has(a.id) ? rang.get(a.id) : Infinity
           const rb = rang.has(b.id) ? rang.get(b.id) : Infinity
           if (ra !== rb) return ra - rb
@@ -721,6 +697,15 @@ export default function AIAlternativesModal({
   }
 
   const filteredMeals = getFilteredMeals()
+  // Kopje boven een groep in de lijst: eigen maaltijden, de groep van een
+  // aanrader (Op brood, Wrap, …), of de rest.
+  const kopVan = (m) => {
+    if (!m) return null
+    const l = laagRef.current.get(m.id)
+    if (l === 0) return 'Mijn maaltijden'
+    if (l === 1) return groepVan(m) || 'Aanraders'
+    return 'Meer maaltijden'
+  }
   filteredMealsRef.current = filteredMeals
 
   // Zoekterm loggen zodra de gebruiker typt (wissel-context).
@@ -944,14 +929,14 @@ export default function AIAlternativesModal({
             )}
             {filteredMeals.map((meal, idx) => (
               <React.Fragment key={meal.id || idx}>
-              {bron === 'wissel' && sortering === 'smart' && !searchTerm && groepVan(meal)
-                && groepVan(meal) !== groepVan(filteredMeals[idx - 1]) && (
+              {sortering === 'smart' && !searchTerm && kopVan(meal)
+                && kopVan(meal) !== kopVan(filteredMeals[idx - 1]) && (
                 <div style={{
                   padding: `${idx === 0 ? '0.2rem' : '0.9rem'} ${isMobile ? '0.9rem' : '1.25rem'} 0.35rem`,
                   fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.06em',
                   textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)',
                 }}>
-                  {groepVan(meal)}
+                  {kopVan(meal)}
                 </div>
               )}
               <SuggestieKaart
@@ -1019,7 +1004,9 @@ export default function AIAlternativesModal({
 
           {/* Eigen maaltijden: de weg naar het aanmaakscherm hoort onderaan de
               lijst waar je 'm mist. */}
-          {bron === 'mine' && onMaaltijdAanmaken && !loading && (
+          {/* Eigen maaltijd maken: onderaan de lijst, nu er geen aparte
+              'Mijn maaltijden'-lijst meer is. */}
+          {onMaaltijdAanmaken && !loading && !searchTerm.trim() && (
             <div style={{ padding: isMobile ? '0.75rem 1rem 1.5rem' : '1rem 1.5rem 2rem' }}>
               <button
                 onClick={onMaaltijdAanmaken}
@@ -1182,7 +1169,6 @@ export default function AIAlternativesModal({
       {/* Filterblad: wat je ziet (bron), in welke volgorde, en grenzen. */}
       <BladModal open={filterOpen} titel="Filter" onClose={() => setFilterOpen(false)} zIndex={10600}>
         {[
-          { kop: 'Toon', opties: bronOpties, waarde: bron, zet: setBron },
           { kop: 'Volgorde', opties: sorteerOpties, waarde: sortering, zet: setSortering },
         ].map(blok => (
           <div key={blok.kop} style={{ marginBottom: '1.1rem' }}>
