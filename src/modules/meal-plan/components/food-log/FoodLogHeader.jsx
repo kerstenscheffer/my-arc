@@ -14,15 +14,15 @@ import { Search, Scan, Zap, Camera } from 'lucide-react'
 const FOTO_SCAN_AAN = false
 
 const STANDEN = [
-  { id: 'zoeken', label: 'Zoeken', Icon: Search, breedte: 1 },
-  { id: 'scannen', label: 'Scannen', Icon: Scan, breedte: 1 },
+  { id: 'zoeken', label: 'Zoek', Icon: Search, breedte: 1 },
+  { id: 'scannen', label: 'Scan', Icon: Scan, breedte: 1 },
   // Foto van je bord: AI herkent de onderdelen, de macro's komen uit onze
   // eigen database (14 okt 2026).
   ...(FOTO_SCAN_AAN ? [{ id: 'foto', label: 'Foto', Icon: Camera, breedte: 0.8 }] : []),
   // Snel invoeren (alleen kcal/macro's) staat hier sinds 14 okt 2026; zijn
   // plek in de rij eronder is voor Coach maaltijden.
-  // Smaller: het is een bijzaak naast zoeken en scannen.
-  { id: 'snel', label: 'Snel', Icon: Zap, breedte: 0.55 },
+  // Drie even grote vakken (27 okt 2026).
+  { id: 'snel', label: 'Snel', Icon: Zap, breedte: 1 },
 ]
 const TOTAAL = STANDEN.reduce((t, s) => t + s.breedte, 0)
 const LINKS = STANDEN.map((_, i) => STANDEN.slice(0, i).reduce((t, s) => t + s.breedte, 0) / TOTAAL * 100)
@@ -32,7 +32,7 @@ export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
   return (
     <div style={{ flexShrink: 0 }}>
       <div style={{
-        padding: isMobile ? '0.7rem 3rem 0.5rem' : '0.85rem 4rem 0.6rem',
+        padding: isMobile ? '0.6rem 3rem 0.45rem' : '0.75rem 4rem 0.5rem',
         textAlign: 'center',
       }}>
         <div style={{
@@ -44,12 +44,11 @@ export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
       </div>
 
       {/* Schuifknop: het witte blokje schuift naar de gekozen stand. */}
-      <div style={{ padding: isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.75rem' }}>
+      <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.25rem 0.6rem' }}>
         <div style={{
           position: 'relative',
           display: 'flex',
           background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: 999,
           padding: 3,
         }}>
@@ -70,7 +69,7 @@ export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
                 onClick={() => onWeergave(stand.id)}
                 style={{
                   position: 'relative', zIndex: 1,
-                  flex: stand.breedte, minWidth: 0, minHeight: 36,
+                  flex: stand.breedte, minWidth: 0, minHeight: 34,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   background: 'transparent', border: 'none', borderRadius: 999,
                   color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',

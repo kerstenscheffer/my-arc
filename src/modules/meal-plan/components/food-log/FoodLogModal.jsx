@@ -2,7 +2,7 @@
 // 🎯 v3.1 — Edit flow race fix: useEffect deps gefixt + diagnostic log
 import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
-import { X, ArrowLeft, AlertCircle, Star, Apple, UtensilsCrossed, ChefHat } from 'lucide-react'
+import { X, ArrowLeft, AlertCircle, Heart } from 'lucide-react'
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
@@ -429,47 +429,49 @@ export default function FoodLogModal({
   return createPortal(modal, document.body)
 }
 
-// Vier knoppen die bepalen waar je zoekt: je favorieten, alle producten, je
-// eigen maaltijden of de maaltijden van je coach. Snel invoeren staat sinds
-// 14 okt 2026 bovenaan naast Scannen.
+// Waar je zoekt: favorieten (hartje), producten, je eigen maaltijden of de
+// maaltijden van je coach. Geen vakken meer: alleen tekst, de gekozen keuze
+// een wit pilletje (27 okt 2026, naar voorbeeld van een andere log-app).
 function FilterKnoppen({ filter, zet, isMobile }) {
   const knoppen = [
-    { id: 'favorieten', label: 'Favoriet', Icon: Star },
-    { id: 'producten', label: 'Producten', Icon: Apple },
-    { id: 'maaltijden', label: 'Mijn maaltijden', Icon: UtensilsCrossed },
+    { id: 'producten', label: 'Producten' },
+    { id: 'maaltijden', label: 'Mijn maaltijden' },
     // Wat de coach voor je klaarzet: dezelfde lijst als bij wisselen.
-    { id: 'coach', label: 'Coach maaltijden', Icon: ChefHat },
+    { id: 'coach', label: 'Coach' },
   ]
+  const favAan = filter === 'favorieten'
   return (
     <div style={{
-      display: 'flex', gap: 6, flexShrink: 0,
-      padding: isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.75rem',
+      display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0,
+      padding: isMobile ? '0 0.75rem 0.55rem' : '0 1rem 0.65rem',
+      overflowX: 'auto', scrollbarWidth: 'none',
     }}>
+      <button onClick={() => zet('favorieten')} title="Favorieten" aria-label="Favorieten" style={{
+        flexShrink: 0, width: 38, height: 34, padding: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
+        opacity: favAan ? 1 : 0.55,
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}>
+        <Heart size={20} strokeWidth={2.4} fill={favAan ? '#fff' : 'none'} />
+      </button>
       {knoppen.map(k => {
         const aan = filter === k.id
         return (
           <button
             key={k.id}
             onClick={() => zet(k.id)}
-            title={k.label}
             style={{
-              flex: 1, minWidth: 0, minHeight: 44,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
-              background: aan ? 'rgba(255,255,255,0.12)' : 'transparent',
-              border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
-              borderRadius: 12,
-              color: aan ? '#fff' : 'rgba(255,255,255,0.5)',
-              fontSize: isMobile ? '0.58rem' : '0.62rem',
-              fontWeight: aan ? 900 : 700,
-              fontFamily: 'inherit', cursor: 'pointer',
+              flexShrink: 0, height: 34, padding: '0 0.9rem',
+              background: aan ? '#fff' : 'transparent', border: 'none', borderRadius: 999,
+              color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+              fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 900,
+              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              transition: 'all 0.15s ease',
+              transition: 'background 0.15s ease, color 0.15s ease',
             }}
           >
-            <k.Icon size={16} strokeWidth={aan ? 2.6 : 2} fill={k.id === 'favorieten' && aan ? '#fff' : 'none'} />
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-              {k.label}
-            </span>
+            {k.label}
           </button>
         )
       })}
