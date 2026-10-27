@@ -21,12 +21,26 @@ export default class CommandCenterService {
       const since = new Date()
       since.setDate(since.getDate() - 545)
 
-      const { data: weightLogs, error } = await this.supabase
-        .from('weight_challenge_logs')
-        .select('client_id, date, weight, is_friday_weighin')
-        .in('client_id', clientIds)
-        .gte('date', since.toISOString().split('T')[0])
-        .order('date', { ascending: false })
+      // In blokken van 1000: Supabase geeft nooit meer dan 1000 rijen per
+      // verzoek terug, en met alle klanten samen zijn het er meer (1207 op
+      // 27 okt 2026). Dan vielen de oudste weg en miste het insight-paneel
+      // metingen (Kersten: "ik moet hier gewoon alle gewicht logs zien").
+      const BLOK = 1000
+      let weightLogs = [], error = null
+      for (let van = 0; ; van += BLOK) {
+        const { data, error: fout } = await this.supabase
+          .from('weight_challenge_logs')
+          .select('client_id, date, weight, is_friday_weighin')
+          .in('client_id', clientIds)
+          .gte('date', since.toISOString().split('T')[0])
+          .order('date', { ascending: false })
+          .order('client_id', { ascending: true })
+          .order('id', { ascending: true })
+          .range(van, van + BLOK - 1)
+        if (fout) { error = fout; break }
+        weightLogs = weightLogs.concat(data || [])
+        if (!data || data.length < BLOK) break
+      }
 
       if (error) { console.error('❌ Weight error:', error); return clients.map(c => ({ ...c, weightData: null })) }
 

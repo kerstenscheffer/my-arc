@@ -27,6 +27,8 @@ const PERIODES = [
   { id: '2m', label: '2 mnd', lang: 'Laatste 2 maanden', dagen: 61 },
   { id: '4m', label: '4 mnd', lang: 'Laatste 4 maanden', dagen: 122 },
   { id: '6m', label: '6 mnd', lang: 'Laatste 6 maanden', dagen: 183 },
+  // Alles wat er is (het paneel haalt 18 maanden op).
+  { id: 'alles', label: 'Alles', lang: 'Alle metingen' },
 ]
 
 const datumKort = (d) => {
@@ -58,6 +60,7 @@ export default function MetingenTabel({ client, history, fase, isMobile }) {
     const gekozen = PERIODES.find(p => p.id === periode) || PERIODES[0]
     const vanaf = (() => {
       if (gekozen.id === 'fase') return fase?.started_on ? String(fase.started_on).slice(0, 10) : null
+      if (gekozen.id === 'alles') return null
       const d = new Date()
       d.setDate(d.getDate() - gekozen.dagen)
       return d.toISOString().split('T')[0]
