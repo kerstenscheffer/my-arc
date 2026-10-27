@@ -70,6 +70,7 @@ import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 import AIAlternativesModal from './components/AIAlternativesModal'
 import { resolveFoodImage } from './foodImageFallback'
 import DagenKiezer from './components/DagenKiezer'
+import { weekplanVoorWeek } from './DayTemplateService'
 import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen } from './dagAanpassingen'
 import AIMealInfoModal from './components/AIMealInfoModal'
 import AIFavoritesModal from './components/AIFavoritesModal'
@@ -488,6 +489,24 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
 
   // Prullenbakje op een planmaaltijd: zelfde dagkiezer, dan weghalen.
   const [verwijderMeal, setVerwijderMeal] = useState(null)
+
+  // Op welke dagen staat deze maaltijd op hetzelfde moment? Voor de stippen in
+  // de dagkiezer. maandag = null: het vaste weekplan; anders die week, met de
+  // losse dag-aanpassingen erover. Zelfde maaltijd = zelfde id, of bij oude
+  // planregels zonder id dezelfde naam.
+  const dagenMetMaaltijd = (meal) => async (maandag) => {
+    const basis = dashboardData?.activePlan?.week_structure
+    if (!meal?.slot || !basis) return []
+    const week = maandag ? await weekplanVoorWeek(db.supabase, client.id, basis, maandag) : basis
+    const id = meal.meal_id || meal.id
+    const naam = (meal.name || meal.meal_name || '').trim().toLowerCase()
+    return DAYS_OF_WEEK.map(d => d.key).filter(k => {
+      const m = week?.[k]?.[meal.slot]
+      if (!m || typeof m !== 'object') return false
+      const mid = m.meal_id || m.id
+      return id && mid ? String(mid) === String(id) : (m.name || '').trim().toLowerCase() === naam
+    })
+  }
   const voerVerwijderUit = async (keuze) => {
     if (!verwijderMeal) return
     const slot = verwijderMeal.slot
@@ -895,6 +914,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
             datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
             dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
             slot={verwijderMeal.slot}
+            dagenMetMaaltijd={dagenMetMaaltijd(verwijderMeal)}
             bezig={wisselBezig}
             fout={wisselFout}
             isMobile={isMobile}

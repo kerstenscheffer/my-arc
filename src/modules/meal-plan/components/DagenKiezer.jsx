@@ -15,7 +15,11 @@
 // `volScherm`: zelfde keuzes, maar als volledig scherm in de stijl van het
 // logscherm (ronde foto, grote vraag, knop vast onderaan). Voor verwijderen:
 // een schuifvenstertje onderaan voelde te licht voor iets dat je plan wijzigt.
-import React, { useMemo, useState } from 'react'
+//
+// `dagenMetMaaltijd(maandag | null)`: optioneel, geeft (async) de dag-keys
+// terug waar deze maaltijd op dit moment staat; null = het vaste weekplan.
+// Die dagen krijgen een stip, zodat je ziet waar hij terugkomt.
+import React, { useEffect, useMemo, useState } from 'react'
 import { X, Repeat, CalendarDays, ArrowLeft } from 'lucide-react'
 import { lokaleIso } from '../utils/dagVenster'
 
@@ -43,7 +47,7 @@ export default function DagenKiezer({
   titel, subtitel, datum, dagKey, slot, bezig = false, fout = null,
   isMobile, onKies, onTerug, terugTekst = '← Terug', onClose, extra = null,
   vraag = 'Waar geldt deze wijziging?', knopTekst = 'Opslaan', gevaar = false,
-  volScherm = false, foto = null, keuzeVraag = null,
+  volScherm = false, foto = null, keuzeVraag = null, dagenMetMaaltijd = null,
 }) {
   const bekeken = datum ? new Date(datum) : new Date()
   const ditMaandag = maandagVan(new Date())
@@ -58,6 +62,19 @@ export default function DagenKiezer({
 
   const weekMaandag = plus(ditMaandag, week * 7)
   const datumVan = (idx) => plus(weekMaandag, idx)
+
+  // Op welke dagen staat deze maaltijd? Vast plan bij "Elke week", de
+  // gekozen week (met losse dag-aanpassingen) bij "Eén week".
+  const [aanwezig, setAanwezig] = useState(() => new Set())
+  useEffect(() => {
+    if (!dagenMetMaaltijd) return undefined
+    let weg = false
+    Promise.resolve(dagenMetMaaltijd(modus === 'altijd' ? null : weekMaandag))
+      .then(keys => { if (!weg) setAanwezig(new Set(keys || [])) }, () => { if (!weg) setAanwezig(new Set()) })
+    return () => { weg = true }
+  }, [modus, week]) // eslint-disable-line react-hooks/exhaustive-deps
+  const zetAanwezig = () => setGekozen(new Set(aanwezig))
+  const alleenAanwezig = aanwezig.size > 0 && gekozen.size === aanwezig.size && [...aanwezig].every(k => gekozen.has(k))
 
   const wissel = (key) => setGekozen(prev => {
     const n = new Set(prev)
@@ -140,10 +157,18 @@ export default function DagenKiezer({
         <div>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>Dagen</span>
-            <button onClick={zetAlles} disabled={bezig} style={{
-              background: 'none', border: 'none', color: '#fff', fontSize: '0.72rem', fontWeight: 800,
-              cursor: 'pointer', padding: 0, fontFamily: 'inherit',
-            }}>{alles ? 'Alleen deze dag' : 'Hele week'}</button>
+            <span style={{ display: 'flex', gap: 14 }}>
+              {aanwezig.size > 0 && !alleenAanwezig && (
+                <button onClick={zetAanwezig} disabled={bezig} style={{
+                  background: 'none', border: 'none', color: '#fff', fontSize: '0.72rem', fontWeight: 800,
+                  cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+                }}>Waar hij staat ({aanwezig.size})</button>
+              )}
+              <button onClick={zetAlles} disabled={bezig} style={{
+                background: 'none', border: 'none', color: '#fff', fontSize: '0.72rem', fontWeight: 800,
+                cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+              }}>{alles ? 'Alleen deze dag' : 'Hele week'}</button>
+            </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
             {DAGEN.map((d, i) => {
@@ -161,12 +186,22 @@ export default function DagenKiezer({
                   {modus === 'week' && (
                     <span style={{ fontSize: '0.58rem', fontWeight: 800, opacity: 0.75 }}>{datumVan(i).getDate()}</span>
                   )}
+                  {/* Stip: deze maaltijd staat op deze dag. */}
+                  <span style={{
+                    width: 5, height: 5, borderRadius: '50%', marginTop: 2,
+                    background: aanwezig.has(d.key) ? (aan ? '#000' : '#fff') : 'transparent',
+                  }} />
                 </button>
               )
             })}
           </div>
+          {aanwezig.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff' }} />
+              {modus === 'altijd' ? 'staat in je weekplan' : 'staat die week in je plan'}
+            </div>
+          )}
         </div>
-
     </>
   )
 
