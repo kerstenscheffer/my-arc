@@ -12,7 +12,7 @@ import GramInvoer from './GramInvoer'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils, ChevronDown } from 'lucide-react'
 import { createPortal } from '../../../client/paginaPortal'
 
 // De secties van "Mijn maaltijden" heten anders dan de log-momenten hier.
@@ -87,6 +87,8 @@ export default function AIAlternativesModal({
   // Filters achter één knop (27 okt 2026): in beeld alleen het moment, de
   // rest in een blad. Wat afwijkt van de standaard staat als chipje in beeld.
   const [filterOpen, setFilterOpen] = useState(false)
+  // Ingeklapte groepen in de lijst (op kopje).
+  const [dicht, setDicht] = useState(() => new Set())
   // Groep per maaltijd uit de laatste lijst (0 eigen, 1 aanrader, 2 rest),
   // voor de kopjes in de lijst.
   const laagRef = useRef(new Map())
@@ -931,15 +933,18 @@ export default function AIAlternativesModal({
               <React.Fragment key={meal.id || idx}>
               {sortering === 'smart' && !searchTerm && kopVan(meal)
                 && kopVan(meal) !== kopVan(filteredMeals[idx - 1]) && (
-                <div style={{
+                <div onClick={() => setDicht(prev => { const n = new Set(prev); const k = kopVan(meal); if (n.has(k)) n.delete(k); else n.add(k); return n })} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent', userSelect: 'none',
                   padding: `${idx === 0 ? '0.2rem' : '0.9rem'} ${isMobile ? '0.9rem' : '1.25rem'} 0.35rem`,
                   fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.06em',
-                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)',
+                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)',
                 }}>
                   {kopVan(meal)}
+                  <ChevronDown size={14} strokeWidth={3} style={{ transition: 'transform 0.15s ease', transform: dicht.has(kopVan(meal)) ? 'rotate(-90deg)' : 'none' }} />
                 </div>
               )}
-              <SuggestieKaart
+              {!(sortering === 'smart' && !searchTerm && dicht.has(kopVan(meal))) && <SuggestieKaart
                 meal={meal}
                 currentMeal={currentMeal}
                 isSelected={selectedMeal?.id === meal.id}
@@ -949,7 +954,7 @@ export default function AIAlternativesModal({
                 inMijnMaaltijden={meal._isCustom || staatInMijnMaaltijden(meal)}
                 onSter={() => setSterMeal(meal)}
                 onInfo={() => openInfo(meal)}
-              />
+              />}
               </React.Fragment>
             ))}
             {/* Vangnet: weinig uitkomst door filters? Eén tik en alles staat er. */}
@@ -1370,22 +1375,21 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inM
       geselecteerd={isSelected}
       onCheck={onSelect}
       onTik={onSelect}
-      // Info rechts in het midden, het hartje in de hoek: twee knopjes naast
-      // elkaar in de hoek liepen over de naam.
+      // Hartje en info onder elkaar in een eigen kolom rechts: zelfde maat,
+      // zelfde afstand. Eerst stond het hartje in de hoek en info half
+      // eronder, en dat zag er scheef uit.
       rechts={
-        <button onClick={(e) => { e.stopPropagation(); onInfo?.() }} aria-label="Info" style={{ ...hoek, opacity: 0.55, cursor: 'pointer', marginTop: 14 }}>
-          <Info size={16} strokeWidth={2.4} />
-        </button>
-      }
-      hoekKnop={
-        <div style={{ display: 'flex' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, marginRight: -6 }}>
           <button
             onClick={(e) => { e.stopPropagation(); if (!inMijnMaaltijden) onSter?.() }}
             aria-label={inMijnMaaltijden ? 'Staat in jouw maaltijden' : 'Zet bij mijn maaltijden'}
             title={inMijnMaaltijden ? 'Staat al in jouw maaltijden' : 'Zet bij mijn maaltijden'}
             style={{ ...hoek, opacity: inMijnMaaltijden ? 1 : 0.55, cursor: inMijnMaaltijden ? 'default' : 'pointer' }}
           >
-            <Heart size={15} strokeWidth={2.6} fill={inMijnMaaltijden ? '#fff' : 'none'} />
+            <Heart size={16} strokeWidth={2.6} fill={inMijnMaaltijden ? '#fff' : 'none'} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onInfo?.() }} aria-label="Info" style={{ ...hoek, opacity: 0.55, cursor: 'pointer' }}>
+            <Info size={16} strokeWidth={2.6} />
           </button>
         </div>
       }
