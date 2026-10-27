@@ -33,6 +33,9 @@ const MOMENT_SECTIE = {
   pre_workout: 'pre_workout',
 }
 const sectieVan = (ruw) => MOMENT_SECTIE[String(ruw || '').toLowerCase()] || null
+// Opslaan als 'snack' i.p.v. 'snacks': het wisselscherm in app-versies tot en
+// met 15 okt 2026 kent alleen 'snack' (sectieVan leest beide).
+const sectieOpslag = (sectie) => (sectie === 'snacks' ? 'snack' : (sectie || null))
 
 export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, buildingMeal, setBuildingMeal, isMobile }) {
   const [myMeals, setMyMeals] = useState([])
@@ -437,10 +440,9 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   // een maaltijd onder "Overige" staan hoe vaak je Diner ook koos.
   const [sectie, setSectie] = useState(sectieVan(meal.section) || (meal._moment ? MOMENT_SECTIE[meal._moment] : null) || '')
   const mealMoment = SECTION_MOMENT[sectie] || meal._moment || 'snack'
-  const sectieOptiesDetail = [
-    ...SECTIONS.map(sec => ({ id: sec.id, label: sec.label.replace(/^Mijn /, '') })),
-    { id: '', label: 'Geen sectie' },
-  ]
+  // Verplicht (27 okt 2026): zonder moment stond een eigen maaltijd onder
+  // elk moment in het wisselscherm.
+  const sectieOptiesDetail = SECTIONS.map(sec => ({ id: sec.id, label: sec.label.replace(/^Mijn /, '') }))
   // Photo state — `photoFile` is a File from the picker (upload pending),
   // `photoPreview` is what's shown in the UI (object URL or saved image_url).
   const [photoFile, setPhotoFile] = useState(null)
@@ -527,7 +529,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   }
 
   const handleSave = async () => {
-    if (!meal.name?.trim()) return
+    if (!meal.name?.trim() || !sectie) return
     if (!meal.ingredients_list?.length && !totals.calories) return
     setSaving(true)
     try {
@@ -538,7 +540,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
         image_url: imageUrl,
-        section: sectie || null,
+        section: sectieOpslag(sectie),
         updated_at: new Date().toISOString()
       }
       if (meal.id) {
@@ -567,7 +569,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
         image_url: imageUrl,
-        section: sectie || null,
+        section: sectieOpslag(sectie),
         updated_at: new Date().toISOString()
       }
       if (meal.id) {
@@ -613,12 +615,12 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
           {meal.id ? 'Maaltijd bewerken' : 'Maaltijd aanmaken'}
         </div>
         <button onClick={handleSave}
-          disabled={saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)}
+          disabled={saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)}
           aria-label="Opslaan"
           style={{
             width: 32, height: 32, borderRadius: 9,
             background: 'transparent', border: 'none',
-            color: '#fff', opacity: (saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)) ? 0.3 : 1,
+            color: '#fff', opacity: (saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)) ? 0.3 : 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', touchAction: 'manipulation',
           }}
@@ -683,24 +685,26 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         </div>
 
         {/* Moment — zelfde keuzemenu als de rest van de voedingsschermen. */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: isMobile ? '0 1rem 0.9rem' : '0 1.5rem 1rem',
-        }}>
+        {/* Wanneer eet je hem? Verplicht; de knop opslaan wacht hierop. */}
+        <div style={{ padding: isMobile ? '0 1rem 0.9rem' : '0 1.5rem 1rem' }}>
           <div style={{
-            fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-            textTransform: 'uppercase', letterSpacing: '0.1em',
+            fontSize: '0.62rem', fontWeight: 800, color: sectie ? 'rgba(255,255,255,0.4)' : '#fff',
+            textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8,
           }}>
-            Sectie
+            {sectie ? 'Moment' : 'Wanneer eet je hem?'}
           </div>
-          <div style={{ width: 160 }}>
-            <Keuze
-              waarde={sectie}
-              opties={sectieOptiesDetail}
-              zet={setSectie}
-              isMobile={isMobile}
-              uitlijning="rechts"
-            />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {sectieOptiesDetail.map(o => {
+              const aan = sectie === o.id
+              return (
+                <button key={o.id} onClick={() => setSectie(o.id)} style={{
+                  height: 34, padding: '0 0.85rem', borderRadius: 999, border: 'none',
+                  background: aan ? '#fff' : 'rgba(255,255,255,0.07)', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
+                  fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>{o.label}</button>
+              )
+            })}
           </div>
         </div>
 
@@ -783,14 +787,14 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
           paddingBottom: isMobile ? '1.5rem' : '1rem',
         }}>
           <button onClick={handleLogMeal}
-            disabled={saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)}
+            disabled={saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)}
             style={{
               width: '100%', minHeight: 50,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
               background: '#fff', border: 'none', borderRadius: 12,
               color: '#0a0a0a', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900,
               fontFamily: 'inherit', cursor: saving ? 'wait' : 'pointer',
-              opacity: (saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)) ? 0.4 : 1,
+              opacity: (saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)) ? 0.4 : 1,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
@@ -799,7 +803,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
           </button>
 
           <button onClick={handleSave}
-            disabled={saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)}
+            disabled={saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)}
             style={{
               width: '100%', minHeight: 38,
               background: 'transparent', border: 'none',

@@ -18,7 +18,8 @@ import { createPortal } from '../../../client/paginaPortal'
 // De secties van "Mijn maaltijden" heten anders dan de log-momenten hier.
 const MOMENT_NAAR_SECTIE = {
   breakfast: 'ontbijt', lunch: 'lunch', dinner: 'diner',
-  snack: 'snacks', post_workout: 'snacks', pre_workout: 'pre_workout',
+  // 'snack' en niet 'snacks': oude app-versies kennen alleen 'snack'.
+  snack: 'snack', post_workout: 'snack', pre_workout: 'pre_workout',
 }
 
 // De coach bewaart zijn vervangers per slot ('breakfast', 'avondsnack',

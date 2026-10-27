@@ -82,6 +82,17 @@ export default function MealPrepModal({ meal, ingredients = [], client, db, onCl
         serving_size: dagen,
         tips: `Meal prep voor ${dagen} dagen. Koelkast ${houdbaar} dagen, daarna invriezen.`,
         image_url: meal?.image_url || null,
+        // Moment van de maaltijd waar je de prep van maakt (sectie-waarden
+        // die ook oude app-versies kennen); zonder slot geen sectie.
+        section: (() => {
+          const v = String(meal?.slot || '').toLowerCase()
+          if (v.includes('breakfast')) return 'ontbijt'
+          if (v.includes('lunch')) return 'lunch'
+          if (v.includes('dinner')) return 'diner'
+          if (v.includes('pre')) return 'pre_workout'
+          if (v.includes('snack') || v.includes('post')) return 'snack'
+          return null
+        })(),
         is_active: true,
         updated_at: new Date().toISOString(),
       })

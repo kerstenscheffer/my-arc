@@ -18,6 +18,9 @@ export default function MealPrepCalculator({ client, db, onClose, onSaved }) {
   const [rows, setRows] = useState([])          // { ing, grams }
   const [bakjes, setBakjes] = useState(4)
   const [name, setName] = useState('')
+  // Wanneer eet je een bakje? Verplicht: daarmee staat hij in het wisselscherm
+  // onder het juiste moment. Waarden zoals oude app-versies ze kennen.
+  const [sectie, setSectie] = useState('')
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
   const [showSearch, setShowSearch] = useState(false)
@@ -80,7 +83,7 @@ export default function MealPrepCalculator({ client, db, onClose, onSaved }) {
 
   // Klik op "Voeg maaltijd toe" → eerst om een foto vragen.
   const onSaveClick = () => {
-    if (!name.trim() || rows.length === 0) { alert('Geef een naam en voeg ingrediënten toe.'); return }
+    if (!name.trim() || rows.length === 0 || !sectie) { setSavedMsg('Opslaan mislukt: geef een naam, ingrediënten en een moment.'); return }
     if (!client?.id) { alert('Geen client.'); return }
     setSavedMsg(''); setShowPhotoStep(true)
   }
@@ -130,7 +133,8 @@ export default function MealPrepCalculator({ client, db, onClose, onSaved }) {
         ingredients_list: ingredientsList,
         calories: Math.round(per.calories),
         protein: r(per.protein), carbs: r(per.carbs), fat: r(per.fat), fiber: r(per.fiber),
-        meal_type: ['snack'],
+        meal_type: [{ ontbijt: 'breakfast', lunch: 'lunch', diner: 'dinner', pre_workout: 'pre_workout' }[sectie] || 'snack'],
+        section: sectie,
         is_active: true,
         image_url: imageUrl || null,
         created_at: new Date().toISOString(),
@@ -169,7 +173,11 @@ export default function MealPrepCalculator({ client, db, onClose, onSaved }) {
       <img src={resolveFoodImage(ing)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
     </div>
   )
-  const kanOpslaan = !saving && rows.length > 0 && !!name.trim()
+  const kanOpslaan = !saving && rows.length > 0 && !!name.trim() && !!sectie
+  const MOMENTEN = [
+    { id: 'ontbijt', label: 'Ontbijt' }, { id: 'lunch', label: 'Lunch' }, { id: 'diner', label: 'Diner' },
+    { id: 'snack', label: 'Snack' }, { id: 'pre_workout', label: 'Pre-workout' },
+  ]
   const sheet = (zIndex, children, onBuiten) => (
     <div onClick={onBuiten} style={{ position: 'fixed', inset: 0, zIndex, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={e => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 560, margin: '0 auto', maxHeight: '94vh', background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.1)', borderTopLeftRadius: 22, borderTopRightRadius: 22, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -244,6 +252,21 @@ export default function MealPrepCalculator({ client, db, onClose, onSaved }) {
           {/* Naam */}
           <div style={kopje}>Naam</div>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Bv. Kip-rijst bakje" style={{ ...veld, width: '100%' }} />
+
+          <div style={{ ...kopje, color: sectie ? 'rgba(255,255,255,0.4)' : '#fff' }}>Wanneer eet je hem?</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {MOMENTEN.map(o => {
+              const aan = sectie === o.id
+              return (
+                <button key={o.id} onClick={() => setSectie(o.id)} style={{
+                  height: 34, padding: '0 0.85rem', borderRadius: 999, border: 'none',
+                  background: aan ? '#fff' : 'rgba(255,255,255,0.07)', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
+                  fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>{o.label}</button>
+              )
+            })}
+          </div>
           {savedMsg && <div style={{ fontSize: '0.8rem', fontWeight: 700, color: savedMsg.startsWith('Opslaan mislukt') ? '#ef4444' : GREEN_OK, marginTop: '0.6rem' }}>{savedMsg}</div>}
         </div>
 
