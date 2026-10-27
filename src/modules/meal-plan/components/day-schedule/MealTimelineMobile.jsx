@@ -265,11 +265,23 @@ export default function MealTimelineMobile({
                 display: 'flex', alignItems: 'center', gap: 10, padding: '0.55rem 0.9rem',
                 borderTop: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer',
               }}>
-                <span style={{ width: 40, flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>{klok(min)}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: af ? 'rgba(255,255,255,0.45)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: af ? 'line-through' : 'none' }}>
-                  {sp.naam}
-                  {sp.dosering && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginLeft: 6, textDecoration: 'none' }}>{sp.dosering}</span>}
+                <img src={productFotos[sp.id] || supplementFoto(sp, 120)} alt="" style={{
+                  width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.06)',
+                  objectFit: productFotos[sp.id] ? 'contain' : 'cover', opacity: af ? 0.5 : 1,
+                }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800, color: af ? 'rgba(255,255,255,0.45)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: af ? 'line-through' : 'none' }}>
+                    {sp.naam}
+                  </span>
+                  <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {klok(min)}{sp.dosering ? ` · ${sp.dosering}` : ''}
+                  </span>
                 </span>
+                <button onClick={(e) => { e.stopPropagation(); onSupplementInfo?.(sp) }} aria-label="Info" style={{
+                  flexShrink: 0, width: 28, height: 28, padding: 0, background: 'none', border: 'none', color: '#fff', opacity: 0.55,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}><Info size={16} strokeWidth={2.4} /></button>
                 <button onClick={(e) => { e.stopPropagation(); onSupplementCheck?.(sp) }} aria-label={af ? 'Genomen' : 'Afvinken'} style={{
                   flexShrink: 0, width: 26, height: 26, borderRadius: '50%', padding: 0,
                   background: af ? '#fff' : 'transparent', border: `1.5px solid ${af ? '#fff' : 'rgba(255,255,255,0.35)'}`,
