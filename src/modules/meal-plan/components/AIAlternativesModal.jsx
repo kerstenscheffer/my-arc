@@ -793,7 +793,7 @@ export default function AIAlternativesModal({
                 {Math.round(currentMeal?.calories || 0)} kcal · {Math.round(currentMeal?.protein || 0)}g eiwit
               </div>
               <div style={{
-                fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 2, lineHeight: 1.25,
+                fontSize: '0.75rem', fontWeight: 900, color: '#fff', marginTop: 2, lineHeight: 1.25,
                 display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
               }}>
                 {currentMeal?.name || currentMeal?.meal_name}
