@@ -19,6 +19,11 @@
 // echte noodrem is een nieuwe bundel met de goede code uploaden.
 //
 // Uploaden: `npm run live-update -- "korte notitie"`.
+//
+// Diagnose (27 okt 2026, native 1.9): elke stap gaat naar app_live_update_log
+// (welke bundel draait, en of de update stopt bij "geen nieuwe", "native te
+// oud", downloaden of next). De live-bundels kwamen nooit aan en we konden
+// niet zien waarom. Per start hooguit één rij per soort stap.
 
 import { Capacitor } from '@capacitor/core'
 import { nieuwerDan } from './appVersie'
@@ -28,12 +33,26 @@ const ELKE_MS = 10 * 60 * 1000
 
 export async function startLiveUpdate(supabase) {
   if (!Capacitor.isNativePlatform() || !supabase) return
+  let native = null
+  const gelogd = new Set()
+  const log = (stap, detail = null) => {
+    if (gelogd.has(stap)) return
+    gelogd.add(stap)
+    supabase.from('app_live_update_log').insert({
+      platform: Capacitor.getPlatform(), native_versie: native, bundel: EIGEN,
+      stap, detail: detail == null ? null : String(detail).slice(0, 500),
+    }).then(r => r, () => {})
+  }
+
   let updater
   try {
     ;({ CapacitorUpdater: updater } = await import('@capgo/capacitor-updater'))
     await updater.notifyAppReady()
+    try { native = (await updater.current())?.native || null } catch { /* alleen voor de log */ }
+    log('start')
   } catch (e) {
     console.warn('Live update niet beschikbaar:', e?.message)
+    log('geen_updater', e?.message)
     return
   }
 
@@ -51,15 +70,23 @@ export async function startLiveUpdate(supabase) {
         .limit(1)
         .maybeSingle()
         .then(r => r, () => ({ data: null }))
-      if (!rij || !(String(rij.version) > EIGEN)) return
-      const { native } = await updater.current()
-      if (rij.min_native && nieuwerDan(rij.min_native, native)) return
+      if (!rij) { log('geen_rij'); return }
+      if (!(String(rij.version) > EIGEN)) { log('al_nieuwste', rij.version); return }
+      const { native: nu } = await updater.current()
+      native = nu || native
+      if (rij.min_native && nieuwerDan(rij.min_native, native)) { log('native_te_oud', `${native} < ${rij.min_native}`); return }
       const { bundles } = await updater.list()
       let bundel = (bundles || []).find(b => b.version === rij.version && b.status !== 'error')
-      if (!bundel) bundel = await updater.download({ url: rij.url, version: rij.version })
+      if (!bundel) {
+        log('download', rij.version)
+        bundel = await updater.download({ url: rij.url, version: rij.version })
+        log('download_ok', rij.version)
+      }
       await updater.next({ id: bundel.id })
+      log('klaar_bij_herstart', rij.version)
     } catch (e) {
       console.warn('Live update mislukt (volgende keer opnieuw):', e?.message)
+      log('fout', e?.message || e)
     } finally {
       bezig = false
     }
