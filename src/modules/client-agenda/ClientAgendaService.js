@@ -756,22 +756,28 @@ export class ClientAgendaService {
     const preWorkoutVanPlan = mealPlan?.pre_workout_meal
     DAYS.forEach(day => {
       const uitSlot = preWorkoutUitPlan[day]
-      // Weggehaald met het prullenbakje: voor één datum (aanpassing) of elke
-      // week (uit_dagen op de maaltijd van het plan).
+      // Weggehaald met het prullenbakje voor één datum.
       const aangepastPre = maaltijdAanpassingen?.[toIsoDate(dateForDay(anchor, day))]?.[PRE_WORKOUT_SLOT]
       if (aangepastPre?.verwijderd) return
-      // De losse kolom wint: die is de nieuwe plek en de coach zet 'm daar.
       const vanPlan = (preWorkoutVanPlan && typeof preWorkoutVanPlan === 'object') ? preWorkoutVanPlan : null
-      if (vanPlan && preWorkoutUitDag(vanPlan, day)) return
-      let maaltijd = vanPlan || uitSlot?.meal
-      if (!maaltijd) return
-      if (vanPlan && aangepastPre) maaltijd = { ...vanPlan, ...aangepastPre, timing: vanPlan.timing }
-
       const trainStart = trainingStartByDay[day]
       const traint = Number.isFinite(trainStart)
-      // Uit de losse kolom komt hij alleen op trainingsdagen; die maaltijd
-      // hóórt bij de training en staat verder nergens in het weekschema.
-      if (!traint && !uitSlot) return
+
+      // Welke pre-workout? Dezelfde regel als de Meal-pagina
+      // (AIMealPlanService.getTodayFromWeekStructure en AIDaySchedule):
+      //   1. staat er een in het weekplan op deze dag, dan die (inclusief een
+      //      eenmalige aanpassing, al verwerkt in de lus hierboven);
+      //   2. anders die van het plan, alleen op trainingsdagen en niet als hij
+      //      voor deze weekdag is weggehaald (uit_dagen).
+      // Hier won eerst de plan-kolom. Dan zag je op Home een andere
+      // pre-workout dan op Voeding, en verdween een maaltijd die de klant zelf
+      // met "Altijd" in zijn plan zette (die komt in het weekplan) van Home
+      // (Kersten, 27 okt 2026).
+      let maaltijd = uitSlot?.meal || null
+      if (!maaltijd) {
+        if (!vanPlan || preWorkoutUitDag(vanPlan, day) || !traint) return
+        maaltijd = aangepastPre ? { ...vanPlan, ...aangepastPre, timing: vanPlan.timing } : vanPlan
+      }
 
       const duur = uitSlot?.duration || PRE_WORKOUT_DURATION
       const start = traint
