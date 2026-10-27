@@ -86,7 +86,9 @@ export default function ClientMealEditModal({
       onSaved?.()
     } catch (e) {
       console.error('❌ Client meal save failed:', e)
-      setError(e?.message || 'Opslaan mislukt')
+      // PGRST116 = plan niet gevonden; in de praktijk een verlopen sessie
+      // (verzoek gaat anoniem, RLS geeft 0 rijen).
+      setError(e?.code === 'PGRST116' ? 'Je bent uitgelogd. Log opnieuw in en probeer het nog eens.' : (e?.message || 'Opslaan mislukt'))
       setSaving(false)
     }
   }
