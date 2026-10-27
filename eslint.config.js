@@ -28,6 +28,19 @@ export default defineConfig([
     },
   },
   {
+    // Eén Supabase-client voor de hele app (src/lib/supabase.js). Een tweede
+    // createClient deelt de sessie-opslag maar niet de lock, en liet de app
+    // op iPhones eindeloos laden (27 okt 2026).
+    files: ['src/**/*.{js,jsx}'],
+    ignores: ['src/lib/supabase.js', 'src/lib/supabase-broken.js', 'src/lead-magnet/**', '**/*backup*'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [{
+        name: '@supabase/supabase-js', importNames: ['createClient'],
+        message: "Gebruik `supabase` uit src/lib/supabase.js; een eigen client vecht om de login-lock.",
+      }] }],
+    },
+  },
+  {
     // De serverless functies in /api draaien op Node, niet in de browser.
     // Zonder deze uitzondering meldt de linter `process is not defined` in elk
     // van die bestanden, en die ruis verbergt echte fouten.

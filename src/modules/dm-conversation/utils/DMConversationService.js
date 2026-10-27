@@ -2,21 +2,14 @@
 // VERSION 3.1 - FIXED: Removed time_in_ columns that don't exist in database
 // WITH MESSAGE VARIANT TRACKING
 
-import { createClient } from '@supabase/supabase-js'
+import { supabase as gedeeld } from '../../../lib/supabase'
 import { getNode, isEndNode, DECISION_TREE } from '../data/decisionTree'
 import { detectPain, calculateTriggerScore } from './painDetection'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 class DMConversationService {
   constructor(db) {
-    // Accept DatabaseService instance OR create new Supabase client
-    if (db && db.supabase) {
-      this.supabase = db.supabase
-    } else {
-      this.supabase = createClient(supabaseUrl, supabaseAnonKey)
-    }
+    this.supabase = db?.supabase || gedeeld
   }
 
   // ========================================

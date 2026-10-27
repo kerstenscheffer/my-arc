@@ -1,11 +1,9 @@
 // src/intake/IntakeService.js
 // Standalone service — geen DatabaseService dependency
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+// Altijd de gedeelde client: een tweede createClient krijgt een eigen
+// sessiebeheer op dezelfde opslag en vecht met de hoofdclient om de
+// login-lock (zie lib/supabase.js).
+import { supabase } from '../lib/supabase'
 
 // Coach (Kersten) die de intake-notificaties ontvangt. coach_notifications.coach_id
 // = de auth-uid van de coach (CoachNotificationBell filtert op coach_id = user.id).

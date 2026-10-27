@@ -1,9 +1,6 @@
 // src/modules/workout/services/WorkoutServiceNew.js
-import { createClient } from '@supabase/supabase-js'
+import { supabase as gedeeld } from '../../../lib/supabase'
 import { laadExerciseMeta, verrijkWeekStructure } from '../utils/exerciseMeta'
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 class WorkoutServiceNew {
   constructor() {
@@ -11,9 +8,7 @@ class WorkoutServiceNew {
   }
 
   _client(db) {
-    if (db?.supabase) return db.supabase
-    if (!this._fallback) this._fallback = createClient(supabaseUrl, supabaseKey)
-    return this._fallback
+    return db?.supabase || gedeeld
   }
 
   getCurrentWeekStart() {

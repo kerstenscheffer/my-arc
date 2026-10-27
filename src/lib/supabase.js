@@ -1,5 +1,6 @@
 // src/lib/supabase.js
-import { createClient } from '@supabase/supabase-js'
+import { createClient, processLock } from '@supabase/supabase-js'
+import { Capacitor } from '@capacitor/core'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -90,7 +91,10 @@ const fetchMetHergebruik = (input, init = {}) => {
   return item.antwoord.then(res => res.clone())
 }
 
-// SINGLETON PATTERN - voorkomt meerdere instances
+// SINGLETON PATTERN - voorkomt meerdere instances. Maak NOOIT een eigen
+// createClient elders: twee clients op dezelfde sessie-opslag vechten om de
+// login-lock en verversen elkaars token weg. ESLint (no-restricted-imports)
+// houdt dit tegen; importeer `supabase` uit dit bestand.
 let supabaseInstance = null;
 
 export const supabase = (() => {
@@ -101,7 +105,15 @@ export const supabase = (() => {
         autoRefreshToken: true,
         detectSessionInUrl: true,
         storage: window.localStorage,
-        storageKey: `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`
+        storageKey: `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`,
+        // In de iOS/Android-app één lock in het geheugen i.p.v. navigator.locks.
+        // Die van WebKit bleef hangen als iOS de app pauzeerde midden in een
+        // tokenverversing: daarna wachtte élke vraag op een lock die nooit
+        // vrijkwam ("app blijft laden", gewicht opslaan deed niets; Martijn
+        // van Doesburg, 26-27 okt 2026). De app heeft maar één venster, dus
+        // afstemmen tussen tabbladen is daar niet nodig.
+        ...(Capacitor.isNativePlatform() ? { lock: processLock } : {}),
+        lockAcquireTimeout: 5000,
       },
       global: { fetch: fetchMetHergebruik },
     })
