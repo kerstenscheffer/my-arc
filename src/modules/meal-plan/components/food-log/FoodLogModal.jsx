@@ -137,7 +137,9 @@ export default function FoodLogModal({
       const newIngredient = {
         id: logData.sourceId || logData.id,
         name: logData.name, brand: logData.brand || null,
-        amount: logData.amount || 100, unit: 'g',
+        // Een maaltijd als ingrediënt is 1 portie, geen 1 gram.
+        amount: logData.amount ?? (logData.per_unit === 'portion' || logData.per100g === false ? 1 : 100),
+        unit: logData.per_unit === 'portion' ? 'portie' : 'g',
         calories: logData.calories || 0, protein: logData.protein || 0,
         carbs: logData.carbs || 0, fat: logData.fat || 0
       }
@@ -184,7 +186,10 @@ export default function FoodLogModal({
         barcode: logData.barcode || null,
         brand: logData.brand || null,
         per100g: logData.per100g || false,
-        amount: logData.amount || 100,
+        // Zonder aantal: een maaltijd/portie is er 1, een product 100 gram.
+        // Hier stond altijd 100, ook voor een eigen maaltijd of snel invoeren
+        // — bij bewerken stond er dan "100 porties" (385 logs sinds mei).
+        amount: logData.amount ?? (logData.per100g ? 100 : 1),
         per_unit: logData.per_unit || null,
         defaultPortion: logData.defaultPortion || 100,
         meal_type: logData.meal_type || 'snack'

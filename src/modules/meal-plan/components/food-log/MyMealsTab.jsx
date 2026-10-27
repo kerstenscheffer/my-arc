@@ -751,7 +751,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
               carbs: ing.carbs, fat: ing.fat,
             }}
             momentLabel=""
-            rechts={`${ing.amount ?? '?'}${ing.unit === 'gram' ? 'g' : (ing.unit || 'g')}`}
+            rechts={`${ing.amount ?? '?'}${ing.unit === 'gram' || ing.unit === 'g' || !ing.unit ? 'g' : ` ${ing.unit}`}`}
             isMobile={isMobile}
             acties={[{
               icon: <Trash2 size={11} />, label: 'Weghalen',
