@@ -898,6 +898,41 @@ export default function AIAlternativesModal({
               </>)}
             </div>
           </div>
+
+          {/* Gekozen: het verschil per macro en de knop om door te gaan, bovenin
+              waar je toch al kijkt (eerst stond de knop onderaan). */}
+          {gekozen && (
+            <div key={`v-${gekozen.id}`} style={{ marginBottom: '0.9rem', animation: 'altFadeIn 0.25s ease both' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 18 : 26, marginBottom: '0.75rem' }}>
+                {[
+                  { label: 'kcal', n: (gekozen.calories || 0) - (currentMeal?.calories || 0), kleur: '#10b981', g: '' },
+                  { label: 'eiwit', n: (gekozen.protein || 0) - (currentMeal?.protein || 0), kleur: '#3b82f6', g: 'g' },
+                  { label: 'koolh', n: (gekozen.carbs || 0) - (currentMeal?.carbs || 0), kleur: '#ec4899', g: 'g' },
+                  { label: 'vet', n: (gekozen.fat || 0) - (currentMeal?.fat || 0), kleur: '#f59e0b', g: 'g' },
+                ].map(m => {
+                  const v = Math.round(m.n)
+                  return (
+                    <div key={m.label} style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: v === 0 ? 'rgba(255,255,255,0.45)' : '#fff', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+                        {v > 0 ? '+' : v < 0 ? '−' : ''}{Math.abs(v)}{m.g}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 3, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.kleur }} />{m.label}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <button onClick={() => onSelectMeal?.(gekozen.id)} style={{
+                width: '100%', minHeight: 46, borderRadius: 12, border: 'none', background: '#fff', color: '#0a0a0a',
+                fontSize: '0.92rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <Check size={16} strokeWidth={3} /> Wissel
+              </button>
+            </div>
+          )}
           </>)}
 
           {/* Search */}
@@ -1113,23 +1148,6 @@ export default function AIAlternativesModal({
           )}
         </div>
 
-        {/* Doorgaan met de aangetikte maaltijd: naar de pop-up oud -> nieuw. */}
-        {!embedded && gekozen && (
-          <div style={{
-            flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0a0a0a',
-            padding: isMobile ? '0.7rem 1rem calc(0.9rem + env(safe-area-inset-bottom, 0px))' : '0.8rem 1.5rem 1rem',
-            animation: 'altKnopIn 0.25s ease both',
-          }}>
-            <button onClick={() => onSelectMeal?.(gekozen.id)} style={{
-              width: '100%', minHeight: 50, borderRadius: 12, border: 'none', background: '#fff', color: '#0a0a0a',
-              fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-              <Check size={16} strokeWidth={3} /> Wissel
-            </button>
-          </div>
-        )}
 
       </div>
     </div>
@@ -1425,10 +1443,6 @@ export default function AIAlternativesModal({
           0% { transform: translateY(26px) scale(0.4); opacity: 0; }
           60% { opacity: 1; }
           100% { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        @keyframes altKnopIn {
-          from { transform: translateY(100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
         }
         @keyframes altFadeIn {
           from { opacity: 0; }
