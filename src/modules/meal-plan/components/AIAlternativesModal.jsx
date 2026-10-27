@@ -13,7 +13,7 @@ import GramInvoer from './GramInvoer'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Heart, Plus, Info, SlidersHorizontal, ArrowRight, Utensils } from 'lucide-react'
 import { createPortal } from '../../../client/paginaPortal'
 
 // De secties van "Mijn maaltijden" heten anders dan de log-momenten hier.
@@ -781,16 +781,26 @@ export default function AIAlternativesModal({
             </button>
           </div>
 
-          {/* De maaltijd die je wisselt: één regel, geen kaart. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.75rem' }}>
-            <img src={resolveFoodImage(currentMeal || {}, { size: 120 })} alt=""
-              onError={e => { e.currentTarget.style.visibility = 'hidden' }}
-              style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, background: 'rgba(255,255,255,0.06)' }} />
-            <div style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              <span style={{ color: 'rgba(255,255,255,0.45)' }}>Nu · </span>{currentMeal?.name || currentMeal?.meal_name}
+          {/* De maaltijd die je wisselt -> lege plek voor de nieuwe. Zelfde
+              beeld als de pop-up erna (oud -> nieuw), zodat je ziet wat je doet. */}
+          <div style={{ textAlign: 'center', margin: '0.2rem 0 1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+              <img src={resolveFoodImage(currentMeal || {}, { size: 200 })} alt=""
+                onError={e => { e.currentTarget.style.visibility = 'hidden' }}
+                style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', opacity: 0.55, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+              <ArrowRight size={20} strokeWidth={2.8} color="#fff" />
+              <div style={{
+                width: 84, height: 84, borderRadius: '50%', border: '1.5px dashed rgba(255,255,255,0.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)',
+              }}>
+                <Utensils size={26} strokeWidth={2} />
+              </div>
             </div>
-            <div style={{ flexShrink: 0, fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
-              {Math.round(currentMeal?.calories || 0)} <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)' }}>kcal</span>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', marginTop: '0.7rem', padding: '0 1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {currentMeal?.name || currentMeal?.meal_name}
+            </div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+              {Math.round(currentMeal?.calories || 0)} kcal · {Math.round(currentMeal?.protein || 0)}g eiwit
             </div>
           </div>
           </>)}
