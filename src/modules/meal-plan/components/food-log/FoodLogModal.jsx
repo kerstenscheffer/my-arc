@@ -321,16 +321,14 @@ export default function FoodLogModal({
             style={{
               position: 'absolute', top: isMobile ? '0.75rem' : '1rem',
               right: isMobile ? '0.75rem' : '1rem',
-              width: '36px', height: '36px', borderRadius: '10px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-              color: 'rgba(255, 255, 255, 0.4)',
+              width: '36px', height: '36px', padding: 0,
+              background: 'none', border: 'none', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', zIndex: 10001,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <X size={16} />
+            <X size={22} strokeWidth={2.4} />
           </button>
 
           <FoodLogHeader
@@ -436,8 +434,9 @@ function FilterKnoppen({ filter, zet, isMobile }) {
   const knoppen = [
     { id: 'producten', label: 'Producten' },
     { id: 'maaltijden', label: 'Mijn maaltijden' },
-    // Wat de coach voor je klaarzet: dezelfde lijst als bij wisselen.
-    { id: 'coach', label: 'Coach' },
+    // Wat de coach voor je klaarzet: dezelfde lijst als bij wisselen. Heette
+    // 'Coach'; 'Recepten' zegt wat je er vindt (kant-en-klare maaltijden).
+    { id: 'coach', label: 'Recepten' },
   ]
   const favAan = filter === 'favorieten'
   return (
