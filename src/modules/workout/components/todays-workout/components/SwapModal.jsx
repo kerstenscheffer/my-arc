@@ -160,6 +160,31 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
   // De opengetikte vervanger: popt rechts in de cirkel bovenin.
   const [gekozenAlt, setGekozenAlt] = useState(null)
   const [filterOpen, setFilterOpen] = useState(false)
+
+  // Dezelfde oefening in een ándere training van het plan (Pull op di én za
+  // als twee losse dagen). Bij de maaltijden kies je ook op welke dagen een
+  // wissel geldt; hier op welke trainingen. Standaard allemaal (27 okt 2026).
+  const doelNaam = normNaam(exercise._originalName || exercise.name)
+  const [andereTrainingen] = useState(() => {
+    const rooster = client?.workout_schedule || {}
+    const weekdagenVan = (dk) => Object.entries(rooster)
+      .filter(([, v]) => v === dk)
+      .map(([d]) => String(d).toLowerCase())
+      .sort((a, b) => DAG_VOLGORDE.indexOf(a) - DAG_VOLGORDE.indexOf(b))
+      .map(d => DAG_KORT[d]).filter(Boolean)
+    return Object.entries(schema?.week_structure || {})
+      .filter(([dk]) => dk !== workoutDayKey)
+      .map(([dk, dagPlan]) => {
+        const i = (dagPlan?.exercises || []).findIndex(e => normNaam(e?.name) === doelNaam)
+        if (i < 0) return null
+        return { dk, i, ex: dagPlan.exercises[i], naam: String(dagPlan?.name || dk).trim(), dagen: weekdagenVan(dk) }
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.dk.localeCompare(b.dk))
+  })
+  const [ookIn, setOokIn] = useState(() => new Set(andereTrainingen.map(a => a.dk)))
+  const ookDoelen = andereTrainingen.filter(a => ookIn.has(a.dk))
+  const wisselOok = (dk) => setOokIn(prev => { const n = new Set(prev); if (n.has(dk)) n.delete(dk); else n.add(dk); return n })
   const [media, setMedia] = useState(() => new Map())
 
   useEffect(() => {
@@ -254,6 +279,20 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
     setSelectedType(v === 'compound' || v === 'isolation' ? v : null)
   }
 
+  // De nieuwe oefening op de plek van `basis` (sets, reps en rust blijven van
+  // die plek; media komen van de nieuwe oefening).
+  const bouwVervanger = (basis, newExercise) => ({
+    ...basis,
+    name: newExercise.name,
+    equipment: newExercise.equipment || basis.equipment,
+    primairSpieren: basis.primairSpieren,
+    video_url: newExercise.video_url || null,
+    thumbnail_url: newExercise.thumbnail_url || null,
+    fallback_video_url: newExercise.fallback_video_url || null,
+    image_url: newExercise.image_url || null,
+  })
+  const ookTekst = ookDoelen.length ? ` (ook in ${ookDoelen.map(a => a.naam).join(', ')})` : ''
+
   // alleenDag: de wissel geldt alleen voor deze weekdag, niet voor de andere
   // keren dat deze training in de week staat.
   const handleSwap = async (newExercise, { alleenDag = false } = {}) => {
@@ -290,6 +329,14 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
       await WorkoutServiceNew.saveWeeklyOverride(
         client.id, schema.id, workoutDayKey, exerciseIndex, updatedExercise, db
       )
+      // Ook in de andere gekozen trainingen (niet bij "alleen deze dag").
+      if (!alleenDag) {
+        for (const a of ookDoelen) {
+          await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, a.dk, a.i, db, { alleDagen: true })
+          await WorkoutServiceNew.saveWeeklyOverride(client.id, schema.id, a.dk, a.i,
+            { ...bouwVervanger(a.ex, newExercise), _isWeeklyOverride: true, _originalName: a.ex.name }, db)
+        }
+      }
       logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: alleenDag ? 'wissel_dag' : 'wissel_week', oefening: newExercise.name, was: exercise._originalName || exercise.name })
 
       const coachId = client?.coach_id || client?.trainer_id
@@ -301,7 +348,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           type: 'workout',
           priority: 'low',
           title: alleenDag ? `${clientName} heeft een oefening gewisseld voor ${DAG_NL[dag] || 'één dag'}` : `${clientName} heeft een oefening gewisseld`,
-          message: `${exercise.name} → ${newExercise.name}`,
+          message: `${exercise.name} → ${newExercise.name}${alleenDag ? '' : ookTekst}`,
           read_status: false,
         }).then(r => r, err => console.error('❌ Swap notification failed:', err))
       }
@@ -351,6 +398,17 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
       await db.updateExerciseInSchema(schema.id, workoutDayKey, exerciseIndex, updatedExercise)
       // Verwijder de weekly overrides van deze oefening, ook die voor één dag
       await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, exerciseIndex, db, { alleDagen: true })
+      // Ook in de andere gekozen trainingen. Na elkaar: updateExerciseInSchema
+      // leest en schrijft telkens het hele schema.
+      for (const a of ookDoelen) {
+        await db.updateExerciseInSchema(schema.id, a.dk, a.i, {
+          ...bouwVervanger(a.ex, newExercise),
+          _originalName: a.ex._originalName || a.ex.name,
+          _swappedAt: new Date().toISOString(),
+          _doorKlant: true,
+        })
+        await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, a.dk, a.i, db, { alleDagen: true })
+      }
       logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: 'wissel_permanent', oefening: newExercise.name, was: exercise.name })
 
       const coachId = client?.coach_id || client?.trainer_id
@@ -362,7 +420,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           type: 'workout',
           priority: 'low',
           title: `${clientName} heeft een oefening permanent gewisseld`,
-          message: `${exercise.name} → ${newExercise.name}`,
+          message: `${exercise.name} → ${newExercise.name}${ookTekst}`,
           read_status: false,
         }).then(r => r, err => console.error('❌ Permanent swap notification failed:', err))
       }
@@ -466,6 +524,27 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
                 <button disabled={swapping} onClick={() => handleSwap(gekozenAlt)} style={knop(true)}>Deze week</button>
                 <button disabled={swapping} onClick={() => handleMakePermanent(gekozenAlt)} style={knop(false)}>Altijd</button>
               </div>
+              {/* Ook in andere trainingen met deze oefening: aan/uit per training. */}
+              {andereTrainingen.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>Ook in</span>
+                  {andereTrainingen.map(a => {
+                    const aan = ookIn.has(a.dk)
+                    return (
+                      <button key={a.dk} onClick={() => wisselOok(a.dk)} style={{
+                        display: 'flex', alignItems: 'center', gap: 5, height: 30, padding: '0 0.75rem', borderRadius: 999,
+                        background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                        border: aan ? 'none' : '1px solid rgba(255,255,255,0.25)',
+                        fontSize: 12, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}>
+                        {aan && <Check size={13} strokeWidth={3.2} />}
+                        {a.naam}{a.dagen.length ? ` · ${a.dagen.join(' + ')}` : ''}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               {vaker && (
                 <button disabled={swapping} onClick={() => handleSwap(gekozenAlt, { alleenDag: true })} style={{
                   background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 800,
