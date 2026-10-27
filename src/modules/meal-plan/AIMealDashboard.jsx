@@ -912,8 +912,6 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           onSelectMeal={(newMealId, aangepast) => kiesWissel(modals.alternatives, newMealId, { inline: true, aangepast })}
           waarInhoud={wisselKeuze?.inline ? (
             <WisselStappen
-              oudNaam={wisselKeuze.meal.name || wisselKeuze.meal.meal_name}
-              nieuwNaam={wisselKeuze.nieuw.name || wisselKeuze.nieuw.meal_name}
               datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
               dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
               slot={wisselKeuze.meal.slot}

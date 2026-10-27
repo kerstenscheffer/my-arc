@@ -38,7 +38,7 @@ const lijstTekst = (woorden) => woorden.length <= 1 ? (woorden[0] || '')
   : `${woorden.slice(0, -1).join(', ')} en ${woorden[woorden.length - 1]}`
 
 export default function WisselStappen({
-  datum, dagKey, slot, oudNaam, nieuwNaam,
+  datum, dagKey, slot,
   dagenMetMaaltijd = null, trainingsdagen = null, vastAltijd = false,
   bezig = false, fout = null, onKies, onTerug,
 }) {
@@ -180,29 +180,29 @@ export default function WisselStappen({
 
       {stap === 3 && (<>
         {titel('Klopt dit?')}
-        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-          <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#fff' }}>
-            {moment} · {modus === 'altijd' ? altijdTekst : datumTekst}
-          </div>
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 4, lineHeight: 1.35 }}>
-            {oudNaam} → <span style={{ color: '#fff' }}>{nieuwNaam}</span>
-          </div>
-          {modus === 'week' && (
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>Daarna weer je gewone plan</div>
-          )}
+        {/* Twee regels: wat en wanneer. De maaltijden zelf staan al bovenin
+            (oud -> nieuw), die hoeven hier niet nog een keer. */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.1rem' }}>
+          {[
+            { label: 'Moment', waarde: moment },
+            { label: 'Wanneer', waarde: modus === 'altijd' ? altijdTekst : datumTekst, sub: modus === 'week' ? 'daarna weer je gewone plan' : null },
+          ].map(r => (
+            <div key={r.label} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '0.75rem 0.2rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>{r.label}</span>
+              <span style={{ textAlign: 'right', minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '0.92rem', fontWeight: 900, color: '#fff' }}>{r.waarde}</span>
+                {r.sub && <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{r.sub}</span>}
+              </span>
+            </div>
+          ))}
         </div>
         {fout && (
           <div style={{ fontSize: '0.72rem', color: '#ef4444', textAlign: 'center', marginBottom: '0.6rem' }}>{fout}</div>
         )}
-        <button onClick={bevestig} disabled={bezig} aria-label="Wisselen" style={{
-          alignSelf: 'center', padding: '0.4rem 1rem', background: 'none', border: 'none', color: '#fff',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-          fontSize: '0.9rem', fontWeight: 900, fontFamily: 'inherit', cursor: bezig ? 'default' : 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}>
+        <button onClick={bevestig} disabled={bezig} style={{ ...wit(bezig), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           {bezig
-            ? <span style={{ width: 40, height: 40, boxSizing: 'border-box', border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'wsSpin 0.8s linear infinite' }} />
-            : <RefreshCw size={44} strokeWidth={3} />}
+            ? <span style={{ width: 16, height: 16, boxSizing: 'border-box', border: '2.5px solid rgba(0,0,0,0.2)', borderTopColor: '#000', borderRadius: '50%', animation: 'wsSpin 0.8s linear infinite' }} />
+            : <RefreshCw size={17} strokeWidth={3} />}
           Wisselen
         </button>
         {terugKnop(() => setStap(2))}
