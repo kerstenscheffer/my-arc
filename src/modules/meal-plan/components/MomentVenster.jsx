@@ -10,7 +10,18 @@
 import React, { useState } from 'react'
 import { X } from 'lucide-react'
 
-const LABEL_OPTIES = ['Ontbijt', 'Lunch', 'Diner', 'Pre Workout Meal', 'After Workout Meal', 'Snack', 'Avondsnack', 'Fruit']
+// Zelfde waarden als de coach opslaat; op de knop een korte naam.
+const LABEL_OPTIES = [
+  { id: 'Ontbijt', kort: 'Ontbijt' }, { id: 'Lunch', kort: 'Lunch' }, { id: 'Diner', kort: 'Diner' }, { id: 'Snack', kort: 'Snack' },
+  { id: 'Pre Workout Meal', kort: 'Pre-workout' }, { id: 'After Workout Meal', kort: 'Post-workout' }, { id: 'Avondsnack', kort: 'Avondsnack' }, { id: 'Fruit', kort: 'Fruit' },
+]
+// "13:00" +/- minuten, binnen de dag.
+const schuif = (tijd, min) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(tijd || ''))
+  const nu = m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 12 * 60
+  const n = Math.round(((nu + min) % 1440 + 1440) % 1440 / 15) * 15 % 1440
+  return `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+}
 
 export default function MomentVenster({ label, tijd, metTijd = true, dagNaam, pos, bezig = false, onClose, onSave }) {
   const BREED = 300, HOOG = 190
@@ -20,10 +31,13 @@ export default function MomentVenster({ label, tijd, metTijd = true, dagNaam, po
   const top = (pos?.top || 8) + HOOG > vh - 8 ? Math.max(8, (pos?.boven || 0) - HOOG - 6) : (pos?.top || 8)
   const [l, setL] = useState(label || '')
   const [t, setT] = useState(tijd || '')
-  const opties = [
-    ...(LABEL_OPTIES.some(o => o.toLowerCase() === String(l).toLowerCase()) || !l ? [] : [l]),
-    ...LABEL_OPTIES,
-  ]
+  const opties = LABEL_OPTIES
+  const stap = {
+    width: 32, height: 32, padding: 0, borderRadius: 9, border: 'none', background: 'rgba(255,255,255,0.07)',
+    color: '#fff', fontSize: '1.1rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', lineHeight: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
   const kop = { fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em' }
   const knop = (vol) => ({
     flex: 1, height: 40, borderRadius: 10, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 900,
@@ -46,27 +60,28 @@ export default function MomentVenster({ label, tijd, metTijd = true, dagNaam, po
             <X size={17} strokeWidth={2.6} />
           </button>
         </div>
-        <div className="mv-rij" style={{ display: 'flex', gap: 4, overflowX: 'auto', scrollbarWidth: 'none', margin: '0 -0.85rem 12px', padding: '0 0.85rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 12 }}>
           {opties.map(o => {
-            const aan = String(l).toLowerCase() === o.toLowerCase()
+            const aan = String(l).toLowerCase() === o.id.toLowerCase()
             return (
-              <button key={o} onClick={() => setL(o)} style={{
-                flexShrink: 0, height: 32, padding: '0 0.75rem', borderRadius: 999, border: 'none',
+              <button key={o.id} onClick={() => setL(o.id)} style={{
+                height: 32, padding: 0, borderRadius: 9, border: 'none', minWidth: 0,
                 background: aan ? '#fff' : 'rgba(255,255,255,0.07)', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
-                fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                fontSize: '0.68rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>{o}</button>
+              }}>{o.kort}</button>
             )
           })}
         </div>
         {metTijd ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <span style={kop}>Tijd</span>
-            <input type="time" value={t} onChange={e => setT(e.target.value)} style={{
-              width: 92, boxSizing: 'border-box', height: 34, padding: '0 0.5rem', borderRadius: 9, textAlign: 'center',
-              background: 'rgba(255,255,255,0.07)', border: 'none', color: '#fff',
-              fontSize: '0.9rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none', colorScheme: 'dark',
-            }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <button onClick={() => setT(schuif(t, -15))} aria-label="Eerder" style={stap}>−</button>
+              <span style={{ minWidth: 56, textAlign: 'center', fontSize: '1rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{t || '--:--'}</span>
+              <button onClick={() => setT(schuif(t, 15))} aria-label="Later" style={stap}>+</button>
+            </div>
           </div>
         ) : (
           <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>De tijd volgt je training.</div>
