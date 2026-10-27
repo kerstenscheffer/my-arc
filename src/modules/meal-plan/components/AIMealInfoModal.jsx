@@ -6,7 +6,7 @@ import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCi
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
 import ClientMealEditModal from './ClientMealEditModal'
 import MealCard from './day-schedule/MealCard'
-import { foodImageFallback } from '../foodImageFallback'
+import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
 import MealPrepModal from './MealPrepModal'
 import PartnerBestellen from './PartnerBestellen'
 import SausBlok from './SausBlok'
@@ -60,28 +60,40 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
       } else {
       }
 
-      // 2. Haal ingrediënten op
-      const ingList = meal?.ingredients_list || []
-      const ids = ingList.filter(i => i?.ingredient_id).map(i => i.ingredient_id)
-
+      // 2. Haal ingrediënten op. Plan-maaltijden verwijzen met ingredient_id;
+      //    eigen maaltijden (ai_custom_meals) met `id` en hebben de macro's
+      //    voor hun hoeveelheid er zelf bij. Die tweede vorm bleef leeg
+      //    (Kersten, 27 okt 2026: pre-workout wrap zonder ingrediënten).
+      const ingList = (meal?.ingredients_list || []).filter(Boolean)
+      const ids = [...new Set(ingList.map(i => i.ingredient_id || i.id).filter(Boolean))]
+      let ingData = []
       if (ids.length > 0) {
-        const { data: ingData, error: ingError } = await db.supabase
+        const { data } = await db.supabase
           .from('ai_ingredients')
           .select('*')
           .in('id', ids)
-
-
-        if (ingData) {
-          const mapped = ingList.map(item => {
-            const ing = ingData.find(i => i.id === item.ingredient_id)
-            // `display` is hoe het op je boodschappenlijst zou staan
-            // ("2 sneeën volkoren brood"); die leest prettiger dan de kale
-            // databasenaam. Staat hij er niet, dan de naam.
-            return ing ? { ...ing, amount: item.amount, unit: item.unit || 'gram', display: item.display || null } : null
-          }).filter(Boolean)
-          setIngredients(mapped)
-        }
+        ingData = data || []
       }
+      const mapped = ingList.map(item => {
+        const ing = ingData.find(i => i.id === (item.ingredient_id || item.id))
+        // `display` is hoe het op je boodschappenlijst zou staan
+        // ("2 sneeën volkoren brood"); die leest prettiger dan de kale
+        // databasenaam. Staat hij er niet, dan de naam.
+        if (ing) return { ...ing, amount: item.amount, unit: item.unit || 'gram', display: item.display || null }
+        if (!item.name) return null
+        // Niet in de database (eigen product): reken de meegegeven macro's
+        // terug naar per 100 g, zodat de rest van het venster gewoon werkt.
+        const per = Number(item.amount) > 0 ? 100 / Number(item.amount) : 0
+        return {
+          name: item.name, brand: item.brand || null, image_url: item.image_url || null,
+          amount: item.amount, unit: item.unit || 'gram', display: item.display || null,
+          calories_per_100g: (Number(item.calories) || 0) * per,
+          protein_per_100g: (Number(item.protein) || 0) * per,
+          carbs_per_100g: (Number(item.carbs) || 0) * per,
+          fat_per_100g: (Number(item.fat) || 0) * per,
+        }
+      }).filter(Boolean)
+      setIngredients(mapped)
     } catch (e) {
       console.error('❌ loadData error:', e)
     } finally {
@@ -130,6 +142,9 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
   const getMealImage = () => {
     if (meal?.image_url) return meal.image_url
     if (dbMealData?.image_url) return dbMealData.image_url
+    // Zelfde foto als op de maaltijdkaart (op titel), niet een losse bowl.
+    const opTitel = resolveFoodImage(meal, { size: 800 })
+    if (opTitel) return opTitel
     const fallbacks = {
       breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&h=400&fit=crop&q=80',
       lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&h=400&fit=crop&q=80',
