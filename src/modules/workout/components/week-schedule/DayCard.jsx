@@ -152,7 +152,7 @@ export default function DayCard({
   })()
   const kaart = {
     position: 'relative', width: '100%', minWidth: 0,
-    height: hoogte, borderRadius: isMobile ? 12 : 14,
+    minHeight: hoogte, borderRadius: isMobile ? 12 : 14,
     paddingTop: !metLabel ? (isMobile ? 3 : 4) : isToday ? (isMobile ? 22 : 24) : (isMobile ? 6 : 8),
     paddingBottom: isMobile ? 4 : 5, paddingLeft: isMobile ? 3 : 4, paddingRight: isMobile ? 3 : 4,
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
