@@ -88,6 +88,9 @@ export default function AIAlternativesModal({
   // Filters achter één knop (27 okt 2026): in beeld alleen het moment, de
   // rest in een blad. Wat afwijkt van de standaard staat als chipje in beeld.
   const [filterOpen, setFilterOpen] = useState(false)
+  // Aangetikte maaltijd: verschijnt in de cirkel bovenaan, met een knop
+  // onderaan om door te gaan (27 okt 2026).
+  const [gekozen, setGekozen] = useState(null)
   // Ingeklapte groepen in de lijst (op kopje).
   const [dicht, setDicht] = useState(() => new Set())
   // Groep per maaltijd uit de laatste lijst (0 eigen, 1 aanrader, 2 rest),
@@ -180,6 +183,7 @@ export default function AIAlternativesModal({
     }
     return () => {
       setSelectedMeal(null)
+      setGekozen(null)
       setSearchTerm('')
       setMoment('alles')
       setBron('alles')
@@ -644,9 +648,9 @@ export default function AIAlternativesModal({
       zoekLog.gekozen(meal, filteredMealsRef.current.indexOf(meal))
     }
     if (embedded) { onKiesMaaltijd?.(meal); return }
-    // Direct door naar de pop-up oud -> nieuw (daar kies je ook waar). Het
-    // tussenblad "Wissel hiermee?" was een tweede bevestiging van hetzelfde.
-    onSelectMeal?.(meal.id)
+    // In de cirkel bovenaan; nog een keer tikken haalt hem eruit. Door naar
+    // de pop-up oud -> nieuw gaat met de knop onderaan.
+    setGekozen(prev => (prev?.id === meal.id ? null : meal))
   }
 
   const openInfo = async (meal) => {
@@ -866,17 +870,32 @@ export default function AIAlternativesModal({
             <div style={{ height: 60, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
               <ArrowRight size={20} strokeWidth={2.8} color="#fff" />
             </div>
-            {/* Nieuw: lege cirkel, even groot */}
+            {/* Nieuw: lege cirkel, of de aangetikte maaltijd die erin popt */}
             <div style={{ flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: '50%', border: '1.5px dashed rgba(255,255,255,0.35)', boxSizing: 'border-box',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)',
-              }}>
-                <Utensils size={20} strokeWidth={2} />
-              </div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: '0.5rem', lineHeight: 1.25 }}>
-                Kies hieronder
-              </div>
+              {gekozen ? (
+                <div key={gekozen.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'altPopIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
+                  <img src={resolveFoodImage(gekozen, { size: 200 })} alt=""
+                    onError={e => { e.currentTarget.style.visibility = 'hidden' }}
+                    style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.06)', border: '2px solid #fff', boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginTop: '0.5rem' }}>
+                    {Math.round(gekozen.calories || 0)} kcal · {Math.round(gekozen.protein || 0)}g eiwit
+                  </div>
+                  <div style={{
+                    fontSize: '0.75rem', fontWeight: 900, color: '#fff', marginTop: 2, lineHeight: 1.25,
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                  }}>{gekozen.name}</div>
+                </div>
+              ) : (<>
+                <div style={{
+                  width: 60, height: 60, borderRadius: '50%', border: '1.5px dashed rgba(255,255,255,0.35)', boxSizing: 'border-box',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)',
+                }}>
+                  <Utensils size={20} strokeWidth={2} />
+                </div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: '0.5rem', lineHeight: 1.25 }}>
+                  Kies hieronder
+                </div>
+              </>)}
             </div>
           </div>
           </>)}
@@ -1011,7 +1030,7 @@ export default function AIAlternativesModal({
               {!(sortering === 'smart' && !searchTerm && dicht.has(kopVan(meal))) && <SuggestieKaart
                 meal={meal}
                 currentMeal={currentMeal}
-                isSelected={selectedMeal?.id === meal.id}
+                isSelected={gekozen?.id === meal.id}
                 onSelect={() => kies(meal)}
                 zonderVerschil={embedded}
                 isMobile={isMobile}
@@ -1093,6 +1112,24 @@ export default function AIAlternativesModal({
             </div>
           )}
         </div>
+
+        {/* Doorgaan met de aangetikte maaltijd: naar de pop-up oud -> nieuw. */}
+        {!embedded && gekozen && (
+          <div style={{
+            flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0a0a0a',
+            padding: isMobile ? '0.7rem 1rem calc(0.9rem + env(safe-area-inset-bottom, 0px))' : '0.8rem 1.5rem 1rem',
+            animation: 'altKnopIn 0.25s ease both',
+          }}>
+            <button onClick={() => onSelectMeal?.(gekozen.id)} style={{
+              width: '100%', minHeight: 50, borderRadius: 12, border: 'none', background: '#fff', color: '#0a0a0a',
+              fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <Check size={16} strokeWidth={3} /> Wissel
+            </button>
+          </div>
+        )}
 
       </div>
     </div>
@@ -1384,6 +1421,15 @@ export default function AIAlternativesModal({
       </BladModal>
 
       <style>{`
+        @keyframes altPopIn {
+          0% { transform: translateY(26px) scale(0.4); opacity: 0; }
+          60% { opacity: 1; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes altKnopIn {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
         @keyframes altFadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
