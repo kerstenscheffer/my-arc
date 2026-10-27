@@ -351,7 +351,7 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
 
       <div style={{ width: '100%', height: isMobile ? 190 : 230 }}>
         <ResponsiveContainer>
-          <ComposedChart data={data} margin={{ top: 16, right: 10, bottom: 0, left: -18 }}>
+          <ComposedChart data={data} margin={{ top: 16, right: 10, bottom: 0, left: -4 }}>
             <defs>
               {/* De lijn kleurt mee met hoe je ervoor staat: groen op tempo,
                   oranje als je vooruitgaat maar traag, rood als je stilstaat.

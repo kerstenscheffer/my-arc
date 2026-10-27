@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../../../../../lazyMetHerlaad'
 import { vanKg, naarKg, eenheidLabel, haalGyms } from '../../../gym/GymService'
 import { createPortal } from '../../../../../client/paginaPortal'
-import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp } from 'lucide-react'
+import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 // Grafiek (recharts, ~300 KB) pas laden als het logscherm opengaat, niet
 // met de hele workoutpagina mee.
@@ -225,7 +225,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 }
 
 // ========== LOGGED SET ROW ==========
-function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMobile, eenheid = 'kg' }) {
+function LoggedSetRow({ set, index, vorige, vorigeSleutel = 0, onAddDropset, onEdit, onDelete, isMobile, eenheid = 'kg' }) {
   const EH = eenheidLabel(eenheid)
   const toon = (kilo) => vanKg(kilo, eenheid)
   const [showMenu, setShowMenu] = useState(false)
@@ -280,9 +280,9 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
           )}
         </div>
 
-        <span style={{
+        <span key={vorigeSleutel} style={{
           fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)',
-          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', animation: 'fadeIn 0.2s ease',
         }}>
           {vorige
             ? <>{toon(vorige.weight)}<span style={{ fontSize: '0.8em' }}>{EH}</span> × {vorige.reps}</>
@@ -326,7 +326,7 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
 // Een set die nog moet. Staat er meteen in zodra je de oefening opent, met
 // wat je vorige keer deed als richtpunt. Zo zie je in één blik hoeveel sets
 // er nog liggen en wat je moet halen, in plaats van "Nog geen sets gelogd".
-function LegeSetRow({ index, vorige, onClick, isMobile, eenheid = 'kg' }) {
+function LegeSetRow({ index, vorige, vorigeSleutel = 0, onClick, isMobile, eenheid = 'kg' }) {
   const EH = eenheidLabel(eenheid)
   return (
     <button
@@ -353,9 +353,9 @@ function LegeSetRow({ index, vorige, onClick, isMobile, eenheid = 'kg' }) {
       }}>
         —
       </span>
-      <span style={{
+      <span key={vorigeSleutel} style={{
         fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)',
-        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', animation: 'fadeIn 0.2s ease',
       }}>
         {vorige
           ? <>{vanKg(vorige.weight, eenheid)}<span style={{ fontSize: '0.8em' }}>{EH}</span> × {vorige.reps}</>
@@ -459,6 +459,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // verversen.
   const [grafiekVersie, setGrafiekVersie] = useState(0)
   const [previousPerformance, setPreviousPerformance] = useState(null)
+  // Alle eerdere keren van deze oefening (nieuw → oud), om in de settabel
+  // doorheen te vegen. `vergelijkIdx` is welke er nu in de rechterkolom
+  // staat; standaard dezelfde als previousPerformance. Alleen de tabel
+  // gebruikt dit — werkgewicht en invoer blijven op de vorige keer.
+  const [eerdereKeren, setEerdereKeren] = useState([])
+  const [vergelijkIdx, setVergelijkIdx] = useState(0)
+  const veegStart = useRef(null)
   const [attachmentUsed, setAttachmentUsed] = useState(null)
   const [machineSettings, setMachineSettings] = useState({})
   const [previousMachineSettings, setPreviousMachineSettings] = useState(null)
@@ -544,6 +551,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
         date: session?.workout_date || null,
         anderGym,
       })
+      // Alle keren op datum, met de zaak erbij als die anders is dan nu.
+      const keren = bruikbaar.map(r => {
+        const sessie = bijSessie(r)
+        const gymId = sessie?.gym_id || null
+        const elders = gymInfo.actiefId && gymId && gymId !== gymInfo.actiefId
+        return {
+          sets: r.sets,
+          date: sessie?.workout_date || null,
+          anderGym: elders ? (gymInfo.gyms.find(g => g.id === gymId)?.naam || null) : null,
+        }
+      })
+      setEerdereKeren(keren)
+      setVergelijkIdx(Math.max(0, bruikbaar.indexOf(gekozen)))
       if (gekozen.machine_settings) setPreviousMachineSettings(gekozen.machine_settings)
     } catch (e) { console.error('Previous performance load failed:', e) }
   }
@@ -1118,6 +1138,32 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 vorige keer deed op precies dezelfde set. De datum staat als
                 kolomkop, zodat het losse "vorige sessie"-blok in de kop weg
                 kon — dezelfde cijfers stonden er twee keer. */}
+            {/* Naar rechts vegen = een training eerder in de rechterkolom,
+                naar links = weer nieuwer. pan-y: verticaal scrollen blijft
+                gewoon werken, alleen een zijwaartse veeg is voor ons. */}
+            {(() => {
+              const vergelijk = eerdereKeren[vergelijkIdx] || previousPerformance
+              const kanOuder = vergelijkIdx < eerdereKeren.length - 1
+              const kanNieuwer = vergelijkIdx > 0
+              const pijl = (aan) => ({
+                background: 'none', border: 'none', padding: '0 2px', cursor: aan ? 'pointer' : 'default',
+                color: aan ? 'rgba(255,215,0,0.75)' : 'rgba(255,255,255,0.12)', display: 'inline-flex',
+                fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              })
+              return (
+            <div
+              onTouchStart={(e) => { const t = e.touches[0]; veegStart.current = { x: t.clientX, y: t.clientY } }}
+              onTouchEnd={(e) => {
+                const b = veegStart.current; veegStart.current = null
+                if (!b) return
+                const t = e.changedTouches[0]
+                const dx = t.clientX - b.x, dy = t.clientY - b.y
+                if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+                if (dx > 0 && kanOuder) setVergelijkIdx(i => i + 1)
+                if (dx < 0 && kanNieuwer) setVergelijkIdx(i => i - 1)
+              }}
+              style={{ touchAction: 'pan-y' }}
+            >
             <div style={{
               display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem',
               alignItems: 'center',
@@ -1130,16 +1176,28 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
             }}>
               <span />
               <span style={{ color: '#FFD700' }}>Vandaag</span>
-              <span style={{ color: 'rgba(255,215,0,0.55)' }}>
-                {previousPerformance?.date
-                  ? new Date(`${String(previousPerformance.date).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+              <span style={{ color: 'rgba(255,215,0,0.55)', display: 'flex', alignItems: 'center', gap: 2, marginLeft: eerdereKeren.length > 1 ? -6 : 0 }}>
+                {eerdereKeren.length > 1 && (
+                  <button aria-label="Training eerder" disabled={!kanOuder} onClick={() => setVergelijkIdx(i => i + 1)} style={pijl(kanOuder)}>
+                    <ChevronLeft size={13} strokeWidth={3} />
+                  </button>
+                )}
+                <span key={vergelijkIdx} style={{ animation: 'fadeIn 0.2s ease' }}>
+                {vergelijk?.date
+                  ? new Date(`${String(vergelijk.date).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
                   : 'vorige'}
                 {/* Komt de vergelijking van een andere zaak, dan hoort dat
                     erbij te staan: een ander apparaat weegt anders. */}
-                {previousPerformance?.anderGym && (
+                {vergelijk?.anderGym && (
                   <span style={{ display: 'block', marginTop: 1, fontSize: '0.88em', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'none', letterSpacing: 0 }}>
-                    {previousPerformance.anderGym}
+                    {vergelijk.anderGym}
                   </span>
+                )}
+                </span>
+                {eerdereKeren.length > 1 && (
+                  <button aria-label="Training later" disabled={!kanNieuwer} onClick={() => setVergelijkIdx(i => i - 1)} style={pijl(kanNieuwer)}>
+                    <ChevronRight size={13} strokeWidth={3} />
+                  </button>
                 )}
               </span>
               <span />
@@ -1147,10 +1205,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
 
             {Array.from({ length: Math.max(loggedSets.length, geplandeSets) }, (_, i) => {
               const set = loggedSets[i]
-              const vorige = previousPerformance?.sets?.[i] || null
+              const vorige = vergelijk?.sets?.[i] || null
               return set ? (
                 <LoggedSetRow key={i} set={set} index={i}
-                  vorige={vorige}
+                  vorige={vorige} vorigeSleutel={vergelijkIdx}
                   onAddDropset={(idx) => { setDropsetIndex(idx); setShowWizard(false) }}
                   onEdit={handleEditSet}
                   onDelete={handleDeleteSet}
@@ -1158,11 +1216,14 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                   eenheid={eenheid}
                 />
               ) : (
-                <LegeSetRow key={i} index={i} vorige={vorige} isMobile={isMobile} eenheid={eenheid}
+                <LegeSetRow key={i} index={i} vorige={vorige} vorigeSleutel={vergelijkIdx} isMobile={isMobile} eenheid={eenheid}
                   onClick={startSet}
                 />
               )
             })}
+            </div>
+              )
+            })()}
 
             {tipZwaarder && (
               <div style={{
