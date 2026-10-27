@@ -171,7 +171,9 @@ const MEAL_OPTIONS = [
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
 
-export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment, db }) {
+// `knopTekst`: andere tekst op de knop, bv. 'Toevoegen aan maaltijd' als je
+// een eigen maaltijd aan het bouwen bent.
+export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment, db, knopTekst = 'Loggen' }) {
   // Geen vroege return vóór de hooks: React eist dat elke render dezelfde
   // hooks in dezelfde volgorde draait, en met `if (!item) return null` bovenaan
   // stond dit hele bestand in de linter als fout. De hooks gaan uit van een
@@ -753,7 +755,7 @@ export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment,
           onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(1)' }}
         >
           <Check size={16} strokeWidth={2.5} />
-          {saving ? 'Opslaan…' : 'Loggen'}
+          {saving ? 'Opslaan…' : knopTekst}
         </button>
       </div>
 

@@ -2,7 +2,7 @@
 // 🎯 v3.1 — Edit flow race fix: useEffect deps gefixt + diagnostic log
 import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from '../../../../client/paginaPortal'
-import { X, ArrowLeft, AlertCircle, Heart } from 'lucide-react'
+import { X, ArrowLeft, AlertCircle, Heart, Plus } from 'lucide-react'
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
@@ -312,6 +312,7 @@ export default function FoodLogModal({
             db={db}
             client={client}
             loggingService={loggingService}
+            knopTekst={addIngredientCallback ? 'Toevoegen aan maaltijd' : 'Loggen'}
           />
         </>
       ) : !successData ? (
@@ -337,7 +338,17 @@ export default function FoodLogModal({
             isMobile={isMobile}
           />
 
-          {weergave === 'zoeken' && (
+          {/* Ingrediënt zoeken voor een eigen maaltijd: vaste balk met de
+              maaltijd die je bouwt, in plaats van de filters. Zonder dit zag
+              je alleen producten en wist je niet meer dat je een maaltijd
+              aan het maken was (Kersten, 27 okt 2026). */}
+          {addIngredientCallback && buildingMeal ? (
+            <BouwBalk
+              maaltijd={buildingMeal}
+              isMobile={isMobile}
+              onTerug={() => { setAddIngredientCallback(null); setFilter('maaltijden') }}
+            />
+          ) : weergave === 'zoeken' && (
             <FilterKnoppen filter={filter} zet={setFilter} isMobile={isMobile} />
           )}
 
@@ -425,6 +436,37 @@ export default function FoodLogModal({
   )
 
   return createPortal(modal, document.body)
+}
+
+// Balk bovenaan tijdens ingrediënten zoeken voor een eigen maaltijd.
+function BouwBalk({ maaltijd, isMobile, onTerug }) {
+  const lijst = maaltijd?.ingredients_list || []
+  const kcal = Math.round(lijst.reduce((t, i) => t + (Number(i.calories) || 0), 0))
+  return (
+    <div style={{ padding: isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.7rem', flexShrink: 0 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '0.55rem 0.55rem 0.55rem 0.85rem', borderRadius: 14,
+        background: 'rgba(255,255,255,0.08)',
+      }}>
+        <Plus size={16} strokeWidth={3} color="#fff" style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {maaltijd?.name?.trim() || 'Nieuwe maaltijd'}
+          </div>
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+            {lijst.length} {lijst.length === 1 ? 'ingrediënt' : 'ingrediënten'} · {kcal} kcal
+          </div>
+        </div>
+        <button onClick={onTerug} style={{
+          flexShrink: 0, height: 34, padding: '0 0.85rem', borderRadius: 999,
+          background: '#fff', border: 'none', color: '#0a0a0a',
+          fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>Klaar</button>
+      </div>
+    </div>
+  )
 }
 
 // Waar je zoekt: favorieten (hartje), producten, je eigen maaltijden of de
