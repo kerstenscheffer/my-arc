@@ -79,13 +79,16 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
         // `display` is hoe het op je boodschappenlijst zou staan
         // ("2 sneeën volkoren brood"); die leest prettiger dan de kale
         // databasenaam. Staat hij er niet, dan de naam.
-        if (ing) return { ...ing, amount: item.amount, unit: item.unit || 'gram', display: item.display || null }
-        if (!item.name) return null
-        // Niet in de database (eigen product): reken de meegegeven macro's
-        // terug naar per 100 g, zodat de rest van het venster gewoon werkt.
-        const per = Number(item.amount) > 0 ? 100 / Number(item.amount) : 0
+        // Eigen vorm (naam + macro's voor deze hoeveelheid): die macro's
+        // gelden, zodat de regels optellen tot de maaltijd. Terugrekenen naar
+        // per 100 g zodat de rest van het venster gewoon werkt.
+        const eigen = !item.ingredient_id && item.name && item.calories != null && Number(item.amount) > 0
+        if (ing && !eigen) return { ...ing, amount: item.amount, unit: item.unit || 'gram', display: item.display || null }
+        if (!eigen) return null
+        const per = 100 / Number(item.amount)
         return {
-          name: item.name, brand: item.brand || null, image_url: item.image_url || null,
+          ...(ing || {}),
+          name: item.name, brand: item.brand || ing?.brand || null, image_url: item.image_url || ing?.image_url || null,
           amount: item.amount, unit: item.unit || 'gram', display: item.display || null,
           calories_per_100g: (Number(item.calories) || 0) * per,
           protein_per_100g: (Number(item.protein) || 0) * per,

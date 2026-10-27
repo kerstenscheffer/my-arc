@@ -49,7 +49,12 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
       setLoadingInit(true)
       const raw  = meal?.ingredients_list || meal?.ingredients || []
       const list = Array.isArray(raw) ? raw : []
-      const uuids = list.filter(i => i?.ingredient_id && UUID_REGEX.test(i.ingredient_id)).map(i => i.ingredient_id)
+      // Plan-maaltijden verwijzen met ingredient_id; eigen maaltijden van een
+      // klant (ai_custom_meals) met `id` en de macro's voor hun hoeveelheid
+      // erbij. Die tweede vorm viel hier weg, zodat "Aanpassen" leeg opende
+      // (Kersten, 27 okt 2026).
+      const idVan = (i) => i?.ingredient_id || i?.id
+      const uuids = list.filter(i => idVan(i) && UUID_REGEX.test(idVan(i))).map(idVan)
       let dbRows = {}
       if (uuids.length > 0 && db?.supabase) {
         const { data } = await db.supabase.from('ai_ingredients')
@@ -59,12 +64,20 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
       }
       setDbCache(dbRows)
       const built = list.map(item => {
-        if (!item?.ingredient_id || !UUID_REGEX.test(item.ingredient_id)) return null
-        const d = dbRows[item.ingredient_id]; if (!d) return null
+        const id = idVan(item)
+        const d = id && UUID_REGEX.test(id) ? dbRows[id] : null
+        // Eigen vorm: de meegegeven macro's gelden voor `amount`; terugrekenen
+        // naar per 100 g zodat de totalen blijven kloppen met de maaltijd.
+        const eigen = !item?.ingredient_id && item?.name && item?.calories != null && Number(item.amount) > 0
+        if (eigen) {
+          const per = 100 / Number(item.amount)
+          return { ingredient_id: d ? id : null, _eigen: true, name: item.name, amount: Number(item.amount), unit: item.unit || 'gram', cal: (Number(item.calories) || 0) * per, prot: (Number(item.protein) || 0) * per, carbs: (Number(item.carbs) || 0) * per, fat: (Number(item.fat) || 0) * per, min: 0, max: Infinity, scalable: d ? d.scalable !== false : true, portie: d ? portieInfo(d) : null }
+        }
+        if (!d) return null
         const amount = item.amount || d.default_portion_gram || 100
         // Geen min_portion_gram-ondergrens bij handmatig bewerken — de coach mag
         // vrij omlaag (0 = ondergrens). Voorheen zat je vast op bv. 100g.
-        return { ingredient_id: item.ingredient_id, name: d.name, amount, unit: item.unit || 'gram', cal: d.calories_per_100g, prot: d.protein_per_100g, carbs: d.carbs_per_100g, fat: d.fat_per_100g, min: 0, max: Infinity, scalable: d.scalable !== false, portie: portieInfo(d) }
+        return { ingredient_id: id, name: d.name, amount, unit: item.unit || 'gram', cal: d.calories_per_100g, prot: d.protein_per_100g, carbs: d.carbs_per_100g, fat: d.fat_per_100g, min: 0, max: Infinity, scalable: d.scalable !== false, portie: portieInfo(d) }
       }).filter(Boolean)
       setIngredients(built)
 
@@ -179,7 +192,18 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
     const macros = calcMacros(ingredients)
     return {
       ...meal, name: mealName, meal_name: mealName, ...macros,
-      ingredients_list: ingredients.map(i => ({ ingredient_id: i.ingredient_id, amount: parseFloat(i.amount) || 0, unit: i.unit||'gram' })),
+      ingredients_list: ingredients.map(i => {
+        const amount = parseFloat(i.amount) || 0
+        if (!i._eigen) return { ingredient_id: i.ingredient_id, amount, unit: i.unit||'gram' }
+        // Eigen ingrediënt: naam en macro's mee, anders weet niemand meer
+        // wat het was (er is niet altijd een rij in ai_ingredients).
+        const f = amount / 100
+        return {
+          ...(i.ingredient_id ? { id: i.ingredient_id } : {}), name: i.name, amount, unit: i.unit||'gram',
+          calories: Math.round((i.cal||0)*f), protein: Math.round((i.prot||0)*f*10)/10,
+          carbs: Math.round((i.carbs||0)*f*10)/10, fat: Math.round((i.fat||0)*f*10)/10,
+        }
+      }),
       preparation_steps: prepSteps.filter(s => s.trim().length > 0),
       tips: tips || meal?.tips || null,
       original_calories: meal.original_calories || meal.calories,
