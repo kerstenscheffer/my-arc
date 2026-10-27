@@ -242,8 +242,9 @@ export default function AIDaySchedule({
       // Deze voortgang gaat over VANDAAG, dus komt hij alleen in de bak van
       // vandaag. Eerder ging hij in de gedeelde bak en gold hij daarmee voor
       // elke dag die je opende.
-      const vandaagKey = daysOfWeek[getTodayIndex()]?.key
-      if (!vandaagKey) return
+      // Op datum, niet op weekdag: anders stond vandaag ook afgevinkt op
+      // dezelfde weekdag volgende week (Kersten, 27 okt 2026).
+      const vandaagKey = lokaleDatum(new Date())
       // Mergen i.p.v. vervangen, zodat een (lege) todayProgress de uit de DB
       // herstelde vinkjes hieronder niet wegvaagt.
       setCheckedByDay(prev => ({
@@ -255,7 +256,7 @@ export default function AIDaySchedule({
 
   // Ander eten op hetzelfde moment? Dan gaat het vinkje eraf.
   useEffect(() => {
-    const dagKey = daysOfWeek[currentDay]?.key
+    const dagKey = datumVanDag(currentDay)
     if (!dagKey || !displayMeals.length) return
     const gewisseld = []
     displayMeals.forEach(m => {
@@ -271,7 +272,7 @@ export default function AIDaySchedule({
       gewisseld.forEach(slot => { delete dag[slot] })
       return { ...prev, [dagKey]: dag }
     })
-  }, [displayMeals, currentDay])
+  }, [displayMeals, currentDay, weekOffset])
 
   // Herstel de afvink-status bij (her)laden van de pagina. De macro-totalen
   // bleven wel staan (losse som uit consumed_meals), maar de vinkjes per maaltijd
@@ -282,7 +283,7 @@ export default function AIDaySchedule({
     // beperking er nog, dan laadde een andere dag zijn eigen stand nooit en
     // liet hij zien wat er toevallig van vandaag in het geheugen stond.
     if (!client?.id || !db?.supabase || displayMeals.length === 0) return
-    const dagKey = daysOfWeek[currentDay]?.key
+    const dagKey = datumVanDag(currentDay)
     if (!dagKey) return
     let alive = true
     ;(async () => {
@@ -319,7 +320,7 @@ export default function AIDaySchedule({
       } catch (e) { console.warn('Vinkjes herstellen mislukt:', e) }
     })()
     return () => { alive = false }
-  }, [displayMeals, currentDay, client?.id, db])
+  }, [displayMeals, currentDay, weekOffset, client?.id, db])
 
   useEffect(() => {
     // OVERHAUL: free-mode skips plan loading entirely
@@ -711,12 +712,13 @@ export default function AIDaySchedule({
   // Wat de tijdlijn krijgt: alleen de vinkjes van de dag die je bekijkt.
   // De tijdlijn zoekt zelf op meal.slot, dus die hoeft niets te weten van
   // de opdeling per dag.
-  const checkedMeals = checkedByDay[daysOfWeek[currentDay]?.key] || {}
+  // Vinkjes per kalenderdatum (zie vandaagKey hierboven).
+  const checkedMeals = checkedByDay[datumVanDag(currentDay)] || {}
 
   const isVandaagNu = () => isVandaag()
 
   const handleMealCheck = async (meal) => {
-    const dagKey = daysOfWeek[currentDay]?.key
+    const dagKey = datumVanDag(currentDay)
     const zetVink = (waarde) => setCheckedByDay(prev => ({
       ...prev,
       [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: waarde },
@@ -922,7 +924,7 @@ export default function AIDaySchedule({
             // als "nog niet afgevinkt" gelezen en door de dubbelklik-slot
             // tegengehouden. Vandaar dat het scherm leek te haperen.
             const zetVinkVoorDeze = (waarde) => setCheckedByDay(prev => {
-              const dagKey = daysOfWeek[currentDay]?.key
+              const dagKey = datumVanDag(currentDay)
               if (!dagKey) return prev
               return { ...prev, [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: waarde } }
             })
@@ -1025,7 +1027,7 @@ export default function AIDaySchedule({
                 // Ook hier per dag: zetVink hoort bij handleMealCheck en
                 // bestaat hier niet.
                 setCheckedByDay(prev => {
-                  const dagKey = daysOfWeek[currentDay]?.key
+                  const dagKey = datumVanDag(currentDay)
                   if (!dagKey) return prev
                   return { ...prev, [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: true } }
                 })
