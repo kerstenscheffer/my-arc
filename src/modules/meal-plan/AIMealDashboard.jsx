@@ -999,7 +999,6 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           label={momentKeuze.meal.display_label || momentKeuze.meal.timeSlot || ''}
           tijd={typeof momentKeuze.meal.timing === 'string' ? momentKeuze.meal.timing : ''}
           metTijd={momentKeuze.meal.slot !== PRE_WORKOUT_SLOT}
-          dagNaam={['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'][dayKeyToIndex(selectedDay)]}
           pos={momentKeuze.pos}
           isMobile={isMobile}
           bezig={momentBezig}
