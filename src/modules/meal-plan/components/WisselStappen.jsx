@@ -180,19 +180,17 @@ export default function WisselStappen({
 
       {stap === 3 && (<>
         {titel('Klopt dit?')}
-        {/* Twee regels: wat en wanneer. De maaltijden zelf staan al bovenin
-            (oud -> nieuw), die hoeven hier niet nog een keer. */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.1rem' }}>
+        {/* Wat en wanneer, naast elkaar in het midden. De maaltijden zelf
+            staan al bovenin (oud -> nieuw), die hoeven hier niet nog een keer. */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 28, marginBottom: '1.2rem' }}>
           {[
             { label: 'Moment', waarde: moment },
             { label: 'Wanneer', waarde: modus === 'altijd' ? altijdTekst : datumTekst, sub: modus === 'week' ? 'daarna weer je gewone plan' : null },
           ].map(r => (
-            <div key={r.label} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '0.75rem 0.2rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>{r.label}</span>
-              <span style={{ textAlign: 'right', minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: '0.92rem', fontWeight: 900, color: '#fff' }}>{r.waarde}</span>
-                {r.sub && <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{r.sub}</span>}
-              </span>
+            <div key={r.label} style={{ textAlign: 'center', minWidth: 0 }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{r.label}</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{r.waarde}</div>
+              {r.sub && <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{r.sub}</div>}
             </div>
           ))}
         </div>
