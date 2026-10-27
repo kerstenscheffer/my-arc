@@ -136,6 +136,9 @@ const WORK_COLOR = '#e8756a'
 // plaatsen we hem daarom relatief aan het trainingsblok van die dag.
 const PRE_WORKOUT_LEAD = 60   // minuten vóór aanvang training
 const PRE_WORKOUT_DURATION = 15
+// Geen training en geen eigen kloktijd: dezelfde tijd als de Meal-pagina
+// (plannedTime 15.5 in AIMealPlanService/AIDaySchedule).
+const PRE_WORKOUT_TERUGVAL = 15 * 60 + 30
 
 const TRAINING_DEFAULT_START = 17 * 60
 const TRAINING_DEFAULT_DURATION = 60
@@ -532,13 +535,17 @@ export class ClientAgendaService {
           // Klok-tijd bepalen: meal.timing indien geldig, anders slot-default.
           // (ai_meals slaat .timing soms als type-array op → geen klok-tijd.)
           const timing = parseTime(meal.timing) ?? parseTime(SLOT_DEFAULT_TIME[slot])
-          if (timing == null) return
           const duration = SLOT_DURATION[slot] || 30
-          mealTimesByDay[day][slot] = timing
+          // Pre-workout vóór de tijd-check: zijn tijd volgt de training, en
+          // zonder eigen kloktijd (geen standaard voor dit slot) viel hij hier
+          // stil weg. Op Voeding stond hij wel (Thin wraps jam, 27 okt 2026).
           if (slot === PRE_WORKOUT_SLOT) {
-            preWorkoutUitPlan[day] = { meal, timing, duration }
+            if (timing != null) mealTimesByDay[day][slot] = timing
+            preWorkoutUitPlan[day] = { meal, timing: timing ?? PRE_WORKOUT_TERUGVAL, duration }
             return
           }
+          if (timing == null) return
+          mealTimesByDay[day][slot] = timing
           blocksByDay[day].push({
             id: `meal-${day}-${slot}`,
             day, type: 'meal',
