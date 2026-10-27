@@ -385,8 +385,14 @@ export default function WeekSchedule({
     } finally { setSaving(false) }
   }
 
+  // Is de training op deze dag (van de getoonde week) al gedaan? Dan schuift
+  // hij bij een wissel niet mee naar de andere dag: hij is al getraind. Zonder
+  // dit stond Pull twee keer in de week nadat ks10k Legs naar een dag zette
+  // waarop hij Pull al gedaan had (27 okt 2026).
+  const alGedaan = (day) => gedaneDagen.some(u => u.workout_day === day)
+
   // Verschuif workout van `day` één positie in `direction` (-1 = vorige dag,
-  // +1 = volgende dag). Bezet → swap; leeg → move.
+  // +1 = volgende dag). Bezet → swap; leeg of al gedaan → move.
   const handleShift = (day, direction) => {
     const sourceIdx = weekDays.indexOf(day)
     const targetIdx = sourceIdx + direction
@@ -396,7 +402,7 @@ export default function WeekSchedule({
     const targetDay = weekDays[targetIdx]
     const targetWorkout = tempSchedule[targetDay]
     const next = { ...tempSchedule }
-    if (targetWorkout) {
+    if (targetWorkout && !alGedaan(targetDay)) {
       next[targetDay] = sourceWorkout
       next[day] = targetWorkout
     } else {
@@ -568,7 +574,8 @@ export default function WeekSchedule({
     } else {
       if (selectedForSwap) {
         const s = { ...tempSchedule }
-        if (selectedForSwap.workoutKey && workoutKey) { s[day] = selectedForSwap.workoutKey; s[selectedForSwap.day] = workoutKey }
+        if (selectedForSwap.workoutKey && workoutKey && alGedaan(day)) { s[day] = selectedForSwap.workoutKey; delete s[selectedForSwap.day] }
+        else if (selectedForSwap.workoutKey && workoutKey) { s[day] = selectedForSwap.workoutKey; s[selectedForSwap.day] = workoutKey }
         else if (selectedForSwap.workoutKey && !workoutKey) { s[day] = selectedForSwap.workoutKey; delete s[selectedForSwap.day] }
         else if (!selectedForSwap.workoutKey && workoutKey) { s[selectedForSwap.day] = workoutKey; delete s[day] }
         handleAutoSave(s)
