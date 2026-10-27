@@ -15,7 +15,13 @@ export default function LaadScherm() {
 
   return (
     <div style={{ minHeight: '100dvh', background: '#0a0a0a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 16px', textAlign: 'center' }}>
-      <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'laadspin 0.9s linear infinite' }} />
+      {/* Groter rondje met het logo stil in het midden (Kersten, 27 okt 2026).
+          Zelfde opbouw als het eerste scherm in index.html, zodat de overgang
+          niet verspringt. */}
+      <div style={{ position: 'relative', width: 96, height: 96 }}>
+        <div style={{ position: 'absolute', inset: 0, border: '3px solid rgba(255,255,255,0.12)', borderTopColor: '#fff', borderRadius: '50%', animation: 'laadspin 0.9s linear infinite' }} />
+        <img src="/ma-logo-header.png" alt="MY ARC" style={{ position: 'absolute', top: '50%', left: '50%', width: 84, transform: 'translate(-50%, -50%)' }} />
+      </div>
       <style>{'@keyframes laadspin { to { transform: rotate(360deg); } }'}</style>
       {lang && (
         <>

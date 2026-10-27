@@ -133,16 +133,29 @@
         align-items: center;
         justify-content: center;
         min-height: 100vh;
-        background: linear-gradient(180deg, #0a0a0a 0%, #171717 100%);
+        background: #0a0a0a;
       }
       
+      /* Zelfde als LaadScherm.jsx: wit rondje met het logo in het midden. */
+      .loading-logo {
+        position: relative;
+        width: 96px;
+        height: 96px;
+      }
       .loading-spinner {
-        width: 60px;
-        height: 60px;
-        border: 3px solid rgba(255, 184, 0, 0.2);
-        border-top-color: #FFB800;
+        position: absolute;
+        inset: 0;
+        border: 3px solid rgba(255, 255, 255, 0.12);
+        border-top-color: #fff;
         border-radius: 50%;
-        animation: spin 1s linear infinite;
+        animation: spin 0.9s linear infinite;
+      }
+      .loading-logo img {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 84px;
+        transform: translate(-50%, -50%);
       }
       
       @keyframes spin {
@@ -157,7 +170,10 @@
     /></noscript>
     <div id="root">
       <div class="loading-container">
-        <div class="loading-spinner"></div>
+        <div class="loading-logo">
+          <div class="loading-spinner"></div>
+          <img src="/ma-logo-header.png" alt="MY ARC" />
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.jsx"></script>
