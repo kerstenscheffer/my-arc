@@ -863,8 +863,8 @@ export default function AIAlternativesModal({
                 {Math.round(currentMeal?.calories || 0)} kcal · {Math.round(currentMeal?.protein || 0)}g eiwit
               </div>
               <div style={{
-                fontSize: '0.75rem', fontWeight: 900, color: '#fff', marginTop: 2, lineHeight: 1.25,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.25,
+                maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
                 {currentMeal?.name || currentMeal?.meal_name}
               </div>
@@ -876,7 +876,7 @@ export default function AIAlternativesModal({
             {/* Nieuw: lege cirkel, of de aangetikte maaltijd die erin popt */}
             <div style={{ flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               {gekozen ? (
-                <div key={gekozen.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'altPopIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
+                <div key={gekozen.id} style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'altPopIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
                   <img src={resolveFoodImage(gekozen, { size: 200 })} alt=""
                     onError={e => { e.currentTarget.style.visibility = 'hidden' }}
                     style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', boxSizing: 'border-box' }} />
@@ -884,8 +884,8 @@ export default function AIAlternativesModal({
                     {Math.round(gekozen.calories || 0)} kcal · {Math.round(gekozen.protein || 0)}g eiwit
                   </div>
                   <div style={{
-                    fontSize: '0.75rem', fontWeight: 900, color: '#fff', marginTop: 2, lineHeight: 1.25,
-                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.25,
+                    maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>{gekozen.name}</div>
                 </div>
               ) : (<>
