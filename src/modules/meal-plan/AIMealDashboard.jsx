@@ -629,6 +629,18 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     }
   }
 
+  // Vanuit Inzicht naar een datum springen (ook volgende weken): de week en
+  // de weekdag zetten, en eventueel meteen het wisselvenster voor een
+  // geplande maaltijd openen. Het wisselvenster rekent zijn datum uit deze
+  // twee standen, dus "alleen deze dag" landt op de goede datum.
+  const gaNaarDatum = (datum, wisselMaaltijd = null) => {
+    const maandag = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x }
+    const weken = Math.round((maandag(datum) - maandag(new Date())) / (7 * 864e5))
+    setWeekOffset(weken)
+    setSelectedDay(DAYS_OF_WEEK[(new Date(datum).getDay() + 6) % 7].key)
+    if (wisselMaaltijd) setModals(prev => ({ ...prev, summary: false, alternatives: wisselMaaltijd }))
+  }
+
   const handleDayChange = (newDay) => {
     setSelectedDay(newDay)
   }
@@ -1121,6 +1133,10 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
           selectedDay={selectedDay}
           onDayChange={handleDayChange}
           onOpenFullHistory={() => setModals(prev => ({ ...prev, summary: false, history: true }))}
+          activePlan={dashboardData?.activePlan || null}
+          workoutSchedule={trainingsSchema || null}
+          onOpenDag={(d) => gaNaarDatum(d)}
+          onWisselMaaltijd={(d, m) => gaNaarDatum(d, m)}
           targets={dashboardData?.dailyTotals?.targets || {
             calories: client.target_calories || 0,
             protein:  client.target_protein  || 0,

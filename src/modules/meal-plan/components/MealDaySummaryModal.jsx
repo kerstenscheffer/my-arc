@@ -12,13 +12,21 @@
 //   4. Maandkalender — stip onder elke dag met logs, reeks dagen op rij.
 //      Tik een dag en je ziet hem hierboven, ook buiten deze week.
 //
+// Vooruit plannen (27 okt 2026): vandaag en latere dagen tonen ook wat er
+// gepland staat (zelfde bron als de dagpagina: utils/maaltijdenVoorDag). Tik
+// een maaltijd en je staat op die dag met het wisselvenster open; zo zet een
+// klant volgende week alvast klaar. Alleen als `activePlan` meekomt.
+//
 // Datums zijn lokale datums. De vorige versie rekende in UTC, waardoor een
 // maaltijd na 22:00 bij de volgende dag telde en de stipjes verschoven.
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays } from 'lucide-react'
-import { foodImageFallback } from '../foodImageFallback'
+import { X, ChevronLeft, ChevronRight, ArrowRight, Flame, CalendarDays, RefreshCw } from 'lucide-react'
+import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
+import { maaltijdenVoorDag } from '../utils/maaltijdenVoorDag'
+import { getOverrides } from '../DayTemplateService'
+import { ClientAgendaService } from '../../client-agenda/ClientAgendaService'
 import { kcalKleur } from '../utils/kcalKleur'
 import useZwevendVenster from '../../../components/useZwevendVenster'
 
@@ -74,6 +82,11 @@ export default function MealDaySummaryModal({
   // Coach Inzicht: als zwevend venster naast je werk — te verslepen aan de
   // kop, groter of kleiner aan de hoek, zonder gedimde achtergrond.
   zwevend = false,
+  // Vooruit plannen (alleen op de maaltijdpagina van de klant).
+  activePlan = null,
+  workoutSchedule = null,
+  onOpenDag = null,       // (datum) => naar die dag in het plan
+  onWisselMaaltijd = null, // (datum, maaltijd) => die dag + wisselvenster
 }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
   const venster = useZwevendVenster({ isMobile, standaard: { w: 540, h: 820 } })
@@ -128,6 +141,42 @@ export default function MealDaySummaryModal({
     return () => { weg = true }
   }, [isOpen, db, clientId, bereik])
 
+  // Gepland: per dag van de week van de gekozen dag, vanaf vandaag.
+  const [gepland, setGepland] = useState({}) // { 'YYYY-MM-DD': [maaltijden] }
+  const [trainingStarts, setTrainingStarts] = useState(null)
+  useEffect(() => {
+    if (!isOpen || !activePlan || !db?.supabase || !clientId) return
+    let weg = false
+    new ClientAgendaService(db.supabase).getTrainingStartsPerDag(clientId)
+      .then(t => { if (!weg) setTrainingStarts(t || {}) }, () => { if (!weg) setTrainingStarts({}) })
+    return () => { weg = true }
+  }, [isOpen, activePlan, db, clientId])
+  const weekSleutel = sleutel(maandagVan(gekozen))
+  useEffect(() => {
+    if (!isOpen || !activePlan || !db?.supabase || !clientId || trainingStarts === null) return
+    let weg = false
+    ;(async () => {
+      const maandagD = vanSleutel(weekSleutel)
+      const vandaagK = sleutel(new Date())
+      const dagen = Array.from({ length: 7 }, (_, i) => plusDagen(maandagD, i)).filter(d => sleutel(d) >= vandaagK)
+      if (!dagen.length) return
+      const templates = await getOverrides(db.supabase, clientId, sleutel(dagen[0]), sleutel(dagen[dagen.length - 1]))
+      const uit = {}
+      await Promise.all(dagen.map(async d => {
+        const k = sleutel(d)
+        const dayKey = DAYS_OF_WEEK[(d.getDay() + 6) % 7]
+        try {
+          uit[k] = await maaltijdenVoorDag({
+            supabase: db.supabase, clientId, activePlan, dagTemplate: templates[k]?.dag || null,
+            dayKey, datum: k, workoutSchedule, trainingStart: trainingStarts[dayKey],
+          })
+        } catch { uit[k] = [] }
+      }))
+      if (!weg) setGepland(prev => ({ ...prev, ...uit }))
+    })()
+    return () => { weg = true }
+  }, [isOpen, activePlan, workoutSchedule, db, clientId, weekSleutel, trainingStarts])
+
   if (!isOpen) return null
 
   const doel = { kcal: Number(targets.calories) || 0, eiwit: Number(targets.protein) || 0, koolh: Number(targets.carbs) || 0, vet: Number(targets.fat) || 0 }
@@ -142,13 +191,20 @@ export default function MealDaySummaryModal({
   const gekozenSleutel = sleutel(gekozen)
   const maaltijden = perDag?.[gekozenSleutel] || []
   const dag = totaal(maaltijden)
+  const gekozenGepland = gepland[sleutel(gekozen)] || null
+  // Een dag in de toekomst heeft nog geen logs: dan tellen de geplande
+  // maaltijden in de grote cijfers.
+  const toekomst = sleutel(gekozen) > sleutel(new Date())
+  const toonPlan = toekomst && !!gekozenGepland
+  const dagCijfers = toonPlan ? totaal(gekozenGepland) : null
   const verschil = doel.kcal ? Math.round(doel.kcal - dag.kcal) : null
 
   // Week van de gekozen dag.
   const maandag = maandagVan(gekozen)
   const week = Array.from({ length: 7 }, (_, i) => {
     const d = plusDagen(maandag, i); const k = sleutel(d)
-    return { d, k, kcal: totaal(perDag?.[k]).kcal, eiwit: totaal(perDag?.[k]).eiwit, gelogd: !!perDag?.[k]?.length }
+    const plan = k > sleutel(new Date()) && gepland[k] ? totaal(gepland[k]).kcal : 0
+    return { d, k, kcal: totaal(perDag?.[k]).kcal, eiwit: totaal(perDag?.[k]).eiwit, gelogd: !!perDag?.[k]?.length, plan }
   })
   const gelogdeDagen = week.filter(w => w.gelogd)
   const weekGem = gelogdeDagen.length ? {
@@ -156,7 +212,7 @@ export default function MealDaySummaryModal({
     eiwit: gelogdeDagen.reduce((t, w) => t + w.eiwit, 0) / gelogdeDagen.length,
   } : null
   const opDoel = doel.kcal ? gelogdeDagen.filter(w => Math.abs(w.kcal - doel.kcal) <= 100).length : 0
-  const staafMax = Math.max(doel.kcal * 1.25, ...week.map(w => w.kcal), 1)
+  const staafMax = Math.max(doel.kcal * 1.25, ...week.map(w => Math.max(w.kcal, w.plan)), 1)
 
   // Reeks: dagen op rij met logs, tot en met vandaag (of gisteren als je
   // vandaag nog niets logde).
@@ -238,8 +294,11 @@ export default function MealDaySummaryModal({
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: isMobile ? '2.2rem' : '2.5rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
-                    {fmt(dag.kcal)}<span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: 0 }}>{doel.kcal ? ` / ${fmt(doel.kcal)} kcal` : ' kcal'}</span>
+                    {fmt(toonPlan ? dagCijfers.kcal : dag.kcal)}<span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: 0 }}>{doel.kcal ? ` / ${fmt(doel.kcal)} kcal` : ' kcal'}</span>
                   </div>
+                  {toonPlan && (
+                    <div style={{ marginTop: 6, fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>Gepland</div>
+                  )}
                   {verschil !== null && maaltijden.length > 0 && (
                     <div style={{ marginTop: 6, fontSize: '0.8rem', fontWeight: 800, color: kcalKleur(dag.kcal, doel.kcal) }}>
                       {Math.abs(verschil) <= doel.kcal * 0.1
@@ -251,16 +310,24 @@ export default function MealDaySummaryModal({
               </div>
               {doel.kcal > 0 && (
                 <div style={{ height: 6, marginTop: 12, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, (dag.kcal / doel.kcal) * 100)}%`, height: '100%', borderRadius: 3, background: maaltijden.length ? kcalKleur(dag.kcal, doel.kcal) : 'transparent', transition: 'width 0.4s ease' }} />
+                  <div style={{ width: `${Math.min(100, ((toonPlan ? dagCijfers.kcal : dag.kcal) / doel.kcal) * 100)}%`, height: '100%', borderRadius: 3, background: toonPlan ? 'rgba(255,255,255,0.45)' : maaltijden.length ? kcalKleur(dag.kcal, doel.kcal) : 'transparent', transition: 'width 0.4s ease' }} />
                 </div>
               )}
               <div style={{ display: 'flex', gap: 14, marginTop: '1.1rem' }}>
-                <MacroBalk label="Eiwit" waarde={dag.eiwit} doel={doel.eiwit} />
-                <MacroBalk label="Koolh." waarde={dag.koolh} doel={doel.koolh} />
-                <MacroBalk label="Vet" waarde={dag.vet} doel={doel.vet} />
+                <MacroBalk label="Eiwit" waarde={(toonPlan ? dagCijfers : dag).eiwit} doel={doel.eiwit} />
+                <MacroBalk label="Koolh." waarde={(toonPlan ? dagCijfers : dag).koolh} doel={doel.koolh} />
+                <MacroBalk label="Vet" waarde={(toonPlan ? dagCijfers : dag).vet} doel={doel.vet} />
               </div>
 
-              {onDayChange && inDezeWeek && gekozenSleutel !== sleutel(startDatum) && (
+              {onOpenDag ? (
+                <button
+                  onClick={() => { onOpenDag(gekozen); onClose?.() }}
+                  style={{ marginTop: '1rem', width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'transparent', border: `1px solid rgba(255,255,255,0.2)`, borderRadius: 12, color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <CalendarDays size={16} strokeWidth={2.6} /> {toekomst ? 'Pas deze dag aan in je plan' : 'Open deze dag in je plan'}
+                </button>
+              ) : (<>
+                {onDayChange && inDezeWeek && gekozenSleutel !== sleutel(startDatum) && (
                 <button
                   onClick={() => { onDayChange?.(DAYS_OF_WEEK[(gekozen.getDay() + 6) % 7]); onClose?.() }}
                   style={{ marginTop: '1rem', width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'transparent', border: `1px solid rgba(255,255,255,0.2)`, borderRadius: 12, color: '#fff', fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
@@ -269,9 +336,42 @@ export default function MealDaySummaryModal({
                 </button>
               )}
 
+              </>)}
+
+              {/* ── Gepland (vandaag en later) ── */}
+              {gekozenGepland && sleutel(gekozen) >= vandaagSleutel && (<>
+                {kopje('Gepland', gekozenGepland.length ? `${gekozenGepland.length} ${gekozenGepland.length === 1 ? 'maaltijd' : 'maaltijden'}` : null)}
+                {gekozenGepland.length === 0 ? (
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Voor deze dag staat niets in je plan.</div>
+                ) : gekozenGepland.map((m, i) => {
+                  const naam = m.name || m.meal_name || 'Maaltijd'
+                  return (
+                    <button key={`${m.slot}-${i}`} onClick={onWisselMaaltijd ? () => { onWisselMaaltijd(gekozen, m); onClose?.() } : undefined} style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0',
+                      background: 'none', border: 'none', borderTop: i ? `1px solid ${LIJN}` : 'none', textAlign: 'left',
+                      fontFamily: 'inherit', cursor: onWisselMaaltijd ? 'pointer' : 'default',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <span style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 10, backgroundImage: `url(${resolveFoodImage({ ...m, name: naam }, { size: 120 })})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {m.timeSlot || m.display_label || ''}{m.timing ? ` · ${m.timing}` : ''}
+                        </span>
+                        <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>{naam}</span>
+                      </span>
+                      <span style={{ flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 900, color: '#fff' }}>{fmt(m.calories)} kcal</span>
+                        <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{fmt(m.protein)}g eiwit</span>
+                      </span>
+                      {onWisselMaaltijd && <RefreshCw size={15} strokeWidth={2.6} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0 }} />}
+                    </button>
+                  )
+                })}
+              </>)}
+
               {/* ── 2. Wat je hebt gelogd ── */}
-              {kopje('Gelogd', maaltijden.length ? `${maaltijden.length} ${maaltijden.length === 1 ? 'maaltijd' : 'maaltijden'}` : null)}
-              {maaltijden.length === 0 ? (
+              {!toekomst && kopje('Gelogd', maaltijden.length ? `${maaltijden.length} ${maaltijden.length === 1 ? 'maaltijd' : 'maaltijden'}` : null)}
+              {toekomst ? null : maaltijden.length === 0 ? (
                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Op deze dag is niets gelogd.</div>
               ) : maaltijden.map((m, i) => {
                 const naam = m.meal_name || 'Maaltijd'
@@ -294,7 +394,14 @@ export default function MealDaySummaryModal({
               })}
 
               {/* ── 3. De week ── */}
-              {kopje(`Week van ${maandag.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace(/\.$/, '')}`, doel.kcal ? `${opDoel}/${gelogdeDagen.length || 0} op doel` : null)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '1.5rem 0 0.75rem' }}>
+                <button onClick={() => kies(plusDagen(gekozen, -7))} aria-label="Vorige week" style={{ ...pijl, width: 28, height: 28, marginLeft: -6 }}><ChevronLeft size={16} strokeWidth={3} /></button>
+                <span style={{ fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  Week van {maandag.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }).replace(/\.$/, '')}
+                </span>
+                <button onClick={() => kies(plusDagen(gekozen, 7))} aria-label="Volgende week" style={{ ...pijl, width: 28, height: 28 }}><ChevronRight size={16} strokeWidth={3} /></button>
+                {doel.kcal > 0 && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{opDoel}/{gelogdeDagen.length || 0} op doel</span>}
+              </div>
               <div style={{ position: 'relative', height: 120, display: 'flex', alignItems: 'flex-end', gap: 6 }}>
                 {doel.kcal > 0 && (
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${(doel.kcal / staafMax) * 100}%`, borderTop: '1px dashed rgba(255,255,255,0.35)', pointerEvents: 'none' }} />
@@ -304,8 +411,9 @@ export default function MealDaySummaryModal({
                   return (
                     <button key={w.k} onClick={() => kies(w.d)} aria-label={`${NL_DAY_SHORT[i]} ${fmt(w.kcal)} kcal`} style={{ flex: 1, height: '100%', padding: 0, background: 'transparent', border: 'none', display: 'flex', alignItems: 'flex-end', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                       <span style={{
-                        width: '100%', height: `${Math.max(w.gelogd ? 4 : 2, (w.kcal / staafMax) * 100)}%`, borderRadius: 6,
-                        background: w.gelogd ? kcalKleur(w.kcal, doel.kcal) : 'rgba(255,255,255,0.08)',
+                        // Toekomst: wat er gepland staat, als lichte staaf.
+                        width: '100%', height: `${Math.max(w.gelogd || w.plan ? 4 : 2, ((w.gelogd ? w.kcal : w.plan) / staafMax) * 100)}%`, borderRadius: 6,
+                        background: w.gelogd ? kcalKleur(w.kcal, doel.kcal) : w.plan ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.08)',
                         opacity: aan ? 1 : 0.55, outline: aan ? '2px solid #fff' : 'none', outlineOffset: 2,
                         transition: 'height 0.3s ease',
                       }} />
