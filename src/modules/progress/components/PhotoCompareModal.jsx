@@ -93,6 +93,33 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
   const uitsnedeVan = (foto) => (foto && uitsnedes[foto.id]) || { zoom: 1, x: 0, y: 0 }
   const zetUitsnede = (foto, patch) => foto && setUitsnedes(u => ({ ...u, [foto.id]: { ...uitsnedeVan(foto), ...patch } }))
 
+  // Gewicht op de dag van de foto (27 okt 2026): uit dezelfde weeglogs als
+  // de Tracking-pagina. Geen weging die dag? De dichtstbijzijnde binnen een
+  // week. Met de kg-knop staat het ook op de afbeelding (onthouden).
+  const [wegingen, setWegingen] = useState([])
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return
+    let weg = false
+    db.supabase.from('weight_challenge_logs').select('date, weight').eq('client_id', client.id).order('date')
+      .then(r => { if (!weg) setWegingen((r?.data || []).filter(w => Number(w.weight) > 0)) }, () => {})
+    return () => { weg = true }
+  }, [db, client?.id])
+  const gewichtOp = (foto) => {
+    const d = String(foto?.photo_date || '').slice(0, 10)
+    if (!d || !wegingen.length) return null
+    const t = new Date(`${d}T12:00:00`).getTime()
+    let beste = null
+    wegingen.forEach(w => {
+      const af = Math.abs(new Date(`${w.date}T12:00:00`).getTime() - t) / 864e5
+      if (af <= 7 && (!beste || af < beste.af)) beste = { af, kg: Number(w.weight) }
+    })
+    return beste ? beste.kg : null
+  }
+  const [toonGewicht, setToonGewichtRuw] = useState(() => { try { return localStorage.getItem('myarc_vergelijk_kg') === '1' } catch { return false } })
+  const setToonGewicht = (v) => { setToonGewichtRuw(v); try { localStorage.setItem('myarc_vergelijk_kg', v ? '1' : '0') } catch { /* geen opslag */ } }
+  const kgLinks = gewichtOp(left), kgRechts = gewichtOp(right)
+  const kgTekst = (v) => v == null ? '—' : `${String(Math.round(v * 10) / 10).replace('.', ',')} kg`
+
   // Het resultaat tekenen zodra de keuze verandert.
   const canvasRef = useRef(null)
   const [beeld, setBeeld] = useState('laden') // laden | klaar | fout
@@ -109,6 +136,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
         const klaar = await tekenTransformatie(canvasRef.current, left, right, {
           startDatum, afgebroken: () => weg, formaat,
           uitsnede: { links: uitsnedeVan(left), rechts: uitsnedeVan(right) },
+          gewichten: toonGewicht ? { links: kgLinks, rechts: kgRechts } : null,
         })
         if (klaar && !weg) { getekendRef.current = sleutel; setBeeld('klaar') }
       } catch (e) {
@@ -117,7 +145,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
       }
     })()
     return () => { weg = true }
-  }, [left?.id, right?.id, left?.photo_url, right?.photo_url, startDatum, formaat, JSON.stringify(uitsnedes)]) // eslint-disable-line
+  }, [left?.id, right?.id, left?.photo_url, right?.photo_url, startDatum, formaat, JSON.stringify(uitsnedes), toonGewicht, kgLinks, kgRechts]) // eslint-disable-line
 
   // Slepen in het voorbeeld schuift de foto in de helft waar je begon;
   // scrollen (of de schuif eronder) zoomt.
@@ -224,7 +252,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
   // Per kant één regel: ‹ datum ›. Tik op de datum = direct springen (de
   // keuzelijst ligt onzichtbaar over de datum heen).
   const labelVan = (p, i) => `${fmtDate(p.photo_date)}${forAngle.filter(x => x.photo_date === p.photo_date).length > 1 ? ` (#${forAngle.filter((x, j) => x.photo_date === p.photo_date && j <= i).length})` : ''}`
-  const DatumStap = ({ label, value, onChange }) => {
+  const DatumStap = ({ label, value, onChange, kg }) => {
     const idx = Math.max(0, forAngle.findIndex(p => p.id === value))
     const pijl = (uit) => ({
       width: 30, height: 30, padding: 0, background: 'none', border: 'none', color: '#fff', opacity: uit ? 0.25 : 1,
@@ -245,6 +273,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
           </div>
           <button onClick={() => idx < forAngle.length - 1 && onChange(forAngle[idx + 1].id)} disabled={idx >= forAngle.length - 1} aria-label="Latere foto" style={pijl(idx >= forAngle.length - 1)}><ChevronRight size={18} strokeWidth={2.8} /></button>
         </div>
+        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: kg == null ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)', marginTop: 1 }}>{kgTekst(kg)}</div>
       </div>
     )
   }
@@ -321,14 +350,24 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                 </div>
                 {/* Voor en na: per kant ‹ datum ›, onder de eigen helft. */}
                 <div style={{ display: 'flex', gap: 8, marginTop: '0.8rem' }}>
-                  <DatumStap label="Voor" value={leftId} onChange={setLeftId} />
-                  <DatumStap label="Na" value={rightId} onChange={setRightId} />
+                  <DatumStap label="Voor" value={leftId} onChange={setLeftId} kg={kgLinks} />
+                  <DatumStap label="Na" value={rightId} onChange={setRightId} kg={kgRechts} />
                 </div>
+                {kgLinks != null && kgRechts != null && (() => {
+                  const v = Math.round((kgRechts - kgLinks) * 10) / 10
+                  return (
+                    <div style={{ textAlign: 'center', marginTop: 6, fontSize: '1rem', fontWeight: 900, color: '#fff' }}>
+                      {v > 0 ? '+' : v < 0 ? '−' : ''}{String(Math.abs(v)).replace('.', ',')} kg
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginLeft: 6 }}>verschil</span>
+                    </div>
+                  )
+                })()}
 
                 {/* Acties: wissel en bewerk als icoon, download als hoofdknop. */}
                 <div style={{ display: 'flex', gap: 8, marginTop: '0.9rem' }}>
                   <button onClick={wissel} aria-label="Voor en na omdraaien" title="Voor en na omdraaien" style={{ ...knop(false), width: 44, padding: 0, justifyContent: 'center' }}><ArrowLeftRight size={18} strokeWidth={2.6} /></button>
                   <button onClick={() => setAanpassen(v => !v)} aria-label="Bewerken" title="Uitsnede en hoek" style={{ ...knop(aanpassen), width: 44, padding: 0, justifyContent: 'center' }}><Crop size={18} strokeWidth={2.6} /></button>
+                  <button onClick={() => setToonGewicht(!toonGewicht)} aria-label="Gewicht op de foto" title="Gewicht op de foto aan/uit" style={{ ...knop(toonGewicht), width: 44, padding: 0, justifyContent: 'center', fontSize: '0.8rem' }}>kg</button>
                   <button onClick={download} disabled={bezig} style={{ ...knop(true), flex: 1, justifyContent: 'center', opacity: bezig ? 0.6 : 1 }}>
                     <Download size={17} strokeWidth={2.8} />{bezig ? 'Bezig…' : 'Download'}
                   </button>

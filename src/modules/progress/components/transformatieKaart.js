@@ -105,7 +105,9 @@ function tekenOverlay(ctx, overlay, W, H) {
 // `afgebroken`: geeft true als er intussen een nieuwere tekening is gestart;
 // dan tekent deze niet meer (snel wisselen van datum).
 // `formaat`: sleutel uit FORMATEN. `uitsnede`: { links: {zoom,x,y}, rechts }.
-export async function tekenTransformatie(canvas, first, last, { startDatum, afgebroken, formaat = '4:5', uitsnede = {} } = {}) {
+// `gewichten`: { links, rechts } in kg; staat er een getal, dan komt het
+// boven 'Maand X' op de kaart (aan/uit in het vergelijk-scherm, 27 okt 2026).
+export async function tekenTransformatie(canvas, first, last, { startDatum, afgebroken, formaat = '4:5', uitsnede = {}, gewichten = null } = {}) {
   const { W, H } = FORMATEN[formaat] || FORMATEN['4:5']
   const [imgA, imgB, overlay] = await Promise.all([
     loadImg(fotoWeergaveUrl(first.photo_url, { breedte: 1000, kwaliteit: 85 }), true),
@@ -131,6 +133,14 @@ export async function tekenTransformatie(canvas, first, last, { startDatum, afge
   const y = H - (OVERLAY_H - 1161) * k   // zelfde hoogte als het logo (was H * 0.86 bij 4:5)
   ctx.fillText(`Maand ${maand(first.photo_date)}`, W * 0.24, y)
   ctx.fillText(`Maand ${maand(last.photo_date)}`, W * 0.76, y)
+  if (gewichten) {
+    const kg = (v) => `${String(Math.round(v * 10) / 10).replace('.', ',')} kg`
+    ctx.font = `900 ${Math.round(40 * k)}px Arial, sans-serif`
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    const yk = y - 62 * k
+    if (Number.isFinite(gewichten.links)) ctx.fillText(kg(gewichten.links), W * 0.24, yk)
+    if (Number.isFinite(gewichten.rechts)) ctx.fillText(kg(gewichten.rechts), W * 0.76, yk)
+  }
   ctx.restore()
   return true
 }
