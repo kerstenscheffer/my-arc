@@ -291,7 +291,10 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
     fallback_video_url: newExercise.fallback_video_url || null,
     image_url: newExercise.image_url || null,
   })
-  const ookTekst = ookDoelen.length ? ` (ook in ${ookDoelen.map(a => a.naam).join(', ')})` : ''
+  const ookTekstVoor = (doelen) => doelen.length ? ` (ook in ${doelen.map(a => a.naam).join(', ')})` : ''
+  // Stap 2 na "Altijd": ook in de andere training(en)?
+  const [vraagOok, setVraagOok] = useState(false)
+  useEffect(() => { setVraagOok(false) }, [gekozenAlt])
 
   // alleenDag: de wissel geldt alleen voor deze weekdag, niet voor de andere
   // keren dat deze training in de week staat.
@@ -329,14 +332,6 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
       await WorkoutServiceNew.saveWeeklyOverride(
         client.id, schema.id, workoutDayKey, exerciseIndex, updatedExercise, db
       )
-      // Ook in de andere gekozen trainingen (niet bij "alleen deze dag").
-      if (!alleenDag) {
-        for (const a of ookDoelen) {
-          await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, a.dk, a.i, db, { alleDagen: true })
-          await WorkoutServiceNew.saveWeeklyOverride(client.id, schema.id, a.dk, a.i,
-            { ...bouwVervanger(a.ex, newExercise), _isWeeklyOverride: true, _originalName: a.ex.name }, db)
-        }
-      }
       logPlanWijziging(db, { client, schema, dayKey: workoutDayKey, soort: alleenDag ? 'wissel_dag' : 'wissel_week', oefening: newExercise.name, was: exercise._originalName || exercise.name })
 
       const coachId = client?.coach_id || client?.trainer_id
@@ -348,7 +343,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           type: 'workout',
           priority: 'low',
           title: alleenDag ? `${clientName} heeft een oefening gewisseld voor ${DAG_NL[dag] || 'één dag'}` : `${clientName} heeft een oefening gewisseld`,
-          message: `${exercise.name} → ${newExercise.name}${alleenDag ? '' : ookTekst}`,
+          message: `${exercise.name} → ${newExercise.name}`,
           read_status: false,
         }).then(r => r, err => console.error('❌ Swap notification failed:', err))
       }
@@ -363,7 +358,9 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
     }
   }
 
-  const handleMakePermanent = async (newExercise) => {
+  // metAndere: ook in de andere trainingen die bij stap 2 aan staan.
+  const handleMakePermanent = async (newExercise, { metAndere = false } = {}) => {
+    const doelen = metAndere ? ookDoelen : []
     if (!schema?.id || !workoutDayKey || swapping) return
     // Een standaardplan van de coach is gedeeld; een permanente wissel zou
     // voor iedereen gelden. Dan wordt het een weekwissel voor deze klant.
@@ -400,7 +397,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
       await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, exerciseIndex, db, { alleDagen: true })
       // Ook in de andere gekozen trainingen. Na elkaar: updateExerciseInSchema
       // leest en schrijft telkens het hele schema.
-      for (const a of ookDoelen) {
+      for (const a of doelen) {
         await db.updateExerciseInSchema(schema.id, a.dk, a.i, {
           ...bouwVervanger(a.ex, newExercise),
           _originalName: a.ex._originalName || a.ex.name,
@@ -420,7 +417,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           type: 'workout',
           priority: 'low',
           title: `${clientName} heeft een oefening permanent gewisseld`,
-          message: `${exercise.name} → ${newExercise.name}${ookTekst}`,
+          message: `${exercise.name} → ${newExercise.name}${ookTekstVoor(doelen)}`,
           read_status: false,
         }).then(r => r, err => console.error('❌ Permanent swap notification failed:', err))
       }
@@ -519,33 +516,52 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           {/* Gekozen: meteen de knoppen, waar je toch al kijkt. */}
           {gekozenAlt && (
             <div key={gekozenAlt.name} style={{ display: 'flex', flexDirection: 'column', gap: space[2], animation: 'okPopIn 0.3s ease both' }}>
-              {vaker && <div style={{ ...kopje, textAlign: 'center' }}>Elke keer · {alleDagenLabel}</div>}
-              <div style={{ display: 'flex', gap: space[2] }}>
-                <button disabled={swapping} onClick={() => handleSwap(gekozenAlt)} style={knop(true)}>Deze week</button>
-                <button disabled={swapping} onClick={() => handleMakePermanent(gekozenAlt)} style={knop(false)}>Altijd</button>
-              </div>
-              {/* Ook in andere trainingen met deze oefening: aan/uit per training. */}
-              {andereTrainingen.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>Ook in</span>
-                  {andereTrainingen.map(a => {
-                    const aan = ookIn.has(a.dk)
-                    return (
-                      <button key={a.dk} onClick={() => wisselOok(a.dk)} style={{
-                        display: 'flex', alignItems: 'center', gap: 5, height: 30, padding: '0 0.75rem', borderRadius: 999,
-                        background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
-                        border: aan ? 'none' : '1px solid rgba(255,255,255,0.25)',
-                        fontSize: 12, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}>
-                        {aan && <Check size={13} strokeWidth={3.2} />}
-                        {a.naam}{a.dagen.length ? ` · ${a.dagen.join(' + ')}` : ''}
-                      </button>
-                    )
-                  })}
+              {!vraagOok ? (<>
+                {vaker && <div style={{ ...kopje, textAlign: 'center' }}>Elke keer · {alleDagenLabel}</div>}
+                <div style={{ display: 'flex', gap: space[2] }}>
+                  <button disabled={swapping} onClick={() => handleSwap(gekozenAlt)} style={knop(true)}>Alleen nu</button>
+                  <button disabled={swapping} onClick={() => (andereTrainingen.length ? setVraagOok(true) : handleMakePermanent(gekozenAlt))} style={knop(false)}>Altijd</button>
+                </div>
+              </>) : (
+                // Stap 2: dezelfde oefening staat ook in een andere training.
+                <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], animation: 'okPopIn 0.3s ease both' }}>
+                  <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                    {andereTrainingen.length === 1
+                      ? `Ook in ${andereTrainingen[0].naam}${andereTrainingen[0].dagen.length ? ` (${andereTrainingen[0].dagen.join(' + ')})` : ''}?`
+                      : 'Ook in je andere trainingen?'}
+                  </div>
+                  {andereTrainingen.length > 1 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                      {andereTrainingen.map(a => {
+                        const aan = ookIn.has(a.dk)
+                        return (
+                          <button key={a.dk} onClick={() => wisselOok(a.dk)} style={{
+                            display: 'flex', alignItems: 'center', gap: 5, height: 32, padding: '0 0.8rem', borderRadius: 999,
+                            background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                            border: aan ? 'none' : '1px solid rgba(255,255,255,0.25)',
+                            fontSize: 13, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          }}>
+                            {aan && <Check size={13} strokeWidth={3.2} />}
+                            {a.naam}{a.dagen.length ? ` · ${a.dagen.join(' + ')}` : ''}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: space[2] }}>
+                    <button disabled={swapping || (andereTrainingen.length > 1 && ookDoelen.length === 0)} onClick={() => handleMakePermanent(gekozenAlt, { metAndere: true })} style={knop(true)}>
+                      Ja, ook daar
+                    </button>
+                    <button disabled={swapping} onClick={() => handleMakePermanent(gekozenAlt)} style={knop(false)}>Alleen hier</button>
+                  </div>
+                  <button onClick={() => setVraagOok(false)} disabled={swapping} style={{
+                    background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 800,
+                    fontFamily: 'inherit', cursor: 'pointer', padding: '2px 0',
+                  }}>← Terug</button>
                 </div>
               )}
-              {vaker && (
+              {vaker && !vraagOok && (
                 <button disabled={swapping} onClick={() => handleSwap(gekozenAlt, { alleenDag: true })} style={{
                   background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 800,
                   fontFamily: 'inherit', cursor: 'pointer', padding: '2px 0', textDecoration: 'underline', textUnderlineOffset: 3,
