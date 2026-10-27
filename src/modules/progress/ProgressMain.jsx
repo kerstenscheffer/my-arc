@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { VoortgangSkelet } from '../../client/PaginaSkeletten'
 import usePaginaTerug from '../../client/usePaginaTerug'
 import { createPortal } from '../../client/paginaPortal'
-import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon, GitCompareArrows, Ruler, X, CalendarDays, ClipboardCheck } from 'lucide-react'
+import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, ChevronLeft, Coffee, Sun, Moon, GitCompareArrows, Ruler, X, CalendarDays, ClipboardCheck } from 'lucide-react'
 
 import ProgressPhotos from '../progress-photos/ProgressPhotos'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
@@ -512,72 +512,34 @@ export default function ProgressMain({ db, client }) {
       {/* ═══ FOTO-DROPDOWN — vervangt rest van pagina ═══ */}
       {photosOpen && (
         <>
-          {/* Header met collapse-knop */}
+          {/* Kop: terugpijltje, titel, aantal. */}
           <div style={{
-            padding: isMobile ? '0.95rem 1rem' : '1.15rem 1.5rem',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', alignItems: 'center', gap: 12,
+            padding: isMobile ? '0.75rem 0.6rem 0.25rem' : '0.9rem 1.2rem 0.3rem',
+            display: 'flex', alignItems: 'center', gap: 6,
           }}>
-            <button
-              onClick={() => setPhotosOpen(false)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '0.4rem 0.7rem',
-                background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 8,
-                color: 'rgba(255,255,255,0.75)',
-                cursor: 'pointer',
-                fontSize: isMobile ? '0.7rem' : '0.75rem',
-                fontWeight: 800,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <ChevronUp size={isMobile ? 14 : 15} strokeWidth={2.4} />
-              Sluiten
-            </button>
-            <div style={{
-              flex: 1,
-              fontSize: isMobile ? '0.95rem' : '1.05rem',
-              fontWeight: 900, color: '#fff',
-              letterSpacing: '-0.015em',
+            <button onClick={() => setPhotosOpen(false)} aria-label="Terug" style={{
+              width: 38, height: 38, padding: 0, background: 'none', border: 'none', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              Progress foto's
-            </div>
-            {photoCount > 0 && (
-              <div style={{
-                fontSize: isMobile ? '0.7rem' : '0.78rem',
-                color: 'rgba(255,255,255,0.55)', fontWeight: 800,
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                {photoCount}
-              </div>
-            )}
-          </div>
-          <RecentProgressPhotos photos={recentPhotos} onUpload={handlePhotoUpload} todayData={todayData} isFriday={isFriday} isMobile={isMobile} />
-
-          {/* Vergelijk-knop — opent de voor/na vergelijk-modal */}
-          <div style={{ padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 0.85rem' }}>
-            <button
-              onClick={() => setShowCompare(true)}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
-                padding: isMobile ? '0.8rem' : '0.9rem',
-                background: '#fff',
-                border: 'none',
-                borderRadius: 12,
-                color: '#0a0a0a',
-                fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, letterSpacing: '-0.01em',
-                cursor: 'pointer', minHeight: '48px',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <GitCompareArrows size={isMobile ? 16 : 17} /> Vergelijk foto's
+              <ChevronLeft size={24} strokeWidth={2.6} />
             </button>
+            <div style={{ flex: 1, fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+              Progress foto's
+              {photoCount > 0 && <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>{photoCount}</span>}
+            </div>
           </div>
+          <RecentProgressPhotos photos={recentPhotos} onUpload={handlePhotoUpload} todayData={todayData} isFriday={isFriday} isMobile={isMobile}
+            naast={
+              <button onClick={() => setShowCompare(true)} style={{
+                flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
+                background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 12, color: '#fff',
+                fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, cursor: 'pointer', minHeight: 48, fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <GitCompareArrows size={isMobile ? 16 : 17} strokeWidth={2.6} /> Vergelijk
+              </button>
+            } />
 
           <ProgressPhotos db={db} client={client} />
         </>

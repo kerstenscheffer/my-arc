@@ -12,20 +12,11 @@ const SUBTYPE_OPTIONS = [
   { value: 'back',  label: 'Achterkant' },
 ]
 
-// Kleur per hoek. Goud, oranje en blauw naast elkaar maakten van de galerij een
-// kleurenkaart; het label zegt al welke hoek het is. Nu drie tinten wit, zodat
-// je de groepen nog steeds uit elkaar houdt zonder dat het schreeuwt.
-const ANGLE_COLOR = {
-  front: '#fff',
-  side:  'rgba(255,255,255,0.62)',
-  back:  'rgba(255,255,255,0.38)',
-}
-const angleColor = (subtype) => ANGLE_COLOR[(subtype || '').toLowerCase()] || '#9ca3af'
 
 export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, isMobile = false }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState(null)
-  const [compareMode, setCompareMode] = useState(false)
+  const [compareMode] = useState(false) // vergelijken gaat via 'Vergelijk foto's'
   const [comparePhotos, setComparePhotos] = useState([])
   const [editingSubtype, setEditingSubtype] = useState(false)
   const [subtypeSaving, setSubtypeSaving] = useState(false)
@@ -43,11 +34,6 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
     }
   }
 
-  const toggleCompareMode = () => {
-    setCompareMode(v => !v)
-    setComparePhotos([])
-    setSelectedPhoto(null)
-  }
   
   const dates = Object.keys(photos).sort((a, b) => new Date(b) - new Date(a))
   const displayDates = expanded ? dates : dates.slice(0, 3)
@@ -76,166 +62,41 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
 
   return (
     <div>
-      {/* ── HEADER BAR ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.5rem',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <Grid size={12} color="rgba(255,255,255,0.3)" />
-          <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>
-            Galerij
-          </span>
-          <span style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', color: 'rgba(255,255,255,0.2)' }}>
-            {totalPhotos}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button onClick={toggleCompareMode}
-            style={{
-              background: compareMode ? 'rgba(255, 255, 255,0.12)' : 'none',
-              border: compareMode ? '1px solid rgba(255, 255, 255,0.3)' : '1px solid transparent',
-              borderRadius: '6px',
-              color: compareMode ? '#fff' : 'rgba(255,255,255,0.35)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem',
-              padding: '0.25rem 0.5rem',
-              fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '700',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              textTransform: 'uppercase', letterSpacing: '0.03em',
-            }}>
-            <ArrowLeftRight size={11} />
-            {compareMode ? 'Stop' : 'Vergelijk'}
-          </button>
-
-          <button onClick={() => setExpanded(!expanded)}
-            style={{
-              background: 'none', border: 'none', color: 'rgba(255, 255, 255,0.4)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
-              padding: '0.2rem', fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '600',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-            }}>
-            {expanded ? 'Minder' : `Alle ${totalPhotos}`}
-            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          </button>
-        </div>
-      </div>
-
-      {/* ── COMPARE INSTRUCTIONS + RESULT ── */}
-      {compareMode && (
-        <div>
-          {comparePhotos.length < 2 ? (
-            <div style={{
-              padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.5rem',
-              background: 'rgba(255, 255, 255,0.04)',
-              borderBottom: '1px solid rgba(255, 255, 255,0.08)',
-              fontSize: isMobile ? '0.6rem' : '0.65rem',
-              color: 'rgba(255, 255, 255,0.55)', fontWeight: '600',
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-            }}>
-              <ArrowLeftRight size={11} color="#fff" style={{ opacity: 0.6 }} />
-              {comparePhotos.length === 0 ? 'Tik op 2 foto\'s om te vergelijken' : 'Tik op een tweede foto'}
-              {comparePhotos.length === 1 && (
-                <button onClick={() => setComparePhotos([])}
-                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', padding: 0 }}>
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-          ) : (
-            <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              {/* Side-by-side compare view */}
-              <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px',
-                background: 'rgba(0,0,0,0.6)',
-              }}>
-                {comparePhotos.map((photo, i) => {
-                  const d = photo.taken_at || photo.created_at
-                  const dateLabel = d ? new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' }) : ''
-                  return (
-                    <div key={photo.id} style={{ position: 'relative', aspectRatio: '3/4' }}>
-                      <img src={fotoWeergaveUrl(photo.photo_url, { breedte: 500 })} alt={`Vergelijking ${i + 1}`}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      <div style={{
-                        position: 'absolute', bottom: 0, left: 0, right: 0,
-                        padding: '0.5rem 0.5rem 0.35rem',
-                        background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)',
-                        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-                      }}>
-                        <span style={{ fontSize: '0.55rem', fontWeight: 700, color: '#fff' }}>
-                          {i === 0 ? 'VOOR' : 'NA'}
-                        </span>
-                        {dateLabel && (
-                          <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>
-                            {dateLabel}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div style={{ padding: '0.35rem 0.75rem', display: 'flex', justifyContent: 'flex-end' }}>
-                <button onClick={() => setComparePhotos([])}
-                  style={{
-                    background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
-                    fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
-                    textTransform: 'uppercase', letterSpacing: '0.04em',
-                    display: 'flex', alignItems: 'center', gap: '0.2rem',
-                    touchAction: 'manipulation',
-                  }}>
-                  <X size={10} /> Reset selectie
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── PHOTO GRID ── */}
       <div style={{
-        maxHeight: expanded ? 'none' : isMobile ? '280px' : '350px',
-        overflow: expanded ? 'visible' : 'hidden',
         position: 'relative'
       }}>
-        {displayDates.map((date, dateIdx) => {
+        {displayDates.map((date) => {
           const dayPhotos = photos[date] || []
           if (dayPhotos.length === 0) return null
           const d = new Date(date)
           
           return (
-            <div key={date} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              {/* Date header */}
+            <div key={date} style={{ marginBottom: isMobile ? '0.9rem' : '1.1rem' }}>
+              {/* Datum: bold wit, aantal ernaast. */}
               <div style={{
-                display: 'flex', alignItems: 'center', gap: '0.35rem',
-                padding: isMobile ? '0.35rem 1rem' : '0.4rem 1.5rem'
+                display: 'flex', alignItems: 'baseline', gap: '0.45rem',
+                padding: isMobile ? '0 1rem 0.45rem' : '0 1.5rem 0.5rem'
               }}>
-                <Calendar size={10} color="rgba(255, 255, 255,0.3)" />
-                <span style={{
-                  fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '500',
-                  color: 'rgba(255, 255, 255,0.4)'
-                }}>
+                <span style={{ fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
                   {d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
-                {d.getDay() === 5 && (
-                  <span style={{ fontSize: '0.45rem', fontWeight: '700', color: '#fff', textTransform: 'uppercase' }}>VR</span>
-                )}
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>{dayPhotos.length}</span>
               </div>
 
               {/* Grid */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: `repeat(${isMobile ? 4 : 6}, 1fr)`,
-                gap: '2px',
-                padding: isMobile ? '0 0.5rem 0.5rem' : '0 0.75rem 0.625rem'
+                gridTemplateColumns: `repeat(${isMobile ? 3 : 5}, 1fr)`,
+                gap: 6,
+                padding: isMobile ? '0 1rem' : '0 1.5rem'
               }}>
                 {dayPhotos.map(photo => {
                   const selected = isCompareSelected(photo)
                   return (
                     <div key={photo.id} onClick={() => handlePhotoClick(photo)}
                       style={{
-                        position: 'relative', paddingBottom: '100%',
+                        position: 'relative', paddingBottom: '125%', borderRadius: 10,
                         overflow: 'hidden', cursor: 'pointer',
                         background: 'rgba(255, 255, 255, 0.02)',
                         outline: selected ? '2px solid #fff' : 'none',
@@ -247,15 +108,12 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
                       {/* Subtype label — color per angle */}
                       {photo.metadata?.subtype && (
                         <div style={{
-                          position: 'absolute', bottom: '2px', right: '2px',
-                          background: 'rgba(0,0,0,0.85)', borderRadius: '3px',
-                          padding: '1px 4px', fontSize: '0.55rem',
-                          color: '#fff',
-                          fontWeight: '800', textTransform: 'uppercase', lineHeight: 1.3,
-                          letterSpacing: '0.04em',
-                          borderLeft: `2px solid ${angleColor(photo.metadata.subtype)}`,
+                          position: 'absolute', left: 0, right: 0, bottom: 0,
+                          padding: '1rem 0.4rem 0.35rem',
+                          background: 'linear-gradient(to top, rgba(0,0,0,0.75), transparent)',
+                          fontSize: '0.62rem', color: '#fff', fontWeight: 800,
                         }}>
-                          {photo.metadata.subtype.slice(0, 3)}
+                          {SUBTYPE_OPTIONS.find(o => o.value === String(photo.metadata.subtype).toLowerCase())?.label || photo.metadata.subtype}
                         </div>
                       )}
                       {/* Compare checkmark */}
@@ -278,13 +136,16 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
           )
         })}
 
-        {/* Fade */}
-        {!expanded && dates.length > 3 && (
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '50px',
-            background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
-            pointerEvents: 'none'
-          }} />
+        {/* Meer dan drie dagen: de rest achter één knop. */}
+        {dates.length > 3 && (
+          <button onClick={() => setExpanded(v => !v)} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, margin: '0 auto 1rem',
+            background: 'none', border: 'none', color: '#fff', fontSize: '0.82rem', fontWeight: 900,
+            fontFamily: 'inherit', cursor: 'pointer', padding: '0.5rem 1rem',
+          }}>
+            {expanded ? 'Minder' : `Alle ${totalPhotos} foto's`}
+            {expanded ? <ChevronUp size={15} strokeWidth={2.8} /> : <ChevronDown size={15} strokeWidth={2.8} />}
+          </button>
         )}
       </div>
 

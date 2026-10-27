@@ -6,12 +6,11 @@ import React, { useState, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import ProgressPhotosService from './ProgressPhotosService'
 import PhotoGallery from './components/PhotoGallery'
-import PhotoStats from './components/PhotoStats'
 
 export default function ProgressPhotos({ db, client }) {
   const [service] = useState(() => new ProgressPhotosService(db))
-  const [todayData, setTodayData] = useState({})
-  const [weeklyStats, setWeeklyStats] = useState({})
+  const [, setTodayData] = useState({})
+  const [, setWeeklyStats] = useState({})
   const [recentPhotos, setRecentPhotos] = useState({})
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -54,7 +53,8 @@ export default function ProgressPhotos({ db, client }) {
   return (
     <div>
       <PhotoGallery photos={recentPhotos} onDelete={handleDelete} onUpdateSubtype={handleUpdateSubtype} isMobile={isMobile} />
-      <PhotoStats weeklyStats={weeklyStats} todayData={todayData} isMobile={isMobile} />
+      {/* De statistiekenrij (vandaag/week/totaal/actief) is weg: het aantal
+          staat al in de kop, de rest was ruis (27 okt 2026). */}
     </div>
   )
 }

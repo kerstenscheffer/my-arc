@@ -5,7 +5,8 @@
 import React, { useState, useRef } from 'react'
 import { Camera, Upload } from 'lucide-react'
 
-export default function UploadSection({ onUpload, todayData = {}, isFriday = false, isMobile = false }) {
+// `naast`: een knop naast Upload op dezelfde regel (Vergelijk, 27 okt 2026).
+export default function UploadSection({ onUpload, todayData = {}, isFriday = false, isMobile = false, naast = null }) {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
   const { hasCompleteFriday = false } = todayData
@@ -44,12 +45,12 @@ export default function UploadSection({ onUpload, todayData = {}, isFriday = fal
       )}
 
       {/* ── UPLOAD KNOP — vol wit vlak, zwarte tekst ── */}
-      <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.85rem 1.5rem' }}>
+      <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.85rem 1.5rem', display: 'flex', gap: 8 }}>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           style={{
-            width: '100%',
+            flex: 1, minWidth: 0,
             background: uploading ? 'rgba(255,255,255,0.2)' : '#fff',
             border: 'none', borderRadius: 12,
             padding: isMobile ? '0.8rem' : '0.9rem',
@@ -71,9 +72,10 @@ export default function UploadSection({ onUpload, todayData = {}, isFriday = fal
           {uploading ? (
             <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255, 255, 255,0.25)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Uploaden…</>
           ) : (
-            <><Upload size={isMobile ? 16 : 17} /> Upload Progressie Foto</>
+            <><Upload size={isMobile ? 16 : 17} strokeWidth={2.6} /> Upload foto</>
           )}
         </button>
+        {naast}
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
