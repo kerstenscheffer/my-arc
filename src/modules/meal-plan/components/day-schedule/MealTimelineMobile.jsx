@@ -194,8 +194,8 @@ export default function MealTimelineMobile({
           )
         }
 
-        // Supplement — compact (27 okt 2026): dosering achter de naam, geen
-        // knoppenrij. Tik op de kaart = info, het vinkje rechts = genomen.
+        // Supplement — dezelfde kaart als een maaltijd, de dosering grijs
+        // achter de naam (op dezelfde regel) en de tijd op de foto.
         const sp = item.data
         const afgevinkt = !!supplementLogs?.has?.(sp.id)
         return (
@@ -203,26 +203,21 @@ export default function MealTimelineMobile({
             key={item.sleutel}
             meal={{ name: sp.naam, image_url: productFotos[sp.id] || supplementFoto(sp, 240) }}
             productFoto={!!productFotos[sp.id]}
-            momentLabel=""
+            momentLabel="Supplement"
             tijdLabel={Number.isFinite(item.min) ? klok(item.min) : null}
-            ondertitel={null}
             naNaam={sp.dosering || null}
-            compact
             isChecked={afgevinkt}
             isMobile={true}
             onCheck={() => onSupplementCheck?.(sp)}
-            onTik={() => onSupplementInfo?.(sp)}
-            rechts={
-              <button onClick={(e) => { e.stopPropagation(); onSupplementCheck?.(sp) }} aria-label={afgevinkt ? 'Genomen' : 'Afvinken'} style={{
-                width: 30, height: 30, borderRadius: '50%', padding: 0,
-                background: afgevinkt ? '#fff' : 'transparent', border: `1.5px solid ${afgevinkt ? '#fff' : 'rgba(255,255,255,0.35)'}`,
-                color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-                {afgevinkt && <Check size={16} strokeWidth={3} />}
-              </button>
-            }
-            acties={[]}
+            acties={[
+              { icon: <Info size={11} />, label: 'Info', onClick: () => onSupplementInfo?.(sp) },
+              {
+                icon: <Check size={11} strokeWidth={2.6} />,
+                label: afgevinkt ? 'Genomen' : 'Afronden',
+                onClick: () => onSupplementCheck?.(sp),
+                checked: afgevinkt,
+              },
+            ]}
           />
         )
       })}
