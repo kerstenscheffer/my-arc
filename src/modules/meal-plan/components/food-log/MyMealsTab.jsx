@@ -783,19 +783,34 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         </div>
       </div>
 
-      {/* Onderaan: opslaan en loggen. */}
+      {/* Onderaan: twee gelijke knoppen naast elkaar. "Alleen opslaan" was
+          een grijs regeltje en viel niet op (Kersten, 27 okt 2026). */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
         <div style={{
-          display: 'flex', flexDirection: 'column', gap: 8,
+          display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 8,
           padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
-          paddingBottom: isMobile ? '1.5rem' : '1rem',
+          paddingBottom: isMobile ? 'calc(1rem + env(safe-area-inset-bottom, 0px))' : '1rem',
         }}>
+          <button onClick={handleSave}
+            disabled={saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)}
+            style={{
+              minHeight: 50, borderRadius: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.3)',
+              color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900,
+              fontFamily: 'inherit', cursor: saving ? 'wait' : 'pointer',
+              opacity: (saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)) ? 0.4 : 1,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {saving ? 'Opslaan…' : 'Opslaan'}
+          </button>
           <button onClick={handleLogMeal}
             disabled={saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)}
             style={{
-              width: '100%', minHeight: 50,
+              minHeight: 50, borderRadius: 12,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              background: '#fff', border: 'none', borderRadius: 12,
+              background: '#fff', border: 'none',
               color: '#0a0a0a', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900,
               fontFamily: 'inherit', cursor: saving ? 'wait' : 'pointer',
               opacity: (saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)) ? 0.4 : 1,
@@ -803,20 +818,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
             }}
           >
             <Check size={16} strokeWidth={3} />
-            {saving ? 'Opslaan…' : 'Opslaan en loggen'}
-          </button>
-
-          <button onClick={handleSave}
-            disabled={saving || !meal.name?.trim() || !sectie || (!meal.ingredients_list?.length && !totals.calories)}
-            style={{
-              width: '100%', minHeight: 38,
-              background: 'transparent', border: 'none',
-              color: 'rgba(255,255,255,0.45)',
-              fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit',
-              cursor: 'pointer', touchAction: 'manipulation',
-            }}
-          >
-            {saving ? 'Opslaan…' : 'Alleen opslaan'}
+            Opslaan en loggen
           </button>
         </div>
       </div>
