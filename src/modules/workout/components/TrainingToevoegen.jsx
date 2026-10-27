@@ -73,11 +73,40 @@ export default function TrainingToevoegen({
   const [eigenOpen, setEigenOpen] = useState(false)
   const [eigenBewerk, setEigenBewerk] = useState(null)   // eigen training die open staat om te bewerken
   const [bezig, setBezig] = useState(false)
+  // Eigen cardio-soorten van de klant (client_cardio_soorten, 27 okt 2026):
+  // één keer aanmaken, daarna staan ze tussen de vaste sporten.
+  const [eigenCardio, setEigenCardio] = useState([])
+  const [nieuweSport, setNieuweSport] = useState(null) // tekst in het invoerveld, of null = dicht
+  useEffect(() => {
+    if (!open || !db?.supabase || !clientId) return
+    let weg = false
+    db.supabase.from('client_cardio_soorten').select('id, naam, duur_minuten').eq('client_id', clientId).order('created_at')
+      .then(r => { if (!weg) setEigenCardio(r?.data || []) }, () => {})
+    return () => { weg = true }
+  }, [open, clientId, db])
+  const bewaarNieuweSport = async () => {
+    const naam = String(nieuweSport || '').trim().slice(0, 40)
+    if (!naam || !db?.supabase || !clientId) return
+    const bestaat = [...SPORTEN.map(x => x.id), ...eigenCardio.map(x => x.naam)].find(n => n.toLowerCase() === naam.toLowerCase())
+    if (!bestaat) {
+      const { data, error } = await db.supabase.from('client_cardio_soorten')
+        .insert({ client_id: clientId, naam }).select('id, naam, duur_minuten').single()
+      if (error) { console.error('Eigen sport opslaan mislukt:', error); alert('Opslaan mislukt.'); return }
+      setEigenCardio(prev => [...prev, data])
+    }
+    setNieuweSport(null)
+    setSport(bestaat || naam); setStap('cardio-duur')
+  }
+  const verwijderEigenSport = async (s) => {
+    if (!window.confirm(`${s.naam} uit je sporten halen?`)) return
+    const { error } = await db.supabase.from('client_cardio_soorten').delete().eq('id', s.id)
+    if (!error) setEigenCardio(prev => prev.filter(x => x.id !== s.id))
+  }
 
   useEffect(() => {
     if (!open) return
     setStap('soort'); setSoortTraining(null); setWorkoutKey(null); setDag(null); setSport(null)
-    setDuur(30); setTijd('18:00'); setDagen([]); setEigenOpen(false); setBezig(false)
+    setDuur(30); setTijd('18:00'); setDagen([]); setEigenOpen(false); setBezig(false); setNieuweSport(null)
     if (workoutService && clientId) workoutService.getCustomWorkouts(clientId).then(l => setEigen(l || []), () => setEigen([]))
   }, [open, workoutService, clientId])
   if (!open) return null
@@ -411,6 +440,7 @@ export default function TrainingToevoegen({
           )}
 
           {stap === 'cardio-sport' && (
+            <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {SPORTEN.map(s => {
                 const Icoon = s.icoon
@@ -420,7 +450,37 @@ export default function TrainingToevoegen({
                   </button>
                 )
               })}
+              {/* Eigen sporten: na de vaste, met een kruisje om weg te halen. */}
+              {eigenCardio.map(s => (
+                <div key={s.id} style={{ position: 'relative' }}>
+                  <button onClick={() => { tik(); setSport(s.naam); setStap('cardio-duur') }} style={tegel(sport === s.naam, { paddingRight: '2rem' })}>
+                    <Activity size={18} strokeWidth={2.4} /><span style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.naam}</span>
+                  </button>
+                  <button onClick={() => verwijderEigenSport(s)} aria-label={`${s.naam} weghalen`} style={{
+                    position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', width: 26, height: 26, padding: 0,
+                    background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}><X size={14} strokeWidth={2.6} /></button>
+                </div>
+              ))}
+              {nieuweSport === null && (
+                <button onClick={() => setNieuweSport('')} style={tegel(false, { borderStyle: 'dashed', color: 'rgba(255,255,255,0.75)' })}>
+                  <Plus size={18} strokeWidth={2.6} /><span style={{ fontSize: '0.9rem', fontWeight: 900 }}>Eigen sport</span>
+                </button>
+              )}
             </div>
+            {nieuweSport !== null && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <input autoFocus value={nieuweSport} maxLength={40} placeholder="Bv. Boksen, Voetbal, Spinning"
+                  onChange={e => setNieuweSport(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') bewaarNieuweSport() }}
+                  style={{
+                    flex: 1, minWidth: 0, height: 48, padding: '0 0.9rem', borderRadius: 12, border: 'none',
+                    background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.92rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none',
+                  }} />
+                <button onClick={bewaarNieuweSport} disabled={!nieuweSport.trim()} style={{ ...primair(!nieuweSport.trim()), width: 'auto', minHeight: 48, padding: '0 1.1rem' }}>Opslaan</button>
+              </div>
+            )}
+            </>
           )}
 
           {stap === 'cardio-duur' && (
