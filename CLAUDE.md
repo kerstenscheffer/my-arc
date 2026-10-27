@@ -52,6 +52,16 @@ Staat een naam elders in hetzelfde bestand, dan komt 'ie langs `no-undef` en cra
 
 Er draait een auto-sync die elke ~10 minuten commit en pusht. Die racet met je stash; een `stash pop` kan "No stash entries found" geven terwijl je werk weg lijkt. Wil je de stand vóór je wijziging zien, gebruik dan `git show HEAD:<pad>`.
 
+### 5. Oude app-versies moeten blijven werken. Altijd.
+
+Klanten met de iOS/Android-app draaien de webcode van hun laatste download of live-bundel; wie nooit updatet, houdt die code voor altijd. Databasewijzigingen krijgen ze wél direct. Dus bij elke wijziging in Supabase:
+
+- **Nooit** een kolom, tabel, RPC, foreign key (PostgREST-embeds leunen erop) of RLS-recht weghalen of hernoemen dat een oudere versie gebruikt. Nieuw = erbij zetten; oud laten staan.
+- Een RPC die anders moet werken: nieuwe naam (`_v2`), de oude blijft.
+- Data die van vorm verandert (jsonb, enums): de oude vorm moet leesbaar blijven.
+- Controleer na een wijziging in de edge-logs of er 400/404's opduiken: `select log_attributes['request.url'], count(*) from logs where source='edge_logs' and log_attributes['response.status_code'] in ('400','404') group by 1`.
+- Release = `npm run release` (web + live-bundel tegelijk). Alleen web deployen laat de app achter (27 okt 2026: app-gebruikers zaten 12 dagen op code van 15 okt).
+
 ## Stack
 
 - **Frontend**: React 19, Vite 7, Tailwind 4, `react-router-dom` v7 (but routing is hand-rolled by `window.location.pathname` in App.jsx, not via `<BrowserRouter>`)
