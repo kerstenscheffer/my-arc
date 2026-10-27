@@ -8,6 +8,7 @@
 // aan de echte blokken, anders verspringt de pagina alsnog.
 import { SkeletStijl, SkeletBlok, SkeletKaart, SkeletGrafiek } from '../ui/Skelet'
 import { WorkoutPaginaSkelet } from '../modules/workout/components/WorkoutSkelet'
+import MacroBoxes from './components/MacroBoxes'
 
 const PULS = { animation: 'skeletPuls 1.4s ease-in-out infinite' }
 
@@ -31,20 +32,41 @@ export function HomeSkelet({ isMobile }) {
   )
 }
 
-// Voeding: kop met foto, macro's, maaltijden. Ligt vast over het scherm,
-// net als de pagina zelf.
+// Voeding: precies de opbouw van AIMealDashboard (zwarte balk, lage foto
+// met de echte banner, de vier macro-vakken leeg, dan de maaltijdkaarten).
+// Elke maat hier moet gelijk blijven aan het dashboard: verschilt er één,
+// dan klapt de pagina in zodra hij geladen is (Kersten, 27 okt 2026).
+// Ligt vast over het scherm, net als de pagina zelf.
+export const MEAL_BANNER_URL = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1200&h=700&fit=crop&q=80'
+
 export function MaaltijdSkelet({ isMobile }) {
   return (
-    <div aria-hidden style={{ position: 'fixed', inset: 0, height: '100dvh', zIndex: 1, background: '#0a0a0a', overflow: 'hidden' }}>
+    <div aria-hidden style={{ position: 'fixed', inset: 0, height: '100dvh', zIndex: 1, background: '#0a0a0a', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <SkeletStijl />
-      <div style={{ height: isMobile ? 40 : 48, borderBottom: '1px solid rgba(255,255,255,0.06)' }} />
-      <div style={{ height: isMobile ? 190 : 230, background: 'rgba(255,255,255,0.04)', ...PULS }} />
-      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '0.9rem 1rem' }}>
-        {[0, 1, 2, 3].map(i => <SkeletBlok key={i} breedte={44} hoogte={44} radius={22} />)}
+      <div style={{ flexShrink: 0, height: isMobile ? 34 : 40, paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0, boxSizing: 'content-box' }} />
+      <div style={{ position: 'relative', width: '100%', height: isMobile ? 100 : 150, flexShrink: 0 }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${MEAL_BANNER_URL})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.7) 0%, rgba(10,10,10,0.45) 25%, rgba(10,10,10,0.7) 50%, rgba(10,10,10,0.92) 75%, #0a0a0a 100%)' }} />
       </div>
-      <div style={{ padding: isMobile ? '0 0.6rem' : '0 1rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {[0, 1, 2, 3].map(i => <SkeletKaart key={i} hoogte={72} foto={64} radius={12} />)}
+      <div style={{ flexShrink: 0, padding: isMobile ? '0 0.9rem 0.4rem' : '0 1.5rem 0.6rem', maxWidth: 1400, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+        <MacroBoxes kaal compact leeg />
       </div>
+      <MaaltijdKaartenSkelet isMobile={isMobile} />
+    </div>
+  )
+}
+
+// De maaltijdkaarten zelf, met de maten van MealCard (foto 78/90, zelfde
+// marges). Ook gebruikt door AIDaySchedule terwijl een dag laadt.
+export function MaaltijdKaartenSkelet({ isMobile, aantal = 4 }) {
+  return (
+    <div aria-hidden>
+      <SkeletStijl />
+      {Array.from({ length: aantal }).map((_, i) => (
+        <div key={i} style={{ margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem' }}>
+          <SkeletKaart hoogte={isMobile ? 74 : 82} foto={isMobile ? 78 : 90} radius={12} />
+        </div>
+      ))}
     </div>
   )
 }

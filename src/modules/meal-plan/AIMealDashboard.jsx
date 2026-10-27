@@ -5,7 +5,7 @@
 // ✅ v6.3 - Fixed: Supplement button styled to match dashboard design
 import React, { useState, useEffect } from 'react'
 import { createPortal } from '../../client/paginaPortal'
-import { MaaltijdSkelet } from '../../client/PaginaSkeletten'
+import { MaaltijdSkelet, MEAL_BANNER_URL } from '../../client/PaginaSkeletten'
 import usePaginaTerug from '../../client/usePaginaTerug'
 import AIMealPlanService from './AIMealPlanService'
 
@@ -43,7 +43,6 @@ const DAYS_OF_WEEK = [
 // titel eroverheen. Zelfde vorm als de kop van de workout-pagina, zodat de
 // twee pagina's op elkaar lijken.
 
-const MEAL_BANNER_URL = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1200&h=700&fit=crop&q=80'
 
 const getTodayIndex = () => {
   const day = new Date().getDay()
@@ -657,8 +656,9 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       position: 'fixed', inset: 0, height: '100dvh', zIndex: 1,
       background: '#0a0a0a',
       display: 'flex', flexDirection: 'column',
+      // Geen fade-in: het skelet ervoor heeft dezelfde vorm, de inhoud komt
+      // er gewoon in te staan (een fade liet de pagina eerst wegflitsen).
       overflowX: 'hidden',
-      animation: 'fadeIn 0.5s ease'
     }}>
 
       {/* ════ ZWARTE BALK BOVEN DE FOTO ════

@@ -15,6 +15,7 @@ import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
 import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst, voegEigenSupplementToe, verwijderEigenSupplement } from '../../supplements/utils/supplementSchedule'
 import SupplementInfoModal from './SupplementInfoModal'
 import GelogdOverlay from './GelogdOverlay'
+import { MaaltijdKaartenSkelet } from '../../../client/PaginaSkeletten'
 import { PillBottle } from 'lucide-react'
 
 const getTodayIndex = () => {
@@ -868,7 +869,7 @@ export default function AIDaySchedule({
           terugzetten = dit blok weer renderen met onOpenDagen. */}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Laden...</div>
+        <MaaltijdKaartenSkelet isMobile={isMobile} />
       ) : !hasContent && !client ? (
         <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>
           Geen maaltijden gepland voor deze dag
