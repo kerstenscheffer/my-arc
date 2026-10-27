@@ -906,8 +906,8 @@ export default function AIAlternativesModal({
               waar je toch al kijkt (eerst stond de knop onderaan). */}
           {gekozen && (
             <div key={`v-${gekozen.id}`} style={{ marginBottom: '0.9rem', animation: 'altFadeIn 0.25s ease both' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center', gap: isMobile ? 16 : 26 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 16 : 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 16 : 26 }}>
                 {[
                   { label: 'kcal', n: (gekozen.calories || 0) - (currentMeal?.calories || 0), kleur: '#10b981', g: '' },
                   { label: 'eiwit', n: (gekozen.protein || 0) - (currentMeal?.protein || 0), kleur: '#3b82f6', g: 'g' },
@@ -930,7 +930,7 @@ export default function AIAlternativesModal({
               {/* Doorgaan: wit wissel-icoon rechts op de macro-regel. */}
               {!waarInhoud && (
                 <button onClick={() => onSelectMeal?.(gekozen.id)} aria-label="Wissel" style={{
-                  flexShrink: 0, padding: '0.2rem 0.3rem 0.2rem 0.6rem', background: 'none', border: 'none', color: '#fff',
+                  flexShrink: 0, padding: '0.2rem 0.3rem', background: 'none', border: 'none', color: '#fff',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                   fontSize: '0.7rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
