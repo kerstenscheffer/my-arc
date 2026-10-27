@@ -876,7 +876,7 @@ export default function AIAlternativesModal({
                 <div key={gekozen.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'altPopIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
                   <img src={resolveFoodImage(gekozen, { size: 200 })} alt=""
                     onError={e => { e.currentTarget.style.visibility = 'hidden' }}
-                    style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.06)', border: '2px solid #fff', boxSizing: 'border-box' }} />
+                    style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', boxSizing: 'border-box' }} />
                   <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginTop: '0.5rem' }}>
                     {Math.round(gekozen.calories || 0)} kcal · {Math.round(gekozen.protein || 0)}g eiwit
                   </div>
