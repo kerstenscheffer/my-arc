@@ -788,7 +788,7 @@ export default function AIAlternativesModal({
             <div style={{ flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               <img src={resolveFoodImage(currentMeal || {}, { size: 200 })} alt=""
                 onError={e => { e.currentTarget.style.visibility = 'hidden' }}
-                style={{ width: 78, height: 78, borderRadius: '50%', objectFit: 'cover', opacity: 0.6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+                style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', opacity: 0.6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
               <div style={{
                 fontSize: '0.78rem', fontWeight: 800, color: '#fff', marginTop: '0.55rem', lineHeight: 1.25,
                 display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -800,16 +800,16 @@ export default function AIAlternativesModal({
               </div>
             </div>
             {/* Pijl op de hoogte van de cirkels */}
-            <div style={{ height: 78, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <div style={{ height: 60, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
               <ArrowRight size={20} strokeWidth={2.8} color="#fff" />
             </div>
             {/* Nieuw: lege cirkel, even groot */}
             <div style={{ flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               <div style={{
-                width: 78, height: 78, borderRadius: '50%', border: '1.5px dashed rgba(255,255,255,0.35)', boxSizing: 'border-box',
+                width: 60, height: 60, borderRadius: '50%', border: '1.5px dashed rgba(255,255,255,0.35)', boxSizing: 'border-box',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)',
               }}>
-                <Utensils size={24} strokeWidth={2} />
+                <Utensils size={20} strokeWidth={2} />
               </div>
               <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: '0.55rem', lineHeight: 1.25 }}>
                 Kies hieronder
