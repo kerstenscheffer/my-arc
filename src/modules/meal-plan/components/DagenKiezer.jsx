@@ -11,8 +11,12 @@
 //   { modus: 'altijd', dagen: ['monday', ...] }
 //   { modus: 'week',   dagen: [...], datums: ['2026-10-20', ...] }
 // Wat ermee gebeurt (weekplan of losse datum) bepaalt de aanroeper.
+//
+// `volScherm`: zelfde keuzes, maar als volledig scherm in de stijl van het
+// logscherm (ronde foto, grote vraag, knop vast onderaan). Voor verwijderen:
+// een schuifvenstertje onderaan voelde te licht voor iets dat je plan wijzigt.
 import React, { useMemo, useState } from 'react'
-import { X, Repeat, CalendarDays } from 'lucide-react'
+import { X, Repeat, CalendarDays, ArrowLeft } from 'lucide-react'
 import { lokaleIso } from '../utils/dagVenster'
 
 const DAGEN = [
@@ -39,6 +43,7 @@ export default function DagenKiezer({
   titel, subtitel, datum, dagKey, slot, bezig = false, fout = null,
   isMobile, onKies, onTerug, terugTekst = '← Terug', onClose, extra = null,
   vraag = 'Waar geldt deze wijziging?', knopTekst = 'Opslaan', gevaar = false,
+  volScherm = false, foto = null, keuzeVraag = null,
 }) {
   const bekeken = datum ? new Date(datum) : new Date()
   const ditMaandag = maandagVan(new Date())
@@ -84,26 +89,8 @@ export default function DagenKiezer({
 
   const weekLabels = ['Deze week', 'Volgende week', 'Week erna']
 
-  return (
-    <div style={{
-      background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.12)',
-      borderTopLeftRadius: isMobile ? 16 : 12, borderTopRightRadius: isMobile ? 16 : 12,
-      maxWidth: isMobile ? '100%' : 620, width: '100%', margin: '0 auto',
-      display: 'flex', flexDirection: 'column', maxHeight: '85vh', overflow: 'hidden',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.85rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titel}</div>
-          {subtitel && <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{subtitel}</div>}
-        </div>
-        <button onClick={onClose} disabled={bezig} style={iconBtn}><X size={16} /></button>
-      </div>
-
-      <div style={{ padding: '0.85rem 1rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto' }}>
-        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
-          {vraag}
-        </div>
-
+  const keuzes = (
+    <>
         {/* Elke week / alleen één week */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 4 }}>
           {[
@@ -180,13 +167,11 @@ export default function DagenKiezer({
           </div>
         </div>
 
-        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35 }}>{effect}</div>
+    </>
+  )
 
-        {fout && (
-          <div style={{ fontSize: '0.7rem', color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: '0.5rem 0.6rem' }}>{fout}</div>
-        )}
-
-        <button onClick={kies} disabled={bezig || !lijst.length} style={{
+  const knop = (
+    <button onClick={kies} disabled={bezig || !lijst.length} style={{
           padding: '0.8rem', borderRadius: 12, border: 'none', fontFamily: 'inherit',
           background: !lijst.length ? 'rgba(255,255,255,0.15)' : gevaar ? '#ef4444' : '#fff',
           color: gevaar && lijst.length ? '#fff' : '#000',
@@ -197,6 +182,94 @@ export default function DagenKiezer({
           {bezig && <span style={{ width: 14, height: 14, border: '2px solid rgba(0,0,0,0.2)', borderTopColor: '#000', borderRadius: '50%', animation: 'cmeSpin 0.8s linear infinite' }} />}
           {knopTekst}
         </button>
+  )
+
+  const foutBlok = fout && (
+    <div style={{ fontSize: '0.7rem', color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: '0.5rem 0.6rem' }}>{fout}</div>
+  )
+
+  if (volScherm) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#0a0a0a', display: 'flex', flexDirection: 'column', zIndex: 1 }}>
+        <button onClick={onClose} disabled={bezig} aria-label="Terug" style={{
+          position: 'absolute', top: isMobile ? 'calc(0.75rem + env(safe-area-inset-top, 0px))' : '1rem', left: isMobile ? '0.75rem' : '1rem',
+          width: 36, height: 36, borderRadius: 10, zIndex: 2,
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+          color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}><ArrowLeft size={16} /></button>
+
+        <div style={{
+          flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          paddingTop: isMobile ? 'calc(3.5rem + env(safe-area-inset-top, 0px))' : '4rem',
+        }}>
+          <div style={{ maxWidth: 520, margin: '0 auto', padding: isMobile ? '0.5rem 1rem 1.25rem' : '0.75rem 1.5rem 1.5rem' }}>
+            <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.4rem' : '1.75rem' }}>
+              {foto && (
+                <img src={foto} alt="" style={{
+                  width: 96, height: 96, borderRadius: '50%', objectFit: 'cover',
+                  border: '1px solid rgba(255,255,255,0.12)', display: 'block', margin: '0 auto 0.9rem',
+                }} />
+              )}
+              <div style={{
+                fontSize: isMobile ? '1.45rem' : '1.6rem', fontWeight: 900, color: '#fff',
+                letterSpacing: '-0.025em', lineHeight: 1.2,
+              }}>{vraag}</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', marginTop: 6 }}>{titel}</div>
+              {subtitel && <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{subtitel}</div>}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              {keuzeVraag && (
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center' }}>{keuzeVraag}</div>
+              )}
+              {keuzes}
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35, textAlign: 'center' }}>{effect}</div>
+              {foutBlok}
+              {extra}
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          flexShrink: 0, background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.06)',
+          padding: isMobile ? '0.75rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px))' : '1rem 1.5rem 1.5rem',
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <div style={{ maxWidth: 520, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column' }}>{knop}</div>
+        </div>
+        <style>{'@keyframes cmeSpin { to { transform: rotate(360deg); } }'}</style>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.12)',
+      borderTopLeftRadius: isMobile ? 16 : 12, borderTopRightRadius: isMobile ? 16 : 12,
+      maxWidth: isMobile ? '100%' : 620, width: '100%', margin: '0 auto',
+      display: 'flex', flexDirection: 'column', maxHeight: '85vh', overflow: 'hidden',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.85rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titel}</div>
+          {subtitel && <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{subtitel}</div>}
+        </div>
+        <button onClick={onClose} disabled={bezig} style={iconBtn}><X size={16} /></button>
+      </div>
+
+      <div style={{ padding: '0.85rem 1rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto' }}>
+        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+          {vraag}
+        </div>
+
+        {keuzes}
+
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35 }}>{effect}</div>
+
+        {foutBlok}
+
+        {knop}
 
         {extra}
 

@@ -68,6 +68,7 @@ import BelangrijkeVideo from '../../client/components/BelangrijkeVideo'
 
 // Modals
 import AIAlternativesModal from './components/AIAlternativesModal'
+import { resolveFoodImage } from './foodImageFallback'
 import DagenKiezer from './components/DagenKiezer'
 import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen } from './dagAanpassingen'
 import AIMealInfoModal from './components/AIMealInfoModal'
@@ -880,14 +881,15 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       )}
 
       {verwijderMeal && createPortal(
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)',
-          zIndex: 11000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-        }}>
+        // Volledig scherm zoals het logscherm: foto, grote vraag, dan waar.
+        <div style={{ position: 'fixed', inset: 0, zIndex: 11000 }}>
           <DagenKiezer
+            volScherm
+            foto={resolveFoodImage(verwijderMeal, { size: 300 })}
             titel={verwijderMeal.name || verwijderMeal.meal_name}
-            subtitel={`${Math.round(verwijderMeal.calories || 0)} kcal uit je plan halen`}
-            vraag="Waar haal je deze maaltijd weg?"
+            subtitel={`${Math.round(verwijderMeal.calories || 0)} kcal`}
+            vraag="Deze maaltijd verwijderen?"
+            keuzeVraag="Waar haal je hem weg?"
             knopTekst="Verwijderen"
             gevaar
             datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
