@@ -14,6 +14,7 @@ import {
   EigenOefeningKnop, HuidigeOefening,
 } from './OefeningKiezer'
 import { spierLabel, materiaalLabel } from '../../../utils/oefeningLabels'
+import { coachSuggesties, normNaam } from '../../../utils/coachSwaps'
 
 const fuzzyMatch = (text, query) => {
   if (!text || !query) return false
@@ -234,6 +235,14 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
     setFilteredAlternatives(filtered)
   }, [searchQuery, allExercises, selectedMuscle, selectedEquipment, homeOnlyFilter, selectedType, basis])
 
+  // Coach-suggesties: de twee, drie beste vervangers vanuit bodybuilding
+  // (zie utils/coachSwaps.js), bovenaan de lijst. Bij zoeken niet: dan wil je
+  // vinden wat je typt.
+  const suggesties = searchQuery.trim() ? [] : coachSuggesties(exercise._originalName || exercise.name, allExercises)
+    .filter(ex => normNaam(ex.name) !== normNaam(exercise.name))
+  const suggestieNamen = new Set(suggesties.map(ex => normNaam(ex.name)))
+  const rest = filteredAlternatives.filter(ex => !suggestieNamen.has(normNaam(ex.name)))
+
   const muscleGroups = [...new Set(allExercises.map(ex => ex.primair_spieren).filter(Boolean))].sort()
   const equipmentTypes = [...new Set(allExercises.filter(ex => !ex._isCustom).map(ex => ex.equipment).filter(Boolean))].sort()
   // Thuis en compound/isolatie in één keuzemenu: ze stonden achter een
@@ -399,6 +408,46 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
   })
 
   const kopje = { fontSize: 13, fontWeight: 700, color: colors.textSecondary }
+  const sectieKop = {
+    padding: `${space[3]}px ${space[4]}px ${space[1]}px`,
+    fontSize: 12, fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase',
+    color: colors.textSecondary,
+  }
+
+  // Eén oefening in de lijst; tik = open, dan Deze week / Altijd.
+  const rij = (alt, index) => {
+    const sleutel = `${alt._isCustom ? 'custom' : 'db'}-${alt.id || alt.name || index}-${index}`
+    const open = openRij === sleutel
+    return (
+      <div key={sleutel} style={{ background: open ? colors.surfaceHover : 'transparent' }}>
+        <OefeningRij
+          ex={alt}
+          actief={open}
+          uit={swapping}
+          onClick={() => setOpenRij(open ? null : sleutel)}
+          rechts={<ChevronDown size={20} strokeWidth={2.6} color={open ? colors.textPrimary : colors.textMuted}
+            style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
+        />
+        {open && !vaker && (
+          <div style={{ display: 'flex', gap: space[2], padding: `0 ${space[4]}px ${space[3]}px` }}>
+            <button disabled={swapping} onClick={() => handleSwap(alt)} style={knop(true)}>Deze week</button>
+            <button disabled={swapping} onClick={() => handleMakePermanent(alt)} style={knop(false)}>Altijd</button>
+          </div>
+        )}
+        {open && vaker && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], padding: `0 ${space[4]}px ${space[4]}px` }}>
+            <div style={kopje}>Elke keer · {alleDagenLabel}</div>
+            <div style={{ display: 'flex', gap: space[2] }}>
+              <button disabled={swapping} onClick={() => handleSwap(alt)} style={knop(true)}>Deze week</button>
+              <button disabled={swapping} onClick={() => handleMakePermanent(alt)} style={knop(false)}>Altijd</button>
+            </div>
+            <div style={{ ...kopje, marginTop: space[2] }}>Alleen deze training</div>
+            <button disabled={swapping} onClick={() => handleSwap(alt, { alleenDag: true })} style={{ ...knop(false), flex: 'none', width: '100%' }}>{dezeDagLabel}</button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -421,48 +470,23 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           </FilterBalk>
         </>}
       >
-        {loading ? <LaadRijen /> : filteredAlternatives.length === 0 ? (
-          <div style={{ padding: `${space[8]}px ${space[4]}px 0`, textAlign: 'center' }}>
-            <div style={{ fontSize: 15, color: colors.textMuted, marginBottom: space[3] }}>
-              Geen vervanger gevonden met deze filters.
+        {loading ? <LaadRijen /> : (<>
+          {suggesties.length > 0 && (<>
+            <div style={sectieKop}>Coach suggesties</div>
+            {suggesties.map((alt, i) => rij(alt, `coach-${i}`))}
+            <div style={{ ...sectieKop, paddingTop: space[4] }}>Alle oefeningen</div>
+          </>)}
+          {rest.length === 0 && suggesties.length === 0 ? (
+            <div style={{ padding: `${space[8]}px ${space[4]}px 0`, textAlign: 'center' }}>
+              <div style={{ fontSize: 15, color: colors.textMuted, marginBottom: space[3] }}>
+                Geen vervanger gevonden met deze filters.
+              </div>
+              <button onClick={resetAlles} style={{ ...knop(false), flex: 'none', padding: `0 ${space[6]}px` }}>
+                Filters wissen
+              </button>
             </div>
-            <button onClick={resetAlles} style={{ ...knop(false), flex: 'none', padding: `0 ${space[6]}px` }}>
-              Filters wissen
-            </button>
-          </div>
-        ) : filteredAlternatives.map((alt, index) => {
-          const sleutel = `${alt._isCustom ? 'custom' : 'db'}-${alt.id || alt.name || index}`
-          const open = openRij === sleutel
-          return (
-            <div key={sleutel} style={{ background: open ? colors.surfaceHover : 'transparent' }}>
-              <OefeningRij
-                ex={alt}
-                actief={open}
-                uit={swapping}
-                onClick={() => setOpenRij(open ? null : sleutel)}
-                rechts={<ChevronDown size={20} strokeWidth={2.6} color={open ? colors.textPrimary : colors.textMuted}
-                  style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
-              />
-              {open && !vaker && (
-                <div style={{ display: 'flex', gap: space[2], padding: `0 ${space[4]}px ${space[3]}px` }}>
-                  <button disabled={swapping} onClick={() => handleSwap(alt)} style={knop(true)}>Deze week</button>
-                  <button disabled={swapping} onClick={() => handleMakePermanent(alt)} style={knop(false)}>Altijd</button>
-                </div>
-              )}
-              {open && vaker && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], padding: `0 ${space[4]}px ${space[4]}px` }}>
-                  <div style={kopje}>Elke keer · {alleDagenLabel}</div>
-                  <div style={{ display: 'flex', gap: space[2] }}>
-                    <button disabled={swapping} onClick={() => handleSwap(alt)} style={knop(true)}>Deze week</button>
-                    <button disabled={swapping} onClick={() => handleMakePermanent(alt)} style={knop(false)}>Altijd</button>
-                  </div>
-                  <div style={{ ...kopje, marginTop: space[2] }}>Alleen deze training</div>
-                  <button disabled={swapping} onClick={() => handleSwap(alt, { alleenDag: true })} style={{ ...knop(false), flex: 'none', width: '100%' }}>{dezeDagLabel}</button>
-                </div>
-              )}
-            </div>
-          )
-        })}
+          ) : rest.map((alt, index) => rij(alt, index))}
+        </>)}
         {!loading && (
           <EigenOefeningKnop onClick={() => setShowCustomModal(true)} icoon={<Plus size={18} strokeWidth={2.6} />} />
         )}
