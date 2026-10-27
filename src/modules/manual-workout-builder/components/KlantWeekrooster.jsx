@@ -6,14 +6,17 @@
 // zodat de coach op dezelfde plek plant als de klant zelf kijkt. Zelfde
 // onderdeel, geen kopie: wat hier verandert, ziet de klant direct.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import WeekSchedule from '../../workout/components/WeekSchedule'
 import useWorkoutSchedule from '../../workout/hooks/useWorkoutSchedule'
 import WorkoutService from '../../../services/WorkoutService'
 
 const LEEG_SCHEMA = { id: null, name: 'Nog geen plan', week_structure: {} }
 
-export default function KlantWeekrooster({ client, db, isMobile = false, onSwitchPlan = null, refreshKey = 0, zonderKop = false, onKiesTraining = null }) {
+// `voorbeeld` = { schemaId, week }: de onopgeslagen stand uit de Workout
+// Builder. Is dat het actieve plan van de klant, dan toont het rooster die
+// stand meteen (namen, oefeningen), nog vóór opslaan (Kersten, 27 okt 2026).
+export default function KlantWeekrooster({ client, db, isMobile = false, onSwitchPlan = null, refreshKey = 0, zonderKop = false, onKiesTraining = null, voorbeeld = null }) {
   const [schema, setSchema] = useState(null)
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
   const [weekOffset, setWeekOffset] = useState(0)
@@ -36,12 +39,22 @@ export default function KlantWeekrooster({ client, db, isMobile = false, onSwitc
   const { weekSchedule, setWeekSchedule, swapMode, selectedWorkout } = useWorkoutSchedule(schema || LEEG_SCHEMA, client?.id, db)
   const todayIndex = (new Date().getDay() + 6) % 7
 
+  // Alleen de weergave krijgt de voorbeeldstand; de hook hierboven houdt het
+  // opgeslagen plan, anders laadt hij bij elke tik de indeling opnieuw.
+  const voorbeeldSleutel = voorbeeld?.week ? JSON.stringify(voorbeeld.week) : ''
+  const getoond = useMemo(() => (
+    schema?.id && voorbeeld?.schemaId === schema.id && voorbeeld?.week
+      ? { ...schema, week_structure: voorbeeld.week }
+      : schema
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [schema, voorbeeld?.schemaId, voorbeeldSleutel])
+
   if (!client?.id || !schema) return null
 
   return (
     <WeekSchedule
       weekSchedule={weekSchedule}
-      schema={schema}
+      schema={getoond}
       swapMode={swapMode}
       selectedWorkout={selectedWorkout}
       completedWorkouts={[]}

@@ -795,6 +795,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         <div style={{ flexShrink: 0, borderBottom: DUN }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box', paddingTop: m ? '0.5rem' : '0.75rem' }}>
             <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} zonderKop
+              voorbeeld={selectedSchemaId ? { schemaId: selectedSchemaId, week: buildWeekStructure() } : null}
               onKiesTraining={(key) => {
                 // Rooster-sleutel 'dag2' = de tweede dag van het plan (zelfde
                 // volgorde als loadSchemaIntoBuilder). Bestaat die niet, niets.
@@ -959,7 +960,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 </div>
                 {agendaWeergave === 'rooster' ? (
                   <div key={`rooster-${agendaKey}`} style={{ padding: m ? '0.25rem 0 0.5rem' : '0.5rem 0 0.75rem' }}>
-                    <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} onSwitchPlan={() => setShowPlanSwitch(true)} />
+                    <KlantWeekrooster client={effectiveClient} db={db} isMobile={m} refreshKey={agendaKey} onSwitchPlan={() => setShowPlanSwitch(true)}
+                      voorbeeld={selectedSchemaId ? { schemaId: selectedSchemaId, week: buildWeekStructure() } : null} />
                   </div>
                 ) : (
                   <div style={{ height: m ? 460 : 560, overflow: 'auto' }}>
