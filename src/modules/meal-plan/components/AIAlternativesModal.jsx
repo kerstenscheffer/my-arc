@@ -789,14 +789,14 @@ export default function AIAlternativesModal({
               <img src={resolveFoodImage(currentMeal || {}, { size: 200 })} alt=""
                 onError={e => { e.currentTarget.style.visibility = 'hidden' }}
                 style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', opacity: 0.6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+              <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginTop: '0.5rem' }}>
+                {Math.round(currentMeal?.calories || 0)} kcal · {Math.round(currentMeal?.protein || 0)}g eiwit
+              </div>
               <div style={{
-                fontSize: '0.78rem', fontWeight: 800, color: '#fff', marginTop: '0.55rem', lineHeight: 1.25,
+                fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 2, lineHeight: 1.25,
                 display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
               }}>
                 {currentMeal?.name || currentMeal?.meal_name}
-              </div>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-                {Math.round(currentMeal?.calories || 0)} kcal · {Math.round(currentMeal?.protein || 0)}g eiwit
               </div>
             </div>
             {/* Pijl op de hoogte van de cirkels */}
@@ -811,7 +811,7 @@ export default function AIAlternativesModal({
               }}>
                 <Utensils size={20} strokeWidth={2} />
               </div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: '0.55rem', lineHeight: 1.25 }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: '0.5rem', lineHeight: 1.25 }}>
                 Kies hieronder
               </div>
             </div>
