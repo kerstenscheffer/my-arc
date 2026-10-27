@@ -13,7 +13,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
-import { X, Download, ArrowLeftRight, Loader, Crop, RotateCcw } from 'lucide-react'
+import { X, Download, ArrowLeftRight, Loader, Crop, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { tekenTransformatie, FORMATEN } from './transformatieKaart'
 
 const angleOf = (p) => (p?.metadata?.subtype || 'overig')
@@ -86,7 +86,8 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
   // meegaat als je links en rechts omdraait). Standaard staat elke foto
   // passend in zijn vak: heel in beeld, met een vage rand. Eerder werd hij
   // bijgesneden tot hij het smalle vak vulde, en dat zag eruit als inzoomen.
-  const [formaat, setFormaat] = useState('4:5')
+  // Altijd 4:5 (27 okt 2026): de keuze met o.a. 'Instagram' is weg.
+  const formaat = '4:5'
   const [uitsnedes, setUitsnedes] = useState({}) // { [fotoId]: { zoom, x, y } }
   const [aanpassen, setAanpassen] = useState(false)
   const uitsnedeVan = (foto) => (foto && uitsnedes[foto.id]) || { zoom: 1, x: 0, y: 0 }
@@ -192,55 +193,38 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
     } finally { setBezig(false) }
   }
 
-  const selectStyle = {
-    width: '100%', boxSizing: 'border-box', marginTop: '0.45rem',
-    padding: m ? '0.5rem 0.6rem' : '0.55rem 0.7rem',
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.18)',
-    borderRadius: 10, color: '#fff', fontSize: m ? '0.76rem' : '0.8rem', fontWeight: 800,
-    fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+  // Per kant één regel: ‹ datum ›. Tik op de datum = direct springen (de
+  // keuzelijst ligt onzichtbaar over de datum heen).
+  const labelVan = (p, i) => `${fmtDate(p.photo_date)}${forAngle.filter(x => x.photo_date === p.photo_date).length > 1 ? ` (#${forAngle.filter((x, j) => x.photo_date === p.photo_date && j <= i).length})` : ''}`
+  const DatumStap = ({ label, value, onChange }) => {
+    const idx = Math.max(0, forAngle.findIndex(p => p.id === value))
+    const pijl = (uit) => ({
+      width: 30, height: 30, padding: 0, background: 'none', border: 'none', color: '#fff', opacity: uit ? 0.25 : 1,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uit ? 'default' : 'pointer', flexShrink: 0,
+      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    })
+    return (
+      <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+        <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+          <button onClick={() => idx > 0 && onChange(forAngle[idx - 1].id)} disabled={idx <= 0} aria-label="Eerdere foto" style={pijl(idx <= 0)}><ChevronLeft size={18} strokeWidth={2.8} /></button>
+          <div style={{ position: 'relative', minWidth: 0 }}>
+            <span style={{ fontSize: m ? '0.88rem' : '0.92rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>{forAngle[idx] ? labelVan(forAngle[idx], idx) : '—'}</span>
+            <select value={value || ''} onChange={e => onChange(e.target.value)} aria-label={`${label} kiezen`}
+              style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', cursor: 'pointer' }}>
+              {forAngle.map((p, i) => <option key={p.id} value={p.id}>{labelVan(p, i)}</option>)}
+            </select>
+          </div>
+          <button onClick={() => idx < forAngle.length - 1 && onChange(forAngle[idx + 1].id)} disabled={idx >= forAngle.length - 1} aria-label="Latere foto" style={pijl(idx >= forAngle.length - 1)}><ChevronRight size={18} strokeWidth={2.8} /></button>
+        </div>
+      </div>
+    )
   }
 
-  // Per kant: datum kiezen, en de hoek verzetten als de klant bij het
-  // uploaden de verkeerde kant koos.
-  const Keuze = ({ label, photo, value, onChange }) => (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: m ? '0.66rem' : '0.7rem', fontWeight: 900, letterSpacing: '0.08em', color: '#fff' }}>{label}</span>
-        {photo && (
-          <select
-            value={angleOf(photo)}
-            onChange={e => zetHoek(photo, e.target.value)}
-            title="Hoek van deze foto wijzigen"
-            style={{
-              marginLeft: 'auto', maxWidth: '60%', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)',
-              border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
-              fontSize: m ? '0.62rem' : '0.66rem', fontWeight: 800, padding: '0.15rem 0.3rem',
-              fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
-            }}
-          >
-            {['front', 'back', 'side'].map(a => (
-              <option key={a} value={a} style={{ background: '#111' }}>{angleLabel(a)}</option>
-            ))}
-            {!['front', 'back', 'side'].includes(angleOf(photo)) && (
-              <option value={angleOf(photo)} style={{ background: '#111' }}>{angleLabel(angleOf(photo))}</option>
-            )}
-          </select>
-        )}
-      </div>
-      <select value={value || ''} onChange={e => onChange(e.target.value)} style={selectStyle}>
-        {forAngle.map((p, i) => (
-          <option key={p.id} value={p.id} style={{ background: '#111' }}>
-            {fmtDate(p.photo_date)}{forAngle.filter(x => x.photo_date === p.photo_date).length > 1 ? ` (#${forAngle.filter((x, j) => x.photo_date === p.photo_date && j <= i).length})` : ''}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-
   const knop = (vol) => ({
-    height: 40, padding: '0 0.85rem', borderRadius: 10,
-    background: vol ? '#fff' : 'rgba(255,255,255,0.06)',
-    border: `1px solid ${vol ? '#fff' : 'rgba(255,255,255,0.14)'}`,
+    height: 44, padding: '0 0.9rem', borderRadius: 12,
+    background: vol ? '#fff' : 'rgba(255,255,255,0.07)',
+    border: 'none',
     color: vol ? '#0a0a0a' : '#fff', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit',
     display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', whiteSpace: 'nowrap',
@@ -250,15 +234,9 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10600, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column' }}>
       <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', height: '100%', maxWidth: 760, width: '100%', margin: '0 auto', background: '#0a0a0a' }}>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: m ? 'calc(0.75rem + env(safe-area-inset-top, 0px)) 0.9rem 0.75rem' : '0.9rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: m ? 'calc(0.75rem + env(safe-area-inset-top, 0px)) 0.9rem 0.75rem' : '0.9rem 1.25rem', flexShrink: 0 }}>
           <span style={{ flex: 1, fontSize: m ? '1.05rem' : '1.2rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Vergelijk foto's</span>
-          {left && right && (
-            <>
-              <button onClick={wissel} title="Links en rechts omdraaien" style={knop(false)}><ArrowLeftRight size={15} strokeWidth={2.6} />{!m && 'Wissel'}</button>
-              <button onClick={download} disabled={bezig} title="Vergelijking opslaan als afbeelding" style={{ ...knop(true), opacity: bezig ? 0.6 : 1 }}><Download size={15} strokeWidth={2.6} />{bezig ? 'Bezig…' : 'Download'}</button>
-            </>
-          )}
-          <button onClick={onClose} aria-label="Sluiten" style={{ ...knop(false), width: 40, padding: 0, justifyContent: 'center' }}><X size={17} /></button>
+          <button onClick={onClose} aria-label="Sluiten" style={{ width: 40, height: 40, padding: 0, background: 'none', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={22} strokeWidth={2.4} /></button>
         </div>
 
         {photos === null ? (
@@ -276,9 +254,8 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                 return (
                   <button key={a} onClick={() => setAngle(a)} style={{
                     padding: m ? '0.5rem 0.85rem' : '0.55rem 0.95rem',
-                    background: on ? '#fff' : 'transparent',
-                    border: `1px solid ${on ? '#fff' : 'rgba(255,255,255,0.18)'}`,
-                    borderRadius: 999, color: on ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
+                    background: on ? '#fff' : 'transparent', border: 'none',
+                    borderRadius: 999, color: on ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
                     fontSize: m ? '0.78rem' : '0.82rem', fontWeight: 900, fontFamily: 'inherit',
                     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   }}>{angleLabel(a)} <span style={{ opacity: 0.55 }}>{count}</span></button>
@@ -297,7 +274,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
             ) : (
               <div style={{ maxWidth: 480, margin: '0 auto' }}>
                 {/* Het eindresultaat, zoals het gedownload wordt. */}
-                <div style={{ position: 'relative', width: '100%', aspectRatio: `${FORMATEN[formaat].W} / ${FORMATEN[formaat].H}`, maxHeight: formaat === '9:16' ? '70vh' : undefined, margin: '0 auto', borderRadius: 14, overflow: 'hidden', background: '#000', border: `1px solid ${aanpassen ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}` }}>
+                <div style={{ position: 'relative', width: '100%', aspectRatio: `${FORMATEN[formaat].W} / ${FORMATEN[formaat].H}`, maxHeight: formaat === '9:16' ? '70vh' : undefined, margin: '0 auto', borderRadius: 14, overflow: 'hidden', background: '#000', border: aanpassen ? '1px solid rgba(255,255,255,0.5)' : 'none' }}>
                   <canvas ref={canvasRef}
                     onPointerDown={sleepStart} onPointerMove={sleepBeweeg} onPointerUp={sleepEind} onPointerCancel={sleepEind}
                     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: beeld === 'klaar' ? 'block' : 'none', cursor: aanpassen ? 'grab' : 'default', touchAction: aanpassen ? 'none' : 'auto' }} />
@@ -314,40 +291,46 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', fontWeight: 700 }}>Voorbeeld lukt niet. Download opent de twee foto's los.</div>
                   ) : null}
                 </div>
-                {/* Formaat en uitsnede: één regel. */}
-                <div style={{ display: 'flex', gap: 8, marginTop: '0.8rem', alignItems: 'center' }}>
-                  <select value={formaat} onChange={e => setFormaat(e.target.value)} title="Formaat van de afbeelding"
-                    style={{ ...selectStyle, marginTop: 0, flex: 1, height: 40, colorScheme: 'dark' }}>
-                    {Object.entries(FORMATEN).map(([k, f]) => <option key={k} value={k} style={{ background: '#111' }}>{f.label}</option>)}
-                  </select>
-                  <button onClick={() => setAanpassen(v => !v)} style={{ ...knop(aanpassen), flexShrink: 0 }}>
-                    <Crop size={15} strokeWidth={2.6} /> {aanpassen ? 'Klaar' : 'Uitsnede aanpassen'}
+                {/* Voor en na: per kant ‹ datum ›, onder de eigen helft. */}
+                <div style={{ display: 'flex', gap: 8, marginTop: '0.8rem' }}>
+                  <DatumStap label="Voor" value={leftId} onChange={setLeftId} />
+                  <DatumStap label="Na" value={rightId} onChange={setRightId} />
+                </div>
+
+                {/* Acties: wissel en bewerk als icoon, download als hoofdknop. */}
+                <div style={{ display: 'flex', gap: 8, marginTop: '0.9rem' }}>
+                  <button onClick={wissel} aria-label="Voor en na omdraaien" title="Voor en na omdraaien" style={{ ...knop(false), width: 44, padding: 0, justifyContent: 'center' }}><ArrowLeftRight size={18} strokeWidth={2.6} /></button>
+                  <button onClick={() => setAanpassen(v => !v)} aria-label="Bewerken" title="Uitsnede en hoek" style={{ ...knop(aanpassen), width: 44, padding: 0, justifyContent: 'center' }}><Crop size={18} strokeWidth={2.6} /></button>
+                  <button onClick={download} disabled={bezig} style={{ ...knop(true), flex: 1, justifyContent: 'center', opacity: bezig ? 0.6 : 1 }}>
+                    <Download size={17} strokeWidth={2.8} />{bezig ? 'Bezig…' : 'Download'}
                   </button>
                 </div>
+
+                {/* Bewerken: uitsnede per foto en, als de foto verkeerd staat, de hoek. */}
                 {aanpassen && left && right && (
-                  <div style={{ marginTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
-                      Sleep een foto om hem te verschuiven. Zoom met de schuif{m ? '' : ' of door te scrollen boven de foto'}.
+                  <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+                      Sleep een foto om te verschuiven{m ? '' : ', scroll om te zoomen'}
                     </div>
                     {[{ label: 'Voor', foto: left }, { label: 'Na', foto: right }].map(({ label, foto }) => (
-                      <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ width: 36, fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>{label}</span>
+                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ width: 30, fontSize: '0.78rem', fontWeight: 900, color: '#fff' }}>{label}</span>
                         <input type="range" min="1" max="4" step="0.01" value={uitsnedeVan(foto).zoom}
                           onChange={e => zetUitsnede(foto, { zoom: Number(e.target.value) })}
                           style={{ flex: 1, accentColor: '#fff' }} />
-                        <span style={{ width: 40, textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', fontVariantNumeric: 'tabular-nums' }}>{uitsnedeVan(foto).zoom.toFixed(1)}×</span>
-                      </label>
+                        <select value={angleOf(foto)} onChange={e => zetHoek(foto, e.target.value)} title="Hoek van deze foto"
+                          style={{ background: 'rgba(255,255,255,0.07)', color: '#fff', border: 'none', borderRadius: 8, fontSize: '0.72rem', fontWeight: 800, padding: '0.35rem 0.4rem', fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }}>
+                          {['front', 'back', 'side'].map(a => <option key={a} value={a}>{angleLabel(a)}</option>)}
+                          {!['front', 'back', 'side'].includes(angleOf(foto)) && <option value={angleOf(foto)}>{angleLabel(angleOf(foto))}</option>}
+                        </select>
+                      </div>
                     ))}
                     <button onClick={() => setUitsnedes(u => { const n = { ...u }; delete n[left.id]; delete n[right.id]; return n })}
-                      style={{ ...knop(false), alignSelf: 'flex-start', height: 34 }}>
+                      style={{ alignSelf: 'center', background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <RotateCcw size={14} strokeWidth={2.6} /> Terug naar passend
                     </button>
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: m ? '0.6rem' : '0.8rem', marginTop: '0.8rem' }}>
-                  <Keuze label="VOOR" photo={left} value={leftId} onChange={setLeftId} />
-                  <Keuze label="NA" photo={right} value={rightId} onChange={setRightId} />
-                </div>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               </div>
             )}
