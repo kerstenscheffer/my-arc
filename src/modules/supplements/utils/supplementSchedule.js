@@ -160,3 +160,52 @@ export const groepeerPerMoment = (supplementen, maaltijdTijden = null) => {
     return a.minuten - b.minuten
   })
 }
+
+// ── Eigen supplementen van de klant (27 okt 2026) ──
+// Staan in hetzelfde actieve plan als die van de coach, met `door_klant`.
+// Zo leest alles wat supplementen toont (tijdlijn, agenda, oude app-versies)
+// ze zonder aanpassing mee. Geen actief plan? Dan maken we er een.
+async function actiefPlan(supabase, clientId) {
+  const { data, error } = await supabase
+    .from('supplement_plans').select('id, supplements')
+    .eq('client_id', clientId).eq('status', 'active')
+    .order('updated_at', { ascending: false }).limit(1)
+  if (error) throw error
+  return data?.[0] || null
+}
+
+export async function voegEigenSupplementToe(supabase, clientId, { naam, hoeveelheid, tijd, dagen }) {
+  const delen = String(hoeveelheid || '').trim().match(/^([\d.,-]+)\s*(.*)$/)
+  const supp = {
+    template_id: `eigen_${Date.now()}`,
+    name: String(naam || '').trim(),
+    emoji: '💊',
+    dosage: delen ? { amount: delen[1].replace(',', '.'), unit: delen[2] || '' } : { amount: null, unit: String(hoeveelheid || '').trim() },
+    timing: { specific_time: tijd || null, meal_reference: null, time_of_day: null },
+    days: Array.isArray(dagen) && dagen.length ? dagen : DAG_SLEUTELS,
+    category: 'eigen',
+    door_klant: true,
+  }
+  const plan = await actiefPlan(supabase, clientId)
+  if (plan) {
+    const lijst = Array.isArray(plan.supplements) ? plan.supplements : []
+    const { error } = await supabase.from('supplement_plans')
+      .update({ supplements: [...lijst, supp], updated_at: new Date().toISOString() }).eq('id', plan.id)
+    if (error) throw error
+  } else {
+    const { error } = await supabase.from('supplement_plans')
+      .insert({ client_id: clientId, status: 'active', supplements: [supp] })
+    if (error) throw error
+  }
+  return supp
+}
+
+export async function verwijderEigenSupplement(supabase, clientId, templateId) {
+  const plan = await actiefPlan(supabase, clientId)
+  if (!plan) return
+  const lijst = (Array.isArray(plan.supplements) ? plan.supplements : [])
+    .filter(s => !(s.door_klant && s.template_id === templateId))
+  const { error } = await supabase.from('supplement_plans')
+    .update({ supplements: lijst, updated_at: new Date().toISOString() }).eq('id', plan.id)
+  if (error) throw error
+}

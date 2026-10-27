@@ -12,7 +12,7 @@ import DailyTotalsBar from './day-schedule/DailyTotalsBar'
 import MealTimelineMobile from './day-schedule/MealTimelineMobile'
 import FoodLogModal from './food-log/FoodLogModal'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
-import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst } from '../../supplements/utils/supplementSchedule'
+import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst, voegEigenSupplementToe, verwijderEigenSupplement } from '../../supplements/utils/supplementSchedule'
 import SupplementInfoModal from './SupplementInfoModal'
 import GelogdOverlay from './GelogdOverlay'
 import { PillBottle } from 'lucide-react'
@@ -636,6 +636,21 @@ export default function AIDaySchedule({
     }
   }
 
+  // Zelf een supplement toevoegen of weer weghalen (alleen eigen).
+  const herlaadSupplementen = async () => {
+    const lijst = await laadSupplementen(db.supabase, client.id)
+    setSupplementen(Array.isArray(lijst) ? lijst : [])
+  }
+  const supplementToevoegen = async (gegevens) => {
+    await voegEigenSupplementToe(db.supabase, client.id, gegevens)
+    await herlaadSupplementen()
+  }
+  const supplementVerwijderen = async (sp) => {
+    if (!sp?.eigen || !sp.templateId) return
+    await verwijderEigenSupplement(db.supabase, client.id, sp.templateId)
+    await herlaadSupplementen()
+  }
+
   const supplementenPerMoment = (() => {
     const uit = { breakfast: [], lunch: [], dinner: [], snack: [] }
     const dagKey = daysOfWeek[currentDay]?.key
@@ -683,6 +698,9 @@ export default function AIDaySchedule({
         tijdNotitie: sp.timing?.notes || null,
         doseringNotitie: sp.dosage?.note || null,
         categorie: sp.category || null,
+        // Zelf toegevoegd: die mag de klant ook zelf weer weghalen.
+        eigen: !!sp.door_klant,
+        templateId: sp.template_id || null,
       })
     })
     return uit
@@ -855,6 +873,8 @@ export default function AIDaySchedule({
         <MealTimelineMobile
           meals={displayMeals}
           legeMomenten={legeMomenten}
+          onSupplementToevoegen={alleenKijken || isFreeMode ? null : supplementToevoegen}
+          onSupplementVerwijderen={alleenKijken ? null : supplementVerwijderen}
           onVoegToe={alleenKijken ? null : (plek) => onOpenAlternatives?.({
             slot: plek.slot, _leeg: true, name: plek.label, display_label: plek.label,
             calories: 0, protein: 0, carbs: 0, fat: 0, timing: null,
