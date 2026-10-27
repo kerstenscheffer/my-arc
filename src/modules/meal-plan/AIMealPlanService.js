@@ -87,7 +87,10 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       customMeals,
       recentHistory,
       todayDate: todayStr,
-      dayName: this.getDayName(today)
+      dayName: this.getDayName(today),
+      // Vers uit de database: de client-prop is van bij het openen van de app
+      // en klopt niet meer als de klant intussen zijn training verzette.
+      workoutSchedule: klant?.workout_schedule ?? null
     } 
   } catch (error) {
     console.error('❌ Error loading AI dashboard:', error)

@@ -37,6 +37,8 @@ export default function AIDaySchedule({
   onCheckMeal, onUncheckMeal, onOpenInfo, onOpenAlternatives,
   // Prullenbakje op een planmaaltijd; de ouder vraagt op welke dagen.
   onVerwijderMeal = null,
+  // Vers trainingsschema van het dashboard; client.workout_schedule kan oud zijn.
+  workoutSchedule = null,
   db, dailyTotals,
   // ✅ FOOD LOG: New props from AIMealDashboard
   client, onMealLogged, targets,
@@ -66,6 +68,8 @@ export default function AIDaySchedule({
   // verleden-dag-log gewijzigd is (zodat MacroHero-cache ongeldig gemaakt wordt).
   onPastDayUpdate,
 }) {
+  // Training verzet: tijden, dagen en pre-workout opnieuw bepalen.
+  const schemaSleutel = JSON.stringify(workoutSchedule || null)
   const isFreeMode = mode === 'free'
   const isMobile = window.innerWidth <= 768
   // Gelogd-animatie na Afronden (zelfde als in het log-venster).
@@ -327,7 +331,7 @@ export default function AIDaySchedule({
 
     // ✅ FOOD LOG: Load consumed meals for this day (works in both modes)
     if (client?.id) loadConsumedMeals(currentDay)
-  }, [currentDay, weekOffset, todayMeals, activePlan, client?.id, isFreeMode, overrides, dagRefreshKey])
+  }, [currentDay, weekOffset, todayMeals, activePlan, client?.id, isFreeMode, overrides, dagRefreshKey, schemaSleutel])
 
   // ✅ FOOD LOG: Load consumed_meals from DB for selected day
   const loadConsumedMeals = async (dayIndex) => {
@@ -404,7 +408,7 @@ export default function AIDaySchedule({
       .then(perDag => { if (leeft) setTrainingStarts(perDag || {}) },
             e => console.warn('trainingstijden laden mislukt:', e?.message))
     return () => { leeft = false }
-  }, [db, client?.id])
+  }, [db, client?.id, schemaSleutel])
 
   const loadDayMeals = async (dayIndex) => {
     const tijdelijk = overrides[datumVanDag(dayIndex)]?.dag || null
@@ -503,7 +507,7 @@ export default function AIDaySchedule({
       // hierboven al opgepikt en zou anders twee keer op de tijdlijn staan.
       const preWorkoutPlan = dayPlan?.[PRE_WORKOUT_SLOT] || aangepast[PRE_WORKOUT_SLOT]?.verwijderd
         ? null
-        : preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
+        : preWorkoutVoorDag(activePlan, workoutSchedule ?? client?.workout_schedule, dayKey, dayPlan)
       // Kopie, niet het object uit het plan zelf aanpassen.
       const preWorkout = preWorkoutPlan && aangepast[PRE_WORKOUT_SLOT]
         ? { ...preWorkoutPlan, ...aangepast[PRE_WORKOUT_SLOT], timing: preWorkoutPlan.timing }

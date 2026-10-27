@@ -491,6 +491,12 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   // Prullenbakje op een planmaaltijd: zelfde dagkiezer, dan weghalen.
   const [verwijderMeal, setVerwijderMeal] = useState(null)
 
+  // Trainingsdagen vers (komt met elke dashboard-lading mee, ook bij terug
+  // naar deze pagina). client.workout_schedule is van bij het openen van de
+  // app: training verzet op Workout = pre-workout bleef op de oude dag
+  // (Kersten, 27 okt 2026).
+  const trainingsSchema = dashboardData?.workoutSchedule ?? client?.workout_schedule
+
   // Op welke dagen staat deze maaltijd op hetzelfde moment? Voor de stippen in
   // de dagkiezer. maandag = null: het vaste weekplan; anders die week, met de
   // losse dag-aanpassingen erover. Zelfde maaltijd = zelfde id, of bij oude
@@ -512,14 +518,14 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       if (m && typeof m === 'object') return zelfde(m)
       // Pre-workout van het plan: op trainingsdagen zonder eigen slot.
       return meal.slot === PRE_WORKOUT_SLOT && zelfde(planPre) && !preWorkoutUitDag(planPre, k)
-        && isTrainingsdag(client?.workout_schedule, k, week?.[k])
+        && isTrainingsdag(trainingsSchema, k, week?.[k])
     })
   }
 
   // Pre-workout hoort bij de training: alleen trainingsdagen zijn te kiezen.
   // Zelfde bron als de tijdlijn en Home (clients.workout_schedule).
   const trainingsdagenVoor = (meal) => meal?.slot === PRE_WORKOUT_SLOT
-    ? DAYS_OF_WEEK.map(d => d.key).filter(k => isTrainingsdag(client?.workout_schedule, k, dashboardData?.activePlan?.week_structure?.[k]))
+    ? DAYS_OF_WEEK.map(d => d.key).filter(k => isTrainingsdag(trainingsSchema, k, dashboardData?.activePlan?.week_structure?.[k]))
     : null
   const voerVerwijderUit = async (keuze) => {
     if (!verwijderMeal) return
@@ -771,6 +777,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
 
       {/* ════ TIMELINE (overhaul phase 5: direct AIDaySchedule, mode-aware) ════ */}
       <AIDaySchedule
+        workoutSchedule={trainingsSchema}
         alleenKijken={alleenKijken}
         mode={mealMode || 'plan'}
         hideTotalsBar
