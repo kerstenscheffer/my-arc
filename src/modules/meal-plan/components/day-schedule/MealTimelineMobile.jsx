@@ -6,9 +6,12 @@
 // "Voedingsmiddel toevoegen" per section
 import React, { useState } from 'react'
 import MealCard from './MealCard'
-import { Trash2, Edit3, Info, Check, Plus } from 'lucide-react'
+import { Trash2, Edit3, Info, Check, Plus, Sunrise, Salad, Apple, UtensilsCrossed, Zap } from 'lucide-react'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
 import { useProductFotos } from '../../../supplements/utils/productFoto'
+
+// Icoon per vast moment voor een lege plek in de tijdlijn.
+const LEEG_ICOON = { breakfast: Sunrise, lunch: Salad, snack1: Apple, dinner: UtensilsCrossed, pre_workout: Zap }
 
 // Label van het moment waarop iets gelogd is, voor op de foto van de kaart.
 const MOMENT_LABEL = {
@@ -176,20 +179,34 @@ export default function MealTimelineMobile({
           )
         }
 
-        // Lege plek: dit vaste moment staat niet (meer) in het plan.
+        // Lege plek: dit vaste moment staat niet (meer) in het plan. Een
+        // grijze maaltijdkaart met het icoon van het moment op de fotoplek.
         if (item.soort === 'leeg') {
           const p = item.data
+          const Icoon = LEEG_ICOON[p.slot] || LEEG_ICOON.snack1
           return (
             <button key={item.sleutel} onClick={() => onVoegToe?.(p)} style={{
-              margin: '0 0.9rem 0.55rem', minHeight: 54, borderRadius: 12,
-              border: '1.5px dashed rgba(255,255,255,0.22)', background: 'transparent',
-              display: 'flex', alignItems: 'center', gap: 10, padding: '0 0.9rem',
-              color: 'rgba(255,255,255,0.7)', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+              margin: '0 0.9rem 0.55rem', minHeight: 78, borderRadius: 12, padding: 0, overflow: 'hidden',
+              background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)',
+              display: 'flex', alignItems: 'stretch', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}>
-              <Plus size={18} strokeWidth={2.8} style={{ flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 900 }}>{p.label} toevoegen</span>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>{klok(p.min)}</span>
+              <div style={{
+                width: 78, flexShrink: 0, background: 'rgba(255,255,255,0.05)', position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.45)',
+              }}>
+                <Icoon size={26} strokeWidth={2} />
+                <span style={{ position: 'absolute', left: 6, bottom: 5, fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>{klok(p.min)}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 0.8rem' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{p.label}</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Nog niets gepland</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', paddingRight: '0.9rem', color: '#fff' }}>
+                <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#fff', color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Plus size={17} strokeWidth={3} />
+                </span>
+              </div>
             </button>
           )
         }
