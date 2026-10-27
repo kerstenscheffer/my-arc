@@ -240,7 +240,9 @@ export default function ProgressMain({ db, client }) {
       {/* ════ ZWARTE BALK BOVEN DE FOTO — zelfde als Meal en Workout ════
           Alleen iconen, in het midden de challenge-stand. De progress-foto's
           zaten als blok bovenaan de pagina; hier kosten ze geen ruimte. */}
-      {!photosOpen && (() => {
+      {/* Zwarte bovenbalk ook op de foto's-pagina: daar staat de challenge-
+          teller in, anders zweefde die over de titel (27 okt 2026). */}
+      {(() => {
         const knop = {
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           minWidth: isMobile ? 42 : 48, padding: isMobile ? '0 0.9rem' : '0 1.2rem',

@@ -427,9 +427,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           hem juist wilt kunnen checken terwijl je in je workout of je
           maaltijdplan zit. Niet in focus-mode en niet in een meekijk-paneel:
           daar gaat het over de klant, maar kijkt de coach mee. */}
-      {/* Op maaltijd, workout en home staat hij in de zwarte bovenbalk van
+      {/* Op maaltijd, workout, home en tracking staat hij in de zwarte bovenbalk van
           die pagina (inline); daar zou het zwevende bolletje over de balk vallen. */}
-      {!ingebed && !focusMode && !['meal', 'workout', 'home'].includes(currentView) && (
+      {!ingebed && !focusMode && !['meal', 'workout', 'home', 'tracking'].includes(currentView) && (
         <ChallengeProgressTab db={db} client={client} isMobile={isMobile} />
       )}
 
