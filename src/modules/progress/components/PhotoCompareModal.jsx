@@ -121,26 +121,54 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
 
   // Slepen in het voorbeeld schuift de foto in de helft waar je begon;
   // scrollen (of de schuif eronder) zoomt.
+  // Twee vingers = knijpen om te zoomen in de helft waar je knijpt; de
+  // schuifbalken eronder zijn daarmee weg (27 okt 2026).
   const sleepRef = useRef(null)
+  const vingers = useRef(new Map())
+  const knijpRef = useRef(null)
   const kantOnder = (e) => {
     const r = canvasRef.current.getBoundingClientRect()
     return (e.clientX - r.left) < r.width / 2 ? left : right
   }
+  const afstand = () => {
+    const [a, b] = [...vingers.current.values()]
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
+  }
   const sleepStart = (e) => {
     if (!aanpassen || !canvasRef.current) return
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    vingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (vingers.current.size === 2) {
+      const [a, b] = [...vingers.current.values()]
+      const foto = kantOnder({ clientX: (a.x + b.x) / 2 })
+      knijpRef.current = { foto, d: afstand() || 1, zoom: uitsnedeVan(foto).zoom }
+      sleepRef.current = null
+      return
+    }
+    if (vingers.current.size > 2) return
     const foto = kantOnder(e)
     const r = canvasRef.current.getBoundingClientRect()
     sleepRef.current = { foto, x: e.clientX, y: e.clientY, b: r.width / 2, h: r.height, start: uitsnedeVan(foto) }
-    e.currentTarget.setPointerCapture?.(e.pointerId)
   }
   const sleepBeweeg = (e) => {
+    if (vingers.current.has(e.pointerId)) vingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const kn = knijpRef.current
+    if (kn) {
+      const z = kn.zoom * (afstand() / kn.d)
+      zetUitsnede(kn.foto, { zoom: Math.max(1, Math.min(4, z)) })
+      return
+    }
     const sl = sleepRef.current
     if (!sl) return
     const nx = sl.start.x + (e.clientX - sl.x) / sl.b
     const ny = sl.start.y + (e.clientY - sl.y) / sl.h
     zetUitsnede(sl.foto, { x: Math.max(-1, Math.min(1, nx)), y: Math.max(-1, Math.min(1, ny)) })
   }
-  const sleepEind = () => { sleepRef.current = null }
+  const sleepEind = (e) => {
+    vingers.current.delete(e?.pointerId)
+    if (vingers.current.size < 2) knijpRef.current = null
+    sleepRef.current = null
+  }
   const wiel = (e) => {
     if (!aanpassen || !canvasRef.current) return
     e.preventDefault()
@@ -309,15 +337,14 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                 {/* Bewerken: uitsnede per foto en, als de foto verkeerd staat, de hoek. */}
                 {aanpassen && left && right && (
                   <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
-                      Sleep een foto om te verschuiven{m ? '' : ', scroll om te zoomen'}
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff', textAlign: 'center' }}>
+                      Sleep om te verschuiven · {m ? 'knijp met twee vingers' : 'scroll'} om te zoomen
                     </div>
+                    {/* Hoek per foto, voor een foto die bij het uploaden verkeerd is gezet. */}
+                    <div style={{ display: 'flex', gap: 8 }}>
                     {[{ label: 'Voor', foto: left }, { label: 'Na', foto: right }].map(({ label, foto }) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ width: 30, fontSize: '0.78rem', fontWeight: 900, color: '#fff' }}>{label}</span>
-                        <input type="range" min="1" max="4" step="0.01" value={uitsnedeVan(foto).zoom}
-                          onChange={e => zetUitsnede(foto, { zoom: Number(e.target.value) })}
-                          style={{ flex: 1, accentColor: '#fff' }} />
+                      <div key={label} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
                         <select value={angleOf(foto)} onChange={e => zetHoek(foto, e.target.value)} title="Hoek van deze foto"
                           style={{ background: 'rgba(255,255,255,0.07)', color: '#fff', border: 'none', borderRadius: 8, fontSize: '0.72rem', fontWeight: 800, padding: '0.35rem 0.4rem', fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }}>
                           {['front', 'back', 'side'].map(a => <option key={a} value={a}>{angleLabel(a)}</option>)}
@@ -325,6 +352,7 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
                         </select>
                       </div>
                     ))}
+                    </div>
                     <button onClick={() => setUitsnedes(u => { const n = { ...u }; delete n[left.id]; delete n[right.id]; return n })}
                       style={{ alignSelf: 'center', background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <RotateCcw size={14} strokeWidth={2.6} /> Terug naar passend
