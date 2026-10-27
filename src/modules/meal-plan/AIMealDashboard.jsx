@@ -964,27 +964,47 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       )}
 
       {verwijderMeal && createPortal(
-        // Volledig scherm zoals het logscherm: foto, grote vraag, dan waar.
-        <div style={{ position: 'fixed', inset: 0, zIndex: 11000 }}>
-          <DagenKiezer
-            volScherm
-            foto={resolveFoodImage(verwijderMeal, { size: 300 })}
-            titel={verwijderMeal.name || verwijderMeal.meal_name}
-            subtitel={`${Math.round(verwijderMeal.calories || 0)} kcal`}
-            vraag="Waar wil je deze maaltijd verwijderen?"
-            knopTekst="Verwijderen"
-            gevaar
-            datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
-            dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
-            slot={verwijderMeal.slot}
-            dagenMetMaaltijd={dagenMetMaaltijd(verwijderMeal)}
-            trainingsdagen={trainingsdagenVoor(verwijderMeal)}
-            bezig={wisselBezig}
-            fout={wisselFout}
-            isMobile={isMobile}
-            onKies={voerVerwijderUit}
-            onClose={() => !wisselBezig && setVerwijderMeal(null)}
-          />
+        // Pop-up van onder over een geblurde pagina, met de stappen van
+        // wisselen: welke dag -> hoe vaak -> klopt dit? (27 okt 2026).
+        <div onClick={() => !wisselBezig && setVerwijderMeal(null)} style={{
+          position: 'fixed', inset: 0, zIndex: 11000,
+          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            position: 'relative', width: '100%', maxWidth: 560, margin: '0 auto', maxHeight: '92vh', overflowY: 'auto',
+            background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.1)', borderTopLeftRadius: 22, borderTopRightRadius: 22,
+            padding: isMobile ? '0 1rem calc(1rem + env(safe-area-inset-bottom, 0px))' : '0 1.4rem 1.4rem',
+          }}>
+            <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.18)', margin: '8px auto 0' }} />
+            <button onClick={() => !wisselBezig && setVerwijderMeal(null)} aria-label="Sluiten" style={{
+              position: 'absolute', top: 12, right: 12, width: 36, height: 36, padding: 0, background: 'none', border: 'none',
+              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            }}><X size={22} strokeWidth={2.4} /></button>
+            <div style={{ textAlign: 'center', padding: '0.9rem 0 1rem' }}>
+              <img src={resolveFoodImage(verwijderMeal, { size: 300 })} alt="" style={{
+                width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.12)',
+              }} />
+              <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginTop: '0.55rem', padding: '0 2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {verwijderMeal.name || verwijderMeal.meal_name}
+              </div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                {Math.round(verwijderMeal.calories || 0)} kcal · {Math.round(verwijderMeal.protein || 0)}g eiwit
+              </div>
+            </div>
+            <WisselStappen
+              gevaar
+              knopTekst="Verwijderen"
+              datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
+              dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
+              slot={verwijderMeal.slot}
+              dagenMetMaaltijd={dagenMetMaaltijd(verwijderMeal)}
+              trainingsdagen={trainingsdagenVoor(verwijderMeal)}
+              bezig={wisselBezig}
+              fout={wisselFout}
+              onKies={voerVerwijderUit}
+            />
+          </div>
         </div>,
         document.body
       )}

@@ -12,8 +12,11 @@
 //
 // Pre-workout (`trainingsdagen` + `vastAltijd`): alleen trainingsdagen te
 // kiezen, en "altijd" betekent op al je trainingsdagen.
+//
+// Ook voor verwijderen: `gevaar` maakt de laatste knop rood met een
+// prullenbak, `knopTekst` zegt wat hij doet.
 import React, { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw, CalendarDays, Repeat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, CalendarDays, Repeat, Trash2 } from 'lucide-react'
 import { lokaleIso } from '../utils/dagVenster'
 
 const DAGEN = [
@@ -40,7 +43,8 @@ const lijstTekst = (woorden) => woorden.length <= 1 ? (woorden[0] || '')
 export default function WisselStappen({
   datum, dagKey, slot,
   dagenMetMaaltijd = null, trainingsdagen = null, vastAltijd = false,
-  bezig = false, fout = null, onKies, onTerug,
+  bezig = false, fout = null, onKies, onTerug, terugTekst = '← Andere maaltijd',
+  knopTekst = 'Wisselen', gevaar = false,
 }) {
   const mag = (key) => !trainingsdagen || trainingsdagen.includes(key)
   const ditMaandag = maandagVan(new Date())
@@ -152,7 +156,7 @@ export default function WisselStappen({
         )}
         <div style={{ height: '1rem' }} />
         <button onClick={() => setStap(2)} disabled={!lijst.length} style={wit(!lijst.length)}>Volgende</button>
-        {onTerug && terugKnop(onTerug, '← Andere maaltijd')}
+        {onTerug && terugKnop(onTerug, terugTekst)}
       </>)}
 
       {stap === 2 && (<>
@@ -197,11 +201,14 @@ export default function WisselStappen({
         {fout && (
           <div style={{ fontSize: '0.72rem', color: '#ef4444', textAlign: 'center', marginBottom: '0.6rem' }}>{fout}</div>
         )}
-        <button onClick={bevestig} disabled={bezig} style={{ ...wit(bezig), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <button onClick={bevestig} disabled={bezig} style={{
+          ...wit(bezig), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          ...(gevaar && !bezig ? { background: '#ef4444', color: '#fff' } : {}),
+        }}>
           {bezig
-            ? <span style={{ width: 16, height: 16, boxSizing: 'border-box', border: '2.5px solid rgba(0,0,0,0.2)', borderTopColor: '#000', borderRadius: '50%', animation: 'wsSpin 0.8s linear infinite' }} />
-            : <RefreshCw size={17} strokeWidth={3} />}
-          Wisselen
+            ? <span style={{ width: 16, height: 16, boxSizing: 'border-box', border: '2.5px solid rgba(0,0,0,0.2)', borderTopColor: gevaar ? '#fff' : '#000', borderRadius: '50%', animation: 'wsSpin 0.8s linear infinite' }} />
+            : gevaar ? <Trash2 size={17} strokeWidth={2.8} /> : <RefreshCw size={17} strokeWidth={3} />}
+          {knopTekst}
         </button>
         {terugKnop(() => setStap(2))}
       </>)}
