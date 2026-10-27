@@ -3,9 +3,11 @@
 // Het wisselvenster van de analyzer: dezelfde opbouw als het wisselvenster
 // van de klant (meal-plan/components/AIAlternativesModal), zodat coach en
 // klant naar hetzelfde scherm kijken. Bovenin de maaltijd die je wisselt als
-// kaart, daaronder zoeken, drie keuzes (moment, bron, volgorde) en grenzen;
-// de lijst is dezelfde kaart als in de dagplanning. Kiezen gaat via een blad
-// met het verschil in macro's, en pas dan de knop.
+// cirkels (oud -> nieuw), daaronder zoeken, het moment als pilletjes en een
+// filterblad (volgorde, grenzen). Eén lijst in groepen: vaste swaps,
+// favorieten, eigen maaltijden van de klant, de rest. Tik = kiezen (popt in
+// de cirkel, verschil eronder), de ronde knop = wisselen (27 okt 2026,
+// zelfde upgrade als de klant).
 //
 // Verschil met de klant-versie: de ster is hier een coach-favoriet
 // (coach_meal_favorites) en "Eigen maaltijden" zijn die van de klant.
@@ -13,14 +15,13 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import MealCard from '../../../meal-plan/components/day-schedule/MealCard'
-import Keuze from '../../../meal-plan/components/Keuze'
-import { foodImageFallback } from '../../../meal-plan/foodImageFallback'
+import { foodImageFallback, resolveFoodImage } from '../../../meal-plan/foodImageFallback'
 import { niveauVoorDoel } from '../../../meal-plan/DayTemplateService'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
 import BereikKeuze from './BereikKeuze'
 import { findPortionConfig } from '../../../meal-plan/components/food-log/portionPresets'
 import { portieInfo, portieLabel, stapPortie } from './portie'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Info, SlidersHorizontal } from 'lucide-react'
+import { X, Search, Check, Star, Info, SlidersHorizontal, ArrowRight, Utensils, RefreshCw, Plus, ChevronDown } from 'lucide-react'
 
 // Slots van het weekplan ('breakfast', 'snack2', 'pre_workout', …) naar de
 // zes momenten van de keuzelijst.
@@ -110,11 +111,15 @@ export default function WisselModal({
 }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [moment, setMoment] = useState('alles')
-  const [bron, setBron] = useState('alles')
   const [sortering, setSortering] = useState('smart')
   const [maxKcal, setMaxKcal] = useState('')
   const [minEiwit, setMinEiwit] = useState('')
-  const [toonFilter, setToonFilter] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  // Aangetikt in de lijst: popt rechts in de cirkel. Pas de ronde knop wisselt.
+  const [gekozen, setGekozen] = useState(null)
+  // Ingeklapte groepen (op kopje) en de groep per maaltijd.
+  const [dicht, setDicht] = useState(() => new Set())
+  const laagRef = useRef(new Map())
   const [allMeals, setAllMeals] = useState([])
   const [customMeals, setCustomMeals] = useState([])
   const [coachOptions, setCoachOptions] = useState([])
@@ -197,7 +202,7 @@ export default function WisselModal({
       const { data, error } = await db.supabase.from('ai_meals').insert([rij]).select('*').single()
       if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
       setPortieVan(null)
-      setSelectedMeal({ ...data, meal_id: data.id })
+      setGekozen({ ...data, meal_id: data.id })
     } catch (e) {
       console.error('product toevoegen mislukt:', e)
       alert('Product toevoegen mislukt: ' + (e?.message || 'onbekende fout'))
@@ -213,65 +218,71 @@ export default function WisselModal({
     : isAvondsnack(slot, currentMeal) ? 'avondsnack' : slotNaarMoment(slot || currentMeal?.slot)
   const huidigId = currentMeal?.meal_id || currentMeal?.id || null
 
-  const bronOpties = [
-    { id: 'alles', label: 'Overal zoeken' },
-    ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Vaste swaps' }] : []),
-    ...(favorites.size > 0 ? [{ id: 'fav', label: 'Favorieten' }] : []),
-    ...(customMeals.length > 0 ? [{ id: 'mine', label: 'Eigen maaltijden klant' }] : []),
-    { id: 'db', label: 'Maaltijden-database' },
-  ]
-
   useEffect(() => {
     laadAlles()
     return () => {
       setSelectedMeal(null)
+      setGekozen(null)
       setSearchTerm('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot, huidigId, clientId])
 
+  // Alles tegelijk ophalen: eerst stonden hier zes rondes na elkaar.
   const laadAlles = async () => {
     setLoading(true)
     try {
-      // Coach + favorieten.
-      try {
-        const user = await db.getCurrentUser?.()
-        if (user?.id) {
-          setCoachId(user.id)
-          const { data } = await db.supabase
-            .from('coach_meal_favorites').select('meal_id').eq('coach_id', user.id)
-          setFavorites(new Set((data || []).map(r => r.meal_id)))
-        }
-      } catch (e) { console.warn('favorieten laden mislukt', e?.message) }
+      const sb = db.supabase
+      const niveau = niveauVoorDoel(targetCalories)
+      const [user, poolRes, slotsRes, dagmenuRes, customRes] = await Promise.all([
+        Promise.resolve(db.getCurrentUser?.()).then(r => r, () => null),
+        // Zonder needs_review: een lijst die zichzelf op macro's aanprijst
+        // mag geen maaltijden bevatten waarvan de kcal niet klopt.
+        sb.from('ai_meals').select('*').gt('calories', 0)
+          .or('needs_review.is.null,needs_review.eq.false').then(r => r, () => ({ data: [] })),
+        // Vaste swaps voor deze klant (met de standaard-laag via de RPC).
+        clientId
+          ? sb.rpc('get_effective_swap_options', { p_client_id: clientId }).then(r => r, () => ({ data: {} }))
+          : Promise.resolve({ data: {} }),
+        // Dagmenu's van het niveau dat bij het caloriedoel hoort.
+        niveau
+          ? sb.from('ai_meals').select('*').like('internal_name', `dagmenu${niveau}_%`).then(r => r, () => ({ data: [] }))
+          : Promise.resolve({ data: [] }),
+        // Eigen maaltijden van de klant.
+        clientId
+          ? sb.from('ai_custom_meals')
+              .select('id, name, calories, protein, carbs, fat, fiber, image_url, section, ingredients_list')
+              .eq('client_id', clientId).eq('is_active', true).then(r => r, () => ({ data: [] }))
+          : Promise.resolve({ data: [] }),
+      ])
+      const meals = poolRes.data || []
 
-      // De pool. Zonder limit en zonder needs_review, om dezelfde reden als
-      // bij de klant: een lijst die zichzelf op macro's aanprijst mag geen
-      // maaltijden bevatten waarvan de kcal niet klopt.
-      const { data: meals } = await db.supabase
-        .from('ai_meals')
-        .select('*')
-        .gt('calories', 0)
-        .or('needs_review.is.null,needs_review.eq.false')
+      // Favorieten van de coach.
+      if (user?.id) {
+        setCoachId(user.id)
+        const { data } = await sb.from('coach_meal_favorites').select('meal_id').eq('coach_id', user.id)
+          .then(r => r, () => ({ data: [] }))
+        setFavorites(new Set((data || []).map(r => r.meal_id)))
+      }
 
-      // Vaste swaps van de coach voor deze klant (met de standaard-laag
-      // eronder via de RPC), per moment.
+      // Vaste swaps per moment, in de volgorde waarin de coach ze koos. Ze
+      // staan bijna altijd al in de pool; alleen wat ontbreekt apart halen.
       let curated = []
       const perMoment = {}
       try {
-        let alleSlots = {}
-        if (clientId) {
-          const { data } = await db.supabase
-            .rpc('get_effective_swap_options', { p_client_id: clientId })
-          alleSlots = data || {}
-        }
+        const alleSlots = slotsRes.data || {}
         const alleIds = [...new Set(Object.values(alleSlots).flatMap(v => v?.meal_ids || []))]
         if (alleIds.length > 0) {
-          const { data: curatedMeals } = await db.supabase.from('ai_meals').select('*').in('id', alleIds)
-          const opId = new Map((curatedMeals || []).map(m => [m.id, m]))
-          Object.entries(alleSlots).forEach(([s, v]) => {
+          const opId = new Map(meals.filter(m => alleIds.includes(m.id)).map(m => [m.id, m]))
+          const mist = alleIds.filter(id => !opId.has(id))
+          if (mist.length) {
+            const { data: extra } = await sb.from('ai_meals').select('*').in('id', mist)
+            ;(extra || []).forEach(m => opId.set(m.id, m))
+          }
+          Object.entries(alleSlots).forEach(([s2, v]) => {
             const lijst = (v?.meal_ids || []).map(id => opId.get(id)).filter(Boolean)
             if (lijst.length === 0) return
-            const mom = swapSlotNaarMoment(s)
+            const mom = swapSlotNaarMoment(s2)
             perMoment[mom] = [...(perMoment[mom] || []), ...lijst]
           })
           // Avondsnack zonder eigen lijst valt terug op de snacklijst.
@@ -280,45 +291,23 @@ export default function WisselModal({
         }
       } catch (e) { console.warn('vaste swaps laden mislukt', e?.message) }
 
-      // Dagmenu's van het niveau dat bij het caloriedoel hoort.
-      try {
-        const niveau = niveauVoorDoel(targetCalories)
-        if (niveau) {
-          const { data: dagmenu } = await db.supabase
-            .from('ai_meals').select('*').like('internal_name', `dagmenu${niveau}_%`)
-          const alGekozen = new Set(curated.map(m => m.id))
-          ;(dagmenu || []).forEach(m => {
-            const mom = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
-            if (!(perMoment[mom] || []).some(x => x.id === m.id)) {
-              perMoment[mom] = [...(perMoment[mom] || []), m]
-            }
-            if (mom === basisMoment(slotKey) && !alGekozen.has(m.id)) {
-              curated = [...curated, m]
-              alGekozen.add(m.id)
-            }
-          })
+      const alGekozen = new Set(curated.map(m => m.id))
+      ;(dagmenuRes.data || []).forEach(m => {
+        const mom = slotNaarMoment((Array.isArray(m.timing) ? m.timing[0] : m.timing) || m.meal_type)
+        if (!(perMoment[mom] || []).some(x => x.id === m.id)) {
+          perMoment[mom] = [...(perMoment[mom] || []), m]
         }
-      } catch (e) { console.warn('dagmenu laden mislukt', e?.message) }
-
-      // Eigen maaltijden van de klant.
-      let custom = []
-      try {
-        if (clientId) {
-          const { data } = await db.supabase
-            .from('ai_custom_meals')
-            .select('id, name, calories, protein, carbs, fat, fiber, image_url, section, ingredients_list')
-            .eq('client_id', clientId)
-            .eq('is_active', true)
-          custom = (data || []).map(m => ({ ...m, _isCustom: true }))
+        if (mom === basisMoment(slotKey) && !alGekozen.has(m.id)) {
+          curated = [...curated, m]
+          alGekozen.add(m.id)
         }
-      } catch (e) { console.warn('eigen maaltijden laden mislukt', e?.message) }
+      })
 
-      setAllMeals(meals || [])
-      setCustomMeals(custom)
+      setAllMeals(meals)
+      setCustomMeals((customRes.data || []).map(m => ({ ...m, _isCustom: true })))
       setCoachOptions(curated)
       setCoachPerMoment(perMoment)
       setMoment(slotKey)
-      setBron(curated.length > 0 ? 'coach' : 'alles')
     } catch (e) {
       console.error('WisselModal laden mislukt:', e)
     } finally {
@@ -359,41 +348,54 @@ export default function WisselModal({
     return uit
   }
 
-  const filterActief = !!(maxKcal || minEiwit)
+  // Wat er anders staat dan standaard, als chips met een kruisje.
+  const afwijkingen = [
+    sortering !== 'smart' && { id: 'sort', label: SORTEER_OPTIES.find(o => o.id === sortering)?.label, terug: () => setSortering('smart') },
+    maxKcal && { id: 'kcal', label: `max ${maxKcal} kcal`, terug: () => setMaxKcal('') },
+    minEiwit && { id: 'eiwit', label: `min ${minEiwit}g eiwit`, terug: () => setMinEiwit('') },
+  ].filter(Boolean)
+  const allesTonen = () => { setMoment('alles'); setSortering('smart'); setMaxKcal(''); setMinEiwit('') }
+
+  // Kopje boven een groep in de lijst.
+  const KOPPEN = ['Vaste swaps', 'Favorieten', 'Eigen maaltijden klant', 'Meer maaltijden']
+  const kopVan = (m) => (m ? KOPPEN[laagRef.current.get(m.id) ?? 3] : null)
 
   const getFilteredMeals = () => {
     const currentCal = currentMeal?.calories || 0
     const currentProt = currentMeal?.protein || 0
     const nietZelf = (m) => m.id !== huidigId
 
-    let pool
-    if (bron === 'coach') {
-      if (moment !== 'alles') {
-        // Geen eigen avondsnack-lijst? Dan de snacklijst.
-        const lijst = coachPerMoment[moment]?.length ? coachPerMoment[moment] : (coachPerMoment[basisMoment(moment)] || [])
-        pool = lijst.filter(nietZelf)
-      } else {
-        const gezien = new Set()
-        pool = [...coachOptions, ...Object.values(coachPerMoment).flat()].filter(m => {
-          if (!nietZelf(m) || gezien.has(m.id)) return false
-          gezien.add(m.id); return true
-        })
-      }
+    // Eén lijst in groepen (geen bron meer kiezen). De vaste swaps zijn al
+    // per moment gekozen; de rest filtert op de timing van de maaltijd, en
+    // een maaltijd zonder timing blijft staan.
+    const pastMoment = (m) => {
+      if (moment === 'alles') return true
+      const set = momentenVan(m)
+      return set.size === 0 || set.has(moment) || set.has(basisMoment(moment))
     }
-    else if (bron === 'fav') pool = allMeals.filter(m => favorites.has(m.id) && nietZelf(m))
-    else if (bron === 'mine') pool = customMeals.filter(nietZelf)
-    else if (bron === 'db') pool = allMeals.filter(nietZelf)
-    else {
-      const gezien = new Set()
-      pool = [...coachOptions, ...customMeals, ...allMeals].filter(m => {
-        if (!nietZelf(m) || gezien.has(m.id)) return false
-        gezien.add(m.id); return true
-      })
-    }
+    const vast = moment !== 'alles'
+      ? (coachPerMoment[moment]?.length ? coachPerMoment[moment] : (coachPerMoment[basisMoment(moment)] || []))
+      : [...coachOptions, ...Object.values(coachPerMoment).flat()]
+    const gezien = new Set()
+    const laag = new Map()
+    const neem = (lijst, l) => lijst.filter(m => {
+      if (!m || !nietZelf(m) || gezien.has(m.id)) return false
+      gezien.add(m.id); laag.set(m.id, l)
+      return true
+    })
+    laagRef.current = laag
+    const pool = [
+      ...neem(vast, 0),
+      ...neem(allMeals.filter(m => favorites.has(m.id) && pastMoment(m)), 1),
+      ...neem(customMeals.filter(pastMoment), 2),
+      ...neem(allMeals.filter(pastMoment), 3),
+    ]
 
+    // Zoeken gaat over alles, ook over andere momenten.
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
-      return pool.filter(m =>
+      const alles = [...pool, ...neem([...customMeals, ...allMeals], 3)]
+      return alles.filter(m =>
         m.name?.toLowerCase().includes(term) ||
         m.name_en?.toLowerCase().includes(term) ||
         m.internal_name?.toLowerCase().includes(term)
@@ -401,13 +403,6 @@ export default function WisselModal({
     }
 
     let meals = pool
-    if (moment !== 'alles' && bron !== 'coach') {
-      meals = pool.filter(m => {
-        const set = momentenVan(m)
-        return set.size === 0 || set.has(moment) || set.has(basisMoment(moment))
-      })
-    }
-
     if (huidigNiveau) {
       meals = meals.filter(m => {
         const n = niveauVan(m)
@@ -436,11 +431,16 @@ export default function WisselModal({
       case 'less-protein':
         return meals.filter(m => opProt(m) < currentProt).sort((a, b) => opProt(b) - opProt(a))
       default: {
-        if (!currentMeal) return [...meals].sort((a, b) => opCal(a) - opCal(b))
-        return meals
-          .map(m => ({ m, d: wisselAfstand(m, currentMeal) }))
-          .sort((a, b) => a.d - b.d)
-          .map(x => x.m)
+        // Per groep. Vaste swaps in de volgorde van de coach, de rest op
+        // afstand tot de huidige maaltijd (zie wisselAfstand).
+        const volg = new Map(meals.map((m, i) => [m.id, i]))
+        const afstand = new Map(meals.map(m => [m.id, currentMeal ? wisselAfstand(m, currentMeal) : opCal(m)]))
+        return [...meals].sort((a, b) => {
+          const la = laag.get(a.id) ?? 3, lb = laag.get(b.id) ?? 3
+          if (la !== lb) return la - lb
+          if (la === 0) return volg.get(a.id) - volg.get(b.id)
+          return afstand.get(a.id) - afstand.get(b.id)
+        })
       }
     }
   }
@@ -485,21 +485,14 @@ export default function WisselModal({
     setInfoIngredienten(uit || [])
   }
 
-  const getDiff = (newVal, oldVal) => {
-    const diff = Math.round((newVal || 0) - (oldVal || 0))
-    if (diff > 0) return { text: `+${diff}`, color: '#fff', Icon: ArrowUp }
-    if (diff < 0) return { text: `${diff}`, color: '#ef4444', Icon: ArrowDown }
-    return { text: '0', color: 'rgba(255,255,255,0.3)', Icon: Minus }
-  }
-
   const [bezig, setBezig] = useState(null)
-  const bevestig = async (bereik = 'day', dagen = null, geldt = 'altijd') => {
-    if (!selectedMeal || bezig) return
-    const gekozen = selectedMeal
+  const bevestig = async (bereik = 'day', dagen = null, geldt = 'altijd', meal = selectedMeal) => {
+    if (!meal || bezig) return
     setBezig(bereik)
     try {
-      await onSelect?.(gekozen, bereik, dagen, geldt)
+      await onSelect?.(meal, bereik, dagen, geldt)
       setSelectedMeal(null)
+      setGekozen(null)
     } finally {
       setBezig(null)
     }
@@ -510,6 +503,14 @@ export default function WisselModal({
   const vraagBereik = plekken !== undefined && (!!currentMeal || !!weekStart)
 
   const filteredMeals = getFilteredMeals()
+  // De ronde knop: moet er nog gevraagd worden waar het geldt, dan het blad;
+  // anders meteen.
+  const wissel = () => {
+    if (!gekozen) return
+    if (vraagBereik) setSelectedMeal(gekozen)
+    else bevestig('day', null, 'altijd', gekozen)
+  }
+  const kies = (meal) => setGekozen(prev => (prev?.id === meal.id ? null : meal))
 
   const inhoud = (
     <div
@@ -533,143 +534,191 @@ export default function WisselModal({
           gap: 10, marginBottom: '0.7rem',
         }}>
           <div style={{ fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em' }}>
-            Wissel maaltijd
+            {currentMeal ? 'Wissel maaltijd' : 'Maaltijd toevoegen'}
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Sluit"
-            style={{
-              width: 36, height: 36, flexShrink: 0,
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: 10, color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <X size={16} strokeWidth={2.5} />
-          </button>
+          {!embedded && (
+            <button
+              onClick={onClose}
+              aria-label="Sluit"
+              style={{
+                width: 36, height: 36, flexShrink: 0, padding: 0, marginRight: -6,
+                background: 'none', border: 'none', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <X size={22} strokeWidth={2.4} />
+            </button>
+          )}
         </div>
 
-        {/* De maaltijd die je gaat wisselen, als dezelfde kaart. */}
-        {currentMeal ? (
-          <div style={{ margin: isMobile ? '0 -1rem 0.7rem' : '0 -1.5rem 0.8rem' }}>
-            <MealCard
-              meal={{
-                name: currentMeal?.name || currentMeal?.meal_name,
-                image_url: currentMeal?.image_url,
-                slot: slot || currentMeal?.slot,
-                timing: currentMeal?.timing,
-                calories: currentMeal?.calories, protein: currentMeal?.protein,
-                carbs: currentMeal?.carbs, fat: currentMeal?.fat,
-              }}
-              isMobile={isMobile}
-              acties={[]}
-            />
+        {/* Oud -> nieuw: wat je wisselt, en de aangetikte maaltijd die erin popt. */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 6, margin: '0.2rem 0 1rem' }}>
+          <div style={{ flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            {currentMeal ? (
+              <img src={resolveFoodImage({ ...currentMeal, name: currentMeal.name || currentMeal.meal_name }, { size: 200 })} alt=""
+                onError={e => { e.currentTarget.style.visibility = 'hidden' }}
+                style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', opacity: 0.6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+            ) : (
+              <div style={{
+                width: 60, height: 60, borderRadius: '50%', border: '1.5px dashed rgba(255,255,255,0.25)', boxSizing: 'border-box',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.45)',
+              }}>
+                <Plus size={20} strokeWidth={2.4} />
+              </div>
+            )}
+            <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginTop: '0.5rem' }}>
+              {currentMeal
+                ? `${Math.round(currentMeal.calories || 0)} kcal · ${Math.round(currentMeal.protein || 0)}g eiwit`
+                : (tijd ? `${dagNaam || 'Deze dag'} ${tijd}` : 'Nu leeg')}
+            </div>
+            <div style={{
+              fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.25,
+              maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {currentMeal?.name || currentMeal?.meal_name || ''}
+            </div>
           </div>
-        ) : (
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: '0.7rem' }}>
-            {tijd ? `Nieuwe maaltijd op ${dagNaam || 'deze dag'} om ${tijd}.` : 'Dit slot is nog leeg.'}
+          <div style={{ height: 60, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <ArrowRight size={20} strokeWidth={2.8} color="#fff" />
+          </div>
+          <div style={{ flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            {gekozen ? (
+              <div key={gekozen.id} style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'wisselPopIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
+                <img src={resolveFoodImage(gekozen, { size: 200 })} alt=""
+                  onError={e => { e.currentTarget.style.visibility = 'hidden' }}
+                  style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', boxSizing: 'border-box' }} />
+                <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fff', marginTop: '0.5rem' }}>
+                  {Math.round(gekozen.calories || 0)} kcal · {Math.round(gekozen.protein || 0)}g eiwit
+                </div>
+                <div style={{
+                  fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.25,
+                  maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>{gekozen.name}</div>
+              </div>
+            ) : (<>
+              <div style={{
+                width: 60, height: 60, borderRadius: '50%', border: '1.5px dashed rgba(255,255,255,0.35)', boxSizing: 'border-box',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)',
+              }}>
+                <Utensils size={20} strokeWidth={2} />
+              </div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: '0.5rem', lineHeight: 1.25 }}>
+                Kies hieronder
+              </div>
+            </>)}
+          </div>
+        </div>
+
+        {/* Gekozen: het verschil per macro, met de ronde wisselknop ernaast. */}
+        {gekozen && (
+          <div key={`v-${gekozen.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 16 : 22, marginBottom: '0.9rem', animation: 'wisselFadeIn 0.25s ease both' }}>
+            {currentMeal && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 16 : 26 }}>
+                {[
+                  { label: 'kcal', n: (gekozen.calories || 0) - (currentMeal.calories || 0), kleur: '#10b981', g: '' },
+                  { label: 'eiwit', n: (gekozen.protein || 0) - (currentMeal.protein || 0), kleur: '#3b82f6', g: 'g' },
+                  { label: 'koolh', n: (gekozen.carbs || 0) - (currentMeal.carbs || 0), kleur: '#ec4899', g: 'g' },
+                  { label: 'vet', n: (gekozen.fat || 0) - (currentMeal.fat || 0), kleur: '#f59e0b', g: 'g' },
+                ].map(x => {
+                  const v = Math.round(x.n)
+                  return (
+                    <div key={x.label} style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: v === 0 ? 'rgba(255,255,255,0.45)' : '#fff', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+                        {v > 0 ? '+' : v < 0 ? '−' : ''}{Math.abs(v)}{x.g}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 3, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: x.kleur }} />{x.label}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <button onClick={wissel} disabled={!!bezig} aria-label={currentMeal ? 'Wissel' : 'Zet in het slot'} title={currentMeal ? 'Wissel' : 'Zet in het slot'} style={{
+              flexShrink: 0, width: 40, height: 40, borderRadius: '50%', padding: 0,
+              background: '#fff', border: 'none', color: '#0a0a0a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: bezig ? 'wait' : 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              {currentMeal ? <RefreshCw size={20} strokeWidth={3} /> : <Check size={20} strokeWidth={3} />}
+            </button>
           </div>
         )}
 
-        <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>
-          {currentMeal ? 'Wissel voor:' : 'Kies een maaltijd:'}
-        </div>
-
         {/* Zoeken */}
         <div style={{ position: 'relative', marginBottom: '0.625rem' }}>
-          <Search size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.2)' }} />
+          <Search size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.4)' }} />
           <input
             type="text"
-            placeholder="Zoek maaltijd..."
+            placeholder="Zoek maaltijd of product"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
               width: '100%',
               padding: '0.6rem 0.75rem 0.6rem 2.25rem',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-              borderRadius: 10, color: 'white',
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              outline: 'none', minHeight: 40, boxSizing: 'border-box',
+              background: 'rgba(255, 255, 255, 0.07)',
+              border: 'none', borderRadius: 12, color: 'white',
+              fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 600,
+              outline: 'none', minHeight: 42, boxSizing: 'border-box',
               fontFamily: 'inherit',
             }}
-            onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
-            onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)'}
           />
         </div>
 
-        {/* Drie keuzes: moment, bron, volgorde. */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Keuze waarde={moment} opties={MOMENT_OPTIES} zet={setMoment} isMobile={isMobile} />
-          <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-          <Keuze waarde={bron} opties={bronOpties} zet={setBron} isMobile={isMobile} />
-          <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-          <Keuze waarde={sortering} opties={SORTEER_OPTIES} zet={setSortering} isMobile={isMobile} uitlijning="rechts" />
-        </div>
-
-        {/* Grenzen, dicht tot je ze nodig hebt. */}
-        <div style={{ marginTop: 8 }}>
-          <button
-            onClick={() => setToonFilter(v => !v)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'transparent', border: 'none', padding: 0,
-              color: filterActief ? '#fff' : 'rgba(255,255,255,0.45)',
-              fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 800,
-              fontFamily: 'inherit', cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <SlidersHorizontal size={14} strokeWidth={2.6} />
-            {filterActief
-              ? [maxKcal ? `max ${maxKcal} kcal` : null, minEiwit ? `min ${minEiwit}g eiwit` : null].filter(Boolean).join(' · ')
-              : 'Grenzen'}
+        {/* Moment als pilletjes (de gekozen wit) en één filterknop. */}
+        <div style={{ display: 'flex', alignItems: 'center', margin: isMobile ? '0 -1rem' : '0 -1.5rem' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', padding: isMobile ? '0 0 0 1rem' : '0 0 0 1.5rem' }}>
+            {MOMENT_OPTIES.map(o => {
+              const aan = moment === o.id
+              return (
+                <button key={o.id} onClick={() => setMoment(o.id)} style={{
+                  flexShrink: 0, height: 32, padding: '0 0.8rem', borderRadius: 999, border: 'none',
+                  background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                  fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>{o.id === 'alles' ? 'Alles' : o.label}</button>
+              )
+            })}
+          </div>
+          <button onClick={() => setFilterOpen(true)} aria-label="Filter" style={{
+            position: 'relative', flexShrink: 0, width: 44, height: 36, padding: 0,
+            marginRight: isMobile ? '0.5rem' : '1rem', marginLeft: 4,
+            background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <SlidersHorizontal size={19} strokeWidth={2.6} />
+            {afwijkingen.length > 0 && (
+              <span style={{
+                position: 'absolute', top: 2, right: 6, minWidth: 16, height: 16, borderRadius: 8, padding: '0 4px',
+                background: '#fff', color: '#0a0a0a', fontSize: '0.62rem', fontWeight: 900,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
+              }}>{afwijkingen.length}</span>
+            )}
           </button>
-
-          {toonFilter && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              {[
-                { waarde: maxKcal, zet: setMaxKcal, plaats: 'max kcal' },
-                { waarde: minEiwit, zet: setMinEiwit, plaats: 'min eiwit' },
-              ].map(veld => (
-                <input
-                  key={veld.plaats}
-                  type="number" inputMode="numeric"
-                  value={veld.waarde}
-                  onChange={e => veld.zet(e.target.value)}
-                  placeholder={veld.plaats}
-                  style={{
-                    width: 110, minHeight: 38, padding: '0 0.7rem',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
-                    color: '#fff', fontSize: '0.85rem', fontWeight: 700,
-                    fontFamily: 'inherit', outline: 'none',
-                  }}
-                />
-              ))}
-              {filterActief && (
-                <button
-                  onClick={() => { setMaxKcal(''); setMinEiwit('') }}
-                  style={{
-                    minHeight: 38, padding: '0 0.8rem', borderRadius: 10,
-                    background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-                    color: 'rgba(255,255,255,0.6)', fontSize: '0.82rem', fontWeight: 800,
-                    fontFamily: 'inherit', cursor: 'pointer',
-                  }}
-                >
-                  Wissen
-                </button>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Wat er anders staat dan standaard, met een kruisje om terug te zetten. */}
+        {afwijkingen.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {afwijkingen.map(x => (
+              <button key={x.id} onClick={x.terug} style={{
+                display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 0.55rem 0 0.75rem',
+                borderRadius: 999, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff',
+                fontSize: '0.74rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                {x.label} <X size={13} strokeWidth={3} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Lijst ── */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingTop: '0.6rem' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingTop: '0.6rem' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
             <div style={{
@@ -681,25 +730,48 @@ export default function WisselModal({
             }} />
           </div>
         ) : (filteredMeals.length > 0 || producten.length > 0 || productenLaden) ? (<>
-          {filteredMeals.map((meal, idx) => (
-            <SuggestieKaart
-              key={meal.id || idx}
-              meal={meal}
-              currentMeal={currentMeal}
-              slot={slot}
-              isSelected={selectedMeal?.id === meal.id}
-              onSelect={() => setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)}
-              isMobile={isMobile}
-              isFavoriet={favorites.has(meal.id)}
-              onSter={meal._isCustom ? null : () => toggleFavorite(meal.id)}
-              onInfo={() => openInfo(meal)}
-            />
-          ))}
+          {filteredMeals.map((meal, idx) => {
+            const kop = sortering === 'smart' && !searchTerm ? kopVan(meal) : null
+            const nieuweKop = kop && kop !== kopVan(filteredMeals[idx - 1])
+            return (
+              <React.Fragment key={meal.id || idx}>
+                {nieuweKop && (
+                  <div onClick={() => setDicht(prev => { const n = new Set(prev); if (n.has(kop)) n.delete(kop); else n.add(kop); return n })} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent', userSelect: 'none',
+                    padding: `${idx === 0 ? '0.2rem' : '0.9rem'} ${isMobile ? '0.9rem' : '1.25rem'} 0.35rem`,
+                    fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.06em',
+                    textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)',
+                  }}>
+                    {kop}
+                    <ChevronDown size={14} strokeWidth={3} style={{ transition: 'transform 0.15s ease', transform: dicht.has(kop) ? 'rotate(-90deg)' : 'none' }} />
+                  </div>
+                )}
+                {!(kop && dicht.has(kop)) && (
+                  <SuggestieKaart
+                    meal={meal}
+                    currentMeal={currentMeal}
+                    slot={slot}
+                    isSelected={gekozen?.id === meal.id}
+                    onSelect={() => kies(meal)}
+                    isMobile={isMobile}
+                    isFavoriet={favorites.has(meal.id)}
+                    onSter={meal._isCustom ? null : () => toggleFavorite(meal.id)}
+                    onInfo={() => openInfo(meal)}
+                  />
+                )}
+              </React.Fragment>
+            )
+          })}
 
           {/* Producten en ingrediënten, alleen bij een zoekterm. */}
           {searchTerm.trim().length >= 2 && (producten.length > 0 || productenLaden) && (
             <div style={{ marginTop: filteredMeals.length > 0 ? '0.6rem' : 0 }}>
-              <div style={{ padding: isMobile ? '0 0.9rem 0.45rem' : '0 1.25rem 0.5rem', fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>
+              <div style={{
+                padding: `0.9rem ${isMobile ? '0.9rem' : '1.25rem'} 0.35rem`,
+                fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.06em',
+                textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)',
+              }}>
                 Producten en ingrediënten{productenLaden ? '…' : ''}
               </div>
               {producten.map(ing => {
@@ -718,10 +790,20 @@ export default function WisselModal({
                     isMobile={isMobile}
                     compact
                     onTik={() => { setPortieVan(ing); setGram(portie) }}
-                    acties={[{ icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />, label: 'Kies', onClick: () => { setPortieVan(ing); setGram(portie) } }]}
+                    acties={[]}
                   />
                 )
               })}
+            </div>
+          )}
+
+          {/* Weinig over door filters? Eén tik en alles staat er. */}
+          {!searchTerm.trim() && filteredMeals.length < 6 && (moment !== 'alles' || afwijkingen.length > 0) && (
+            <div style={{ textAlign: 'center', padding: '1rem 1rem 1.25rem' }}>
+              <button onClick={allesTonen} style={{
+                background: 'none', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 900,
+                fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3,
+              }}>Niet gevonden wat je zoekt? Toon alles</button>
             </div>
           )}
         </>) : (
@@ -730,19 +812,13 @@ export default function WisselModal({
               Geen resultaten
             </div>
             <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', lineHeight: 1.45, maxWidth: 300, margin: '0 auto' }}>
-              {bron === 'coach' && moment !== 'alles'
-                ? `Voor ${(MOMENT_OPTIES.find(o => o.id === moment)?.label || moment).toLowerCase()} staan geen vaste swaps.`
-                : bron === 'coach'
-                  ? 'Er staan nog geen vaste swaps.'
-                  : bron === 'mine'
-                    ? 'De klant heeft hier nog geen eigen maaltijden die passen.'
-                    : searchTerm.trim().length >= 2
-                      ? 'Niets gevonden bij maaltijden, producten of ingrediënten.'
-                      : 'Probeer een ander moment, een andere bron of een zoekterm.'}
+              {searchTerm.trim().length >= 2
+                ? 'Niets gevonden bij maaltijden, producten of ingrediënten.'
+                : 'Probeer een ander moment of minder strenge grenzen.'}
             </div>
-            {(moment !== 'alles' || bron !== 'alles') && (
+            {(moment !== 'alles' || afwijkingen.length > 0) && (
               <button
-                onClick={() => { setMoment('alles'); setBron('alles') }}
+                onClick={allesTonen}
                 style={{
                   marginTop: '1rem', padding: '0.55rem 1rem',
                   background: 'transparent', border: '1.5px solid rgba(255,255,255,0.3)',
@@ -752,7 +828,7 @@ export default function WisselModal({
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                Zoek overal
+                Toon alles
               </button>
             )}
           </div>
@@ -889,16 +965,19 @@ export default function WisselModal({
       >
         {infoMeal && (
           <>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            {/* Macro's: vier getallen met een stipje, geen vakken. */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginBottom: '1.1rem' }}>
               {[
-                { label: 'kcal', waarde: Math.round(infoMeal.calories || 0) },
-                { label: 'eiwit', waarde: `${Math.round(infoMeal.protein || 0)}g` },
-                { label: 'koolh', waarde: `${Math.round(infoMeal.carbs || 0)}g` },
-                { label: 'vet', waarde: `${Math.round(infoMeal.fat || 0)}g` },
+                { label: 'kcal', waarde: Math.round(infoMeal.calories || 0), kleur: '#10b981' },
+                { label: 'eiwit', waarde: `${Math.round(infoMeal.protein || 0)}g`, kleur: '#3b82f6' },
+                { label: 'koolh', waarde: `${Math.round(infoMeal.carbs || 0)}g`, kleur: '#ec4899' },
+                { label: 'vet', waarde: `${Math.round(infoMeal.fat || 0)}g`, kleur: '#f59e0b' },
               ].map(x => (
-                <div key={x.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0.5rem 0.25rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 }}>
-                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>{x.waarde}</div>
-                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{x.label}</div>
+                <div key={x.label} style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{x.waarde}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 4, fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: x.kleur }} />{x.label}
+                  </div>
                 </div>
               ))}
             </div>
@@ -933,7 +1012,7 @@ export default function WisselModal({
             )}
 
             <button
-              onClick={() => { setSelectedMeal(infoMeal); setInfoMeal(null); setInfoIngredienten(null) }}
+              onClick={() => { setGekozen(infoMeal); setInfoMeal(null); setInfoIngredienten(null) }}
               style={{
                 width: '100%', minHeight: 48,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
@@ -949,79 +1028,70 @@ export default function WisselModal({
         )}
       </BladModal>
 
-      {/* Bevestigen: de nieuwe maaltijd als kaart, het verschil eronder, dan de knop. */}
+      {/* Volgorde en grenzen, in een blad (zoals bij de klant). */}
+      <BladModal open={filterOpen} titel="Filter" onClose={() => setFilterOpen(false)} zIndex={10600}>
+        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Volgorde</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1.1rem' }}>
+          {SORTEER_OPTIES.map(o => {
+            const aan = sortering === o.id
+            return (
+              <button key={o.id} onClick={() => setSortering(o.id)} style={{
+                height: 34, padding: '0 0.85rem', borderRadius: 999,
+                background: aan ? '#fff' : 'rgba(255,255,255,0.06)', border: 'none',
+                color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
+                fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>{o.label}</button>
+            )
+          })}
+        </div>
+        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Grenzen</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: '1.2rem' }}>
+          {[
+            { waarde: maxKcal, zet: setMaxKcal, plaats: 'max kcal' },
+            { waarde: minEiwit, zet: setMinEiwit, plaats: 'min eiwit (g)' },
+          ].map(veld => (
+            <input key={veld.plaats} type="number" inputMode="numeric" value={veld.waarde}
+              onChange={e => veld.zet(e.target.value)} placeholder={veld.plaats}
+              style={{
+                flex: 1, minWidth: 0, height: 42, padding: '0 0.8rem', background: 'rgba(255,255,255,0.06)',
+                border: 'none', borderRadius: 12, color: '#fff', fontSize: '0.88rem', fontWeight: 700,
+                fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+              }} />
+          ))}
+        </div>
+        <button onClick={() => setFilterOpen(false)} style={{
+          width: '100%', minHeight: 50, borderRadius: 12, border: 'none', background: '#fff', color: '#0a0a0a',
+          fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>Toon {filteredMeals.length} maaltijden</button>
+        {(afwijkingen.length > 0 || moment !== 'alles') && (
+          <button onClick={() => { allesTonen(); setFilterOpen(false) }} style={{
+            width: '100%', minHeight: 40, marginTop: 6, background: 'none', border: 'none',
+            color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+          }}>Alles terugzetten</button>
+        )}
+      </BladModal>
+
+      {/* Waar geldt de wissel? Het verschil staat al bovenin het venster. */}
       <BladModal
         open={!!selectedMeal}
-        titel="Wissel hiermee?"
-        onClose={() => setSelectedMeal(null)}
+        titel={currentMeal ? 'Waar geldt deze wissel?' : 'Waar komt hij erbij?'}
+        onClose={() => { if (!bezig) setSelectedMeal(null) }}
         zIndex={10600}
       >
         {selectedMeal && (
           <>
-            <div style={{ margin: '0 -1.25rem 0.9rem' }}>
-              <MealCard
-                meal={{
-                  name: selectedMeal.name,
-                  image_url: selectedMeal.image_url,
-                  slot: slot || currentMeal?.slot,
-                  calories: selectedMeal.calories, protein: selectedMeal.protein,
-                  carbs: selectedMeal.carbs, fat: selectedMeal.fat,
-                }}
-                momentLabel={selectedMeal._isCustom ? 'Eigen maaltijd' : 'Nieuw'}
-                isMobile={isMobile}
-                acties={[]}
-              />
+            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', marginBottom: '0.9rem' }}>
+              {currentMeal ? <>{currentMeal.name || currentMeal.meal_name} <span style={{ color: '#fff' }}>→ {selectedMeal.name}</span></> : selectedMeal.name}
             </div>
-
-            {currentMeal && (
-              <>
-                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>
-                  Verschil met {currentMeal?.name || 'de huidige maaltijd'}
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.1rem' }}>
-                  {[
-                    { label: 'kcal', diff: getDiff(selectedMeal.calories, currentMeal?.calories) },
-                    { label: 'eiwit', diff: getDiff(selectedMeal.protein, currentMeal?.protein) },
-                    { label: 'koolh', diff: getDiff(selectedMeal.carbs, currentMeal?.carbs) },
-                    { label: 'vet', diff: getDiff(selectedMeal.fat, currentMeal?.fat) },
-                  ].map(item => (
-                    <div key={item.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '0.5rem 0.25rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 }}>
-                      <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: item.diff.color, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                        {item.diff.text}
-                      </div>
-                      <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>
-                        {item.label}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {vraagBereik ? (
-              <BereikKeuze
-                vraag={currentMeal ? 'Waar geldt deze wissel?' : 'Waar komt hij erbij?'}
-                dagNaam={dagNaam} slot={slot}
-                oudeNaam={currentMeal?.name} nieuweNaam={selectedMeal?.name}
-                plekken={plekken} metAlleDagen dagIndex={dagIndex} weekStart={weekStart}
-                bezig={bezig} onKies={bevestig}
-              />
-            ) : (
-              <button
-                onClick={() => bevestig('day')}
-                disabled={!!bezig}
-                style={{
-                  width: '100%', minHeight: 50, marginBottom: '0.5rem',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  background: '#fff', border: 'none', borderRadius: 12,
-                  color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900,
-                  fontFamily: 'inherit', cursor: bezig ? 'wait' : 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <Check size={16} strokeWidth={3} /> {bezig ? 'Bezig…' : currentMeal ? 'Wissel hiermee' : 'Zet in het slot'}
-              </button>
-            )}
+            <BereikKeuze
+              vraag={currentMeal ? 'Waar geldt deze wissel?' : 'Waar komt hij erbij?'}
+              dagNaam={dagNaam} slot={slot}
+              oudeNaam={currentMeal?.name} nieuweNaam={selectedMeal?.name}
+              plekken={plekken} metAlleDagen dagIndex={dagIndex} weekStart={weekStart}
+              bezig={bezig} onKies={bevestig}
+            />
             <button
               onClick={() => setSelectedMeal(null)}
               style={{
@@ -1040,6 +1110,8 @@ export default function WisselModal({
 
       <style>{`
         @keyframes wisselSpin { to { transform: rotate(360deg); } }
+        @keyframes wisselPopIn { 0% { opacity: 0; transform: scale(0.4); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes wisselFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
       `}</style>
     </>
   )
@@ -1052,16 +1124,24 @@ const portieKnop = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
-// Eén suggestie: dezelfde kaart als in de dagplanning, met op de foto het
-// verschil in kcal en eiwit met de huidige maaltijd. De ster is de
-// coach-favoriet.
+// Eén suggestie, compact zoals bij de klant: tik = kiezen (popt bovenin),
+// het verschil met de huidige maaltijd als regel onder de naam, ster
+// (coach-favoriet) en info in een kolom rechts.
 function SuggestieKaart({ meal, currentMeal, slot, isSelected, onSelect, isMobile, isFavoriet, onSter, onInfo }) {
-  const teken = (n) => `${n > 0 ? '+' : ''}${n}`
-  const heeftHuidig = !!currentMeal
+  const teken = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)}`
   const kcalOp = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
   const eiwitOp = Math.round((meal.protein || 0) - (currentMeal?.protein || 0))
-  const kcalLabel = !heeftHuidig ? `${Math.round(meal.calories || 0)} kcal` : kcalOp === 0 ? 'Zelfde kcal' : `${teken(kcalOp)} kcal`
-  const eiwitLabel = !heeftHuidig ? `${Math.round(meal.protein || 0)}g eiwit` : eiwitOp === 0 ? 'zelfde eiwit' : `${teken(eiwitOp)}g eiwit`
+  const verschil = currentMeal ? (
+    <span>
+      <span style={{ color: '#fff' }}>{kcalOp === 0 ? 'zelfde kcal' : `${teken(kcalOp)} kcal`}</span>
+      {' · '}{eiwitOp === 0 ? 'zelfde eiwit' : `${teken(eiwitOp)}g eiwit`}
+    </span>
+  ) : null
+  const hoek = {
+    width: 30, height: 30, padding: 0, background: 'transparent', border: 'none',
+    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
 
   return (
     <MealCard
@@ -1072,37 +1152,32 @@ function SuggestieKaart({ meal, currentMeal, slot, isSelected, onSelect, isMobil
         calories: meal.calories, protein: meal.protein,
         carbs: meal.carbs, fat: meal.fat,
       }}
-      momentLabel={kcalLabel}
-      tijdLabel={eiwitLabel}
+      momentLabel={currentMeal ? '' : null}
+      ondertitel={verschil}
+      compact
       isMobile={isMobile}
       geselecteerd={isSelected}
       onCheck={onSelect}
-      hoekKnop={onSter ? (
-        <button
-          onClick={(e) => { e.stopPropagation(); onSter() }}
-          aria-label={isFavoriet ? 'Favoriet verwijderen' : 'Favoriet maken'}
-          title={isFavoriet ? 'Favoriet verwijderen' : 'Favoriet maken'}
-          style={{
-            width: 28, height: 28, padding: 0,
-            background: 'transparent', border: 'none', borderRadius: 7,
-            color: '#fff', opacity: isFavoriet ? 1 : 0.55,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Star size={14} strokeWidth={2.6} fill={isFavoriet ? '#fff' : 'none'} />
-        </button>
-      ) : null}
-      acties={[
-        { icon: <Info size={isMobile ? 11 : 12} />, label: 'Info', onClick: onInfo },
-        {
-          icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />,
-          label: isSelected ? 'Gekozen' : 'Kies',
-          onClick: onSelect,
-          checked: isSelected,
-        },
-      ]}
+      onTik={onSelect}
+      rechts={
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, marginRight: -6 }}>
+          {onSter ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSter() }}
+              aria-label={isFavoriet ? 'Favoriet verwijderen' : 'Favoriet maken'}
+              title={isFavoriet ? 'Favoriet verwijderen' : 'Favoriet maken'}
+              style={{ ...hoek, opacity: isFavoriet ? 1 : 0.55, cursor: 'pointer' }}
+            >
+              <Star size={16} strokeWidth={2.6} fill={isFavoriet ? '#fff' : 'none'} />
+            </button>
+          ) : <div style={{ width: 30, height: 30 }} />}
+          <button onClick={(e) => { e.stopPropagation(); onInfo?.() }} aria-label="Info" style={{ ...hoek, opacity: 0.55, cursor: 'pointer' }}>
+            <Info size={16} strokeWidth={2.6} />
+          </button>
+        </div>
+      }
+      acties={[]}
     />
   )
 }
+
