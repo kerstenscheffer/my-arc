@@ -67,7 +67,10 @@ export default function PhotoGallery({ photos = {}, onDelete, onUpdateSubtype, i
         position: 'relative'
       }}>
         {displayDates.map((date) => {
-          const dayPhotos = photos[date] || []
+          // Vaste volgorde per dag: voorkant, zijkant, achterkant, dan de rest.
+          const VOLGORDE = { front: 0, side: 1, back: 2 }
+          const plek = (p) => VOLGORDE[String(p.metadata?.subtype || '').toLowerCase()] ?? 3
+          const dayPhotos = [...(photos[date] || [])].sort((a, b) => plek(a) - plek(b))
           if (dayPhotos.length === 0) return null
           const d = new Date(date)
           
