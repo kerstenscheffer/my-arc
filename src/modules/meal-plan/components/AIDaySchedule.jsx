@@ -16,6 +16,7 @@ import { laadSupplementen, geldtOpDag, momentVanSupplement, klantDoseringTekst, 
 import SupplementInfoModal from './SupplementInfoModal'
 import GelogdOverlay from './GelogdOverlay'
 import { MaaltijdKaartenSkelet } from '../../../client/PaginaSkeletten'
+import { SkeletStijl } from '../../../ui/Skelet'
 import { PillBottle } from 'lucide-react'
 
 const getTodayIndex = () => {
@@ -875,6 +876,10 @@ export default function AIDaySchedule({
           Geen maaltijden gepland voor deze dag
         </div>
       ) : (
+        // Kaarten vervagen kort in over het skelet heen (alleen opacity, de
+        // maat staat al vast), net als Sectie in ui/Skelet.
+        <div style={{ animation: 'skeletIn 0.28s ease-out' }}>
+        <SkeletStijl />
         <MealTimelineMobile
           meals={displayMeals}
           legeMomenten={legeMomenten}
@@ -1064,6 +1069,7 @@ export default function AIDaySchedule({
             }
           }}
         />
+        </div>
       )}
 
       {suppInfo && (

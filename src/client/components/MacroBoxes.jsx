@@ -7,10 +7,11 @@ import { Flame, Wheat, Egg, Droplet } from 'lucide-react'
 
 // Telt een getal soepel naar de nieuwe waarde (600 ms, zelfde curve als de
 // ring). Zonder dit sprong het percentage in één keer terwijl de ring nog
-// onderweg was.
+// onderweg was. Begint bij 0: bij het openen van een pagina lopen de ringen
+// vanuit het lege skelet vol, zoals Apple Fitness (27 okt 2026).
 function useTelOp(doel, duur = 600) {
-  const [waarde, setWaarde] = useState(doel)
-  const huidig = useRef(doel)
+  const [waarde, setWaarde] = useState(0)
+  const huidig = useRef(0)
   useEffect(() => {
     const van = huidig.current
     if (van === doel) return
