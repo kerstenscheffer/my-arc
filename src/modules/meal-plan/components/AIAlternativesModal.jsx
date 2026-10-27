@@ -321,10 +321,37 @@ export default function AIAlternativesModal({
         if (clientId) {
           const { data: customData } = await db.supabase
             .from('ai_custom_meals')
-            .select('id, name, calories, protein, carbs, fat, image_url, section')
+            .select('id, name, calories, protein, carbs, fat, image_url, section, meal_type')
             .eq('client_id', clientId)
             .eq('is_active', true)
           custom = (customData || []).map(m => ({ ...m, _isCustom: true }))
+
+          // Bij welk moment hoort een eigen maaltijd zonder sectie? 81 van de
+          // ~106 hebben er geen, en die stonden dan onder elk moment (bij
+          // Diner ook je ontbijtwrap; Kersten, 27 okt 2026). Afgeleid uit
+          // waar de klant hem logde: elk moment met minstens een kwart van
+          // zijn logs telt. Geen logs = blijft overal staan.
+          const zonder = custom.filter(m => !m.section)
+          if (zonder.length) {
+            const { data: logs } = await db.supabase
+              .from('consumed_meals').select('meal_id, meal_name, meal_type')
+              .eq('client_id', clientId)
+              .gte('consumed_at', new Date(Date.now() - 365 * 864e5).toISOString())
+              .then(r => r, () => ({ data: [] }))
+            const NAAR = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'snack', pre_workout: 'pre_workout', post_workout: 'post_workout', avondsnack: 'avondsnack' }
+            zonder.forEach(m => {
+              const tel = {}
+              let totaal = 0
+              ;(logs || []).forEach(l => {
+                const zelfde = l.meal_id === m.id || (l.meal_name || '').trim().toLowerCase() === (m.name || '').trim().toLowerCase()
+                const mo = NAAR[String(l.meal_type || '').toLowerCase()]
+                if (!zelfde || !mo) return
+                tel[mo] = (tel[mo] || 0) + 1; totaal++
+              })
+              const momenten = Object.entries(tel).filter(([, n]) => n / totaal >= 0.25).map(([mo]) => mo)
+              if (momenten.length) m._momenten = momenten
+            })
+          }
         }
       } catch {}
 
@@ -354,7 +381,10 @@ export default function AIAlternativesModal({
   // hebben één `section` die soms Nederlands is ("ontbijt", "diner").
   const SECTIE_NAAR_MOMENT = {
     ontbijt: 'breakfast', lunch: 'lunch', diner: 'dinner', avondeten: 'dinner',
-    snack: 'snack', tussendoortje: 'snack',
+    snack: 'snack', snacks: 'snack', tussendoortje: 'snack',
+    // Secties van Mijn maaltijden (MyMealsTab) schrijven 'snacks' en
+    // 'pre_workout'; post-workout valt daar onder snacks.
+    pre_workout: 'pre_workout', post_workout: 'snack',
   }
   // Dagmenu's: elk gerecht draagt het label van zijn niveau (dagmenu_2000,
   // _2500, _3000). Dezelfde gerechten bestaan in drie maten, dus je ziet er
@@ -381,6 +411,10 @@ export default function AIAlternativesModal({
       uit.add(SECTIE_NAAR_MOMENT[s] || s)
     }
     if (m?.slot) uit.add(String(m.slot).toLowerCase())
+    // Eigen maaltijden: meal_type (meal prep zet ['snack']) en het afgeleide
+    // moment uit de logs. 'custom' zegt niets over het moment.
+    ;(Array.isArray(m?.meal_type) ? m.meal_type : []).forEach(t => { if (t && t !== 'custom') uit.add(String(t).toLowerCase()) })
+    ;(m?._momenten || []).forEach(t => uit.add(t))
     return uit
   }
 
