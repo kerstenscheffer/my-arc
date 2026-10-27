@@ -57,6 +57,9 @@ export default function DagenKiezer({
   vraag = 'Waar geldt deze wijziging?', knopTekst = 'Opslaan', gevaar = false,
   volScherm = false, foto = null, fotoNaar = null, dagenMetMaaltijd = null,
   trainingsdagen = null, vastAltijd = false,
+  // `inline`: alleen de keuzes en de knop, zonder kop of eigen venster — voor
+  // binnen een ander scherm (het wisselscherm, 27 okt 2026).
+  inline = false,
 }) {
   const mag = (key) => !trainingsdagen || trainingsdagen.includes(key)
   const bekeken = datum ? new Date(datum) : new Date()
@@ -216,6 +219,25 @@ export default function DagenKiezer({
   const foutBlok = fout && (
     <div style={{ fontSize: '0.7rem', color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: '0.5rem 0.6rem' }}>{fout}</div>
   )
+
+  if (inline) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+        <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', textAlign: 'center' }}>{vraag}</div>
+        {keuzes}
+        {foutBlok}
+        {extra}
+        {knop}
+        {onTerug && (
+          <button onClick={onTerug} disabled={bezig} style={{
+            background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: '0.82rem', fontWeight: 800,
+            fontFamily: 'inherit', cursor: 'pointer', padding: '0.4rem', touchAction: 'manipulation',
+          }}>{terugTekst}</button>
+        )}
+        <style>{'@keyframes cmeSpin { to { transform: rotate(360deg); } }'}</style>
+      </div>
+    )
+  }
 
   if (volScherm) {
     // Pop-up van onder over een geblurde pagina: je ziet nog waar je zat.
