@@ -37,6 +37,8 @@ export default function AIDaySchedule({
   onCheckMeal, onUncheckMeal, onOpenInfo, onOpenAlternatives,
   // Prullenbakje op een planmaaltijd; de ouder vraagt op welke dagen.
   onVerwijderMeal = null,
+  // Tik op moment/tijd op de foto van een planmaaltijd.
+  onMomentWijzigen = null,
   // Vers trainingsschema van het dashboard; client.workout_schedule kan oud zijn.
   workoutSchedule = null,
   db, dailyTotals,
@@ -888,6 +890,7 @@ export default function AIDaySchedule({
           onOpenInfo={onOpenInfo}
           onOpenAlternatives={onOpenAlternatives}
           onVerwijderMeal={alleenKijken ? null : onVerwijderMeal}
+          onMomentWijzigen={alleenKijken ? null : onMomentWijzigen}
           isToday={isVandaag()}
           isMobile={isMobile}
           consumedMeals={consumedMeals}

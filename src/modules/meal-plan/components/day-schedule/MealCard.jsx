@@ -84,6 +84,9 @@ export default function MealCard({
   // Grijze tekst direct achter de naam, op dezelfde regel (de dosering van
   // een supplement).
   naNaam = null,
+  // Tik op het moment/de tijd op de foto: moment aanpassen (krijgt de
+  // positie mee voor het venstertje).
+  onMoment = null,
 }) {
   const photoSize = compact ? (isMobile ? 60 : 66) : (isMobile ? 78 : 90)
   // Een lege string betekent bewust geen label op de foto (ingrediënten).
@@ -144,11 +147,18 @@ export default function MealCard({
               ? 'linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.75) 100%)'
               : 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0.8) 100%)',
           }} />
-          <div style={{
-            position: 'absolute', left: 0, right: 0, bottom: 0,
-            padding: isMobile ? '0 5px 5px' : '0 6px 6px',
-            pointerEvents: 'none',
-          }}>
+          <div
+            onClick={onMoment ? (e) => {
+              e.stopPropagation()
+              const r = e.currentTarget.getBoundingClientRect()
+              onMoment({ top: r.bottom + 6, left: r.left, boven: r.top })
+            } : undefined}
+            style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0,
+              padding: isMobile ? '0 5px 5px' : '0 6px 6px',
+              pointerEvents: onMoment ? 'auto' : 'none',
+              cursor: onMoment ? 'pointer' : undefined,
+            }}>
             {moment && <div style={{
               fontSize: isMobile ? '0.6rem' : '0.66rem',
               fontWeight: 900, color: '#fff',

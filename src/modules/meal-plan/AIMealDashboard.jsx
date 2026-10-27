@@ -72,7 +72,8 @@ import { resolveFoodImage } from './foodImageFallback'
 import DagenKiezer from './components/DagenKiezer'
 import WisselStappen from './components/WisselStappen'
 import { weekplanVoorWeek } from './DayTemplateService'
-import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen, zetPreWorkoutOpTrainingsdagen } from './dagAanpassingen'
+import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen, zetPreWorkoutOpTrainingsdagen, zetMomentOpDagen } from './dagAanpassingen'
+import MomentVenster from './components/MomentVenster'
 import { isTrainingsdag, preWorkoutUitDag, PRE_WORKOUT_SLOT } from './utils/preWorkoutMeal'
 import AIMealInfoModal from './components/AIMealInfoModal'
 import AIFavoritesModal from './components/AIFavoritesModal'
@@ -506,6 +507,34 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
   // Prullenbakje op een planmaaltijd: zelfde dagkiezer, dan weghalen.
   const [verwijderMeal, setVerwijderMeal] = useState(null)
 
+  // Moment aanpassen (soort + tijd), vanaf de foto van een planmaaltijd.
+  const [momentKeuze, setMomentKeuze] = useState(null) // { meal, pos }
+  const [momentBezig, setMomentBezig] = useState(false)
+  const bewaarMoment = async (label, tijd, bereik) => {
+    const meal = momentKeuze?.meal
+    if (!meal?.slot || !dashboardData?.activePlan?.id) return
+    setMomentBezig(true)
+    try {
+      const dagKey = DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key
+      let dagen = [dagKey]
+      if (bereik === 'overal') {
+        const waar = await dagenMetMaaltijd(meal)(null)
+        if (waar.length) dagen = waar
+      }
+      const velden = { display_label: label || null }
+      if (meal.slot !== PRE_WORKOUT_SLOT && tijd) velden.timing = tijd
+      await zetMomentOpDagen(db.supabase, dashboardData.activePlan.id, dagen, meal.slot, velden)
+      setMomentKeuze(null)
+      setPastDayRefreshKey(k => k + 1)
+      await loadDashboardData()
+    } catch (e) {
+      console.error('Moment aanpassen mislukt:', e)
+      alert('Opslaan mislukt.')
+    } finally {
+      setMomentBezig(false)
+    }
+  }
+
   // Trainingsdagen vers (komt met elke dashboard-lading mee, ook bij terug
   // naar deze pagina). client.workout_schedule is van bij het openen van de
   // app: training verzet op Workout = pre-workout bleef op de oude dag
@@ -807,6 +836,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
         onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
         onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
         onVerwijderMeal={(meal) => { setWisselFout(null); setVerwijderMeal(meal) }}
+        onMomentWijzigen={(meal, pos) => setMomentKeuze({ meal, pos })}
         db={db}
         dailyTotals={dashboardData.dailyTotals || {
           targets: {
@@ -961,6 +991,21 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
             onClose={() => !wisselBezig && setWisselKeuze(null)}
           />
         </div>,
+        document.body
+      )}
+
+      {momentKeuze && createPortal(
+        <MomentVenster
+          label={momentKeuze.meal.display_label || momentKeuze.meal.timeSlot || ''}
+          tijd={typeof momentKeuze.meal.timing === 'string' ? momentKeuze.meal.timing : ''}
+          metTijd={momentKeuze.meal.slot !== PRE_WORKOUT_SLOT}
+          dagNaam={['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'][dayKeyToIndex(selectedDay)]}
+          pos={momentKeuze.pos}
+          isMobile={isMobile}
+          bezig={momentBezig}
+          onClose={() => setMomentKeuze(null)}
+          onSave={bewaarMoment}
+        />,
         document.body
       )}
 

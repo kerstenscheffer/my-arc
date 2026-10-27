@@ -54,6 +54,8 @@ export default function MealTimelineMobile({
   // een eigen supplement weer weghalen.
   onSupplementToevoegen = null,
   onSupplementVerwijderen = null,
+  // Moment (soort + tijd) van een planmaaltijd aanpassen.
+  onMomentWijzigen = null,
 }) {
   const [showPlan, setShowPlan] = useState(true)
   const productFotos = useProductFotos()
@@ -167,6 +169,7 @@ export default function MealTimelineMobile({
               onInfo={() => onOpenInfo(meal)}
               onAlternatives={() => onOpenAlternatives(meal)}
               onVerwijder={onVerwijderMeal ? () => onVerwijderMeal(meal) : null}
+              onMoment={onMomentWijzigen ? (pos) => onMomentWijzigen(meal, pos) : null}
               isMobile={true}
               isLast={false}
             />

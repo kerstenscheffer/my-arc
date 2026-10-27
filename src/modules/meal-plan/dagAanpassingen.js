@@ -200,3 +200,31 @@ export async function haalMaaltijdWegOpDagen(supabase, planId, dagen, slot) {
     .eq('id', planId)
   if (error) throw error
 }
+
+// Moment van een maaltijd aanpassen door de klant (27 okt 2026): eigen titel
+// (display_label) en/of kloktijd (timing) op de gekozen weekdagen, blijvend.
+// Alleen dagen waar het slot echt staat; de maaltijd zelf blijft gelijk.
+// Een pre-workout van het plan (niet per dag) krijgt het label op de
+// plan-kolom.
+export async function zetMomentOpDagen(supabase, planId, dagen, slot, velden) {
+  if (!supabase || !planId || !slot || !dagen?.length || !velden) return
+  const { data: plan, error: leesFout } = await supabase
+    .from('client_meal_plans').select('week_structure, pre_workout_meal').eq('id', planId).single()
+  if (leesFout) throw leesFout
+  const week = { ...(plan?.week_structure || {}) }
+  let raakt = false
+  dagen.forEach(dag => {
+    const oud = week[dag]?.[slot]
+    if (!oud || typeof oud !== 'object') return
+    week[dag] = { ...week[dag], [slot]: { ...oud, ...velden } }
+    raakt = true
+  })
+  const wijziging = { updated_at: new Date().toISOString() }
+  if (raakt) wijziging.week_structure = week
+  if (!raakt && slot === PRE_WORKOUT_SLOT && plan?.pre_workout_meal) {
+    wijziging.pre_workout_meal = { ...plan.pre_workout_meal, ...velden }
+  }
+  if (Object.keys(wijziging).length === 1) return
+  const { error } = await supabase.from('client_meal_plans').update(wijziging).eq('id', planId)
+  if (error) throw error
+}
