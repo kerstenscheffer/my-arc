@@ -438,32 +438,36 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   // Je kiest de sectie ("Mijn diner"); het log-moment volgt daaruit. Eerder
   // koos je alleen het moment en werd de sectie nooit meegeschreven, dus bleef
   // een maaltijd onder "Overige" staan hoe vaak je Diner ook koos.
-  const [sectie, setSectie] = useState(sectieVan(meal.section) || (meal._moment ? MOMENT_SECTIE[meal._moment] : null) || '')
+  // Moment en foto leven op de maaltijd in opbouw (buildingMeal), niet in
+  // dit scherm: zoek je een ingrediënt, dan verdwijnt dit scherm even en
+  // waren ze weg (Kersten, 27 okt 2026). _sectie / _fotoBestand /
+  // _fotoVoorbeeld gaan niet mee naar de database (velden staan uitgeschreven).
+  const sectie = meal._sectie ?? (sectieVan(meal.section) || (meal._moment ? MOMENT_SECTIE[meal._moment] : null) || '')
+  const setSectie = (id) => setMeal(prev => ({ ...prev, _sectie: id }))
   const mealMoment = SECTION_MOMENT[sectie] || meal._moment || 'snack'
   // Verplicht (27 okt 2026): zonder moment stond een eigen maaltijd onder
   // elk moment in het wisselscherm.
   const sectieOptiesDetail = SECTIONS.map(sec => ({ id: sec.id, label: sec.label.replace(/^Mijn /, '') }))
   // Photo state — `photoFile` is a File from the picker (upload pending),
   // `photoPreview` is what's shown in the UI (object URL or saved image_url).
-  const [photoFile, setPhotoFile] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(meal.image_url || null)
-  // Tijdelijke blob-URL van de vorige/laatste foto vrijgeven (anders blijft
-  // de hele foto in het geheugen tot de app sluit).
-  useEffect(() => () => { if (typeof photoPreview === 'string' && photoPreview.startsWith('blob:')) URL.revokeObjectURL(photoPreview) }, [photoPreview])
+  const photoFile = meal._fotoBestand || null
+  const photoPreview = meal._fotoVoorbeeld !== undefined ? meal._fotoVoorbeeld : (meal.image_url || null)
+  // Tijdelijke blob-URL vrijgeven bij vervangen of weghalen; niet bij het
+  // verlaten van dit scherm, want dan kom je er zo weer terug.
+  const geefVrij = () => { if (typeof meal._fotoVoorbeeld === 'string' && meal._fotoVoorbeeld.startsWith('blob:')) URL.revokeObjectURL(meal._fotoVoorbeeld) }
   const [photoUploading, setPhotoUploading] = useState(false)
 
   const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setPhotoFile(file)
-    setPhotoPreview(URL.createObjectURL(file))
+    geefVrij()
+    setMeal(prev => ({ ...prev, _fotoBestand: file, _fotoVoorbeeld: URL.createObjectURL(file) }))
   }
 
   const handlePhotoRemove = () => {
-    setPhotoFile(null)
-    setPhotoPreview(null)
-    // Mark image_url as cleared so save() knows to null it in DB
-    setMeal({ ...meal, image_url: null })
+    geefVrij()
+    // image_url leeg, zodat opslaan hem in de database ook wist.
+    setMeal(prev => ({ ...prev, _fotoBestand: null, _fotoVoorbeeld: null, image_url: null }))
   }
 
   const uploadMealPhoto = async (file) => {
