@@ -6,7 +6,8 @@
 // icoon zonder tekst — dat is nu een knop met tekst + pijl.
 
 import React, { useState, useEffect } from 'react'
-import { Check, ChevronDown, Timer } from 'lucide-react'
+import { Check, ChevronDown, Timer, Flame } from 'lucide-react'
+import { isOpwarmPromptAan, zetOpwarmPrompt } from './opwarmen'
 import { useRef } from 'react'
 import { actieveOefeningen } from '../../utils/exerciseCompletion'
 import { workoutFoto } from '../../utils/workoutFoto'
@@ -208,6 +209,7 @@ export default function TodaysWorkoutCard({
             {client?.id && db && (
               <GymKiezer db={db} client={client} isMobile={isMobile} />
             )}
+            <OpwarmKnop isMobile={isMobile} />
           </div>
         </div>
       </div>
@@ -392,4 +394,39 @@ function TimerGetal({ opgebouwd, startedAt, format }) {
   }, [startedAt])
   const live = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0
   return format(opgebouwd + live)
+}
+
+// Warming-up-vraag aan of uit, naast de gym. Eerst kon je hem alleen
+// uitzetten via "niet meer vragen" in de vraag zelf, en daarna nooit meer aan
+// (Kersten, 27 okt 2026). Per telefoon, zoals die instelling al was.
+function OpwarmKnop({ isMobile }) {
+  const [aan, setAan] = useState(() => isOpwarmPromptAan())
+  const wissel = (e) => {
+    e.stopPropagation()
+    const nieuw = !aan
+    zetOpwarmPrompt(nieuw)
+    setAan(nieuw)
+    if (navigator.vibrate) navigator.vibrate(10)
+  }
+  return (
+    <button
+      onClick={wissel}
+      aria-pressed={aan}
+      aria-label={aan ? 'Warming-up vraag staat aan' : 'Warming-up vraag staat uit'}
+      title={aan ? 'Warming-up: aan' : 'Warming-up: uit'}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '2px 7px', borderRadius: 7,
+        background: aan ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${aan ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`,
+        color: aan ? '#fff' : 'rgba(255,255,255,0.45)',
+        fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 800,
+        fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', textShadow: 'none',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <Flame size={11} strokeWidth={2.8} fill={aan ? '#f59e0b' : 'none'} color={aan ? '#f59e0b' : 'currentColor'} style={{ flexShrink: 0 }} />
+      <span style={{ textDecoration: aan ? 'none' : 'line-through' }}>Warming-up</span>
+    </button>
+  )
 }

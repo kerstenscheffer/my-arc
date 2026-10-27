@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import lazy from '../../../../../lazyMetHerlaad'
 import { vanKg, naarKg, eenheidLabel, haalGyms } from '../../../gym/GymService'
 import { createPortal } from '../../../../../client/paginaPortal'
-import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2, TrendingUp } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 // Grafiek (recharts, ~300 KB) pas laden als het logscherm opengaat, niet
 // met de hele workoutpagina mee.
@@ -94,9 +94,6 @@ function AdjustBtn({ label, onClick, isMobile }) {
   )
 }
 
-// De kolommen van de set-tabel: setnummer, vandaag, vorige keer, verschil.
-// Op één plek, zodat de koprij en de rijen niet uit de pas lopen.
-const KOLOMMEN = '3.2rem 1fr 1fr 4.2rem'
 
 // Aantal geplande sets kiezen. Leunt op dezelfde NumberPicker als de kilo's
 // en de reps: één manier om in dit scherm een getal te kiezen.
@@ -224,15 +221,88 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
   )
 }
 
+// ========== SET-TABEL ==========
+// Setnummer en Vandaag plakken links, het verschil plakt rechts; daartussen
+// staan de eerdere trainingen naast elkaar en veeg je zijwaarts terug in de
+// tijd. De kolom direct naast Vandaag is de vergelijking: daar rekent het
+// verschil mee (Kersten, 27 okt 2026). Vaste pixelbreedtes, zodat koprij en
+// rijen precies onder elkaar staan en het vastklikken per kolom klopt.
+const TABEL = { set: 52, vandaag: 92, eerder: 78, rechts: 84 }
+const tabelZij = (isMobile) => (isMobile ? 16 : 20)
+
+// Eén rij. `links` = [setnummer, vandaag], `eerder` = een cel per eerdere
+// training, `rechts` = verschil + menu.
+function TabelRij({ links, eerder, rechts, isMobile, actief, onClick, kop = false, breedte = 0 }) {
+  const zij = tabelZij(isMobile)
+  const Tag = onClick ? 'button' : 'div'
+  return (
+    <Tag onClick={onClick} style={{
+      display: 'flex', alignItems: 'center', width: 'max-content', minWidth: '100%',
+      padding: kop ? (isMobile ? '1.5rem 0 0.35rem' : '1.7rem 0 0.4rem') : (isMobile ? '0.42rem 0' : '0.48rem 0'),
+      borderBottom: `1px solid rgba(255,255,255,${kop ? 0.08 : 0.06})`,
+      ...(onClick ? {
+        background: 'transparent', border: 'none', borderBottomStyle: 'solid', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'inherit',
+        touchAction: 'pan-x pan-y', WebkitTapHighlightColor: 'transparent',
+      } : null),
+    }}>
+      <div style={{
+        position: 'sticky', left: 0, zIndex: 2, background: '#0a0a0a', alignSelf: 'stretch',
+        display: 'flex', alignItems: 'center', paddingLeft: zij, flexShrink: 0,
+      }}>
+        <div style={{ width: TABEL.set, flexShrink: 0 }}>{links[0]}</div>
+        <div style={{ width: TABEL.vandaag, flexShrink: 0, minWidth: 0 }}>{links[1]}</div>
+      </div>
+      {eerder.map((cel, k) => (
+        <div key={k} style={{
+          width: TABEL.eerder, flexShrink: 0, scrollSnapAlign: 'start',
+          opacity: k === actief ? 1 : 0.55, transition: 'opacity 0.2s ease',
+        }}>{cel}</div>
+      ))}
+      {/* Ruimte na de laatste kolom, zodat ook de oudste training naast
+          Vandaag kan vastklikken. */}
+      <div style={{ flex: 1, minWidth: Math.max(0, breedte - zij - TABEL.set - TABEL.vandaag - TABEL.eerder - TABEL.rechts) }} />
+      <div style={{
+        position: 'sticky', right: 0, zIndex: 2, background: '#0a0a0a', alignSelf: 'stretch',
+        width: TABEL.rechts, flexShrink: 0, paddingRight: zij,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2,
+      }}>{rechts}</div>
+    </Tag>
+  )
+}
+
+// Een eerdere set in een cel: "79kg × 8", of een streepje.
+function EerdereSet({ set, eenheid, actief }) {
+  const EH = eenheidLabel(eenheid)
+  return (
+    <span style={{
+      fontSize: '0.85rem', fontWeight: 800,
+      color: actief ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.38)',
+      fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+    }}>
+      {set
+        ? <>{vanKg(set.weight, eenheid)}<span style={{ fontSize: '0.8em' }}>{EH}</span> × {set.reps}</>
+        : <span style={{ color: 'rgba(255,255,255,0.18)' }}>—</span>}
+    </span>
+  )
+}
+
+const SET_LABEL = (kleur) => ({
+  fontSize: '0.66rem', fontWeight: 800, color: kleur,
+  textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap',
+})
+
 // ========== LOGGED SET ROW ==========
-function LoggedSetRow({ set, index, vorige, vorigeSleutel = 0, onAddDropset, onEdit, onDelete, isMobile, eenheid = 'kg' }) {
+// `eerder` = deze set bij elke eerdere training, `actief` = welke daarvan de
+// vergelijking is.
+function LoggedSetRow({ set, index, eerder = [], actief = 0, onAddDropset, onEdit, onDelete, isMobile, eenheid = 'kg', breedte }) {
   const EH = eenheidLabel(eenheid)
   const toon = (kilo) => vanKg(kilo, eenheid)
   const [showMenu, setShowMenu] = useState(false)
+  const vorige = eerder[actief] || null
 
-  // Vergelijking met dezelfde set van vorige keer. Precies wat je tijdens het
-  // loggen wilt weten: ging deze set beter dan de vorige keer? Eerst het
-  // gewicht, en bij gelijk gewicht de reps.
+  // Vergelijking met dezelfde set bij de training in de vergelijkkolom.
+  // Eerst het gewicht, en bij gelijk gewicht de reps.
   let delta = null
   if (vorige) {
     const dKg = (set.weight || 0) - (vorige.weight || 0)
@@ -245,56 +315,38 @@ function LoggedSetRow({ set, index, vorige, vorigeSleutel = 0, onAddDropset, onE
 
   return (
     <div>
-      {/* Eén regel per set: nummer, cijfers, verschil met vorige keer, menu.
-          Stond met een groen vinkje in een vakje en het gewicht in goud —
-          drie accenten voor een regel die alleen hoeft te zeggen wat je deed. */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem',
-        alignItems: 'center',
-        padding: isMobile ? '0.42rem 1rem' : '0.48rem 1.25rem',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-      }}>
-        <span style={{
-          fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-          textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap',
-        }}>
-          Set {index + 1}
-        </span>
-
-        <div style={{ minWidth: 0 }}>
-          <div style={{
-            fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff',
-            fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
-          }}>
-            {toon(set.weight)}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>{EH}</span>
-            <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
-            {set.reps}
-            {set.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{set.partials}p</span>}
-          </div>
-          {set.dropsets?.length > 0 && (
-            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
-              {set.dropsets.map((ds, i) => (
-                <span key={i}>↓ {toon(ds.weight)}{EH} × {ds.reps}{i < set.dropsets.length - 1 ? ', ' : ''}</span>
-              ))}
+      <TabelRij
+        isMobile={isMobile}
+        actief={actief}
+        breedte={breedte}
+        links={[
+          <span style={SET_LABEL('rgba(255,255,255,0.4)')}>Set {index + 1}</span>,
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff',
+              fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+            }}>
+              {toon(set.weight)}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>{EH}</span>
+              <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
+              {set.reps}
+              {set.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{set.partials}p</span>}
             </div>
-          )}
-        </div>
-
-        <span key={vorigeSleutel} style={{
-          fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)',
-          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', animation: 'fadeIn 0.2s ease',
-        }}>
-          {vorige
-            ? <>{toon(vorige.weight)}<span style={{ fontSize: '0.8em' }}>{EH}</span> × {vorige.reps}</>
-            : <span style={{ color: 'rgba(255,255,255,0.18)' }}>—</span>}
-        </span>
-
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2 }}>
+            {set.dropsets?.length > 0 && (
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
+                {set.dropsets.map((ds, i) => (
+                  <span key={i}>↓ {toon(ds.weight)}{EH} × {ds.reps}{i < set.dropsets.length - 1 ? ', ' : ''}</span>
+                ))}
+              </div>
+            )}
+          </div>,
+        ]}
+        eerder={eerder.map((v, k) => <EerdereSet set={v} eenheid={eenheid} actief={k === actief} />)}
+        rechts={<>
           {delta && (
-            <span style={{
+            <span key={actief} style={{
               fontSize: '0.7rem', fontWeight: 900,
               color: delta.op === null ? 'rgba(255,255,255,0.28)' : delta.op ? '#10b981' : 'rgba(255,255,255,0.42)',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap', animation: 'fadeIn 0.2s ease',
             }}>
               {delta.tekst}
             </span>
@@ -309,11 +361,13 @@ function LoggedSetRow({ set, index, vorige, vorigeSleutel = 0, onAddDropset, onE
           }}>
             <MoreVertical size={14} />
           </button>
-        </span>
-      </div>
+        </>}
+      />
 
       {showMenu && (
-        <div style={{ display: 'flex', gap: '0.35rem', padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.02)' }}>
+        // Plakt links en is zo breed als het scherm: de tabel eromheen
+        // scrolt zijwaarts, het menu hoort stil te staan.
+        <div style={{ position: 'sticky', left: 0, width: breedte || '100%', boxSizing: 'border-box', display: 'flex', gap: '0.35rem', padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.02)' }}>
           <MenuBtn label="↓ Dropset" onClick={() => { onAddDropset(index); setShowMenu(false) }} isMobile={isMobile} gold />
           <MenuBtn label="✎ Aanpassen" onClick={() => { onEdit(index); setShowMenu(false) }} isMobile={isMobile} />
           <MenuBtn label="✕ Verwijder" onClick={() => { onDelete(index); setShowMenu(false) }} isMobile={isMobile} danger />
@@ -324,45 +378,22 @@ function LoggedSetRow({ set, index, vorige, vorigeSleutel = 0, onAddDropset, onE
 }
 
 // Een set die nog moet. Staat er meteen in zodra je de oefening opent, met
-// wat je vorige keer deed als richtpunt. Zo zie je in één blik hoeveel sets
-// er nog liggen en wat je moet halen, in plaats van "Nog geen sets gelogd".
-function LegeSetRow({ index, vorige, vorigeSleutel = 0, onClick, isMobile, eenheid = 'kg' }) {
-  const EH = eenheidLabel(eenheid)
+// wat je eerder deed als richtpunt. Zo zie je in één blik hoeveel sets er nog
+// liggen en wat je moet halen, in plaats van "Nog geen sets gelogd".
+function LegeSetRow({ index, eerder = [], actief = 0, onClick, isMobile, eenheid = 'kg', breedte }) {
   return (
-    <button
+    <TabelRij
+      isMobile={isMobile}
+      actief={actief}
+      breedte={breedte}
       onClick={onClick}
-      style={{
-        display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem',
-        alignItems: 'center', width: '100%',
-        padding: isMobile ? '0.42rem 1rem' : '0.48rem 1.25rem',
-        background: 'transparent', border: 'none',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <span style={{
-        fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)',
-        textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap',
-      }}>
-        Set {index + 1}
-      </span>
-      <span style={{
-        fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900,
-        color: 'rgba(255,255,255,0.22)',
-      }}>
-        —
-      </span>
-      <span key={vorigeSleutel} style={{
-        fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)',
-        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', animation: 'fadeIn 0.2s ease',
-      }}>
-        {vorige
-          ? <>{vanKg(vorige.weight, eenheid)}<span style={{ fontSize: '0.8em' }}>{EH}</span> × {vorige.reps}</>
-          : <span style={{ color: 'rgba(255,255,255,0.18)' }}>—</span>}
-      </span>
-      <span />
-    </button>
+      links={[
+        <span style={SET_LABEL('rgba(255,255,255,0.3)')}>Set {index + 1}</span>,
+        <span style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: 'rgba(255,255,255,0.22)' }}>—</span>,
+      ]}
+      eerder={eerder.map((v, k) => <EerdereSet set={v} eenheid={eenheid} actief={k === actief} />)}
+      rechts={null}
+    />
   )
 }
 
@@ -459,13 +490,30 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // verversen.
   const [grafiekVersie, setGrafiekVersie] = useState(0)
   const [previousPerformance, setPreviousPerformance] = useState(null)
-  // Alle eerdere keren van deze oefening (nieuw → oud), om in de settabel
-  // doorheen te vegen. `vergelijkIdx` is welke er nu in de rechterkolom
-  // staat; standaard dezelfde als previousPerformance. Alleen de tabel
-  // gebruikt dit — werkgewicht en invoer blijven op de vorige keer.
+  // Alle eerdere keren van deze oefening (nieuw → oud), naast elkaar in de
+  // settabel. `vergelijkIdx` is de kolom die naast Vandaag staat en waar het
+  // verschil mee rekent; standaard dezelfde als previousPerformance. Alleen
+  // de tabel gebruikt dit — werkgewicht en invoer blijven op de vorige keer.
   const [eerdereKeren, setEerdereKeren] = useState([])
   const [vergelijkIdx, setVergelijkIdx] = useState(0)
-  const veegStart = useRef(null)
+  const tabelRef = useRef(null)
+  const [tabelBreedte, setTabelBreedte] = useState(0)
+  // Breedte van de tabel voor het menu onder een set (dat plakt en moet
+  // precies het scherm vullen terwijl de tabel zijwaarts scrolt).
+  useEffect(() => {
+    const el = tabelRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setTabelBreedte(el.clientWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [loading])
+  // Zodra de eerdere trainingen binnen zijn: de vergelijkkolom naast Vandaag
+  // zetten (de laatste keer in deze sportschool, niet per se de allerlaatste).
+  useEffect(() => {
+    if (!eerdereKeren.length || !tabelRef.current) return
+    tabelRef.current.scrollLeft = vergelijkIdx * TABEL.eerder
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eerdereKeren, loading])
   const [attachmentUsed, setAttachmentUsed] = useState(null)
   const [machineSettings, setMachineSettings] = useState({})
   const [previousMachineSettings, setPreviousMachineSettings] = useState(null)
@@ -1138,77 +1186,67 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 vorige keer deed op precies dezelfde set. De datum staat als
                 kolomkop, zodat het losse "vorige sessie"-blok in de kop weg
                 kon — dezelfde cijfers stonden er twee keer. */}
-            {/* Naar rechts vegen = een training eerder in de rechterkolom,
-                naar links = weer nieuwer. pan-y: verticaal scrollen blijft
-                gewoon werken, alleen een zijwaartse veeg is voor ons. */}
+            {/* De set-tabel: één zijwaarts scrollende strook (zie TabelRij).
+                Vastklikken per kolom; de kolom die naast Vandaag staat is de
+                vergelijking. scroll-padding = de vastgeplakte linkerkant,
+                anders klikt een kolom vast ónder Set + Vandaag. */}
             {(() => {
-              const vergelijk = eerdereKeren[vergelijkIdx] || previousPerformance
-              const kanOuder = vergelijkIdx < eerdereKeren.length - 1
-              const kanNieuwer = vergelijkIdx > 0
-              const pijl = (aan) => ({
-                background: 'none', border: 'none', padding: '0 2px', cursor: aan ? 'pointer' : 'default',
-                color: aan ? 'rgba(255,215,0,0.75)' : 'rgba(255,255,255,0.12)', display: 'inline-flex',
-                fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              })
+              const kolommen = eerdereKeren.length ? eerdereKeren : [{ sets: [], date: null }]
+              const zij = tabelZij(isMobile)
               return (
             <div
-              onTouchStart={(e) => { const t = e.touches[0]; veegStart.current = { x: t.clientX, y: t.clientY } }}
-              onTouchEnd={(e) => {
-                const b = veegStart.current; veegStart.current = null
-                if (!b) return
-                const t = e.changedTouches[0]
-                const dx = t.clientX - b.x, dy = t.clientY - b.y
-                if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.5) return
-                if (dx > 0 && kanOuder) setVergelijkIdx(i => i + 1)
-                if (dx < 0 && kanNieuwer) setVergelijkIdx(i => i - 1)
+              ref={tabelRef}
+              className="set-tabel"
+              onScroll={(e) => {
+                const i = Math.round(e.currentTarget.scrollLeft / TABEL.eerder)
+                const nieuw = Math.max(0, Math.min(kolommen.length - 1, i))
+                if (nieuw !== vergelijkIdx) setVergelijkIdx(nieuw)
               }}
-              style={{ touchAction: 'pan-y' }}
+              style={{
+                overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch',
+                scrollSnapType: 'x mandatory', scrollPaddingLeft: zij + TABEL.set + TABEL.vandaag,
+                scrollbarWidth: 'none', overscrollBehaviorX: 'contain',
+              }}
             >
-            <div style={{
-              display: 'grid', gridTemplateColumns: KOLOMMEN, gap: '0 0.6rem',
-              alignItems: 'center',
-              // Lucht boven de tabel, zodat hij niet tegen materiaal en
-              // instellingen aan plakt.
-              padding: isMobile ? '1.5rem 1rem 0.35rem' : '1.7rem 1.25rem 0.4rem',
-              fontSize: '0.62rem', fontWeight: 900,
-              textTransform: 'uppercase', letterSpacing: '0.07em',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-            }}>
-              <span />
-              <span style={{ color: '#FFD700' }}>Vandaag</span>
-              <span style={{ color: 'rgba(255,215,0,0.55)', display: 'flex', alignItems: 'center', gap: 2, marginLeft: eerdereKeren.length > 1 ? -6 : 0 }}>
-                {eerdereKeren.length > 1 && (
-                  <button aria-label="Training eerder" disabled={!kanOuder} onClick={() => setVergelijkIdx(i => i + 1)} style={pijl(kanOuder)}>
-                    <ChevronLeft size={13} strokeWidth={3} />
-                  </button>
-                )}
-                <span key={vergelijkIdx} style={{ animation: 'fadeIn 0.2s ease' }}>
-                {vergelijk?.date
-                  ? new Date(`${String(vergelijk.date).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-                  : 'vorige'}
-                {/* Komt de vergelijking van een andere zaak, dan hoort dat
-                    erbij te staan: een ander apparaat weegt anders. */}
-                {vergelijk?.anderGym && (
-                  <span style={{ display: 'block', marginTop: 1, fontSize: '0.88em', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'none', letterSpacing: 0 }}>
-                    {vergelijk.anderGym}
+              <TabelRij
+                kop
+                isMobile={isMobile}
+                actief={vergelijkIdx}
+                breedte={tabelBreedte}
+                links={[
+                  <span />,
+                  <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#FFD700' }}>Vandaag</span>,
+                ]}
+                eerder={kolommen.map((k, i) => (
+                  <span style={{
+                    display: 'block', fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em',
+                    color: i === vergelijkIdx ? 'rgba(255,215,0,0.85)' : 'rgba(255,215,0,0.45)', whiteSpace: 'nowrap',
+                  }}>
+                    {k.date
+                      ? new Date(`${String(k.date).slice(0, 10)}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+                      : 'vorige'}
+                    {/* Komt een training van een andere zaak, dan hoort dat
+                        erbij te staan: een ander apparaat weegt anders. */}
+                    {k.anderGym && (
+                      <span style={{ display: 'block', marginTop: 1, fontSize: '0.88em', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'none', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {k.anderGym}
+                      </span>
+                    )}
                   </span>
-                )}
-                </span>
-                {eerdereKeren.length > 1 && (
-                  <button aria-label="Training later" disabled={!kanNieuwer} onClick={() => setVergelijkIdx(i => i - 1)} style={pijl(kanNieuwer)}>
-                    <ChevronRight size={13} strokeWidth={3} />
-                  </button>
-                )}
-              </span>
-              <span />
-            </div>
+                ))}
+                rechts={kolommen.length > 1 ? (
+                  <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
+                    {vergelijkIdx + 1}/{kolommen.length}
+                  </span>
+                ) : null}
+              />
 
             {Array.from({ length: Math.max(loggedSets.length, geplandeSets) }, (_, i) => {
               const set = loggedSets[i]
-              const vorige = vergelijk?.sets?.[i] || null
+              const eerder = kolommen.map(k => k.sets?.[i] || null)
               return set ? (
                 <LoggedSetRow key={i} set={set} index={i}
-                  vorige={vorige} vorigeSleutel={vergelijkIdx}
+                  eerder={eerder} actief={vergelijkIdx} breedte={tabelBreedte}
                   onAddDropset={(idx) => { setDropsetIndex(idx); setShowWizard(false) }}
                   onEdit={handleEditSet}
                   onDelete={handleDeleteSet}
@@ -1216,7 +1254,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                   eenheid={eenheid}
                 />
               ) : (
-                <LegeSetRow key={i} index={i} vorige={vorige} vorigeSleutel={vergelijkIdx} isMobile={isMobile} eenheid={eenheid}
+                <LegeSetRow key={i} index={i} eerder={eerder} actief={vergelijkIdx} breedte={tabelBreedte} isMobile={isMobile} eenheid={eenheid}
                   onClick={startSet}
                 />
               )
@@ -1560,6 +1598,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .set-tabel::-webkit-scrollbar { display: none; }
         /* Volledig scherm: alles wat wij op de speler zetten los laten, zodat
            hij het hele scherm mag vullen. */
         .oefening-video:fullscreen,
