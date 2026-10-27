@@ -1,7 +1,7 @@
 // scripts/live-update.mjs
 //
 // Zet de huidige code als live update klaar voor de native app.
-//   npm run live-update -- "korte notitie"            (min. native 1.7)
+//   npm run live-update -- "korte notitie"            (min. native 1.6)
 //   npm run live-update -- "notitie" --min 1.8        (alleen voor 1.8+)
 //
 // Draait cap:sync met BUILD_TIJD (bouwen + marketingbestanden uit de
@@ -29,9 +29,11 @@ if (!URL_ || !KEY) { console.error('VITE_SUPABASE_URL of SUPABASE_SERVICE_KEY on
 
 const args = process.argv.slice(2)
 const minIdx = args.indexOf('--min')
-// 1.7 build 9 (15 okt) heeft dezelfde plugins als 1.8, incl. de updater; oudere
-// builds bevatten de update-code niet en vragen dus nooit. Daarom 1.7.
-const minNative = minIdx >= 0 ? args[minIdx + 1] : '1.7'
+// De App Store-versie is 1.6 (live 16 okt, itunes lookup) en heeft de updater
+// al; zonder plugin vraagt de app nooit om een bundel (notifyAppReady faalt
+// eerst). Native plugins zijn sinds 15 okt niet veranderd. Komt er een nieuwe
+// plugin bij: --min op de winkelversie die hem heeft.
+const minNative = minIdx >= 0 ? args[minIdx + 1] : '1.6'
 const notitie = args.filter((a, i) => i !== minIdx && i !== minIdx + 1).join(' ') || null
 
 const versie = new Date().toISOString().replace(/\D/g, '').slice(0, 12)
