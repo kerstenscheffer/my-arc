@@ -3,7 +3,7 @@
 // "Waar geldt deze wijziging?" voor aanpassen en wisselen van een maaltijd.
 // Zeven dagen om aan te tikken, en daarboven de keuze tussen:
 //
-//   Elke week     -> blijvend in het weekplan, op de gekozen weekdagen
+//   Altijd        -> blijvend in het weekplan, op de gekozen weekdagen
 //   Alleen week X -> eenmalig op die datums (deze week, volgende week of de
 //                    week erna); daarna staat het gewone plan er weer
 //
@@ -54,7 +54,7 @@ export default function DagenKiezer({
   // Welke week bekijkt de klant nu? Die staat voorgeselecteerd bij "Alleen".
   const startWeek = Math.max(0, Math.min(2, Math.round((maandagVan(bekeken) - ditMaandag) / (7 * 864e5))))
 
-  // Verwijderen begint op "Eén week" met alleen de bekeken dag: wie snel
+  // Verwijderen begint op "Eenmalig" met alleen de bekeken dag: wie snel
   // doortikt, haalt anders de maaltijd voor altijd uit het weekplan.
   const [modus, setModus] = useState(gevaar ? 'week' : 'altijd')
   const [week, setWeek] = useState(startWeek)
@@ -63,8 +63,8 @@ export default function DagenKiezer({
   const weekMaandag = plus(ditMaandag, week * 7)
   const datumVan = (idx) => plus(weekMaandag, idx)
 
-  // Op welke dagen staat deze maaltijd? Vast plan bij "Elke week", de
-  // gekozen week (met losse dag-aanpassingen) bij "Eén week".
+  // Op welke dagen staat deze maaltijd? Vast plan bij "Altijd", de
+  // gekozen week (met losse dag-aanpassingen) bij "Eenmalig".
   const [aanwezig, setAanwezig] = useState(() => new Set())
   useEffect(() => {
     if (!dagenMetMaaltijd) return undefined
@@ -107,11 +107,11 @@ export default function DagenKiezer({
 
   const keuzes = (
     <>
-        {/* Elke week / alleen één week */}
+        {/* Altijd / Eenmalig */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 4 }}>
           {[
-            { key: 'altijd', Icon: Repeat, label: 'Elke week' },
-            { key: 'week', Icon: CalendarDays, label: 'Eén week' },
+            { key: 'altijd', Icon: Repeat, label: 'Altijd' },
+            { key: 'week', Icon: CalendarDays, label: 'Eenmalig' },
           ].map(o => {
             const aan = modus === o.key
             return (
