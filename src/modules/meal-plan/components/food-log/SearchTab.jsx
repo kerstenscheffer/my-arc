@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
-import { Search, Loader, X, ChevronRight, Plus, Star } from 'lucide-react'
+import { Search, Loader, X, ChevronRight, Plus, Heart } from 'lucide-react'
 import FatSecretService from './FatSecretService'
 import { resolveFoodImage } from '../../foodImageFallback'
 import { vulZoekFotos } from './enrichImageFromOFF'
@@ -687,7 +687,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   )
 }
 
-// Ster rechtsboven op een kaart: product bij je favorieten zetten of eraf
+// Hartje rechtsboven op een kaart: product bij je favorieten zetten of eraf
 // halen. Gevuld = staat erin.
 function SterKnop({ aan, onClick }) {
   return (
@@ -703,7 +703,7 @@ function SterKnop({ aan, onClick }) {
         cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <Star size={14} strokeWidth={2.6} fill={aan ? '#fff' : 'none'} />
+      <Heart size={15} strokeWidth={2.6} fill={aan ? '#fff' : 'none'} />
     </button>
   )
 }
