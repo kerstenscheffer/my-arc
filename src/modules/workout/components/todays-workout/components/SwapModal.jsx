@@ -1,5 +1,6 @@
 // src/modules/workout/components/todays-workout/components/SwapModal.jsx
-import { Plus, ChevronDown } from 'lucide-react'
+import { Plus, Check, SlidersHorizontal, X } from 'lucide-react'
+import BladModal from './BladModal'
 import { useState, useEffect } from 'react'
 import { createPortal } from '../../../../../client/paginaPortal'
 import CustomExerciseModal from './CustomExerciseModal'
@@ -7,10 +8,9 @@ import ExerciseService from '../../../../../services/ExerciseService'
 import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
 import { logPlanWijziging } from '../../../services/planWijzigingLog'
 import { laadOefeningMedia } from '../../../utils/oefeningFoto'
-import Keuze from '../../../../meal-plan/components/Keuze'
-import { colors, radius, space, shadow } from '../../../../../ui/tokens'
+import { colors, space } from '../../../../../ui/tokens'
 import {
-  KiezerSchil, ZoekVeld, FilterBalk, FilterStreep, OefeningRij, LaadRijen,
+  KiezerSchil, ZoekVeld, OefeningRij, LaadRijen,
   EigenOefeningKnop, WisselCirkels,
 } from './OefeningKiezer'
 import { spierLabel, materiaalLabel } from '../../../utils/oefeningLabels'
@@ -157,10 +157,9 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
   const [selectedEquipment, setSelectedEquipment] = useState(null)
   const [homeOnlyFilter, setHomeOnlyFilter] = useState(false)
   const [selectedType, setSelectedType] = useState(null)
-  // Welke rij staat open (Deze week / Altijd)?
-  const [openRij, setOpenRij] = useState(null)
   // De opengetikte vervanger: popt rechts in de cirkel bovenin.
   const [gekozenAlt, setGekozenAlt] = useState(null)
+  const [filterOpen, setFilterOpen] = useState(false)
   const [media, setMedia] = useState(() => new Map())
 
   useEffect(() => {
@@ -401,55 +400,55 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
   }
 
   const knop = (primair) => ({
-    flex: 1, minHeight: 48, borderRadius: radius.btn, fontFamily: 'inherit',
-    fontSize: 15, fontWeight: 800, cursor: swapping ? 'default' : 'pointer',
+    flex: 1, minHeight: 46, borderRadius: 12, fontFamily: 'inherit',
+    fontSize: 15, fontWeight: 900, cursor: swapping ? 'default' : 'pointer',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    // Wit en zwart, zoals het maaltijd-wisselvenster (geen goud meer).
     ...(primair
-      ? { background: colors.accent, color: colors.onAccent, border: 'none', boxShadow: shadow.glow }
-      : { background: 'transparent', color: colors.textPrimary, border: `1px solid ${colors.borderSubtle}` }),
+      ? { background: '#fff', color: '#0a0a0a', border: 'none' }
+      : { background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }),
   })
 
   const kopje = { fontSize: 13, fontWeight: 700, color: colors.textSecondary }
   const sectieKop = {
     padding: `${space[3]}px ${space[4]}px ${space[1]}px`,
-    fontSize: 12, fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase',
-    color: colors.textSecondary,
+    fontSize: 11, fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.75)',
   }
 
-  // Eén oefening in de lijst; tik = open, dan Deze week / Altijd.
+  // Eén oefening in de lijst. Tik = kiezen: hij popt rechts in de cirkel en
+  // de knoppen staan daaronder (zoals bij maaltijden wisselen).
   const rij = (alt, index) => {
     const sleutel = `${alt._isCustom ? 'custom' : 'db'}-${alt.id || alt.name || index}-${index}`
-    const open = openRij === sleutel
+    const aan = gekozenAlt && normNaam(gekozenAlt.name) === normNaam(alt.name)
     return (
-      <div key={sleutel} style={{ background: open ? colors.surfaceHover : 'transparent' }}>
-        <OefeningRij
-          ex={alt}
-          actief={open}
-          uit={swapping}
-          onClick={() => { setOpenRij(open ? null : sleutel); setGekozenAlt(open ? null : alt) }}
-          rechts={<ChevronDown size={20} strokeWidth={2.6} color={open ? colors.textPrimary : colors.textMuted}
-            style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
-        />
-        {open && !vaker && (
-          <div style={{ display: 'flex', gap: space[2], padding: `0 ${space[4]}px ${space[3]}px` }}>
-            <button disabled={swapping} onClick={() => handleSwap(alt)} style={knop(true)}>Deze week</button>
-            <button disabled={swapping} onClick={() => handleMakePermanent(alt)} style={knop(false)}>Altijd</button>
+      <OefeningRij
+        key={sleutel}
+        ex={alt}
+        actief={aan}
+        uit={swapping}
+        onClick={() => setGekozenAlt(aan ? null : alt)}
+        rechts={aan ? (
+          <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#fff', color: '#0a0a0a', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Check size={15} strokeWidth={3.2} />
           </div>
-        )}
-        {open && vaker && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: space[2], padding: `0 ${space[4]}px ${space[4]}px` }}>
-            <div style={kopje}>Elke keer · {alleDagenLabel}</div>
-            <div style={{ display: 'flex', gap: space[2] }}>
-              <button disabled={swapping} onClick={() => handleSwap(alt)} style={knop(true)}>Deze week</button>
-              <button disabled={swapping} onClick={() => handleMakePermanent(alt)} style={knop(false)}>Altijd</button>
-            </div>
-            <div style={{ ...kopje, marginTop: space[2] }}>Alleen deze training</div>
-            <button disabled={swapping} onClick={() => handleSwap(alt, { alleenDag: true })} style={{ ...knop(false), flex: 'none', width: '100%' }}>{dezeDagLabel}</button>
-          </div>
-        )}
-      </div>
+        ) : null}
+      />
     )
   }
+
+  // Wat er anders staat dan standaard (materiaal, soort), als chips.
+  const afwijkingen = [
+    selectedEquipment && { id: 'mat', label: materiaalLabel(selectedEquipment), terug: () => setSelectedEquipment(null) },
+    soort !== 'all' && { id: 'soort', label: { thuis: 'Thuis', compound: 'Compound', isolation: 'Isolatie' }[soort], terug: () => zetSoort('all') },
+  ].filter(Boolean)
+  const pil = (aan) => ({
+    flexShrink: 0, height: 32, padding: '0 0.8rem', borderRadius: 999, border: 'none',
+    background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+    fontSize: 13, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
+  const blokPil = (aan) => ({ ...pil(aan), height: 34, background: aan ? '#fff' : 'rgba(255,255,255,0.06)', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)' })
 
   return (
     <>
@@ -459,17 +458,58 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
         isMobile={isMobile}
         kop={<>
           <WisselCirkels oud={huidig} oudOnder={ondertitel} nieuw={gekozenAlt} />
+          {/* Gekozen: meteen de knoppen, waar je toch al kijkt. */}
+          {gekozenAlt && (
+            <div key={gekozenAlt.name} style={{ display: 'flex', flexDirection: 'column', gap: space[2], animation: 'okPopIn 0.3s ease both' }}>
+              {vaker && <div style={{ ...kopje, textAlign: 'center' }}>Elke keer · {alleDagenLabel}</div>}
+              <div style={{ display: 'flex', gap: space[2] }}>
+                <button disabled={swapping} onClick={() => handleSwap(gekozenAlt)} style={knop(true)}>Deze week</button>
+                <button disabled={swapping} onClick={() => handleMakePermanent(gekozenAlt)} style={knop(false)}>Altijd</button>
+              </div>
+              {vaker && (
+                <button disabled={swapping} onClick={() => handleSwap(gekozenAlt, { alleenDag: true })} style={{
+                  background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 800,
+                  fontFamily: 'inherit', cursor: 'pointer', padding: '2px 0', textDecoration: 'underline', textUnderlineOffset: 3,
+                }}>{dezeDagLabel}</button>
+              )}
+            </div>
+          )}
           <ZoekVeld waarde={searchQuery} zet={setSearchQuery} placeholder="Zoek een vervanger" />
-          <FilterBalk>
-            <Keuze waarde={selectedMuscle || 'all'} zet={(v) => setSelectedMuscle(v === 'all' ? null : v)} isMobile={isMobile}
-              opties={[{ id: 'all', label: 'Alle spieren' }, ...muscleGroups.map(m => ({ id: m, label: spierLabel(m) }))]} />
-            <FilterStreep />
-            <Keuze waarde={selectedEquipment || 'all'} zet={(v) => setSelectedEquipment(v === 'all' ? null : v)} isMobile={isMobile}
-              opties={[{ id: 'all', label: 'Alle materiaal' }, ...equipmentTypes.map(e => ({ id: e, label: materiaalLabel(e) }))]} />
-            <FilterStreep />
-            <Keuze waarde={soort} zet={zetSoort} isMobile={isMobile} uitlijning="rechts"
-              opties={[{ id: 'all', label: 'Alles' }, { id: 'thuis', label: 'Thuis' }, { id: 'compound', label: 'Compound' }, { id: 'isolation', label: 'Isolatie' }]} />
-          </FilterBalk>
+          {/* Spiergroep als pilletjes (de gekozen wit) en één filterknop. */}
+          <div style={{ display: 'flex', alignItems: 'center', margin: `0 -${space[4]}px` }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', paddingLeft: space[4] }}>
+              <button onClick={() => setSelectedMuscle(null)} style={pil(!selectedMuscle)}>Alles</button>
+              {muscleGroups.map(m => (
+                <button key={m} onClick={() => setSelectedMuscle(m)} style={pil(selectedMuscle === m)}>{spierLabel(m)}</button>
+              ))}
+            </div>
+            <button onClick={() => setFilterOpen(true)} aria-label="Filter" style={{
+              position: 'relative', flexShrink: 0, width: 44, height: 36, padding: 0, marginRight: space[2], marginLeft: 4,
+              background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <SlidersHorizontal size={19} strokeWidth={2.6} />
+              {afwijkingen.length > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 6, minWidth: 16, height: 16, borderRadius: 8, padding: '0 4px',
+                  background: '#fff', color: '#0a0a0a', fontSize: 10, fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
+                }}>{afwijkingen.length}</span>
+              )}
+            </button>
+          </div>
+          {afwijkingen.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {afwijkingen.map(x => (
+                <button key={x.id} onClick={x.terug} style={{
+                  display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 0.55rem 0 0.75rem',
+                  borderRadius: 999, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff',
+                  fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                }}>{x.label} <X size={13} strokeWidth={3} /></button>
+              ))}
+            </div>
+          )}
         </>}
       >
         {loading ? <LaadRijen /> : (<>
@@ -493,6 +533,25 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           <EigenOefeningKnop onClick={() => setShowCustomModal(true)} icoon={<Plus size={18} strokeWidth={2.6} />} />
         )}
       </KiezerSchil>
+
+      <BladModal open={filterOpen} titel="Filter" onClose={() => setFilterOpen(false)} zIndex={10600}>
+        <div style={{ ...sectieKop, padding: '0 0 8px', color: 'rgba(255,255,255,0.4)' }}>Materiaal</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
+          <button onClick={() => setSelectedEquipment(null)} style={blokPil(!selectedEquipment)}>Alles</button>
+          {equipmentTypes.map(e => (
+            <button key={e} onClick={() => setSelectedEquipment(e)} style={blokPil(selectedEquipment === e)}>{materiaalLabel(e)}</button>
+          ))}
+        </div>
+        <div style={{ ...sectieKop, padding: '0 0 8px', color: 'rgba(255,255,255,0.4)' }}>Soort</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+          {[{ id: 'all', label: 'Alles' }, { id: 'thuis', label: 'Thuis' }, { id: 'compound', label: 'Compound' }, { id: 'isolation', label: 'Isolatie' }].map(o => (
+            <button key={o.id} onClick={() => zetSoort(o.id)} style={blokPil(soort === o.id)}>{o.label}</button>
+          ))}
+        </div>
+        <button onClick={() => setFilterOpen(false)} style={{ ...knop(true), width: '100%', minHeight: 50 }}>
+          Toon {rest.length + suggesties.length} oefeningen
+        </button>
+      </BladModal>
 
       {showCustomModal && createPortal(
         <CustomExerciseModal onClose={() => setShowCustomModal(false)} onSave={handleCustomCreated} client={client} db={db} schema={schema} />,

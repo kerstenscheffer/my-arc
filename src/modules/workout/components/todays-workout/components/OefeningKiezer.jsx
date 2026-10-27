@@ -63,35 +63,36 @@ export function KiezerSchil({ titel, onClose, isMobile, kop, children }) {
       <div style={{
         width: '100%', maxWidth: isMobile ? '100%' : 560,
         height: isMobile ? '92dvh' : 'min(760px, 88vh)',
-        background: colors.surface,
-        border: `1px solid ${colors.borderSubtle}`,
-        borderRadius: isMobile ? `${radius.card}px ${radius.card}px 0 0` : radius.card,
+        // Zelfde blad als het maaltijd-wisselvenster: zwart, ronde bovenhoeken.
+        background: '#0a0a0a',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: isMobile ? '22px 22px 0 0' : 22,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
         transform: zichtbaar ? 'translateY(0)' : 'translateY(24px)',
         transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
       }}>
         <div style={{ flexShrink: 0, padding: space[4], paddingBottom: space[3], display: 'flex', flexDirection: 'column', gap: space[3] }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: colors.textPrimary }}>{titel}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.025em', color: colors.textPrimary }}>{titel}</div>
             <button
               onClick={onClose}
               aria-label="Sluiten"
               style={{
-                width: 44, height: 44, flexShrink: 0, borderRadius: radius.btn,
+                width: 36, height: 36, flexShrink: 0, padding: 0, marginRight: -6,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'transparent', border: `1px solid ${colors.borderSubtle}`,
+                background: 'none', border: 'none',
                 color: colors.textPrimary, cursor: 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <X size={20} strokeWidth={2.4} />
+              <X size={22} strokeWidth={2.4} />
             </button>
           </div>
           {kop}
         </div>
         <div style={{
           flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-          borderTop: `1px solid ${colors.borderSubtle}`,
+          borderTop: '1px solid rgba(255,255,255,0.06)',
           paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${space[4]}px)`,
         }}>
           {children}
@@ -105,7 +106,7 @@ export function KiezerSchil({ titel, onClose, isMobile, kop, children }) {
 export function ZoekVeld({ waarde, zet, placeholder, autoFocus }) {
   return (
     <div style={{ position: 'relative' }}>
-      <Search size={18} color={colors.textMuted} style={{ position: 'absolute', left: space[3], top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+      <Search size={17} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', left: space[3], top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
       <input
         type="text"
         value={waarde}
@@ -113,9 +114,9 @@ export function ZoekVeld({ waarde, zet, placeholder, autoFocus }) {
         placeholder={placeholder}
         autoFocus={autoFocus}
         style={{
-          width: '100%', height: 48, boxSizing: 'border-box',
+          width: '100%', height: 44, boxSizing: 'border-box',
           padding: `0 ${space[3]}px 0 ${space[8] + space[2]}px`,
-          background: colors.bg, border: `1px solid ${colors.borderSubtle}`, borderRadius: radius.btn,
+          background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 12,
           color: colors.textPrimary, fontSize: 15, fontWeight: 600, fontFamily: 'inherit', outline: 'none',
         }}
       />
@@ -127,8 +128,7 @@ export function ZoekVeld({ waarde, zet, placeholder, autoFocus }) {
 export function FilterBalk({ children }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', height: 44, padding: `0 ${space[1]}px`,
-      borderRadius: radius.btn, border: `1px solid ${colors.borderSubtle}`, background: colors.bg,
+      display: 'flex', alignItems: 'center', height: 40,
     }}>
       {children}
     </div>

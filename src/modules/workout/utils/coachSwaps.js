@@ -29,8 +29,8 @@ const REGELS = [
   // ── Biceps ──
   { match: /preacher|spider|concentration/, opties: ['EZ-Bar Preacher Curls', 'Preacher Curl (Dumbbell)', 'Single Arm Cable Preacher Curl', 'Spider Curl'] },
   { match: /hammer|zottman/, opties: ['Hammer Curls', 'Cable Hammer Curls', 'Zottman Curl'] },
-  { match: /incline.*curl|bayesian|drag curl/, opties: ['Bayesian Cable Curl', 'Incline Dumbbell Curl', 'Single Arm Cable Curl', 'Cable Curl'] },
-  { match: /curl/, opties: ['Cable Curl', 'EZ-Bar Curl', 'Dumbbell Curl', 'Bayesian Cable Curl'] },
+  { match: /incline.*curl|bayesian|drag curl/, opties: ['Bayesian Cable Curl', 'Incline Dumbbell Curl', 'Single Arm Cable Curl', 'Cable Bicep Curls'] },
+  { match: /curl/, opties: ['Cable Bicep Curls', 'EZ-Bar Curl', 'Dumbbell Curl', 'Bayesian Cable Curl'] },
 
   // ── Triceps ──
   { match: /overhead.*(tri|ext)|(tri|ext).*overhead/, opties: ['Cable Overhead Triceps Extension', 'Dumbbell Overhead Extension', 'Single-Arm Overhead Cable Extension', 'EZ-Bar Skull Crusher'] },
@@ -40,7 +40,7 @@ const REGELS = [
   { match: /dips.*tri|bench dips|diamond/, opties: ['Dips (Triceps Focus)', 'Close-Grip Bench Press', 'Cable Pushdown (Rope)'] },
 
   // ── Borst ──
-  { match: /(incline|low-to-high|low to high).*(fly|flies|crossover)/, opties: ['Incline Cable Fly', 'Low-to-High Cable Fly', 'Incline Dumbbell Fly', 'Seated Incline Cable Fly'] },
+  { match: /(incline|low-to-high|low to high).*(fly|flies|crossover)/, opties: ['Incline Cable Flies', 'Low-to-High Cable Fly', 'Incline Dumbbell Fly', 'Seated Incline Cable Fly'] },
   { match: /(high-to-low|high to low|decline).*(fly|flies|crossover)/, opties: ['High-to-Low Cable Fly', 'Machine Pec Deck', 'Seated Cable Fly', 'Cable Crossover'] },
   { match: /pec deck|chest fly|machine fly|crossover|cable fly|dumbbell fly|seated cable fly|squeeze press|svend/, opties: ['Machine Pec Deck', 'Seated Cable Fly', 'Cable Crossover', 'Flat Dumbbell Fly'] },
   { match: /incline/, opties: ['Incline Dumbbell Press', 'Incline Smith Machine Bench Press', 'Incline Machine Chest Press', 'Low-Incline Barbell Bench Press', 'Incline Barbell Bench Press'] },
@@ -51,8 +51,8 @@ const REGELS = [
 
   // ── Rug ──
   { match: /straight.?arm|pullover/, opties: ['Straight-Arm Pulldown (Rope)', 'Cable Pullovers', 'Dumbbell Pullover'] },
-  { match: /single.?arm.*(lat )?pull(down)?|single arm lat pull/, opties: ['Lat Pulldown (Close Grip)', 'Single Arm Cable Row', 'Lat Pulldown'] },
-  { match: /pulldown|pull-?ups?|chin-?ups?|chin assist/, opties: ['Lat Pulldown', 'Single Arm Lat Pulldown', 'Lat Pulldown (Close Grip)', 'Pull-Ups'] },
+  { match: /single.?arm.*(lat )?pull(down)?|single arm lat pull/, opties: ['Close-Grip Lat Pulldown', 'Single Arm Cable Row', 'Lat Pulldown'] },
+  { match: /pulldown|pull-?ups?|chin-?ups?|chin assist/, opties: ['Lat Pulldown', 'Single Arm Lat Pulldown', 'Close-Grip Lat Pulldown', 'Pull-Ups'] },
   { match: /chest supported.*row|machine row|t-bar row/, opties: ['Chest Supported Machine Row', 'Seated Cable Row (Close Grip)', 'T-Bar Row (Chest-Supported)', 'Machine Row'] },
   { match: /(single.?arm|dumbbell|kettlebell|meadows).*row|row.*single arm/, opties: ['Single Arm Machine Row', 'Single Arm Cable Row', 'Chest Supported Machine Row'] },
   { match: /barbell.*row|bent.?over row|pendlay|yates/, opties: ['T-Bar Row (Chest-Supported)', 'Chest Supported Machine Row', 'Seated Cable Row (Wide Grip)'] },
@@ -63,12 +63,12 @@ const REGELS = [
   { match: /leg press calf/, opties: ['Standing Calf Raise', 'Seated Calf Raise'] },
   { match: /seated calf/, opties: ['Seated Calf Raise', 'Standing Calf Raise', 'Leg Press Calf Raise'] },
   { match: /calf/, opties: ['Standing Calf Raise', 'Leg Press Calf Raise', 'Seated Calf Raise'] },
-  { match: /leg extension|sissy/, opties: ['Leg Extension', 'Sissy Squat', 'Hack Squat', 'Leg Press'] },
+  { match: /leg extension|sissy/, opties: ['Leg Extension', 'Sissy Squat', 'Hack Squat', 'Leg Press (machine)'] },
   { match: /hip thrust|glute bridge|frog pump|pull-through/, opties: ['Hip Thrust', 'Glute Bridge', 'B-Stance Hip Thrust', 'Cable Pull-Through'] },
   { match: /split squat|lunge|step-?ups?/, opties: ['Bulgarian Split Squat', 'Walking Lunges', 'Reverse Lunges', 'Leg Press (Single Leg)'] },
-  { match: /hack|pend[ua]l|smith.*squat/, opties: ['Hack Squat', 'Leg Press', 'Smith Machine Squat', 'Barbell Front Squat'] },
-  { match: /goblet/, opties: ['Leg Press', 'Bulgarian Split Squat', 'Hack Squat'] },
-  { match: /squat|sqaut/, opties: ['Hack Squat', 'Smith Machine Squat', 'Leg Press', 'Barbell Front Squat'] },
+  { match: /hack|pend[ua]l|smith.*squat/, opties: ['Hack Squat', 'Leg Press (machine)', 'Smith Machine Squat', 'Barbell Front Squat'] },
+  { match: /goblet/, opties: ['Leg Press (machine)', 'Bulgarian Split Squat', 'Hack Squat'] },
+  { match: /squat|sqaut/, opties: ['Hack Squat', 'Smith Machine Squat', 'Leg Press (machine)', 'Barbell Front Squat'] },
   { match: /leg press/, opties: ['Hack Squat', 'Leg Press (Single Leg)', 'Smith Machine Squat'] },
 
   // ── Buik ──
