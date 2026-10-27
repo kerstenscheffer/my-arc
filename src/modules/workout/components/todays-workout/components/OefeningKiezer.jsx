@@ -6,7 +6,7 @@
 // rij. Alles uit src/ui/tokens volgens DESIGN-CONTRACT.md.
 import { useEffect, useState } from 'react'
 import { createPortal } from '../../../../../client/paginaPortal'
-import { X, Search } from 'lucide-react'
+import { X, Search, ArrowRight, Dumbbell } from 'lucide-react'
 import { colors, radius, space, overlay, gradientImage } from '../../../../../ui/tokens'
 import { getFallbackImage } from '../../../utils/oefeningFoto'
 import { fotoVoor, spierLabel, materiaalLabel } from '../../../utils/oefeningLabels'
@@ -192,6 +192,44 @@ export function HuidigeOefening({ ex, ondertitel }) {
           {ex.name}
         </div>
         {ondertitel && <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{ondertitel}</div>}
+      </div>
+    </div>
+  )
+}
+
+// Oud -> nieuw in twee cirkels, zoals het wisselvenster van de maaltijden
+// (27 okt 2026). Links wat je wisselt, rechts de aangetikte vervanger die
+// erin popt; nog niets gekozen = stippellijn.
+export function WisselCirkels({ oud, oudOnder, nieuw }) {
+  const cirkel = { width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', background: colors.surfaceHover, border: '1px solid rgba(255,255,255,0.12)', boxSizing: 'border-box' }
+  const naam = { fontSize: 13, fontWeight: 800, color: colors.textPrimary, marginTop: space[2], maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+  const onder = { fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginTop: 2, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+  const kant = { flex: '0 1 42%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }
+  const nieuwOnder = nieuw ? [spierLabel(nieuw.primair_spieren), materiaalLabel(nieuw.equipment)].filter(Boolean).join(' · ') : ''
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 6, padding: `${space[1]}px 0 ${space[2]}px` }}>
+      <style>{'@keyframes okPopIn { 0% { opacity: 0; transform: scale(0.4) } 100% { opacity: 1; transform: scale(1) } }'}</style>
+      <div style={kant}>
+        <img src={fotoVoor(oud)} alt="" style={{ ...cirkel, opacity: 0.6 }} onError={e => { e.currentTarget.style.visibility = 'hidden' }} />
+        <div style={naam}>{oud?.name}</div>
+        {oudOnder && <div style={onder}>{oudOnder}</div>}
+      </div>
+      <div style={{ height: 64, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <ArrowRight size={20} strokeWidth={2.8} color="#fff" />
+      </div>
+      <div style={kant}>
+        {nieuw ? (
+          <div key={nieuw.name} style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'okPopIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
+            <img src={fotoVoor(nieuw)} alt="" style={cirkel} onError={e => { e.currentTarget.style.visibility = 'hidden' }} />
+            <div style={naam}>{nieuw.name}</div>
+            {nieuwOnder && <div style={onder}>{nieuwOnder}</div>}
+          </div>
+        ) : (<>
+          <div style={{ ...cirkel, border: '1.5px dashed rgba(255,255,255,0.35)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)' }}>
+            <Dumbbell size={22} strokeWidth={2} />
+          </div>
+          <div style={{ ...onder, marginTop: space[2] }}>Kies hieronder</div>
+        </>)}
       </div>
     </div>
   )

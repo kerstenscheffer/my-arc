@@ -11,7 +11,7 @@ import Keuze from '../../../../meal-plan/components/Keuze'
 import { colors, radius, space, shadow } from '../../../../../ui/tokens'
 import {
   KiezerSchil, ZoekVeld, FilterBalk, FilterStreep, OefeningRij, LaadRijen,
-  EigenOefeningKnop, HuidigeOefening,
+  EigenOefeningKnop, WisselCirkels,
 } from './OefeningKiezer'
 import { spierLabel, materiaalLabel } from '../../../utils/oefeningLabels'
 import { coachSuggesties, normNaam } from '../../../utils/coachSwaps'
@@ -159,6 +159,8 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
   const [selectedType, setSelectedType] = useState(null)
   // Welke rij staat open (Deze week / Altijd)?
   const [openRij, setOpenRij] = useState(null)
+  // De opengetikte vervanger: popt rechts in de cirkel bovenin.
+  const [gekozenAlt, setGekozenAlt] = useState(null)
   const [media, setMedia] = useState(() => new Map())
 
   useEffect(() => {
@@ -424,7 +426,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
           ex={alt}
           actief={open}
           uit={swapping}
-          onClick={() => setOpenRij(open ? null : sleutel)}
+          onClick={() => { setOpenRij(open ? null : sleutel); setGekozenAlt(open ? null : alt) }}
           rechts={<ChevronDown size={20} strokeWidth={2.6} color={open ? colors.textPrimary : colors.textMuted}
             style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
         />
@@ -456,7 +458,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, week
         onClose={onClose}
         isMobile={isMobile}
         kop={<>
-          <HuidigeOefening ex={huidig} ondertitel={ondertitel} />
+          <WisselCirkels oud={huidig} oudOnder={ondertitel} nieuw={gekozenAlt} />
           <ZoekVeld waarde={searchQuery} zet={setSearchQuery} placeholder="Zoek een vervanger" />
           <FilterBalk>
             <Keuze waarde={selectedMuscle || 'all'} zet={(v) => setSelectedMuscle(v === 'all' ? null : v)} isMobile={isMobile}
