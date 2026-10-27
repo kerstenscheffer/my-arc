@@ -1,7 +1,7 @@
 // src/client/ClientDashboard.jsx - CLEAN VERSION v2.0
 // ✅ ONLY STYLING CHANGED - All logic, state, routing, auth IDENTICAL
 import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
-import PaginaVangnet from '../ui/PaginaVangnet'
+import PaginaVangnet, { foutContext } from '../ui/PaginaVangnet'
 import lazy from '../lazyMetHerlaad'
 import LaadScherm from '../components/LaadScherm'
 import ruimOpslagOp from '../utils/opruimenOpslag'
@@ -91,6 +91,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   // pagina opnieuw op, met laadscherm en al (Kersten, 21 okt 2026).
   const bezocht = useRef(new Set())
   bezocht.current.add(currentView)
+  // Voor fouten buiten een pagina (klik, laden): waar was de klant?
+  foutContext.pagina = currentView
   const getoond = useRef(new Set(['home']))
   const scrollPerPagina = useRef({})
   const zichtbarePagina = useRef(currentView)
@@ -142,6 +144,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   }, [currentView])
   const [user, setUser] = useState(null)
   const [client, setClient] = useState(null)
+  foutContext.clientId = client?.id || null
   // Account op slot (coaching gestopt): de klant ziet alleen het slotscherm.
   const [opSlot, setOpSlot] = useState(false)
   const [schema, setSchema] = useState(null)

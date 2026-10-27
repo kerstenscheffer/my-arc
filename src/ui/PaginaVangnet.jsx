@@ -16,7 +16,12 @@ import { APP_VERSIE } from '../modules/app-update/appVersie'
 // Eén melding per fout per sessie; een lus van dezelfde fout vult de tabel niet.
 const gemeld = new Set()
 
-function meldFout(fout, info, pagina, clientId) {
+// Waar je bent en wie je bent, voor fouten die niet uit een pagina komen
+// (klik, laden). ClientDashboard en CoachHub zetten dit bij elke wissel.
+export const foutContext = { pagina: null, clientId: null }
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function meldFout(fout, info, pagina, clientId) {
   const melding = String(fout?.message || fout || 'Onbekende fout').slice(0, 1000)
   const sleutel = `${pagina}|${melding}`
   if (gemeld.has(sleutel)) return
@@ -70,4 +75,23 @@ export default class PaginaVangnet extends Component {
       </div>
     )
   }
+}
+
+// Fouten buiten het tekenen: in een klik, een timer of een mislukte belofte.
+// Die geven geen foutscherm (de app draait door), maar het knopje deed dan
+// niets. Ook die willen we zien. Ruis eruit: browsermeldingen zonder inhoud
+// en de bekende ResizeObserver-melding.
+let geinstalleerd = false
+// eslint-disable-next-line react-refresh/only-export-components
+export function installeerFoutvanger() {
+  if (geinstalleerd || typeof window === 'undefined') return
+  geinstalleerd = true
+  const ruis = (m) => !m || m === 'Script error.' || /ResizeObserver loop/i.test(m)
+  const meld = (fout, soort) => {
+    const melding = String(fout?.message || fout || '')
+    if (ruis(melding)) return
+    meldFout(fout, null, `${soort}:${foutContext.pagina || window.location.pathname}`, foutContext.clientId)
+  }
+  window.addEventListener('error', (e) => meld(e.error || e.message, 'los'))
+  window.addEventListener('unhandledrejection', (e) => meld(e.reason, 'belofte'))
 }

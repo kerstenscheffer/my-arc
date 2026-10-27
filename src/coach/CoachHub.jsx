@@ -1,6 +1,7 @@
 // src/coach/CoachHub.jsx - REFACTOR v3.0
 // Gold Theme | Top Tabs | Hash Routing | Categorized Dropdown | Compact
 
+import PaginaVangnet, { foutContext } from '../ui/PaginaVangnet'
 import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
 import lazy from '../lazyMetHerlaad'
 import { createPortal } from '../client/paginaPortal'
@@ -499,7 +500,13 @@ export default function CoachHub() {
   // Geen hub-brede spinner meer: het tabblad staat er meteen en laadt zijn
   // eigen blokken (zie src/ui/Skelet.jsx). De lijsten uit initializeHub
   // (klanten, schema's, templates) vullen zich terwijl je al kijkt.
-  const renderTabContent = (tabId = activeTab) => {
+  // Elk tabblad in een vangnet: een fout toont daar een melding i.p.v. een
+  // wit scherm, en gaat naar app_fouten.
+  foutContext.pagina = `coach:${activeTab}`
+  const renderTabContent = (tabId = activeTab) => (
+    <PaginaVangnet key={tabId} pagina={`coach:${tabId}`}>{renderTabInhoud(tabId)}</PaginaVangnet>
+  )
+  const renderTabInhoud = (tabId) => {
     switch (tabId) {
       case 'command':
         return (

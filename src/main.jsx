@@ -8,6 +8,7 @@ import './ui/tokens.css'   // design-contract tokens (goud), additief — laadt 
 import App from './App.jsx'
 import LaadScherm from './components/LaadScherm'
 import { installeerTerugknop } from './terugknop'
+import PaginaVangnet, { installeerFoutvanger } from './ui/PaginaVangnet'
 
 // ── Service-worker kill-switch ──────────────────────────────────────────────
 // De oude PWA-service-worker (public/service-worker.js) veroorzaakte spontane
@@ -26,6 +27,8 @@ if ('serviceWorker' in navigator) {
 }
 
 installeerTerugknop()
+// Fouten buiten het tekenen (klik, laden) ook naar app_fouten.
+installeerFoutvanger()
 
 // Live updates in de native app (zie modules/app-update/liveUpdate.js). Na de
 // eerste render, zodat het opstarten er niet op wacht.
@@ -43,9 +46,14 @@ const root = createRoot(container);
 // nooit de coachcode op en andersom, en de marketingpagina's zitten niet in
 // de app-bundel. LaadScherm is wat je ziet terwijl zo'n stuk binnenkomt.
 root.render(
-  <Suspense fallback={<LaadScherm />}>
-    <App />
-  </Suspense>
+  // Buitenste vangnet: crasht iets boven de pagina's (inloggen, de schil van
+  // het dashboard), dan een melding i.p.v. een wit scherm, en de fout in
+  // app_fouten.
+  <PaginaVangnet pagina="app">
+    <Suspense fallback={<LaadScherm />}>
+      <App />
+    </Suspense>
+  </PaginaVangnet>
 );
 
 // TIJDELIJK UITGESCHAKELD - Service worker veroorzaakt mounting issues
