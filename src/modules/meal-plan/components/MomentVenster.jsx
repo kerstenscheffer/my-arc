@@ -8,7 +8,7 @@
 // Bewaren kan voor alleen deze weekdag of overal waar deze maaltijd staat.
 // Bij een pre-workout geen tijd: die volgt de training.
 import React, { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, ChevronDown, Check } from 'lucide-react'
 
 // Zelfde waarden als de coach opslaat; op de knop een korte naam.
 const LABEL_OPTIES = [
@@ -24,13 +24,14 @@ const schuif = (tijd, min) => {
 }
 
 export default function MomentVenster({ label, tijd, metTijd = true, dagNaam, pos, bezig = false, onClose, onSave }) {
-  const BREED = 300, HOOG = 190
+  const BREED = 280, HOOG = 170
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
   const left = Math.max(8, Math.min((pos?.left || 8), vw - BREED - 8))
   const top = (pos?.top || 8) + HOOG > vh - 8 ? Math.max(8, (pos?.boven || 0) - HOOG - 6) : (pos?.top || 8)
   const [l, setL] = useState(label || '')
   const [t, setT] = useState(tijd || '')
+  const [lijstOpen, setLijstOpen] = useState(false)
   const opties = LABEL_OPTIES
   const stap = {
     width: 32, height: 32, padding: 0, borderRadius: 9, border: 'none', background: 'rgba(255,255,255,0.07)',
@@ -60,19 +61,38 @@ export default function MomentVenster({ label, tijd, metTijd = true, dagNaam, po
             <X size={17} strokeWidth={2.6} />
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 12 }}>
-          {opties.map(o => {
-            const aan = String(l).toLowerCase() === o.id.toLowerCase()
-            return (
-              <button key={o.id} onClick={() => setL(o.id)} style={{
-                height: 32, padding: 0, borderRadius: 9, border: 'none', minWidth: 0,
-                background: aan ? '#fff' : 'rgba(255,255,255,0.07)', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
-                fontSize: '0.68rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>{o.kort}</button>
-            )
-          })}
+        {/* Soort: mini-dropdown op één regel, net als de tijd eronder. */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={kop}>Soort</span>
+          <button onClick={() => setLijstOpen(v => !v)} style={{
+            display: 'flex', alignItems: 'center', gap: 5, height: 32, padding: '0 0.7rem', borderRadius: 9, border: 'none',
+            background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            {opties.find(o => o.id.toLowerCase() === String(l).toLowerCase())?.kort || l || 'Kies'}
+            <ChevronDown size={14} strokeWidth={3} style={{ transition: 'transform 0.15s ease', transform: lijstOpen ? 'rotate(180deg)' : 'none' }} />
+          </button>
+          {lijstOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 2, minWidth: 150,
+              background: '#1c1c1c', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: 4,
+              boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+            }}>
+              {opties.map(o => {
+                const aan = String(l).toLowerCase() === o.id.toLowerCase()
+                return (
+                  <button key={o.id} onClick={() => { setL(o.id); setLijstOpen(false) }} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                    height: 34, padding: '0 0.6rem', borderRadius: 7, border: 'none',
+                    background: aan ? 'rgba(255,255,255,0.1)' : 'transparent', color: '#fff',
+                    fontSize: '0.84rem', fontWeight: aan ? 900 : 700, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+                  }}>
+                    {o.kort}{aan && <Check size={14} strokeWidth={3} />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
         {metTijd ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
