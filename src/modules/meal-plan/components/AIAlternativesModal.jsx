@@ -4,7 +4,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import useZoekLog from './food-log/useZoekLog'
 import MealCard from './day-schedule/MealCard'
-import Keuze from './Keuze'
 import { foodImageFallback, resolveFoodImage } from '../foodImageFallback'
 import { niveauVoorDoel, wisselNiveauVoorDoel } from '../DayTemplateService'
 import { stukVan } from './food-log/portionPresets'
@@ -85,7 +84,11 @@ export default function AIAlternativesModal({
   // gesorteerd is, dit zegt wat er in mag.
   const [maxKcal, setMaxKcal] = useState('')
   const [minEiwit, setMinEiwit] = useState('')
-  const [toonFilter, setToonFilter] = useState(false)
+  // Filters achter één knop (27 okt 2026): in beeld alleen het moment, de
+  // rest in een blad. Wat afwijkt van de standaard staat als chipje in beeld.
+  const [filterOpen, setFilterOpen] = useState(false)
+  // Waar het venster mee opent (Aanraders, anders Van je coach, anders alles).
+  const [standaardBron, setStandaardBron] = useState('alles')
   // Het caloriedoel bepaalt welk dagmenu-niveau je ziet. Het zit niet altijd
   // op het client-object dat dit venster binnenkrijgt, dus halen we het er zo
   // nodig zelf bij — anders valt het hele niveau weg en blijft er van de
@@ -161,15 +164,23 @@ export default function AIAlternativesModal({
     { id: 'db', label: 'Maaltijden-database' },
   ]
 
+  // Vier in plaats van zeven: meer kcal, zelfde eiwit en minder eiwit koos
+  // bijna niemand (de sorteringen zelf blijven bestaan, zie hieronder).
   const sorteerOpties = [
     { id: 'smart', label: 'Beste match' },
-    { id: 'same-cal', label: 'Zelfde kcal' },
-    { id: 'more-cal', label: 'Meer kcal' },
     { id: 'less-cal', label: 'Minder kcal' },
-    { id: 'same-protein', label: 'Zelfde eiwit' },
     { id: 'more-protein', label: 'Meer eiwit' },
-    { id: 'less-protein', label: 'Minder eiwit' },
+    { id: 'same-cal', label: 'Zelfde kcal' },
   ]
+
+  // Wat staat er anders dan standaard? Die worden chipjes met een kruisje.
+  const afwijkingen = [
+    bron !== standaardBron && { id: 'bron', label: bronOpties.find(o => o.id === bron)?.label || bron, terug: () => setBron(standaardBron) },
+    sortering !== 'smart' && { id: 'sort', label: sorteerOpties.find(o => o.id === sortering)?.label || 'Volgorde', terug: () => setSortering('smart') },
+    maxKcal && { id: 'kcal', label: `max ${maxKcal} kcal`, terug: () => setMaxKcal('') },
+    minEiwit && { id: 'eiwit', label: `min ${minEiwit}g eiwit`, terug: () => setMinEiwit('') },
+  ].filter(Boolean)
+  const allesTonen = () => { setMoment('alles'); setBron('alles'); setSortering('smart'); setMaxKcal(''); setMinEiwit('') }
 
   useEffect(() => {
     if ((isOpen || embedded) && currentMeal) {
@@ -180,6 +191,7 @@ export default function AIAlternativesModal({
       setSearchTerm('')
       setMoment('alles')
       setBron('alles')
+      setStandaardBron('alles')
       setSortering('smart')
     }
   }, [isOpen, currentMeal])
@@ -338,8 +350,9 @@ export default function AIAlternativesModal({
       setMoment(slotKey)
       // Wisselopties voor dit moment gaan voor: dat is waar je voor wisselt.
       // Anders wat de coach voor dit slot heeft ingesteld.
-      if ((wissel[basisMoment(slotKey)] || []).length > 0) setBron('wissel')
-      else if (curated.length > 0) setBron('coach')
+      const startBron = (wissel[basisMoment(slotKey)] || []).length > 0 ? 'wissel' : curated.length > 0 ? 'coach' : 'alles'
+      setBron(startBron)
+      setStandaardBron(startBron)
     } catch (error) {
       console.error('Failed to load alternatives:', error)
     } finally {
@@ -382,7 +395,6 @@ export default function AIAlternativesModal({
     return uit
   }
 
-  const filterActief = !!(maxKcal || minEiwit)
 
   const getFilteredMeals = () => {
     const currentCal = currentMeal?.calories || 0
@@ -853,88 +865,54 @@ export default function AIAlternativesModal({
           {/* Drie keuzes: welk moment, waar zoeken, welke volgorde. Losse
               tekst met een pijltje, gescheiden door een lijntje — geen vakken,
               die maakten van de kop een formulier. */}
-          {/* Moment als pilletjes (zoals het logscherm); de gekozen wit. */}
-          <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', margin: isMobile ? '0 -1rem 0.35rem' : '0 -1.5rem 0.4rem', padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-            {momentOpties.map(o => {
-              const aan = moment === o.id
-              return (
-                <button key={o.id} onClick={() => setMoment(o.id)} style={{
-                  flexShrink: 0, height: 32, padding: '0 0.8rem', borderRadius: 999, border: 'none',
-                  background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
-                  fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>{o.id === 'alles' ? 'Alles' : o.label}</button>
-              )
-            })}
-          </div>
-          {/* Waar zoeken en volgorde: twee losse keuzes op één regel. */}
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Keuze waarde={bron} opties={bronOpties} zet={setBron} isMobile={isMobile} />
-            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-            <Keuze waarde={sortering} opties={sorteerOpties} zet={setSortering} isMobile={isMobile} uitlijning="rechts" />
-          </div>
-
-          {/* Grenzen. Dicht, want de meeste keren wissel je zonder na te
-              denken over getallen; wie het wel wil, tikt het open. */}
-          <div style={{ marginTop: 8 }}>
-            <button
-              onClick={() => setToonFilter(v => !v)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: 'transparent', border: 'none', padding: 0,
-                color: filterActief ? '#fff' : 'rgba(255,255,255,0.45)',
-                fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 800,
-                fontFamily: 'inherit', cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <SlidersHorizontal size={14} strokeWidth={2.6} />
-              {filterActief
-                ? [
-                  maxKcal ? `max ${maxKcal} kcal` : null,
-                  minEiwit ? `min ${minEiwit}g eiwit` : null,
-                ].filter(Boolean).join(' · ')
-                : 'Grenzen'}
+          {/* Moment als pilletjes (de gekozen wit) en één filterknop. */}
+          <div style={{ display: 'flex', alignItems: 'center', margin: isMobile ? '0 -1rem' : '0 -1.5rem' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', padding: isMobile ? '0 0 0 1rem' : '0 0 0 1.5rem' }}>
+              {momentOpties.map(o => {
+                const aan = moment === o.id
+                return (
+                  <button key={o.id} onClick={() => setMoment(o.id)} style={{
+                    flexShrink: 0, height: 32, padding: '0 0.8rem', borderRadius: 999, border: 'none',
+                    background: aan ? '#fff' : 'transparent', color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                    fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>{o.id === 'alles' ? 'Alles' : o.label}</button>
+                )
+              })}
+            </div>
+            <button onClick={() => setFilterOpen(true)} aria-label="Filter" style={{
+              position: 'relative', flexShrink: 0, width: 44, height: 36, padding: 0,
+              marginRight: isMobile ? '0.5rem' : '1rem', marginLeft: 4,
+              background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <SlidersHorizontal size={19} strokeWidth={2.6} />
+              {afwijkingen.length > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 6, minWidth: 16, height: 16, borderRadius: 8, padding: '0 4px',
+                  background: '#fff', color: '#0a0a0a', fontSize: '0.62rem', fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
+                }}>{afwijkingen.length}</span>
+              )}
             </button>
-
-            {toonFilter && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                {[
-                  { waarde: maxKcal, zet: setMaxKcal, plaats: 'max kcal' },
-                  { waarde: minEiwit, zet: setMinEiwit, plaats: 'min eiwit' },
-                ].map(veld => (
-                  <input
-                    key={veld.plaats}
-                    type="number"
-                    inputMode="numeric"
-                    value={veld.waarde}
-                    onChange={e => veld.zet(e.target.value)}
-                    placeholder={veld.plaats}
-                    style={{
-                      width: 110, minHeight: 38, padding: '0 0.7rem',
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
-                      color: '#fff', fontSize: '0.85rem', fontWeight: 700,
-                      fontFamily: 'inherit', outline: 'none',
-                    }}
-                  />
-                ))}
-                {filterActief && (
-                  <button
-                    onClick={() => { setMaxKcal(''); setMinEiwit('') }}
-                    style={{
-                      minHeight: 38, padding: '0 0.8rem', borderRadius: 10,
-                      background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-                      color: 'rgba(255,255,255,0.6)', fontSize: '0.82rem', fontWeight: 800,
-                      fontFamily: 'inherit', cursor: 'pointer',
-                    }}
-                  >
-                    Wissen
-                  </button>
-                )}
-              </div>
-            )}
           </div>
+
+          {/* Wat er anders staat dan standaard, met een kruisje om terug te zetten. */}
+          {afwijkingen.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {afwijkingen.map(a => (
+                <button key={a.id} onClick={a.terug} style={{
+                  display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 0.55rem 0 0.75rem',
+                  borderRadius: 999, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff',
+                  fontSize: '0.74rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  {a.label} <X size={13} strokeWidth={3} />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Meal List ── */}
@@ -958,8 +936,13 @@ export default function AIAlternativesModal({
                 animation: 'altSpin 0.8s linear infinite'
               }} />
             </div>
-          ) : filteredMeals.length > 0 ? (
-            filteredMeals.map((meal, idx) => (
+          ) : filteredMeals.length > 0 ? (<>
+            {searchTerm.trim() && (
+              <div style={{ padding: `0.6rem ${isMobile ? '1rem' : '1.5rem'} 0.2rem`, fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
+                Gezocht in alle maaltijden
+              </div>
+            )}
+            {filteredMeals.map((meal, idx) => (
               <React.Fragment key={meal.id || idx}>
               {bron === 'wissel' && sortering === 'smart' && !searchTerm && groepVan(meal)
                 && groepVan(meal) !== groepVan(filteredMeals[idx - 1]) && (
@@ -983,8 +966,17 @@ export default function AIAlternativesModal({
                 onInfo={() => openInfo(meal)}
               />
               </React.Fragment>
-            ))
-          ) : (
+            ))}
+            {/* Vangnet: weinig uitkomst door filters? Eén tik en alles staat er. */}
+            {!searchTerm.trim() && filteredMeals.length < 6 && (moment !== 'alles' || afwijkingen.length > 0 || bron !== 'alles') && (
+              <div style={{ textAlign: 'center', padding: '1rem 1rem 1.25rem' }}>
+                <button onClick={allesTonen} style={{
+                  background: 'none', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 900,
+                  fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3,
+                }}>Niet gevonden wat je zoekt? Toon alles</button>
+              </div>
+            )}
+          </>) : (
             <div style={{ textAlign: 'center', padding: '3rem 1.25rem' }}>
               <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: '0.35rem' }}>
                 Geen resultaten
@@ -1009,7 +1001,7 @@ export default function AIAlternativesModal({
               </div>
               {(moment !== 'alles' || bron !== 'alles') && (
                 <button
-                  onClick={() => { setMoment('alles'); setBron('alles') }}
+                  onClick={allesTonen}
                   style={{
                     marginTop: '1rem', padding: '0.55rem 1rem',
                     background: 'transparent', border: '1.5px solid rgba(255,255,255,0.3)',
@@ -1184,6 +1176,58 @@ export default function AIAlternativesModal({
               </button>
             ))}
           </>
+        )}
+      </BladModal>
+
+      {/* Filterblad: wat je ziet (bron), in welke volgorde, en grenzen. */}
+      <BladModal open={filterOpen} titel="Filter" onClose={() => setFilterOpen(false)} zIndex={10600}>
+        {[
+          { kop: 'Toon', opties: bronOpties, waarde: bron, zet: setBron },
+          { kop: 'Volgorde', opties: sorteerOpties, waarde: sortering, zet: setSortering },
+        ].map(blok => (
+          <div key={blok.kop} style={{ marginBottom: '1.1rem' }}>
+            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{blok.kop}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {blok.opties.map(o => {
+                const aan = blok.waarde === o.id
+                return (
+                  <button key={o.id} onClick={() => blok.zet(o.id)} style={{
+                    height: 34, padding: '0 0.85rem', borderRadius: 999,
+                    background: aan ? '#fff' : 'rgba(255,255,255,0.06)', border: 'none',
+                    color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
+                    fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>{o.id === 'alles' ? 'Alles' : o.label}</button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Grenzen</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: '1.2rem' }}>
+          {[
+            { waarde: maxKcal, zet: setMaxKcal, plaats: 'max kcal' },
+            { waarde: minEiwit, zet: setMinEiwit, plaats: 'min eiwit (g)' },
+          ].map(veld => (
+            <input key={veld.plaats} type="number" inputMode="numeric" value={veld.waarde}
+              onChange={e => veld.zet(e.target.value)} placeholder={veld.plaats}
+              style={{
+                flex: 1, minWidth: 0, height: 42, padding: '0 0.8rem', background: 'rgba(255,255,255,0.06)',
+                border: 'none', borderRadius: 12, color: '#fff', fontSize: '0.88rem', fontWeight: 700,
+                fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+              }} />
+          ))}
+        </div>
+        <button onClick={() => setFilterOpen(false)} style={{
+          width: '100%', minHeight: 50, borderRadius: 12, border: 'none', background: '#fff', color: '#0a0a0a',
+          fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>Toon {filteredMeals.length} maaltijden</button>
+        {(afwijkingen.length > 0 || moment !== 'alles') && (
+          <button onClick={() => { allesTonen(); setFilterOpen(false) }} style={{
+            width: '100%', minHeight: 40, marginTop: 6, background: 'none', border: 'none',
+            color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+          }}>Alles terugzetten</button>
         )}
       </BladModal>
 
