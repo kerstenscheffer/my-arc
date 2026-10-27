@@ -238,9 +238,27 @@ export default function PhotoCompareModal({ db, client, isMobile, onClose }) {
     const naam = `${(client?.first_name || 'client')}-${angle}-${(left.photo_date || '').slice(0, 10)}-vs-${(right.photo_date || '').slice(0, 10)}`.replace(/[^\w.-]+/g, '-').toLowerCase()
     try {
       if (beeld !== 'klaar') throw new Error('nog niet getekend')
+      const bestandsnaam = `myarc-transformatie-${naam}.png`
+      // Eerst het deelvenster van de telefoon ("Bewaar afbeelding"): een
+      // downloadlink doet in de iPhone-app niets (Kersten, 27 okt 2026).
+      // Zelfde aanpak als de pump-deelknop.
+      const blob = await new Promise(res => canvasRef.current.toBlob(res, 'image/png'))
+      if (blob && typeof File !== 'undefined') {
+        const file = new File([blob], bestandsnaam, { type: 'image/png' })
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: 'Mijn transformatie' })
+            return
+          } catch (err) {
+            if (err?.name === 'AbortError') return // zelf weggeklikt
+            console.warn('Delen mislukt, val terug op downloaden:', err)
+          }
+        }
+      }
+      // Computer en browsers zonder delen: gewoon downloaden.
       const url = canvasRef.current.toDataURL('image/png')
       const link = document.createElement('a')
-      link.href = url; link.download = `myarc-transformatie-${naam}.png`
+      link.href = url; link.download = bestandsnaam
       document.body.appendChild(link); link.click(); link.remove()
     } catch (e) {
       // Meestal CORS op de foto-URL. Dan los openen, zodat er altijd iets gebeurt.
