@@ -19,8 +19,16 @@
 // `dagenMetMaaltijd(maandag | null)`: optioneel, geeft (async) de dag-keys
 // terug waar deze maaltijd op dit moment staat; null = het vaste weekplan.
 // Die dagen krijgen een stip, zodat je ziet waar hij terugkomt.
+//
+// `trainingsdagen` (pre-workout): alleen die weekdagen zijn te kiezen; een
+// pre-workout op een rustdag of eenmalig op een rustdag heeft geen betekenis
+// (en deed eenmalig ook niets). `vastAltijd`: bij "Altijd" staan de
+// trainingsdagen vast aan, je kiest niet zelf: de pre-workout volgt de
+// training, ook als die later verschuift.
+//
+// `fotoNaar`: bij wisselen twee foto's, oud -> nieuw.
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Repeat, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Repeat, CalendarDays, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { lokaleIso } from '../utils/dagVenster'
 
 const DAGEN = [
@@ -47,8 +55,10 @@ export default function DagenKiezer({
   titel, subtitel, datum, dagKey, slot, bezig = false, fout = null,
   isMobile, onKies, onTerug, terugTekst = '← Terug', onClose, extra = null,
   vraag = 'Waar geldt deze wijziging?', knopTekst = 'Opslaan', gevaar = false,
-  volScherm = false, foto = null, dagenMetMaaltijd = null,
+  volScherm = false, foto = null, fotoNaar = null, dagenMetMaaltijd = null,
+  trainingsdagen = null, vastAltijd = false,
 }) {
+  const mag = (key) => !trainingsdagen || trainingsdagen.includes(key)
   const bekeken = datum ? new Date(datum) : new Date()
   const ditMaandag = maandagVan(new Date())
   // Welke week bekijkt de klant nu? Die staat voorgeselecteerd bij "Alleen".
@@ -58,7 +68,10 @@ export default function DagenKiezer({
   // doortikt, haalt anders de maaltijd voor altijd uit het weekplan.
   const [modus, setModus] = useState(gevaar ? 'week' : 'altijd')
   const [week, setWeek] = useState(startWeek)
-  const [gekozen, setGekozen] = useState(() => new Set(dagKey ? [dagKey] : []))
+  const [gekozen, setGekozenRuw] = useState(() => new Set(dagKey && mag(dagKey) ? [dagKey] : []))
+  const setGekozen = (v) => setGekozenRuw(prev => new Set([...(typeof v === 'function' ? v(prev) : v)].filter(mag)))
+  const vast = vastAltijd && !!trainingsdagen && modus === 'altijd'
+  const effectief = vast ? new Set(trainingsdagen) : gekozen
 
   const weekMaandag = plus(ditMaandag, week * 7)
   const datumVan = (idx) => plus(weekMaandag, idx)
@@ -75,17 +88,17 @@ export default function DagenKiezer({
   }, [modus, week]) // eslint-disable-line react-hooks/exhaustive-deps
   // "Alle dagen": waar deze maaltijd staat, of zonder die info de hele week.
   // Nog een keer tikken = terug naar alleen de bekeken dag.
-  const doelDagen = aanwezig.size > 0 ? aanwezig : new Set(DAGEN.map(d => d.key))
-  const alleDagenAan = gekozen.size === doelDagen.size && [...doelDagen].every(k => gekozen.has(k))
+  const doelDagen = new Set([...(aanwezig.size > 0 ? aanwezig : DAGEN.map(d => d.key))].filter(mag))
+  const alleDagenAan = doelDagen.size > 0 && gekozen.size === doelDagen.size && [...doelDagen].every(k => gekozen.has(k))
   const zetAlleDagen = () => setGekozen(alleDagenAan ? new Set(dagKey ? [dagKey] : []) : new Set(doelDagen))
 
-  const wissel = (key) => setGekozen(prev => {
+  const wissel = (key) => !vast && mag(key) && setGekozen(prev => {
     const n = new Set(prev)
     if (n.has(key)) n.delete(key); else n.add(key)
     return n
   })
 
-  const lijst = DAGEN.filter(d => gekozen.has(d.key))
+  const lijst = DAGEN.filter(d => effectief.has(d.key))
   const moment = SLOT_KORT[slot] || slot || 'maaltijd'
 
   const effect = useMemo(() => {
@@ -144,17 +157,19 @@ export default function DagenKiezer({
                   aria-label="Volgende week" style={{ ...pijl, opacity: week === 2 ? 0.25 : 1 }}><ChevronRight size={18} strokeWidth={2.8} /></button>
               </div>
             ) : <span />}
-            <button onClick={zetAlleDagen} disabled={bezig} style={{
+            {!vast && doelDagen.size > 1 && <button onClick={zetAlleDagen} disabled={bezig} style={{
               background: 'none', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 900,
               cursor: 'pointer', padding: 0, fontFamily: 'inherit', whiteSpace: 'nowrap',
-            }}>{alleDagenAan ? 'Alleen deze dag' : 'Alle dagen'}</button>
+            }}>{alleDagenAan ? 'Alleen deze dag' : 'Alle dagen'}</button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
             {DAGEN.map((d, i) => {
-              const aan = gekozen.has(d.key)
+              const aan = effectief.has(d.key)
+              const kan = mag(d.key) && !vast
               return (
-                <button key={d.key} onClick={() => wissel(d.key)} disabled={bezig} style={{
-                  padding: '0.55rem 0', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                <button key={d.key} onClick={() => wissel(d.key)} disabled={bezig || !kan} style={{
+                  padding: '0.55rem 0', borderRadius: 10, cursor: kan ? 'pointer' : 'default', fontFamily: 'inherit',
+                  opacity: mag(d.key) ? 1 : 0.25,
                   background: aan ? '#fff' : 'rgba(255,255,255,0.04)',
                   border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.1)'}`,
                   color: aan ? '#000' : 'rgba(255,255,255,0.7)',
@@ -230,7 +245,19 @@ export default function DagenKiezer({
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <div style={{ padding: isMobile ? '1rem 1rem 1rem' : '1.25rem 1.5rem 1.25rem' }}>
               <div style={{ textAlign: 'center', marginBottom: '1.2rem' }}>
-                {foto && (
+                {foto && fotoNaar ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: '0.8rem' }}>
+                    <img src={foto} alt="" style={{
+                      width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', opacity: 0.5,
+                      border: '1px solid rgba(255,255,255,0.12)',
+                    }} />
+                    <ArrowRight size={20} strokeWidth={2.8} color="#fff" />
+                    <img src={fotoNaar} alt="" style={{
+                      width: 84, height: 84, borderRadius: '50%', objectFit: 'cover',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                    }} />
+                  </div>
+                ) : foto && (
                   <img src={foto} alt="" style={{
                     width: 84, height: 84, borderRadius: '50%', objectFit: 'cover',
                     border: '1px solid rgba(255,255,255,0.12)', display: 'block', margin: '0 auto 0.8rem',

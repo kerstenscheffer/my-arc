@@ -110,6 +110,53 @@ export async function zetMaaltijdOpDagen(supabase, planId, dagen, slot, maaltijd
   if (error) throw error
 }
 
+// Pre-workout blijvend wisselen: hij wordt dé pre-workout van het plan, op
+// élke trainingsdag (schuift mee als de training verschuift). Losse
+// pre-workouts per dag in week_structure gaan weg, anders winnen die op hun
+// dag en staat er toch nog de oude (zie de regel in AIMealPlanService,
+// AIDaySchedule en ClientAgendaService). Uitzonderingen (uit_dagen) vervallen:
+// het is een nieuwe keuze.
+export async function zetPreWorkoutOpTrainingsdagen(supabase, planId, maaltijd) {
+  if (!supabase || !planId || !maaltijd) return
+  const { data: plan, error: leesFout } = await supabase
+    .from('client_meal_plans')
+    .select('week_structure, pre_workout_meal')
+    .eq('id', planId)
+    .single()
+  if (leesFout) throw leesFout
+  const week = { ...(plan?.week_structure || {}) }
+  Object.keys(week).forEach(dag => {
+    const dagPlan = week[dag]
+    if (!dagPlan || typeof dagPlan !== 'object' || !(PRE_WORKOUT_SLOT in dagPlan)) return
+    const kopie = { ...dagPlan }
+    delete kopie[PRE_WORKOUT_SLOT]
+    const maaltijden = Object.entries(kopie)
+      .filter(([k, m]) => k !== 'totals' && m && typeof m === 'object' && m.calories)
+      .map(([, m]) => m)
+    kopie.totals = {
+      kcal: maaltijden.reduce((s, m) => s + (m.calories || 0), 0),
+      protein: maaltijden.reduce((s, m) => s + (m.protein || 0), 0),
+      carbs: maaltijden.reduce((s, m) => s + (m.carbs || 0), 0),
+      fat: maaltijden.reduce((s, m) => s + (m.fat || 0), 0),
+    }
+    week[dag] = kopie
+  })
+  const oud = (plan?.pre_workout_meal && typeof plan.pre_workout_meal === 'object') ? plan.pre_workout_meal : {}
+  const nieuw = {
+    ...maaltijd,
+    meal_id: maaltijd.meal_id || maaltijd.id,
+    meal_name: maaltijd.name || maaltijd.meal_name,
+    timing: oud.timing ?? null,
+    display_label: oud.display_label ?? maaltijd.display_label ?? null,
+  }
+  ;['slot', 'timeSlot', 'plannedTime', 'isConsumed', 'consumedAt', 'volgtTraining', 'uit_dagen'].forEach(k => { delete nieuw[k] })
+  const { error } = await supabase
+    .from('client_meal_plans')
+    .update({ week_structure: week, pre_workout_meal: nieuw, updated_at: new Date().toISOString() })
+    .eq('id', planId)
+  if (error) throw error
+}
+
 // Haalt een moment (slot) blijvend uit het weekplan op de gekozen weekdagen.
 // Eén lees- en één schrijfactie; dagtotalen worden opnieuw opgeteld.
 export async function haalMaaltijdWegOpDagen(supabase, planId, dagen, slot) {
@@ -122,10 +169,12 @@ export async function haalMaaltijdWegOpDagen(supabase, planId, dagen, slot) {
   if (leesFout) throw leesFout
   const week = { ...(plan?.week_structure || {}) }
   // De pre-workout van het plan (pre_workout_meal) staat niet per dag in
-  // week_structure; die dagen onthouden we op de maaltijd zelf.
+  // week_structure; die dagen onthouden we op de maaltijd zelf. Altijd beide:
+  // alleen het slot van de dag weghalen liet op een trainingsdag de
+  // plan-pre-workout ervoor in de plaats verschijnen (27 okt 2026).
   const preUit = []
   dagen.forEach(dag => {
-    if (slot === PRE_WORKOUT_SLOT && plan?.pre_workout_meal && !week[dag]?.[slot]) { preUit.push(dag); return }
+    if (slot === PRE_WORKOUT_SLOT && plan?.pre_workout_meal) preUit.push(dag)
     if (!week[dag] || !(slot in week[dag])) return
     const dagPlan = { ...week[dag] }
     delete dagPlan[slot]

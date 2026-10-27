@@ -71,7 +71,8 @@ import AIAlternativesModal from './components/AIAlternativesModal'
 import { resolveFoodImage } from './foodImageFallback'
 import DagenKiezer from './components/DagenKiezer'
 import { weekplanVoorWeek } from './DayTemplateService'
-import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen } from './dagAanpassingen'
+import { zetMaaltijdOpDagen, haalMaaltijdWegOpDagen, zetPreWorkoutOpTrainingsdagen } from './dagAanpassingen'
+import { isTrainingsdag, preWorkoutUitDag, PRE_WORKOUT_SLOT } from './utils/preWorkoutMeal'
 import AIMealInfoModal from './components/AIMealInfoModal'
 import AIFavoritesModal from './components/AIFavoritesModal'
 import AIMealHistoryModal from './components/AIMealHistoryModal'
@@ -500,13 +501,26 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     const week = maandag ? await weekplanVoorWeek(db.supabase, client.id, basis, maandag) : basis
     const id = meal.meal_id || meal.id
     const naam = (meal.name || meal.meal_name || '').trim().toLowerCase()
-    return DAYS_OF_WEEK.map(d => d.key).filter(k => {
-      const m = week?.[k]?.[meal.slot]
+    const zelfde = (m) => {
       if (!m || typeof m !== 'object') return false
       const mid = m.meal_id || m.id
       return id && mid ? String(mid) === String(id) : (m.name || '').trim().toLowerCase() === naam
+    }
+    const planPre = dashboardData?.activePlan?.pre_workout_meal
+    return DAYS_OF_WEEK.map(d => d.key).filter(k => {
+      const m = week?.[k]?.[meal.slot]
+      if (m && typeof m === 'object') return zelfde(m)
+      // Pre-workout van het plan: op trainingsdagen zonder eigen slot.
+      return meal.slot === PRE_WORKOUT_SLOT && zelfde(planPre) && !preWorkoutUitDag(planPre, k)
+        && isTrainingsdag(client?.workout_schedule, k, week?.[k])
     })
   }
+
+  // Pre-workout hoort bij de training: alleen trainingsdagen zijn te kiezen.
+  // Zelfde bron als de tijdlijn en Home (clients.workout_schedule).
+  const trainingsdagenVoor = (meal) => meal?.slot === PRE_WORKOUT_SLOT
+    ? DAYS_OF_WEEK.map(d => d.key).filter(k => isTrainingsdag(client?.workout_schedule, k, dashboardData?.activePlan?.week_structure?.[k]))
+    : null
   const voerVerwijderUit = async (keuze) => {
     if (!verwijderMeal) return
     const slot = verwijderMeal.slot
@@ -537,7 +551,13 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       const snap = { ...nieuw, meal_id: nieuw.id, meal_name: nieuw.name || nieuw.meal_name }
       // Porties van de vorige maaltijd horen niet mee (zie swapMealInWeekStructure).
       ;['original_calories', 'original_protein', 'original_carbs', 'original_fat', 'fitScore'].forEach(k => { delete snap[k] })
-      if (keuze.modus === 'altijd') {
+      if (keuze.modus === 'altijd' && slot === PRE_WORKOUT_SLOT) {
+        // Op elke trainingsdag, meeschuivend met de training.
+        await zetPreWorkoutOpTrainingsdagen(db.supabase, dashboardData.activePlan?.id, snap)
+        if (keuze.dagen.includes(DAYS_OF_WEEK[getTodayIndex()]?.key)) {
+          await service.wisDagAanpassing(client.id, slot, null)
+        }
+      } else if (keuze.modus === 'altijd') {
         await zetMaaltijdOpDagen(db.supabase, dashboardData.activePlan?.id, keuze.dagen, slot, snap)
         // Een oudere eenmalige wissel op vandaag zou de blijvende verbergen.
         if (keuze.dagen.includes(DAYS_OF_WEEK[getTodayIndex()]?.key)) {
@@ -879,16 +899,22 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
       )}
       
       {wisselKeuze && createPortal(
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)',
-          zIndex: 11000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-        }}>
+        // Zelfde pop-up als verwijderen: oud -> nieuw, dan waar.
+        <div style={{ position: 'fixed', inset: 0, zIndex: 11000 }}>
           <DagenKiezer
-            titel={`Wisselen naar ${wisselKeuze.nieuw.name || wisselKeuze.nieuw.meal_name}`}
-            subtitel={`in plaats van ${wisselKeuze.meal.name || wisselKeuze.meal.meal_name} · ${Math.round(wisselKeuze.nieuw.calories || 0)} kcal`}
+            volScherm
+            foto={resolveFoodImage(wisselKeuze.meal, { size: 300 })}
+            fotoNaar={resolveFoodImage(wisselKeuze.nieuw, { size: 300 })}
+            vraag="Wil je deze maaltijd wisselen?"
+            titel={`${wisselKeuze.meal.name || wisselKeuze.meal.meal_name} → ${wisselKeuze.nieuw.name || wisselKeuze.nieuw.meal_name}`}
+            subtitel={`${Math.round(wisselKeuze.nieuw.calories || 0)} kcal`}
+            knopTekst="Wisselen"
             datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}
             dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
             slot={wisselKeuze.meal.slot}
+            dagenMetMaaltijd={dagenMetMaaltijd(wisselKeuze.meal)}
+            trainingsdagen={trainingsdagenVoor(wisselKeuze.meal)}
+            vastAltijd
             bezig={wisselBezig}
             fout={wisselFout}
             isMobile={isMobile}
@@ -914,6 +940,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
             dagKey={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
             slot={verwijderMeal.slot}
             dagenMetMaaltijd={dagenMetMaaltijd(verwijderMeal)}
+            trainingsdagen={trainingsdagenVoor(verwijderMeal)}
             bezig={wisselBezig}
             fout={wisselFout}
             isMobile={isMobile}
