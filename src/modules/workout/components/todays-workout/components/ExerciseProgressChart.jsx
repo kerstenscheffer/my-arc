@@ -266,10 +266,14 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
     const kleurPunt = payload.isPR ? GROEN
       : payload.isLaagste ? ROOD
       : (KLEUR_VOOR[payload.oordeel] || '#fff')
-    const straal = payload.isPR ? 5 : payload.isLaagste ? 4.5 : isLaatste ? 4 : 3
+    // Gewone punten klein en zonder zwarte rand: met een ring om elk punt
+    // werd de vloeiende lijn weer een kralenketting.
+    const opvallend = payload.isPR || payload.isLaagste || isLaatste
+    const straal = payload.isPR ? 5 : payload.isLaagste ? 4.5 : isLaatste ? 4 : 2.2
     return (
       <g>
-        <circle cx={cx} cy={cy} r={straal} fill={kleurPunt} stroke="#0a0a0a" strokeWidth={1.5} />
+        <circle cx={cx} cy={cy} r={straal} fill={kleurPunt}
+          stroke={opvallend ? '#0a0a0a' : 'none'} strokeWidth={opvallend ? 1.5 : 0} />
         {payload.isPR && (
           <text
             x={cx} y={cy - 10} textAnchor="middle"
@@ -385,8 +389,16 @@ export default function ExerciseProgressChart({ db, client, exerciseName, isMobi
               dataKey="doel" stroke="rgba(255,255,255,0.28)" strokeWidth={1}
               strokeDasharray="4 4" dot={false} isAnimationActive={false}
             />
+            {/* Vloeiend (monotone: buigt zonder voorbij een meetpunt te
+                schieten, dus nooit een bult die er niet was) met een zachte
+                gloed eronder in dezelfde kleuren. */}
             <Line
-              dataKey="gewicht" stroke={`url(#kracht-lijn-${velling})`} strokeWidth={2.6}
+              type="monotone" dataKey="gewicht" stroke={`url(#kracht-lijn-${velling})`}
+              strokeWidth={9} strokeOpacity={0.14} strokeLinecap="round"
+              dot={false} activeDot={false} isAnimationActive={false} legendType="none"
+            />
+            <Line
+              type="monotone" dataKey="gewicht" stroke={`url(#kracht-lijn-${velling})`} strokeWidth={2.4}
               strokeLinejoin="round" strokeLinecap="round"
               dot={<Punt />} activeDot={false} isAnimationActive={false}
             />
