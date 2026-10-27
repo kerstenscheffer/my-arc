@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/ClientFeedbackModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from '../../../../../client/paginaPortal'
-import { X, Send, CheckCircle, Clock, MessageSquare, Camera, Upload, AlertTriangle, ThumbsUp, Scissors } from 'lucide-react'
+import { X, Send, CheckCircle, Video, Upload, AlertTriangle } from 'lucide-react'
 
 export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
   const isMobile = window.innerWidth <= 768
@@ -38,6 +38,21 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
       }
     } catch (e) { console.error('Error loading submission:', e) }
     finally { setLoading(false) }
+  }
+
+  // Melding (en via de trigger een push) voor de coach. Mag mislukken zonder
+  // dat de upload faalt. Eerst stond er niets: de coach zag een video pas als
+  // hij zelf in het feedback-scherm keek (27 okt 2026).
+  const meldCoach = () => {
+    const coachId = client?.trainer_id || client?.coach_id
+    if (!coachId) return
+    const naam = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'Een klant'
+    db.supabase.from('coach_notifications').insert({
+      coach_id: coachId, client_id: client.id, type: 'video_feedback', priority: 'normal',
+      title: `${naam} stuurde een techniekvideo`,
+      message: `${exercise.name}: wacht op je feedback.`,
+      read_status: false,
+    }).then(r => { if (r?.error) console.warn('Coach-melding video mislukt:', r.error.message) }, () => {})
   }
 
   const handleClose = () => { setVisible(false); setTimeout(() => onClose(), 300) }
@@ -93,6 +108,7 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
       if (error) throw error
 
       setUploadProgress(100)
+      meldCoach()
       setUploadSuccess(true)
       setSelectedFile(null)
       await loadSubmission()
@@ -102,6 +118,7 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
       // Fallback naar originele methode als XHR faalt
       try {
         await db.submitExerciseVideo(client.id, exercise.name, file)
+        meldCoach()
         setUploadSuccess(true)
         setSelectedFile(null)
         await loadSubmission()
@@ -114,159 +131,163 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
 
   const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1)
 
-  const getStatusColor = (s) => ({ approved: '#10b981', needs_work: '#f59e0b', reviewed: '#3b82f6' }[s] || '#FFD700')
-  const getStatusLabel = (s) => ({ approved: 'Goedgekeurd', needs_work: 'Werk aan', reviewed: 'Beoordeeld' }[s] || 'Wacht op feedback')
-  const getStatusIcon = (s) => ({ approved: ThumbsUp, needs_work: AlertTriangle, reviewed: MessageSquare }[s] || Clock)
+  // Status als stipje met tekst, zoals de macro's: geen gekleurde vakken.
+  const STATUS = {
+    approved: { kleur: '#10b981', label: 'Goedgekeurd' },
+    needs_work: { kleur: '#f59e0b', label: 'Werk aan' },
+    reviewed: { kleur: '#3b82f6', label: 'Beoordeeld' },
+  }
+  const statusVan = (s) => STATUS[s] || { kleur: 'rgba(255,255,255,0.45)', label: 'Wacht op feedback' }
 
+  const knopTekst = uploading ? 'Uploaden…'
+    : uploadSuccess ? 'Verstuurd'
+    : sizeWarning ? 'Andere video kiezen'
+    : submissions.length > 0 ? 'Nog een video insturen'
+    : 'Video insturen'
+
+  // Bottom sheet over de wazige pagina, zwart-wit zoals de wisselvensters
+  // (27 okt 2026; was een goud omrand vak midden in beeld).
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '1rem' : '2rem', opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
+        opacity: visible ? 1 : 0, transition: 'opacity 0.25s ease',
+      }}
+    >
+      <div style={{
+        position: 'relative', width: '100%', maxWidth: 520, maxHeight: '92dvh',
+        background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: isMobile ? '22px 22px 0 0' : 22,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        transform: visible ? 'translateY(0)' : 'translateY(30px)', transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
+      }}>
+        {isMobile && <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.18)', margin: '8px auto 0', flexShrink: 0 }} />}
+        <button onClick={handleClose} aria-label="Sluiten" style={{
+          position: 'absolute', top: 12, right: 12, width: 36, height: 36, padding: 0, zIndex: 1,
+          background: 'none', border: 'none', color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}><X size={22} strokeWidth={2.4} /></button>
 
-      <div style={{ width: '100%', maxWidth: '500px', maxHeight: isMobile ? '90vh' : '85vh', background: '#0a0a0a', border: '1px solid rgba(255,215,0,0.2)', borderRadius: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(30px)', transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)' }}>
-
-        {/* HEADER */}
-        <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-              <Send size={13} color="rgba(255,215,0,0.6)" />
-              <span style={{ fontSize: '0.62rem', color: 'rgba(255,215,0,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Video Feedback</span>
+        <div style={{
+          flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+          padding: isMobile ? '1rem 1rem calc(1.2rem + env(safe-area-inset-bottom, 0px))' : '1.4rem',
+        }}>
+          {/* Kop: icoon in een cirkel, oefening, één zin. */}
+          <div style={{ textAlign: 'center', padding: '0.4rem 2rem 1.1rem' }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%', margin: '0 auto',
+              border: '1.5px dashed rgba(255,255,255,0.35)', boxSizing: 'border-box',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            }}>
+              <Video size={26} strokeWidth={2} />
             </div>
-            <h2 style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff', margin: 0, letterSpacing: '-0.01em' }}>{exercise.name}</h2>
+            <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', marginTop: '0.75rem', letterSpacing: '-0.02em' }}>
+              {exercise.name}
+            </div>
+            <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.45 }}>
+              {submissions.length > 0 ? 'Je ingestuurde video’s en de feedback van je coach.' : 'Film een set en je coach kijkt mee naar je techniek.'}
+            </div>
           </div>
-          <button onClick={handleClose} style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <X size={18} strokeWidth={2.5} />
-          </button>
-        </div>
 
-        {/* CONTENT */}
-        <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? '1rem' : '1.25rem', WebkitOverflowScrolling: 'touch' }}>
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
-              <div style={{ width: '32px', height: '32px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+              <div style={{ width: 30, height: 30, border: '3px solid rgba(255,255,255,0.12)', borderTopColor: '#fff', borderRadius: '50%', animation: 'fbSpin 0.9s linear infinite' }} />
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-              {/* Bestaande submissions */}
-              {submissions.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-                  {submissions.map((sub, i) => {
-                    const StatusIcon = getStatusIcon(sub.status)
-                    return (
-                      <div key={sub.id} style={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
-                        {/* Status header */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.625rem 0.875rem', background: `${getStatusColor(sub.status)}10`, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <StatusIcon size={14} color={getStatusColor(sub.status)} strokeWidth={2} />
-                          <span style={{ fontSize: '0.72rem', fontWeight: '700', color: getStatusColor(sub.status) }}>{getStatusLabel(sub.status)}</span>
-                          <span style={{ marginLeft: 'auto', fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>
-                            {new Date(sub.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                          </span>
-                          {submissions.length > 1 && (
-                            <span style={{ fontSize: '0.55rem', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)', padding: '0.1rem 0.375rem', borderRadius: '3px', fontWeight: '700' }}>
-                              #{submissions.length - i}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Video */}
-                        <div style={{ aspectRatio: '9/16', maxHeight: '260px', background: '#111' }}>
-                          <video src={sub.video_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                        </div>
-
-                        {/* Coach feedback */}
-                        {sub.coach_feedback && (
-                          <div style={{ padding: '0.75rem 0.875rem', background: 'rgba(255,215,0,0.04)', borderTop: '1px solid rgba(255,215,0,0.1)' }}>
-                            <div style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Feedback van coach</div>
-                            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.82rem', margin: 0, lineHeight: 1.5 }}>{sub.coach_feedback}</p>
-                          </div>
-                        )}
+          ) : (<>
+            {/* Eerdere video's: status, video, feedback als gewone tekst. */}
+            {submissions.map((sub, i) => {
+              const st = statusVan(sub.status)
+              return (
+                <div key={sub.id} style={{ marginBottom: '1.2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: st.kleur, flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>{st.label}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                      {submissions.length > 1 && `#${submissions.length - i} · `}
+                      {new Date(sub.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                    </span>
+                  </div>
+                  <div style={{ aspectRatio: '9/16', maxHeight: 300, borderRadius: 14, overflow: 'hidden', background: '#141414', margin: '0 auto' }}>
+                    <video src={sub.video_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  </div>
+                  {sub.coach_feedback && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                        Feedback van je coach
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Upload sectie — altijd zichtbaar */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem', padding: submissions.length > 0 ? '0.875rem' : '1.5rem 0.5rem', background: submissions.length > 0 ? 'rgba(255,255,255,0.02)' : 'transparent', border: submissions.length > 0 ? '1px dashed rgba(255,255,255,0.08)' : 'none', borderRadius: '10px' }}>
-
-                {submissions.length === 0 && (
-                  <>
-                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Camera size={32} color="rgba(255,215,0,0.7)" strokeWidth={1.5} />
+                      <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff', lineHeight: 1.5 }}>{sub.coach_feedback}</div>
                     </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <h3 style={{ color: '#fff', fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '800', margin: '0 0 0.375rem', letterSpacing: '-0.01em' }}>Stuur je video in</h3>
-                      <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem', margin: 0, lineHeight: 1.5 }}>
-                        Film jezelf tijdens {exercise.name} en krijg persoonlijke techniek-feedback van je coach
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                {/* Bestandsgrootte feedback */}
-                {selectedFile && !sizeWarning && (
-                  <div style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <CheckCircle size={13} color="#10b981" strokeWidth={2.5} />
-                    <span style={{ fontSize: '0.72rem', color: 'rgba(16,185,129,0.8)', fontWeight: '600' }}>{selectedFile.name} · {formatMB(selectedFile.size)} MB</span>
-                  </div>
-                )}
-
-                {/* Size warning */}
-                {sizeWarning && selectedFile && (
-                  <div style={{ width: '100%', padding: '0.75rem', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
-                      <AlertTriangle size={14} color="rgba(239,68,68,0.7)" strokeWidth={2} />
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(239,68,68,0.7)', fontWeight: '700' }}>Video te groot ({formatMB(selectedFile.size)} MB)</span>
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                      Knip onnodige stukken eraf via de <strong style={{ color: 'rgba(255,255,255,0.6)' }}>Foto's app</strong> → bewerk → trim → sla op.
-                    </p>
-                  </div>
-                )}
-
-                {/* Progressbalk */}
-                {uploading && (
-                  <div style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.375rem' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Uploaden...</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#FFD700' }}>{uploadProgress}%</span>
-                    </div>
-                    <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'linear-gradient(90deg, rgba(255,215,0,0.6), #FFD700)', borderRadius: '2px', transition: 'width 0.3s ease' }} />
-                    </div>
-                  </div>
-                )}
-
-                {/* Upload knop */}
-                <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                  style={{ width: '100%', padding: '0.8rem 1.25rem', background: uploading ? 'rgba(255,215,0,0.06)' : 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '10px', color: '#FFD700', fontSize: '0.82rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '48px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}>
-                  {uploading ? (
-                    <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Uploaden...</>
-                  ) : uploadSuccess ? (
-                    <><CheckCircle size={16} strokeWidth={2.5} />Verstuurd!</>
-                  ) : sizeWarning ? (
-                    <><Upload size={16} strokeWidth={2.5} />Andere video kiezen</>
-                  ) : submissions.length > 0 ? (
-                    <><Upload size={16} strokeWidth={2.5} />Nog een video insturen</>
-                  ) : (
-                    <><Send size={16} strokeWidth={2.5} />Video Insturen</>
                   )}
-                </button>
+                </div>
+              )
+            })}
 
-                {!sizeWarning && !uploading && (
-                  <p style={{ color: 'rgba(255,255,255,0.18)', fontSize: '0.65rem', margin: 0, textAlign: 'center' }}>
-                    Max 500MB · MP4, MOV · max 60 seconden
-                  </p>
-                )}
+            {/* Gekozen bestand of te groot. */}
+            {selectedFile && !sizeWarning && !uploadSuccess && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
+                <CheckCircle size={15} strokeWidth={2.6} color="#10b981" />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedFile.name} · {formatMB(selectedFile.size)} MB</span>
               </div>
-            </div>
-          )}
+            )}
+            {sizeWarning && selectedFile && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.84rem', fontWeight: 900, color: '#ef4444' }}>
+                  <AlertTriangle size={15} strokeWidth={2.6} /> Video te groot ({formatMB(selectedFile.size)} MB)
+                </div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.45 }}>
+                  Knip hem korter in je Foto's-app (bewerk → inkorten) en kies hem opnieuw.
+                </div>
+              </div>
+            )}
+
+            {/* Voortgang tijdens het uploaden. */}
+            {uploading && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>
+                  <span>Uploaden</span><span style={{ color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{uploadProgress}%</span>
+                </div>
+                <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#fff', borderRadius: 2, transition: 'width 0.3s ease' }} />
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              style={{
+                width: '100%', minHeight: 50, borderRadius: 12, border: 'none',
+                background: uploadSuccess ? '#10b981' : '#fff', color: uploadSuccess ? '#fff' : '#0a0a0a',
+                fontSize: '0.95rem', fontWeight: 900, fontFamily: 'inherit',
+                cursor: uploading ? 'wait' : 'pointer', opacity: uploading ? 0.6 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {uploadSuccess ? <CheckCircle size={17} strokeWidth={2.8} /> : submissions.length > 0 || sizeWarning ? <Upload size={17} strokeWidth={2.8} /> : <Send size={17} strokeWidth={2.8} />}
+              {knopTekst}
+            </button>
+            {uploadSuccess && (
+              <div style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 8 }}>
+                Je coach krijgt een melding.
+              </div>
+            )}
+            {!sizeWarning && !uploading && !uploadSuccess && (
+              <div style={{ textAlign: 'center', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginTop: 8 }}>
+                Max 60 seconden · max 500 MB
+              </div>
+            )}
+          </>)}
         </div>
 
         <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileSelect} style={{ display: 'none' }} />
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{'@keyframes fbSpin { to { transform: rotate(360deg); } }'}</style>
     </div>,
     document.body
   )

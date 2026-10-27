@@ -20,6 +20,8 @@ const RED = '#ef4444'
 const FIXED = [
   { key: 'intake_completed',  who: 'coach',  label: 'Intake ingevuld',   desc: 'Een lead of klant rondt de intake af.',        Icon: ClipboardCheck, color: '#3b82f6' },
   { key: 'checkin_completed', who: 'coach',  label: 'Check-in binnen',   desc: 'Een klant levert zijn check-in in.',           Icon: CheckCircle2,   color: GREEN },
+  { key: 'video_feedback',    who: 'coach',  label: 'Techniekvideo binnen', desc: 'Een klant stuurt een video voor feedback.', Icon: Video,          color: '#f59e0b' },
+  { key: 'workout',           who: 'coach',  label: 'Oefening gewisseld', desc: 'Een klant wisselt een oefening in zijn plan.',  Icon: Dumbbell,       color: '#a855f7' },
   { key: 'client_workout',    who: 'klant',  label: 'Nieuw trainingsschema', desc: 'Je wijst een klant een nieuw plan toe.',   Icon: Dumbbell,       color: '#a855f7' },
   { key: 'client_video',      who: 'klant',  label: 'Video toegewezen',  desc: 'Je deelt een video met een klant.',            Icon: Video,          color: '#f59e0b' },
   { key: 'client_message',    who: 'klant',  label: 'Bericht van jou',   desc: 'Je stuurt een klant zelf een melding.',        Icon: MessageCircle,  color: '#06b6d4' },
