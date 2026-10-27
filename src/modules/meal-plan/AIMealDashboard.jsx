@@ -907,8 +907,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
             foto={resolveFoodImage(verwijderMeal, { size: 300 })}
             titel={verwijderMeal.name || verwijderMeal.meal_name}
             subtitel={`${Math.round(verwijderMeal.calories || 0)} kcal`}
-            vraag="Deze maaltijd verwijderen?"
-            keuzeVraag="Waar haal je hem weg?"
+            vraag="Waar wil je deze maaltijd verwijderen?"
             knopTekst="Verwijderen"
             gevaar
             datum={indexToDate(dayKeyToIndex(selectedDay), weekOffset)}

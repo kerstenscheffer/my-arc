@@ -20,7 +20,7 @@
 // terug waar deze maaltijd op dit moment staat; null = het vaste weekplan.
 // Die dagen krijgen een stip, zodat je ziet waar hij terugkomt.
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Repeat, CalendarDays, ArrowLeft } from 'lucide-react'
+import { X, Repeat, CalendarDays, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { lokaleIso } from '../utils/dagVenster'
 
 const DAGEN = [
@@ -47,7 +47,7 @@ export default function DagenKiezer({
   titel, subtitel, datum, dagKey, slot, bezig = false, fout = null,
   isMobile, onKies, onTerug, terugTekst = '← Terug', onClose, extra = null,
   vraag = 'Waar geldt deze wijziging?', knopTekst = 'Opslaan', gevaar = false,
-  volScherm = false, foto = null, keuzeVraag = null, dagenMetMaaltijd = null,
+  volScherm = false, foto = null, dagenMetMaaltijd = null,
 }) {
   const bekeken = datum ? new Date(datum) : new Date()
   const ditMaandag = maandagVan(new Date())
@@ -104,8 +104,6 @@ export default function DagenKiezer({
     else onKies({ modus, dagen, datums: lijst.map(d => lokaleIso(datumVan(DAGEN.indexOf(d)))) })
   }
 
-  const weekLabels = ['Deze week', 'Volgende week', 'Week erna']
-
   const keuzes = (
     <>
         {/* Elke week / alleen één week */}
@@ -129,40 +127,28 @@ export default function DagenKiezer({
           })}
         </div>
 
-        {/* Welke week, alleen bij "Eén week" */}
+        {/* Welke week, alleen bij "Eén week": één regel met pijltjes. */}
         {modus === 'week' && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            {weekLabels.map((l, i) => {
-              const aan = week === i
-              return (
-                <button key={l} onClick={() => setWeek(i)} disabled={bezig} style={{
-                  flex: 1, padding: '0.45rem 0.3rem', borderRadius: 9, cursor: 'pointer',
-                  background: aan ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  border: `1px solid ${aan ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`,
-                  color: aan ? '#fff' : 'rgba(255,255,255,0.55)', fontFamily: 'inherit',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>{l}</span>
-                  <span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.7 }}>
-                    {kortDatum(plus(ditMaandag, i * 7))} – {kortDatum(plus(ditMaandag, i * 7 + 6))}
-                  </span>
-                </button>
-              )
-            })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={() => setWeek(w => Math.max(0, w - 1))} disabled={bezig || week === 0}
+              aria-label="Vorige week" style={{ ...pijl, opacity: week === 0 ? 0.25 : 1 }}><ChevronLeft size={18} strokeWidth={2.6} /></button>
+            <div style={{ flex: 1, textAlign: 'center', fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
+              Alleen {kortDatum(weekMaandag)} – {kortDatum(plus(weekMaandag, 6))}
+            </div>
+            <button onClick={() => setWeek(w => Math.min(2, w + 1))} disabled={bezig || week === 2}
+              aria-label="Volgende week" style={{ ...pijl, opacity: week === 2 ? 0.25 : 1 }}><ChevronRight size={18} strokeWidth={2.6} /></button>
           </div>
         )}
 
         {/* De zeven dagen */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>Dagen</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', marginBottom: 6 }}>
             <span style={{ display: 'flex', gap: 14 }}>
               {aanwezig.size > 0 && !alleenAanwezig && (
                 <button onClick={zetAanwezig} disabled={bezig} style={{
                   background: 'none', border: 'none', color: '#fff', fontSize: '0.72rem', fontWeight: 800,
                   cursor: 'pointer', padding: 0, fontFamily: 'inherit',
-                }}>Waar hij staat ({aanwezig.size})</button>
+                }}>● {aanwezig.size} dagen</button>
               )}
               <button onClick={zetAlles} disabled={bezig} style={{
                 background: 'none', border: 'none', color: '#fff', fontSize: '0.72rem', fontWeight: 800,
@@ -198,7 +184,7 @@ export default function DagenKiezer({
           {aanwezig.size > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff' }} />
-              {modus === 'altijd' ? 'staat in je weekplan' : 'staat die week in je plan'}
+              in je plan
             </div>
           )}
         </div>
@@ -250,16 +236,13 @@ export default function DagenKiezer({
                 fontSize: isMobile ? '1.45rem' : '1.6rem', fontWeight: 900, color: '#fff',
                 letterSpacing: '-0.025em', lineHeight: 1.2,
               }}>{vraag}</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)', marginTop: 6 }}>{titel}</div>
-              {subtitel && <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{subtitel}</div>}
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>
+                {titel}{subtitel ? ` · ${subtitel}` : ''}
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              {keuzeVraag && (
-                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center' }}>{keuzeVraag}</div>
-              )}
               {keuzes}
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35, textAlign: 'center' }}>{effect}</div>
               {foutBlok}
               {extra}
             </div>
@@ -320,6 +303,13 @@ export default function DagenKiezer({
       <style>{'@keyframes cmeSpin { to { transform: rotate(360deg); } }'}</style>
     </div>
   )
+}
+
+const pijl = {
+  width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
 const iconBtn = {
