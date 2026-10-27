@@ -6,7 +6,7 @@
 // "Voedingsmiddel toevoegen" per section
 import React, { useState } from 'react'
 import MealCard from './MealCard'
-import { Trash2, Edit3, Info, Check, Plus, Sunrise, Salad, Apple, UtensilsCrossed, Zap } from 'lucide-react'
+import { Trash2, Edit3, Info, Check, Plus, Sunrise, Salad, Apple, UtensilsCrossed, Zap, Pill, ChevronDown } from 'lucide-react'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
 import { useProductFotos } from '../../../supplements/utils/productFoto'
 
@@ -99,10 +99,14 @@ export default function MealTimelineMobile({
       min: tijdVanGelogd(meal) ?? 12 * 60,
     })
   })
-  Object.values(supplementenPerMoment || {}).flat().forEach(sp => items.push({
-    soort: 'supplement', sleutel: `supp-${sp.id}`, data: sp,
-    min: Number.isFinite(sp.sorteerMin) ? sp.sorteerMin : 12 * 60,
-  }))
+  // Supplementen niet meer tussen de maaltijden (dat maakte de pagina druk,
+  // 27 okt 2026) maar in één inklapbaar blok onderaan, op tijd.
+  const supplementen = Object.values(supplementenPerMoment || {}).flat()
+    .map(sp => ({ sp, min: Number.isFinite(sp.sorteerMin) ? sp.sorteerMin : 12 * 60 }))
+    .sort((a, b) => a.min - b.min)
+  const genomen = supplementen.filter(x => supplementLogs?.has?.(x.sp.id)).length
+  const [suppOpen, setSuppOpenRuw] = useState(() => { try { return localStorage.getItem('myarc_supp_open') === '1' } catch { return false } })
+  const setSuppOpen = (v) => { setSuppOpenRuw(v); try { localStorage.setItem('myarc_supp_open', v ? '1' : '0') } catch { /* geen opslag */ } }
 
   if (onVoegToe) (legeMomenten || []).forEach(p => items.push({
     soort: 'leeg', sleutel: `leeg-${p.slot}`, data: p, min: p.min,
@@ -237,6 +241,46 @@ export default function MealTimelineMobile({
           />
         )
       })}
+
+      {/* Supplementen: één blok onderaan, standaard dicht, met voortgang. */}
+      {supplementen.length > 0 && (
+        <div style={{ margin: '0.4rem 0.9rem 0.6rem', borderRadius: 12, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+          <button onClick={() => setSuppOpen(!suppOpen)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem 0.9rem',
+            background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <Pill size={17} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 900 }}>Supplementen</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.82rem', fontWeight: 900, color: genomen === supplementen.length ? '#fff' : 'rgba(255,255,255,0.5)' }}>
+              {genomen === supplementen.length && <Check size={14} strokeWidth={3} />}
+              {genomen}/{supplementen.length}
+            </span>
+            <ChevronDown size={16} strokeWidth={2.8} style={{ transition: 'transform 0.15s ease', transform: suppOpen ? 'rotate(180deg)' : 'none', opacity: 0.7 }} />
+          </button>
+          {suppOpen && supplementen.map(({ sp, min }) => {
+            const af = !!supplementLogs?.has?.(sp.id)
+            return (
+              <div key={sp.id} onClick={() => onSupplementInfo?.(sp)} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '0.55rem 0.9rem',
+                borderTop: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer',
+              }}>
+                <span style={{ width: 40, flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>{klok(min)}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: af ? 'rgba(255,255,255,0.45)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: af ? 'line-through' : 'none' }}>
+                  {sp.naam}
+                  {sp.dosering && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginLeft: 6, textDecoration: 'none' }}>{sp.dosering}</span>}
+                </span>
+                <button onClick={(e) => { e.stopPropagation(); onSupplementCheck?.(sp) }} aria-label={af ? 'Genomen' : 'Afvinken'} style={{
+                  flexShrink: 0, width: 26, height: 26, borderRadius: '50%', padding: 0,
+                  background: af ? '#fff' : 'transparent', border: `1.5px solid ${af ? '#fff' : 'rgba(255,255,255,0.35)'}`,
+                  color: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>{af && <Check size={14} strokeWidth={3} />}</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Wijde gele "Voedingsmiddel toevoegen" knop weggehaald —
           de floating FAB rechtsonder is de enige log-actie op de pagina. */}
