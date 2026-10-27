@@ -1,7 +1,7 @@
 // scripts/off-export-fotos.mjs
 // Productfoto's uit de complete Open Food Facts-export in plaats van één
 // API-verzoek per barcode (OFF remt dat af tot ~12 per minuut). De export
-// (~1 GB gz) wordt gestreamd en niet opgeslagen; alleen barcodes die wij
+// (~1 GB gz) wordt gestreamd (max 2 MB/s, anders trekt hij de lijn vol) en niet opgeslagen; alleen barcodes die wij
 // hebben worden onthouden.
 //
 // Database: een paar lees-pagina's aan het begin, daarna per 100 producten
@@ -52,7 +52,7 @@ for (;;) {
 console.log(`${tijd()}  ${perCode.size} barcodes zonder foto`)
 
 // 2. Export streamen
-const curl = spawn('sh', ['-c', `curl -sL ${EXPORT} | gunzip`])
+const curl = spawn('sh', ['-c', `curl -sL --limit-rate 2M ${EXPORT} | gunzip`])
 const rl = readline.createInterface({ input: curl.stdout, crlfDelay: Infinity })
 let kop = null, iCode, iFront, iImg, regels = 0
 const gevonden = []
