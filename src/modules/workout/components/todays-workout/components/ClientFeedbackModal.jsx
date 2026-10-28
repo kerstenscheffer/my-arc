@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/ClientFeedbackModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from '../../../../../client/paginaPortal'
-import { X, Send, CheckCircle, Video, Upload, AlertTriangle } from 'lucide-react'
+import { X, Send, CheckCircle, Video, Upload, AlertTriangle, PlayCircle, ChevronRight } from 'lucide-react'
 import { puntenVan, soortVan, tijdTekst } from '../../../../video-feedback/feedbackPunten'
 
 export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
@@ -241,6 +241,22 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
                       </div>
                     )}
                   </div>
+                  {/* De video die de coach bij deze feedback maakte (Zoom, Loom). */}
+                  {sub.feedback_link && (
+                    <a href={sub.feedback_link} target="_blank" rel="noopener noreferrer" style={{
+                      display: 'flex', alignItems: 'center', gap: 10, marginTop: 12,
+                      padding: '0.75rem 0.85rem', borderRadius: 12,
+                      background: 'rgba(255,255,255,0.06)', color: '#fff', textDecoration: 'none',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <PlayCircle size={22} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 900 }}>Bekijk de feedbackvideo</span>
+                        <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>Je coach legt de punten hieronder uit</span>
+                      </span>
+                      <ChevronRight size={17} strokeWidth={2.6} color="rgba(255,255,255,0.5)" />
+                    </a>
+                  )}
                   {puntenVan(sub).length > 0 && (
                     <div style={{ marginTop: 12 }}>
                       <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>

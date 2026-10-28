@@ -14,6 +14,7 @@ import { useLanguage } from '../contexts/LanguageContext'
 
 // Component Imports - ALLEEN ESSENTIEEL
 import NotificationWidget from '../modules/notifications/NotificationWidget'
+import VideoFeedbackOpener from '../modules/video-feedback/VideoFeedbackOpener'
 import PWAUpdateBanner from '../components/PWAUpdateBanner'
 import ReviewPrompt from '../modules/app-review/ReviewPrompt'
 import UpdateBalk from '../modules/app-update/UpdateBalk'
@@ -737,6 +738,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       {/* Vraag van de coach om stappen te delen (verschijnt alleen na een
           verzoek uit Coach Inzicht). */}
       {client?.id && <StappenVerzoek db={db} clientId={client.id} isMobile={isMobile} />}
+
+      {/* Opent de feedbackmodal vanuit een melding of push, op elke pagina. */}
+      <VideoFeedbackOpener client={client} db={db} />
 
       <NotificationWidget
         db={db} clientId={client?.id} currentPage="all"

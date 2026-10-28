@@ -6,6 +6,7 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from '../lib/supabase.js';
+import { openUitMelding } from '../modules/video-feedback/feedbackOpenen';
 
 class PushNotificationService {
   constructor() {
@@ -66,6 +67,13 @@ class PushNotificationService {
     // Foreground notification — you can dispatch a custom event here if needed
     PushNotifications.addListener('pushNotificationReceived', (notification) => {
       console.log('Push received in foreground:', notification.title);
+    });
+
+    // Tik op een push: naar de juiste plek in de app. trigger_data komt mee
+    // vanuit de trigger op notifications (bv. feedback op een techniekvideo).
+    PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
+      const data = notification?.data || {};
+      openUitMelding(data.trigger_data);
     });
   }
 

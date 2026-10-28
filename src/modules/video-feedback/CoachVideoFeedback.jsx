@@ -1,6 +1,6 @@
 // src/modules/video-feedback/CoachVideoFeedback.jsx
 import { useState, useEffect, useRef } from 'react'
-import { Video, Clock, Send, X, Play, Upload, Plus, RotateCcw, ChevronRight } from 'lucide-react'
+import { Video, Clock, Send, X, Play, Upload, Plus, RotateCcw, ChevronRight, Link2 } from 'lucide-react'
 import { oefeningInfo } from '../workout/utils/oefeningBatch'
 import { extractYouTubeId, appSafeEmbedUrl } from '../videos/utils/youtubeHelpers'
 import { SOORTEN, soortVan, tijdTekst, puntenVan, puntenAlsTekst } from './feedbackPunten'
@@ -135,6 +135,9 @@ export function KlantVideos({ db, lijst, start = 0, onClose }) {
 function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
   const isMobile = window.innerWidth <= 768
   const [punten, setPunten] = useState(() => puntenVan(submission))
+  // Link naar de video die de coach bij deze feedback maakte (Zoom-opname,
+  // Loom...). Staat bij de punten in de app van de klant.
+  const [link, setLink] = useState(submission.feedback_link || '')
   const [tekst, setTekst] = useState('')
   const [soort, setSoort] = useState('beter')
   const [metTijd, setMetTijd] = useState(true)
@@ -171,19 +174,24 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
   const gekozen = bronnen.find(b => b.id === bron) || bronnen[0] || null
   const ytId = gekozen ? extractYouTubeId(gekozen.url) : null
 
-  // Punten direct bewaren (kort na de laatste wijziging).
+  // Punten en link direct bewaren (kort na de laatste wijziging).
+  const schoneLink = () => {
+    const l = link.trim()
+    if (!l) return null
+    return /^https?:\/\//i.test(l) ? l : `https://${l}`
+  }
   useEffect(() => {
     if (eerste.current) { eerste.current = false; return }
     clearTimeout(bewaarTimer.current)
     setOpslag('bezig')
     bewaarTimer.current = setTimeout(async () => {
       const { error } = await db.supabase.from('client_exercise_submissions')
-        .update({ feedback_punten: punten, coach_feedback: puntenAlsTekst(punten) })
+        .update({ feedback_punten: punten, coach_feedback: puntenAlsTekst(punten), feedback_link: schoneLink() })
         .eq('id', submission.id)
         .then(r => r, e => ({ error: e }))
       setOpslag(error ? 'fout' : 'ok')
     }, 600)
-  }, [punten])
+  }, [punten, link])
 
   useEffect(() => {
     if (klantRef.current) klantRef.current.playbackRate = snelheid
@@ -245,6 +253,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
         .update({
           feedback_punten: punten,
           coach_feedback: puntenAlsTekst(punten),
+          feedback_link: schoneLink(),
           status,
           reviewed_at: new Date().toISOString(),
         })
@@ -256,6 +265,8 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
           client_id: submission.client_id, type: 'workout', source: 'auto', page_context: 'workout',
           priority: 'normal',
           title: 'Feedback op je techniekvideo',
+          // Tik op de melding (of de push) opent meteen deze feedback.
+          trigger_data: { actie: 'video_feedback', submission_id: submission.id, oefening: submission.exercise_name },
           message: `${submission.exercise_name}: je coach heeft ${punten.length || ''} punt${punten.length === 1 ? '' : 'en'} voor je klaargezet.`.replace('  ', ' '),
         }).then(r => { if (r?.error) console.warn('Klantmelding feedback mislukt:', r.error.message) }, () => {})
       }
@@ -383,6 +394,22 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
           </div>
 
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '0.75rem 1rem' : '1rem 1.25rem' }}>
+            <div style={kopje}>Video bij je feedback</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: 10, marginBottom: 16 }}>
+              <Link2 size={15} strokeWidth={2.4} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0 }} />
+              <input
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder="Plak je Zoom- of Loom-link"
+                inputMode="url"
+                style={{ flex: 1, minWidth: 0, padding: '0.65rem 0', background: 'none', border: 'none', color: '#fff', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+              {link && (
+                <button onClick={() => setLink('')} aria-label="Link weghalen" style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 2, display: 'flex' }}>
+                  <X size={14} strokeWidth={2.4} />
+                </button>
+              )}
+            </div>
             <div style={kopje}>Punten voor {clientName.split(' ')[0] || 'de klant'} ({punten.length})</div>
             {punten.length === 0 && (
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>

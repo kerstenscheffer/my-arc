@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { openUitMelding } from '../video-feedback/feedbackOpenen'
 import zichtbaarPollen from '../../utils/zichtbaarPollen';
 
 // Meldingen die al eens vanzelf openklapten (deze sessie).
@@ -372,7 +373,11 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all', 
                   <div
                     key={notification.id}
                     id={`notification-${notification.id}`}
-                    onClick={() => isActive && handleMarkAsRead(notification.id)}
+                    onClick={() => {
+                      // Feedback op een techniekvideo: meteen de modal open.
+                      if (openUitMelding(notification.trigger_data)) setIsExpanded(false)
+                      if (isActive) handleMarkAsRead(notification.id)
+                    }}
                     style={{
                       padding: isMobile ? '0.9rem 0.95rem' : '1rem 1.1rem',
                       paddingLeft: isMobile ? '1.05rem' : '1.2rem',
