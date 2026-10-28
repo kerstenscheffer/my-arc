@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from '../../../../../client/paginaPortal'
 import { X, Send, CheckCircle, Video, Upload, AlertTriangle } from 'lucide-react'
+import { puntenVan, soortVan, tijdTekst } from '../../../../video-feedback/feedbackPunten'
 
 export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
   const isMobile = window.innerWidth <= 768
@@ -15,6 +16,7 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
   const [selectedFile, setSelectedFile] = useState(null)
   const [sizeWarning, setSizeWarning] = useState(false)
   const fileInputRef = useRef(null)
+  const videoRefs = useRef({})
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 50)
@@ -23,9 +25,9 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
     return () => { document.body.style.overflow = 'auto' }
   }, [])
 
-  const loadSubmission = async () => {
+  const loadSubmission = async (stil = false) => {
     if (!client?.id || !exercise?.name || !db) { setLoading(false); return }
-    setLoading(true)
+    if (!stil) setLoading(true)
     try {
       if (db.getExerciseSubmissions) {
         const subs = await db.getExerciseSubmissions(client.id, exercise.name)
@@ -53,6 +55,20 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
       message: `${exercise.name}: wacht op je feedback.`,
       read_status: false,
     }).then(r => { if (r?.error) console.warn('Coach-melding video mislukt:', r.error.message) }, () => {})
+  }
+
+  // Live tijdens een Zoom-call: de coach zet punten één voor één klaar, de
+  // klant ziet ze binnen een paar seconden verschijnen zolang dit open staat.
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') loadSubmission(true) }, 6000)
+    return () => clearInterval(t)
+  }, [])
+
+  const naarMoment = (id, tijd) => {
+    const v = videoRefs.current[id]
+    if (!v) return
+    v.pause()
+    v.currentTime = tijd
   }
 
   const handleClose = () => { setVisible(false); setTimeout(() => onClose(), 300) }
@@ -129,6 +145,8 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
     } finally { setUploading(false) }
   }
 
+  const videoLabel = { position: 'absolute', top: 8, left: 8, zIndex: 1, padding: '3px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.66rem', fontWeight: 800 }
+
   const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1)
 
   // Status als stipje met tekst, zoals de macro's: geen gekleurde vakken.
@@ -198,7 +216,7 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
               <div style={{ width: 30, height: 30, border: '3px solid rgba(255,255,255,0.12)', borderTopColor: '#fff', borderRadius: '50%', animation: 'fbSpin 0.9s linear infinite' }} />
             </div>
           ) : (<>
-            {/* Eerdere video's: status, video, feedback als gewone tekst. */}
+            {/* Eerdere video's: status, video (naast die van de coach) en de punten. */}
             {submissions.map((sub, i) => {
               const st = statusVan(sub.status)
               return (
@@ -211,15 +229,41 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
                       {new Date(sub.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                     </span>
                   </div>
-                  <div style={{ aspectRatio: '9/16', maxHeight: 300, borderRadius: 14, overflow: 'hidden', background: '#141414', margin: '0 auto' }}>
-                    <video src={sub.video_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0, aspectRatio: '9/16', maxHeight: 300, borderRadius: 14, overflow: 'hidden', background: '#141414', margin: '0 auto', position: 'relative' }}>
+                      {sub.coach_video_url && <span style={videoLabel}>Jij</span>}
+                      <video ref={el => { videoRefs.current[sub.id] = el }} src={sub.video_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    </div>
+                    {sub.coach_video_url && (
+                      <div style={{ flex: 1, minWidth: 0, aspectRatio: '9/16', maxHeight: 300, borderRadius: 14, overflow: 'hidden', background: '#141414', position: 'relative' }}>
+                        <span style={videoLabel}>Coach</span>
+                        <video src={sub.coach_video_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      </div>
+                    )}
                   </div>
-                  {sub.coach_feedback && (
-                    <div style={{ marginTop: 10 }}>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                  {puntenVan(sub).length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
                         Feedback van je coach
                       </div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff', lineHeight: 1.5 }}>{sub.coach_feedback}</div>
+                      {/* Punten met een moment: tik en de video springt erheen. */}
+                      {puntenVan(sub).map(p => {
+                        const s = soortVan(p.soort)
+                        return (
+                          <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '0.55rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.kleur, marginTop: 6, flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0, fontSize: '0.88rem', fontWeight: 600, color: '#fff', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{p.tekst}</div>
+                            {p.tijd != null && (
+                              <button onClick={() => naarMoment(sub.id, p.tijd)} style={{
+                                flexShrink: 0, padding: '0.2rem 0.6rem', borderRadius: 999, border: 'none',
+                                background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '0.72rem', fontWeight: 800,
+                                fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums', cursor: 'pointer',
+                                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                              }}>{tijdTekst(p.tijd)}</button>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
