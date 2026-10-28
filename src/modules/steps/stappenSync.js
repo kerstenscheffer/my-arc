@@ -8,7 +8,7 @@
 // niets te weten van de stappen-pil die ergens op een pagina staat.
 
 import StappenService, { vandaagIso } from './StappenService'
-import { stappenBijOpstart, stappenVanVandaag, stappenPerDag, isGekoppeld, stappenStatus, platform, isNative } from './telefoonStappen'
+import { stappenBijOpstart, stappenVanVandaag, stappenPerDag, isGekoppeld, stappenStatus, platform, isNative, laatsteBronnenVandaag } from './telefoonStappen'
 
 export const STAPPEN_EVENT = 'myarc:stappen-bijgewerkt'
 // De coach vroeg opnieuw om toestemming; StappenVerzoek luistert hiernaar.
@@ -42,7 +42,7 @@ export async function syncStappen(db, clientId, { bijOpstart = false } = {}) {
     // toestemmingsscherm open, en dan zou de status 'geweigerd' zijn.
     if (bijOpstart) meldStappenStatus(db, clientId)
     if (n == null) return null
-    await StappenService.bewaar(db, clientId, n, { source: 'telefoon' })
+    await StappenService.bewaar(db, clientId, n, { source: 'telefoon', bronnen: laatsteBronnenVandaag() })
     window.dispatchEvent(new CustomEvent(STAPPEN_EVENT, { detail: { steps: n } }))
 
     // Bij het opstarten ook de dagen ervoor bijwerken. De telefoon heeft ze,
@@ -77,7 +77,7 @@ async function haalAchterstandIn(db, clientId) {
       const rij = perDag.get(dag.iso)
       if (rij?.source === 'handmatig' && rij.steps > 0) continue
       if (rij && rij.steps === dag.steps) continue
-      await StappenService.bewaar(db, clientId, dag.steps, { datum: dag.iso, source: 'telefoon' })
+      await StappenService.bewaar(db, clientId, dag.steps, { datum: dag.iso, source: 'telefoon', bronnen: dag.bronnen })
       bijgewerkt++
     }
     if (bijgewerkt > 0) {

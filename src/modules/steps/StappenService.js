@@ -90,7 +90,9 @@ const StappenService = {
     return uit
   },
 
-  async bewaar(db, clientId, steps, { datum = vandaagIso(), source = 'handmatig' } = {}) {
+  // `bronnen`: alleen op Android, stappen per app (zie telefoonStappen.js).
+  // Alleen meegestuurd als er iets is, zodat een rij zonder niets wist.
+  async bewaar(db, clientId, steps, { datum = vandaagIso(), source = 'handmatig', bronnen = null } = {}) {
     if (!db?.supabase || !clientId) return null
     const aantal = Math.max(0, Math.min(200000, Math.round(Number(steps) || 0)))
     const { data, error } = await db.supabase
@@ -100,6 +102,7 @@ const StappenService = {
         date: datum,
         steps: aantal,
         source,
+        ...(bronnen ? { bronnen } : null),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'client_id,date' })
       .select()

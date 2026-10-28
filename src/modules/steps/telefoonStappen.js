@@ -107,8 +107,76 @@ export async function stappenBijOpstart() {
   return stappenVanVandaag()
 }
 
-// De laatste n dagen als lijst van { iso, steps }, oudste eerst. Null als we
-// het niet kunnen weten.
+// ── Dubbeltelling op Android ──
+//
+// Health Connect telt de stappen van álle apps die erin schrijven bij elkaar
+// en ontdubbelt alleen waar die elkaar in de tijd overlappen. Schrijven
+// Samsung Health (horloge + telefoon) en bijv. Google Fit allebei stappen, dan
+// komt het totaal ruim hoger uit dan wat de klant in Samsung Health ziet
+// (Elijah, 27 okt 2026: 24.804 bij ons, ±15.000 in Samsung Health). De plugin
+// waarschuwt hier zelf voor bij queryRecords.
+//
+// Daarom op Android: per app uitlezen en één bron aanhouden. Samsung Health
+// als die er is (dat is wat de klant zelf bekijkt), anders de app met de
+// meeste stappen. Nooit optellen.
+const SAMSUNG_HEALTH = 'com.sec.android.app.shealth'
+const p2 = (n) => String(n).padStart(2, '0')
+const isoVan = (ruw) => {
+  const d = ruw ? new Date(ruw) : null
+  if (!d || isNaN(d.getTime())) return null
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+}
+
+// Emmers van queryAggregated optellen per kalenderdag. De plugin geeft per
+// emmer een begin-datum; die kan als string of als tijdstempel binnenkomen.
+const perKalenderdag = (rijen) => {
+  const perDag = new Map()
+  ;(rijen || []).forEach(r => {
+    const iso = isoVan(r?.startDate || r?.date || r?.start || null)
+    if (!iso) return
+    perDag.set(iso, (perDag.get(iso) || 0) + (Number(r?.value) || 0))
+  })
+  return perDag
+}
+
+// { iso: { pakket: stappen } } voor elke app die stappen schreef, of null
+// als het niet nodig is (één bron, iOS) of niet lukt (oude app zonder
+// queryRecords). Null = gewoon het totaal gebruiken zoals voorheen.
+async function stappenPerApp(startIso, eindIso) {
+  if (platform() !== 'android') return null
+  try {
+    const { records } = await Health.queryRecords({ startDate: startIso, endDate: eindIso, dataType: 'steps' })
+    const apps = [...new Set((records || []).map(r => r?.sourceBundleId).filter(Boolean))]
+    if (apps.length < 2) return null
+    const uit = {}
+    for (const app of apps) {
+      const res = await Health.queryAggregated({
+        startDate: startIso, endDate: eindIso, dataType: 'steps', bucket: 'day', dataOrigins: [app],
+      })
+      perKalenderdag(res?.aggregatedData).forEach((n, iso) => {
+        if (!uit[iso]) uit[iso] = {}
+        uit[iso][app] = Math.round(n)
+      })
+    }
+    return uit
+  } catch (e) {
+    console.warn('Stappen per app lezen mislukt, totaal gebruikt:', e?.message || e)
+    return null
+  }
+}
+
+// Eén getal uit de stappen per app: Samsung Health als die iets heeft, anders
+// de app met de meeste.
+const kiesBron = (perApp) => {
+  if (perApp?.[SAMSUNG_HEALTH] > 0) return perApp[SAMSUNG_HEALTH]
+  const waarden = Object.values(perApp || {}).filter(n => n > 0)
+  return waarden.length ? Math.max(...waarden) : null
+}
+
+// De laatste n dagen als lijst van { iso, steps, bronnen }, oudste eerst.
+// Null als we het niet kunnen weten. `bronnen` is alleen gevuld op Android
+// met meer dan één app: { per_app, totaal_health_connect } — zo is achteraf
+// te zien waarom ons getal afwijkt van het opgetelde totaal.
 //
 // Waarom dit er is: de app las alleen vandaag. Opende een klant de app twee
 // dagen niet, dan stonden die dagen bij de coach op nul terwijl zijn telefoon
@@ -127,20 +195,19 @@ export async function stappenPerDag(dagenTerug = 7) {
       dataType: 'steps',
       bucket: 'day',
     })
-    const rijen = res?.aggregatedData || []
-    // Emmers optellen per kalenderdag. De plugin geeft per emmer een
-    // begin-datum; die kan als string of als tijdstempel binnenkomen.
-    const perDag = new Map()
-    rijen.forEach(r => {
-      const ruw = r?.startDate || r?.date || r?.start || null
-      const d = ruw ? new Date(ruw) : null
-      if (!d || isNaN(d.getTime())) return
-      const p = (n) => String(n).padStart(2, '0')
-      const iso = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-      perDag.set(iso, (perDag.get(iso) || 0) + (Number(r?.value) || 0))
-    })
-    return [...perDag.entries()]
-      .map(([iso, aantal]) => ({ iso, steps: Math.round(aantal) }))
+    const totaal = perKalenderdag(res?.aggregatedData)
+    const perApp = await stappenPerApp(start.toISOString(), eind.toISOString())
+    const dagen = new Set([...totaal.keys(), ...Object.keys(perApp || {})])
+    return [...dagen]
+      .map(iso => {
+        const som = Math.round(totaal.get(iso) || 0)
+        const gekozen = perApp?.[iso] ? kiesBron(perApp[iso]) : null
+        return {
+          iso,
+          steps: gekozen ?? som,
+          bronnen: perApp?.[iso] ? { per_app: perApp[iso], totaal_health_connect: som } : null,
+        }
+      })
       .sort((a, b) => a.iso.localeCompare(b.iso))
   } catch (e) {
     console.warn('Stappen-historie lezen mislukt:', e?.message || e)
@@ -148,29 +215,25 @@ export async function stappenPerDag(dagenTerug = 7) {
   }
 }
 
+// Vandaag als { steps, bronnen }, of null als we het niet kunnen weten. De
+// bronnen van de laatste lezing blijven bewaard voor stappenSync, dat alleen
+// het getal terugkrijgt.
+let bronnenVandaag = null
+export const laatsteBronnenVandaag = () => bronnenVandaag
+
+export async function vandaagMetBronnen() {
+  const dagen = await stappenPerDag(1)
+  if (dagen == null) return null
+  const vandaag = isoVan(new Date())
+  const rij = dagen.find(d => d.iso === vandaag)
+  bronnenVandaag = rij?.bronnen || null
+  return rij ? { steps: rij.steps, bronnen: rij.bronnen } : { steps: 0, bronnen: null }
+}
+
 // Het aantal stappen van vandaag, of null als we het niet kunnen weten.
 export async function stappenVanVandaag() {
-  if (!(await heeftTelefoonBron())) return null
-  const start = new Date(); start.setHours(0, 0, 0, 0)
-  const eind = new Date()
-  try {
-    const res = await Health.queryAggregated({
-      // iOS wil fractionele seconden in de datum; toISOString levert die.
-      startDate: start.toISOString(),
-      endDate: eind.toISOString(),
-      dataType: 'steps',
-      bucket: 'day',
-    })
-    const rijen = res?.aggregatedData || []
-    if (!rijen.length) return 0
-    // Eén emmer van één dag, maar over de dagrand (of bij tijdzonegedoe) kan
-    // het er meer zijn; optellen is dan het juiste antwoord.
-    const totaal = rijen.reduce((s, r) => s + (Number(r?.value) || 0), 0)
-    return Math.round(totaal)
-  } catch (e) {
-    console.warn('Stappen lezen mislukt:', e?.message || e)
-    return null
-  }
+  const v = await vandaagMetBronnen()
+  return v == null ? null : v.steps
 }
 
 // ── Waarom komen er wel of geen stappen binnen? ──
