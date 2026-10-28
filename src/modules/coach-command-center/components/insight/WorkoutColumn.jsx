@@ -19,6 +19,7 @@ import { KolomKopInhoud } from './KolomKop'
 import { kopKnopStijl, kopInfoStijl } from './kolomKopStijl'
 import BladModal from '../../../workout/components/todays-workout/components/BladModal'
 import KlantPlanTerugzetten from './KlantPlanTerugzetten'
+import InklapKop, { useInklap } from './InklapKop'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 // Wanneer de klant de training opsloeg (completed_at wordt bij het opslaan
@@ -126,6 +127,7 @@ const SOORT = {
 function PlanWijzigingen({ db, client, isMobile }) {
   const [rijen, setRijen] = useState([])
   const [alles, setAlles] = useState(false)
+  const [open, wissel] = useInklap('plan_wijzigingen')
   useEffect(() => {
     if (!client?.id || !db?.supabase) { setRijen([]); return }
     db.supabase.from('client_plan_changes')
@@ -139,8 +141,8 @@ function PlanWijzigingen({ db, client, isMobile }) {
   const zichtbaar = alles ? rijen : rijen.slice(0, 5)
   return (
     <div style={{ marginBottom: '0.4rem' }}>
-      <div style={{ ...SECTIEKOP, paddingTop: '0.6rem' }}>Aangepast in plan</div>
-      {zichtbaar.map(r => {
+      <InklapKop titel="Aangepast in plan" aantal={rijen.length} open={open} onWissel={wissel} />
+      {open && zichtbaar.map(r => {
         const m = SOORT[r.soort] || SOORT.toegevoegd
         const Icoon = m.icoon
         const datum = new Date(r.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
@@ -159,7 +161,7 @@ function PlanWijzigingen({ db, client, isMobile }) {
           </div>
         )
       })}
-      {rijen.length > 5 && (
+      {open && rijen.length > 5 && (
         <button onClick={() => setAlles(v => !v)} style={{ background: 'none', border: 'none', padding: '0.4rem 0.9rem', color: 'rgba(255,255,255,0.55)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
           {alles ? 'Minder tonen' : `Alle ${rijen.length} tonen`}
         </button>

@@ -8,6 +8,7 @@
 // dag daarna niet nóg eens veranderd is. Zie plan-terugzetten.sql.
 import { useCallback, useEffect, useState } from 'react'
 import { Undo2, Check } from 'lucide-react'
+import InklapKop, { useInklap } from './InklapKop'
 
 const SECTIEKOP = { padding: '0.6rem 0.9rem 0.45rem', fontSize: '0.86rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }
 const ZWAK = 'rgba(255,255,255,0.5)'
@@ -94,6 +95,7 @@ export default function KlantPlanTerugzetten({ db, client, soort, isMobile, onTe
   const [zeker, setZeker] = useState(null)   // id dat om bevestiging vraagt
   const [melding, setMelding] = useState({}) // id -> tekst
   const [alles, setAlles] = useState(false)
+  const [open, wissel] = useInklap(`terugzetten_${soort}`)
 
   const laad = useCallback(async () => {
     if (!client?.id || !db?.supabase) { setVersies([]); return }
@@ -126,11 +128,11 @@ export default function KlantPlanTerugzetten({ db, client, soort, isMobile, onTe
   }
 
   if (!versies.length) return null
-  const zichtbaar = alles ? versies : versies.slice(0, 4)
+  const zichtbaar = !open ? [] : alles ? versies : versies.slice(0, 4)
 
   return (
     <div style={{ marginBottom: '0.4rem' }}>
-      <div style={SECTIEKOP}>Blijvend aangepast door klant</div>
+      <InklapKop titel="Blijvend aangepast door klant" aantal={versies.filter(v => !v.teruggezet_at).length} open={open} onWissel={wissel} />
       {zichtbaar.map(r => {
         const regels = soort === 'meal' ? maaltijdRegels(r, namen) : workoutRegels(r)
         const datum = new Date(r.created_at).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -167,7 +169,7 @@ export default function KlantPlanTerugzetten({ db, client, soort, isMobile, onTe
           </div>
         )
       })}
-      {versies.length > 4 && (
+      {open && versies.length > 4 && (
         <button onClick={() => setAlles(v => !v)} style={{ background: 'none', border: 'none', padding: '0.4rem 0.9rem', color: 'rgba(255,255,255,0.55)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
           {alles ? 'Minder tonen' : `Alle ${versies.length} tonen`}
         </button>
