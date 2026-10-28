@@ -1,19 +1,22 @@
 // src/modules/video-feedback/CoachVideoFeedback.jsx
 import { useState, useEffect, useRef } from 'react'
-import {
-  Video, Clock, Send, User, Dumbbell, ChevronRight, X, Play,
-  Upload, Plus, RotateCcw
-} from 'lucide-react'
+import { Video, Clock, Send, X, Play, Upload, Plus, RotateCcw, ChevronRight } from 'lucide-react'
 import { oefeningInfo } from '../workout/utils/oefeningBatch'
 import { extractYouTubeId, appSafeEmbedUrl } from '../videos/utils/youtubeHelpers'
 import { SOORTEN, soortVan, tijdTekst, puntenVan, puntenAlsTekst } from './feedbackPunten'
 
+const STATUS_KLEUR = { approved: '#10b981', needs_work: '#f59e0b', reviewed: '#3b82f6', pending: '#fff' }
+const naamVan = (s) => s?.clients ? `${s.clients.first_name || ''} ${s.clients.last_name || ''}`.trim() : 'Onbekend'
+
+// Overzicht per klant (28 okt 2026; was een raster van grote kaarten met
+// gele knoppen). Per klant één regel met kleine staande thumbnails; tik er
+// één aan en je loopt die klant z'n video's na in het vergelijkscherm.
 export default function CoachVideoFeedback({ db }) {
   const isMobile = window.innerWidth <= 768
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('pending')
-  const [selectedSubmission, setSelectedSubmission] = useState(null)
+  const [filter, setFilter] = useState('open')
+  const [open, setOpen] = useState(null) // { lijst, index }
 
   useEffect(() => { loadSubmissions() }, [])
 
@@ -26,70 +29,74 @@ export default function CoachVideoFeedback({ db }) {
     finally { setLoading(false) }
   }
 
-  const filteredSubmissions = submissions.filter(s =>
-    filter === 'all' ? true : s.status === filter
+  const gefilterd = submissions.filter(s =>
+    filter === 'all' ? true : filter === 'open' ? s.status === 'pending' : s.status !== 'pending'
   )
+  const perKlant = []
+  const index = new Map()
+  gefilterd.forEach(s => {
+    if (!index.has(s.client_id)) { index.set(s.client_id, perKlant.length); perKlant.push({ id: s.client_id, naam: naamVan(s), lijst: [] }) }
+    perKlant[index.get(s.client_id)].lijst.push(s)
+  })
+  // Oudste video eerst binnen een klant: daar wacht iemand het langst op.
+  perKlant.forEach(k => k.lijst.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
 
-  const pendingCount = submissions.filter(s => s.status === 'pending').length
+  const openAantal = submissions.filter(s => s.status === 'pending').length
+  const pil = (actief) => ({
+    padding: '0.45rem 0.95rem', borderRadius: 999, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+    background: actief ? '#fff' : 'rgba(255,255,255,0.06)', color: actief ? '#000' : 'rgba(255,255,255,0.7)',
+    fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit', touchAction: 'manipulation',
+  })
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Video size={20} color="#FFD700" />
-        </div>
-        <div>
-          <h1 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: '800', color: '#fff', margin: 0 }}>Video Feedback</h1>
-          <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', margin: 0 }}>{pendingCount} wachtend op review</p>
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
-        {[
-          { id: 'pending', label: 'Pending', color: '#FFD700' },
-          { id: 'reviewed', label: 'Reviewed', color: '#3b82f6' },
-          { id: 'approved', label: 'Approved', color: '#10b981' },
-          { id: 'needs_work', label: 'Werk nodig', color: '#f59e0b' },
-          { id: 'all', label: 'Alle', color: '#666' }
-        ].map(({ id, label, color }) => {
-          const count = id === 'all' ? submissions.length : submissions.filter(s => s.status === id).length
-          const active = filter === id
-          return (
-            <button key={id} onClick={() => setFilter(id)} style={{ padding: '0.45rem 0.875rem', background: active ? `${color}18` : 'transparent', border: active ? `1px solid ${color}45` : '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: active ? color : 'rgba(255,255,255,0.4)', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              {label}
-              <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>{count}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Submissions */}
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
-          <div style={{ width: '32px', height: '32px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        </div>
-      ) : filteredSubmissions.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <Video size={36} color="rgba(255,255,255,0.15)" style={{ marginBottom: '0.75rem' }} />
-          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.875rem', margin: 0 }}>Geen video's in deze categorie</p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: '0.875rem' }}>
-          {filteredSubmissions.map(s => (
-            <SubmissionCard key={s.id} submission={s} onClick={() => setSelectedSubmission(s)} />
+    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <h1 style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.02em' }}>Video feedback</h1>
+        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+          {openAantal === 0 ? 'Alles bekeken' : `${openAantal} open`}
+        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          {[['open', 'Open'], ['klaar', 'Afgerond'], ['all', 'Alle']].map(([id, l]) => (
+            <button key={id} onClick={() => setFilter(id)} style={pil(filter === id)}>{l}</button>
           ))}
         </div>
-      )}
+      </div>
 
-      {selectedSubmission && (
-        <FeedbackModal
-          submission={selectedSubmission}
-          db={db}
-          onClose={() => setSelectedSubmission(null)}
-          onUpdate={() => { loadSubmissions(); setSelectedSubmission(null) }}
-        />
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+          <div style={{ width: 30, height: 30, border: '3px solid rgba(255,255,255,0.12)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        </div>
+      ) : perKlant.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.88rem', fontWeight: 600 }}>
+          {filter === 'open' ? 'Geen open video’s. Alles heeft feedback.' : 'Geen video’s.'}
+        </div>
+      ) : perKlant.map(k => (
+        <div key={k.id} style={{ padding: '0.9rem 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <button onClick={() => setOpen({ lijst: k.lijst, index: 0 })} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginBottom: 10, fontFamily: 'inherit' }}>
+            <span style={{ fontSize: '0.98rem', fontWeight: 900, color: '#fff' }}>{k.naam}</span>
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{k.lijst.length} video{k.lijst.length === 1 ? '' : '’s'}</span>
+            <ChevronRight size={15} color="rgba(255,255,255,0.4)" />
+          </button>
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+            {k.lijst.map((s, i) => (
+              <button key={s.id} onClick={() => setOpen({ lijst: k.lijst, index: i })} style={{ flexShrink: 0, width: isMobile ? 104 : 120, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                <div style={{ aspectRatio: '9/16', borderRadius: 12, overflow: 'hidden', background: '#111', position: 'relative' }}>
+                  <video src={`${s.video_url}#t=0.5`} preload="metadata" muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                  <span style={{ position: 'absolute', top: 7, left: 7, width: 8, height: 8, borderRadius: '50%', background: STATUS_KLEUR[s.status] || '#fff', boxShadow: '0 0 0 2px rgba(0,0,0,0.6)' }} />
+                </div>
+                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#fff', marginTop: 6, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.exercise_name}</div>
+                <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                  {new Date(s.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {open && (
+        <KlantVideos db={db} lijst={open.lijst} start={open.index}
+          onClose={(gewijzigd) => { setOpen(null); if (gewijzigd) loadSubmissions() }} />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -97,64 +104,35 @@ export default function CoachVideoFeedback({ db }) {
   )
 }
 
-function SubmissionCard({ submission, onClick }) {
-  const clientName = submission.clients
-    ? `${submission.clients.first_name || ''} ${submission.clients.last_name || ''}`.trim()
-    : 'Onbekend'
-
-  const statusColor = { approved: '#10b981', needs_work: '#f59e0b', reviewed: '#3b82f6', pending: '#FFD700' }[submission.status] || '#FFD700'
-  const statusLabel = { approved: 'Goedgekeurd', needs_work: 'Werk nodig', reviewed: 'Reviewed', pending: 'Pending' }[submission.status] || 'Pending'
-
+// Loop de video's van één klant na: afronden gaat door naar de volgende.
+// Ook gebruikt vanaf de klantkaart in het Command Center.
+export function KlantVideos({ db, lijst, start = 0, onClose }) {
+  const [index, setIndex] = useState(start)
+  const gewijzigd = useRef(false)
+  const sub = lijst[index]
+  if (!sub) return null
   return (
-    <div onClick={onClick} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s ease' }}
-      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'}
-      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'}>
-      {/* Thumbnail */}
-      <div style={{ aspectRatio: '16/9', background: '#111', position: 'relative', overflow: 'hidden' }}>
-        <video src={submission.video_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Play size={20} color="#000" fill="#000" style={{ marginLeft: '2px' }} />
-          </div>
-        </div>
-        <div style={{ position: 'absolute', top: '0.625rem', right: '0.625rem', padding: '0.25rem 0.5rem', background: 'rgba(0,0,0,0.7)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusColor }} />
-          <span style={{ fontSize: '0.62rem', fontWeight: '700', color: '#fff' }}>{statusLabel}</span>
-        </div>
-        {submission.coach_video_url && (
-          <div style={{ position: 'absolute', bottom: '0.625rem', right: '0.625rem', padding: '0.2rem 0.5rem', background: 'rgba(16,185,129,0.8)', borderRadius: '5px' }}>
-            <span style={{ fontSize: '0.55rem', fontWeight: '700', color: '#fff' }}>Coach video ✓</span>
-          </div>
-        )}
-      </div>
-      {/* Info */}
-      <div style={{ padding: '0.875rem 1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
-          <User size={12} color="rgba(255,255,255,0.35)" />
-          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#fff' }}>{clientName}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <Dumbbell size={11} color="rgba(255,215,0,0.6)" />
-            <span style={{ fontSize: '0.78rem', fontWeight: '600', color: 'rgba(255,215,0,0.7)' }}>{submission.exercise_name}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-            <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)' }}>{new Date(submission.created_at).toLocaleDateString('nl-NL')}</span>
-            <ChevronRight size={14} color="rgba(255,255,255,0.2)" />
-          </div>
-        </div>
-      </div>
-    </div>
+    <FeedbackModal
+      key={sub.id}
+      submission={sub}
+      db={db}
+      positie={lijst.length > 1 ? { nr: index + 1, van: lijst.length, vorige: index > 0 ? () => setIndex(index - 1) : null, volgende: index < lijst.length - 1 ? () => setIndex(index + 1) : null } : null}
+      onClose={() => onClose(gewijzigd.current)}
+      onUpdate={() => {
+        gewijzigd.current = true
+        if (index < lijst.length - 1) setIndex(index + 1)
+        else onClose(true)
+      }}
+    />
   )
 }
-
 
 // Vergelijk-scherm (28 okt 2026). Kersten deelt dit scherm in Zoom: links de
 // video van de klant, rechts een voorbeeld (eigen coachvideo of de oefenvideo
 // uit de app). Ernaast punten noteren; elk punt kan het moment in de
 // klantvideo vasthouden. Punten worden direct opgeslagen, zodat de klant ze
 // tijdens het gesprek al in de app ziet.
-function FeedbackModal({ submission, db, onClose, onUpdate }) {
+function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
   const isMobile = window.innerWidth <= 768
   const [punten, setPunten] = useState(() => puntenVan(submission))
   const [tekst, setTekst] = useState('')
@@ -305,6 +283,17 @@ function FeedbackModal({ submission, db, onClose, onUpdate }) {
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{clientName}</div>
           <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{submission.exercise_name}</div>
         </div>
+        {positie && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button onClick={positie.vorige || undefined} disabled={!positie.vorige} aria-label="Vorige video" style={{ width: 34, height: 34, background: 'none', border: 'none', color: '#fff', opacity: positie.vorige ? 1 : 0.25, cursor: positie.vorige ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChevronRight size={20} strokeWidth={2.6} style={{ transform: 'rotate(180deg)' }} />
+            </button>
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{positie.nr}/{positie.van}</span>
+            <button onClick={positie.volgende || undefined} disabled={!positie.volgende} aria-label="Volgende video" style={{ width: 34, height: 34, background: 'none', border: 'none', color: '#fff', opacity: positie.volgende ? 1 : 0.25, cursor: positie.volgende ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChevronRight size={20} strokeWidth={2.6} />
+            </button>
+          </div>
+        )}
         <span style={{ fontSize: '0.7rem', fontWeight: 700, color: opslag === 'fout' ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>
           {opslag === 'bezig' ? 'Opslaan…' : opslag === 'ok' ? 'Opgeslagen · klant ziet het' : opslag === 'fout' ? 'Niet opgeslagen' : ''}
         </span>
@@ -430,7 +419,7 @@ function FeedbackModal({ submission, db, onClose, onUpdate }) {
               ))}
             </div>
             <button onClick={handleSubmit} disabled={submitting} style={{ width: '100%', minHeight: 48, borderRadius: 12, border: 'none', background: '#fff', color: '#000', fontSize: '0.92rem', fontWeight: 900, fontFamily: 'inherit', cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <Send size={16} strokeWidth={2.6} />{submitting ? 'Opslaan…' : submission.status === 'pending' ? 'Afronden en klant melden' : 'Afronden'}
+              <Send size={16} strokeWidth={2.6} />{submitting ? 'Opslaan…' : `${submission.status === 'pending' ? 'Afronden en klant melden' : 'Afronden'}${positie?.volgende ? ' · volgende' : ''}`}
             </button>
           </div>
         </div>

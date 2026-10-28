@@ -12,7 +12,7 @@ import { useModalHost } from '../../../coach/ModalHost'
 import {
   TrendingDown, TrendingUp,
   MessageCircle, Power, MoreHorizontal, Trash2,
-  BarChart3, Pause, CheckCircle2, Circle
+  BarChart3, Pause, CheckCircle2, Circle, Video
 } from 'lucide-react'
 import DeleteClientModal from './DeleteClientModal'
 import { computePeriod } from './trajectPeriode'
@@ -80,7 +80,7 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange }) {
+export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos }) {
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
 
@@ -531,6 +531,24 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           )}
           {isInactive && (
             <span style={{ flexShrink: 0, fontSize: '0.6rem', fontWeight: 800, color: '#6b7280', whiteSpace: 'nowrap' }}>inactief</span>
+          )}
+          {/* Open techniekvideo's: wit rondje met het aantal; tik = feedback geven. */}
+          {openVideos > 0 && onOpenVideos && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpenVideos() }}
+              title={`${openVideos} video${openVideos === 1 ? '' : '’s'} wacht${openVideos === 1 ? '' : 'en'} op feedback`}
+              aria-label="Video's bekijken"
+              style={{
+                flexShrink: 0, alignSelf: 'center', position: 'relative', width: 24, height: 24, borderRadius: '50%',
+                background: '#fff', border: 'none', color: '#000', padding: 0, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+              <Video size={13} strokeWidth={2.6} />
+              {openVideos > 1 && (
+                <span style={{ position: 'absolute', top: -5, right: -6, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 999, background: '#ef4444', color: '#fff', fontSize: '0.56rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #0a0a0a' }}>{openVideos}</span>
+              )}
+            </button>
           )}
         </div>
 

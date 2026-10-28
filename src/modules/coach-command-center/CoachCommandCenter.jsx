@@ -7,7 +7,7 @@ import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus, Eye, Eye
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
-import CoachVideoFeedback from '../video-feedback/CoachVideoFeedback'
+import CoachVideoFeedback, { KlantVideos } from '../video-feedback/CoachVideoFeedback'
 import AddClientModal from './components/AddClientModal'
 import { naloopGrens } from '../challenge-monitor/challengeEisen'
 import { PRIVE, zetPrivacy, herstelPrivacy } from './utils/privacyModus'
@@ -61,6 +61,20 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   const service = serviceRef.current
 
   useEffect(() => { loadData() }, [])
+
+  // Open techniekvideo's per klant: rondje op de klantkaart, tik = meteen het
+  // vergelijkscherm voor die klant (28 okt 2026).
+  const [openVideos, setOpenVideos] = useState({})
+  const [videoKlant, setVideoKlant] = useState(null) // { lijst }
+  const laadOpenVideos = useCallback(async () => {
+    const { data } = await db.supabase.from('client_exercise_submissions')
+      .select('*').eq('status', 'pending').order('created_at', { ascending: true })
+      .then(r => r, () => ({ data: [] }))
+    const m = {}
+    ;(data || []).forEach(s => { (m[s.client_id] ||= []).push(s) })
+    setOpenVideos(m)
+  }, [db])
+  useEffect(() => { if (activeView === 'clients') laadOpenVideos() }, [activeView, laadOpenVideos])
 
   // Wie doet er mee aan een lopende challenge. Eén kleine query, los van de
   // zware klantenlaadbeurt, zodat de lijst er niet op hoeft te wachten.
@@ -451,7 +465,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
         <button onClick={() => setActiveView(activeView === 'video' ? 'clients' : 'video')}
           title={activeView === 'video' ? 'Terug naar klanten' : 'Video-feedback'}
           style={{
-            flexShrink: 0, width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
+            position: 'relative', flexShrink: 0, width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: activeView === 'video' ? '#fff' : 'rgba(255,255,255,0.05)',
             border: activeView === 'video' ? 'none' : '1px solid rgba(255,255,255,0.1)',
@@ -459,6 +473,11 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
           <Video size={15} strokeWidth={2.4} />
+          {activeView !== 'video' && Object.keys(openVideos).length > 0 && (
+            <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, padding: '0 4px', borderRadius: 999, background: '#fff', color: '#000', fontSize: '0.62rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #000' }}>
+              {Object.values(openVideos).reduce((n, l) => n + l.length, 0)}
+            </span>
+          )}
         </button>
 
         <button onClick={() => setShowAddClient(true)}
@@ -569,6 +588,8 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
                 onOpenMealPanel={onOpenMealPanel}
                 onOpenWorkoutPanel={onOpenWorkoutPanel}
                 onDagCheckChange={verwerkDagCheck}
+                openVideos={openVideos[client.id]?.length || 0}
+                onOpenVideos={() => setVideoKlant({ lijst: openVideos[client.id].map(v => ({ ...v, clients: { first_name: client.first_name, last_name: client.last_name } })) })}
               />
             ))}
           </div>
@@ -583,6 +604,11 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             </div>
           )}
         </>
+      )}
+
+      {videoKlant && (
+        <KlantVideos db={db} lijst={videoKlant.lijst}
+          onClose={(gewijzigd) => { setVideoKlant(null); if (gewijzigd) laadOpenVideos() }} />
       )}
 
       <AddClientModal
