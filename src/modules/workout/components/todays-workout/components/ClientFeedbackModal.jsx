@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from '../../../../../client/paginaPortal'
 import { X, Send, CheckCircle, Video, Upload, AlertTriangle, PlayCircle, ChevronRight } from 'lucide-react'
 import { puntenVan, soortVan, tijdTekst } from '../../../../video-feedback/feedbackPunten'
+import { embedVan } from '../../../../video-feedback/voorbeeldEmbed'
 
 export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
   const isMobile = window.innerWidth <= 768
@@ -231,15 +232,27 @@ export default function ClientFeedbackModal({ exercise, client, db, onClose }) {
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <div style={{ flex: 1, minWidth: 0, aspectRatio: '9/16', maxHeight: 300, borderRadius: 14, overflow: 'hidden', background: '#141414', margin: '0 auto', position: 'relative' }}>
-                      {sub.coach_video_url && <span style={videoLabel}>Jij</span>}
+                      {(sub.coach_video_url || sub.voorbeeld_url) && <span style={videoLabel}>Jij</span>}
                       <video ref={el => { videoRefs.current[sub.id] = el }} src={sub.video_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     </div>
-                    {sub.coach_video_url && (
-                      <div style={{ flex: 1, minWidth: 0, aspectRatio: '9/16', maxHeight: 300, borderRadius: 14, overflow: 'hidden', background: '#141414', position: 'relative' }}>
-                        <span style={videoLabel}>Coach</span>
-                        <video src={sub.coach_video_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                      </div>
-                    )}
+                    {/* Rechts: het voorbeeld dat de coach koos (link van een
+                        creator), anders zijn eigen video. */}
+                    {(() => {
+                      const vb = sub.voorbeeld_url ? embedVan(sub.voorbeeld_url) : null
+                      if (!vb && !sub.coach_video_url) return null
+                      return (
+                        <div style={{ flex: 1, minWidth: 0, aspectRatio: '9/16', maxHeight: 300, borderRadius: 14, overflow: 'hidden', background: '#141414', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={videoLabel}>{vb ? 'Voorbeeld' : 'Coach'}</span>
+                          {vb?.soort === 'iframe' ? (
+                            <iframe src={vb.src} title="Voorbeeld" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen style={{ width: '100%', height: '100%', border: 'none' }} />
+                          ) : vb?.soort === 'link' ? (
+                            <a href={vb.src} target="_blank" rel="noopener noreferrer" style={{ color: '#fff', fontSize: '0.8rem', fontWeight: 800, textDecoration: 'underline', padding: '1rem', textAlign: 'center' }}>Bekijk het voorbeeld</a>
+                          ) : (
+                            <video src={vb?.src || sub.coach_video_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                   {/* De video die de coach bij deze feedback maakte (Zoom, Loom). */}
                   {sub.feedback_link && (

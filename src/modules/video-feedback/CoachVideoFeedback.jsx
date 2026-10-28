@@ -2,8 +2,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Video, Clock, Send, X, Play, Upload, Plus, RotateCcw, ChevronRight, Link2 } from 'lucide-react'
 import { oefeningInfo } from '../workout/utils/oefeningBatch'
-import { extractYouTubeId, appSafeEmbedUrl } from '../videos/utils/youtubeHelpers'
 import { SOORTEN, soortVan, tijdTekst, puntenVan, puntenAlsTekst } from './feedbackPunten'
+import { embedVan, schoneUrl } from './voorbeeldEmbed'
 
 const STATUS_KLEUR = { approved: '#10b981', needs_work: '#f59e0b', reviewed: '#3b82f6', pending: '#fff' }
 const naamVan = (s) => s?.clients ? `${s.clients.first_name || ''} ${s.clients.last_name || ''}`.trim() : 'Onbekend'
@@ -148,7 +148,21 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
   const [info, setInfo] = useState(null)
   const [coachVideo, setCoachVideo] = useState(submission.coach_video_url || null)
   const [uploadingVideo, setUploadingVideo] = useState(false)
-  const [bron, setBron] = useState(submission.coach_video_url ? 'coach' : 'oefening')
+  const [bron, setBron] = useState(submission.voorbeeld_url ? 'link' : submission.coach_video_url ? 'coach' : 'oefening')
+  // Voorbeeld van een externe creator: geplakte link (YouTube, Instagram,
+  // TikTok, mp4). Wordt op de inzending bewaard; de klant ziet hem ook.
+  const [voorbeeldLink, setVoorbeeldLink] = useState(submission.voorbeeld_url || null)
+  const [linkInvoer, setLinkInvoer] = useState(null) // null = dicht, string = open
+  const bewaarVoorbeeldLink = async (tekst) => {
+    const url = schoneUrl(tekst)
+    const { error } = await db.supabase.from('client_exercise_submissions')
+      .update({ voorbeeld_url: url }).eq('id', submission.id)
+      .then(r => r, e => ({ error: e }))
+    if (error) { alert('Kon de link niet opslaan'); return }
+    setVoorbeeldLink(url)
+    setLinkInvoer(null)
+    if (url) setBron('link')
+  }
   const klantRef = useRef(null)
   const voorbeeldRef = useRef(null)
   const videoInputRef = useRef(null)
@@ -167,12 +181,13 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
 
   // Voorbeeldbronnen: eigen coachvideo, de oefenvideo, de uitlegvideo.
   const bronnen = [
+    voorbeeldLink && { id: 'link', label: 'Link', url: voorbeeldLink },
     coachVideo && { id: 'coach', label: 'Mijn video', url: coachVideo },
     info?.video_url && { id: 'oefening', label: 'Oefenvideo', url: info.video_url },
     info?.fallback_video_url && { id: 'uitleg', label: 'Uitleg', url: info.fallback_video_url },
   ].filter(Boolean)
   const gekozen = bronnen.find(b => b.id === bron) || bronnen[0] || null
-  const ytId = gekozen ? extractYouTubeId(gekozen.url) : null
+  const embed = gekozen ? embedVan(gekozen.url) : null
 
   // Punten en link direct bewaren (kort na de laatste wijziging).
   const schoneLink = () => {
@@ -327,13 +342,18 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 600, textAlign: 'center', padding: '1rem' }}>
                   Geen voorbeeldvideo bij deze oefening.<br />Upload hieronder je eigen video.
                 </div>
-              ) : ytId ? (
+              ) : embed?.soort === 'iframe' ? (
                 <iframe
-                  key={ytId}
-                  src={appSafeEmbedUrl(`https://www.youtube.com/embed/${ytId}?rel=0&playsinline=1&modestbranding=1`)}
+                  key={embed.src}
+                  src={embed.src}
                   title="Voorbeeld" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
-                  style={{ width: '100%', height: '100%', border: 'none' }}
+                  style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
                 />
+              ) : embed?.soort === 'link' ? (
+                <div style={{ textAlign: 'center', padding: '1rem' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 600, marginBottom: 10 }}>Deze site laat zich niet insluiten.</div>
+                  <a href={embed.src} target="_blank" rel="noopener noreferrer" style={{ ...pil(true), textDecoration: 'none', display: 'inline-block' }}>Open de video</a>
+                </div>
               ) : (
                 <video ref={voorbeeldRef} key={gekozen.url} src={gekozen.url} controls loop playsInline muted style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               )}
@@ -356,10 +376,29 @@ function FeedbackModal({ submission, db, onClose, onUpdate, positie }) {
               {uploadingVideo ? 'Uploaden…' : coachVideo ? 'Andere eigen video' : 'Eigen video'}
             </button>
             <input ref={videoInputRef} type="file" accept="video/*" onChange={handleCoachVideoSelect} style={{ display: 'none' }} />
+            <button onClick={() => setLinkInvoer(linkInvoer == null ? (voorbeeldLink || '') : null)} style={pil(linkInvoer != null)}>
+              <Link2 size={13} strokeWidth={2.6} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+              {voorbeeldLink ? 'Andere link' : 'Video-link'}
+            </button>
           </div>
-          {ytId && (
+          {linkInvoer != null && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                autoFocus
+                value={linkInvoer}
+                onChange={(e) => setLinkInvoer(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') bewaarVoorbeeldLink(linkInvoer); if (e.key === 'Escape') setLinkInvoer(null) }}
+                placeholder="Plak een YouTube-, Instagram-, TikTok- of mp4-link"
+                inputMode="url"
+                style={{ flex: 1, minWidth: 0, padding: '0.6rem 0.8rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: 10, color: '#fff', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+              <button onClick={() => bewaarVoorbeeldLink(linkInvoer)} disabled={!linkInvoer.trim()} style={{ ...pil(true), opacity: linkInvoer.trim() ? 1 : 0.4 }}>Toon</button>
+              {voorbeeldLink && <button onClick={() => bewaarVoorbeeldLink('')} style={pil(false)}>Weghalen</button>}
+            </div>
+          )}
+          {embed?.soort === 'iframe' && (
             <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>
-              YouTube-voorbeeld speelt los; "Speel / pauzeer" en snelheid werken op je eigen video's.
+              Deze video speelt los; "Speel / pauzeer" en snelheid werken op je eigen video's.
             </div>
           )}
         </div>
