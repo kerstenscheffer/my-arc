@@ -285,10 +285,26 @@ export default class CommandCenterService {
       for (let i = 0; i < sessions.length; i += batchSize) {
         batches.push(sessions.slice(i, i + batchSize).map(s => s.id))
       }
-      const batchResults = await Promise.all(batches.map(batch =>
-        this.supabase.from('workout_progress').select('session_id, exercise_name, sets, notes, attachment_used').in('session_id', batch)
-      ))
-      batchResults.forEach(({ data: progress }) => { if (progress) allProgress = allProgress.concat(progress) })
+      // Supabase geeft per verzoek hooguit 1000 rijen. 200 sessies × ~6
+      // oefeningen is meer, en dan viel stil het laatste stuk weg — juist de
+      // nieuwste trainingen (sessies staan oud → nieuw), zodat de bovenste
+      // training in Coach Inzicht leeg leek (28 okt 2026). Daarom per blok
+      // doorlezen tot een pagina niet meer vol is.
+      const PAGINA = 1000
+      const leesBlok = async (batch) => {
+        const uit = []
+        for (let van = 0; ; van += PAGINA) {
+          const { data, error } = await this.supabase.from('workout_progress')
+            .select('id, session_id, exercise_name, sets, notes, attachment_used')
+            .in('session_id', batch).order('id').range(van, van + PAGINA - 1)
+          if (error || !data) break
+          uit.push(...data)
+          if (data.length < PAGINA) break
+        }
+        return uit
+      }
+      const batchResults = await Promise.all(batches.map(leesBlok))
+      batchResults.forEach(progress => { allProgress = allProgress.concat(progress) })
       const progressByClient = {}
       clientIds.forEach(id => { progressByClient[id] = {} })
       allProgress.forEach(entry => {
