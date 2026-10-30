@@ -168,3 +168,83 @@ create table if not exists public.business_os_feedback (
 alter table public.business_os_feedback enable row level security;
 create policy coach_eigen_feedback on public.business_os_feedback for all to authenticated
   using (coach_id = auth.uid()) with check (coach_id = auth.uid());
+
+-- Klanten-tabje (30 okt 2026): business_os_klanten() = alle lopende klanten
+-- (zelfde regel als trajectLoopt: periode ingesteld, gestart, niet paused/
+-- ended), per klant check-in deze week (week begint op vrijdag, zoals
+-- CheckinService), ongeziene check-ins (coach_gezien_at leeg), gewicht nu en
+-- 14 dagen terug, dagen gewogen, stappen, trainingsdagen (gestarte sessies,
+-- zoals progressieWeek), volgende call, open afspraken en een aandacht-score.
+create or replace function public.business_os_klanten()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v_team uuid[];
+  v_vandaag date := (now() at time zone 'Europe/Amsterdam')::date;
+  v_vrijdag date;
+  v_res jsonb;
+begin
+  if auth.uid() is null then raise exception 'niet ingelogd'; end if;
+  if public.get_my_portal_role() not in ('coach', 'both') then raise exception 'alleen voor coaches'; end if;
+  v_team := team_coach_ids(auth.uid());
+  v_vrijdag := v_vandaag - ((extract(isodow from v_vandaag)::int - 5 + 7) % 7);
+  select coalesce(jsonb_agg(k order by (k->>'aandacht')::int desc, k->>'naam'), '[]'::jsonb) into v_res
+  from (
+    select jsonb_build_object(
+      'id', c.id,
+      'naam', trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')),
+      'week', least(c.coaching_total_weeks, (v_vandaag - c.coaching_start_date) / 7 + 1),
+      'weken_totaal', c.coaching_total_weeks,
+      'periode_eindigt', c.coaching_start_date + c.coaching_total_weeks * 7,
+      'dagen_tot_einde', (c.coaching_start_date + c.coaching_total_weeks * 7) - v_vandaag,
+      'op_slot', c.account_locked_at is not null,
+      'checkin_deze_week', ci.deze_week,
+      'laatste_checkin', ci.laatste,
+      'checkins_ongezien', ci.ongezien,
+      'laatste_checkin_id', ci.laatste_id,
+      'gewicht_nu', w.nu, 'gewicht_14d_geleden', w.toen, 'gewogen_7d', w.dagen7,
+      'stappen_gem_7d', s.gem, 'stappendoel', c.step_goal,
+      'trainingen_7d', t.n,
+      'volgende_call', cl.volgende,
+      'open_afspraken', ai.n,
+      'aandacht', (case when not coalesce(ci.deze_week, false) then 2 else 0 end)
+                + (case when coalesce(ci.ongezien, 0) > 0 then 2 else 0 end)
+                + (case when coalesce(w.dagen7, 0) = 0 then 1 else 0 end)
+                + (case when coalesce(t.n, 0) = 0 then 1 else 0 end)
+                + (case when (c.coaching_start_date + c.coaching_total_weeks * 7) - v_vandaag between -30 and 14 then 1 else 0 end)
+    ) k
+    from clients c
+    left join lateral (
+      select bool_or(x.checkin_date >= v_vrijdag and x.status in ('submitted', 'reviewed')) deze_week,
+             max(x.checkin_date) filter (where x.status in ('submitted', 'reviewed')) laatste,
+             count(*) filter (where x.status = 'submitted' and x.coach_gezien_at is null) ongezien,
+             (array_agg(x.id order by x.checkin_date desc) filter (where x.status in ('submitted', 'reviewed')))[1] laatste_id
+      from client_checkins x where x.client_id = c.id
+    ) ci on true
+    left join lateral (
+      select (array_agg(l.weight order by l.date desc))[1] nu,
+             (array_agg(l.weight order by l.date desc) filter (where l.date <= v_vandaag - 14))[1] toen,
+             count(distinct l.date) filter (where l.date > v_vandaag - 7) dagen7
+      from weight_challenge_logs l where l.client_id = c.id and l.date > v_vandaag - 60
+    ) w on true
+    left join lateral (
+      select round(avg(sl.steps)) gem from client_step_logs sl where sl.client_id = c.id and sl.date > v_vandaag - 7
+    ) s on true
+    left join lateral (
+      select count(distinct ws.workout_date) n from workout_sessions ws where ws.client_id = c.id and ws.workout_date > v_vandaag - 7
+    ) t on true
+    left join lateral (
+      select min(cc.scheduled_date) volgende from client_calls cc
+      where cc.client_id = c.id and cc.scheduled_date >= now() and cc.canceled_at is null
+    ) cl on true
+    left join lateral (
+      select count(*) n from client_action_items a where a.client_id = c.id and coalesce(a.status, 'open') not in ('done', 'completed', 'afgerond')
+    ) ai on true
+    where c.coach_id = any(v_team)
+      and coalesce(c.coaching_status, 'active') not in ('paused', 'ended')
+      and c.coaching_start_date is not null and c.coaching_total_weeks is not null
+      and c.coaching_start_date <= v_vandaag
+  ) q;
+  return jsonb_build_object('vandaag', v_vandaag, 'checkin_week_vanaf', v_vrijdag, 'klanten', v_res);
+end $$;
+revoke all on function public.business_os_klanten() from public, anon;
+grant execute on function public.business_os_klanten() to authenticated;

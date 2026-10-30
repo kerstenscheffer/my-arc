@@ -371,13 +371,24 @@ const nieuwTabje = (naam, berichten = [], sessie = null) => ({
 // als video-editor-assistent. Herkend aan soort of naam (business_os_gesprekken
 // heeft geen soort-kolom). Ontbreekt hij, dan komt hij na Code en Strategie.
 const isEditor = (g) => g?.soort === 'editor' || g?.naam === 'Editor'
-const metEditor = (gs, lokaal = []) => {
+// Vast tabje 'Klanten' (30 okt): Gino via de Mac met de klant-focus (check-ins,
+// wie aandacht nodig heeft, afspraken). De PA krijgt invoer.tab = 'klanten' en
+// zet de focus bovenaan de vraag; de rest is gewoon Gino (Snel/Slim).
+const isKlanten = (g) => g?.soort === 'klanten' || g?.naam === 'Klanten'
+const metKlanten = (gs, lokaal = []) => {
+  if (gs.some(isKlanten)) return gs.map(g => (isKlanten(g) ? { ...g, soort: 'klanten' } : g))
+  const t = { ...(lokaal.find(isKlanten) || nieuwTabje('Klanten')), soort: 'klanten' }
+  const na = gs.findIndex(isEditor)
+  return na >= 0 ? [...gs.slice(0, na + 1), t, ...gs.slice(na + 1)] : [...gs, t]
+}
+const metEditorAlleen = (gs, lokaal = []) => {
   if (gs.some(isEditor)) return gs.map(g => (isEditor(g) ? { ...g, soort: 'editor' } : g))
   const t = { ...(lokaal.find(isEditor) || nieuwTabje('Editor')), soort: 'editor' }
   return [...gs.slice(0, 2), t, ...gs.slice(2)]
 }
-// Code, Strategie en Editor kunnen niet dicht.
-const isVast = (g, i) => i < 2 || isEditor(g)
+const metEditor = (gs, lokaal = []) => metKlanten(metEditorAlleen(gs, lokaal), lokaal)
+// Code, Strategie, Editor en Klanten kunnen niet dicht.
+const isVast = (g, i) => i < 2 || isEditor(g) || isKlanten(g)
 const leesGesprekken = () => {
   try {
     const g = JSON.parse(localStorage.getItem(GESPREKKEN_KEY))
@@ -1571,7 +1582,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
     const berichten = naarBerichten(nieuw)
     const metBeeld = berichten.some(b => b.afbeelding)
     const opDeel = (t) => setDeelPer(d => ({ ...d, [id]: t }))
-    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie }) : null
+    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }) : null
     opDeel('')
     if (mac) {
       setBezigPer(b => ({ ...b, [id]: false }))
@@ -1662,7 +1673,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
             {isEditor(actief) && <EditorOpdrachten vers={editorVers} />}
             {!gesprek.length && (
               <div style={{ ...TEKST, color: colors.textSecondary, fontWeight: 600 }}>
-                {isEditor(actief) ? 'Editor praat met ChatGPT: knipplannen, titels, ondertitels, instructies. Alleen tekst, hij kan niet zelf in je editor klikken.' : 'Nog geen berichten.'}
+                {isEditor(actief) ? 'Editor praat met ChatGPT: knipplannen, titels, ondertitels, instructies. Alleen tekst, hij kan niet zelf in je editor klikken.'
+                  : isKlanten(actief) ? 'Klanten: vraag wie aandacht nodig heeft, laat check-ins nakijken of een appje voorbereiden. Bijvoorbeeld: "Wie moet ik vandaag spreken?"'
+                  : 'Nog geen berichten.'}
               </div>
             )}
             {gesprek.map((b, i, alle) => {

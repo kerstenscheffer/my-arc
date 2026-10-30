@@ -269,6 +269,11 @@ function zetWarmKlaar() {
 process.on('exit', () => { if (warm && !warm.dood) warm.p.kill() })
 setInterval(zetWarmKlaar, 60 * 1000)
 
+// Tabje Klanten in Business OS: zelfde Gino, met klant-focus (skill Klantzaken).
+const KLANT_FOCUS = `Je zit in het tabje Klanten. Hier gaat het over Kerstens coachingklanten: check-ins, wie aandacht nodig heeft, voortgang, afspraken, calls en appjes. Volg de skill Klantzaken; begin bij node scripts/pa-db.mjs lees "select business_os_klanten() as k". Laat het overzicht uit jezelf zien (skill Visueel uitleggen).
+
+`
+
 // opDeel(tekst): halve tekst tijdens het typen.
 async function beantwoordChat(invoer, opDeel) {
   const slimId = invoer?.modus === 'slim' && GESPREK_ID.test(invoer?.gesprek_id || '') ? invoer.gesprek_id : null
@@ -300,7 +305,7 @@ async function beantwoordChat(invoer, opDeel) {
     }
     w.opEinde = () => { clearTimeout(stop); klaar({ ok: false, tekst: w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
     if (w.dood) return w.opEinde()
-    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: chatVraag({ gesprek, context: invoer?.context }) } }) + '\n')
+    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + chatVraag({ gesprek, context: invoer?.context }) } }) + '\n')
   })
   if (slimId && r.ok) bewaarSlimSessie(slimId)
   if (!slimId) setTimeout(zetWarmKlaar, 500)
