@@ -16,6 +16,11 @@
 // Inloggen: met Kerstens eigen account (anon-sleutel + sessie), nooit de
 // service key. RLS zorgt dat alleen zijn eigen opdrachten opgehaald worden.
 // De sessie staat in ~/.config/myarc-pa/sessie.json (alleen voor jou leesbaar).
+// Eén PA tegelijk (pa.pid): twee processen met dezelfde sessie verversen
+// elkaars login kapot. Automatisch starten: launchd-agent nl.myarc.pa
+// (~/Library/LaunchAgents), log in ~/Library/Logs/myarc-pa.log. Eerste keer
+// inloggen moet in een terminal (npm run pa); op de achtergrond kan hij niet
+// om een wachtwoord vragen.
 //
 // Claude Code mag hier: bestanden lezen/bewerken, build, lint, git diff/status.
 // Niet: committen, pushen, stashen, iets anders in de shell, of MCP-tools
@@ -56,6 +61,10 @@ async function login() {
     const { data, error } = await sb.auth.refreshSession({ refresh_token })
     if (!error && data.session) return data.session.user
   } catch { /* nog geen sessie */ }
+  if (!process.stdin.isTTY) {
+    console.error(tijd(), 'Niet ingelogd. Start één keer npm run pa in een terminal om in te loggen.')
+    process.exit(1)
+  }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const email = (await rl.question('E-mail coach-account: ')).trim()
   const wachtwoord = (await rl.question('Wachtwoord: ')).trim()
@@ -180,6 +189,22 @@ async function rondeChat() {
 const hartslag = () => sb.from('business_os_pa_status')
   .upsert({ coach_id: gebruiker.id, laatst_gezien: new Date().toISOString() })
   .then(({ error }) => { if (error) console.error(tijd(), 'Hartslag mislukt:', error.message) }, () => {})
+
+// Draait er al een PA (bv. de automatische op de achtergrond)? Dan niet nog een.
+const PID = path.join(SESSIE_MAP, 'pa.pid')
+try {
+  const ander = Number(fs.readFileSync(PID, 'utf8'))
+  if (ander && ander !== process.pid) {
+    process.kill(ander, 0)
+    console.log(`De PA draait al (proces ${ander}). Log: ~/Library/Logs/myarc-pa.log`)
+    process.exit(0)
+  }
+} catch { /* geen of verlopen pid-bestand */ }
+fs.mkdirSync(SESSIE_MAP, { recursive: true, mode: 0o700 })
+fs.writeFileSync(PID, String(process.pid))
+const ruimOp = () => { try { if (Number(fs.readFileSync(PID, 'utf8')) === process.pid) fs.unlinkSync(PID) } catch { /* al weg */ } }
+process.on('exit', ruimOp)
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0))
 
 const gebruiker = await login()
 console.log(`MY ARC PA draait in ${MAP} als ${gebruiker.email}. Wacht op opdrachten en chatvragen uit Business OS… (Ctrl+C = stoppen)\n`)
