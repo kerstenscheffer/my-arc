@@ -602,11 +602,11 @@ function naarBerichten(gesprek) {
 
 // ── Editor (ChatGPT via edge function editor-chat) ──
 // Alleen tekst: de hele tabje-geschiedenis gaat mee, de function zet de
-// editor-basis (business_os_editor_instellingen) ervoor en houdt de opdracht bij
-// in business_os_editor_opdrachten (bezig → klaar / mislukt). Geeft { tekst } of { fout }.
+// editor-basis (skill 'Editor-basis' in business_os_skills) ervoor en houdt de
+// opdracht bij in editor_opdrachten (bezig → klaar / mislukt). Geeft { tekst } of { fout }.
 const EDITOR_FOUT = {
-  geen_sleutel: 'OpenAI-sleutel ontbreekt: zet OPENAI_API_KEY in Supabase (Edge Functions, Secrets).',
-  sleutel_ongeldig: 'OpenAI weigert de sleutel (401). Controleer OPENAI_API_KEY in Supabase.',
+  geen_sleutel: 'Geen OpenAI-sleutel gevonden: zet een secret met GPT of OPENAI in de naam in Supabase (Edge Functions, Secrets).',
+  sleutel_ongeldig: 'OpenAI weigert de sleutel (401). Controleer de GPT-sleutel in Supabase Secrets.',
   alleen_coach: 'Editor is alleen voor coaches.',
 }
 async function vraagEditor(gesprek) {
@@ -623,15 +623,16 @@ async function vraagEditor(gesprek) {
 
 const EDITOR_STATUS = { open: 'Open', bezig: 'Bezig…', klaar: 'Klaar', mislukt: 'Mislukt' }
 const EDITOR_KLEUR = { open: colors.textMuted, bezig: colors.textPrimary, klaar: colors.success, mislukt: colors.danger }
-// Laatste opdrachten met status, bovenaan het venster in Editor. Tabel nog niet
-// aangemaakt (business-os-editor.sql) → niets.
+// Laatste opdrachten met statuslicht, bovenaan het venster in Editor. Tik op een
+// rij = antwoord eronder. Tabel nog niet aangemaakt (business-os-editor.sql) → niets.
 function EditorOpdrachten({ vers }) {
   const [rijen, setRijen] = useState([])
   const [alles, setAlles] = useState(false)
+  const [open, setOpen] = useState(null)
   useEffect(() => {
     let weg = false
-    const kijk = () => supabase.from('business_os_editor_opdrachten')
-      .select('id, created_at, opdracht, status').order('created_at', { ascending: false }).limit(10)
+    const kijk = () => supabase.from('editor_opdrachten')
+      .select('id, created_at, opdracht, antwoord, status').order('created_at', { ascending: false }).limit(10)
       .then(({ data, error }) => { if (!weg && !error && Array.isArray(data)) setRijen(data) }, () => {})
     kijk()
     const t = setInterval(kijk, 5000)
@@ -642,16 +643,27 @@ function EditorOpdrachten({ vers }) {
     <div style={{ ...TEKST, borderBottom: `1px solid ${colors.borderSubtle}`, paddingBottom: 8, marginBottom: 4 }}>
       <div style={{ fontWeight: 900, color: colors.textPrimary, marginBottom: 4 }}>Opdrachten</div>
       {(alles ? rijen : rijen.slice(0, 3)).map(r => (
-        <div key={r.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', minWidth: 0 }}>
+        <div key={r.id}>
+        <div onClick={() => setOpen(o => (o === r.id ? null : r.id))}
+          style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0, cursor: r.antwoord ? 'pointer' : 'default' }}>
+          <span className={r.status === 'bezig' ? 'bos-stip' : undefined} style={{
+            width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: EDITOR_KLEUR[r.status] || colors.textMuted,
+            boxShadow: r.status === 'klaar' ? `0 0 6px ${colors.success}` : 'none',
+          }} />
           <span title={r.opdracht} style={{
             flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: colors.textSecondary, fontWeight: 600,
           }}>
             {kort(r.opdracht, 90)}
           </span>
-          <span className={r.status === 'bezig' ? 'bos-stip' : undefined}
-            style={{ flexShrink: 0, fontWeight: 800, fontSize: '0.72rem', color: EDITOR_KLEUR[r.status] || colors.textMuted }}>
+          <span style={{ flexShrink: 0, fontWeight: 800, fontSize: '0.72rem', color: EDITOR_KLEUR[r.status] || colors.textMuted }}>
             {EDITOR_STATUS[r.status] || r.status}
           </span>
+        </div>
+        {open === r.id && r.antwoord && (
+          <div style={{ whiteSpace: 'pre-wrap', color: colors.textSecondary, fontWeight: 500, padding: '4px 0 6px 15px' }}>
+            {r.antwoord}
+          </div>
+        )}
         </div>
       ))}
       {rijen.length > 3 && (

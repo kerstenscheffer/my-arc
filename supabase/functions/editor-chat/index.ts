@@ -9,15 +9,15 @@
 //   POST { berichten: [{ role: 'user'|'assistant', content }] }
 //   → { tekst, opdracht_id, model }  |  { fout: 'geen_sleutel' | 'openai' | ... }
 //
-// Systeemprompt ("editor-basis") en model per coach in
-// business_os_editor_instellingen (business-os-editor.sql); geen rij → PLACEHOLDER
-// en STANDAARD_MODEL (of secret OPENAI_MODEL). Elke vraag wordt een rij in
-// business_os_editor_opdrachten: bezig → klaar / mislukt. Bestaan die tabellen
-// nog niet, dan werkt de chat gewoon door.
+// Systeemprompt = de skill 'Editor-basis' in business_os_skills (Kersten past die
+// aan zonder codewijziging); geen rij → STANDAARD_BASIS. Model: secret
+// OPENAI_MODEL, anders STANDAARD_MODEL. Elke vraag wordt een rij in
+// editor_opdrachten (business-os-editor.sql): bezig → klaar / mislukt. Bestaat
+// die tabel nog niet, dan werkt de chat gewoon door.
 //
-// Alleen coaches (get_my_portal_role = coach/both). Sleutel: OPENAI_API_KEY als
-// Supabase-secret (andere namen met OPENAI erin worden ook gevonden, zie
-// zoekSecret). Ontbreekt hij: 503 { fout: 'geen_sleutel' } en een rij in
+// Alleen coaches (get_my_portal_role = coach/both). Sleutel: OPENAI_API_KEY, anders
+// de eerste secret met GPT of OPENAI in de naam (Kersten: 'gpt api key'), zie
+// zoekSleutel. Ontbreekt hij: 503 { fout: 'geen_sleutel' } en een rij in
 // app_fouten (pagina business-os-editor). Nooit een sleutel in de frontend of de repo.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -28,27 +28,26 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// Goedkoop en recent. Ander model: kolom model in business_os_editor_instellingen,
-// of secret OPENAI_MODEL, of hier aanpassen.
+// Goedkoop en standaard beschikbaar. Ander model: secret OPENAI_MODEL of hier aanpassen.
 const STANDAARD_MODEL = 'gpt-5-mini'
 const MAX_BERICHTEN = 30
 const MAX_TEKENS = 12000
 
-const PLACEHOLDER = `[EDITOR-BASIS NOG IN TE VULLEN: Kersten zet hier zijn vaste instellingen voor de video-editor, bv. stijl, formaten, ondertitel-regels, vaste intro/outro. Aanpassen in business_os_editor_instellingen.systeemprompt.]
+const STANDAARD_BASIS = 'Je bent de video-editor-assistent van Kersten (MY ARC). Geef knipplannen, titels, ondertitels en korte instructies, in spreektaal Nederlands, kort en direct.'
+const BASIS_SKILL = 'Editor-basis'
 
-Je bent de video-editor-assistent van Kersten (MY ARC, online coaching voor drukke werkende mannen van 25-40). Je helpt met knipplannen, titels, hooks, ondertitels en stap-voor-stap instructies voor de editor. Antwoord in het Nederlands, kort en concreet, met lijstjes waar dat helpt. Je kunt niet zelf in de editor klikken of bestanden aanpassen: geef altijd tekst en instructies die Kersten zelf uitvoert.`
-
-// Eerst de vaste naam, anders de eerste secret met OPENAI in de naam (zoals gino-stem).
-function zoekSecret(vast: string, soort: RegExp): string | undefined {
-  const waarde = Deno.env.get(vast)
-  if (waarde) return waarde
-  const naam = Object.keys(Deno.env.toObject())
-    .filter((n) => /OPENAI|OPEN_AI/i.test(n) && soort.test(n) && n !== vast)
-    .sort()[0]
-  if (naam) console.log('editor-chat gebruikt secret', naam, 'voor', vast)
-  return naam ? Deno.env.get(naam) : undefined
+// Eerst OPENAI_API_KEY, anders de eerste secret met GPT of OPENAI in de naam
+// (hoofdletterongevoelig; namen met KEY eerst, OPENAI_MODEL telt niet mee).
+function zoekSleutel(): string | undefined {
+  const vast = Deno.env.get('OPENAI_API_KEY')
+  if (vast) return vast
+  const namen = Object.keys(Deno.env.toObject())
+    .filter((n) => /GPT|OPENAI|OPEN_AI/i.test(n) && !/MODEL/i.test(n) && Deno.env.get(n))
+    .sort((a, b) => Number(!/KEY/i.test(a)) - Number(!/KEY/i.test(b)) || a.localeCompare(b))
+  if (namen[0]) console.log('editor-chat gebruikt secret', namen[0])
+  return namen[0] ? Deno.env.get(namen[0]) : undefined
 }
-const SLEUTEL = zoekSecret('OPENAI_API_KEY', /KEY|TOKEN|SECRET/i)
+const SLEUTEL = zoekSleutel()
 const MODEL_SECRET = Deno.env.get('OPENAI_MODEL')
 if (!SLEUTEL) console.error('editor-chat: geen OpenAI-secret gevonden')
 
@@ -76,7 +75,7 @@ Deno.serve(async (req) => {
       .then((r) => { if (r.error) console.error('app_fouten', r.error.message) }, () => {})
 
     if (!SLEUTEL) {
-      await meldFout('geen_sleutel: OPENAI_API_KEY ontbreekt in Supabase Secrets')
+      await meldFout('geen_sleutel: geen OPENAI_API_KEY of secret met GPT/OPENAI in de naam in Supabase Secrets')
       return json({ fout: 'geen_sleutel' }, 503)
     }
 
@@ -88,22 +87,22 @@ Deno.serve(async (req) => {
     const laatste = berichten[berichten.length - 1]
     if (!laatste || laatste.role !== 'user') return json({ fout: 'geen_tekst' }, 400)
 
-    // Editor-basis + model van deze coach (tabel mag nog ontbreken).
-    const { data: inst } = await sb.from('business_os_editor_instellingen')
-      .select('systeemprompt, model').eq('coach_id', user.id).maybeSingle()
+    // Editor-basis van deze coach (skill-rij; ontbreekt → standaardbasis).
+    const { data: basis } = await sb.from('business_os_skills')
+      .select('instructies').eq('coach_id', user.id).eq('naam', BASIS_SKILL).maybeSingle()
       .then((r) => r, () => ({ data: null }))
-    const systeem = inst?.systeemprompt?.trim() || PLACEHOLDER
-    const model = inst?.model?.trim() || MODEL_SECRET || STANDAARD_MODEL
+    const systeem = basis?.instructies?.trim() || STANDAARD_BASIS
+    const model = MODEL_SECRET || STANDAARD_MODEL
 
     // Opdracht-rij: bezig tijdens het wachten (tabel mag nog ontbreken).
-    const { data: rij } = await sb.from('business_os_editor_opdrachten')
+    const { data: rij } = await sb.from('editor_opdrachten')
       .insert({ coach_id: user.id, opdracht: laatste.content.slice(0, 4000), status: 'bezig', model })
       .select('id').single()
       .then((r) => r, () => ({ data: null }))
     const opdrachtId = rij?.id || null
     const zetRij = async (velden: Record<string, unknown>) => {
       if (!opdrachtId) return
-      await sb.from('business_os_editor_opdrachten').update({ ...velden, klaar_at: new Date().toISOString() })
+      await sb.from('editor_opdrachten').update({ ...velden, klaar_at: new Date().toISOString() })
         .eq('id', opdrachtId).then(() => {}, () => {})
     }
     rijMislukt = (fout) => zetRij({ status: 'mislukt', fout })

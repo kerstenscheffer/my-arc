@@ -5,17 +5,18 @@
 -- (knipplannen, titels, ondertitels, instructies). Alleen tekst: ChatGPT kan
 -- niet in de editor klikken of bestanden op de Mac aanpassen.
 --
--- 1. business_os_editor_opdrachten: elke gestuurde opdracht is een rij.
---    editor-chat zet hem op 'bezig', daarna 'klaar' (antwoord) of 'mislukt'
---    (fout). 'open' is voor later (klaargezet maar nog niet verstuurd).
--- 2. business_os_editor_instellingen: één rij per coach met de vaste
---    systeemprompt ("de editor-basis") en eventueel een ander model. Geen rij
---    of leeg veld → de placeholder/het standaardmodel uit editor-chat.
+-- 1. editor_opdrachten: elke gestuurde opdracht is een rij. editor-chat zet hem
+--    op 'bezig', daarna 'klaar' (antwoord) of 'mislukt' (fout). 'open' is voor
+--    later (klaargezet maar nog niet verstuurd).
+-- 2. De vaste systeemprompt ("Editor-basis") is een rij in business_os_skills
+--    met naam 'Editor-basis' (al ingevuld op 30 okt). Aanpassen = die rij wijzigen,
+--    of het Gino vragen (bewaar_skill). Model wisselen: secret OPENAI_MODEL of
+--    STANDAARD_MODEL in editor-chat.
 --
--- Zonder deze tabellen werkt het tabje gewoon (alleen zonder lijst en met de
--- placeholder-prompt). Alleen toevoegen, niets weghalen (oude app-versies).
+-- Zonder deze tabel werkt het tabje gewoon (alleen zonder lijst). Alleen
+-- toevoegen, niets weghalen (oude app-versies).
 
-create table if not exists public.business_os_editor_opdrachten (
+create table if not exists public.editor_opdrachten (
   id          uuid primary key default gen_random_uuid(),
   coach_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
   created_at  timestamptz not null default now(),
@@ -27,33 +28,13 @@ create table if not exists public.business_os_editor_opdrachten (
   klaar_at    timestamptz
 );
 
-create index if not exists business_os_editor_opdrachten_coach_idx
-  on public.business_os_editor_opdrachten (coach_id, created_at desc);
+create index if not exists editor_opdrachten_coach_idx
+  on public.editor_opdrachten (coach_id, created_at desc);
 
-alter table public.business_os_editor_opdrachten enable row level security;
+alter table public.editor_opdrachten enable row level security;
 
-drop policy if exists coach_eigen_editor_opdrachten on public.business_os_editor_opdrachten;
-create policy coach_eigen_editor_opdrachten on public.business_os_editor_opdrachten
+drop policy if exists coach_eigen_editor_opdrachten on public.editor_opdrachten;
+create policy coach_eigen_editor_opdrachten on public.editor_opdrachten
   for all to authenticated
   using (coach_id = auth.uid())
   with check (coach_id = auth.uid());
-
-create table if not exists public.business_os_editor_instellingen (
-  coach_id      uuid primary key default auth.uid() references auth.users(id) on delete cascade,
-  systeemprompt text,
-  model         text,          -- leeg = standaard in editor-chat (OPENAI_MODEL of gpt-5-mini)
-  updated_at    timestamptz not null default now()
-);
-
-alter table public.business_os_editor_instellingen enable row level security;
-
-drop policy if exists coach_eigen_editor_instellingen on public.business_os_editor_instellingen;
-create policy coach_eigen_editor_instellingen on public.business_os_editor_instellingen
-  for all to authenticated
-  using (coach_id = auth.uid())
-  with check (coach_id = auth.uid());
-
--- Editor-basis invullen (of later aanpassen), als Kersten ingelogd / via Gino:
---   insert into business_os_editor_instellingen (coach_id, systeemprompt)
---   values (auth.uid(), 'Jij bent mijn video-editor-assistent. ...')
---   on conflict (coach_id) do update set systeemprompt = excluded.systeemprompt, updated_at = now();
