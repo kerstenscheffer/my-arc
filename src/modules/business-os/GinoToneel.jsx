@@ -5,7 +5,9 @@
 // rond de bol: blokken links en rechts van de middengroep (desktop) of als
 // strook bovenaan (mobiel). Geen code van de AI, alleen deze beschrijving:
 //
-//   blok   = { icoon, titel, waarde?, tekst?, toon?, beweging? }
+//   blok   = { icoon, titel, waarde?, tekst?, toon?, beweging?, vorige?, verschil? }
+//   vorige/verschil = vergelijking, bv. "sep €4.855" en "-4%": pijltje omhoog
+//   of omlaag naar het teken van verschil, kleur volgt toon
 //   icoon  = naam uit ICONEN hieronder (onbekend → Sparkles)
 //   toon   = 'goed' | 'let_op' | 'leeg' | 'neutraal'
 //   beweging = 'zweef' | 'puls' | 'draai' | 'schud' | 'geen'
@@ -66,6 +68,8 @@ function schoonVisueel(v) {
     tekst: str(b?.tekst, 110),
     toon: TOON[b?.toon] ? b.toon : 'neutraal',
     beweging: BEWEGING[b?.beweging] ? b.beweging : 'zweef',
+    vorige: str(b?.vorige, 30),
+    verschil: str(b?.verschil, 10),
   })).filter(b => b.titel)
   if (!blokken.length) return null
   const advies = v.advies && str(v.advies.tekst, 220)
@@ -98,6 +102,20 @@ function Blok({ b, i }) {
           <span style={{ fontSize: '0.86rem', fontWeight: 800, color: leeg ? colors.textSecondary : colors.textPrimary }}>{b.titel}</span>
           {b.waarde && <span style={{ fontSize: '1.05rem', fontWeight: 900, color: kleur, fontVariantNumeric: 'tabular-nums' }}>{b.waarde}</span>}
         </div>
+        {(b.verschil || b.vorige) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+            {b.verschil && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 7px', borderRadius: 999,
+                fontSize: '0.72rem', fontWeight: 900, color: kleur, border: `1px solid ${kleur}`, fontVariantNumeric: 'tabular-nums',
+              }}>
+                {/^\s*-/.test(b.verschil) ? <TrendingDown size={12} strokeWidth={2.6} /> : /^\s*\+/.test(b.verschil) ? <TrendingUp size={12} strokeWidth={2.6} /> : null}
+                {b.verschil}
+              </span>
+            )}
+            {b.vorige && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: colors.textMuted }}>{b.vorige}</span>}
+          </div>
+        )}
         {b.tekst && <div style={{ fontSize: '0.76rem', fontWeight: 600, color: colors.textSecondary, lineHeight: 1.35, marginTop: 2 }}>{b.tekst}</div>}
       </div>
     </div>
