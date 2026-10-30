@@ -933,8 +933,9 @@ function PaInloggen({ zichtbaar, onKlaar }) {
   )
 }
 
-// onVisueel(actie): Gino wil iets laten zien rond de bol (GinoToneel.jsx).
-export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 28 }) {
+// onVisueel(actie, tabId): Gino wil iets laten zien rond de bol (GinoToneel.jsx),
+// bij dat tabje. onTab(tabId): het open tabje, zodat het beeld meewisselt.
+export default function BusinessChat({ context, onBezig, onVisueel, onTab, marginTop = 28 }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -942,6 +943,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
   const [actiefId, setActiefId] = useState(() => lees(ACTIEF_KEY))
   const actief = gesprekken.find(g => g.id === actiefId) || gesprekken[0]
   const gesprek = actief.berichten
+  useEffect(() => { onTab?.(actief.id) }, [actief.id, onTab])
   const gesprekkenRef = useRef(gesprekken)
   gesprekkenRef.current = gesprekken
   const actiefRef = useRef(actief.id)
@@ -1062,7 +1064,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
         zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `Groeironde (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [], op: new Date(r.klaar_at).getTime() || Date.now() }])
         // Ochtendbeeld meteen rond de bol.
         const beeld = (r.antwoord.acties || []).find(a => a?.soort === 'visueel')
-        if (beeld) onVisueel?.(beeld)
+        if (beeld) onVisueel?.(beeld, doel.id)
         markeer(doel.id)
       }
     }
@@ -1529,7 +1531,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
     bericht = { ...bericht, op: Date.now() }
     zetBerichten(id, g => [...g, bericht])
     const visueel = (bericht.acties || []).find(a => a?.soort === 'visueel')
-    if (visueel) onVisueel?.(visueel)
+    if (visueel) onVisueel?.(visueel, id)
     markeer(id)
     meld('Klaar', false)
     if (actiefRef.current !== id) return
@@ -1704,7 +1706,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
                     if (ac.soort === 'visueel') return (
-                      <button key={j} type="button" onClick={() => onVisueel?.(ac)} style={{
+                      <button key={j} type="button" onClick={() => onVisueel?.(ac, actief.id)} style={{
                         display: 'flex', gap: 6, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, marginBottom: 4,
                         color: colors.success, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
                       }}>

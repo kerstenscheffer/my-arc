@@ -750,13 +750,24 @@ export default function BusinessOS({ isMobile }) {
   const [menu, setMenu] = useState(false)
   const [blad, setBlad] = useState(null)
   const [denkt, setDenkt] = useState(false)
-  // Wat Gino rond de bol laat zien (blijft staan tot het kruisje).
-  // GinoToneel schoont de ruwe actie zelf op.
-  const [visueel, setVisueel] = useState(() => { try { return JSON.parse(localStorage.getItem('business_os_visueel')) } catch { return null } })
-  const toonVisueel = useCallback((v) => {
-    setVisueel(v || null)
-    try { if (v) localStorage.setItem('business_os_visueel', JSON.stringify(v).slice(0, 40000)); else localStorage.removeItem('business_os_visueel') } catch { /* geen opslag */ }
+  // Wat Gino rond de bol laat zien, per gesprek-tabje: wissel je van tabje,
+  // dan wisselt het beeld mee (geen beeld = leeg). Blijft staan tot het
+  // kruisje. GinoToneel schoont de ruwe actie zelf op.
+  const [beelden, setBeelden] = useState(() => { try { return JSON.parse(localStorage.getItem('business_os_beelden')) || {} } catch { return {} } })
+  const [actieveTab, setActieveTab] = useState(null)
+  const actieveTabRef = useRef(null)
+  const kiesTab = useCallback((id) => { actieveTabRef.current = id; setActieveTab(id) }, [])
+  // tab: het tabje waar het beeld bij hoort (standaard het open tabje).
+  const toonVisueel = useCallback((v, tab = actieveTabRef.current) => {
+    if (!tab) return
+    setBeelden(b => {
+      const n = { ...b }
+      if (v) n[tab] = v; else delete n[tab]
+      try { localStorage.setItem('business_os_beelden', JSON.stringify(n)) } catch { /* vol of geen opslag */ }
+      return n
+    })
   }, [])
+  const visueel = actieveTab ? beelden[actieveTab] || null : null
   const sluitBlad = useCallback(() => setBlad(null), [])
   const vandaag = useVandaag()
   const { laad: laadVandaag } = vandaag
@@ -1060,7 +1071,7 @@ export default function BusinessOS({ isMobile }) {
           <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
 
           {/* ── Chat: de ring praat ── */}
-          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} marginTop={isMobile ? 18 : 24} context={{
+          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onTab={kiesTab} marginTop={isMobile ? 18 : 24} context={{
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
