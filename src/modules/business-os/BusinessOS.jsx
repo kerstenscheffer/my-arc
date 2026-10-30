@@ -75,33 +75,75 @@ function Paneel({ titel, children, style }) {
   )
 }
 
+// Reactor: groene voortgangsboog = % van het maanddoel, eromheen draaiende
+// tikkenring en segmenten, in het midden een pulserende kern.
 function Reactor({ pct }) {
-  const ringen = [180, 144, 108, 72]
+  const R = 96
+  const omtrek = 2 * Math.PI * R
+  const draai = (sec, terug) => ({
+    transformOrigin: '120px 120px', transformBox: 'view-box',
+    animation: `${terug ? 'bos-terug' : 'bos-draai'} ${sec}s linear infinite`,
+  })
   return (
-    <div style={{ position: 'relative', width: 200, height: 200, margin: '0 auto' }}>
+    <div style={{ position: 'relative', width: 240, height: 240, margin: '0 auto' }}>
       <style>{`
-        @keyframes bos-draai { to { transform: translate(-50%,-50%) rotate(360deg) } }
-        @keyframes bos-terug { to { transform: translate(-50%,-50%) rotate(-360deg) } }
-        @keyframes bos-puls { 0%,100% { opacity: .75 } 50% { opacity: 1 } }
+        @keyframes bos-draai { to { transform: rotate(360deg) } }
+        @keyframes bos-terug { to { transform: rotate(-360deg) } }
+        @keyframes bos-puls { 0%,100% { opacity: .55; transform: scale(.94) } 50% { opacity: 1; transform: scale(1) } }
+        @keyframes bos-boog { from { stroke-dashoffset: ${omtrek} } }
       `}</style>
-      {ringen.map((d, i) => (
-        <div key={d} style={{
-          position: 'absolute', left: '50%', top: '50%', width: d, height: d,
-          transform: 'translate(-50%,-50%)', borderRadius: '50%',
-          border: `${i === 0 ? 2 : 6}px ${i % 2 ? 'dashed' : 'solid'} ${i === 0 ? C.rand : C.gloed}`,
-          boxShadow: i === 0 ? 'none' : `0 0 14px rgba(255,255,255,0.12)`,
-          animation: `${i % 2 ? 'bos-terug' : 'bos-draai'} ${14 + i * 6}s linear infinite`,
-        }} />
-      ))}
+      <svg viewBox="0 0 240 240" width="240" height="240" style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
+        <defs>
+          <radialGradient id="bos-kern">
+            <stop offset="0%" stopColor={C.groen} stopOpacity="0.45" />
+            <stop offset="60%" stopColor={C.groen} stopOpacity="0.15" />
+            <stop offset="100%" stopColor={C.groen} stopOpacity="0" />
+          </radialGradient>
+          <filter id="bos-gloed" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* tikkenring */}
+        <g style={draai(60)}>
+          {Array.from({ length: 72 }, (_, i) => (
+            <line key={i} x1="120" y1="4" x2="120" y2={i % 6 ? 9 : 14}
+              stroke="#ffffff" strokeOpacity={i % 6 ? 0.18 : 0.5} strokeWidth={i % 6 ? 1 : 2}
+              transform={`rotate(${i * 5} 120 120)`} />
+          ))}
+        </g>
+
+        {/* voortgangsboog */}
+        <circle cx="120" cy="120" r={R} fill="none" stroke="#ffffff" strokeOpacity="0.07" strokeWidth="6" />
+        <circle cx="120" cy="120" r={R} fill="none" stroke={C.groen} strokeWidth="6" strokeLinecap="round"
+          strokeDasharray={omtrek} strokeDashoffset={omtrek * (1 - pct / 100)}
+          transform="rotate(-90 120 120)" filter="url(#bos-gloed)"
+          style={{ animation: 'bos-boog 1.6s cubic-bezier(.2,.8,.2,1)', transition: 'stroke-dashoffset 1s' }} />
+
+        {/* segmenten */}
+        <g style={draai(18, true)}>
+          <circle cx="120" cy="120" r="78" fill="none" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="5"
+            strokeDasharray="22 10" />
+        </g>
+        <g style={draai(10)}>
+          <circle cx="120" cy="120" r="64" fill="none" stroke={C.groen} strokeOpacity="0.8" strokeWidth="2"
+            strokeDasharray="60 40" strokeLinecap="round" filter="url(#bos-gloed)" />
+        </g>
+        <circle cx="120" cy="120" r="56" fill="none" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
+
+        {/* kern */}
+        <circle cx="120" cy="120" r="48" fill="url(#bos-kern)"
+          style={{ transformOrigin: '120px 120px', transformBox: 'view-box', animation: 'bos-puls 3s ease-in-out infinite' }} />
+      </svg>
       <div style={{
-        position: 'absolute', left: '50%', top: '50%', width: 52, height: 52,
-        transform: 'translate(-50%,-50%)', borderRadius: '50%',
-        background: `radial-gradient(circle, #ffffff 0%, rgba(255,255,255,0.85) 45%, rgba(255,255,255,0) 72%)`,
-        animation: 'bos-puls 3s ease-in-out infinite',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        ...NUM, fontWeight: 900, fontSize: '0.8rem', color: colors.onAccent,
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
       }}>
-        {Math.round(pct)}%
+        <div style={{ ...NUM, fontWeight: 900, fontSize: '1.6rem', color: '#ffffff', textShadow: `0 0 16px ${C.groen}` }}>
+          {Math.round(pct)}%
+        </div>
+        <div style={{ ...LABEL, fontSize: '0.65rem', color: '#ffffff', opacity: 0.85 }}>van doel</div>
       </div>
     </div>
   )
