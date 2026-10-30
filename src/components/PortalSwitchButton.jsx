@@ -95,7 +95,9 @@ export default function PortalSwitchButton({
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 2147483600, padding: '1rem',
+            // Maximaal: de knop staat in het Meer-menu (z 2147483647); deze
+            // portal komt later in de DOM en ligt er zo bovenop.
+            zIndex: 2147483647, padding: '1rem',
           }}
         >
           <form

@@ -146,7 +146,8 @@ const MORE_CATEGORIES = [
 const ZWEVENDE_NAV_RUIMTE = 76
 
 // Eén tint voor pagina, onderbalk en zijbalk — anders zie je onderin een band.
-const PAGINA_BG = '#0a0a0a'
+// Puur zwart, gelijk aan colors.bg waarmee Business OS z'n eigen vlak tekent.
+const PAGINA_BG = '#000000'
 
 const SPLIT_KEY = 'myarc_coachhub_split_tab'
 const SPLIT_RATIO_KEY = 'myarc_coachhub_split_ratio'
@@ -1023,7 +1024,7 @@ export default function CoachHub() {
       </main>
 
       {/* ═══ FLOATING BOTTOM NAV ═══ */}
-      {/* Command / Leads / Business OS / Meer / Split + Wissel / Uitloggen.
+      {/* Command / Leads / Business OS / Meer / Split / Uitloggen.
           Output, Productivity en Agenda zitten in Meer. Verborgen in
           klantmodus (terug via de oog-toggle linksonder). */}
       {!clientMode && (
@@ -1069,11 +1070,6 @@ export default function CoachHub() {
                 onClick={() => setSplitTab(t => t ? null : (activeTab === 'workout-builder' ? 'ai-meals' : 'workout-builder'))}
               />
             )}
-
-            {/* Wissel naar het client-portaal (blauw icoon met twee pijltjes). */}
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-              <PortalSwitchButton target="client" db={db} iconOnly style={{ width: 32, height: 32, borderRadius: 8 }} />
-            </div>
 
             <NavKnop
               label="Uitloggen" icon={LogOut} isMobile={isMobile}
@@ -1170,6 +1166,12 @@ export default function CoachHub() {
                 })}
               </div>
             ))}
+
+            {/* Wissel naar het client-portaal. Stond als los icoon in de
+                onderbalk; daar kwam het nergens anders terug, dus nu hier. */}
+            <div style={{ padding: '0.6rem 1.1rem 0.8rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+              <PortalSwitchButton target="client" db={db} style={{ width: '100%', padding: '0.65rem' }} />
+            </div>
           </div>
         </>
       ), document.body)}
@@ -1370,10 +1372,11 @@ export default function CoachHub() {
 
 
 // ── Knop in de onderbalk ────────────────────────────────────────────────────
-// Icoon + label, wit en vet; actief krijgt het gele accent.
+// Icoon + label. Actief = fel wit, extra vet, op een licht wit vlak; de rest
+// iets gedimd en minder vet. Geen geel meer in de balk.
 function NavKnop({ label, icon, actief, kleur, onClick, title, isMobile }) {
   const Icon = icon
-  const tint = kleur || (actief ? G.primary : '#fff')
+  const tint = kleur || (actief ? '#fff' : 'rgba(255,255,255,0.62)')
   return (
     <button
       onClick={onClick}
@@ -1383,7 +1386,7 @@ function NavKnop({ label, icon, actief, kleur, onClick, title, isMobile }) {
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', gap: 2,
         padding: '0.2rem 0.15rem',
-        background: actief ? 'rgba(255,215,0,0.1)' : 'transparent',
+        background: actief ? 'rgba(255,255,255,0.1)' : 'transparent',
         border: 'none', borderRadius: 8,
         cursor: 'pointer', fontFamily: 'inherit',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -1391,10 +1394,10 @@ function NavKnop({ label, icon, actief, kleur, onClick, title, isMobile }) {
         transition: 'background 0.15s ease',
       }}
     >
-      <Icon size={isMobile ? 18 : 19} color={tint} strokeWidth={2.4} />
+      <Icon size={isMobile ? 18 : 19} color={tint} strokeWidth={actief ? 2.6 : 2} />
       <span style={{
         fontSize: isMobile ? '0.56rem' : '0.6rem',
-        fontWeight: 800,
+        fontWeight: actief ? 800 : 600,
         color: tint,
         letterSpacing: '-0.01em', lineHeight: 1,
         whiteSpace: 'nowrap',
