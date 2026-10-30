@@ -37,7 +37,7 @@
 // negeert late resultaten, zodat het veld leeg blijft.
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -160,9 +160,24 @@ function Kopieer({ tekst }) {
   )
 }
 
+// Herhaalknop achter het laatste Gino-antwoord: speelt het opnieuw af met de
+// Gino-stem (stem.herhaal, uit de cache), ook als de stem uit staat. Tijdens praten = stop.
+function Herhaal({ onKlik, praat }) {
+  return (
+    <button onClick={onKlik} title={praat ? 'Stop' : 'Herhaal wat Gino zei'} aria-label={praat ? 'Stop' : 'Herhaal wat Gino zei'}
+      style={{
+        background: 'none', border: 'none', padding: '0 2px', marginLeft: 4, cursor: 'pointer',
+        display: 'inline-flex', verticalAlign: '-2px', color: praat ? colors.success : colors.textSecondary,
+      }}>
+      <Volume2 size={13} />
+    </button>
+  )
+}
+
 // Lange antwoorden ingekort tonen (~6 regels) met 'meer' / 'minder'.
+// achter: element direct achter de laatste zin (ingeklapt: naast 'meer').
 const MAX_REGELS = 6
-function Inkort({ tekst }) {
+function Inkort({ tekst, achter }) {
   const ref = useRef(null)
   const [lang, setLang] = useState(false)
   const [open, setOpen] = useState(false)
@@ -177,14 +192,18 @@ function Inkort({ tekst }) {
         ...(open ? {} : { maxHeight: `${MAX_REGELS * 1.4}em`, overflow: 'hidden' }),
       }}>
         {tekst}
+        {achter && (open || !lang) && achter}
       </div>
       {(lang || open) && (
-        <button onClick={() => setOpen(o => !o)} style={{
-          background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer', fontFamily: 'inherit',
-          color: colors.success, fontWeight: 800, fontSize: '0.75rem',
-        }}>
-          {open ? 'minder' : 'meer'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <button onClick={() => setOpen(o => !o)} style={{
+            background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer', fontFamily: 'inherit',
+            color: colors.success, fontWeight: 800, fontSize: '0.75rem',
+          }}>
+            {open ? 'minder' : 'meer'}
+          </button>
+          {lang && !open && achter}
+        </div>
       )}
     </>
   )
@@ -923,15 +942,27 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
 
   // Halve tekst terwijl Gino via de Mac typt.
   const [deel, setDeel] = useState('')
+  // Voorleestekst: het antwoord en daarna de eerste toestemmingsvraag (die in het wolkje).
+  // Vastgelegd bij binnenkomst, zodat herhalen dezelfde (bewaarde) audio pakt.
+  // Op inhoud, niet op object: een afgehandelde actie vervangt het bericht-object.
+  const spraak = useRef({ content: null, tekst: '' })
+  const spraakVan = (bericht) => {
+    if (spraak.current.content === bericht.content) return spraak.current.tekst
+    const open = (bericht.acties || []).find(staatOpen)
+    return [bericht.content, open && vraagVoor(open).vraag].filter(Boolean).join('\n')
+  }
   const antwoord = (bericht) => {
     setGesprek(g => [...g, bericht])
     if (!openRef.current) setOngelezen(true)
     meld('Klaar', false)
-    // Voorlezen: het antwoord en daarna de eerste toestemmingsvraag (die in het wolkje).
-    if (stem.isAan() && !luistertRef.current) {
-      const open = bericht.acties.find(staatOpen)
-      stem.spreek([bericht.content, open && vraagVoor(open).vraag].filter(Boolean).join('\n'))
-    }
+    const tekst = spraakVan(bericht)
+    spraak.current = { content: bericht.content, tekst }
+    if (stem.isAan() && !luistertRef.current) stem.spreek(tekst, { bewaar: true })
+  }
+  const herhaal = (bericht) => {
+    if (stem.isBezig()) { stem.stop(); return }
+    stopHerkenner()
+    stem.herhaal(spraakVan(bericht))
   }
 
   const stuur = async () => {
@@ -1032,7 +1063,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
             boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
           }}>
             {!gesprek.length && <div style={{ ...TEKST, color: colors.textSecondary, fontWeight: 600 }}>Nog geen berichten.</div>}
-            {gesprek.map((b, i) => b.role === 'user' ? (
+            {gesprek.map((b, i, alle) => b.role === 'user' ? (
               <div key={i} style={{
                 alignSelf: 'flex-end', maxWidth: '85%', background: colors.surface, borderRadius: 14,
                 padding: '4px 9px', ...TEKST, fontWeight: 700, color: colors.textPrimary, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
@@ -1062,7 +1093,9 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                       </div>
                     )
                   })}
-                  <Inkort tekst={b.content} />
+                  <Inkort tekst={b.content}
+                    achter={alle.slice(i + 1).every(n => n.role === 'user') && stem.beschikbaar()
+                      ? <Herhaal praat={spreekt} onKlik={() => herhaal(b)} /> : null} />
                 </div>
                 <Kopieer tekst={b.content} />
               </div>

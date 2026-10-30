@@ -91,7 +91,9 @@ const G = {
 const PRIMARY_TABS = [
   { id: 'command', label: 'Command', icon: Shield },
   { id: 'leads', label: 'Leads', icon: UserPlus },
-  { id: 'output', label: 'Output', icon: Send }
+  // Business OS staat sinds 30 okt 2026 in de onderbalk; Output, Productivity
+  // en Agenda zijn naar het Meer-menu verhuisd.
+  { id: 'business-os', label: 'Business OS', icon: Activity }
 ]
 
 // ============================================
@@ -105,7 +107,7 @@ const MORE_CATEGORIES = [
   {
     label: 'Gameplan',
     items: [
-      { id: 'business-os', label: 'Business OS', icon: Activity },
+      { id: 'output', label: 'Output', icon: Send },
       { id: 'productivity', label: 'Productivity', icon: Target },
       // Ads zit sinds 23 okt 2026 in het Leads-tabblad (schakelaar bovenaan).
     ]
@@ -140,8 +142,11 @@ const MORE_CATEGORIES = [
   }
 ]
 
-// De zwevende navbalk staat fixed op bottom:30 en is ~70px hoog.
-const ZWEVENDE_NAV_RUIMTE = 105
+// De zwevende navbalk staat fixed op bottom:14 en is ~50px hoog.
+const ZWEVENDE_NAV_RUIMTE = 76
+
+// Eén tint voor pagina, onderbalk en zijbalk — anders zie je onderin een band.
+const PAGINA_BG = '#0a0a0a'
 
 const SPLIT_KEY = 'myarc_coachhub_split_tab'
 const SPLIT_RATIO_KEY = 'myarc_coachhub_split_ratio'
@@ -218,6 +223,18 @@ export default function CoachHub() {
   const splitRatioRef = useRef(splitRatio)
   useEffect(() => { splitRatioRef.current = splitRatio }, [splitRatio])
 
+  // html/body zijn #000 (index.html); de hub is PAGINA_BG. Waar de pagina
+  // ophoudt (onderin, overscroll, safe-area) schemerde dat zwart door als band.
+  useEffect(() => {
+    const oud = [document.documentElement.style.background, document.body.style.background]
+    document.documentElement.style.background = PAGINA_BG
+    document.body.style.background = PAGINA_BG
+    return () => {
+      document.documentElement.style.background = oud[0]
+      document.body.style.background = oud[1]
+    }
+  }, [])
+
   useEffect(() => {
     try {
       if (splitTab) localStorage.setItem(SPLIT_KEY, splitTab)
@@ -247,14 +264,14 @@ export default function CoachHub() {
 
   const [navStack, setNavStack] = useState([]) // tab-geschiedenis voor de terug-knop
   const [moreOpen, setMoreOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
   const [selectedClient, setSelectedClient] = useState(null)
   const [reviewPlanId, setReviewPlanId] = useState(null)
   
   // Data
   const [clients, setClients] = useState([])
-  const [workoutSchemas, setWorkoutSchemas] = useState([])
-  const [mealTemplates, setMealTemplates] = useState([])
+  const [, setWorkoutSchemas] = useState([])
+  const [, setMealTemplates] = useState([])
   const [user, setUser] = useState(null)
   
   // Timer state
@@ -286,7 +303,7 @@ export default function CoachHub() {
   })
   const toggleClientMode = () => setClientMode(v => {
     const next = !v
-    try { localStorage.setItem('coachClientMode', next ? '1' : '0') } catch {}
+    try { localStorage.setItem('coachClientMode', next ? '1' : '0') } catch { /* ignore */ }
     if (next) setWidgetOpen(null) // sluit open panelen bij verbergen
     return next
   })
@@ -664,7 +681,7 @@ export default function CoachHub() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#0a0a0a',
+      background: PAGINA_BG,
       // Reserve space for the WeekGoalsBar (fixed, top:0, ~32px + safe-area).
       // Without this the bar floats over the header and covers the
       // logout/switch/notification buttons. The bar hides itself when there
@@ -935,7 +952,7 @@ export default function CoachHub() {
         minHeight: 'calc(100vh - 100px)',
         // Ruimte onderaan voor de floating bottom-nav (zelfde pattern als
         // ClientDashboard) — anders verdwijnt content onder de balk.
-        paddingBottom: splitActief ? 0 : '120px',
+        paddingBottom: splitActief ? 0 : '90px',
       }}>
         {splitActief ? (
           // Twee tabbladen naast elkaar. De hele strook is schermhoog en elk
@@ -1006,169 +1023,66 @@ export default function CoachHub() {
       </main>
 
       {/* ═══ FLOATING BOTTOM NAV ═══ */}
-      {/* 7 quick-access knoppen: Command / Leads / Output / Productivity /
-          Agenda + acties Wissel / Uitlog. Verborgen in klantmodus (terug via
-          de oog-toggle linksonder). */}
-      {!clientMode && (<nav style={{
-        position: 'fixed',
-        bottom: 30,
-        left: isMobile ? 10 : '50%',
-        right: isMobile ? 10 : 'auto',
-        transform: isMobile ? 'none' : 'translateX(-50%)',
-        width: isMobile ? 'auto' : 'min(720px, calc(100vw - 32px))',
-        background: 'rgba(10, 10, 10, 0.88)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 22,
-        boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.04)',
-        padding: isMobile ? '0.5rem 0.3rem' : '0.6rem 0.5rem',
-        zIndex: 100,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 2 }}>
-          {[
-            { id: 'command',        label: 'Command',  Icon: Shield },
-            { id: 'leads',          label: 'Leads',    Icon: UserPlus },
-            { id: 'output',         label: 'Output',   Icon: Send },
-            { id: 'productivity',   label: 'Produc',   Icon: Target },
-            { id: 'client-agenda',  label: 'Agenda',   Icon: Calendar },
-          ].map(item => {
-            const isActive = activeTab === item.id
-            return (
-              <button
-                key={item.id}
+      {/* Command / Leads / Business OS / Meer / Split + Wissel / Uitloggen.
+          Output, Productivity en Agenda zitten in Meer. Verborgen in
+          klantmodus (terug via de oog-toggle linksonder). */}
+      {!clientMode && (
+        <nav style={{
+          position: 'fixed',
+          bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+          left: isMobile ? 10 : '50%',
+          right: isMobile ? 10 : 'auto',
+          transform: isMobile ? 'none' : 'translateX(-50%)',
+          width: isMobile ? 'auto' : 'min(600px, calc(100vw - 32px))',
+          // Zelfde tint als de pagina, en geen zware schaduw: die tekende
+          // een donkere band rond de balk.
+          background: PAGINA_BG,
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 12,
+          padding: '0.2rem 0.25rem',
+          zIndex: 100,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 1 }}>
+            {PRIMARY_TABS.map(item => (
+              <NavKnop
+                key={item.id} label={item.label} icon={item.icon} isMobile={isMobile}
+                actief={activeTab === item.id}
                 onClick={() => navigateTo(item.id)}
-                style={{
-                  flex: 1,
-                  display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', gap: 3,
-                  padding: isMobile ? '0.35rem 0.2rem' : '0.45rem 0.3rem',
-                  background: isActive ? 'rgba(255,215,0,0.1)' : 'transparent',
-                  border: 'none', borderRadius: 14,
-                  cursor: 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  minHeight: 44, minWidth: 44,
-                  transition: 'background 0.15s ease',
-                }}
-              >
-                <item.Icon
-                  size={isMobile ? 20 : 22}
-                  color={isActive ? G.primary : 'rgba(255,255,255,0.42)'}
-                  strokeWidth={isActive ? 2.5 : 1.9}
-                />
-                <span style={{
-                  fontSize: isMobile ? '0.52rem' : '0.58rem',
-                  fontWeight: isActive ? 800 : 600,
-                  color: isActive ? G.primary : 'rgba(255,255,255,0.35)',
-                  letterSpacing: '-0.01em', lineHeight: 1,
-                }}>
-                  {item.label}
-                </span>
-              </button>
-            )
-          })}
-
-          {/* Meer — opent een bottom-sheet met alle secundaire tabs */}
-          <button
-            onClick={() => setMoreOpen(o => !o)}
-            style={{
-              flex: 1,
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', gap: 3,
-              padding: isMobile ? '0.35rem 0.2rem' : '0.45rem 0.3rem',
-              background: (moreOpen || isMoreTab) ? 'rgba(255,215,0,0.1)' : 'transparent',
-              border: 'none', borderRadius: 14,
-              cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              minHeight: 44, minWidth: 44,
-            }}
-          >
-            <MoreHorizontal
-              size={isMobile ? 20 : 22}
-              color={(moreOpen || isMoreTab) ? G.primary : 'rgba(255,255,255,0.42)'}
-              strokeWidth={(moreOpen || isMoreTab) ? 2.5 : 1.9}
-            />
-            <span style={{
-              fontSize: isMobile ? '0.52rem' : '0.58rem',
-              fontWeight: (moreOpen || isMoreTab) ? 800 : 600,
-              color: (moreOpen || isMoreTab) ? G.primary : 'rgba(255,255,255,0.35)',
-              letterSpacing: '-0.01em', lineHeight: 1,
-            }}>
-              Meer
-            </span>
-          </button>
-
-          {/* Split — twee tabbladen naast elkaar. Hoort in deze balk en niet
-              alleen in de header: die scrollt weg zodra je in een tab werkt,
-              en dan is de knop nergens te bekennen. Alleen desktop. */}
-          {!isMobile && (
-            <button
-              onClick={() => setSplitTab(t => t ? null : (activeTab === 'workout-builder' ? 'ai-meals' : 'workout-builder'))}
-              title={splitTab ? 'Split screen uit' : 'Split screen: tweede tabblad ernaast'}
-              style={{
-                flex: 1,
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 3,
-                padding: '0.45rem 0.3rem',
-                background: splitTab ? 'rgba(255,215,0,0.1)' : 'transparent',
-                border: 'none', borderRadius: 14,
-                cursor: 'pointer', fontFamily: 'inherit',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                minHeight: 44, minWidth: 44,
-              }}
-            >
-              <Columns2
-                size={22}
-                color={splitTab ? G.primary : 'rgba(255,255,255,0.42)'}
-                strokeWidth={splitTab ? 2.5 : 1.9}
               />
-              <span style={{
-                fontSize: '0.58rem',
-                fontWeight: splitTab ? 800 : 600,
-                color: splitTab ? G.primary : 'rgba(255,255,255,0.35)',
-                letterSpacing: '-0.01em', lineHeight: 1,
-              }}>
-                Split
-              </span>
-            </button>
-          )}
+            ))}
 
-          {/* Wissel (naar client portal) — custom render PortalSwitchButton */}
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <PortalSwitchButton target="client" db={db} iconOnly />
-          </div>
-
-          {/* Uitlog */}
-          <button
-            onClick={handleLogout}
-            style={{
-              flex: 1,
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', gap: 3,
-              padding: isMobile ? '0.35rem 0.2rem' : '0.45rem 0.3rem',
-              background: 'transparent',
-              border: 'none', borderRadius: 14,
-              cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              minHeight: 44, minWidth: 44,
-            }}
-          >
-            <LogOut
-              size={isMobile ? 20 : 22}
-              color="rgba(239,68,68,0.7)"
-              strokeWidth={2}
+            {/* Meer — opent een bottom-sheet met alle secundaire tabs */}
+            <NavKnop
+              label="Meer" icon={MoreHorizontal} isMobile={isMobile}
+              actief={moreOpen || isMoreTab}
+              onClick={() => setMoreOpen(o => !o)}
             />
-            <span style={{
-              fontSize: isMobile ? '0.52rem' : '0.58rem',
-              fontWeight: 700,
-              color: 'rgba(239,68,68,0.7)',
-              letterSpacing: '-0.01em', lineHeight: 1,
-            }}>
-              Uitlog
-            </span>
-          </button>
-        </div>
-      </nav>)}
+
+            {/* Split — twee tabbladen naast elkaar. Hoort in deze balk en niet
+                alleen in de header: die scrollt weg zodra je in een tab werkt,
+                en dan is de knop nergens te bekennen. Alleen desktop. */}
+            {!isMobile && (
+              <NavKnop
+                label="Split" icon={Columns2} isMobile={isMobile}
+                actief={!!splitTab}
+                title={splitTab ? 'Split screen uit' : 'Split screen: tweede tabblad ernaast'}
+                onClick={() => setSplitTab(t => t ? null : (activeTab === 'workout-builder' ? 'ai-meals' : 'workout-builder'))}
+              />
+            )}
+
+            {/* Wissel naar het client-portaal (blauw icoon met twee pijltjes). */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+              <PortalSwitchButton target="client" db={db} iconOnly style={{ width: 32, height: 32, borderRadius: 8 }} />
+            </div>
+
+            <NavKnop
+              label="Uitloggen" icon={LogOut} isMobile={isMobile}
+              kleur="#ef4444"
+              onClick={handleLogout}
+            />
+          </div>
+        </nav>
+      )}
 
       {/* ═══ MEER BOTTOM-SHEET ═══ */}
       {/* Opent boven de bottom-nav als de coach op "Meer" tikt. Bevat
@@ -1189,7 +1103,7 @@ export default function CoachHub() {
           />
           <div style={{
             position: 'fixed',
-            bottom: isMobile ? 102 : 110,
+            bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
             left: isMobile ? 10 : '50%',
             right: isMobile ? 10 : 'auto',
             transform: isMobile ? 'none' : 'translateX(-50%)',
@@ -1342,6 +1256,7 @@ export default function CoachHub() {
           Verborgen in klantmodus. */}
       {!clientMode && <WidgetSidebar
         isMobile={isMobile}
+        achtergrond={PAGINA_BG}
         buttons={[
           {
             id: 'notifications', label: 'Meldingen', Icon: Bell, color: G.primary,
@@ -1453,6 +1368,42 @@ export default function CoachHub() {
   )
 }
 
+
+// ── Knop in de onderbalk ────────────────────────────────────────────────────
+// Icoon + label, wit en vet; actief krijgt het gele accent.
+function NavKnop({ label, icon, actief, kleur, onClick, title, isMobile }) {
+  const Icon = icon
+  const tint = kleur || (actief ? G.primary : '#fff')
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        flex: 1,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 2,
+        padding: '0.2rem 0.15rem',
+        background: actief ? 'rgba(255,215,0,0.1)' : 'transparent',
+        border: 'none', borderRadius: 8,
+        cursor: 'pointer', fontFamily: 'inherit',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        minHeight: 40, minWidth: 40,
+        transition: 'background 0.15s ease',
+      }}
+    >
+      <Icon size={isMobile ? 18 : 19} color={tint} strokeWidth={2.4} />
+      <span style={{
+        fontSize: isMobile ? '0.56rem' : '0.6rem',
+        fontWeight: 800,
+        color: tint,
+        letterSpacing: '-0.01em', lineHeight: 1,
+        whiteSpace: 'nowrap',
+      }}>
+        {label}
+      </span>
+    </button>
+  )
+}
 
 // ── Paneel-kop voor split screen ────────────────────────────────────────────
 // Per helft: welk tabblad staat hier, en een keuzelijst om te wisselen. Een

@@ -20,7 +20,9 @@ import React from 'react'
 
 const GOLD = '#FFD700'
 
-export default function WidgetSidebar({ buttons = [], isMobile = false, plek = 'rechtsonder' }) {
+// `achtergrond`: vaste tint i.p.v. het doorschijnende zwart, zodat de balk
+// exact de paginakleur heeft (CoachHub). Dan valt ook de zware schaduw weg.
+export default function WidgetSidebar({ buttons = [], isMobile = false, plek = 'rechtsonder', achtergrond }) {
   if (!buttons.length) return null
 
   return (
@@ -38,13 +40,13 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
         // Smal randje tegen de zijkant: alleen iconen, geen labels en geen
         // kader per knop. Met tekst eronder was het een blok van 60px breed
         // dat over de pagina viel.
-        background: 'rgba(10,10,10,0.9)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
+        background: achtergrond || 'rgba(10,10,10,0.9)',
+        backdropFilter: achtergrond ? 'none' : 'blur(16px)',
+        WebkitBackdropFilter: achtergrond ? 'none' : 'blur(16px)',
         border: '1px solid rgba(255,255,255,0.1)',
         borderRight: 'none',
         borderRadius: '14px 0 0 14px',
-        boxShadow: '-6px 8px 26px rgba(0,0,0,0.55)',
+        boxShadow: achtergrond ? 'none' : '-6px 8px 26px rgba(0,0,0,0.55)',
         padding: 3,
         zIndex: 99,
         display: 'flex',

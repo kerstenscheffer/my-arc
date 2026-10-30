@@ -22,6 +22,10 @@
 // Tekst wordt eerst opgeschoond (markdown, pijltjes, emoji, URL's eruit) en
 // voor de browser in stukken van max ~200 tekens geknipt: Chrome/Safari kappen
 // lange utterances af.
+// Herhalen (30 okt 2026): de audio van het laatste antwoord (spreek(tekst,
+// { bewaar: true })) blijft als object-URL's in het geheugen staan, zodat
+// herhaal() hem opnieuw afspeelt zonder nieuwe gino-stem-aanroep (ElevenLabs-
+// tekens). Nog niets bewaard (stem stond uit)? Dan haalt herhaal() hem één keer op.
 
 import { useSyncExternalStore } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -153,6 +157,14 @@ const speler = () => (audio ||= new Audio())
 let elRonde = 0
 let elAfbreker = null
 let elUrls = []
+// Audio van het laatste bewaarde antwoord: { tekst, urls[i] per stuk }.
+let bewaard = { tekst: null, urls: [] }
+const bewaarVoor = (tekst) => {
+  if (bewaard.tekst === tekst) return bewaard
+  bewaard.urls.forEach(u => u && URL.revokeObjectURL(u))
+  bewaard = { tekst, urls: [] }
+  return bewaard
+}
 
 const ruimOp = () => {
   elAfbreker?.abort()
@@ -182,9 +194,7 @@ async function haalAudio(tekst, signal) {
   }
   const stem = res.headers.get('x-gino-stem')
   if (stem) console.info('[stem] ElevenLabs:', decodeURIComponent(stem))
-  const url = URL.createObjectURL(await res.blob())
-  elUrls.push(url)
-  return url
+  return URL.createObjectURL(await res.blob())
 }
 
 // Ophalen met tijdslimiet; bij te laat breekt hij de hele ronde af (terugval volgt).
@@ -225,21 +235,32 @@ const elevenlabs = {
       ? [zin, eerste.slice(zin.length).trim(), ...rest]
       : [eerste, ...rest]
   },
-  async spreek(stukken, onEinde) {
+  async spreek(stukken, onEinde, bewaarTekst) {
     const mijn = ++elRonde
     ruimOp()
     const afbreker = new AbortController()
     elAfbreker = afbreker
     const actueel = () => mijn === elRonde
+    // Bewaren: al opgehaalde stukken hergebruiken, nieuwe in de cache zetten.
+    // Zonder bewaren: tijdelijk, ruimOp gooit ze weg.
+    const cache = bewaarTekst ? bewaarVoor(bewaarTekst) : null
+    const haal = (n) => {
+      if (cache?.urls[n]) return Promise.resolve(cache.urls[n])
+      return haalMetLimiet(stukken[n], afbreker).then(url => {
+        if (cache && cache === bewaard) cache.urls[n] = url
+        else elUrls.push(url)
+        return url
+      })
+    }
     let i = 0
     try {
-      let volgende = haalMetLimiet(stukken[0], afbreker)
+      let volgende = haal(0)
       for (; i < stukken.length; i++) {
         const url = await volgende
         if (!actueel()) return
         // Prefetch: het volgende stuk ophalen terwijl dit stuk speelt.
         if (i + 1 < stukken.length) {
-          volgende = haalMetLimiet(stukken[i + 1], afbreker)
+          volgende = haal(i + 1)
           volgende.catch(() => {}) // fout komt pas bij await; geen 'unhandled rejection' tussendoor
         }
         await speel(url, mijn)
@@ -295,13 +316,13 @@ const provider = {
   beschikbaar: () => elevenlabs.beschikbaar() || browser.beschikbaar(),
   ontgrendel: () => provider.kies().ontgrendel(),
   knip: (tekst) => (provider.kies().knip || knip)(tekst),
-  spreek: (stukken, onEinde) => {
+  spreek: (stukken, onEinde, bewaarTekst) => {
     // Zonder Audio-element kan gino-stem niet spelen: ook die terugval loggen.
     if (!elevenlabs.beschikbaar()) {
       meldTerugval(stemFout('geen_audio', 'browser heeft geen Audio-element'))
       zet({ teruggevallen: Date.now() })
     }
-    return provider.kies().spreek(stukken, onEinde)
+    return provider.kies().spreek(stukken, onEinde, bewaarTekst)
   },
   // Beide stoppen: na een terugval praat de browserstem namens ElevenLabs.
   stop: () => { elevenlabs.stop(); browser.stop() },
@@ -339,12 +360,24 @@ export function stop() {
   if (stand.spreekt) zet({ spreekt: false })
 }
 
-export function spreek(tekst) {
+// bewaar: audio van dit antwoord bewaren voor herhaal().
+export function spreek(tekst, { bewaar = false } = {}) {
   if (!beschikbaar()) return
-  const stukken = provider.knip(spreekbaar(tekst))
+  const schoon = spreekbaar(tekst)
+  const stukken = provider.knip(schoon)
   if (!stukken.length) return
   zet({ spreekt: true })
-  provider.spreek(stukken, () => zet({ spreekt: false }))
+  provider.spreek(stukken, () => zet({ spreekt: false }), bewaar ? schoon : null)
+}
+
+// Herhaalknop: speelt het antwoord opnieuw af, ook als de stem uit staat.
+// Uit de cache als die er is; anders één keer ophalen en bewaren. Aanroepen
+// vanuit de klik (ontgrendelt Safari).
+export function herhaal(tekst) {
+  if (!beschikbaar()) return
+  stop()
+  provider.ontgrendel()
+  spreek(tekst, { bewaar: true })
 }
 
 export function useStem() {

@@ -148,7 +148,7 @@ const REACTOR_CSS = `
   @keyframes bos-flits { 0% { opacity: 0 } 25% { opacity: 1 } 100% { opacity: 0 } }
   @keyframes bos-dooft { 0% { opacity: 1; transform: scale(1.03) } 100% { opacity: .45; transform: scale(.9) } }
   .bos-r .bos-lijf { position: absolute; inset: 0; opacity: .5; transition: opacity .6s ease }
-  .bos-r.aan .bos-lijf { opacity: 1 }
+  .bos-r.aan .bos-lijf, .bos-r.praat .bos-lijf { opacity: 1 }
   .bos-r .bos-a { transform-origin: 120px 120px; transform-box: view-box; animation: bos-draai calc(var(--d) * 1.6) linear infinite }
   .bos-r .bos-a.terug { animation-name: bos-terug }
   .bos-r.aan .bos-a { animation-duration: calc(var(--d) * .7) }
