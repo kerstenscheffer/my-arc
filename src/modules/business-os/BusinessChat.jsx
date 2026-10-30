@@ -566,12 +566,20 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   }
   useEffect(() => () => clearTimeout(meldTimer.current), [])
 
-  // Draait de PA op de Mac? (hartslag elke 15 s)
-  const [viaMac, setViaMac] = useState(false)
+  // Draait de PA op de Mac? (hartslag elke 15 s). Route = Kerstens keuze
+  // (klik op Mac/API), maar Mac alleen als de PA ook echt online is.
+  const [paOnline, setPaOnline] = useState(false)
+  const [route, setRoute] = useState(() => { try { return localStorage.getItem('business_os_route') || 'mac' } catch { return 'mac' } })
+  const wisselRoute = () => setRoute(r => {
+    const n = r === 'mac' ? 'api' : 'mac'
+    try { localStorage.setItem('business_os_route', n) } catch { /* geen opslag */ }
+    return n
+  })
+  const viaMac = route === 'mac' && paOnline
   useEffect(() => {
     let weg = false
     const kijk = () => supabase.from('business_os_pa_status').select('laatst_gezien').maybeSingle()
-      .then(({ data }) => { if (!weg) setViaMac(!!data && Date.now() - new Date(data.laatst_gezien).getTime() < PA_ONLINE_MS) }, () => {})
+      .then(({ data }) => { if (!weg) setPaOnline(!!data && Date.now() - new Date(data.laatst_gezien).getTime() < PA_ONLINE_MS) }, () => {})
     kijk()
     const t = setInterval(kijk, 15000)
     return () => { weg = true; clearInterval(t) }
@@ -983,14 +991,18 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 }}
               />
               {/* Route + nieuw gesprek: klein, rechts in dezelfde balk */}
-              <span title={viaMac ? 'Via je Mac (Claude-abonnement)' : 'Via de API (start npm run pa om via je Mac te gaan)'}
+              <button onClick={wisselRoute}
+                title={route === 'api' ? 'Via de API. Klik: via je Mac'
+                  : paOnline ? 'Via je Mac (Claude-abonnement). Klik: via de API'
+                  : 'Mac gekozen, maar de PA draait niet: gaat nu via de API. Klik: altijd API'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5, height: 40, padding: isMobile ? '0 6px' : '0 6px 0 8px', flexShrink: 0,
-                  fontSize: '0.68rem', fontWeight: 800, color: colors.textMuted, whiteSpace: 'nowrap', cursor: 'default',
+                  fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', background: 'transparent', border: 'none',
+                  color: viaMac || route === 'api' ? colors.textPrimary : colors.textMuted, fontFamily: 'inherit',
                 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: viaMac ? colors.success : colors.textMuted }} />
-                {!isMobile && (viaMac ? 'Mac' : 'API')}
-              </span>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: viaMac ? colors.success : route === 'api' ? colors.textPrimary : colors.danger }} />
+                {!isMobile && (route === 'api' ? 'API' : paOnline ? 'Mac' : 'Mac uit')}
+              </button>
               {gesprek.length > 0 && (
                 <button onClick={() => { stem.stop(); setGesprek([]); setActieStaat({}); setFout(null); setOngelezen(false) }} title="Nieuw gesprek"
                   style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>

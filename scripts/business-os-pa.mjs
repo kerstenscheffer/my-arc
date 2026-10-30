@@ -20,7 +20,9 @@
 // elkaars login kapot. Automatisch starten: launchd-agent nl.myarc.pa
 // (~/Library/LaunchAgents), log in ~/Library/Logs/myarc-pa.log. Eerste keer
 // inloggen moet in een terminal (npm run pa); op de achtergrond kan hij niet
-// om een wachtwoord vragen.
+// om een wachtwoord vragen. Login kwijt (bv. ergens 'uitloggen overal')? Dan
+// stopt de achtergrond-PA met een melding in de log; opnieuw inloggen met
+// npm run pa -- --login (herstart de achtergrond-PA zelf).
 //
 // Claude Code mag hier: bestanden lezen/bewerken, build, lint, git diff/status.
 // Niet: committen, pushen, stashen, iets anders in de shell, of MCP-tools
@@ -53,17 +55,32 @@ const bewaarSessie = (s) => {
   fs.mkdirSync(SESSIE_MAP, { recursive: true, mode: 0o700 })
   fs.writeFileSync(SESSIE, JSON.stringify({ refresh_token: s.refresh_token }), { mode: 0o600 })
 }
-sb.auth.onAuthStateChange((_e, s) => bewaarSessie(s))
+const LOGIN = process.argv.includes('--login')
+let gebruiker = null
+
+// Login kwijt (refresh-token ingetrokken): stoppen met een duidelijke melding.
+// exit(0) zodat launchd niet elke minuut opnieuw start zonder login.
+let gestopt = false
+const loginKwijt = () => {
+  if (gestopt) return
+  gestopt = true
+  console.error(tijd(), 'Login kwijt. Log opnieuw in met: npm run pa -- --login')
+  process.exit(0)
+}
+sb.auth.onAuthStateChange((e, s) => {
+  if (e === 'SIGNED_OUT' && gebruiker) return loginKwijt()
+  bewaarSessie(s)
+})
 
 async function login() {
-  try {
+  if (!LOGIN) try {
     const { refresh_token } = JSON.parse(fs.readFileSync(SESSIE, 'utf8'))
     const { data, error } = await sb.auth.refreshSession({ refresh_token })
     if (!error && data.session) return data.session.user
   } catch { /* nog geen sessie */ }
   if (!process.stdin.isTTY) {
-    console.error(tijd(), 'Niet ingelogd. Start één keer npm run pa in een terminal om in te loggen.')
-    process.exit(1)
+    console.error(tijd(), 'Niet ingelogd. Log in met: npm run pa -- --login')
+    process.exit(0)
   }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const email = (await rl.question('E-mail coach-account: ')).trim()
@@ -86,6 +103,7 @@ const VERBODEN = ['Bash(git commit*)', 'Bash(git push*)', 'Bash(git stash*)', 'B
 const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat. Voer hem uit in deze repo.
 - Volg CLAUDE.md (lees het eerst) en zijn memory.
 - Niet committen, pushen of stashen: de auto-sync doet dat.
+- Log nooit uit op Kerstens account en maak geen sessies op zijn account (ook niet met de service key om iets te testen): signOut trekt al zijn logins in, ook die van deze PA en zijn browser.
 - Schemawijzigingen in de database kun je hier niet doen; heb je er een nodig, zeg dat in je samenvatting.
 - Klaar = npm run build en eslint op de gewijzigde bestanden zijn groen.
 - Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.`
@@ -188,7 +206,21 @@ async function rondeChat() {
 
 const hartslag = () => sb.from('business_os_pa_status')
   .upsert({ coach_id: gebruiker.id, laatst_gezien: new Date().toISOString() })
-  .then(({ error }) => { if (error) console.error(tijd(), 'Hartslag mislukt:', error.message) }, () => {})
+  .then(({ error }) => {
+    if (!error) return
+    // RLS-weigering = we praten als anon: de login is kwijt.
+    if (/row-level security|JWT/i.test(error.message)) return loginKwijt()
+    console.error(tijd(), 'Hartslag mislukt:', error.message)
+  }, () => {})
+
+// Alleen opnieuw inloggen: sessie bewaren en de achtergrond-PA herstarten.
+if (LOGIN) {
+  const g = await login()
+  console.log(`Ingelogd als ${g.email}. Achtergrond-PA wordt herstart…`)
+  spawn('launchctl', ['kickstart', '-k', `gui/${process.getuid()}/nl.myarc.pa`], { stdio: 'inherit' })
+    .on('close', () => { console.log('Klaar. Log: ~/Library/Logs/myarc-pa.log'); process.exit(0) })
+  await new Promise(() => {})
+}
 
 // Draait er al een PA (bv. de automatische op de achtergrond)? Dan niet nog een.
 const PID = path.join(SESSIE_MAP, 'pa.pid')
@@ -206,7 +238,7 @@ const ruimOp = () => { try { if (Number(fs.readFileSync(PID, 'utf8')) === proces
 process.on('exit', ruimOp)
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0))
 
-const gebruiker = await login()
+gebruiker = await login()
 console.log(`MY ARC PA draait in ${MAP} als ${gebruiker.email}. Wacht op opdrachten en chatvragen uit Business OS… (Ctrl+C = stoppen)\n`)
 // Bleef er bij een vorige keer iets op 'bezig' hangen (script gestopt)? Code
 // terug in de wachtrij; een oude chatvraag heeft de chat al via de API gedaan.
