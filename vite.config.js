@@ -1,4 +1,5 @@
 // vite.config.js
+/* global process */
 import { defineConfig } from 'vite'
 import { readFileSync } from 'node:fs'
 import react from '@vitejs/plugin-react'
@@ -33,6 +34,18 @@ function androidVersie() {
 // command === 'build' → productie: strip alle console.* + debugger (scheelt
 // overhead van logs die grote objecten serialiseren in hot paths en houdt de
 // prod-console schoon). In dev (`vite`) blijven de logs staan om te debuggen.
+const BUILD_TIJD = process.env.BUILD_TIJD || new Date().toISOString().replace(/\D/g, '').slice(0, 12)
+
+// /versie.json in de build: open tabbladen vergelijken dit met hun eigen
+// __BUILD_TIJD__ en herladen zichzelf bij een nieuwe deploy (useNieuweVersie).
+const versieBestand = () => ({
+  name: 'versie-json',
+  apply: 'build',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'versie.json', source: JSON.stringify({ build: BUILD_TIJD }) })
+  },
+})
+
 export default defineConfig(({ command }) => ({
   plugins: [
     react({
@@ -40,7 +53,8 @@ export default defineConfig(({ command }) => ({
     }),
     // Draait /api/* lokaal, zoals Vercel dat in productie doet. Zonder dit
     // geeft elke fetch naar /api een 404 op localhost en lijkt de functie stuk.
-    apiDev()
+    apiDev(),
+    versieBestand()
   ],
   esbuild: command === 'build' ? { drop: ['console', 'debugger'] } : {},
   define: {
@@ -49,7 +63,7 @@ export default defineConfig(({ command }) => ({
     // Bouwtijd (UTC, JJJJMMDDUUMM) = de versie van deze webbundel voor live
     // updates. scripts/live-update.mjs zet BUILD_TIJD zodat de zip en de rij
     // in app_live_bundle hetzelfde getal dragen.
-    __BUILD_TIJD__: JSON.stringify(process.env.BUILD_TIJD || new Date().toISOString().replace(/\D/g, '').slice(0, 12)),
+    __BUILD_TIJD__: JSON.stringify(BUILD_TIJD),
   },
   build: {
     minify: 'esbuild',

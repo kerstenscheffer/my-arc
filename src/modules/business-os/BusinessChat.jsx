@@ -39,6 +39,7 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
 import * as stem from './stem'
+import { useNieuweVersie } from './useNieuweVersie'
 
 const KEY = 'business_os_chat'
 const PA_ONLINE_MS = 45000
@@ -957,6 +958,9 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     if (ac.soort === 'pa_voorstel') setCode(c => c || 'wacht') // robotje meteen, de poll neemt het over
   }
   const afwijzen = (i, j) => zetActie(i, j, { afgewezen: true })
+  // Nieuwe deploy? Herladen zodra er geen gesprek loopt (gesprek staat in localStorage).
+  useNieuweVersie(!bezig && !luistert && !spreekt && !invoer.trim() && !bijlagen.length
+    && !Object.values(actieStaat).some(s => s?.bezig))
   const alleOpen = gesprek.flatMap((b, i) => b.role !== 'assistant' ? [] :
     (b.acties || []).map((ac, j) => ({ ac, i, j })).filter(x => staatOpen(x.ac)))
   // "Wacht op jou" staat als lijstje onder de statusregel; het wolkje is voor toestemmingsvragen.

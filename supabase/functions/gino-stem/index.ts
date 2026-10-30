@@ -9,7 +9,7 @@
 // klant ElevenLabs-tegoed opmaken. Sleutels als Supabase-secrets:
 // ELEVENLABS_API_KEY en (optioneel) ELEVENLABS_VOICE_ID (andere namen met
 // ELEVEN/ELEVAN erin worden ook gevonden, zie zoekSecret). Zonder voice-id kiest
-// kiesStem() er zelf één; header x-gino-stem zegt welke. Ontbreekt de API key:
+// kiesStem() 'Gino - Robert NL' (of Daniel); header x-gino-stem zegt welke. Ontbreekt de API key:
 // 503 { fout: 'geen_sleutel' } en valt stem.js terug op de browserstem.
 // Nooit een sleutel in de frontend of de repo.
 
@@ -48,8 +48,8 @@ const SLEUTEL = zoekSecret('ELEVENLABS_API_KEY', /^(?!.*(VOICE|STEM))/i)
 const VOICE_ID = zoekSecret('ELEVENLABS_VOICE_ID', /VOICE|STEM/i)
 if (!SLEUTEL) console.error('gino-stem: geen ElevenLabs-secret gevonden')
 
-// Zonder voice-id: eerste zelf toegevoegde stem (category ≠ premade)
-// uit het eigen ElevenLabs-account, anders de eerste uit de lijst. Per instantie
+// Zonder voice-id: de stem met 'Gino' in de naam (mannenstem 'Gino - Robert NL')
+// uit het eigen ElevenLabs-account, anders PREMADE_STEM (Daniel). Per instantie
 // gecachet, zodat de lijst niet bij elk verzoek wordt opgehaald.
 let gekozenStem: { id: string; naam: string } | null = null
 let alleenPremade = false // na een 402: rest van deze instantie meteen PREMADE_STEM
@@ -66,10 +66,10 @@ async function kiesStem(sleutel: string): Promise<{ id: string; naam: string } |
     return { status: res.status }
   }
   const { voices = [] } = await res.json().catch(() => ({}))
-  const stem = voices.find((v: { category?: string }) => v.category !== 'premade') || voices[0]
-  if (!stem?.voice_id) return { status: 404 }
-  gekozenStem = { id: stem.voice_id, naam: stem.name || stem.voice_id }
-  console.log('gino-stem kiest', gekozenStem.naam, gekozenStem.id)
+  // Nooit "de eerste eigen stem": in Kerstens account was dat een vrouwenstem.
+  const stem = voices.find((v: { name?: string }) => /gino/i.test(v.name || ''))
+  gekozenStem = stem?.voice_id ? { id: stem.voice_id, naam: stem.name } : PREMADE_STEM
+  console.log('gino-stem kiest', gekozenStem.naam, gekozenStem.id, stem ? '' : '(geen Gino-stem gevonden)')
   return gekozenStem
 }
 

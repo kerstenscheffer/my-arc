@@ -17,16 +17,34 @@
 // Sinds 30 okt (avond) geen stemschakelaar meer: de oude localStorage-waarde
 // 'bos_stem_soort' wordt genegeerd. Valt ElevenLabs uit, dan zet hij
 // stand.teruggevallen (tijdstempel; de bol gloeit kort oranjerood), logt de
-// fout in de console én in app_fouten (pagina 'business-os-stem').
+// fout in de console én in app_fouten (pagina 'business-os-stem', melding
+// 'terugval Mac-stem [foutcode] …', élke terugval, zie meldTerugval).
 // Tekst wordt eerst opgeschoond (markdown, pijltjes, emoji, URL's eruit) en
 // voor de browser in stukken van max ~200 tekens geknipt: Chrome/Safari kappen
 // lange utterances af.
 
 import { useSyncExternalStore } from 'react'
 import { supabase } from '../../lib/supabase'
-import { meldFout } from '../../ui/PaginaVangnet'
+import { APP_VERSIE } from '../app-update/appVersie'
 
 const KEY = 'bos_stem_aan'
+
+// Elke terugval naar de Mac-stem in app_fouten (pagina 'business-os-stem'),
+// met de foutcode vooraan. Bewust niet via meldFout: die meldt dezelfde fout
+// maar één keer per sessie, waardoor een herhaalde 503 onzichtbaar bleef
+// (30 okt 2026). Hooguit 30 per sessie, zodat een lus de tabel niet vult.
+let terugvallenGemeld = 0
+function meldTerugval(e) {
+  if (++terugvallenGemeld > 30) return
+  const code = e?.code || 'onbekend'
+  supabase.from('app_fouten').insert({
+    pagina: 'business-os-stem',
+    melding: `terugval Mac-stem [${code}] ${String(e?.message || e || '').slice(0, 900)}`,
+    stack: String(e?.stack || '').slice(0, 4000),
+    versie: APP_VERSIE || null,
+    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 300) : null,
+  }).then(r => r, () => {})
+}
 const MAX_STUK = 200
 
 // ── Browser-provider ──
@@ -143,17 +161,25 @@ const ruimOp = () => {
   elUrls = []
 }
 
+// Fout met een korte code voor app_fouten (bijv. '503 geen_sleutel', 'afspelen NotAllowedError').
+const stemFout = (code, detail = '') => Object.assign(new Error(`gino-stem ${code}${detail ? ` ${detail}` : ''}`), { code })
+
 async function haalAudio(tekst, signal) {
   const { data } = await supabase.auth.getSession()
   const token = data?.session?.access_token
-  if (!token) throw new Error('geen sessie')
+  if (!token) throw stemFout('geen_sessie')
   const res = await fetch(STEM_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, apikey: ANON, 'Content-Type': 'application/json' },
     body: JSON.stringify({ tekst }),
     signal,
-  })
-  if (!res.ok) throw new Error(`gino-stem ${res.status} ${await res.text().catch(() => '')}`)
+  }).catch(e => { throw stemFout('netwerk', e?.message) })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    let fout = ''
+    try { const j = JSON.parse(body); fout = [j.fout, j.status].filter(Boolean).join(' ') } catch { /* geen json */ }
+    throw stemFout(`${res.status}${fout ? ` ${fout}` : ''}`, fout ? '' : body.slice(0, 200))
+  }
   const stem = res.headers.get('x-gino-stem')
   if (stem) console.info('[stem] ElevenLabs:', decodeURIComponent(stem))
   const url = URL.createObjectURL(await res.blob())
@@ -165,7 +191,7 @@ async function haalAudio(tekst, signal) {
 function haalMetLimiet(tekst, afbreker) {
   let t
   const limiet = new Promise((_, nee) => {
-    t = setTimeout(() => { afbreker.abort(); nee(new Error(`gino-stem te traag (> ${TIJDSLIMIET_EL / 1000} s)`)) }, TIJDSLIMIET_EL)
+    t = setTimeout(() => { afbreker.abort(); nee(stemFout('te_traag', `(> ${TIJDSLIMIET_EL / 1000} s)`)) }, TIJDSLIMIET_EL)
   })
   return Promise.race([haalAudio(tekst, afbreker.signal), limiet]).finally(() => clearTimeout(t))
 }
@@ -176,9 +202,9 @@ function speel(url, mijn) {
   return new Promise((ja, nee) => {
     const klaar = (fout) => { a.onended = a.onerror = null; fout ? nee(fout) : ja() }
     a.onended = () => klaar()
-    a.onerror = () => klaar(new Error('afspelen mislukt'))
+    a.onerror = () => klaar(stemFout('afspelen', `mediafout ${a.error?.code || ''}`.trim()))
     a.src = url
-    a.play().catch(e => { if (mijn === elRonde) klaar(e) })
+    a.play().catch(e => { if (mijn === elRonde) klaar(stemFout(`afspelen ${e?.name || 'fout'}`, e?.message)) })
   })
 }
 
@@ -227,7 +253,7 @@ const elevenlabs = {
       // Alleen dit antwoord terugvallen; het volgende antwoord probeert ElevenLabs opnieuw
       // (30 okt 2026: één fout hield de hele sessie op de Mac-stem, ook na het zetten van de sleutel).
       console.error('[stem] ElevenLabs werkt niet, terug naar browserstem:', e?.message || e)
-      meldFout(e, null, 'business-os-stem')
+      meldTerugval(e)
       zet({ teruggevallen: Date.now() })
       const rest = knip(stukken.slice(i).join(' '))
       if (rest.length && browser.beschikbaar()) browser.spreek(rest, onEinde)
@@ -269,7 +295,14 @@ const provider = {
   beschikbaar: () => elevenlabs.beschikbaar() || browser.beschikbaar(),
   ontgrendel: () => provider.kies().ontgrendel(),
   knip: (tekst) => (provider.kies().knip || knip)(tekst),
-  spreek: (stukken, onEinde) => provider.kies().spreek(stukken, onEinde),
+  spreek: (stukken, onEinde) => {
+    // Zonder Audio-element kan gino-stem niet spelen: ook die terugval loggen.
+    if (!elevenlabs.beschikbaar()) {
+      meldTerugval(stemFout('geen_audio', 'browser heeft geen Audio-element'))
+      zet({ teruggevallen: Date.now() })
+    }
+    return provider.kies().spreek(stukken, onEinde)
+  },
   // Beide stoppen: na een terugval praat de browserstem namens ElevenLabs.
   stop: () => { elevenlabs.stop(); browser.stop() },
 }
