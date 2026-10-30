@@ -7,7 +7,8 @@
 //
 // Alleen coaches (get_my_portal_role = coach/both), anders kan elke ingelogde
 // klant ElevenLabs-tegoed opmaken. Sleutels als Supabase-secrets:
-// ELEVENLABS_API_KEY en (optioneel) ELEVENLABS_VOICE_ID. Zonder voice-id kiest
+// ELEVENLABS_API_KEY en (optioneel) ELEVENLABS_VOICE_ID (andere namen met
+// ELEVEN/ELEVAN erin worden ook gevonden, zie zoekSecret). Zonder voice-id kiest
 // kiesStem() er zelf één; header x-gino-stem zegt welke. Ontbreekt de API key:
 // 503 { fout: 'geen_sleutel' } en valt stem.js terug op de browserstem.
 // Nooit een sleutel in de frontend of de repo.
@@ -31,7 +32,23 @@ const MAX_TEKENS = 1000
 // Business OS stil terug op de browserstem). Bij 402 schakelt hij hierop over.
 const PREMADE_STEM = { id: 'onwK4e9ZLuTAKqWW03F9', naam: 'Daniel (premade)' }
 
-// Zonder ELEVENLABS_VOICE_ID: eerste zelf toegevoegde stem (category ≠ premade)
+// De secret staat niet altijd onder de standaardnaam (30 okt 2026: Kersten zette
+// hem onder een eigen naam → 503 geen_sleutel). Eerst de vaste naam, anders de
+// eerste secret met ELEVEN/ELEVAN/XI_ in de naam. Alleen de naam wordt gelogd.
+function zoekSecret(vast: string, soort: RegExp): string | undefined {
+  const waarde = Deno.env.get(vast)
+  if (waarde) return waarde
+  const naam = Object.keys(Deno.env.toObject())
+    .filter((n) => /ELEVEN|ELEVAN|^XI_/i.test(n) && soort.test(n) && n !== vast)
+    .sort()[0]
+  if (naam) console.log('gino-stem gebruikt secret', naam, 'voor', vast)
+  return naam ? Deno.env.get(naam) : undefined
+}
+const SLEUTEL = zoekSecret('ELEVENLABS_API_KEY', /^(?!.*(VOICE|STEM))/i)
+const VOICE_ID = zoekSecret('ELEVENLABS_VOICE_ID', /VOICE|STEM/i)
+if (!SLEUTEL) console.error('gino-stem: geen ElevenLabs-secret gevonden')
+
+// Zonder voice-id: eerste zelf toegevoegde stem (category ≠ premade)
 // uit het eigen ElevenLabs-account, anders de eerste uit de lijst. Per instantie
 // gecachet, zodat de lijst niet bij elk verzoek wordt opgehaald.
 let gekozenStem: { id: string; naam: string } | null = null
@@ -41,8 +58,7 @@ let alleenPremade = false // na een 402: rest van deze instantie meteen PREMADE_
 // dat als "sleutel ontbreekt").
 async function kiesStem(sleutel: string): Promise<{ id: string; naam: string } | { status: number }> {
   if (alleenPremade) return PREMADE_STEM
-  const vast = Deno.env.get('ELEVENLABS_VOICE_ID')
-  if (vast) return { id: vast, naam: 'ELEVENLABS_VOICE_ID' }
+  if (VOICE_ID) return { id: VOICE_ID, naam: 'ELEVENLABS_VOICE_ID' }
   if (gekozenStem) return gekozenStem
   const res = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': sleutel } })
   if (!res.ok) {
@@ -74,7 +90,7 @@ Deno.serve(async (req) => {
     const { data: rol } = await sb.rpc('get_my_portal_role')
     if (rol !== 'coach' && rol !== 'both') return json({ fout: 'alleen_coach' }, 403)
 
-    const sleutel = Deno.env.get('ELEVENLABS_API_KEY')
+    const sleutel = SLEUTEL
     if (!sleutel) return json({ fout: 'geen_sleutel' }, 503)
     const stem = await kiesStem(sleutel)
     if (!('id' in stem)) return json({ fout: 'elevenlabs', status: stem.status }, 502)

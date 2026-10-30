@@ -16,8 +16,9 @@
 // Stem-modus (30 okt): klik op de ring = Gino spreekt antwoorden hardop
 // (stem.js). Klik tijdens het praten stopt alleen het praten. Zolang hij praat
 // pulseert de ring in een eigen, sneller ritme.
-// Stemkeuze (30 okt): tekstschakelaar onder de bol, Gino-stem (betaald) of
-// Mac-stem (gratis, standaard). Bij betaald gloeit de halo iets voller.
+// Stem (30 okt, avond): altijd eerst ElevenLabs (Gino-stem); de Mac-stem is
+// alleen noodterugval. Faalt ElevenLabs, dan gloeit de bol kort oranjerood
+// (.fout), zonder tekst of icoon.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { MoreHorizontal, X } from 'lucide-react'
@@ -161,45 +162,23 @@ const REACTOR_CSS = `
   .bos-r.praat .bos-kern { animation: bos-praat .7s ease-in-out infinite }
   .bos-r.praat .bos-halo { animation: bos-praat 1.1s ease-in-out infinite }
   .bos-r.dooft .bos-kern { animation: bos-dooft .6s ease-out forwards }
-  .bos-r .bos-halo { transition: filter .6s ease }
-  .bos-r.betaald .bos-halo { filter: saturate(1.5) brightness(1.3) }
+  @keyframes bos-fout { 0% { opacity: 0 } 20% { opacity: .9 } 45% { opacity: .5 } 65% { opacity: .8 } 100% { opacity: 0 } }
+  .bos-r .bos-fout { opacity: 0 }
+  .bos-r.fout .bos-fout { animation: bos-fout 1.8s ease-out }
   .bos-r .bos-golf, .bos-r .bos-flits { opacity: 0 }
   .bos-r.ontwaakt .bos-golf { animation: bos-golf .7s ease-out }
   .bos-r.ontwaakt .bos-flits { animation: bos-flits .7s ease-out }
   @media (prefers-reduced-motion: reduce) {
     .bos-r .bos-a, .bos-r .bos-kern, .bos-r .bos-halo, .bos-r.aan .bos-a, .bos-r.aan .bos-kern, .bos-r.aan .bos-halo,
     .bos-r.bezig .bos-a, .bos-r.bezig .bos-kern, .bos-r.praat .bos-kern, .bos-r.praat .bos-halo,
-    .bos-r.dooft .bos-kern, .bos-r.ontwaakt .bos-golf { animation: none }
+    .bos-r.dooft .bos-kern, .bos-r.ontwaakt .bos-golf, .bos-r.fout .bos-fout { animation: none }
+    .bos-r.fout .bos-fout { opacity: .6 }
     .bos-r .bos-halo { opacity: .4 }
     .bos-r.aan .bos-halo, .bos-r.bezig .bos-halo, .bos-r.praat .bos-halo { opacity: .85 }
   }
 `
 
-// Kleine tekstschakelaar onder de bol: welke stem Gino gebruikt.
-function StemKeuze({ soort, onKies }) {
-  const knop = (s, tekst) => {
-    const actief = soort === s
-    return (
-      <button type="button" onClick={() => onKies(s)} aria-pressed={actief} style={{
-        background: 'none', border: 'none', padding: '6px 4px', minHeight: 32, cursor: 'pointer',
-        fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: actief ? 800 : 600,
-        color: actief ? C.wit : C.zacht, opacity: actief ? 1 : 0.6,
-        borderBottom: `1px solid ${actief ? C.groen : 'transparent'}`,
-      }}>
-        {tekst}
-      </button>
-    )
-  }
-  return (
-    <div role="group" aria-label="Stem van Gino" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-      {knop('betaald', 'Gino-stem (betaald)')}
-      <span style={{ color: C.zacht, opacity: 0.4, fontSize: '0.72rem' }}>·</span>
-      {knop('gratis', 'Mac-stem (gratis)')}
-    </div>
-  )
-}
-
-function Reactor({ pct, maat, bezig, praat, stemAan, betaald, melding, onKlik }) {
+function Reactor({ pct, maat, bezig, praat, stemAan, fout, melding, onKlik }) {
   const R = 96
   const omtrek = 2 * Math.PI * R
   // Eenmalige overgang bij wisselen van de stem: .ontwaakt (aan) of .dooft (uit).
@@ -212,7 +191,7 @@ function Reactor({ pct, maat, bezig, praat, stemAan, betaald, melding, onKlik })
     const t = setTimeout(() => setOvergang(null), stemAan ? 700 : 600)
     return () => clearTimeout(t)
   }, [stemAan])
-  const klassen = ['bos-r', stemAan && 'aan', betaald && 'betaald', praat ? 'praat' : bezig && 'bezig', overgang].filter(Boolean).join(' ')
+  const klassen = ['bos-r', stemAan && 'aan', fout && 'fout', praat ? 'praat' : bezig && 'bezig', overgang].filter(Boolean).join(' ')
   const labelMaat = maat >= 200 ? '0.62rem' : '0.56rem'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -276,6 +255,11 @@ function Reactor({ pct, maat, bezig, praat, stemAan, betaald, melding, onKlik })
           position: 'absolute', inset: '25%', borderRadius: '50%', pointerEvents: 'none',
           border: `2px solid ${C.groen}`, boxShadow: `0 0 24px ${C.groen}, inset 0 0 16px ${C.groen}88`,
         }} />
+        {/* korte oranjerode gloed: ElevenLabs gaf een fout (stem.js zet teruggevallen) */}
+        <div className="bos-fout" style={{
+          position: 'absolute', inset: '-10%', borderRadius: '50%', pointerEvents: 'none',
+          background: 'radial-gradient(circle, rgba(255,90,40,0.55) 0%, rgba(255,60,40,0.22) 45%, transparent 70%)',
+        }} />
       </div>
       {/* naam onder de bol; een melding vervangt hem even */}
       <div role="status" style={{
@@ -329,7 +313,7 @@ export default function BusinessOS({ isMobile }) {
   const sluitBlad = useCallback(() => setBlad(null), [])
   // Stem-modus: eerste klik zet aan (en ontgrendelt iOS), klik tijdens praten
   // stopt alleen, klik in stilte zet uit.
-  const { aan: stemAan, spreekt, soort: stemSoort, teruggevallen } = stem.useStem()
+  const { aan: stemAan, spreekt, teruggevallen } = stem.useStem()
   const [stemMelding, setStemMelding] = useState(null)
   const meldTimer = useRef(null)
   useEffect(() => () => clearTimeout(meldTimer.current), [])
@@ -338,15 +322,14 @@ export default function BusinessOS({ isMobile }) {
     setStemMelding(tekst)
     meldTimer.current = setTimeout(() => setStemMelding(null), ms)
   }, [])
-  // Betaalde stem gaf een fout: dat antwoord ging via de Mac-stem, keuze blijft staan.
+  // ElevenLabs gaf een fout: kort oranjerood licht in de bol (1,8 s), geen tekst.
+  const [stemFout, setStemFout] = useState(false)
   useEffect(() => {
-    if (teruggevallen) meld('Gino-stem gaf een fout, dit antwoord via Mac-stem', 6000)
-  }, [teruggevallen, meld])
-  const kiesStem = (s) => {
-    if (s === stemSoort) return
-    stem.stop()
-    stem.zetSoort(s)
-  }
+    if (!teruggevallen) return
+    setStemFout(true)
+    const t = setTimeout(() => setStemFout(false), 1800)
+    return () => clearTimeout(t)
+  }, [teruggevallen])
   const klikRing = () => {
     if (!stem.beschikbaar()) {
       meld('Stem niet beschikbaar in deze browser', 2500)
@@ -596,8 +579,7 @@ export default function BusinessOS({ isMobile }) {
         alignItems: 'center', justifyContent: 'center',
       }}>
         <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} betaald={stemSoort === 'betaald'} melding={stemMelding} onKlik={klikRing} />
-          <StemKeuze soort={stemSoort} onKies={kiesStem} />
+          <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
 
           {/* ── Chat: de ring praat ── */}
           <BusinessChat onBezig={setDenkt} marginTop={isMobile ? 18 : 24} context={{
