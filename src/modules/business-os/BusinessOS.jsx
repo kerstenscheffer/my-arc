@@ -408,13 +408,49 @@ function AgendaRegel({ e }) {
   )
 }
 
-function VandaagPaneel({ v, agenda }) {
+// Doorstap na de week-5 evaluatie (client_doorstap via get_business_os.doorstap).
+// Eén regel met het percentage, daaronder per status de namen.
+const DOORSTAP_RIJEN = [
+  ['ja_mondeling', 'Ja, mondeling', C.groen],
+  ['betaald', 'Betaald', C.groen],
+  ['denkt_na', 'Denkt na', C.oranje],
+  ['nee', 'Nee', C.rood],
+]
+
+function DoorstapStat({ d }) {
+  const metStatus = DOORSTAP_RIJEN.reduce((n, [k]) => n + (d[k]?.aantal || 0), 0)
+  return (
+    <Paneel titel="Doorstap na evaluatie" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ ...NUM, fontSize: '1.6rem', fontWeight: 900, color: C.wit }}>
+          {d.pct == null ? '—' : `${d.pct}%`}
+        </div>
+        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: C.zacht }}>
+          {(d.ja_mondeling?.aantal || 0) + (d.betaald?.aantal || 0)} van {metStatus} zegt ja · {d.eindigend_30d ?? 0} trajecten eindigen rond nu
+        </div>
+      </div>
+      {DOORSTAP_RIJEN.filter(([k]) => d[k]?.aantal).map(([k, label, kleur]) => (
+        <div key={k} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+          <div style={{ ...NUM, fontSize: '0.8rem', fontWeight: 800, color: kleur, minWidth: 110, flexShrink: 0 }}>
+            {label} · {d[k].aantal}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 700, color: C.wit }}>
+            {(d[k].namen || []).join(', ')}
+          </div>
+        </div>
+      ))}
+    </Paneel>
+  )
+}
+
+function VandaagPaneel({ v, agenda, doorstap }) {
   const [alles, setAlles] = useState(false)
   if (!v.geladen) return <div style={{ fontSize: '0.85rem', color: C.zacht }}>Laden…</div>
   const leeg = (t) => <div style={{ fontSize: '0.85rem', color: C.zacht }}>{t}</div>
   const over = alles ? v.overDatum : v.overDatum.slice(0, 10)
   return (
     <>
+      {doorstap && <DoorstapStat d={doorstap} />}
       <Paneel titel={`Agenda vandaag · ${agenda.length}`} style={{ marginBottom: 16 }}>
         {agenda.length === 0 && leeg('Geen afspraken in je agenda.')}
         {agenda.map((e, i) => <AgendaRegel key={`${e.start}-${i}`} e={e} />)}
@@ -912,7 +948,7 @@ export default function BusinessOS({ isMobile }) {
 
   // Inhoud van de onderdelen: precies wat eerder in de inklap-secties stond.
   const inhoud = (k) => {
-    if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} />
+    if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} doorstap={data.doorstap} />
     if (k === 'content') return <ContentPaneel c={content} />
     if (k === 'week') return <WeekPaneel w={week} />
     if (k === 'kern') return (
@@ -1110,6 +1146,7 @@ export default function BusinessOS({ isMobile }) {
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
             zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
             uitgesteldeSalesNietMeegeteld: data.uitgesteld || [],
+            doorstapNaEvaluatie: data.doorstap || null,
             vandaag: {
               beloftesOpen: vandaag.beloftes.length, takenVandaag: vandaag.takenVandaag.length,
               overDatum: vandaag.overDatum.length,

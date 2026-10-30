@@ -17,6 +17,8 @@ import {
 import DeleteClientModal from './DeleteClientModal'
 import { computePeriod } from './trajectPeriode'
 import ClientInsightModal from './ClientInsightModal'
+import DoorstapKeuze from './DoorstapKeuze'
+import TrajectModal from './TrajectModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
 import { laatsteZaterdag, vensterGemiddelde, zaterdagTempo, zaterdagReeks, maakConfig, tempoKleurVanDoel, startInWeek, actueelGemiddelde } from '../../weight-tracker/utils/coachingBand'
 
@@ -80,7 +82,8 @@ function checkinStip(open) {
   return { ...trap, dagen }
 }
 
-export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos }) {
+export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange, openVideos = 0, onOpenVideos, doorstap, onDoorstap }) {
+  const [verlengOpen, setVerlengOpen] = useState(false)
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
 
@@ -628,6 +631,12 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           marginLeft: 'auto',
           gap: isMobile ? '0.55rem' : '0.7rem',
         }}>
+        {/* Doorstap na de week-5 evaluatie: vlaggetje, of het label als er
+            een status staat. Betaald → verlenging via TrajectModal. */}
+        {!isInactive && (
+          <DoorstapKeuze client={client} coachId={coachId} waarde={doorstap}
+            onGewijzigd={onDoorstap} onBetaald={() => setVerlengOpen(true)} />
+        )}
         {/* Dagelijks afvinken. Alleen een icoon: er staan al twee knoppen
             met tekst naast, en een derde woord maakt de rij te vol op een
             smalle kaart. */}
@@ -742,6 +751,8 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           db={db}
           coachId={coachId}
           dagCheck={{ gehad, bezig: checkBezig, onWissel: wisselDagCheck }}
+          doorstap={doorstap}
+          onDoorstap={onDoorstap}
           onOpenMealPanel={onOpenMealPanel}
           onOpenWorkoutPanel={onOpenWorkoutPanel}
           // Meekijken binnen je eigen CoachHub, op de pagina van deze klant.
@@ -751,6 +762,14 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         />,
         modalHost
       )}
+
+      <TrajectModal
+        open={verlengOpen}
+        modus="verleng"
+        client={client}
+        coachId={coachId}
+        onClose={() => setVerlengOpen(false)}
+      />
 
     </div>
   )

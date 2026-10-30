@@ -14,6 +14,7 @@ import CoachingPeriodPanel from './CoachingPeriodPanel'
 import LooptijdKort from './LooptijdKort'
 import { KolomKop } from './insight/KolomKop'
 import TrajectModal from './TrajectModal'
+import DoorstapKeuze from './DoorstapKeuze'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 import AgendaVenster, { MaaltijdVenster } from './AgendaVenster'
@@ -76,7 +77,7 @@ function groupPhotosByMonthAndDay(photos) {
   return months
 }
 
-export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onSwitchToClientView, dagCheck = null }) {
+export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onSwitchToClientView, dagCheck = null, doorstap, onDoorstap }) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [photoZoom, setPhotoZoom] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
@@ -360,6 +361,11 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     )}
                   </div>
 
+                  {/* Doorstap na de week-5 evaluatie. Vanaf de klantkaart
+                      komt de waarde mee; anders haalt hij hem zelf op. */}
+                  <DoorstapKeuze client={effectiveClient} coachId={coachId} groot
+                    waarde={doorstap} zelfLaden={doorstap === undefined}
+                    onGewijzigd={onDoorstap} onBetaald={() => setTrajectModus('verleng')} />
                   {dagCheck && (
                     <button onClick={dagCheck.onWissel} disabled={dagCheck.bezig}
                       title={dagCheck.gehad ? 'Vandaag afgevinkt — klik om terug te draaien' : 'Vandaag afvinken'}
@@ -440,6 +446,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   </span>
                 )}
                 <span style={{ flex: 1 }} />
+                <DoorstapKeuze client={effectiveClient} coachId={coachId}
+                  waarde={doorstap} zelfLaden={doorstap === undefined}
+                  onGewijzigd={onDoorstap} onBetaald={() => setTrajectModus('verleng')} />
                 {dagCheck && (
                   <button onClick={dagCheck.onWissel} disabled={dagCheck.bezig}
                     title={dagCheck.gehad ? 'Vandaag afgevinkt — tik om terug te draaien' : 'Vandaag afvinken'}

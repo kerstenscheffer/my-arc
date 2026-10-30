@@ -9,6 +9,7 @@ import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
 import CoachVideoFeedback, { KlantVideos } from '../video-feedback/CoachVideoFeedback'
 import AddClientModal from './components/AddClientModal'
+import { laadDoorstap } from './components/DoorstapKeuze'
 import { naloopGrens } from '../challenge-monitor/challengeEisen'
 import { PRIVE, zetPrivacy, herstelPrivacy } from './utils/privacyModus'
 
@@ -75,6 +76,17 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
     setOpenVideos(m)
   }, [db])
   useEffect(() => { if (activeView === 'clients') laadOpenVideos() }, [activeView, laadOpenVideos])
+
+  // Doorstap na de week-5 evaluatie, laatste rij per klant in één query.
+  // null = tabel nog niet aangemaakt; dan tonen de kaarten niets.
+  const [doorstap, setDoorstap] = useState(null)
+  const doorstapSleutel = clientsWithData.map(c => c.id).join(',')
+  useEffect(() => {
+    if (!doorstapSleutel) return
+    let weg = false
+    laadDoorstap(doorstapSleutel.split(',')).then(m => { if (!weg) setDoorstap(m) })
+    return () => { weg = true }
+  }, [doorstapSleutel])
 
   // Wie doet er mee aan een lopende challenge. Eén kleine query, los van de
   // zware klantenlaadbeurt, zodat de lijst er niet op hoeft te wachten.
@@ -588,6 +600,8 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
                 onOpenMealPanel={onOpenMealPanel}
                 onOpenWorkoutPanel={onOpenWorkoutPanel}
                 onDagCheckChange={verwerkDagCheck}
+                doorstap={doorstap ? (doorstap[client.id] || null) : undefined}
+                onDoorstap={(rij) => setDoorstap(m => ({ ...(m || {}), [client.id]: rij }))}
                 openVideos={openVideos[client.id]?.length || 0}
                 onOpenVideos={() => setVideoKlant({ lijst: openVideos[client.id].map(v => ({ ...v, clients: { first_name: client.first_name, last_name: client.last_name } })) })}
               />
