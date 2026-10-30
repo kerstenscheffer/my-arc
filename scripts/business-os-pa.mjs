@@ -114,8 +114,12 @@ const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat
 - Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.`
 
 const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)']
+// De chat past nooit zelf iets aan (dat loopt via Toestaan / Uitvoeren op mijn
+// Mac). Hard verboden, ook als een instellingenbestand het ooit toestaat.
+const CHAT_VERBODEN = ['Edit', 'Write', 'NotebookEdit']
 // Chat licht houden (sneller antwoord): ander model, lage effort, geen
-// MCP-servers, geen user-instellingen/plugins en geen skills. Inloggen blijft
+// MCP-servers, geen user- of local-instellingen (settings.local.json staat
+// Edit/Write/sed toe voor jouw eigen sessies) en geen skills. Inloggen blijft
 // via het abonnement (dus geen --bare: die wil een ANTHROPIC_API_KEY).
 // CHAT_ENV: geen CLAUDE.md en geen auto-memory meeladen (~14k tokens en ~1 s
 // per bericht, gemeten 30 okt). De cwd blijft, dus Read/Grep en pa-db werken;
@@ -126,9 +130,31 @@ const CHAT_LICHT = [
   '--model', CHAT_MODEL,
   '--effort', 'low',
   '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-  '--setting-sources', 'project,local',
+  '--setting-sources', 'project',
   '--disable-slash-commands',
 ]
+
+// Slim (knop in Business OS): zoals Claude Code in de terminal. Opus, lang
+// nadenken, CLAUDE.md + memory, de volledige Claude Code-systeemprompt (de
+// Business OS-regels komen erachter) en per gesprek een sessie die hervat
+// wordt, zodat hij onthoudt wat hij al opzocht. Wel dezelfde rechten als Snel
+// plus internet: alleen lezen, wijzigen via voorstellen.
+const SLIM_MODEL = process.env.PA_SLIM_MODEL || 'opus'
+const SLIM_TOEGESTAAN = [...CHAT_TOEGESTAAN, 'WebSearch', 'WebFetch']
+const SLIM_ARGS = [
+  '--model', SLIM_MODEL,
+  '--effort', 'high',
+  '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+  '--setting-sources', 'project',
+  '--disable-slash-commands',
+]
+const GESPREK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const SLIM_SESSIES = path.join(os.homedir(), '.config', 'myarc-pa', 'slim-sessies.json')
+const slimSessies = new Set((() => { try { return JSON.parse(fs.readFileSync(SLIM_SESSIES, 'utf8')) } catch { return [] } })())
+const bewaarSlimSessie = (id) => {
+  slimSessies.add(id)
+  try { fs.writeFileSync(SLIM_SESSIES, JSON.stringify([...slimSessies].slice(-200)), { mode: 0o600 }) } catch { /* niet erg */ }
+}
 
 function claude(args, extraEnv = {}) {
   return new Promise((klaar) => {
@@ -167,7 +193,8 @@ async function voerCodeUit(opdracht) {
 const WARM_MAX_MS = 20 * 60 * 1000
 let warm = null
 
-async function maakWarm() {
+// slim = { id, hervat } → Slim-proces voor dat gesprek; anders een Snel-proces.
+async function maakWarm(slim = null) {
   const { data: skills } = await sb.from('business_os_skills')
     .select('naam, wanneer, instructies').eq('actief', true).order('naam')
   // Het token gaat mee bij het opstarten: zorg dat het nog ruim een half uur geldig is.
@@ -175,15 +202,24 @@ async function maakWarm() {
   if (session && session.expires_at * 1000 - Date.now() < 30 * 60 * 1000) {
     session = (await sb.auth.refreshSession()).data.session || session
   }
-  const p = spawn('claude', [
-    '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+  const basis = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+    '--permission-mode', 'dontAsk', '--disallowedTools', CHAT_VERBODEN.join(',')]
+  const args = slim ? [
+    ...basis,
+    '--append-system-prompt', chatPrompt({ skills: skills || [] }),
+    '--allowedTools', SLIM_TOEGESTAAN.join(','),
+    ...(slim.hervat ? ['--resume', slim.id] : ['--session-id', slim.id]),
+    '--max-budget-usd', '10',
+    ...SLIM_ARGS,
+  ] : [
+    ...basis,
     '--system-prompt', chatPrompt({ skills: skills || [] }),
-    '--permission-mode', 'dontAsk',
     '--allowedTools', CHAT_TOEGESTAAN.join(','),
     '--no-session-persistence',
     '--max-budget-usd', '3',
     ...CHAT_LICHT,
-  ], { cwd: MAP, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...CHAT_ENV, PA_ACCESS_TOKEN: session?.access_token || '' } })
+  ]
+  const p = spawn('claude', args, { cwd: MAP, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...(slim ? {} : CHAT_ENV), PA_ACCESS_TOKEN: session?.access_token || '' } })
   const w = { p, sinds: Date.now(), dood: false, regels: [] }
   let buf = ''
   p.stdout.on('data', d => {
@@ -218,14 +254,22 @@ setInterval(zetWarmKlaar, 60 * 1000)
 
 // opDeel(tekst): halve tekst tijdens het typen.
 async function beantwoordChat(invoer, opDeel) {
-  if (!warm || warm.dood || Date.now() - warm.sinds > WARM_MAX_MS) { warm?.p.kill(); warm = await maakWarm() }
-  const w = warm
-  warm = null
+  const slimId = invoer?.modus === 'slim' && GESPREK_ID.test(invoer?.gesprek_id || '') ? invoer.gesprek_id : null
+  const hervat = !!slimId && slimSessies.has(slimId)
+  let w
+  if (slimId) w = await maakWarm({ id: slimId, hervat })
+  else {
+    if (!warm || warm.dood || Date.now() - warm.sinds > WARM_MAX_MS) { warm?.p.kill(); warm = await maakWarm() }
+    w = warm
+    warm = null
+  }
   const berichten = (invoer?.berichten || []).slice(-20)
-  const gesprek = berichten.map(b => `${b.role === 'user' ? 'Kersten' : 'Jij'}: ${b.content}`).join('\n\n')
+  // Hervat Slim-gesprek: de sessie kent de rest al, alleen de nieuwe vraag.
+  const gesprek = (hervat ? berichten.slice(-1) : berichten)
+    .map(b => `${b.role === 'user' ? 'Kersten' : 'Jij'}: ${b.content}`).join('\n\n')
   const r = await new Promise((klaar) => {
     let deel = ''
-    const stop = setTimeout(() => w.p.kill('SIGTERM'), 5 * 60 * 1000)
+    const stop = setTimeout(() => w.p.kill('SIGTERM'), (slimId ? 10 : 5) * 60 * 1000)
     w.opBericht = (m) => {
       if (m.type === 'stream_event') {
         const e = m.event
@@ -241,7 +285,8 @@ async function beantwoordChat(invoer, opDeel) {
     if (w.dood) return w.opEinde()
     w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: chatVraag({ gesprek, context: invoer?.context }) } }) + '\n')
   })
-  setTimeout(zetWarmKlaar, 500)
+  if (slimId && r.ok) bewaarSlimSessie(slimId)
+  if (!slimId) setTimeout(zetWarmKlaar, 500)
   if (!r.ok || !r.tekst) return { ok: false, antwoord: { tekst: r.tekst || 'Geen antwoord van Claude Code.', acties: [] } }
   return { ok: true, antwoord: leesAntwoord(r.tekst) }
 }
@@ -306,7 +351,8 @@ async function rondeChat() {
     const r = await beantwoordChat(rij.invoer, opDeel)
     klaar = true
     clearTimeout(wachtend)
-    console.log(`${tijd()} ${r.ok ? '✓' : '✗'} chat-antwoord in ${((Date.now() - t0) / 1000).toFixed(1)} s (${CHAT_MODEL})`)
+    const model = rij.invoer?.modus === 'slim' ? `${SLIM_MODEL}, slim` : CHAT_MODEL
+    console.log(`${tijd()} ${r.ok ? '✓' : '✗'} chat-antwoord in ${((Date.now() - t0) / 1000).toFixed(1)} s (${model})`)
     await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
       .eq('id', rij.id)

@@ -60,9 +60,10 @@ const KAART_SUB = { color: colors.textSecondary, fontWeight: 600, marginBottom: 
 // Vraag via de PA op de Mac. Realtime geeft elke wijziging van de rij meteen
 // door (ook de halve tekst tijdens het typen → opDeel); pollen elke 2 s blijft
 // als vangnet. null = niet gelukt, dan gaat de vraag via de API.
-async function vraagViaMac(berichten, context, opDeel) {
+// extra = { modus: 'snel' | 'slim', gesprek_id } (Slim hervat per gesprek een sessie).
+async function vraagViaMac(berichten, context, opDeel, extra = {}) {
   const { data: rij, error } = await supabase.from('business_os_opdrachten')
-    .insert({ soort: 'chat', opdracht: berichten[berichten.length - 1].content.slice(0, 500), invoer: { berichten, context } })
+    .insert({ soort: 'chat', opdracht: berichten[berichten.length - 1].content.slice(0, 500), invoer: { berichten, context, ...extra } })
     .select('id').single()
   if (error) return null
   const start = Date.now()
@@ -92,7 +93,7 @@ async function vraagViaMac(berichten, context, opDeel) {
           .update({ status: 'mislukt' }).eq('id', rij.id).eq('status', 'wacht').select('id')
         if (ingetrokken?.length) return null
       }
-      if (Date.now() - start > 5 * 60 * 1000) return null
+      if (Date.now() - start > 11 * 60 * 1000) return null
     }
   } finally { supabase.removeChannel(kanaal) }
 }
@@ -591,6 +592,24 @@ function PaInloggen({ zichtbaar, onKlaar }) {
 
 export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   const [gesprek, setGesprek] = useState(leesGesprek)
+  // Snel (Sonnet, licht) of Slim (Opus + CLAUDE.md/memory + onthoudt per
+  // gesprek wat hij opzocht). Slim kan alleen via de Mac.
+  const [modus, setModus] = useState(() => { try { return localStorage.getItem('business_os_modus') || 'snel' } catch { return 'snel' } })
+  const wisselModus = () => setModus(m => {
+    const n = m === 'slim' ? 'snel' : 'slim'
+    try { localStorage.setItem('business_os_modus', n) } catch { /* geen opslag */ }
+    return n
+  })
+  const nieuwGesprekId = () => {
+    const id = crypto.randomUUID()
+    try { localStorage.setItem('business_os_gesprek_id', id) } catch { /* geen opslag */ }
+    return id
+  }
+  const gesprekId = useRef(null)
+  if (!gesprekId.current) {
+    try { gesprekId.current = localStorage.getItem('business_os_gesprek_id') } catch { /* geen opslag */ }
+    if (!gesprekId.current) gesprekId.current = nieuwGesprekId()
+  }
   const [invoer, setInvoer] = useState('')
   const [bijlagen, setBijlagen] = useState([])
   const [bezig, setBezig] = useState(false)
@@ -903,7 +922,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     setFout(null)
     const berichten = naarBerichten(nieuw)
     const metBeeld = berichten.some(b => b.afbeelding)
-    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, setDeel) : null
+    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, setDeel, { modus, gesprek_id: gesprekId.current }) : null
     setDeel('')
     if (mac) {
       setBezig(false)
@@ -1107,6 +1126,17 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 }}
               />
               {/* Route + nieuw gesprek: klein, rechts in dezelfde balk */}
+              <button onClick={wisselModus}
+                title={modus === 'slim'
+                  ? (viaMac ? 'Slim: Opus, kent CLAUDE.md en memory, onthoudt dit gesprek. Trager (10-30 s). Klik: Snel' : 'Slim werkt alleen via je Mac; nu gaat het via de API (Snel). Klik: Snel')
+                  : 'Snel: kort en vlot. Klik: Slim (Opus, denkt langer na)'}
+                style={{
+                  display: 'flex', alignItems: 'center', height: 40, padding: '0 4px', flexShrink: 0,
+                  fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', background: 'transparent', border: 'none',
+                  color: modus === 'slim' ? (viaMac ? colors.success : colors.textMuted) : colors.textSecondary, fontFamily: 'inherit',
+                }}>
+                {modus === 'slim' ? 'Slim' : 'Snel'}
+              </button>
               <button onClick={wisselRoute}
                 title={route === 'api' ? 'Via de API. Klik: via je Mac'
                   : paOnline ? 'Via je Mac (Claude-abonnement). Klik: via de API'
@@ -1120,7 +1150,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 {!isMobile && (route === 'api' ? 'API' : paOnline ? 'Mac' : 'Mac uit')}
               </button>
               {gesprek.length > 0 && (
-                <button onClick={() => { stem.stop(); setGesprek([]); setActieStaat({}); setFout(null); setOngelezen(false) }} title="Nieuw gesprek"
+                <button onClick={() => { stem.stop(); setGesprek([]); setActieStaat({}); setFout(null); setOngelezen(false); gesprekId.current = nieuwGesprekId() }} title="Nieuw gesprek"
                   style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
                   <SquarePen size={16} strokeWidth={2.2} />
                 </button>
