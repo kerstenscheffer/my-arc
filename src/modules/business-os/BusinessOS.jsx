@@ -628,7 +628,7 @@ export default function BusinessOS({ isMobile }) {
   const [visueel, setVisueel] = useState(() => { try { return JSON.parse(localStorage.getItem('business_os_visueel')) } catch { return null } })
   const toonVisueel = useCallback((v) => {
     setVisueel(v || null)
-    try { if (v) localStorage.setItem('business_os_visueel', JSON.stringify(v).slice(0, 20000)); else localStorage.removeItem('business_os_visueel') } catch { /* geen opslag */ }
+    try { if (v) localStorage.setItem('business_os_visueel', JSON.stringify(v).slice(0, 40000)); else localStorage.removeItem('business_os_visueel') } catch { /* geen opslag */ }
   }, [])
   const sluitBlad = useCallback(() => setBlad(null), [])
   const vandaag = useVandaag()

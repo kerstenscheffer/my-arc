@@ -14,6 +14,11 @@
 //   advies = { tekst, icoon? }  → "Ik zou dit doen", onder de rechterkolom
 //
 // Max 8 blokken; de skill "Visueel uitleggen" vertelt Gino wanneer en hoe.
+//
+// Vrij (30 okt): { soort: 'visueel', titel, links: '<html>', rechts: '<html>' }.
+// Gino ontwerpt zelf in HTML/SVG/CSS; visueelHtml.js filtert het en toont het
+// in een afgesloten iframe per kant. Blokken en vrij kunnen niet tegelijk:
+// staat er links/rechts in, dan wint vrij.
 // De structuur van de pagina verandert niet: alles staat absoluut over de lege
 // ruimte naast de groep en gaat met het kruisje weer weg.
 
@@ -24,7 +29,9 @@ import {
   Eye, Heart, Star, Trophy, BarChart3, LineChart, PieChart, Euro, Wallet, Repeat, ArrowRight,
   Layers, Inbox, Send, Hourglass, Coffee, Dumbbell, Brain, Search, X,
 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { colors } from '../../ui/tokens'
+import { schoonHtml, maakSrcdoc, MAX_HTML } from './visueelHtml'
 
 const ICONEN = {
   Sparkles, Calendar, CalendarCheck, CalendarX, CalendarClock, Clock, Video, Film, Camera, Mic,
@@ -61,6 +68,8 @@ const ANIMATIES = `
 function schoonVisueel(v) {
   if (!v || typeof v !== 'object') return null
   const str = (x, n) => (typeof x === 'string' || typeof x === 'number' ? String(x).slice(0, n) : '')
+  const links = str(v.links, MAX_HTML), rechts = str(v.rechts, MAX_HTML)
+  if (links.trim() || rechts.trim()) return { titel: str(v.titel, 60), vrij: { links, rechts } }
   const blokken = (Array.isArray(v.blokken) ? v.blokken : []).slice(0, 8).map(b => ({
     icoon: ICONEN[b?.icoon] ? b.icoon : 'Sparkles',
     titel: str(b?.titel, 40),
@@ -139,11 +148,33 @@ function Advies({ a, i }) {
   )
 }
 
+// Eén afgesloten vakje met Gino's eigen HTML. De hoogte komt via postMessage
+// uit het vakje (alleen van ons eigen iframe aangenomen).
+function Vak({ html, maxHoogte }) {
+  const ref = useRef(null)
+  const [hoogte, setHoogte] = useState(120)
+  const srcdoc = useMemo(() => maakSrcdoc(schoonHtml(html)), [html])
+  useEffect(() => {
+    const bij = (e) => {
+      if (e.source !== ref.current?.contentWindow) return
+      const h = Number(e.data?.gt_hoogte)
+      if (h > 0) setHoogte(Math.min(h, maxHoogte))
+    }
+    window.addEventListener('message', bij)
+    return () => window.removeEventListener('message', bij)
+  }, [maxHoogte])
+  if (!html.trim()) return null
+  return (
+    <iframe ref={ref} title="Gino laat zien" sandbox="allow-scripts" srcDoc={srcdoc}
+      style={{ width: '100%', height: hoogte, border: 'none', background: 'transparent', display: 'block', colorScheme: 'dark' }} />
+  )
+}
+
 // breedte = ruimte die de middengroep inneemt (px); de kolommen vullen wat over is.
 export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSluit }) {
   const visueel = schoonVisueel(ruw)
   if (!visueel) return null
-  const { titel, blokken, advies } = visueel
+  const { titel, blokken = [], advies, vrij } = visueel
   const sluit = (
     <button type="button" onClick={onSluit} title="Weghalen" style={{
       width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'transparent', color: colors.textSecondary,
@@ -156,6 +187,35 @@ export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSl
       {sluit}
     </div>
   )
+
+  if (vrij) {
+    if (isMobile) {
+      return (
+        <div data-gt="" style={{ position: 'absolute', top: 56, left: 16, right: 16, zIndex: 4, maxHeight: '46%', overflowY: 'auto' }}>
+          <style>{ANIMATIES}</style>
+          {kop || <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{sluit}</div>}
+          <Vak html={vrij.links} maxHoogte={900} />
+          <Vak html={vrij.rechts} maxHoogte={900} />
+        </div>
+      )
+    }
+    const kolom = {
+      position: 'absolute', top: '50%', transform: 'translateY(-50%)', zIndex: 4,
+      width: `min(320px, calc((100% - ${breedte}px) / 2 - 32px))`, maxHeight: '92%', overflowY: 'auto',
+    }
+    return (
+      <div data-gt="" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <style>{ANIMATIES}</style>
+        <div style={{ ...kolom, left: 24, pointerEvents: 'auto' }}>
+          {kop || <div style={{ display: 'flex' }}>{sluit}</div>}
+          <Vak html={vrij.links} maxHoogte={640} />
+        </div>
+        <div style={{ ...kolom, right: 24, pointerEvents: 'auto' }}>
+          <Vak html={vrij.rechts} maxHoogte={640} />
+        </div>
+      </div>
+    )
+  }
 
   if (isMobile) {
     return (
