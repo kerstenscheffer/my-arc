@@ -40,7 +40,9 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const MODEL = 'claude-opus-5-5'
+// Terugval als de lokale PA niet draait (die gebruikt Kerstens abonnement):
+// Sonnet, ongeveer vijf keer goedkoper dan Opus en ruim genoeg hiervoor.
+const MODEL = 'claude-sonnet-5-5'
 
 const SYSTEEM = `Je bent de rechterhand van Kersten, eigenaar van MY ARC: online coaching voor drukke werkende mannen van 25-40 die hun buik kwijt willen. Je zit in zijn Business OS, het scherm met zijn maanddoel, de keten views → leads → reactie → call → sale en de zwakste schakel. Kersten geeft je hier taken die hij uitbesteedt.
 

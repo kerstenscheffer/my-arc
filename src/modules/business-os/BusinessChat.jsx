@@ -1,8 +1,12 @@
 // src/modules/business-os/BusinessChat.jsx
 //
 // Chatbalk onder de reactor in Business OS: taken uitbesteden aan Claude
-// (scripts, hooks, DM-teksten, meedenken over de cijfers). Praat met de edge
-// function business-os-chat; het gesprek blijft per apparaat bewaard.
+// (scripts, hooks, DM-teksten, meedenken over de cijfers). Het gesprek blijft
+// per apparaat bewaard.
+// Twee routes: draait de lokale PA (npm run pa, hartslag in
+// business_os_pa_status), dan gaat de vraag via Kerstens Mac en zijn Claude-
+// abonnement (rij soort 'chat' in business_os_opdrachten). Anders, of als de
+// Mac hem niet binnen 25 s oppakt, via de edge function business-os-chat (API).
 // Microfoon = spraak naar tekst van de browser (Web Speech API, nl-NL). Waar
 // de browser dat niet kan (o.a. de iOS-app-webview) verschijnt de knop niet.
 
@@ -12,6 +16,30 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
 const KEY = 'business_os_chat'
+const PA_ONLINE_MS = 45000
+const slaap = (ms) => new Promise(r => setTimeout(r, ms))
+
+// Vraag via de lokale PA. Geeft { tekst, acties } of null (Mac pakte hem niet op).
+async function vraagViaMac(berichten, context) {
+  const { data: rij, error } = await supabase.from('business_os_opdrachten')
+    .insert({ soort: 'chat', opdracht: berichten[berichten.length - 1].content.slice(0, 500), invoer: { berichten, context } })
+    .select('id').single()
+  if (error) return null
+  const start = Date.now()
+  for (;;) {
+    await slaap(1500)
+    const { data } = await supabase.from('business_os_opdrachten')
+      .select('status, antwoord').eq('id', rij.id).maybeSingle()
+    if (data?.status === 'klaar' || data?.status === 'mislukt') return data.antwoord?.tekst ? data.antwoord : null
+    if (data?.status === 'wacht' && Date.now() - start > 25000) {
+      // Niet opgepakt: intrekken (alleen als hij nog op 'wacht' staat) en via de API.
+      const { data: ingetrokken } = await supabase.from('business_os_opdrachten')
+        .update({ status: 'mislukt' }).eq('id', rij.id).eq('status', 'wacht').select('id')
+      if (ingetrokken?.length) return null
+    }
+    if (Date.now() - start > 5 * 60 * 1000) return null
+  }
+}
 const Spraak = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
 
 const leesGesprek = () => {
@@ -213,6 +241,17 @@ export default function BusinessChat({ context }) {
 
   useEffect(() => () => herkenner.current?.abort(), [])
 
+  // Draait de PA op de Mac? (hartslag elke 15 s)
+  const [viaMac, setViaMac] = useState(false)
+  useEffect(() => {
+    let weg = false
+    const kijk = () => supabase.from('business_os_pa_status').select('laatst_gezien').maybeSingle()
+      .then(({ data }) => { if (!weg) setViaMac(!!data && Date.now() - new Date(data.laatst_gezien).getTime() < PA_ONLINE_MS) }, () => {})
+    kijk()
+    const t = setInterval(kijk, 15000)
+    return () => { weg = true; clearInterval(t) }
+  }, [])
+
   const microfoon = () => {
     if (luistert) { herkenner.current?.stop(); return }
     const h = new Spraak()
@@ -247,9 +286,14 @@ export default function BusinessChat({ context }) {
     setInvoer('')
     setBezig(true)
     setFout(null)
-    const { data, error } = await supabase.functions.invoke('business-os-chat', {
-      body: { berichten: nieuw.map(({ role, content }) => ({ role, content })), context },
-    })
+    const berichten = nieuw.map(({ role, content }) => ({ role, content }))
+    const mac = viaMac ? await vraagViaMac(berichten, context) : null
+    if (mac) {
+      setBezig(false)
+      setGesprek(g => [...g, { role: 'assistant', content: mac.tekst, acties: mac.acties || [] }])
+      return
+    }
+    const { data, error } = await supabase.functions.invoke('business-os-chat', { body: { berichten, context } })
     setBezig(false)
     if (error || data?.error || !data?.tekst) {
       setFout(data?.error || 'AI gaf geen antwoord, probeer opnieuw.')
@@ -300,6 +344,11 @@ export default function BusinessChat({ context }) {
       )}
       {fout && <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.danger, marginBottom: 8 }}>{fout}</div>}
 
+      <div title={viaMac ? 'Je Mac beantwoordt (Claude-abonnement)' : 'Via de API (start npm run pa om via je Mac te gaan)'}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, margin: '0 0 8px 4px' }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: viaMac ? colors.success : colors.textMuted }} />
+        {viaMac ? 'Via je Mac' : 'Via de API'}
+      </div>
       <style>{'@keyframes bos-mic { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5) } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0) } }'}</style>
       <div style={{
         display: 'flex', alignItems: 'flex-end', gap: 4, background: colors.surface,
