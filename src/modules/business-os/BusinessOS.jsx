@@ -27,6 +27,7 @@ import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import BusinessChat from './BusinessChat'
+import GinoToneel from './GinoToneel'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
 
@@ -622,6 +623,13 @@ export default function BusinessOS({ isMobile }) {
   const [menu, setMenu] = useState(false)
   const [blad, setBlad] = useState(null)
   const [denkt, setDenkt] = useState(false)
+  // Wat Gino rond de bol laat zien (blijft staan tot het kruisje).
+  // GinoToneel schoont de ruwe actie zelf op.
+  const [visueel, setVisueel] = useState(() => { try { return JSON.parse(localStorage.getItem('business_os_visueel')) } catch { return null } })
+  const toonVisueel = useCallback((v) => {
+    setVisueel(v || null)
+    try { if (v) localStorage.setItem('business_os_visueel', JSON.stringify(v).slice(0, 20000)); else localStorage.removeItem('business_os_visueel') } catch { /* geen opslag */ }
+  }, [])
   const sluitBlad = useCallback(() => setBlad(null), [])
   const vandaag = useVandaag()
   const { laad: laadVandaag } = vandaag
@@ -902,7 +910,7 @@ export default function BusinessOS({ isMobile }) {
           <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
 
           {/* ── Chat: de ring praat ── */}
-          <BusinessChat onBezig={setDenkt} marginTop={isMobile ? 18 : 24} context={{
+          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} marginTop={isMobile ? 18 : 24} context={{
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
@@ -920,6 +928,9 @@ export default function BusinessOS({ isMobile }) {
           }} />
         </div>
       </div>
+
+      {/* ── Gino laat iets zien: blokken naast de groep (smal scherm: strook bovenaan) ── */}
+      <GinoToneel visueel={visueel} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)} />
 
       {blad && (
         <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} onSluit={sluitBlad}>

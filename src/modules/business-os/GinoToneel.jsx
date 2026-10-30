@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { colors } from '../../ui/tokens'
 
-export const ICONEN = {
+const ICONEN = {
   Sparkles, Calendar, CalendarCheck, CalendarX, CalendarClock, Clock, Video, Film, Camera, Mic,
   Image, PenLine, FileText, ListChecks, CheckCircle2, Circle, AlertTriangle, Target, TrendingUp,
   TrendingDown, Rocket, Flame, Zap, Lightbulb, Users, User, MessageCircle, Phone, Mail, Megaphone,
@@ -56,7 +56,7 @@ const ANIMATIES = `
 `
 
 // Ruwe actie → nette beschrijving (alles wat de AI stuurt is onbetrouwbaar).
-export function schoonVisueel(v) {
+function schoonVisueel(v) {
   if (!v || typeof v !== 'object') return null
   const str = (x, n) => (typeof x === 'string' || typeof x === 'number' ? String(x).slice(0, n) : '')
   const blokken = (Array.isArray(v.blokken) ? v.blokken : []).slice(0, 8).map(b => ({
@@ -122,7 +122,8 @@ function Advies({ a, i }) {
 }
 
 // breedte = ruimte die de middengroep inneemt (px); de kolommen vullen wat over is.
-export default function GinoToneel({ visueel, isMobile, breedte = 680, onSluit }) {
+export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSluit }) {
+  const visueel = schoonVisueel(ruw)
   if (!visueel) return null
   const { titel, blokken, advies } = visueel
   const sluit = (

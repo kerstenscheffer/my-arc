@@ -41,7 +41,7 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2, Loader2, Hand, Hourglass, AlertTriangle } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2, Eye } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -174,6 +174,38 @@ function Herhaal({ onKlik, praat }) {
     </button>
   )
 }
+
+// Terugblik onderaan het gesprek: 2-4 zinnen 'waar ging dit over en wat staat
+// open', met een luidspreker die hem door Gino laat voorlezen (nogmaals = stop).
+// Geen label: een zacht groen lijntje links zegt genoeg.
+function Terugblik({ tekst, praat, onKlik }) {
+  return (
+    <div style={{
+      display: 'flex', gap: 6, alignItems: 'flex-start', marginTop: 8, padding: '6px 0 2px 10px',
+      borderLeft: `2px solid ${colors.success}66`,
+    }}>
+      <div style={{ flex: 1, minWidth: 0, ...TEKST, fontWeight: 600, color: colors.textSecondary }}>{tekst}</div>
+      {stem.beschikbaar() && (
+        <button onClick={onKlik} title={praat ? 'Stop' : 'Laat Gino dit voorlezen'} aria-label={praat ? 'Stop' : 'Laat Gino dit voorlezen'}
+          style={{
+            background: 'none', border: 'none', padding: 2, cursor: 'pointer', display: 'flex', flexShrink: 0,
+            color: praat ? colors.success : colors.textSecondary,
+          }}>
+          <Volume2 size={14} className={praat ? 'bos-stip' : undefined} />
+        </button>
+      )}
+    </div>
+  )
+}
+// Laadstaat van de terugblik: alleen een zacht ademend licht, geen tekst.
+const TerugblikLicht = () => (
+  <div aria-hidden style={{ marginTop: 8, padding: '8px 0 6px 10px', borderLeft: `2px solid ${colors.success}33` }}>
+    <span style={{
+      display: 'block', height: 6, width: '45%', borderRadius: 999, color: colors.success,
+      background: `${colors.success}40`, animation: 'bos-licht 1.8s ease-in-out infinite',
+    }} />
+  </div>
+)
 
 // Lange antwoorden ingekort tonen (~6 regels) met 'meer' / 'minder'.
 // achter: element direct achter de laatste zin (ingeklapt: naast 'meer').
@@ -325,6 +357,70 @@ const leesGesprekken = () => {
   return metEditor([nieuwTabje('Code', leesGesprek(), lees('business_os_gesprek_id')), nieuwTabje('Strategie')])
 }
 
+// ── Terugblik per gesprek (30 okt 2026) ──
+// Gemaakt door business-os-chat (de API-route van Gino, niet via de Mac: dan
+// zou hij als opdracht in de robot-regel en de tabjes-status verschijnen).
+// Bewaard in localStorage per tabje: { tekst, tot, sleutel }. tot = tijd van het
+// laatste bericht waar hij op rust; sleutel verandert alleen bij een nieuw
+// bericht, dus opnieuw maken kost alleen tokens als er echt iets bij kwam.
+// De tijd staat er als WANNEER in en wordt bij het tonen ingevuld ('een uur
+// geleden'), zodat een bewaarde terugblik niet veroudert.
+const TERUGBLIK_KEY = 'bos_terugblikken'
+const leesTerugblikken = () => {
+  try { return JSON.parse(localStorage.getItem(TERUGBLIK_KEY)) || {} } catch { return {} }
+}
+// Berichten van vóór 30 okt hebben geen 'op': dan het tabje als tijd en de lengte als sleutel.
+const terugblikBasis = (g) => {
+  const l = g?.berichten[g.berichten.length - 1]
+  if (!l) return null
+  return { tot: l.op || g.bijgewerkt, sleutel: l.op ? String(l.op) : `${g.berichten.length}:${(l.content || '').length}` }
+}
+const geleden = (ms) => {
+  const min = Math.round((Date.now() - ms) / 60000)
+  if (min < 2) return 'net'
+  if (min < 60) return `${min} minuten geleden`
+  const uur = Math.round(min / 60)
+  if (uur < 24) return uur === 1 ? 'een uur geleden' : `${uur} uur geleden`
+  const dag = Math.round(uur / 24)
+  if (dag === 1) return 'gisteren'
+  if (dag < 14) return `${dag} dagen geleden`
+  return `${Math.round(dag / 7)} weken geleden`
+}
+const tijdVan = (ms) => new Date(ms).toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+const vulTerugblikIn = (tb) => tb.tekst.replace(/WANNEER/g, (_, i) => {
+  const w = geleden(tb.tot)
+  return i === 0 || /[.!?]\s*$/.test(tb.tekst.slice(0, i)) ? w[0].toUpperCase() + w.slice(1) : w
+})
+async function maakTerugblik(g) {
+  const regels = g.berichten.slice(-14).map(b => {
+    const wie = b.role === 'user' ? 'Kersten' : 'Gino'
+    const wanneer = b.op ? ` (${tijdVan(b.op)}, ${geleden(b.op)})` : ''
+    const acties = (b.acties || []).filter(a => a && typeof a === 'object').map(a =>
+      `[${a.soort}${a.uitgevoerd ? ', uitgevoerd' : a.afgewezen ? ', afgewezen' : ''}] ${kort(a.tekst || a.uitleg || '', 120)}`)
+    return `${wie}${wanneer}: ${kort((b.content || '').trim() || '[screenshot]', 450)}${acties.length ? `\n${acties.join('\n')}` : ''}`
+  })
+  let verloop = regels.join('\n\n')
+  if (verloop.length > 6000) verloop = `(eerder deel weggelaten)\n${verloop.slice(-6000)}`
+  const vraag = `Hieronder het gesprek '${g.naam}' tussen Kersten en jou (Gino). Nu is het ${tijdVan(Date.now())}.\n\n---\n${verloop}\n---\n\n`
+    + 'Schrijf een terugblik van 2 tot 4 korte zinnen die onderaan dit gesprek komt, zodat Kersten bij terugkomen meteen weet waar het over ging. '
+    + 'Spreektaal Nederlands, tegen Kersten (je), alsof je het hem even vertelt. '
+    + "Eerste zin: wat er speelde, en begin die zin letterlijk met het woord WANNEER in hoofdletters (dat vervang ik door bijvoorbeeld 'Een uur geleden'). "
+    + 'Daarna: wat er besloten of klaargezet is, en wat nu openstaat of de volgende stap is. '
+    + 'Geen gedachtestreepjes, geen emoji, geen opsomming, geen kopjes, geen markdown. Gebruik geen tools en voer niets uit: geef alleen de terugblik.'
+  try {
+    const { data, error } = await supabase.functions.invoke('business-os-chat', { body: { berichten: [{ role: 'user', content: vraag }] } })
+    if (error || data?.error || !data?.tekst) throw new Error(data?.error || error?.message || 'leeg antwoord')
+    const tekst = zonderMarkdown(data.tekst)
+      .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '')
+      .replace(/\s*[–—]\s*/g, ', ').replace(/\s+-\s+/g, ', ')
+      .replace(/\s+/g, ' ').trim()
+    return tekst || null
+  } catch (e) {
+    console.error('[terugblik] maken mislukt:', e?.message || e)
+    return null
+  }
+}
+
 // Voorstel → één korte vraag in spreektaal + samenvatting + volledige tekst.
 function vraagVoor(ac) {
   if (ac.soort === 'wacht_op_jou') return { vraag: `Ik wacht op jou: ${kort(ac.tekst, 120)}`, kort: '', details: '' }
@@ -438,7 +534,11 @@ function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
     }
     kijk()
     const t = setInterval(kijk, 5000)
-    return () => { weg = true; clearInterval(t) }
+    // Realtime: status wisselt meteen; pollen blijft als vangnet.
+    const kanaal = supabase.channel(`bos-pa-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'business_os_opdrachten', filter: `id=eq.${id}` }, kijk)
+      .subscribe()
+    return () => { weg = true; clearInterval(t); supabase.removeChannel(kanaal) }
   }, [id])
 
   const status = rij?.status
@@ -455,9 +555,9 @@ function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
           {bezig ? 'Versturen…' : 'Uitvoeren op mijn Mac'}
         </button>
       ) : (
-        <div style={{ fontWeight: 800, color: status === 'klaar' ? colors.success : status === 'mislukt' ? colors.danger : colors.textPrimary }}>
-          {status === 'klaar' && <Check size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />}
-          {inRij ? `In de rij${voor > 1 ? ` (${voor} vóór)` : ''}, start na de huidige` : PA_STATUS[status] || 'Versturen…'}
+        <div style={{ fontWeight: 800 }}>
+          <StatusLicht status={status || 'wacht'}
+            titel={inRij ? `In de rij${voor > 1 ? ` (${voor} vóór)` : ''}, start na de huidige` : PA_STATUS[status] || 'Versturen…'} />
           {hangt && <div style={{ color: colors.textSecondary, fontWeight: 600, marginTop: 2 }}>Draait npm run pa op je Mac?</div>}
         </div>
       )}
@@ -572,6 +672,10 @@ const ANIMATIES = `
 @keyframes bos-rond { to { transform: rotate(360deg) } }
 .bos-stip { animation: bos-zacht 1.8s ease-in-out infinite }
 .bos-draai { animation: bos-rond 1s linear infinite }
+@keyframes bos-gloei { 0%,100% { opacity: 0.55; transform: scale(0.85); box-shadow: 0 0 2px 0 currentColor } 50% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 8px 1px currentColor } }
+@keyframes bos-licht { 0%,100% { opacity: 0.35; box-shadow: 0 0 0 0 currentColor } 50% { opacity: 0.8; box-shadow: 0 0 5px 0 currentColor } }
+.bos-gloei { animation: bos-gloei 1.4s ease-in-out infinite }
+.bos-licht { animation: bos-licht 2.6s ease-in-out infinite }
 .bos-robot .bos-hand-l { animation: bos-typ 0.5s ease-in-out infinite }
 .bos-robot .bos-hand-r { animation: bos-typ 0.5s ease-in-out 0.25s infinite }
 .bos-robot .bos-oog { transform-box: fill-box; transform-origin: center; animation: bos-knipper 3s infinite }
@@ -580,7 +684,7 @@ const ANIMATIES = `
 .bos-tabjes { scrollbar-width: none }
 .bos-tabjes::-webkit-scrollbar { display: none }
 .bos-robot.bos-rust * { animation: none !important }
-@media (prefers-reduced-motion: reduce) { .bos-robot *, .bos-stip, .bos-draai { animation: none !important } }
+@media (prefers-reduced-motion: reduce) { .bos-robot *, .bos-stip, .bos-draai, .bos-gloei, .bos-licht { animation: none !important } }
 `
 
 // Gesprek → berichten voor de AI. Meerdere screenshots in één bericht worden
@@ -621,15 +725,39 @@ async function vraagEditor(gesprek) {
   return { fout: 'ChatGPT gaf geen antwoord, probeer opnieuw.' }
 }
 
-// Status op een gesprek-tabje: icoon + kort woord, kleur volgt de status.
-// 'jou' = er staat in dat tabje een vraag of actie voor Kersten open;
+// Statuslicht zonder tekst (30 okt): bezig = pulserende gloed, wacht = zacht
+// oplichtend punt, klaar = vinkje, mislukt = x. Het woord staat alleen in
+// title/aria-label (tooltip + schermlezer), niet in beeld.
+// 'jou' = er staat in dat tabje een vraag of actie voor Kersten open (vast wit licht);
 // 'wacht' = opdracht staat klaar maar de Mac heeft hem nog niet opgepakt.
 const TAB_STATUS = {
-  bezig: { Icoon: Loader2, tekst: 'Bezig', kleur: colors.textPrimary, draai: true },
-  jou: { Icoon: Hand, tekst: 'Wacht op jou', kleur: colors.textPrimary },
-  wacht: { Icoon: Hourglass, tekst: 'In de rij', kleur: colors.textSecondary },
-  klaar: { Icoon: Check, tekst: 'Klaar', kleur: colors.success },
-  mislukt: { Icoon: AlertTriangle, tekst: 'Mislukt', kleur: colors.danger },
+  bezig: { tekst: 'Bezig', kleur: colors.success },
+  jou: { tekst: 'Wacht op jou', kleur: colors.textPrimary },
+  wacht: { tekst: 'In de rij', kleur: colors.textSecondary },
+  klaar: { tekst: 'Klaar', kleur: colors.success },
+  mislukt: { tekst: 'Mislukt', kleur: colors.danger },
+}
+function StatusLicht({ status, titel }) {
+  const st = TAB_STATUS[status]
+  if (!st) return null
+  const label = titel || st.tekst
+  const vak = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 12, height: 12, flexShrink: 0, color: st.kleur }
+  if (status === 'klaar' || status === 'mislukt') {
+    const Icoon = status === 'klaar' ? Check : X
+    return (
+      <span role="img" aria-label={label} title={label} style={vak}>
+        <Icoon size={11} strokeWidth={3} style={{ filter: `drop-shadow(0 0 3px ${st.kleur})` }} />
+      </span>
+    )
+  }
+  return (
+    <span role="img" aria-label={label} title={label} style={vak}>
+      <span className={status === 'bezig' ? 'bos-gloei' : status === 'wacht' ? 'bos-licht' : undefined} style={{
+        width: 6, height: 6, borderRadius: '50%', background: 'currentColor',
+        boxShadow: status === 'jou' ? '0 0 5px currentColor' : undefined,
+      }} />
+    </span>
+  )
 }
 const duur = (ms) => {
   const s = Math.max(0, Math.floor(ms / 1000))
@@ -641,20 +769,13 @@ const duur = (ms) => {
 function TabStatus({ staat, nu }) {
   const st = staat && TAB_STATUS[staat.status]
   if (!st) return null
-  const { Icoon } = st
   const tijd = !staat.sinds ? ''
     : staat.status === 'bezig' ? ` ${duur(nu - staat.sinds)}`
     : staat.status === 'klaar' || staat.status === 'mislukt' ? ` · ${duur(nu - staat.sinds)} geleden` : ''
-  return (
-    <span title={`${st.tekst}${tijd}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: st.kleur, fontWeight: 800, flexShrink: 0 }}>
-      <Icoon size={11} strokeWidth={2.75} className={st.draai ? 'bos-draai' : undefined} />
-      <span>{st.tekst}{tijd}</span>
-    </span>
-  )
+  return <StatusLicht status={staat.status} titel={`${st.tekst}${tijd}`} />
 }
 
 const EDITOR_STATUS = { open: 'Open', bezig: 'Bezig…', klaar: 'Klaar', mislukt: 'Mislukt' }
-const EDITOR_KLEUR = { open: colors.textMuted, bezig: colors.textPrimary, klaar: colors.success, mislukt: colors.danger }
 // Laatste opdrachten met statuslicht, bovenaan het venster in Editor. Tik op een
 // rij = antwoord eronder. Tabel nog niet aangemaakt (business-os-editor.sql) → niets.
 function EditorOpdrachten({ vers }) {
@@ -678,17 +799,11 @@ function EditorOpdrachten({ vers }) {
         <div key={r.id}>
         <div onClick={() => setOpen(o => (o === r.id ? null : r.id))}
           style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0, cursor: r.antwoord ? 'pointer' : 'default' }}>
-          <span className={r.status === 'bezig' ? 'bos-stip' : undefined} style={{
-            width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: EDITOR_KLEUR[r.status] || colors.textMuted,
-            boxShadow: r.status === 'klaar' ? `0 0 6px ${colors.success}` : 'none',
-          }} />
+          <StatusLicht status={r.status === 'open' ? 'wacht' : r.status} titel={EDITOR_STATUS[r.status] || r.status} />
           <span title={r.opdracht} style={{
             flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: colors.textSecondary, fontWeight: 600,
           }}>
             {kort(r.opdracht, 90)}
-          </span>
-          <span style={{ flexShrink: 0, fontWeight: 800, fontSize: '0.72rem', color: EDITOR_KLEUR[r.status] || colors.textMuted }}>
-            {EDITOR_STATUS[r.status] || r.status}
           </span>
         </div>
         {open === r.id && r.antwoord && (
@@ -777,7 +892,8 @@ function PaInloggen({ zichtbaar, onKlaar }) {
   )
 }
 
-export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
+// onVisueel(actie): Gino wil iets laten zien rond de bol (GinoToneel.jsx).
+export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 28 }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -902,7 +1018,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
         const gs = gesprekkenRef.current
         const doel = gs.find(g => g.naam === 'Strategie') || gs[1] || gs[0]
         const wanneer = new Date(r.klaar_at).toLocaleString('nl-NL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
-        zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `Groeironde (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [] }])
+        zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `Groeironde (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [], op: new Date(r.klaar_at).getTime() || Date.now() }])
         markeer(doel.id)
       }
     }
@@ -916,7 +1032,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   const [luistert, setLuistert] = useState(false)
   const luistertRef = useRef(false)
   useEffect(() => { luistertRef.current = luistert }, [luistert])
-  const { spreekt } = stem.useStem()
+  const { spreekt, bron: spreekBron } = stem.useStem()
   const [sleept, setSleept] = useState(false)
   const wortel = useRef(null)
   const lijst = useRef(null)
@@ -1263,6 +1379,43 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     onderaan.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
   }
 
+  // Terugblik: maken bij openen of wisselen van tabje, alleen als er sinds de
+  // vorige een nieuw bericht is. Tijdens het doorpraten niet bij elk antwoord
+  // opnieuw (tokens); een verouderde terugblik wordt dan gewoon niet getoond.
+  const [terugblikken, setTerugblikken] = useState(leesTerugblikken)
+  const terugblikkenRef = useRef(terugblikken)
+  terugblikkenRef.current = terugblikken
+  const [terugblikLaadt, setTerugblikLaadt] = useState({})
+  const terugblikLoopt = useRef({})
+  useEffect(() => {
+    const bestaat = new Set(gesprekken.map(g => g.id))
+    schrijf(TERUGBLIK_KEY, JSON.stringify(Object.fromEntries(Object.entries(terugblikken).filter(([id]) => bestaat.has(id)))))
+  }, [terugblikken, gesprekken])
+  useEffect(() => {
+    if (!open) return
+    const g = gesprekkenRef.current.find(x => x.id === actiefRef.current)
+    const basis = terugblikBasis(g)
+    if (!basis || terugblikLoopt.current[g.id] || terugblikkenRef.current[g.id]?.sleutel === basis.sleutel) return
+    terugblikLoopt.current[g.id] = true
+    setTerugblikLaadt(l => ({ ...l, [g.id]: true }))
+    maakTerugblik(g).then(tekst => {
+      if (tekst) setTerugblikken(t => ({ ...t, [g.id]: { tekst, tot: basis.tot, sleutel: basis.sleutel } }))
+    }).finally(() => {
+      terugblikLoopt.current[g.id] = false
+      setTerugblikLaadt(l => ({ ...l, [g.id]: false }))
+    })
+  }, [open, actief.id, dbKlaar])
+  const basisNu = terugblikBasis(actief)
+  const terugblik = basisNu && terugblikken[actief.id]?.sleutel === basisNu.sleutel ? terugblikken[actief.id] : null
+  const terugblikTekst = terugblik ? vulTerugblikIn(terugblik) : ''
+  const terugblikBron = `terugblik-${actief.id}`
+  const terugblikPraat = spreekt && spreekBron === terugblikBron
+  const leesTerugblikVoor = () => {
+    if (terugblikPraat) { stem.stop(); return }
+    stopHerkenner()
+    stem.leesVoor(terugblikTekst, terugblikBron)
+  }
+
   // Halve tekst terwijl Gino via de Mac typt (per tabje).
   const deel = deelPer[actief.id] || ''
   // Voorleestekst: het antwoord en daarna de eerste toestemmingsvraag (die in het wolkje).
@@ -1278,7 +1431,10 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   // Antwoord landt altijd in het tabje waar de vraag vandaan kwam. Voorlezen
   // alleen als je dat tabje nog voor je hebt; anders een groene stip erop.
   const antwoord = (id, bericht) => {
+    bericht = { ...bericht, op: Date.now() }
     zetBerichten(id, g => [...g, bericht])
+    const visueel = (bericht.acties || []).find(a => a?.soort === 'visueel')
+    if (visueel) onVisueel?.(visueel)
     markeer(id)
     meld('Klaar', false)
     if (actiefRef.current !== id) return
@@ -1303,7 +1459,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     stem.stop()
     // Versturen is een klik/Enter: Safari laat het antwoord straks dan ook afspelen.
     if (stem.isAan()) stem.ontgrendel()
-    const nieuwBericht = { role: 'user', content: vraag }
+    const nieuwBericht = { role: 'user', content: vraag, op: Date.now() }
     if (bijlagen.length) {
       nieuwBericht.afbeeldingen = bijlagen.map(({ media_type, data }) => ({ media_type, data }))
       nieuwBericht.thumbs = bijlagen.map(b => b.thumb)
@@ -1450,6 +1606,14 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                     if (ac.soort === 'wacht_op_jou') return <WachtOpJou key={j} {...kaart} />
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
+                    if (ac.soort === 'visueel') return (
+                      <button key={j} type="button" onClick={() => onVisueel?.(ac)} style={{
+                        display: 'flex', gap: 6, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, marginBottom: 4,
+                        color: colors.success, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
+                      }}>
+                        <Eye size={13} strokeWidth={2.5} /> Laat zien{typeof ac.titel === 'string' && ac.titel ? `: ${ac.titel.slice(0, 50)}` : ''}
+                      </button>
+                    )
                     if (ac.soort === 'pa_voorstel') return <PaVoorstel key={j} {...kaart} herhaalKnop={laatsteGino ? herhaalKnop : null} />
                     return (
                       <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, fontSize: '0.8rem', marginBottom: 4 }}>
@@ -1466,6 +1630,9 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
             {bezig && deel && (
               <div style={{ ...TEKST, fontWeight: 500, color: colors.textPrimary, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{deel}</div>
             )}
+            {gesprek.length > 0 && !bezig && (terugblik
+              ? <Terugblik tekst={terugblikTekst} praat={terugblikPraat} onKlik={leesTerugblikVoor} />
+              : terugblikLaadt[actief.id] ? <TerugblikLicht /> : null)}
           </div>
         )}
 

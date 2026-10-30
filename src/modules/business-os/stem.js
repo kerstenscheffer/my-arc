@@ -345,7 +345,8 @@ const provider = {
 const leesAan = () => {
   try { return localStorage.getItem(KEY) === '1' } catch { return false }
 }
-let stand = { aan: leesAan(), spreekt: false, teruggevallen: null }
+// bron: wie er nu praat (bv. 'terugblik-<tabje>'), zodat die knop weet dat hij 'stop' is.
+let stand = { aan: leesAan(), spreekt: false, teruggevallen: null, bron: null }
 const luisteraars = new Set()
 const zet = (veld) => {
   stand = { ...stand, ...veld }
@@ -370,19 +371,20 @@ export function ontgrendel() {
 export function stop() {
   if (!beschikbaar()) return
   provider.stop()
-  if (stand.spreekt) zet({ spreekt: false })
+  if (stand.spreekt) zet({ spreekt: false, bron: null })
 }
 
 // tekst = de volledige tekst; uitgesproken wordt alleen spreekTekst(tekst),
 // plus eventueel de vraag (toestemmingsvraag) erachter.
 // bewaar: audio van dit antwoord bewaren voor herhaal().
-export function spreek(tekst, { bewaar = false, vraag = null } = {}) {
+// heel: de hele tekst uitspreken (alleen opgeschoond), niet de korte versie.
+export function spreek(tekst, { bewaar = false, vraag = null, heel = false, bron = null } = {}) {
   if (!beschikbaar()) return
-  const schoon = [spreekTekst(tekst), spreekTekst(vraag)].filter(Boolean).join(' ')
+  const schoon = heel ? spreekbaar(tekst) : [spreekTekst(tekst), spreekTekst(vraag)].filter(Boolean).join(' ')
   const stukken = provider.knip(schoon)
   if (!stukken.length) return
-  zet({ spreekt: true })
-  provider.spreek(stukken, () => zet({ spreekt: false }), bewaar ? schoon : null)
+  zet({ spreekt: true, bron })
+  provider.spreek(stukken, () => zet({ spreekt: false, bron: null }), bewaar ? schoon : null)
 }
 
 // Herhaalknop: speelt het antwoord opnieuw af, ook als de stem uit staat.
@@ -393,6 +395,16 @@ export function herhaal(tekst, vraag = null) {
   stop()
   provider.ontgrendel()
   spreek(tekst, { bewaar: true, vraag })
+}
+
+// Terugblik onderaan een gesprek: de hele tekst voorlezen, ook als de stem uit
+// staat, audio bewaard (tweede klik op dezelfde terugblik kost geen tekens).
+// Aanroepen vanuit de klik (ontgrendelt Safari).
+export function leesVoor(tekst, bron) {
+  if (!beschikbaar()) return
+  stop()
+  provider.ontgrendel()
+  spreek(tekst, { bewaar: true, heel: true, bron })
 }
 
 export function useStem() {
