@@ -25,8 +25,12 @@ create table if not exists public.agenda_events (
   unique (coach_id, uid, start_at)
 );
 comment on table public.agenda_events is
-  'Kerstens Google Agenda (alleen lezen, via iCal-feed, elke 15 min). soort: paviljoen, salescall, opstartcall, klantcall, overig. Tijden in UTC; toon in Europe/Amsterdam.';
+  'Kerstens Google Agenda (alleen lezen, via iCal-feed, elke 15 min). soort: paviljoen, salescall, opstartcall, klantcall, overig. contact_naam: naam uit "<naam> en Kersten Scheffer". Tijden in UTC; toon in Europe/Amsterdam.';
 create index if not exists agenda_events_coach_start on public.agenda_events (coach_id, start_at);
+
+-- 30 okt 2026: naam uit Calendly/Zoom-titels ('<naam> en Kersten Scheffer').
+-- Alleen toegevoegd (nullable); get_agenda geeft 'm via select * mee.
+alter table public.agenda_events add column if not exists contact_naam text;
 
 alter table public.agenda_events enable row level security;
 drop policy if exists agenda_events_team_lezen on public.agenda_events;
@@ -53,7 +57,8 @@ revoke all on function public.get_agenda(date, date) from public, anon;
 grant execute on function public.get_agenda(date, date) to authenticated;
 
 -- Cron: elke 15 minuten de edge function aanroepen (anon-sleutel is publiek;
--- de functie leest de iCal-link zelf uit haar secrets).
+-- de functie leest de iCal-link zelf uit haar secrets). Staat live sinds
+-- 30 okt 2026 (jobname agenda-sync); hieronder ter documentatie.
 -- select cron.schedule('agenda-sync', '*/15 * * * *', $c$
 --   select net.http_post(
 --     url := 'https://xlaycpwpnhjmulfsnynh.supabase.co/functions/v1/agenda-sync',
@@ -145,7 +150,7 @@ begin
     -- Afspraken van vandaag uit Google Agenda (agenda_events), NL-tijd.
     'agendaVandaag', coalesce((select jsonb_agg(jsonb_build_object(
         'titel', e.titel, 'start', e.start_at, 'eind', e.end_at,
-        'soort', e.soort, 'heleDag', e.hele_dag) order by e.hele_dag desc, e.start_at)
+        'soort', e.soort, 'heleDag', e.hele_dag, 'contactNaam', e.contact_naam) order by e.hele_dag desc, e.start_at)
       from agenda_events e
       where e.coach_id = any(v_team)
         and e.start_at < ((v_dag + 1)::timestamp at time zone 'Europe/Amsterdam')

@@ -8,6 +8,7 @@
 //
 //   node scripts/pa-db.mjs lees "select ..."         alleen SELECT (business_os_lees)
 //   node scripts/pa-db.mjs schema [tabel]            tabellen / kolommen
+//   node scripts/pa-db.mjs agenda [van] [tot]        Google Agenda (YYYY-MM-DD, standaard vandaag t/m +7)
 //   node scripts/pa-db.mjs skill-bewaar '{"naam":…,"wanneer":…,"instructies":…}'
 //   node scripts/pa-db.mjs skill-uit "naam"
 //   node scripts/pa-db.mjs app-lijst "opdracht"      rij in app_issues
@@ -39,6 +40,17 @@ const uit = (x) => console.log(JSON.stringify(x).slice(0, 30000))
 if (cmd === 'lees') {
   const { data, error } = await sb.rpc('business_os_lees', { p_sql: arg })
   uit(error ? { fout: error.message } : data)
+} else if (cmd === 'agenda') {
+  // Google Agenda (agenda_events, RLS: coach + team). Standaard vandaag t/m +7.
+  const dag = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
+  const van = arg || dag(Date.now())
+  const tot = process.argv[4] || dag(new Date(van).getTime() + 7 * 864e5)
+  const { data, error } = await sb.rpc('get_agenda', { van, tot })
+  uit(error ? { fout: error.message } : (data || []).map(e => ({
+    titel: e.titel, soort: e.soort, heleDag: e.hele_dag, locatie: e.locatie,
+    start: new Date(e.start_at).toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam' }),
+    eind: e.end_at ? new Date(e.end_at).toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam' }) : null,
+  })))
 } else if (cmd === 'schema') {
   const { data, error } = await sb.rpc('business_os_schema', { p_tabel: arg || null })
   uit(error ? { fout: error.message } : data)

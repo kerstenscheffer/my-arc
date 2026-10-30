@@ -1,7 +1,8 @@
 // supabase/functions/agenda-sync/index.ts
 //
 // Google Agenda meelezen (30 okt 2026). Alleen lezen: haalt Kerstens geheime
-// iCal-link (secret GOOGLE_AGENDA_ICS) op, rekent herhalende afspraken uit
+// iCal-link (secret GOOGLE_AGENDA_ICS of een andere agenda-naam, zie
+// zoekSleutel) op, rekent herhalende afspraken uit
 // (RRULE, EXDATE, gewijzigde instanties via RECURRENCE-ID) en zet alles van
 // 7 dagen terug t/m 30 dagen vooruit in agenda_events (UTC). Afspraken die
 // niet meer in de feed staan verdwijnen uit dat venster. Er gaat niets terug
@@ -38,22 +39,24 @@ Deno.serve(async () => {
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false },
   })
-  const url = (Deno.env.get('GOOGLE_AGENDA_ICS') || '').trim()
+  const { url, naam: sleutelNaam } = zoekSleutel()
   const schoon = (t: string) => (url ? t.split(url).join('[ical-link]') : t)
-    .replace(/https?:\/\/calendar\.google\.com\/\S*/gi, '[ical-link]')
+    .replace(/https?:\/\/\S*(calendar\.google\.com|\.ics)\S*/gi, '[ical-link]')
     .slice(0, 1000)
 
-  // Eén foutregel per melding per 6 uur, zodat de cron app_fouten niet volspamt.
+  // geen_sleutel max één keer per 6 uur (anders spamt de cron app_fouten vol);
+  // echte fouten (feed, parse, opslaan) gaan er altijd direct in.
   const fout = async (reden: string, detail = '') => {
     const melding = `agenda-sync: ${reden}${detail ? ` · ${schoon(detail)}` : ''}`
-    const sinds = new Date(Date.now() - 6 * 3600e3).toISOString()
-    const { data } = await sb.from('app_fouten').select('id')
-      .eq('pagina', 'agenda-sync').eq('melding', melding).gte('created_at', sinds).limit(1)
-      .then(r => r, () => ({ data: null }))
-    if (!data?.length) {
-      await sb.from('app_fouten').insert({ pagina: 'agenda-sync', melding, user_id: null })
-        .then(r => r, () => null)
+    if (reden === 'geen_sleutel') {
+      const sinds = new Date(Date.now() - 6 * 3600e3).toISOString()
+      const { data } = await sb.from('app_fouten').select('id')
+        .eq('pagina', 'agenda-sync').eq('melding', melding).gte('created_at', sinds).limit(1)
+        .then(r => r, () => ({ data: null }))
+      if (data?.length) return json({ ok: false, reden })
     }
+    await sb.from('app_fouten').insert({ pagina: 'agenda-sync', melding, user_id: null })
+      .then(r => r, () => null)
     return json({ ok: false, reden })
   }
 
@@ -63,12 +66,13 @@ Deno.serve(async () => {
     let tekst: string
     try {
       const r = await fetch(url, { headers: { Accept: 'text/calendar' } })
-      if (!r.ok) return fout('feed_status', String(r.status))
+      if (!r.ok) return fout(`feed_fout ${r.status}`)
       tekst = await r.text()
-    } catch (e) {
-      return fout('feed_onbereikbaar', String((e as Error)?.message || e))
+    } catch {
+      // De foutmelding van fetch kan de link bevatten: niet meesturen.
+      return fout('feed_fout onbereikbaar')
     }
-    if (!tekst.includes('BEGIN:VCALENDAR')) return fout('geen_ics')
+    if (!tekst.includes('BEGIN:VCALENDAR')) return fout('feed_fout geen_ics')
 
     const vandaag = dagInTz(new Date())
     const van = tzNaarUtc(vandaag.y, vandaag.m, vandaag.d - DAGEN_TERUG, 0, 0, 0, TZ)
@@ -81,7 +85,12 @@ Deno.serve(async () => {
       .map(k => (k.first_name || '').trim().toLowerCase())
       .filter(n => n.length >= 3))]
 
-    const rijen = leesFeed(tekst, van, tot, namen)
+    let rijen: Rij[]
+    try {
+      rijen = leesFeed(tekst, van, tot, namen)
+    } catch (e) {
+      return fout('parse_fout', String((e as Error)?.message || e))
+    }
 
     // Dubbele sleutels (zou niet mogen, maar dan faalt de hele upsert).
     const uniek = new Map<string, Rij>()
@@ -111,11 +120,32 @@ Deno.serve(async () => {
 
     const soorten: Record<string, number> = {}
     for (const r of lijst) soorten[r.soort] = (soorten[r.soort] || 0) + 1
-    return json({ ok: true, aantal: lijst.length, verwijderd: weg.length, soorten, van: van.toISOString(), tot: tot.toISOString() })
+    return json({ ok: true, sleutel: sleutelNaam, aantal: lijst.length, verwijderd: weg.length, soorten, van: van.toISOString(), tot: tot.toISOString() })
   } catch (e) {
     return fout('onverwacht', String((e as Error)?.message || e))
   }
 })
+
+// Sleutel: eerst GOOGLE_AGENDA_ICS, anders de eerste env-variabele met
+// CALENDAR/CALANDER/AGENDA/ICAL/ICS in de naam (hoofdletters, spaties en
+// streepjes genegeerd) waarvan de waarde een https-iCal-link is.
+const SLEUTEL_WOORDEN = ['CALENDAR', 'CALANDER', 'AGENDA', 'ICAL', 'ICS']
+function geldigeLink(v: string) {
+  const s = v.trim()
+  return /^https:\/\//i.test(s) && /calendar\.google\.com|\.ics/i.test(s)
+}
+// Geeft ook de naam terug (nooit de waarde) voor de respons.
+function zoekSleutel(): { url: string; naam: string | null } {
+  const vast = (Deno.env.get('GOOGLE_AGENDA_ICS') || '').trim()
+  if (vast && geldigeLink(vast)) return { url: vast, naam: 'GOOGLE_AGENDA_ICS' }
+  const alles = Deno.env.toObject()
+  for (const naam of Object.keys(alles).sort()) {
+    const n = naam.toUpperCase().replace(/[\s_-]/g, '')
+    if (!SLEUTEL_WOORDEN.some(w => n.includes(w))) continue
+    if (geldigeLink(alles[naam] || '')) return { url: alles[naam].trim(), naam }
+  }
+  return { url: '', naam: null }
+}
 
 type Rij = {
   uid: string; start_at: string; end_at: string; hele_dag: boolean

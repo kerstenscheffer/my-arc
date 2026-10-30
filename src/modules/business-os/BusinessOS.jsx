@@ -52,7 +52,7 @@ const PRIJS_KEY = 'business_os_prijs'
 
 // De onderdelen achter de puntjes-knop, in deze volgorde.
 const ONDERDELEN = [
-  ['vandaag', 'Vandaag · taken, beloftes en calls'],
+  ['vandaag', 'Vandaag · agenda, taken, beloftes en calls'],
   ['content', 'Content · komende 14 dagen'],
   ['week', 'Week · inputs vs doel'],
   ['kern', 'Kerncijfers · deze maand'],
@@ -73,6 +73,7 @@ const AGENTS = {
   'meta-capi-flush': 'Meta conversies',
   'run-notification-schedules': 'Klantmeldingen',
   'sync-calendly-bookings': 'Calendly-boekingen',
+  'agenda-sync': 'Google Agenda',
   'weekreview-herinnering': 'Weekreview-herinnering',
 }
 
@@ -384,13 +385,39 @@ function TaakRegel({ taak, vandaag, toonDagen, onVink }) {
   )
 }
 
-function VandaagPaneel({ v }) {
+// Google Agenda (agenda_events via get_business_os.agendaVandaag): de soorten
+// die als call meetellen en hun korte label.
+const AGENDA_CALLS = ['salescall', 'opstartcall', 'klantcall']
+const AGENDA_SOORT = { salescall: 'sales', opstartcall: 'opstart', klantcall: 'klant', paviljoen: 'paviljoen' }
+const nlTijd = (iso) => new Date(iso).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' })
+
+function AgendaRegel({ e }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+      <div style={{ ...NUM, fontSize: '0.8rem', fontWeight: 800, color: C.groen, minWidth: 96, flexShrink: 0 }}>
+        {e.heleDag ? 'Hele dag' : `${nlTijd(e.start)}${e.eind ? `–${nlTijd(e.eind)}` : ''}`}
+      </div>
+      <div style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 700, color: C.wit, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {e.titel || 'Afspraak'}
+      </div>
+      {AGENDA_SOORT[e.soort] && (
+        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: C.zacht, flexShrink: 0 }}>{AGENDA_SOORT[e.soort]}</div>
+      )}
+    </div>
+  )
+}
+
+function VandaagPaneel({ v, agenda }) {
   const [alles, setAlles] = useState(false)
   if (!v.geladen) return <div style={{ fontSize: '0.85rem', color: C.zacht }}>Laden…</div>
   const leeg = (t) => <div style={{ fontSize: '0.85rem', color: C.zacht }}>{t}</div>
   const over = alles ? v.overDatum : v.overDatum.slice(0, 10)
   return (
     <>
+      <Paneel titel={`Agenda vandaag · ${agenda.length}`} style={{ marginBottom: 16 }}>
+        {agenda.length === 0 && leeg('Geen afspraken in je agenda.')}
+        {agenda.map((e, i) => <AgendaRegel key={`${e.start}-${i}`} e={e} />)}
+      </Paneel>
       <Paneel titel={`Beloftes aan klanten · ${v.beloftes.length}`}>
         {v.beloftes.length === 0 && leeg('Geen openstaande beloftes.')}
         {v.beloftes.map(t => <TaakRegel key={t.id} taak={t} vandaag={v.vandaag} toonDagen onVink={v.vinkAf} />)}
@@ -876,13 +903,14 @@ export default function BusinessOS({ isMobile }) {
   if (fout) return <div style={{ background: C.bg, color: C.rood, padding: 24 }}>Business OS laadt niet: {fout}</div>
   if (!a) return <div style={{ background: C.bg, color: C.zacht, padding: 24, minHeight: '60vh', fontWeight: 700 }}>Laden…</div>
 
+  const agendaVandaag = Array.isArray(data.agendaVandaag) ? data.agendaVandaag : []
   const pctDoel = Math.min(100, a.omzet / doel * 100)
   const nodigPerDag = Math.max(0, doel - a.omzet) / Math.max(1, dagenInMaand - dagenVoorbij)
   const zw = a.zwakste[0]
 
   // Inhoud van de onderdelen: precies wat eerder in de inklap-secties stond.
   const inhoud = (k) => {
-    if (k === 'vandaag') return <VandaagPaneel v={vandaag} />
+    if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} />
     if (k === 'content') return <ContentPaneel c={content} />
     if (k === 'week') return <WeekPaneel w={week} />
     if (k === 'kern') return (
@@ -1079,9 +1107,14 @@ export default function BusinessOS({ isMobile }) {
             uitgesteldeSalesNietMeegeteld: data.uitgesteld || [],
             vandaag: {
               beloftesOpen: vandaag.beloftes.length, takenVandaag: vandaag.takenVandaag.length,
-              overDatum: vandaag.overDatum.length, callsVandaag: vandaag.calls.filter(c => dagIso(new Date(c.scheduled_date)) === vandaag.vandaag).length,
+              overDatum: vandaag.overDatum.length,
+              callsVandaag: vandaag.calls.filter(c => dagIso(new Date(c.scheduled_date)) === vandaag.vandaag).length
+                + agendaVandaag.filter(e => AGENDA_CALLS.includes(e.soort)).length,
               oudsteBeloftes: vandaag.beloftes.slice(0, 5).map(t => t.title),
             },
+            agendaVandaag: agendaVandaag.map(e => ({
+              titel: e.titel, start: e.heleDag ? 'hele dag' : nlTijd(e.start), eind: e.eind && !e.heleDag ? nlTijd(e.eind) : null, soort: e.soort,
+            })),
             contentKomende14Dagen: {
               geplandeDagen: content.perDag.filter(d => d.items.length > 0).length,
               legeDagen: content.perDag.filter(d => d.items.length === 0).map(d => d.datum),
