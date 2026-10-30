@@ -19,6 +19,12 @@
 // stand.teruggevallen (tijdstempel; de bol gloeit kort oranjerood), logt de
 // fout in de console én in app_fouten (pagina 'business-os-stem', melding
 // 'terugval Mac-stem [foutcode] …', élke terugval, zie meldTerugval).
+// Korte gesproken versie (30 okt 2026, avond): getypt staat alles, de stem zegt
+// alleen de kern. spreek() en herhaal() krijgen altijd de volledige tekst (niet
+// de ingekorte robot-regel) en maken er via spreekTekst() 1-3 complete zinnen
+// van (max ~250 tekens, nooit midden in een zin, nooit '...'). Eén functie voor
+// voorlezen én herhaalknop, dus ze zeggen hetzelfde; de cache staat op die korte
+// tekst. Scheelt ook ElevenLabs-tekens (gratis plan: 10.000 per maand).
 // Tekst wordt eerst opgeschoond (markdown, pijltjes, emoji, URL's eruit) en
 // voor de browser in stukken van max ~200 tekens geknipt: Chrome/Safari kappen
 // lange utterances af.
@@ -157,13 +163,20 @@ const speler = () => (audio ||= new Audio())
 let elRonde = 0
 let elAfbreker = null
 let elUrls = []
-// Audio van het laatste bewaarde antwoord: { tekst, urls[i] per stuk }.
-let bewaard = { tekst: null, urls: [] }
+// Audio van de laatste paar bewaarde teksten (chatantwoord, robot-regel,
+// opdrachtresultaat): tekst → { urls[i] per stuk }. Oudste valt eruit.
+const MAX_BEWAARD = 4
+const bewaard = new Map()
 const bewaarVoor = (tekst) => {
-  if (bewaard.tekst === tekst) return bewaard
-  bewaard.urls.forEach(u => u && URL.revokeObjectURL(u))
-  bewaard = { tekst, urls: [] }
-  return bewaard
+  if (bewaard.has(tekst)) return bewaard.get(tekst)
+  const nieuw = { urls: [] }
+  bewaard.set(tekst, nieuw)
+  if (bewaard.size > MAX_BEWAARD) {
+    const [oudste, oud] = bewaard.entries().next().value
+    oud.urls.forEach(u => u && URL.revokeObjectURL(u))
+    bewaard.delete(oudste)
+  }
+  return nieuw
 }
 
 const ruimOp = () => {
@@ -247,7 +260,7 @@ const elevenlabs = {
     const haal = (n) => {
       if (cache?.urls[n]) return Promise.resolve(cache.urls[n])
       return haalMetLimiet(stukken[n], afbreker).then(url => {
-        if (cache && cache === bewaard) cache.urls[n] = url
+        if (cache && bewaard.get(bewaarTekst) === cache) cache.urls[n] = url
         else elUrls.push(url)
         return url
       })
@@ -360,10 +373,12 @@ export function stop() {
   if (stand.spreekt) zet({ spreekt: false })
 }
 
+// tekst = de volledige tekst; uitgesproken wordt alleen spreekTekst(tekst),
+// plus eventueel de vraag (toestemmingsvraag) erachter.
 // bewaar: audio van dit antwoord bewaren voor herhaal().
-export function spreek(tekst, { bewaar = false } = {}) {
+export function spreek(tekst, { bewaar = false, vraag = null } = {}) {
   if (!beschikbaar()) return
-  const schoon = spreekbaar(tekst)
+  const schoon = [spreekTekst(tekst), spreekTekst(vraag)].filter(Boolean).join(' ')
   const stukken = provider.knip(schoon)
   if (!stukken.length) return
   zet({ spreekt: true })
@@ -373,11 +388,11 @@ export function spreek(tekst, { bewaar = false } = {}) {
 // Herhaalknop: speelt het antwoord opnieuw af, ook als de stem uit staat.
 // Uit de cache als die er is; anders één keer ophalen en bewaren. Aanroepen
 // vanuit de klik (ontgrendelt Safari).
-export function herhaal(tekst) {
+export function herhaal(tekst, vraag = null) {
   if (!beschikbaar()) return
   stop()
   provider.ontgrendel()
-  spreek(tekst, { bewaar: true })
+  spreek(tekst, { bewaar: true, vraag })
 }
 
 export function useStem() {
@@ -390,7 +405,10 @@ const PIJL = /[→←↑↓⇒⇐➜➔➡]|->|=>|<-/g
 export function spreekbaar(tekst) {
   return (tekst || '')
     .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/https?:\/\/\S+|www\.\S+/g, ' ')
+    .replace(/^\s*([-*_=]\s*){3,}$/gm, '')
+    .replace(/~~/g, '')
     .replace(/[\p{Extended_Pictographic}️‍]/gu, '')
     .split('\n')
     .map(r => r
@@ -408,6 +426,42 @@ export function spreekbaar(tekst) {
     .replace(/\s+([,.!?;:])/g, '$1')
     .replace(/([,.!?;:])[,]+/g, '$1')
     .trim()
+}
+
+// Korte gesproken versie van een volledige tekst: opmaak eruit, kopjes en
+// opsommingen (-, *, •, 1., pijltjes, tabelrijen) overgeslagen zolang er gewone
+// zinnen zijn, dan de eerste 1-3 zinnen tot max ~250 tekens. Knipt alleen op een
+// zinseinde (. ! ?). Is de eerste zin zelf te lang: tot ~400 tekens heel, anders
+// op de laatste komma of woordgrens, afgesloten met een punt. Nooit '...'.
+const MAX_SPREEK = 250
+const MAX_EERSTE_ZIN = 400
+const IS_LIJST = new RegExp(`^\\s*([-*•+]\\s+|\\d+[.)]\\s+|(${PIJL.source})|\\|)`)
+const IS_KOPJE = /^\s*#{1,6}\s/
+
+export function spreekTekst(volledig, max = MAX_SPREEK) {
+  const regels = (volledig || '').replace(/```[\s\S]*?```/g, ' ').split('\n')
+  const volgende = (i) => regels.slice(i + 1).find(r => r.trim()) || ''
+  // Gewone tekst: geen kopje, geen lijst, en geen aankondiging ("Dit deed ik:")
+  // van een lijst die we toch overslaan.
+  const proza = regels.filter((r, i) => r.trim() && !IS_KOPJE.test(r) && !IS_LIJST.test(r)
+    && !(/:\s*$/.test(r) && IS_LIJST.test(volgende(i))))
+  let schoon = spreekbaar(proza.join('\n')) || spreekbaar(volledig)
+  schoon = schoon.replace(/\.{2,}|…/g, '.').replace(/([.!?])[.]+/g, '$1').trim()
+  if (!/[\p{L}\p{N}]/u.test(schoon)) return ''
+  const zinnen = (schoon.match(/.+?(?:[.!?]+(?=\s|$)|$)/g) || []).map(z => z.trim()).filter(Boolean)
+  let uit = zinnen[0]
+  if (uit.length > MAX_EERSTE_ZIN) {
+    const deel = uit.slice(0, max)
+    const komma = deel.lastIndexOf(', ')
+    const op = komma > max / 3 ? komma : deel.lastIndexOf(' ')
+    uit = deel.slice(0, op > 0 ? op : max).replace(/[\s,;:–-]+$/, '')
+  }
+  for (const z of zinnen.slice(1, 3)) {
+    if ((uit + ' ' + z).length > max) break
+    uit += ' ' + z
+  }
+  // Altijd afsluiten op een zinseinde (ook als de laatste zin op : of ; eindigde).
+  return uit.replace(/[\s,;:–-]+$/, '').replace(/([^.!?])$/, '$1.')
 }
 
 // Zinnen samenvoegen tot stukken van max `max` tekens; te lange zinnen op komma of spatie knippen.

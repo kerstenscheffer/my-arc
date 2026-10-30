@@ -31,7 +31,8 @@
 // wolkje. Stopt bij typen, microfoon, versturen, nieuw gesprek en weggaan. Luistert
 // de microfoon, dan praat hij niet (anders hoort de herkenning zichzelf).
 // Rustregel (30 okt): in rust toont het robotje de eerste zin van de laatst
-// afgeronde code-opdracht (max ~60 tekens); open "Ik wacht op jou"-acties staan
+// afgeronde code-opdracht (max ~60 tekens; stem en herhaalknop krijgen het hele
+// resultaat en spreken daarvan de korte kern uit, stem.spreekTekst); open "Ik wacht op jou"-acties staan
 // eronder met elk een Gedaan-knop, plus de ElevenLabs-sleutelactie zolang
 // gino-stem 503 geen_sleutel geeft. Versturen breekt de spraakherkenning af en
 // negeert late resultaten, zodat het veld leeg blijft.
@@ -377,7 +378,8 @@ function WijzigingVoorstel({ voorstel, staat, onToestaan }) {
 // resultaat er is.
 const PA_STATUS = { wacht: 'Wacht op je Mac…', bezig: 'Claude Code is bezig…', klaar: 'Klaar', mislukt: 'Mislukt' }
 
-function PaVoorstel({ voorstel, staat, onToestaan }) {
+// herhaalKnop(tekst): herhaalknop achter het resultaat (alleen bij het laatste Gino-bericht).
+function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
   const [rij, setRij] = useState(null)
   const { bezig, fout } = staat || {}
   const id = voorstel.opdrachtId
@@ -412,7 +414,7 @@ function PaVoorstel({ voorstel, staat, onToestaan }) {
           {hangt && <div style={{ color: colors.textSecondary, fontWeight: 600, marginTop: 2 }}>Draait npm run pa op je Mac?</div>}
         </div>
       )}
-      {rij?.resultaat && <div style={{ marginTop: 6 }}><Inkort tekst={rij.resultaat} /></div>}
+      {rij?.resultaat && <div style={{ marginTop: 6 }}><Inkort tekst={rij.resultaat} achter={herhaalKnop?.(rij.resultaat)} /></div>}
       {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 4 }}>{fout}</div>}
     </div>
   )
@@ -747,7 +749,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   // hoe hij geëindigd is voor de korte melding.
   const [code, setCode] = useState(null) // null | 'wacht' | 'bezig'
   // Laatst afgeronde code-opdracht: de rustregel van het robotje.
-  const [laatst, setLaatst] = useState(null) // { tekst, klaar_at }
+  const [laatst, setLaatst] = useState(null) // { tekst (kort), vol (voor de stem), klaar_at }
   useEffect(() => {
     let weg = false
     const haalLaatst = () => supabase.from('business_os_opdrachten')
@@ -756,7 +758,9 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
       .then(({ data }) => {
         if (weg || !data) return
         const tekst = laatstGedaanRegel(data)
-        if (tekst) setLaatst(o => (o?.klaar_at === data.klaar_at ? o : { tekst, klaar_at: data.klaar_at }))
+        // vol: de hele tekst voor de stem; de regel zelf is ingekort tot ~60 tekens.
+        const vol = data.resultaat?.trim() || `Gino deed: ${data.opdracht || ''}`
+        if (tekst) setLaatst(o => (o?.klaar_at === data.klaar_at ? o : { tekst, vol, klaar_at: data.klaar_at }))
       }, () => {})
     haalLaatst()
     const t = setInterval(haalLaatst, 15000)
@@ -770,7 +774,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     const nieuw = lees(GELEZEN_KEY) !== laatst.klaar_at
     schrijf(GELEZEN_KEY, laatst.klaar_at)
     if (eersteLaatst.current) { eersteLaatst.current = false; return }
-    if (nieuw && stem.isAan() && !stem.isBezig() && !luistertRef.current) stem.spreek(laatst.tekst)
+    if (nieuw && stem.isAan() && !stem.isBezig() && !luistertRef.current) stem.spreek(laatst.vol, { bewaar: true })
   }, [laatst])
 
   // ElevenLabs-sleutels nog niet in Supabase? Dan een open actie voor Kersten,
@@ -945,25 +949,28 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   // Voorleestekst: het antwoord en daarna de eerste toestemmingsvraag (die in het wolkje).
   // Vastgelegd bij binnenkomst, zodat herhalen dezelfde (bewaarde) audio pakt.
   // Op inhoud, niet op object: een afgehandelde actie vervangt het bericht-object.
-  const spraak = useRef({ content: null, tekst: '' })
+  // De stem maakt er zelf de korte versie van (stem.spreekTekst); vraag gaat er heel achteraan.
+  const spraak = useRef({ content: null, tekst: '', vraag: null })
   const spraakVan = (bericht) => {
-    if (spraak.current.content === bericht.content) return spraak.current.tekst
+    if (spraak.current.content === bericht.content) return spraak.current
     const open = (bericht.acties || []).find(staatOpen)
-    return [bericht.content, open && vraagVoor(open).vraag].filter(Boolean).join('\n')
+    return { content: bericht.content, tekst: bericht.content, vraag: (open && vraagVoor(open).vraag) || null }
   }
   const antwoord = (bericht) => {
     setGesprek(g => [...g, bericht])
     if (!openRef.current) setOngelezen(true)
     meld('Klaar', false)
-    const tekst = spraakVan(bericht)
-    spraak.current = { content: bericht.content, tekst }
-    if (stem.isAan() && !luistertRef.current) stem.spreek(tekst, { bewaar: true })
+    const s = spraakVan(bericht)
+    spraak.current = s
+    if (stem.isAan() && !luistertRef.current) stem.spreek(s.tekst, { bewaar: true, vraag: s.vraag })
   }
-  const herhaal = (bericht) => {
+  // tekst = altijd de volledige tekst; stem.herhaal maakt dezelfde korte versie als het voorlezen.
+  const herhaal = (tekst, vraag) => {
     if (stem.isBezig()) { stem.stop(); return }
     stopHerkenner()
-    stem.herhaal(spraakVan(bericht))
+    stem.herhaal(tekst, vraag)
   }
+  const herhaalKnop = (tekst, vraag = null) => <Herhaal praat={spreekt} onKlik={() => herhaal(tekst, vraag)} />
 
   const stuur = async () => {
     const vraag = invoer.trim()
@@ -1063,7 +1070,9 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
             boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
           }}>
             {!gesprek.length && <div style={{ ...TEKST, color: colors.textSecondary, fontWeight: 600 }}>Nog geen berichten.</div>}
-            {gesprek.map((b, i, alle) => b.role === 'user' ? (
+            {gesprek.map((b, i, alle) => {
+              const laatsteGino = alle.slice(i + 1).every(n => n.role === 'user') && stem.beschikbaar()
+              return b.role === 'user' ? (
               <div key={i} style={{
                 alignSelf: 'flex-end', maxWidth: '85%', background: colors.surface, borderRadius: 14,
                 padding: '4px 9px', ...TEKST, fontWeight: 700, color: colors.textPrimary, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
@@ -1086,20 +1095,19 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                     if (ac.soort === 'wacht_op_jou') return <WachtOpJou key={j} {...kaart} />
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
-                    if (ac.soort === 'pa_voorstel') return <PaVoorstel key={j} {...kaart} />
+                    if (ac.soort === 'pa_voorstel') return <PaVoorstel key={j} {...kaart} herhaalKnop={laatsteGino ? herhaalKnop : null} />
                     return (
                       <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, fontSize: '0.8rem', marginBottom: 4 }}>
                         <Check size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : typeof ac.tekst === 'string' ? ac.tekst : ''}
                       </div>
                     )
                   })}
-                  <Inkort tekst={b.content}
-                    achter={alle.slice(i + 1).every(n => n.role === 'user') && stem.beschikbaar()
-                      ? <Herhaal praat={spreekt} onKlik={() => herhaal(b)} /> : null} />
+                  <Inkort tekst={b.content} achter={laatsteGino ? herhaalKnop(spraakVan(b).tekst, spraakVan(b).vraag) : null} />
                 </div>
                 <Kopieer tekst={b.content} />
               </div>
-            ))}
+            )
+            })}
             {bezig && deel && (
               <div style={{ ...TEKST, fontWeight: 500, color: colors.textPrimary, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{deel}</div>
             )}
@@ -1115,7 +1123,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
               <button role="status" onClick={() => setOpen(o => !o)} aria-expanded={open}
                 title={open ? 'Berichten verbergen' : 'Berichten tonen'}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0, flex: 1,
+                  display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0, flex: '0 1 auto',
                   background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                   fontSize: '0.75rem', fontWeight: 800,
                   color: werk || vraagNu || open ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : laatst ? colors.textSecondary : colors.textMuted,
@@ -1135,6 +1143,11 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                   {werk || (melding && !vraagNu ? melding.tekst : vraagNu ? 'Wacht op jou' : laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar'))}
                 </span>
               </button>
+              {/* Herhaalknop direct achter het laatste opdrachtresultaat (robot-regel) */}
+              {!werk && !(melding && !vraagNu) && !vraagNu && laatst?.tekst && stem.beschikbaar() && (
+                <span style={{ display: 'flex', flexShrink: 0, marginLeft: -6 }}>{herhaalKnop(laatst.vol)}</span>
+              )}
+              <span onClick={() => setOpen(o => !o)} style={{ flex: 1, alignSelf: 'stretch', cursor: 'pointer' }} />
               {/* Mac/API + herstart: rechts op de hoogte van het poppetje */}
               <button onClick={wisselRoute}
                 title={route === 'api' ? 'Via de API. Klik: via je Mac'
