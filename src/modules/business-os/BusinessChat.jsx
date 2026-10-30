@@ -7,7 +7,7 @@
 // de browser dat niet kan (o.a. de iOS-app-webview) verschijnt de knop niet.
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
@@ -142,6 +142,66 @@ function WijzigingVoorstel({ voorstel, onKlaar }) {
   )
 }
 
+// Code-opdracht voor de lokale PA (scripts/business-os-pa.mjs). De klik zet een
+// rij in business_os_opdrachten; daarna volgt dit blok de status tot het
+// resultaat er is.
+const PA_STATUS = { wacht: 'Wacht op je Mac…', bezig: 'Claude Code is bezig…', klaar: 'Klaar', mislukt: 'Mislukt' }
+
+function PaVoorstel({ voorstel, onGestart }) {
+  const [rij, setRij] = useState(null)
+  const [fout, setFout] = useState(null)
+  const id = voorstel.opdrachtId
+
+  useEffect(() => {
+    if (!id) return
+    let weg = false
+    const kijk = () => supabase.from('business_os_opdrachten')
+      .select('status, resultaat, created_at').eq('id', id).maybeSingle()
+      .then(({ data }) => { if (!weg && data) setRij(data) }, () => {})
+    kijk()
+    const t = setInterval(kijk, 5000)
+    return () => { weg = true; clearInterval(t) }
+  }, [id])
+
+  const start = async () => {
+    setFout(null)
+    const { data, error } = await supabase.from('business_os_opdrachten')
+      .insert({ opdracht: voorstel.tekst }).select('id').single()
+    if (error) { setFout('Starten mislukt: ' + error.message); return }
+    onGestart(data.id)
+  }
+
+  const status = rij?.status
+  const hangt = status === 'wacht' && rij && Date.now() - new Date(rij.created_at).getTime() > 20000
+  return (
+    <div style={{ margin: '4px 0 12px' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 4 }}>
+        <Laptop size={15} /> Code-opdracht
+      </div>
+      <div style={{ color: colors.textSecondary, fontWeight: 600, marginBottom: 8, whiteSpace: 'pre-wrap' }}>{voorstel.tekst}</div>
+      {!id ? (
+        <button
+          onClick={start}
+          style={{
+            background: colors.textPrimary, color: colors.onAccent, border: 'none', borderRadius: 12,
+            padding: '0 16px', minHeight: 44, fontWeight: 900, fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          Uitvoeren op mijn Mac
+        </button>
+      ) : (
+        <div style={{ fontWeight: 800, color: status === 'klaar' ? colors.success : status === 'mislukt' ? colors.danger : colors.textPrimary }}>
+          {status === 'klaar' && <Check size={16} style={{ verticalAlign: '-3px', marginRight: 4 }} />}
+          {PA_STATUS[status] || 'Versturen…'}
+          {hangt && <div style={{ color: colors.textSecondary, fontWeight: 600, marginTop: 4 }}>Draait npm run pa op je Mac?</div>}
+        </div>
+      )}
+      {rij?.resultaat && <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{rij.resultaat}</div>}
+      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
+    </div>
+  )
+}
+
 export default function BusinessChat({ context }) {
   const [gesprek, setGesprek] = useState(leesGesprek)
   const [invoer, setInvoer] = useState('')
@@ -218,6 +278,12 @@ export default function BusinessChat({ context }) {
                   }))
                   if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} voorstel={ac} onKlaar={klaar} />
                   if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} voorstel={ac} onKlaar={klaar} />
+                  if (ac.soort === 'pa_voorstel') {
+                    const gestart = (opdrachtId) => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
+                      ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, opdrachtId } : x),
+                    }))
+                    return <PaVoorstel key={j} voorstel={ac} onGestart={gestart} />
+                  }
                   return (
                     <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, marginBottom: 6 }}>
                       <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}

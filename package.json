@@ -12,6 +12,7 @@
     "cap:sync": "npm run build && npx cap sync && node scripts/app-assets-opschonen.mjs",
     "android:bundle": "npm run cap:sync && cd android && ./gradlew bundleRelease",
     "live-update": "node scripts/live-update.mjs",
+    "pa": "node scripts/business-os-pa.mjs",
     "release": "npx vercel --prod && node scripts/live-update.mjs"
   },
   "dependencies": {

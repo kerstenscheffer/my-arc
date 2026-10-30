@@ -24,6 +24,11 @@
 // pas die klik schrijft via supabase-js met Kerstens eigen rechten.
 // Schemawijzigingen (kolommen/tabellen) kunnen nooit vanuit de chat.
 //
+// Code: stel_lokale_opdracht_voor zet een opdracht klaar; Kerstens klik op
+// "Uitvoeren op mijn Mac" schrijft hem in business_os_opdrachten en zijn
+// lokale PA (scripts/business-os-pa.mjs, npm run pa) voert hem uit met
+// Claude Code in zijn workapp-map.
+//
 // Alleen coaches (get_my_portal_role = coach/both), anders kan elke ingelogde
 // klant API-tegoed opmaken. Sleutel: ANTHROPIC_API_KEY als Supabase-secret.
 
@@ -65,7 +70,7 @@ Taalregels (altijd):
 - Geen gedachtestreepjes (— of –). Geen emoji's tenzij gevraagd.
 - Kopieer nooit letterlijk van andere coaches: zelfde mechanisme, zijn onderwerp.
 
-App-wijzigingen: vraagt Kersten iets aan te passen in de MY ARC-app, gebruik de tool zet_op_app_lijst. Beloof nooit dat het al aangepast is.
+App-wijzigingen (code, schermen, functies): gebruik standaard stel_lokale_opdracht_voor. Kersten klikt dan op "Uitvoeren op mijn Mac" en Claude Code past het direct aan in zijn lokale code. Schrijf de opdracht volledig en zelfstandig: welk scherm, wat er nu gebeurt, wat het moet worden, en wat je al weet uit de database of het gesprek. Die Claude Code ziet dit gesprek niet. Zegt Kersten "voor later" of "zet op de lijst", gebruik dan zet_op_app_lijst. Beloof nooit dat het al aangepast is; het resultaat verschijnt onder je bericht. Eerdere opdrachten en hun resultaat staan in de tabel business_os_opdrachten.
 
 Skills: hieronder staan Kerstens skills, vaste werkwijzen per soort taak. Past een taak bij een skill, volg die stappen precies. Wil Kersten een nieuwe werkwijze vastleggen of een bestaande aanpassen ("onthoud dit", "maak hier een skill van", "voortaan bij scripts..."), gebruik bewaar_skill met de volledige nieuwe instructies (bij aanpassen: de oude stappen plus de wijziging, onder dezelfde naam). Laat in één zin weten wat je bewaard hebt.
 
@@ -160,6 +165,16 @@ const TOOLS = [{
       uitleg: { type: 'string', description: 'In één zin wat er verandert en waarom.' },
     },
     required: ['tabel', 'actie', 'uitleg'],
+  },
+}, {
+  name: 'stel_lokale_opdracht_voor',
+  description: 'Zet een code-opdracht klaar voor Claude Code op Kerstens Mac. Voert NIETS uit: Kersten klikt "Uitvoeren op mijn Mac".',
+  input_schema: {
+    type: 'object',
+    properties: {
+      opdracht: { type: 'string', description: 'Volledige, zelfstandige opdracht: scherm, huidig gedrag, gewenst gedrag, bekende details.' },
+    },
+    required: ['opdracht'],
   },
 }, {
   name: 'verwijder_skill',
@@ -343,6 +358,14 @@ Deno.serve(async (req) => {
         }
         if (blok.name === 'stel_wijziging_voor') {
           uitkomst = await wijzigingVoorstel(blok.input || {}, acties)
+        }
+        if (blok.name === 'stel_lokale_opdracht_voor') {
+          const opdracht = String(blok.input?.opdracht || '').trim().slice(0, 8000)
+          if (!opdracht) uitkomst = 'Lege opdracht.'
+          else {
+            acties.push({ soort: 'pa_voorstel', tekst: opdracht })
+            uitkomst = 'Opdracht staat klaar; Kersten moet op "Uitvoeren op mijn Mac" klikken. Er is nog niets uitgevoerd.'
+          }
         }
         if (blok.name === 'stel_slot_voor') {
           const ids = new Set((Array.isArray(blok.input?.client_ids) ? blok.input.client_ids : []).map(String))
