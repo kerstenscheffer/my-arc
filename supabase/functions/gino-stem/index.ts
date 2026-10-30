@@ -25,6 +25,28 @@ const MODEL = 'eleven_multilingual_v2'
 const MET_TAALCODE = ['eleven_turbo_v2_5', 'eleven_flash_v2_5']
 const MAX_TEKENS = 1000
 
+// Zonder ELEVENLABS_VOICE_ID: eerste zelf toegevoegde stem (category ≠ premade)
+// uit het eigen ElevenLabs-account, anders de eerste uit de lijst. Per instantie
+// gecachet, zodat de lijst niet bij elk verzoek wordt opgehaald.
+let gekozenStem: { id: string; naam: string } | null = null
+
+async function kiesStem(sleutel: string): Promise<{ id: string; naam: string } | null> {
+  const vast = Deno.env.get('ELEVENLABS_VOICE_ID')
+  if (vast) return { id: vast, naam: 'ELEVENLABS_VOICE_ID' }
+  if (gekozenStem) return gekozenStem
+  const res = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': sleutel } })
+  if (!res.ok) {
+    console.error('ElevenLabs voices', res.status, (await res.text().catch(() => '')).slice(0, 300))
+    return null
+  }
+  const { voices = [] } = await res.json().catch(() => ({}))
+  const stem = voices.find((v: { category?: string }) => v.category !== 'premade') || voices[0]
+  if (!stem?.voice_id) return null
+  gekozenStem = { id: stem.voice_id, naam: stem.name || stem.voice_id }
+  console.log('gino-stem kiest', gekozenStem.naam, gekozenStem.id)
+  return gekozenStem
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   const json = (body: unknown, status = 200) =>
@@ -43,8 +65,10 @@ Deno.serve(async (req) => {
     if (rol !== 'coach' && rol !== 'both') return json({ fout: 'alleen_coach' }, 403)
 
     const sleutel = Deno.env.get('ELEVENLABS_API_KEY')
-    const stemId = Deno.env.get('ELEVENLABS_VOICE_ID')
-    if (!sleutel || !stemId) return json({ fout: 'geen_sleutel' }, 503)
+    if (!sleutel) return json({ fout: 'geen_sleutel' }, 503)
+    const stem = await kiesStem(sleutel)
+    if (!stem) return json({ fout: 'geen_sleutel' }, 503)
+    const stemId = stem.id
 
     const body = await req.json().catch(() => ({}))
     const tekst = typeof body?.tekst === 'string' ? body.tekst.trim() : ''
@@ -70,7 +94,13 @@ Deno.serve(async (req) => {
       return json({ fout: 'elevenlabs', status: res.status }, 502)
     }
     return new Response(res.body, {
-      headers: { ...CORS, 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' },
+      headers: {
+        ...CORS,
+        'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'no-store',
+        'x-gino-stem': encodeURIComponent(stem.naam),
+        'Access-Control-Expose-Headers': 'x-gino-stem',
+      },
     })
   } catch (e) {
     console.error('gino-stem', e)
