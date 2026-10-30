@@ -10,6 +10,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
+import BusinessChat from './BusinessChat'
 
 const C = {
   bg: colors.bg,
@@ -292,6 +293,12 @@ export default function BusinessOS({ isMobile }) {
             <div style={{ fontSize: '0.85rem', fontWeight: 600, color: C.zacht, marginTop: 4 }}>
               Zwakste schakel: <b style={{ color: C.rood }}>{zw.label}</b> ({Math.round(zw.verschil * 100)}% t.o.v. je 3-maands gemiddelde)
             </div>
+            <BusinessChat context={{
+              omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
+              dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
+              schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
+              zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
+            }} />
           </Paneel>
 
           <Paneel titel="DE KETEN · DEZE MAAND VS. GEMIDDELDE">
