@@ -68,6 +68,7 @@ const ResultsHub = lazy(() => import('../modules/results/ResultsHub'))
 const CoachAgendaTab = lazy(() => import('../modules/client-agenda/CoachAgendaTab'))
 const LabHub = lazy(() => import('../modules/lab/LabHub'))
 const CoachWeekReview = lazy(() => import('../modules/week-review/CoachWeekReview'))
+const BusinessOS = lazy(() => import('../modules/business-os/BusinessOS'))
 
 // ============================================
 // GOLD THEME
@@ -104,6 +105,7 @@ const MORE_CATEGORIES = [
   {
     label: 'Gameplan',
     items: [
+      { id: 'business-os', label: 'Business OS', icon: Activity },
       { id: 'productivity', label: 'Productivity', icon: Target },
       // Ads zit sinds 23 okt 2026 in het Leads-tabblad (schakelaar bovenaan).
     ]
@@ -560,6 +562,8 @@ export default function CoachHub() {
             isMobile={isMobile}
           />
         )
+      case 'business-os':
+        return <BusinessOS isMobile={isMobile} />
       case 'week-review':
         return <CoachWeekReview db={db} isMobile={isMobile} />
       case 'checkins':
