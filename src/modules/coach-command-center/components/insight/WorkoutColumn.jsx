@@ -594,7 +594,7 @@ function SessieOefeningen({ db, isMobile, selectedSession, exs, onBack, onKies }
             <div key={idx} style={{ ...KAART, display: 'flex', alignItems: 'stretch' }}>
               {/* Foto links met het nummer linksboven, zoals de oefeningkaart van de klant. */}
               <div style={{ width: photoSize, alignSelf: 'stretch', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${fotoVan(ex.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />
+                <div style={{ position: 'absolute', inset: 0, backgroundImage: fotoVan(ex.name), backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
                 <div style={{
                   position: 'absolute', top: 4, left: 4, width: 18, height: 18, borderRadius: 3,

@@ -18,6 +18,8 @@ import OpwarmPoort from './OpwarmPoort'
 import { isOpgewarmd, zetOpgewarmd, isOpwarmPromptAan } from '../opwarmen'
 import VideoPlayerModal from '../../../../videos/VideoPlayerModal'
 import { appSafeEmbedUrl } from '../../../../videos/utils/youtubeHelpers'
+import OefeningThumb from '../../OefeningThumb'
+import { fotoKandidaten, bruikbareFotos } from '../../../utils/oefeningFoto'
 
 // ========== SCROLL NUMBER PICKER ==========
 function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'kg', onConfirm, halfStep = null, smallStep = null }) {
@@ -898,7 +900,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
   // dan de foto uit de oefeningtabel, en anders leiden we 'm af uit de
   // YouTube-link. Een thumbnail invullen is dus nergens verplicht — vroeger
   // verdween bij een oefening zonder foto het hele blok, play-knop en al.
-  const poster = exercise.thumbnail_url || media?.thumbnail_url || media?.image_url || youtubeThumb(videoBron) || null
+  // Volgorde en ibb-filter uit oefeningFoto; OefeningThumb schuift bij een
+  // laadfout door en toont anders een halter.
+  const posters = bruikbareFotos([...fotoKandidaten(exercise, media), youtubeThumb(videoBron)])
+  const poster = posters[0] || null
 
   // Spiergroep uit het schema (week_structure noemt het primairSpieren),
   // anders uit de oefeningtabel (daar heet de kolom primair_spieren).
@@ -966,11 +971,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, onSets
                 style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: '#000' }}
               />
             ) : poster ? (
-              <img
-                src={poster} alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                onError={e => { e.currentTarget.style.display = 'none' }}
-              />
+              <OefeningThumb bronnen={posters} naam={exercise.name} style={{ width: '100%', height: '100%', background: '#000' }} />
             ) : (
               // Geen plaatje, wel een filmpje: een rustig vlak waar de
               // play-knop op staat. Beter dan niets tonen.

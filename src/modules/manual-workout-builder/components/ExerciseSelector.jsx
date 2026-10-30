@@ -95,7 +95,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
       setBibliotheek((bib.data || []).map(x => ({
         key: `bib_${x.id}`, bron: 'bibliotheek',
         name: x.name, spier: x.primair_spieren, materiaal: x.equipment, type: x.type,
-        thuis: !!x.home_friendly, foto: [x.image_url, ...fotoKandidaten(x)].filter(Boolean),
+        thuis: !!x.home_friendly, foto: fotoKandidaten(x),
         sets: x.suggested_sets, reps: x.suggested_reps, rest: x.suggested_rest,
       })))
       setEigen((cust.data || []).map(x => ({

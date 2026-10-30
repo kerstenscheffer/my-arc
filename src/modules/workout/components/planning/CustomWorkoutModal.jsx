@@ -171,7 +171,7 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {oefeningen.map((e, i) => (
                     <div key={`${e.name}-${i}`} style={{ display: 'flex', gap: 10, padding: 8, borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: 10, backgroundImage: `url(${fotoVan(e.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
+                      <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: 10, backgroundImage: fotoVan(e.name), backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
                         <span style={{ position: 'absolute', top: 4, left: 4, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 5, background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: '0.6rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -235,7 +235,7 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
                 const al = gekozen.has(String(ex.name).toLowerCase())
                 return (
                   <button key={ex.name} onClick={() => voegToe(ex)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 6, borderRadius: 12, background: al ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${al ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`, color: '#fff', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                    <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: 9, backgroundImage: `url(${fotoVan(ex.name)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: 9, backgroundImage: fotoVan(ex.name), backgroundSize: 'cover', backgroundPosition: 'center' }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '0.92rem', fontWeight: 900, letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
                       <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{[SPIER_NL[String(ex.primair_spieren).toLowerCase()] || ex.primair_spieren, ex.equipment].filter(Boolean).join(' · ')}</div>
@@ -253,7 +253,7 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
                 <>
                   <button onClick={() => setGekozenOpen(v => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? '0.55rem 1rem' : '0.6rem 1.2rem', background: 'transparent', border: 'none', fontFamily: 'inherit', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <span style={{ display: 'flex', gap: 3 }}>
-                      {oefeningen.slice(0, 4).map((e, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 6, backgroundImage: `url(${fotoVan(e.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.2)' }} />)}
+                      {oefeningen.slice(0, 4).map((e, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 6, backgroundImage: fotoVan(e.name), backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.2)' }} />)}
                     </span>
                     <span style={{ flex: 1, textAlign: 'left', fontSize: '0.82rem', fontWeight: 900, color: '#fff' }}>{oefeningen.length} gekozen</span>
                     <ChevronUp size={16} strokeWidth={2.8} color="#fff" style={{ transform: gekozenOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
@@ -263,7 +263,7 @@ export default function CustomWorkoutModal({ workoutService, clientId, db = null
                       {oefeningen.map((e, i) => (
                         <div key={`${e.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
                           <span style={{ width: 20, fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{i + 1}</span>
-                          <span style={{ width: 30, height: 30, borderRadius: 7, flexShrink: 0, backgroundImage: `url(${fotoVan(e.name)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                          <span style={{ width: 30, height: 30, borderRadius: 7, flexShrink: 0, backgroundImage: fotoVan(e.name), backgroundSize: 'cover', backgroundPosition: 'center' }} />
                           <span style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</span>
                           <button onClick={() => haalWeg(i)} aria-label={`${e.name} eraf`} style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}><X size={13} strokeWidth={2.8} /></button>
                         </div>

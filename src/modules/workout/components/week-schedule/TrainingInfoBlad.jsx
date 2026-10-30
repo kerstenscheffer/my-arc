@@ -24,7 +24,7 @@ export default function TrainingInfoBlad({ open, training, db, isMobile, onClose
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {oef.map((e, i) => (
             <div key={`${e.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 6, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: 9, backgroundImage: `url(${fotoVan(e.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
+              <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: 9, backgroundImage: fotoVan(e.name), backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
                 <span style={{ position: 'absolute', top: 3, left: 3, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 4, background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: '0.56rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>

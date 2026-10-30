@@ -14,6 +14,7 @@ import { useModalHost } from '../../../coach/ModalHost'
 import { X, Search, Video, ListFilter, Loader2 } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
 import OefeningThumb from '../../workout/components/OefeningThumb'
+import { fotoKandidaten } from '../../workout/utils/oefeningFoto'
 
 const GOLD = '#FFD700'
 
@@ -223,7 +224,7 @@ export default function ExerciseLibraryModal({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {filtered.map(ex => {
               const hasVideo = !!ex.video_url
-              const thumbs = [ex.thumbnail_url, ex.image_url]
+              const thumbs = fotoKandidaten(ex)
               return (
                 <button
                   key={ex.id}

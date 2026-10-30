@@ -19,7 +19,7 @@ export const materiaalLabel = (v) => MATERIAAL_LABELS[v] || v
 // De foto voor een rij uit de lijst. YouTube's hqdefault heeft zwarte balken
 // boven en onder; in een vierkantje zie je die. mqdefault is 16:9 zonder balken.
 export const fotoVoor = (ex) => {
-  const url = (ex?._isCustom ? ex.image_url : fotoUitRij(ex))
+  const url = fotoUitRij(ex)
     || getFallbackImage({ ...ex, primairSpieren: ex?.primair_spieren || ex?.primairSpieren })
   return String(url).replace('/hqdefault.jpg', '/mqdefault.jpg')
 }

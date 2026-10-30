@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from '../../../client/paginaPortal'
 import { X, Trash2, Plus, Search, Check, AlertCircle, Copy, Edit2, ChevronDown, ChevronUp, Moon } from 'lucide-react'
 import ClientPlanEditorService from '../services/ClientPlanEditorService'
+import { fotoAchtergrond } from '../utils/oefeningFoto'
 
 const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const WEEK_DAYS_NL = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -117,7 +118,6 @@ export default function ClientPlanEditor({ schema, client, db, weekSchedule: ini
     })
 
     // Koppel aan eerste vrije weekdag
-    const usedDays = new Set(Object.values(localWeekSchedule))
     const freeDays = WEEK_DAYS.filter(d => !Object.keys(localWeekSchedule).includes(d))
     if (freeDays.length > 0) {
       setLocalWeekSchedule(prev => ({ ...prev, [freeDays[0]]: newKey }))
@@ -217,7 +217,7 @@ export default function ClientPlanEditor({ schema, client, db, weekSchedule: ini
 
   // Weekdag die gekoppeld is aan een workoutKey
   const getWeekDayForKey = (workoutKey) => {
-    return Object.entries(localWeekSchedule).find(([_, v]) => v === workoutKey)?.[0] || null
+    return Object.entries(localWeekSchedule).find(([, v]) => v === workoutKey)?.[0] || null
   }
 
   return createPortal(
@@ -258,7 +258,6 @@ export default function ClientPlanEditor({ schema, client, db, weekSchedule: ini
             const isExpanded = expandedDay === workoutKey
             const isAddingHere = showAddExercise === workoutKey
             const linkedWeekDay = getWeekDayForKey(workoutKey)
-            const linkedWeekDayNL = linkedWeekDay ? WEEK_DAYS_NL[WEEK_DAYS.indexOf(linkedWeekDay)] : null
             const usedWeekDays = Object.keys(localWeekSchedule)
 
             return (
@@ -369,7 +368,7 @@ export default function ClientPlanEditor({ schema, client, db, weekSchedule: ini
                         </div>
 
                         {/* Foto */}
-                        <div style={{ width: '36px', height: '36px', borderRadius: '4px', flexShrink: 0, backgroundImage: `url(${exercise.image_url || getFallbackImage(exercise.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 1 }} />
+                        <div style={{ width: '36px', height: '36px', borderRadius: '4px', flexShrink: 0, backgroundImage: fotoAchtergrond([exercise.image_url, exercise.thumbnail_url, getFallbackImage(exercise.name)]), backgroundSize: 'cover', backgroundPosition: 'center', opacity: 1 }} />
 
                         {/* Info + inputs */}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -426,7 +425,7 @@ export default function ClientPlanEditor({ schema, client, db, weekSchedule: ini
                             style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.45rem 0.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                             onTouchStart={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                             onTouchEnd={(e) => e.currentTarget.style.background = 'transparent'}>
-                            <div style={{ width: '30px', height: '30px', borderRadius: '3px', backgroundImage: `url(${ex.image_url || getFallbackImage(ex.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, opacity: 1 }} />
+                            <div style={{ width: '30px', height: '30px', borderRadius: '3px', backgroundImage: fotoAchtergrond([ex.image_url, ex.thumbnail_url, getFallbackImage(ex.name)]), backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, opacity: 1 }} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {ex.name}

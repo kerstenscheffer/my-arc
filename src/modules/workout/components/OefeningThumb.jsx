@@ -4,12 +4,12 @@
 // zien. 44 oefeningen hadden hun foto op i.ibb.co staan; dat laadt op mobiel
 // en achter adblockers vaak niet, en dan stond er een leeg of gebroken vlak.
 //
-// Volgorde: de opgegeven bronnen (meestal thumbnail_url), dan de YouTube-
+// Volgorde: de opgegeven bronnen (meestal fotoKandidaten), dan de YouTube-
 // thumbnail uit video_url, en lukt geen enkele: een rustig vlak met de naam.
 // Bij een laadfout schuift hij door naar de volgende bron.
 import { useEffect, useMemo, useState } from 'react'
 import { Dumbbell } from 'lucide-react'
-import { youtubeThumbs } from '../utils/oefeningFoto'
+import { youtubeThumbs, bruikbareFotos } from '../utils/oefeningFoto'
 
 export default function OefeningThumb({
   bronnen = [],      // url of lijst url's, in volgorde van voorkeur
@@ -22,8 +22,8 @@ export default function OefeningThumb({
   children,          // overlays (nummer, play-knop) over de foto heen
 }) {
   const lijst = useMemo(() => {
-    const ruw = [...(Array.isArray(bronnen) ? bronnen : [bronnen]), ...youtubeThumbs(videoUrl)]
-    return [...new Set(ruw.filter(Boolean))]
+    // ibb-urls vallen eruit: die geven een blauw foutplaatje zonder onError.
+    return bruikbareFotos([...(Array.isArray(bronnen) ? bronnen : [bronnen]), ...youtubeThumbs(videoUrl)])
   }, [JSON.stringify(bronnen), videoUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [stap, setStap] = useState(0)

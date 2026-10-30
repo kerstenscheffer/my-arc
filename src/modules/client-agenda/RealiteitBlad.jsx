@@ -121,7 +121,7 @@ function TrainingInhoud({ blok, db, isMobile, onOefening = null, onHervatten = n
         return (
           <div key={idx} style={{ ...KAART, display: 'flex', alignItems: 'stretch' }}>
             <div style={{ width: photoSize, alignSelf: 'stretch', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${fotoVan(ex.exercise_name)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />
+              <div style={{ position: 'absolute', inset: 0, backgroundImage: fotoVan(ex.exercise_name), backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
               <div style={{ position: 'absolute', top: 4, left: 4, width: 18, height: 18, borderRadius: 3, background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
                 <span style={{ fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', lineHeight: 1 }}>{idx + 1}</span>

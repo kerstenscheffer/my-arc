@@ -179,7 +179,7 @@ export default function KrachtBlad({ db, client, isMobile }) {
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}>
                   <div style={{ position: 'relative', width: isMobile ? 56 : 64, height: isMobile ? 56 : 64, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.05)' }}>
-                    <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${fotoVan(o.naam)})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: fotoVan(o.naam), backgroundSize: 'cover', backgroundPosition: 'center' }} />
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 100%)' }} />
                     <span style={{ position: 'absolute', left: 5, bottom: 5, width: 8, height: 8, borderRadius: '50%', background: kleur, boxShadow: '0 0 0 2px rgba(0,0,0,0.5)' }} />
                   </div>
