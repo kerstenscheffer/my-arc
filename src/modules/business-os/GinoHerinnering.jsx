@@ -7,7 +7,7 @@
 // een systeemmelding.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Bell, Check, Clock } from 'lucide-react'
+import { Check, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import * as stem from './stem'
@@ -107,74 +107,71 @@ export default function GinoHerinnering({ maat = 240, onPraat }) {
         @keyframes ginoGolf { 0% { opacity: .7; transform: scale(.55) } 100% { opacity: 0; transform: scale(1.15) } }
         @keyframes ginoLijn { from { transform: scaleY(0) } to { transform: scaleY(1) } }
         @keyframes ginoPunt { 0% { opacity: 0; transform: scale(0) } 70% { transform: scale(1.6) } 100% { opacity: 1; transform: scale(1) } }
-        @keyframes ginoBallon { 0% { opacity: 0; transform: translateX(-50%) scale(.2, .05) } 55% { opacity: 1; transform: translateX(-50%) scale(1.02, .5) }
-          100% { opacity: 1; transform: translateX(-50%) scale(1) } }
+        @keyframes ginoMini { 0% { opacity: 0; transform: scale(0) } 70% { transform: scale(1.2) } 100% { opacity: 1; transform: scale(1) } }
+        @keyframes ginoMiniPraat { 0%, 100% { transform: scale(1); box-shadow: 0 0 10px ${G}88 } 50% { transform: scale(1.12); box-shadow: 0 0 20px ${G} } }
+        @keyframes ginoMiniDraai { to { transform: rotate(360deg) } }
         @keyframes ginoCursor { 50% { opacity: 0 } }
         @keyframes ginoKnoppen { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
-        .gino-hk:hover { background: ${G}22 !important; border-color: ${G}88 !important }
+        .gino-hk { opacity: .6; transition: opacity .15s, color .15s }
+        .gino-hk:hover { opacity: 1; color: ${G} !important }
       `}</style>
 
       {/* golf uit de bol */}
       <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `1px solid ${G}`,
         animation: 'ginoGolf .9s ease-out both' }} />
 
-      {/* punt op de bol + lijn omhoog + punt bij de ballon */}
+      {/* punt op de bol + lijn omhoog naar de kleine bol */}
       <div style={{ position: 'absolute', left: '50%', top: rand - 3, width: 6, height: 6, marginLeft: -3, borderRadius: '50%',
         background: G, boxShadow: `0 0 10px ${G}`, animation: 'ginoPunt .3s ease-out .15s both' }} />
       <div style={{ position: 'absolute', left: '50%', top: rand - lijn, width: 1, height: lijn, marginLeft: -0.5,
         background: `linear-gradient(to top, ${G}, ${G}66)`, boxShadow: `0 0 6px ${G}`,
         transformOrigin: 'bottom', animation: 'ginoLijn .3s ease-out .3s both' }} />
 
-      {/* de ballon */}
+      {/* kleine bol met de tekst erachter, alsof hij het zegt */}
       <div role="alertdialog" aria-label="Herinnering van Gino" onClick={vraagMeldingen} style={{
-        position: 'absolute', left: '50%', bottom: maat - rand + lijn, width: 'min(320px, 86vw)',
-        pointerEvents: 'auto', padding: '13px 16px 12px', borderRadius: 14,
-        background: `radial-gradient(120% 140% at 50% 110%, ${G}1f, rgba(4,8,6,.92) 60%)`,
-        border: `1px solid ${G}66`,
-        boxShadow: `0 0 28px ${G}33, inset 0 0 18px ${G}14`,
-        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-        transformOrigin: '50% 100%', animation: 'ginoBallon .45s cubic-bezier(.2,.9,.3,1.1) .5s both',
+        position: 'absolute', left: `calc(50% - ${MINI / 2}px)`, top: rand - lijn - MINI / 2,
+        display: 'flex', alignItems: 'flex-start', gap: 12, width: 'min(360px, 80vw)', pointerEvents: 'auto',
       }}>
-        {/* aansluitpunt van de lijn */}
-        <div style={{ position: 'absolute', left: '50%', bottom: -4, width: 7, height: 7, marginLeft: -3.5,
-          transform: 'rotate(45deg)', background: 'rgb(6,12,9)', borderRight: `1px solid ${G}66`, borderBottom: `1px solid ${G}66` }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-          <Bell size={12} color={G} />
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.32em', color: G }}>
-            GINO{open.length > 1 ? ` · ${open.length}` : ''}
-          </span>
-          <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: 'rgba(255,255,255,.4)' }}>
-            {nlTijd(huidig.moment).toUpperCase()}
-          </span>
+        <div style={{ position: 'relative', width: MINI, height: MINI, flexShrink: 0, animation: 'ginoMini .35s ease-out .5s both' }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `1.5px solid ${G}`,
+            background: `radial-gradient(circle, ${G}55 0%, ${G}14 55%, rgba(0,0,0,.6) 72%)`,
+            animation: klaarGetypt ? 'none' : 'ginoMiniPraat .5s ease-in-out infinite', boxShadow: `0 0 10px ${G}88` }} />
+          <div style={{ position: 'absolute', inset: -5, borderRadius: '50%', border: `1px dashed ${G}66`,
+            animation: 'ginoMiniDraai 6s linear infinite' }} />
         </div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.4, minHeight: 21, wordBreak: 'break-word' }}>
-          {tekst.slice(0, getypt)}
-          {!klaarGetypt && <span style={{ display: 'inline-block', width: 2, height: '1em', marginLeft: 2, verticalAlign: '-2px',
-            background: G, animation: 'ginoCursor .8s steps(1) infinite' }} />}
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 12, opacity: klaarGetypt ? 1 : 0,
-          animation: klaarGetypt ? 'ginoKnoppen .25s ease-out both' : 'none', pointerEvents: klaarGetypt ? 'auto' : 'none' }}>
-          <button type="button" className="gino-hk" onClick={gedaan} style={knop(true)}>
-            <Check size={13} /> Gedaan
-          </button>
-          <button type="button" className="gino-hk" onClick={() => later(3600e3)} style={knop(false)}>
-            <Clock size={12} /> 1 uur
-          </button>
-          <button type="button" className="gino-hk" onClick={() => later(null)} style={knop(false)}>
-            Morgen
-          </button>
+        <div style={{ paddingTop: 2, minWidth: 0 }}>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc`, marginBottom: 4,
+            animation: 'ginoKnoppen .3s ease-out .6s both' }}>
+            GINO · {nlTijd(huidig.moment).toUpperCase()}{open.length > 1 ? ` · ${open.length}` : ''}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', lineHeight: 1.4, minHeight: 22, wordBreak: 'break-word',
+            textShadow: '0 1px 12px rgba(0,0,0,.9)' }}>
+            {tekst.slice(0, getypt)}
+            {!klaarGetypt && <span style={{ display: 'inline-block', width: 2, height: '1em', marginLeft: 2, verticalAlign: '-2px',
+              background: G, animation: 'ginoCursor .8s steps(1) infinite' }} />}
+          </div>
+          <div style={{ display: 'flex', gap: 16, marginTop: 8, opacity: klaarGetypt ? 1 : 0,
+            animation: klaarGetypt ? 'ginoKnoppen .25s ease-out both' : 'none', pointerEvents: klaarGetypt ? 'auto' : 'none' }}>
+            <button type="button" className="gino-hk" onClick={gedaan} style={{ ...knop, color: G, opacity: 1 }}>
+              <Check size={13} /> Gedaan
+            </button>
+            <button type="button" className="gino-hk" onClick={() => later(3600e3)} style={knop}>
+              <Clock size={12} /> 1 uur
+            </button>
+            <button type="button" className="gino-hk" onClick={() => later(null)} style={knop}>
+              Morgen
+            </button>
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-const knop = (hoofd) => ({
-  flex: hoofd ? 1.3 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-  minHeight: 32, padding: '0 10px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap',
-  fontSize: 12, fontWeight: 800, letterSpacing: '.04em', fontFamily: 'inherit', transition: 'background .15s, border-color .15s',
-  border: `1px solid ${hoofd ? colors.success + 'aa' : 'rgba(255,255,255,.14)'}`,
-  background: hoofd ? colors.success + '1a' : 'transparent',
-  color: hoofd ? colors.success : 'rgba(255,255,255,.8)',
-})
+const MINI = 26
+
+const knop = {
+  display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 0', border: 'none', background: 'none',
+  cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 800, letterSpacing: '.06em',
+  fontFamily: 'inherit', color: '#fff',
+}
