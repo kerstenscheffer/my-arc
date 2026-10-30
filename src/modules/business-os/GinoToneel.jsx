@@ -27,7 +27,7 @@ import {
   Image, PenLine, FileText, ListChecks, CheckCircle2, Circle, AlertTriangle, Target, TrendingUp,
   TrendingDown, Rocket, Flame, Zap, Lightbulb, Users, User, MessageCircle, Phone, Mail, Megaphone,
   Eye, Heart, Star, Trophy, BarChart3, LineChart, PieChart, Euro, Wallet, Repeat, ArrowRight,
-  Layers, Inbox, Send, Hourglass, Coffee, Dumbbell, Brain, Search, X,
+  Layers, Inbox, Send, Hourglass, Coffee, Dumbbell, Brain, Search, X, ThumbsUp, ThumbsDown,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { colors } from '../../ui/tokens'
@@ -171,15 +171,30 @@ function Vak({ html, maxHoogte }) {
 }
 
 // breedte = ruimte die de middengroep inneemt (px); de kolommen vullen wat over is.
-export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSluit }) {
+// onOordeel('goed' | 'slecht'): duimpje bij het beeld (Gino leert ervan).
+export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSluit, onOordeel }) {
+  const [oordeel, setOordeel] = useState(null)
+  useEffect(() => { setOordeel(null) }, [ruw])
   const visueel = schoonVisueel(ruw)
   if (!visueel) return null
   const { titel, blokken = [], advies, vrij } = visueel
+  const knopStijl = {
+    width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'transparent', color: colors.textSecondary,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0,
+  }
+  const duim = (waarde, Icoon, titel) => onOordeel && (
+    <button type="button" title={titel} disabled={!!oordeel} onClick={() => { setOordeel(waarde); onOordeel(waarde) }} style={{
+      ...knopStijl, cursor: oordeel ? 'default' : 'pointer',
+      color: oordeel === waarde ? (waarde === 'goed' ? colors.success : colors.danger) : colors.textSecondary,
+      opacity: oordeel && oordeel !== waarde ? 0.3 : 1,
+    }}><Icoon size={14} strokeWidth={2.4} /></button>
+  )
   const sluit = (
-    <button type="button" onClick={onSluit} title="Weghalen" style={{
-      width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'transparent', color: colors.textSecondary,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
-    }}><X size={16} strokeWidth={2.4} /></button>
+    <span style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+      {duim('goed', ThumbsUp, 'Goed beeld (Gino onthoudt het)')}
+      {duim('slecht', ThumbsDown, 'Niet goed (Gino onthoudt het)')}
+      <button type="button" onClick={onSluit} title="Weghalen" style={knopStijl}><X size={16} strokeWidth={2.4} /></button>
+    </span>
   )
   const kop = titel && (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, animation: 'gt-in 0.4s both' }}>

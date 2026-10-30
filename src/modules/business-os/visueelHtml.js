@@ -59,7 +59,7 @@ const BASIS_CSS = `
 html, body { margin:0; padding:0; background:transparent; color:var(--wit); overflow:hidden;
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight:600; -webkit-font-smoothing:antialiased; }
 body { padding: 2px; }
-svg.lucide { width:1em; height:1em; stroke-width:2.2; vertical-align:-0.125em; }
+svg.lucide { width:var(--icoon, 1.25em); height:var(--icoon, 1.25em); stroke-width:2.2; vertical-align:-0.2em; flex-shrink:0; }
 @keyframes gt-in { from { opacity:0; transform:translateY(10px) scale(.97) } to { opacity:1; transform:none } }
 @keyframes gt-zweef { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-5px) } }
 @keyframes gt-puls { 0%,100% { transform:scale(1); opacity:1 } 50% { transform:scale(1.12); opacity:.75 } }

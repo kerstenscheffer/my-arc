@@ -420,7 +420,10 @@ const GROEI_VRAAG = `Groeironde (automatisch, Kersten kijkt later naar je versla
    en je vorige groeirondes (soort = 'groei', laatste 5) zodat je niet hetzelfde voorstelt.
 2. Werk zelf, zonder te vragen, maximaal 3 skills bij of maak ze aan (skill-bewaar) waar je herhaling, correcties of voorkeuren van Kersten ziet. Bij bijwerken: de volledige skill onder dezelfde naam.
 3. Stel maximaal 2 app-verbeteringen voor die hem nu het meest helpen richting zijn doel. Denk aan: zijn agenda helder maken, content vooruit plannen en overzichtelijk houden, taken organiseren en inplannen. Kijk eerst in de code of iets al bestaat (Productivity-tab, Output-planning, Business OS). Elk voorstel is een pa_voorstel met een volledige, zelfstandige opdracht die in één code-opdracht past en alleen toevoegt (niets weghalen of hernoemen in de database).
-4. Je verslag (tekst): max 8 regels met pijltjes. Wat je leerde of bijwerkte en waarom deze voorstellen. Geen inleiding.`
+4. Duimpjes van Kersten (afgelopen 24 uur): node scripts/pa-db.mjs lees "select soort, oordeel, left(vraag, 300) as vraag, left(inhoud, 500) as inhoud, visueel, created_at from business_os_feedback where created_at > now() - interval '24 hours' order by created_at"
+   → goed bij een beeld: zet het kort onder "Bewezen beelden" in de skill Visueel uitleggen (welk soort beeld, opbouw, waarom het werkte; geen hele HTML). goed bij een antwoord: wat werkte vastleggen in de skill die erbij hoort. slecht: zoek uit wat er mis was en pas de skill aan zodat het niet weer gebeurt. Dit telt mee in je max 3 skills, maar duimpjes gaan voor.
+5. Ochtendbeeld: maak een actie "visueel" in de VRIJE vorm (links/rechts HTML, skill Visueel uitleggen) die Kersten ziet als hij Business OS opent. Haal de cijfers met node scripts/pa-db.mjs lees "select business_os_vergelijk() as v" (deze maand vs vorige maand t/m dezelfde dag) en laat zien: hoe de maand loopt (omzet, sales, calls gehouden, leads, reels) met het verschil, wat er vandaag/deze week aandacht nodig heeft, en onderaan één advies ("Ik zou dit doen"). Zet deze actie als eerste in je actieblok.
+6. Je verslag (tekst): max 8 regels met pijltjes. Wat je leerde of bijwerkte (ook van de duimpjes) en waarom deze voorstellen. Geen inleiding.`
 
 async function rondeGroei() {
   const rij = await pak('groei')

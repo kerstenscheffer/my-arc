@@ -41,11 +41,12 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2, Eye } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
 import * as stem from './stem'
+import { bewaarOordeel } from './feedback'
 import { useNieuweVersie } from './useNieuweVersie'
 
 const KEY = 'business_os_chat'
@@ -106,6 +107,13 @@ async function vraagViaMac(berichten, context, opDeel, extra = {}) {
   } finally { supabase.removeChannel(kanaal) }
 }
 const Spraak = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
+// Gesproken stuk achter de tekst plakken: één spatie ertussen, geen dubbele, geen spatie vooraan.
+const plakSpraak = (basis, stuk) => {
+  const s = (stuk || '').replace(/\s+/g, ' ').trim()
+  if (!s) return basis
+  if (!basis.trim()) return s
+  return /\s$/.test(basis) ? basis + s : basis + ' ' + s
+}
 
 // Het oude ene gesprek (vóór de tabjes): wordt bij de eerste keer het tabje 'Code'.
 const leesGesprek = () => {
@@ -158,6 +166,28 @@ function Kopieer({ tekst }) {
     >
       {klaar ? <Check size={13} color={colors.success} /> : <Copy size={13} />}
     </button>
+  )
+}
+
+// Duimpjes (30 okt): oordeel over een antwoord of beeld → business_os_feedback.
+// De groeironde leest ze 's nachts en werkt de skills bij (bewezen beelden,
+// wat Kersten niet wil). Het oordeel staat ook op het bericht zelf (b.oordeel).
+function Duimpjes({ oordeel, onOordeel }) {
+  const knop = (waarde, Icoon, titel) => (
+    <button type="button" onClick={() => onOordeel(waarde)} title={titel} disabled={!!oordeel}
+      style={{
+        background: 'none', border: 'none', padding: 2, display: 'flex', cursor: oordeel ? 'default' : 'pointer',
+        color: oordeel === waarde ? (waarde === 'goed' ? colors.success : colors.danger) : colors.textSecondary,
+        opacity: oordeel && oordeel !== waarde ? 0.3 : 1,
+      }}>
+      <Icoon size={13} strokeWidth={2.4} />
+    </button>
+  )
+  return (
+    <>
+      {knop('goed', ThumbsUp, 'Goed antwoord (Gino leert ervan)')}
+      {knop('slecht', ThumbsDown, 'Niet goed (Gino leert ervan)')}
+    </>
   )
 }
 
@@ -1019,6 +1049,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
         const doel = gs.find(g => g.naam === 'Strategie') || gs[1] || gs[0]
         const wanneer = new Date(r.klaar_at).toLocaleString('nl-NL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
         zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `Groeironde (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [], op: new Date(r.klaar_at).getTime() || Date.now() }])
+        // Ochtendbeeld meteen rond de bol.
+        const beeld = (r.antwoord.acties || []).find(a => a?.soort === 'visueel')
+        if (beeld) onVisueel?.(beeld)
         markeer(doel.id)
       }
     }
@@ -1038,6 +1071,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
   const lijst = useRef(null)
   const veld = useRef(null)
   const herkenner = useRef(null)
+  const spraakBasis = useRef('') // vaste tekst: wat er stond + finale spraak
+  const spraakVerwerkt = useRef(0) // aantal finale resultaten dat al in spraakBasis zit
+  const herstartTimer = useRef(null)
   const kiezer = useRef(null)
   const balk = useRef(null)
 
@@ -1060,7 +1096,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
     return () => window.removeEventListener('resize', meet)
   }, [open])
 
-  useEffect(() => () => herkenner.current?.abort(), [])
+  useEffect(() => () => { clearTimeout(herstartTimer.current); herkenner.current?.abort() }, [])
   // Stem stopt bij weggaan: tab dicht/verborgen of component weg.
   useEffect(() => {
     const zicht = () => { if (document.hidden) stem.stop() }
@@ -1250,45 +1286,93 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
     return () => clearInterval(t)
   }, [ietsLoopt])
 
-  const microfoon = () => {
-    if (luistert) { herkenner.current?.stop(); return }
-    stem.stop()
+  // Eén herkenner-sessie met `basis` als vaste tekst. Finale spraak gaat vast in
+  // spraakBasis; alleen het tussentijdse deel staat als losse staart in het veld.
+  const startHerkenner = (basis) => {
     const h = new Spraak()
     h.lang = 'nl-NL'
     h.continuous = true
     h.interimResults = true
-    // Wat er al stond blijft staan; het gesprokene (ook tussentijds) komt erachter.
-    const basis = invoer.trim() ? invoer.trim() + ' ' : ''
-    // Alleen de actuele herkenner mag het veld vullen: na versturen komt er niets meer terug.
+    h.maxAlternatives = 1
+    spraakBasis.current = basis
+    spraakVerwerkt.current = 0
+    const gestart = Date.now()
+    let fataal = false
+    // Alleen de actuele herkenner mag het veld vullen: na versturen of bewerken komt er niets meer terug.
     h.onresult = (e) => {
       if (herkenner.current !== h) return
-      const tekst = Array.from(e.results).map(r => r[0].transcript).join('')
-      setInvoer(basis + tekst)
+      let staart = ''
+      for (let i = Math.max(e.resultIndex, spraakVerwerkt.current); i < e.results.length; i++) {
+        const r = e.results[i]
+        if (r.isFinal && i === spraakVerwerkt.current) {
+          spraakBasis.current = plakSpraak(spraakBasis.current, r[0].transcript)
+          spraakVerwerkt.current = i + 1
+        } else staart = plakSpraak(staart, r[0].transcript)
+      }
+      setInvoer(plakSpraak(spraakBasis.current, staart))
     }
-    h.onerror = (e) => { if (e.error !== 'aborted' && e.error !== 'no-speech') setFout('Microfoon werkt niet: ' + e.error) }
+    h.onerror = (e) => {
+      if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(e.error)) fataal = true
+      if (e.error !== 'aborted' && e.error !== 'no-speech') setFout('Microfoon werkt niet: ' + e.error)
+    }
     h.onend = () => {
       if (herkenner.current !== h) return
       herkenner.current = null
+      // Chrome/Safari kappen een sessie af na stilte: zolang de mic aan staat, gewoon doorgaan.
+      if (luistertRef.current && !fataal && Date.now() - gestart > 1000 && startHerkenner(spraakBasis.current)) return
+      luistertRef.current = false
       setLuistert(false)
       veld.current?.focus()
     }
     herkenner.current = h
+    try { h.start() } catch { herkenner.current = null; return false }
+    return true
+  }
+  const microfoon = () => {
+    if (luistert) {
+      // Zelf gestopt: geen herstart meer, laatste finale woorden mogen nog binnenkomen.
+      luistertRef.current = false
+      clearTimeout(herstartTimer.current)
+      if (herkenner.current) herkenner.current.stop()
+      else setLuistert(false)
+      return
+    }
+    stem.stop()
     setFout(null)
-    h.start()
+    // Wat er al stond blijft staan; het gesprokene komt erachter.
+    if (!startHerkenner(invoer)) return
     luistertRef.current = true
     setLuistert(true)
   }
-  // Versturen: herkenning hard afbreken en loskoppelen, zodat late (interim/final)
-  // resultaten de verstuurde tekst niet terugzetten.
-  const stopHerkenner = () => {
+  const koppelLos = () => {
     const h = herkenner.current
     herkenner.current = null
     if (h) {
       h.onresult = h.onerror = h.onend = null
       try { h.abort() } catch { /* al gestopt */ }
     }
+  }
+  // Versturen: herkenning hard afbreken en loskoppelen, zodat late (interim/final)
+  // resultaten de verstuurde tekst niet terugzetten.
+  const stopHerkenner = () => {
+    clearTimeout(herstartTimer.current)
+    koppelLos()
     luistertRef.current = false
     setLuistert(false)
+  }
+  // Handmatig bewerken wint: tijdens typen, verwijderen of selecteren staat de
+  // herkenner even uit; na een korte rust start hij schoon met wat er nu in het veld staat.
+  const bewerktTijdensLuisteren = () => {
+    if (!luistertRef.current) return
+    koppelLos()
+    clearTimeout(herstartTimer.current)
+    const herstart = () => {
+      if (!luistertRef.current || herkenner.current) return
+      const el = veld.current
+      if (el && el.selectionStart !== el.selectionEnd) { herstartTimer.current = setTimeout(herstart, 800); return }
+      if (!startHerkenner(el ? el.value : spraakBasis.current)) { luistertRef.current = false; setLuistert(false) }
+    }
+    herstartTimer.current = setTimeout(herstart, 1200)
   }
 
   // Invoerveld groeit mee tot ~6 regels en volgt tijdens inspreken de laatste woorden.
@@ -1623,7 +1707,16 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
                   })}
                   <Inkort tekst={b.content} achter={laatsteGino ? herhaalKnop(spraakVan(b).tekst, spraakVan(b).vraag) : null} />
                 </div>
-                <Kopieer tekst={b.content} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Kopieer tekst={b.content} />
+                  <Duimpjes oordeel={b.oordeel} onOordeel={(oordeel) => {
+                    const id = actief.id
+                    const vraag = alle.slice(0, i).reverse().find(n => n.role === 'user')?.content
+                    zetBerichten(id, g => g.map((n, k) => (k === i ? { ...n, oordeel } : n)))
+                    bewaarOordeel({ soort: 'antwoord', oordeel, vraag, inhoud: b.content, visueel: (b.acties || []).find(a => a?.soort === 'visueel') })
+                      .then(ok => meld(ok ? (oordeel === 'goed' ? 'Onthouden: dit werkt' : 'Onthouden: dit niet') : 'Opslaan mislukt', !ok))
+                  }} />
+                </div>
               </div>
             )
             })}
@@ -1789,8 +1882,13 @@ export default function BusinessChat({ context, onBezig, onVisueel, marginTop = 
               <textarea
                 ref={veld}
                 value={invoer}
-                onChange={e => { stem.stop(); setInvoer(e.target.value) }}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); stuur() } }}
+                onChange={e => { stem.stop(); setInvoer(e.target.value); bewerktTijdensLuisteren() }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); stuur(); return }
+                  bewerktTijdensLuisteren()
+                }}
+                onBeforeInput={bewerktTijdensLuisteren}
+                onSelect={e => { if (e.target.selectionStart !== e.target.selectionEnd) bewerktTijdensLuisteren() }}
                 onPaste={plak}
                 placeholder={luistert ? 'Luistert… praat maar' : isEditor(actief) ? 'Opdracht voor ChatGPT (editor)' : 'Geef een taak of plak een screenshot'}
                 rows={1}

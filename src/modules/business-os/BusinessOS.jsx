@@ -28,6 +28,7 @@ import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import BusinessChat from './BusinessChat'
 import GinoToneel from './GinoToneel'
+import { bewaarOordeel } from './feedback'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
 
@@ -930,7 +931,8 @@ export default function BusinessOS({ isMobile }) {
       </div>
 
       {/* ── Gino laat iets zien: blokken naast de groep (smal scherm: strook bovenaan) ── */}
-      <GinoToneel visueel={visueel} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)} />
+      <GinoToneel visueel={visueel} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
+        onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />
 
       {blad && (
         <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} onSluit={sluitBlad}>

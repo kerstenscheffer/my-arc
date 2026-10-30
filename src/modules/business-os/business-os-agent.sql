@@ -88,3 +88,83 @@ alter publication supabase_realtime add table public.business_os_opdrachten;
 alter table public.business_os_opdrachten drop constraint business_os_opdrachten_soort_check;
 alter table public.business_os_opdrachten add constraint business_os_opdrachten_soort_check check (soort = any (array['code','chat','groei']));
 alter table public.business_os_opdrachten add column if not exists gezien_at timestamptz;
+
+-- Cijfers in één vraag (30 okt 2026): business_os_periode(van, tot) = de keten
+-- van get_business_os plus ontvangen omzet (get_payment_schedule, alleen
+-- aangevinkte betalingen), calls op calldatum, gehouden, no-show, voorgesteld,
+-- afgewezen, close rate, gem. orderwaarde en geplande content. Team-breed.
+-- business_os_vergelijk() = deze maand t/m vandaag, vorige maand t/m dezelfde
+-- dag, hele vorige maand, 3 maanden totaal, deze en vorige week. Gino gebruikt
+-- dit (skill Leadsysteem-cijfers) in plaats van 3-5 losse vragen.
+create or replace function public.business_os_periode(p_van date, p_tot date)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v_team uuid[]; v_keten jsonb; v_ontv numeric := 0; v_marcel numeric := 0; v_c record;
+begin
+  if auth.uid() is null then raise exception 'niet ingelogd'; end if;
+  if public.get_my_portal_role() not in ('coach', 'both') then raise exception 'alleen voor coaches'; end if;
+  v_team := team_coach_ids(auth.uid());
+  v_keten := coalesce(get_business_os(p_van, p_tot)->'nu', '{}'::jsonb);
+  select coalesce(sum((e->>'bedrag')::numeric), 0), coalesce(sum((e->>'partner_deel')::numeric), 0)
+    into v_ontv, v_marcel
+    from jsonb_array_elements(coalesce(get_payment_schedule(null, p_van, p_tot), '[]'::jsonb)) e
+   where (e->>'datum')::date >= p_van and (e->>'datum')::date < p_tot;
+  select
+    count(distinct lead_id) filter (where lower(to_section_title) like '%sales call%' and call_date >= p_van and call_date < p_tot) as op_datum,
+    count(distinct lead_id) filter (where lower(to_section_title) like '%sales call%' and call_date >= p_van and call_date < p_tot and call_happened) as gehouden,
+    count(*) filter (where to_section_title = 'No Show' and moved_at >= p_van and moved_at < p_tot) as no_show,
+    count(*) filter (where to_section_title ilike 'Call voorgesteld%' and moved_at >= p_van and moved_at < p_tot) as voorgesteld,
+    count(*) filter (where to_section_title = 'Call afgewezen' and moved_at >= p_van and moved_at < p_tot) as afgewezen
+    into v_c
+    from lead_movements
+   where reverted_at is null and coach_id = any(v_team)
+     and (call_date >= p_van - 31 or moved_at >= p_van - 31);
+  return v_keten || jsonb_build_object(
+    'van', p_van, 'tot', p_tot,
+    'ontvangen', round(v_ontv), 'marcel_deel', round(v_marcel),
+    'calls_op_datum', v_c.op_datum, 'calls_gehouden', v_c.gehouden, 'no_show', v_c.no_show,
+    'call_voorgesteld', v_c.voorgesteld, 'call_afgewezen', v_c.afgewezen,
+    'close_rate_pct', case when v_c.gehouden > 0 then round(100.0 * (v_keten->>'sales')::numeric / v_c.gehouden) end,
+    'gem_orderwaarde', case when (v_keten->>'sales')::numeric > 0 then round((v_keten->>'omzet')::numeric / (v_keten->>'sales')::numeric) end,
+    'content_gepland', (select count(*) from content_items where coach_id = any(v_team) and planned_date >= p_van and planned_date < p_tot and coalesce(is_template, false) = false and title not like '\_\_test%')
+  );
+end $$;
+revoke all on function public.business_os_periode(date, date) from public, anon;
+grant execute on function public.business_os_periode(date, date) to authenticated;
+
+create or replace function public.business_os_vergelijk()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v_vandaag date := (now() at time zone 'Europe/Amsterdam')::date;
+  v_m0 date := date_trunc('month', v_vandaag)::date;
+  v_m1 date := (date_trunc('month', v_vandaag) - interval '1 month')::date;
+  v_m3 date := (date_trunc('month', v_vandaag) - interval '3 months')::date;
+  v_w0 date := date_trunc('week', v_vandaag)::date;
+  v_dag int := v_vandaag - date_trunc('month', v_vandaag)::date + 1;
+begin
+  return jsonb_build_object(
+    'vandaag', v_vandaag,
+    'deze_maand', business_os_periode(v_m0, v_vandaag + 1),
+    'vorige_maand_zelfde_dagen', business_os_periode(v_m1, least(v_m1 + v_dag, v_m0)),
+    'vorige_maand', business_os_periode(v_m1, v_m0),
+    'drie_maanden_totaal', business_os_periode(v_m3, v_m0),
+    'deze_week', business_os_periode(v_w0, v_vandaag + 1),
+    'vorige_week', business_os_periode(v_w0 - 7, v_w0)
+  );
+end $$;
+revoke all on function public.business_os_vergelijk() from public, anon;
+grant execute on function public.business_os_vergelijk() to authenticated;
+
+-- Duimpjes (30 okt 2026): Kerstens oordeel op antwoorden en beelden; de
+-- groeironde leest de laatste 24 uur en werkt de skills bij.
+create table if not exists public.business_os_feedback (
+  id uuid primary key default gen_random_uuid(),
+  coach_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  soort text not null check (soort in ('antwoord', 'visueel')),
+  oordeel text not null check (oordeel in ('goed', 'slecht')),
+  vraag text, inhoud text, visueel jsonb,
+  created_at timestamptz not null default now()
+);
+alter table public.business_os_feedback enable row level security;
+create policy coach_eigen_feedback on public.business_os_feedback for all to authenticated
+  using (coach_id = auth.uid()) with check (coach_id = auth.uid());
