@@ -121,7 +121,9 @@ const eigenPortie = (item) => {
   if (!eh || eh === 'gram' || gram <= 1) return null
   const labels = Array.isArray(item?.labels) ? item.labels : []
   const gerecht = labels.includes('gerecht')
-  return { enkel: gerecht ? 'portie' : eh, grams: gram, altijd: gerecht || labels.includes('keten') }
+  // Merkproduct (barcode): het gewicht van dát product wint van de preset op
+  // naam; een Jumbo-croissant is kleiner dan een van AH. Presets blijven erbij.
+  return { enkel: gerecht ? 'portie' : eh, grams: gram, altijd: gerecht || labels.includes('keten'), merk: !!item?.barcode }
 }
 
 const buildGramOptions = (naam = '', eigen = null, bereiding = null) => {
@@ -136,7 +138,7 @@ const buildGramOptions = (naam = '', eigen = null, bereiding = null) => {
   // Eigen eenheid alleen als die iets toevoegt: bij een gerecht of keten
   // (presets op naam raden daar mis, "1 broodje" van 60 g bij een broodje
   // gezond), of als er geen preset is. "1 ei" blijft "1 ei", geen "1 stuk".
-  if (eigen && (eigen.altijd || natuurlijk.length === 0)) {
+  if (eigen && (eigen.altijd || eigen.merk || natuurlijk.length === 0)) {
     // Gerecht of keten: alleen de eigen portie; "pasta bolognese" is geen
     // "portie (droog)" pasta en een latte grande geen espresso.
     natuurlijk = eigen.altijd ? [] : natuurlijk.filter(p => p.grams !== eigen.grams)

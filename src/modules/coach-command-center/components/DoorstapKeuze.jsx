@@ -16,33 +16,7 @@ import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { Flag, Check } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
-
-export const DOORSTAP_OPTIES = [
-  { id: null, label: 'Leeg', kort: 'Doorstap', kleur: 'rgba(255,255,255,0.45)' },
-  { id: 'ja_mondeling', label: 'Ja, mondeling', kort: 'Ja', kleur: '#10b981' },
-  { id: 'denkt_na', label: 'Denkt na', kort: 'Denkt na', kleur: '#f59e0b' },
-  { id: 'nee', label: 'Nee', kort: 'Nee', kleur: '#ef4444' },
-  { id: 'betaald', label: 'Betaald', kort: 'Betaald', kleur: '#10b981' },
-]
-const optieVan = (s) => DOORSTAP_OPTIES.find(o => o.id === (s || null)) || DOORSTAP_OPTIES[0]
-
-// Tabel nog niet aangemaakt (42P01 in Postgres, PGRST205 in PostgREST).
-const tabelOntbreekt = (e) => e && (e.code === '42P01' || e.code === 'PGRST205')
-
-// Laatste rij per klant voor een lijst klanten, in één query.
-// Geeft null als de tabel er (nog) niet is.
-export async function laadDoorstap(clientIds) {
-  if (!clientIds?.length) return {}
-  const { data, error } = await supabase.from('client_doorstap')
-    .select('id, client_id, status, pakket, notitie, gezet_at')
-    .in('client_id', clientIds)
-    .order('gezet_at', { ascending: false })
-    .then(r => r, e => ({ data: null, error: e }))
-  if (error) return null
-  const m = {}
-  ;(data || []).forEach(r => { if (!(r.client_id in m)) m[r.client_id] = r })
-  return m
-}
+import { DOORSTAP_OPTIES, optieVan, tabelOntbreekt, laadDoorstap } from './doorstap'
 
 // waarde: laatste rij (of null = geen status). undefined + zelfLaden = haal zelf op.
 export default function DoorstapKeuze({ client, coachId, waarde, zelfLaden = false, onGewijzigd, onBetaald, groot = false }) {

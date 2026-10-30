@@ -9,7 +9,7 @@ import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
 import CoachVideoFeedback, { KlantVideos } from '../video-feedback/CoachVideoFeedback'
 import AddClientModal from './components/AddClientModal'
-import { laadDoorstap } from './components/DoorstapKeuze'
+import { laadDoorstap } from './components/doorstap'
 import { naloopGrens } from '../challenge-monitor/challengeEisen'
 import { PRIVE, zetPrivacy, herstelPrivacy } from './utils/privacyModus'
 

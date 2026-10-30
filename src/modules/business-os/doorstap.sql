@@ -169,14 +169,14 @@ end $function$;
 
 -- 3. Eerste statussen uit de week-5 calls (coach Kersten). Eenmalig: slaat
 --    over als de klant al een rij heeft.
-insert into public.client_doorstap (client_id, coach_id, status, notitie, gezet_door)
-select v.id::uuid, '5a0135ac-3188-499d-8682-ed6a179e5541', v.s,
+insert into public.client_doorstap (client_id, coach_id, status, pakket, notitie, gezet_door)
+select v.id::uuid, '5a0135ac-3188-499d-8682-ed6a179e5541', v.s, v.pakket,
        'mondeling in week-5 call, 30 okt opgegeven', '5a0135ac-3188-499d-8682-ed6a179e5541'
 from (values
-  ('1410ee3e-3a09-43b6-8f4f-a75b554a1594', 'ja_mondeling'),  -- Mark Behr
-  ('11792c0a-e179-4a3d-a895-6cb83c5bd4e1', 'ja_mondeling'),  -- Martijn Kroes
-  ('936f7b51-1867-4ddd-8045-c289f32f0b70', 'ja_mondeling'),  -- Jacco Aalbregt
-  ('a3ac491f-0893-4f19-8ce3-4081bc37d76c', 'ja_mondeling'),  -- Ronald Vervoort
-  ('c3208491-9d3b-4ef2-b0bc-061d59deb34a', 'denkt_na')       -- Joris Harteel
-) v(id, s)
+  ('1410ee3e-3a09-43b6-8f4f-a75b554a1594', 'ja_mondeling', '3 mnd, 450 min borg = 3x50'),  -- Mark Behr
+  ('11792c0a-e179-4a3d-a895-6cb83c5bd4e1', 'ja_mondeling', '3 mnd, 450 min borg = 3x50'),  -- Martijn Kroes
+  ('936f7b51-1867-4ddd-8045-c289f32f0b70', 'ja_mondeling', '3 mnd, 450 min borg = 3x50'),  -- Jacco Aalbregt
+  ('a3ac491f-0893-4f19-8ce3-4081bc37d76c', 'ja_mondeling', '3 mnd, 450 min borg = 3x50'),  -- Ronald Vervoort
+  ('c3208491-9d3b-4ef2-b0bc-061d59deb34a', 'denkt_na', null)                               -- Joris Harteel
+) v(id, s, pakket)
 where not exists (select 1 from public.client_doorstap d where d.client_id = v.id::uuid);

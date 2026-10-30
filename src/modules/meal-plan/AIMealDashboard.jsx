@@ -158,6 +158,7 @@ export default function AIMealDashboard({ client, onNavigate, db, alleenKijken =
     try {
       const { error } = await db.supabase.from('clients').update({ meal_plan_visible: next }).eq('id', client.id)
       if (error) throw error
+      window.dispatchEvent(new CustomEvent('myarc:client-update', { detail: { meal_plan_visible: next } }))
     } catch (e) {
       console.error('meal_plan_visible update failed:', e)
       setMealPlanVisible(!next) // rollback

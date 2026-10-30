@@ -345,6 +345,14 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
     setClient(prev => ({ ...prev, ...updatedClient }))
   }
 
+  // Losse schakelaars (oogje op Home en Meal) melden hun wijziging hier, zodat
+  // de andere pagina meteen dezelfde stand toont.
+  useEffect(() => {
+    const op = (e) => { if (e.detail) setClient(prev => (prev ? { ...prev, ...e.detail } : prev)) }
+    window.addEventListener('myarc:client-update', op)
+    return () => window.removeEventListener('myarc:client-update', op)
+  }, [])
+
   if (loading) return <LaadScherm />
   if (opSlot && client) return <AccountOpSlot client={client} onLogout={handleLogout} />
 

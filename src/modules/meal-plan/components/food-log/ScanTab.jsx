@@ -2,6 +2,25 @@
 // 🎯 v4.0 - Back button, clean manual entry, name correction
 import React, { useState } from 'react'
 import { Scan, Keyboard, AlertCircle, Check, X, ArrowLeft } from 'lucide-react'
+
+// Gewicht van één stuk of portie uit de etiketdata, zelfde regel als de
+// database (stuk_gewicht/stuk_eenheid): "1 portion (57 g)" -> 57, "4 x 70 g" -> 70.
+// 100 g is meestal "per 100 g" en geen portie.
+const stukGewicht = (serving, quantity) => {
+  const g = parseFloat(String(serving || '').match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|gram|ml)\b/i)?.[1]?.replace(',', '.'))
+  if (g >= 5 && g <= 400 && g !== 100) return Math.round(g)
+  const q = parseFloat(String(quantity || '').match(/\d+\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(?:g|gr|ml)\b/i)?.[1]?.replace(',', '.'))
+  return q >= 5 && q <= 400 ? Math.round(q) : null
+}
+const stukEenheid = (naam) => {
+  const n = String(naam || '').toLowerCase()
+  if (/(reepjes|ontbijtkoek|kruidkoek|koeken\b)/.test(n)) return 'portie'
+  return /(broodj|croissant|koek|reep|repen|bolletj|krentenbol|wrap|pita|muffin|donut|bagel|wafel|saucijs|worstenbr|pistolet|kaiser|beschuit|rijstwafel|bonbon|bar\b|ijsje|tompouce|gevulde)/.test(n) ? 'stuk' : 'portie'
+}
+const portieVan = (rij) => {
+  const gram = Number(rij?.gram_per_eenheid) || stukGewicht(rij?.serving_description ?? rij?.serving_size, rij?.quantity)
+  return gram ? { eenheid: rij?.eenheid && rij.eenheid !== 'gram' ? rij.eenheid : stukEenheid(rij?.name), gramPerEenheid: gram } : {}
+}
 import BarcodeScanner from '../../../client-meal-builder/components/BarcodeScanner'
 
 export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
@@ -35,10 +54,14 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
       console.log('🔍 Looking up barcode:', barcode)
 
       // 1. Check internal DB first
-      const { data: existing } = await db.supabase
-        .from('ai_ingredients')
-        .select('*')
-        .eq('barcode', barcode)
+      // Weegbarcode (EAN-13 die met 2 begint, bv. kaas van de afdeling): daar
+      // zitten gewicht of prijs in, dus elk stuk heeft een andere code. Alleen
+      // het artikeldeel (eerste 7 cijfers) is vast; daarop zoeken.
+      const weeg = /^2\d{12}$/.test(barcode)
+      let zoek = db.supabase.from('ai_ingredients').select('*')
+      zoek = weeg ? zoek.like('barcode', `${barcode.slice(0, 7)}%`) : zoek.eq('barcode', barcode)
+      const { data: existing } = await zoek
+        .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
@@ -57,6 +80,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
           fiber: existing.fiber_per_100g || 0, sugar: existing.sugar_per_100g || 0,
           saturated_fat: existing.saturated_fat_per_100g || 0, sodium: existing.sodium_per_100g || 0,
           defaultPortion: existing.default_portion_gram || 100, image_url: existing.image_url,
+          barcode, ...portieVan(existing),
           type: 'ingredient', source: 'barcode', per100g: true
         })
         return
@@ -199,7 +223,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
       id: product._existingId || barcode, name: product.name, brand: product.brands,
       calories: product.calories_per_100g || 0, protein: product.protein_per_100g || 0,
       carbs: product.carbs_per_100g || 0, fat: product.fat_per_100g || 0,
-      image_url: product.image_url, barcode: barcode || product.barcode,
+      image_url: product.image_url, barcode: barcode || product.barcode, ...portieVan(product),
       // Gescand, ook als het product al in de database stond: de coach wil
       // zien dat de klant de scanner gebruikte (logBron.js).
       type: 'product', source: 'barcode', per100g: true
@@ -217,6 +241,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
         calories: corrected.calories_per_100g || 0, protein: corrected.protein_per_100g || 0,
         carbs: corrected.carbs_per_100g || 0, fat: corrected.fat_per_100g || 0,
         defaultPortion: corrected.default_portion_gram || 100, image_url: corrected.image_url,
+        barcode: corrected.barcode || null, ...portieVan(corrected),
         type: 'ingredient', source: 'barcode', per100g: true
       })
     } else {

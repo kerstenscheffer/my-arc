@@ -10,7 +10,7 @@ const MEERVOUD = {
   stuk: 'stuks', plakje: 'plakjes', plak: 'plakken', snee: 'sneeën',
   eetlepel: 'eetlepels', theelepel: 'theelepels', schep: 'scheppen',
   hand: 'handen', blik: 'blikken', bol: 'bollen', blokje: 'blokjes',
-  beker: 'bekers', glas: 'glazen', zakje: 'zakjes', reep: 'repen',
+  beker: 'bekers', glas: 'glazen', zakje: 'zakjes', reep: 'repen', portie: 'porties',
 }
 
 // null als er geen bruikbare eenheid is (geen eenheid, of 'gram').

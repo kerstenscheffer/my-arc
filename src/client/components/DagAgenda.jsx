@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from '../paginaPortal'
 import {
   Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, List,
-  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal, Scale,
+  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal, Scale, Eye, EyeOff,
 } from 'lucide-react'
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
@@ -197,9 +197,28 @@ export default function DagAgenda({
     return () => clearInterval(t)
   }, [])
 
+  // Zelfde schakelaar als het oogje op de maaltijdpagina (clients.meal_plan_visible):
+  // uit = de geplande maaltijden weg, wat je zelf logde blijft staan.
+  const [planZichtbaar, setPlanZichtbaar] = useState(client?.meal_plan_visible !== false)
+  useEffect(() => { setPlanZichtbaar(client?.meal_plan_visible !== false) }, [client?.meal_plan_visible])
+  const wisselPlanZichtbaar = async () => {
+    if (!client?.id) return
+    const next = !planZichtbaar
+    setPlanZichtbaar(next)
+    const { error } = await (db?.supabase || db).from('clients').update({ meal_plan_visible: next }).eq('id', client.id)
+      .then(r => r, e => ({ error: e }))
+    if (error) { setPlanZichtbaar(!next); return }
+    window.dispatchEvent(new CustomEvent('myarc:client-update', { detail: { meal_plan_visible: next } }))
+  }
+  const dagBlokken = useMemo(() => {
+    const lijst = data?.blocksByDay?.[dag] || []
+    return planZichtbaar ? lijst : lijst.filter(b => !(b.type === 'meal' && b.source === 'meal_plan'))
+  }, [data, dag, planZichtbaar])
+  const heeftPlanMaaltijden = (data?.blocksByDay?.[dag] || []).some(b => b.type === 'meal' && b.source === 'meal_plan')
+
   const blokken = useMemo(
-    () => verdeelInKolommen((data?.blocksByDay?.[dag] || [])),
-    [data, dag]
+    () => verdeelInKolommen(dagBlokken),
+    [dagBlokken]
   )
   // Voor de lijst: gewoon op tijd, zonder kolomverdeling.
   // Het ochtenddeel van de slaap (00:00 tot opstaan) staat op de opstatijd:
@@ -207,14 +226,14 @@ export default function DagAgenda({
   // 'Wegen', want daar hoort je weging bij.
   const lijstTijd = (b) => (b.type === 'sleep' && b.meta?.wrapHalf === 'early' ? b.end : b.start)
   const lijstBlokken = useMemo(() => {
-    const lijst = [...(data?.blocksByDay?.[dag] || [])]
+    const lijst = [...dagBlokken]
     const ochtend = lijst.find(b => b.type === 'sleep' && (b.meta?.wrapHalf === 'early' || b.start < 12 * 60))
     const opstaan = ochtend ? ochtend.end : 7 * 60
     // Wegen standaard tien minuten na het opstaan (eerst plassen, dan wegen).
     const wegen = Math.min(opstaan + 10, 24 * 60 - 5)
     lijst.push({ id: `weging-${dag}`, day: dag, type: 'weging', label: 'Wegen', start: wegen, end: wegen + 5, meta: { virtueel: true } })
     return lijst.sort((a, b) => (lijstTijd(a) - lijstTijd(b)) || (a.type === 'sleep' ? -1 : b.type === 'sleep' ? 1 : 0) || (a.end - b.end))
-  }, [data, dag])
+  }, [dagBlokken, dag])
 
   // Het venster volgt de dag: begint bij het eerste blok (afgerond naar het
   // hele uur) en eindigt bij het laatste. Een vast raster van 6:00 tot 24:00
@@ -647,6 +666,16 @@ export default function DagAgenda({
         >
           {weergave === 'lijst' ? <CalendarClock size={16} strokeWidth={2.6} /> : <List size={16} strokeWidth={2.6} />}
         </button>
+        {(heeftPlanMaaltijden || !planZichtbaar) && (
+          <button
+            onClick={wisselPlanZichtbaar}
+            title={planZichtbaar ? 'Geplande maaltijden verbergen' : 'Geplande maaltijden tonen'}
+            aria-label={planZichtbaar ? 'Geplande maaltijden verbergen' : 'Geplande maaltijden tonen'}
+            style={{ ...pijlKnop, width: 28, height: 28, color: 'rgba(255,255,255,0.6)' }}
+          >
+            {planZichtbaar ? <Eye size={16} strokeWidth={2.6} /> : <EyeOff size={16} strokeWidth={2.6} />}
+          </button>
+        )}
         <button
           onClick={() => setDagindeling(true)}
           title="Mijn dagindeling"
