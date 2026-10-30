@@ -34,3 +34,4 @@ src_backup_*
 *.bak
 *backup*/
 credits-backfill.log
+hormozi/

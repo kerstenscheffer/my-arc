@@ -36,6 +36,9 @@
 // eronder met elk een Gedaan-knop, plus de ElevenLabs-sleutelactie zolang
 // gino-stem 503 geen_sleutel geeft. Versturen breekt de spraakherkenning af en
 // negeert late resultaten, zodat het veld leeg blijft.
+// Editor (30 okt): vast tabje na Code/Strategie dat via edge function editor-chat
+// met ChatGPT (OpenAI API) praat, alleen tekst (geen Mac-route, geen screenshots).
+// Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2 } from 'lucide-react'
@@ -302,13 +305,24 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const nieuwTabje = (naam, berichten = [], sessie = null) => ({
   id: crypto.randomUUID(), naam, sessie: UUID.test(sessie || '') ? sessie : crypto.randomUUID(), berichten, bijgewerkt: Date.now(),
 })
+// Vast tabje 'Editor' (30 okt): praat via editor-chat met ChatGPT (OpenAI API)
+// als video-editor-assistent. Herkend aan soort of naam (business_os_gesprekken
+// heeft geen soort-kolom). Ontbreekt hij, dan komt hij na Code en Strategie.
+const isEditor = (g) => g?.soort === 'editor' || g?.naam === 'Editor'
+const metEditor = (gs, lokaal = []) => {
+  if (gs.some(isEditor)) return gs.map(g => (isEditor(g) ? { ...g, soort: 'editor' } : g))
+  const t = { ...(lokaal.find(isEditor) || nieuwTabje('Editor')), soort: 'editor' }
+  return [...gs.slice(0, 2), t, ...gs.slice(2)]
+}
+// Code, Strategie en Editor kunnen niet dicht.
+const isVast = (g, i) => i < 2 || isEditor(g)
 const leesGesprekken = () => {
   try {
     const g = JSON.parse(localStorage.getItem(GESPREKKEN_KEY))
-    if (Array.isArray(g) && g.length) return g
+    if (Array.isArray(g) && g.length) return metEditor(g)
   } catch { /* nog niets */ }
   // Eerste keer: het bestaande gesprek (en zijn Slim-sessie) wordt 'Code'.
-  return [nieuwTabje('Code', leesGesprek(), lees('business_os_gesprek_id')), nieuwTabje('Strategie')]
+  return metEditor([nieuwTabje('Code', leesGesprek(), lees('business_os_gesprek_id')), nieuwTabje('Strategie')])
 }
 
 // Voorstel → één korte vraag in spreektaal + samenvatting + volledige tekst.
@@ -586,6 +600,72 @@ function naarBerichten(gesprek) {
     .reverse()
 }
 
+// ── Editor (ChatGPT via edge function editor-chat) ──
+// Alleen tekst: de hele tabje-geschiedenis gaat mee, de function zet de
+// editor-basis (business_os_editor_instellingen) ervoor en houdt de opdracht bij
+// in business_os_editor_opdrachten (bezig → klaar / mislukt). Geeft { tekst } of { fout }.
+const EDITOR_FOUT = {
+  geen_sleutel: 'OpenAI-sleutel ontbreekt: zet OPENAI_API_KEY in Supabase (Edge Functions, Secrets).',
+  sleutel_ongeldig: 'OpenAI weigert de sleutel (401). Controleer OPENAI_API_KEY in Supabase.',
+  alleen_coach: 'Editor is alleen voor coaches.',
+}
+async function vraagEditor(gesprek) {
+  const berichten = gesprek.filter(b => b.content?.trim()).map(({ role, content }) => ({ role, content }))
+  const { data, error } = await supabase.functions.invoke('editor-chat', { body: { berichten } })
+  if (data?.tekst) return { tekst: data.tekst }
+  // Bij een 4xx/5xx zit de body in error.context (een Response).
+  const body = data || await error?.context?.json?.().catch(() => null)
+  const code = body?.fout
+  if (EDITOR_FOUT[code]) return { fout: EDITOR_FOUT[code] }
+  if (code === 'openai') return { fout: `ChatGPT gaf een fout: ${body.detail || body.status || 'onbekend'}` }
+  return { fout: 'ChatGPT gaf geen antwoord, probeer opnieuw.' }
+}
+
+const EDITOR_STATUS = { open: 'Open', bezig: 'Bezig…', klaar: 'Klaar', mislukt: 'Mislukt' }
+const EDITOR_KLEUR = { open: colors.textMuted, bezig: colors.textPrimary, klaar: colors.success, mislukt: colors.danger }
+// Laatste opdrachten met status, bovenaan het venster in Editor. Tabel nog niet
+// aangemaakt (business-os-editor.sql) → niets.
+function EditorOpdrachten({ vers }) {
+  const [rijen, setRijen] = useState([])
+  const [alles, setAlles] = useState(false)
+  useEffect(() => {
+    let weg = false
+    const kijk = () => supabase.from('business_os_editor_opdrachten')
+      .select('id, created_at, opdracht, status').order('created_at', { ascending: false }).limit(10)
+      .then(({ data, error }) => { if (!weg && !error && Array.isArray(data)) setRijen(data) }, () => {})
+    kijk()
+    const t = setInterval(kijk, 5000)
+    return () => { weg = true; clearInterval(t) }
+  }, [vers])
+  if (!rijen.length) return null
+  return (
+    <div style={{ ...TEKST, borderBottom: `1px solid ${colors.borderSubtle}`, paddingBottom: 8, marginBottom: 4 }}>
+      <div style={{ fontWeight: 900, color: colors.textPrimary, marginBottom: 4 }}>Opdrachten</div>
+      {(alles ? rijen : rijen.slice(0, 3)).map(r => (
+        <div key={r.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', minWidth: 0 }}>
+          <span title={r.opdracht} style={{
+            flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: colors.textSecondary, fontWeight: 600,
+          }}>
+            {kort(r.opdracht, 90)}
+          </span>
+          <span className={r.status === 'bezig' ? 'bos-stip' : undefined}
+            style={{ flexShrink: 0, fontWeight: 800, fontSize: '0.72rem', color: EDITOR_KLEUR[r.status] || colors.textMuted }}>
+            {EDITOR_STATUS[r.status] || r.status}
+          </span>
+        </div>
+      ))}
+      {rijen.length > 3 && (
+        <button onClick={() => setAlles(a => !a)} style={{
+          background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer', fontFamily: 'inherit',
+          color: colors.success, fontWeight: 800, fontSize: '0.75rem',
+        }}>
+          {alles ? 'minder' : `alle ${rijen.length}`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 // PA opnieuw inloggen vanuit Business OS. Alleen zichtbaar als de PA op deze
 // Mac draait maar zijn login kwijt is (lokaal loket 127.0.0.1:47615, zie
 // scripts/business-os-pa.mjs). Met je wachtwoord vragen we bij de auth-API
@@ -710,10 +790,10 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     setGesprekken(gs => [...gs, t])
     kiesGesprek(t.id)
   }
-  // Alleen extra tabjes kunnen dicht; Code en Strategie blijven staan.
+  // Alleen extra tabjes kunnen dicht; Code, Strategie en Editor blijven staan.
   const sluitGesprek = (id) => {
     const g = gesprekken.find(x => x.id === id)
-    if (!g || gesprekken.indexOf(g) < 2) return
+    if (!g || isVast(g, gesprekken.indexOf(g))) return
     if (g.berichten.length && !window.confirm(`Gesprek '${g.naam}' sluiten? De berichten verdwijnen.`)) return
     setGesprekken(gs => gs.filter(x => x.id !== id))
     if (actief.id === id) { setActiefId(gesprekken[0].id); schrijf(ACTIEF_KEY, gesprekken[0].id) }
@@ -739,11 +819,11 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
           opgeslagen.current[r.id] = bijgewerkt
           return { id: r.id, naam: r.naam, sessie: r.sessie || r.id, berichten: Array.isArray(r.berichten) ? r.berichten : [], bijgewerkt }
         })
-        if (uitDb.length) setGesprekken(lokaal => [
+        if (uitDb.length) setGesprekken(lokaal => metEditor([
           ...uitDb.map(d => { const l = lokaal.find(x => x.id === d.id); return l && l.bijgewerkt > d.bijgewerkt ? l : d }),
           // Alleen hier bestaande tabjes met berichten (bv. de oude geschiedenis) erachter.
           ...lokaal.filter(l => !uitDb.some(d => d.id === l.id) && l.berichten.length),
-        ])
+        ], lokaal))
         setDbKlaar(true)
       }, () => {})
     return () => { weg = true }
@@ -762,6 +842,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     return () => clearTimeout(t)
   }, [gesprekken, dbKlaar])
   const [fout, setFout] = useState(null)
+  const [editorVers, setEditorVers] = useState(0) // ophogen = opdrachtenlijst Editor opnieuw ophalen
   const [luistert, setLuistert] = useState(false)
   const luistertRef = useRef(false)
   useEffect(() => { luistertRef.current = luistert }, [luistert])
@@ -986,6 +1067,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   const neemBeelden = async (bestanden) => {
     const beelden = Array.from(bestanden || []).filter(b => b?.type?.startsWith('image/'))
     if (!beelden.length) return
+    if (isEditor(actief)) { setFout('Editor (ChatGPT) kan nog geen screenshots, alleen tekst'); return }
     try {
       setFout(null)
       const nieuw = await Promise.all(beelden.map(verklein))
@@ -1117,6 +1199,15 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     setBijlagen([])
     setBezigPer(b => ({ ...b, [id]: true }))
     setFout(null)
+    if (isEditor(actief)) {
+      setEditorVers(v => v + 1) // lijst toont meteen de nieuwe 'bezig'-rij
+      const r = await vraagEditor(nieuw)
+      setBezigPer(b => ({ ...b, [id]: false }))
+      setEditorVers(v => v + 1)
+      if (r.fout) { setFout(r.fout); meld('Mislukt, bekijk resultaat', true); return }
+      antwoord(id, { role: 'assistant', content: r.tekst })
+      return
+    }
     const berichten = naarBerichten(nieuw)
     const metBeeld = berichten.some(b => b.afbeelding)
     const opDeel = (t) => setDeelPer(d => ({ ...d, [id]: t }))
@@ -1188,7 +1279,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   }
   const anderBezig = gesprekken.find(g => g.id !== actief.id && bezigPer[g.id])
   const werk = code === 'bezig' ? (inRij ? `Bezig met code · ${inRij} in de rij` : 'Bezig met code…')
-    : bezig ? (deel ? 'Gino typt…' : 'Gino denkt na…') : spreekt ? 'Gino praat…'
+    : bezig ? (isEditor(actief) ? 'ChatGPT denkt na…' : deel ? 'Gino typt…' : 'Gino denkt na…') : spreekt ? 'Gino praat…'
     : anderBezig ? `Gino denkt na in ${anderBezig.naam}…`
     : code === 'wacht' ? 'Wacht op je Mac…' : null
 
@@ -1208,7 +1299,12 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
             background: '#0a0a0a', border: `1px solid ${colors.borderSubtle}`, borderRadius: 16,
             boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
           }}>
-            {!gesprek.length && <div style={{ ...TEKST, color: colors.textSecondary, fontWeight: 600 }}>Nog geen berichten.</div>}
+            {isEditor(actief) && <EditorOpdrachten vers={editorVers} />}
+            {!gesprek.length && (
+              <div style={{ ...TEKST, color: colors.textSecondary, fontWeight: 600 }}>
+                {isEditor(actief) ? 'Editor praat met ChatGPT: knipplannen, titels, ondertitels, instructies. Alleen tekst, hij kan niet zelf in je editor klikken.' : 'Nog geen berichten.'}
+              </div>
+            )}
             {gesprek.map((b, i, alle) => {
               const laatsteGino = alle.slice(i + 1).every(n => n.role === 'user') && stem.beschikbaar()
               return b.role === 'user' ? (
@@ -1308,7 +1404,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                           background: colors.success, boxShadow: `0 0 6px ${colors.success}`,
                         }} />
                       )}
-                      {aan && gi >= 2 && (
+                      {aan && !isVast(g, gi) && (
                         <span role="button" aria-label={`Sluit ${g.naam}`} title="Gesprek sluiten"
                           onClick={e => { e.stopPropagation(); sluitGesprek(g.id) }}
                           style={{ color: colors.textMuted, fontWeight: 800, marginRight: -2 }}>×</span>
@@ -1407,7 +1503,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 onChange={e => { stem.stop(); setInvoer(e.target.value) }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); stuur() } }}
                 onPaste={plak}
-                placeholder={luistert ? 'Luistert… praat maar' : 'Geef een taak of plak een screenshot'}
+                placeholder={luistert ? 'Luistert… praat maar' : isEditor(actief) ? 'Opdracht voor ChatGPT (editor)' : 'Geef een taak of plak een screenshot'}
                 rows={1}
                 style={{
                   flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', resize: 'none',
@@ -1415,8 +1511,8 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                   minHeight: 36, maxHeight: INVOER_MAX_H, overflowY: 'auto', boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
-              {/* Snel/Slim + nieuw gesprek: klein, rechts in dezelfde balk */}
-              <button onClick={wisselModus}
+              {/* Snel/Slim + nieuw gesprek: klein, rechts in dezelfde balk (Snel/Slim niet in Editor) */}
+              {!isEditor(actief) && <button onClick={wisselModus}
                 title={modus === 'slim'
                   ? (viaMac ? 'Slim: Opus, kent CLAUDE.md en memory, onthoudt dit gesprek. Trager (10-30 s). Klik: Snel' : 'Slim werkt alleen via je Mac; nu gaat het via de API (Snel). Klik: Snel')
                   : 'Snel: kort en vlot. Klik: Slim (Opus, denkt langer na)'}
@@ -1426,7 +1522,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                   color: modus === 'slim' ? (viaMac ? colors.success : colors.textMuted) : colors.textSecondary, fontFamily: 'inherit',
                 }}>
                 {modus === 'slim' ? 'Slim' : 'Snel'}
-              </button>
+              </button>}
               {gesprek.length > 0 && (
                 <button onClick={leegGesprek} title={`Nieuw gesprek in ${actief.naam}`}
                   style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
@@ -1435,10 +1531,12 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
               )}
               <input ref={kiezer} type="file" accept="image/*" multiple hidden
                 onChange={e => { neemBeelden(e.target.files); e.target.value = '' }} />
-              <button onClick={() => kiezer.current?.click()} title="Screenshot meesturen"
-                style={{ ...rondeKnop, background: 'transparent', color: colors.textSecondary }}>
-                <ImagePlus size={18} strokeWidth={2.2} />
-              </button>
+              {!isEditor(actief) && (
+                <button onClick={() => kiezer.current?.click()} title="Screenshot meesturen"
+                  style={{ ...rondeKnop, background: 'transparent', color: colors.textSecondary }}>
+                  <ImagePlus size={18} strokeWidth={2.2} />
+                </button>
+              )}
               {Spraak && (
                 <button
                   onClick={microfoon}

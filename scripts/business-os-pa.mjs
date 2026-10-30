@@ -105,14 +105,24 @@ async function login() {
 const TOEGESTAAN = [
   'Read', 'Glob', 'Grep', 'Edit', 'Write',
   'Bash(npm run build)', 'Bash(npm run lint)', 'Bash(npx eslint *)',
-  'Bash(git status*)', 'Bash(git diff*)', 'Bash(git log*)', 'Bash(git show*)',
+  'Bash(git status*)', 'Bash(git diff*)', 'Bash(git log*)', 'Bash(git show*)', 'Bash(git check-ignore *)',
+  'Bash(ls *)', 'Bash(mdfind *)', 'Bash(mkdir *)', 'Bash(cp *)',
 ]
-const VERBODEN = ['Bash(git commit*)', 'Bash(git push*)', 'Bash(git stash*)', 'Bash(git reset*)', 'Bash(git checkout*)']
+// Eigen mappen op de Mac (boeken, PDF's, exports): alleen lezen. Code-
+// opdrachten mogen eruit kopiëren naar workapp (bv. workapp/hormozi, staat in
+// .gitignore); bewerken of verwijderen in die mappen is verboden.
+const HOME = os.homedir()
+const EIGEN_MAPPEN = ['Downloads', 'Documents', 'Desktop', 'Library/Mobile Documents']
+  .map(m => path.join(HOME, m)).filter(m => fs.existsSync(m))
+const EIGEN_ARGS = EIGEN_MAPPEN.length ? ['--add-dir', ...EIGEN_MAPPEN] : []
+const EIGEN_NIET_BEWERKEN = EIGEN_MAPPEN.flatMap(m => [`Edit(/${m}/**)`, `Write(/${m}/**)`, `NotebookEdit(/${m}/**)`])
+const VERBODEN = ['Bash(git commit*)', 'Bash(git push*)', 'Bash(git stash*)', 'Bash(git reset*)', 'Bash(git checkout*)', 'Bash(rm *)', 'Bash(mv *)', ...EIGEN_NIET_BEWERKEN]
 
 const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat. Voer hem uit in deze repo.
 - Volg CLAUDE.md (lees het eerst) en zijn memory.
 - Niet committen, pushen of stashen: de auto-sync doet dat.
 - Log nooit uit op Kerstens account en maak geen sessies op zijn account (ook niet met de service key om iets te testen): signOut trekt al zijn logins in, ook die van deze PA en zijn browser.
+- Je mag lezen in Kerstens eigen mappen (${EIGEN_MAPPEN.join(', ')}) en daaruit kopiëren naar deze repo (cp; zoeken met mdfind of ls). Pas daar nooit iets aan en verwijder niets. Bestanden van Kersten (boeken, PDF's) zet je in een map die in .gitignore staat, zodat ze niet online komen.
 - Schemawijzigingen in de database kun je hier niet doen; heb je er een nodig, zeg dat in je samenvatting.
 - Klaar = npm run build en eslint op de gewijzigde bestanden zijn groen.
 - Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.`
@@ -183,6 +193,7 @@ async function voerCodeUit(opdracht) {
     '--permission-mode', 'acceptEdits',
     '--allowedTools', TOEGESTAAN.join(','),
     '--disallowedTools', VERBODEN.join(','),
+    ...EIGEN_ARGS,
     '--max-budget-usd', '10',
   ])
   const tekst = r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
@@ -207,7 +218,7 @@ async function maakWarm(slim = null) {
     session = (await sb.auth.refreshSession()).data.session || session
   }
   const basis = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-    '--permission-mode', 'dontAsk', '--disallowedTools', CHAT_VERBODEN.join(',')]
+    '--permission-mode', 'dontAsk', '--disallowedTools', CHAT_VERBODEN.join(','), ...EIGEN_ARGS]
   const args = slim ? [
     ...basis,
     '--append-system-prompt', chatPrompt({ skills: skills || [] }),
