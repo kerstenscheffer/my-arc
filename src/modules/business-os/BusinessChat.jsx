@@ -354,7 +354,7 @@ function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee }) {
   const { bezig, fout } = staat || {}
   const meer = volledig && volledig !== samenvatting
   return (
-    <div role="dialog" aria-label="Toestemming gevraagd" style={{
+    <div role="dialog" aria-label="Gino vraagt toestemming" style={{
       position: 'absolute', left: 0, bottom: '100%', marginBottom: 34, zIndex: 6,
       width: 'min(340px, 100%)', boxSizing: 'border-box', padding: '10px 12px',
       background: '#0a0a0a', border: `1px solid ${colors.success}55`, borderRadius: 14,
@@ -451,7 +451,7 @@ function naarBerichten(gesprek) {
     .reverse()
 }
 
-export default function BusinessChat({ context, onBezig }) {
+export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   const [gesprek, setGesprek] = useState(leesGesprek)
   const [invoer, setInvoer] = useState('')
   const [bijlagen, setBijlagen] = useState([])
@@ -715,11 +715,11 @@ export default function BusinessChat({ context, onBezig }) {
     width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative',
   }
-  const werk = code === 'bezig' ? 'Bezig met code…' : bezig ? 'Denkt na…' : spreekt ? 'Praat…' : code === 'wacht' ? 'Wacht op je Mac…' : null
+  const werk = code === 'bezig' ? 'Bezig met code…' : bezig ? 'Gino denkt na…' : spreekt ? 'Gino praat…' : code === 'wacht' ? 'Wacht op je Mac…' : null
 
   return (
     <div ref={wortel} style={{
-      textAlign: 'left', marginTop: 28, flexShrink: 0, width: '100%',
+      textAlign: 'left', marginTop, flexShrink: 0, width: '100%',
     }}>
       <style>{ANIMATIES}</style>
       <div style={{ position: 'relative' }}>

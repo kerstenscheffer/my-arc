@@ -13,12 +13,12 @@
 // als zijpaneel (desktop) of bottom sheet (mobiel).
 // Sinds 30 okt (avond): geen begroeting meer; ring, cijferregel en chatbalk
 // vormen één groep midden op het scherm, de ring schaalt mee met de hoogte.
-// Stem-modus (30 okt): klik op de ring = assistent spreekt antwoorden hardop
+// Stem-modus (30 okt): klik op de ring = Gino spreekt antwoorden hardop
 // (stem.js). Klik tijdens het praten stopt alleen het praten. Zolang hij praat
 // pulseert de ring in een eigen, sneller ritme.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { MoreHorizontal, X, Volume2, VolumeX } from 'lucide-react'
+import { MoreHorizontal, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
@@ -126,111 +126,137 @@ function Blad({ titel, isMobile, onSluit, children }) {
   )
 }
 
-// Reactor: groene voortgangsboog = % van het maanddoel, eromheen draaiende
-// tikkenring en segmenten, in het midden een ademende kern. bezig = de chat
-// denkt: alles draait en pulseert sneller. Animaties uit bij reduced-motion.
+// Reactor = Gino, de AI-assistent. In het midden alleen licht: een gloeiende
+// kern die ademt. Status via licht, geen iconen: stem uit = gedimd en traag,
+// stem aan = fel en sneller, bezig = ringen jagen en de kern flikkert, praat =
+// ritmisch pulseren. Aanzetten geeft een lichtgolf + flits (.ontwaakt), uitzetten
+// dooft zacht (.dooft). De dunne groene boog = % van het maanddoel.
+// Bij reduced-motion wisselt alleen de helderheid.
 const REACTOR_CSS = `
   @keyframes bos-draai { to { transform: rotate(360deg) } }
   @keyframes bos-terug { to { transform: rotate(-360deg) } }
-  @keyframes bos-puls { 0%,100% { opacity: .55; transform: scale(.94) } 50% { opacity: 1; transform: scale(1) } }
-  @keyframes bos-adem { 0%,100% { opacity: .35; transform: scale(.92) } 50% { opacity: .7; transform: scale(1.04) } }
-  .bos-r .bos-a { transform-origin: 120px 120px; transform-box: view-box; animation: bos-draai var(--d) linear infinite }
+  @keyframes bos-puls { 0%,100% { opacity: .75; transform: scale(.95) } 50% { opacity: 1; transform: scale(1.03) } }
+  @keyframes bos-sluimer { 0%,100% { opacity: .45; transform: scale(.9) } 50% { opacity: .8; transform: scale(1) } }
+  @keyframes bos-adem { 0%,100% { opacity: .3; transform: scale(.9) } 50% { opacity: .6; transform: scale(1) } }
+  @keyframes bos-adem-aan { 0%,100% { opacity: .6; transform: scale(1.02) } 50% { opacity: .95; transform: scale(1.12) } }
+  @keyframes bos-flikker { 0%,100% { opacity: 1 } 20% { opacity: .55 } 35% { opacity: .95 } 55% { opacity: .65 } 80% { opacity: .9 } }
+  @keyframes bos-praat { 0%,100% { opacity: .6; transform: scale(.92) } 30% { opacity: 1; transform: scale(1.1) } 60% { opacity: .8; transform: scale(.98) } }
+  @keyframes bos-golf { 0% { opacity: .9; transform: scale(.5) } 100% { opacity: 0; transform: scale(2.3) } }
+  @keyframes bos-flits { 0% { opacity: 0 } 25% { opacity: 1 } 100% { opacity: 0 } }
+  @keyframes bos-dooft { 0% { opacity: 1; transform: scale(1.03) } 100% { opacity: .45; transform: scale(.9) } }
+  .bos-r .bos-lijf { position: absolute; inset: 0; opacity: .5; transition: opacity .6s ease }
+  .bos-r.aan .bos-lijf { opacity: 1 }
+  .bos-r .bos-a { transform-origin: 120px 120px; transform-box: view-box; animation: bos-draai calc(var(--d) * 1.6) linear infinite }
   .bos-r .bos-a.terug { animation-name: bos-terug }
-  .bos-r .bos-kern { transform-origin: 120px 120px; transform-box: view-box; animation: bos-puls 3s ease-in-out infinite }
+  .bos-r.aan .bos-a { animation-duration: calc(var(--d) * .7) }
+  .bos-r .bos-kern { transform-origin: 120px 120px; transform-box: view-box; animation: bos-sluimer 6s ease-in-out infinite }
+  .bos-r.aan .bos-kern { animation: bos-puls 3s ease-in-out infinite }
   .bos-r .bos-halo { animation: bos-adem 6s ease-in-out infinite }
+  .bos-r.aan .bos-halo { animation: bos-adem-aan 3.5s ease-in-out infinite }
   .bos-r.bezig .bos-a { animation-duration: calc(var(--d) / 5) }
-  .bos-r.bezig .bos-kern { animation-duration: .9s }
+  .bos-r.bezig .bos-kern { animation: bos-flikker 1.1s ease-in-out infinite }
   .bos-r.bezig .bos-halo { animation-duration: 1.4s }
-  @keyframes bos-praat { 0%,100% { opacity: .5; transform: scale(.9) } 30% { opacity: 1; transform: scale(1.06) } 60% { opacity: .75; transform: scale(.97) } }
   .bos-r.praat .bos-kern { animation: bos-praat .7s ease-in-out infinite }
   .bos-r.praat .bos-halo { animation: bos-praat 1.1s ease-in-out infinite }
+  .bos-r.dooft .bos-kern { animation: bos-dooft .6s ease-out forwards }
+  .bos-r .bos-golf, .bos-r .bos-flits { opacity: 0 }
+  .bos-r.ontwaakt .bos-golf { animation: bos-golf .7s ease-out }
+  .bos-r.ontwaakt .bos-flits { animation: bos-flits .7s ease-out }
   @media (prefers-reduced-motion: reduce) {
-    .bos-r .bos-a, .bos-r .bos-kern, .bos-r .bos-halo, .bos-r.praat .bos-kern, .bos-r.praat .bos-halo { animation: none }
-    .bos-r.bezig .bos-halo, .bos-r.praat .bos-halo { opacity: .8 }
+    .bos-r .bos-a, .bos-r .bos-kern, .bos-r .bos-halo, .bos-r.aan .bos-a, .bos-r.aan .bos-kern, .bos-r.aan .bos-halo,
+    .bos-r.bezig .bos-a, .bos-r.bezig .bos-kern, .bos-r.praat .bos-kern, .bos-r.praat .bos-halo,
+    .bos-r.dooft .bos-kern, .bos-r.ontwaakt .bos-golf { animation: none }
+    .bos-r .bos-halo { opacity: .4 }
+    .bos-r.aan .bos-halo, .bos-r.bezig .bos-halo, .bos-r.praat .bos-halo { opacity: .85 }
   }
 `
 
 function Reactor({ pct, maat, bezig, praat, stemAan, melding, onKlik }) {
   const R = 96
   const omtrek = 2 * Math.PI * R
-  const Luidspreker = stemAan ? Volume2 : VolumeX
+  // Eenmalige overgang bij wisselen van de stem: .ontwaakt (aan) of .dooft (uit).
+  const [overgang, setOvergang] = useState(null)
+  const vorige = useRef(stemAan)
+  useEffect(() => {
+    if (vorige.current === stemAan) return
+    vorige.current = stemAan
+    setOvergang(stemAan ? 'ontwaakt' : 'dooft')
+    const t = setTimeout(() => setOvergang(null), stemAan ? 700 : 600)
+    return () => clearTimeout(t)
+  }, [stemAan])
+  const klassen = ['bos-r', stemAan && 'aan', praat ? 'praat' : bezig && 'bezig', overgang].filter(Boolean).join(' ')
+  const labelMaat = maat >= 200 ? '0.62rem' : '0.56rem'
   return (
-    <div className={`bos-r${praat ? ' praat' : bezig ? ' bezig' : ''}`} style={{ position: 'relative', width: maat, height: maat, margin: '0 auto', cursor: 'pointer' }}
-      role="button" tabIndex={0} title="Stem aan/uit" aria-pressed={stemAan}
-      aria-label={`${Math.round(pct)}% van je maanddoel${praat ? ', assistent praat' : bezig ? ', assistent denkt na' : ''}. Stem ${stemAan ? 'aan' : 'uit'}`}
-      onClick={onKlik} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onKlik() } }}>
-      <style>{REACTOR_CSS}</style>
-      <div className="bos-halo" style={{
-        position: 'absolute', inset: '-12%', borderRadius: '50%', pointerEvents: 'none',
-        background: `radial-gradient(circle, ${C.groen}55 0%, ${C.groen}18 45%, transparent 70%)`,
-      }} />
-      <svg viewBox="0 0 240 240" width={maat} height={maat} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
-        <defs>
-          <radialGradient id="bos-kern">
-            <stop offset="0%" stopColor={C.groen} stopOpacity="0.45" />
-            <stop offset="60%" stopColor={C.groen} stopOpacity="0.15" />
-            <stop offset="100%" stopColor={C.groen} stopOpacity="0" />
-          </radialGradient>
-          <filter id="bos-gloed" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-
-        {/* tikkenring */}
-        <g className="bos-a" style={{ '--d': '60s' }}>
-          {Array.from({ length: 72 }, (_, i) => (
-            <line key={i} x1="120" y1="4" x2="120" y2={i % 6 ? 9 : 14}
-              stroke="#ffffff" strokeOpacity={i % 6 ? 0.18 : 0.5} strokeWidth={i % 6 ? 1 : 2}
-              transform={`rotate(${i * 5} 120 120)`} />
-          ))}
-        </g>
-
-        {/* voortgangsboog = omzet / doel */}
-        <circle cx="120" cy="120" r={R} fill="none" stroke="#ffffff" strokeOpacity="0.07" strokeWidth="6" />
-        <circle cx="120" cy="120" r={R} fill="none" stroke={C.groen} strokeWidth="6" strokeLinecap="round"
-          strokeDasharray={omtrek} strokeDashoffset={omtrek * (1 - pct / 100)}
-          transform="rotate(-90 120 120)" filter="url(#bos-gloed)"
-          style={{ transition: 'stroke-dashoffset 1s' }} />
-
-        {/* segmenten */}
-        <g className="bos-a terug" style={{ '--d': '18s' }}>
-          <circle cx="120" cy="120" r="78" fill="none" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="5"
-            strokeDasharray="22 10" />
-        </g>
-        <g className="bos-a" style={{ '--d': '10s' }}>
-          <circle cx="120" cy="120" r="64" fill="none" stroke={C.groen} strokeOpacity="0.8" strokeWidth="2"
-            strokeDasharray="60 40" strokeLinecap="round" filter="url(#bos-gloed)" />
-        </g>
-        <circle cx="120" cy="120" r="56" fill="none" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
-
-        {/* kern */}
-        <circle className="bos-kern" cx="120" cy="120" r="48" fill="url(#bos-kern)" />
-      </svg>
-      <div style={{
-        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
-      }}>
-        <div style={{ ...NUM, fontWeight: 900, fontSize: maat >= 260 ? '3rem' : maat >= 200 ? '2.3rem' : '1.6rem', lineHeight: 1, color: C.wit, textShadow: `0 0 18px ${C.groen}` }}>
-          {Math.round(pct)}%
-        </div>
-        <div style={{ ...LABEL, fontSize: maat >= 200 ? '0.68rem' : '0.56rem', color: C.wit, opacity: 0.85, marginTop: maat >= 200 ? 6 : 4, position: 'relative' }}>
-          van doel
-          {/* luidspreker: absoluut, zodat het percentage niet verschuift */}
-          <Luidspreker size={maat >= 200 ? 14 : 12} strokeWidth={2.4} aria-hidden="true" style={{
-            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: maat >= 200 ? 8 : 5,
-            color: stemAan ? C.groen : C.wit, opacity: stemAan ? 0.95 : 0.4,
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className={klassen} style={{ position: 'relative', width: maat, height: maat, margin: '0 auto', cursor: 'pointer' }}
+        role="button" tabIndex={0} title={`Gino, stem ${stemAan ? 'uit' : 'aan'}zetten`} aria-pressed={stemAan}
+        aria-label={`Gino, stem ${stemAan ? 'aan' : 'uit'}${praat ? '. Gino praat' : bezig ? '. Gino denkt na' : ''}`}
+        onClick={onKlik} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onKlik() } }}>
+        <style>{REACTOR_CSS}</style>
+        <div className="bos-lijf">
+          <div className="bos-halo" style={{
+            position: 'absolute', inset: '-14%', borderRadius: '50%', pointerEvents: 'none',
+            background: `radial-gradient(circle, ${C.groen}66 0%, ${C.groen}1f 45%, transparent 70%)`,
           }} />
+          <svg viewBox="0 0 240 240" width={maat} height={maat} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
+            <defs>
+              <radialGradient id="bos-kern">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+                <stop offset="18%" stopColor={C.groen} stopOpacity="0.9" />
+                <stop offset="50%" stopColor={C.groen} stopOpacity="0.35" />
+                <stop offset="100%" stopColor={C.groen} stopOpacity="0" />
+              </radialGradient>
+              <filter id="bos-gloed" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="3" result="b" />
+                <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+
+            {/* tikkenring */}
+            <g className="bos-a" style={{ '--d': '60s' }}>
+              {Array.from({ length: 72 }, (_, i) => (
+                <line key={i} x1="120" y1="4" x2="120" y2={i % 6 ? 9 : 14}
+                  stroke="#ffffff" strokeOpacity={i % 6 ? 0.18 : 0.5} strokeWidth={i % 6 ? 1 : 2}
+                  transform={`rotate(${i * 5} 120 120)`} />
+              ))}
+            </g>
+
+            {/* voortgangsboog = omzet / doel, bewust subtiel */}
+            <circle cx="120" cy="120" r={R} fill="none" stroke="#ffffff" strokeOpacity="0.05" strokeWidth="3" />
+            <circle cx="120" cy="120" r={R} fill="none" stroke={C.groen} strokeOpacity="0.5" strokeWidth="3" strokeLinecap="round"
+              strokeDasharray={omtrek} strokeDashoffset={omtrek * (1 - pct / 100)}
+              transform="rotate(-90 120 120)"
+              style={{ transition: 'stroke-dashoffset 1s' }} />
+
+            {/* segmenten */}
+            <g className="bos-a terug" style={{ '--d': '18s' }}>
+              <circle cx="120" cy="120" r="78" fill="none" stroke="#ffffff" strokeOpacity="0.45" strokeWidth="4"
+                strokeDasharray="22 10" />
+            </g>
+            <g className="bos-a" style={{ '--d': '10s' }}>
+              <circle cx="120" cy="120" r="64" fill="none" stroke={C.groen} strokeOpacity="0.8" strokeWidth="2"
+                strokeDasharray="60 40" strokeLinecap="round" filter="url(#bos-gloed)" />
+            </g>
+
+            {/* kern + flits bij ontwaken */}
+            <circle className="bos-kern" cx="120" cy="120" r="60" fill="url(#bos-kern)" filter="url(#bos-gloed)" />
+            <circle className="bos-flits" cx="120" cy="120" r="62" fill="url(#bos-kern)" />
+          </svg>
         </div>
+        {/* lichtgolf bij ontwaken: buiten het gedimde lijf, schiet vanuit de kern naar buiten */}
+        <div className="bos-golf" style={{
+          position: 'absolute', inset: '25%', borderRadius: '50%', pointerEvents: 'none',
+          border: `2px solid ${C.groen}`, boxShadow: `0 0 24px ${C.groen}, inset 0 0 16px ${C.groen}88`,
+        }} />
       </div>
-      {melding && (
-        <div role="status" style={{
-          position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, whiteSpace: 'nowrap',
-          fontSize: '0.72rem', fontWeight: 800, color: C.zacht, pointerEvents: 'none', zIndex: 2,
-        }}>
-          {melding}
-        </div>
-      )}
+      {/* naam onder de bol; een melding vervangt hem even */}
+      <div role="status" style={{
+        ...LABEL, fontSize: labelMaat, letterSpacing: melding ? '0.04em' : '0.42em', textTransform: melding ? 'none' : 'uppercase',
+        marginTop: maat >= 200 ? 10 : 6, height: 16, lineHeight: '16px', whiteSpace: 'nowrap', pointerEvents: 'none',
+        color: melding ? C.zacht : C.wit, opacity: melding ? 1 : 0.35, paddingLeft: melding ? 0 : '0.42em',
+      }}>
+        {melding || 'Gino'}
+      </div>
     </div>
   )
 }
@@ -290,7 +316,7 @@ export default function BusinessOS({ isMobile }) {
     if (!stemAan) stem.ontgrendel()
     stem.zetAan(!stemAan)
   }
-  // Ringmaat volgt de beschikbare ruimte: hoogte min cijferregel + chatbalk.
+  // Ringmaat volgt de beschikbare ruimte: hoogte min ringlabel + chatbalk.
   const [ruimte, setRuimte] = useState(null)
   const ro = useRef(null)
   const midden = useCallback((el) => {
@@ -305,7 +331,7 @@ export default function BusinessOS({ isMobile }) {
   }, [])
   const maxMaat = isMobile ? 190 : 240
   const maat = ruimte
-    ? Math.round(Math.max(96, Math.min(maxMaat, ruimte.h - (isMobile ? 190 : 170), ruimte.b - 48)))
+    ? Math.round(Math.max(96, Math.min(maxMaat, ruimte.h - (isMobile ? 170 : 160), ruimte.b - 48)))
     : (isMobile ? 150 : 210)
 
   const nu = new Date()
@@ -361,7 +387,6 @@ export default function BusinessOS({ isMobile }) {
 
   const pctDoel = Math.min(100, a.omzet / doel * 100)
   const nodigPerDag = Math.max(0, doel - a.omzet) / Math.max(1, dagenInMaand - dagenVoorbij)
-  const opKoers = a.prognose >= doel
   const zw = a.zwakste[0]
 
   // Inhoud van de onderdelen: precies wat eerder in de inklap-secties stond.
@@ -483,8 +508,8 @@ export default function BusinessOS({ isMobile }) {
 
   return (
     // Vaste pagina: precies de ruimte boven de zwevende navbalk (in split
-    // screen de hele helft). Alleen de chatlijst scrolt. Ring, cijferregel en
-    // chatbalk staan als één groep in het midden; de ring schaalt mee met de
+    // screen de hele helft). Alleen de chatlijst scrolt. Ring en chatbalk
+    // staan als één groep in het midden; de ring schaalt mee met de
     // hoogte zodat de groep altijd past.
     <div data-bos-pagina="" style={{
       background: C.bg, color: C.tekst, position: 'relative', overflow: 'hidden',
@@ -525,24 +550,16 @@ export default function BusinessOS({ isMobile }) {
         )}
       </div>
 
-      {/* ── Eén gecentreerde groep: ring, cijferregel, chatbalk ── */}
+      {/* ── Eén gecentreerde groep: ring en chatbalk ── */}
       <div ref={midden} style={{
         flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
       }}>
         <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} melding={stemMelding} onKlik={klikRing} />
-          <div style={{
-            display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: isMobile ? '2px 14px' : '4px 28px',
-            marginTop: isMobile ? 12 : 18, fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 700, color: C.zacht, textAlign: 'center',
-          }}>
-            <span><b style={{ ...NUM, color: C.wit }}>{euro(a.omzet)}</b> van {euro(doel)}</span>
-            <span>prognose <b style={{ ...NUM, color: opKoers ? C.groen : C.oranje }}>{euro(a.prognose)}</b></span>
-            <span>zwakste schakel <b style={{ color: C.wit }}>{zw.label}</b></span>
-          </div>
 
           {/* ── Chat: de ring praat ── */}
-          <BusinessChat onBezig={setDenkt} context={{
+          <BusinessChat onBezig={setDenkt} marginTop={isMobile ? 18 : 24} context={{
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),

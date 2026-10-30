@@ -23,12 +23,26 @@ const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
 let stemCache = null
 if (synth) synth.addEventListener?.('voiceschanged', () => { stemCache = null })
 
-// Beste Nederlandse stem: nl-NL boven nl-BE, en Premium/Enhanced/Siri/Google voorop.
+// Gino is een man: bekende mannelijke Nederlandse stemmen op naam voorop,
+// bekende vrouwenstemmen achteraan. Pas deze lijsten aan om de stem te wisselen.
+const VOORKEUR_STEMMEN = ['Xander', 'Maarten', 'Arnaud']
+const MANNELIJK = /\b(male|man)\b|mannelijk/i
+const VROUWELIJKE_STEMMEN = ['Claire', 'Ellen', 'Colette', 'Fenna', 'Ana', 'Flo', 'Sandy', 'Shelley', 'Grandma']
+
+const heeftNaam = (v, namen) => namen.some(n => new RegExp(`\\b${n}\\b`, 'i').test(v.name))
+const isMannelijk = (v) => !!v && (heeftNaam(v, VOORKEUR_STEMMEN) || (MANNELIJK.test(v.name) && !/female|vrouw/i.test(v.name)))
+
+// Volgorde: mannelijk + premium/enhanced > mannelijk > rest (nl-NL boven nl-BE,
+// Premium/Enhanced/Siri/Google voorop). Geen mannenstem: dan gewoon de beste nl-stem.
 function kiesStem() {
   if (stemCache) return stemCache
   const nl = (synth?.getVoices() || []).filter(v => /^nl([-_]|$)/i.test(v.lang))
   if (!nl.length) return null
-  const score = (v) => (/premium|enhanced|siri|google/i.test(v.name) ? 2 : 0) + (/^nl[-_]nl/i.test(v.lang) ? 1 : 0)
+  const score = (v) =>
+    (isMannelijk(v) ? 10 : 0)
+    + (heeftNaam(v, VROUWELIJKE_STEMMEN) || /female|vrouw/i.test(v.name) ? -5 : 0)
+    + (/premium|enhanced|siri|google/i.test(v.name) ? 2 : 0)
+    + (/^nl[-_]nl/i.test(v.lang) ? 1 : 0)
   stemCache = [...nl].sort((a, b) => score(b) - score(a))[0]
   return stemCache
 }
@@ -60,13 +74,15 @@ const browser = {
     await stemmenKlaar()
     if (mijn !== ronde) return
     const stem = kiesStem()
+    // Mannenstem iets lager; valt hij terug op een vrouwenstem, dan nog wat dieper.
+    const pitch = isMannelijk(stem) ? 0.95 : 0.85
     const klaar = () => { if (mijn === ronde) { lopend = []; onEinde() } }
     lopend = stukken.map((stuk, i) => {
       const u = new window.SpeechSynthesisUtterance(stuk)
       u.lang = stem?.lang || 'nl-NL'
       if (stem) u.voice = stem
       u.rate = 1.05
-      u.pitch = 1
+      u.pitch = pitch
       if (i === stukken.length - 1) u.onend = klaar
       u.onerror = klaar
       return u
