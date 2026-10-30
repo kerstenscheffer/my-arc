@@ -75,3 +75,8 @@ $$;
 
 revoke all on function public.business_os_schema(text) from public, anon;
 grant execute on function public.business_os_schema(text) to authenticated;
+
+-- Snelle chat (30 okt 2026): de PA hoort nieuwe opdrachten direct via Realtime
+-- en schrijft het antwoord al tijdens het typen in `antwoord`; Business OS
+-- luistert mee op de eigen rij. RLS blijft gelden voor postgres_changes.
+alter publication supabase_realtime add table public.business_os_opdrachten;

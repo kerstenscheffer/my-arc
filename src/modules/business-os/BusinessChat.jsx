@@ -57,25 +57,44 @@ const KAART_KOP = { display: 'flex', gap: 6, alignItems: 'center', fontWeight: 8
 const KAART_SUB = { color: colors.textSecondary, fontWeight: 600, marginBottom: 6 }
 
 // Vraag via de lokale PA. Geeft { tekst, acties } of null (Mac pakte hem niet op).
-async function vraagViaMac(berichten, context) {
+// Vraag via de PA op de Mac. Realtime geeft elke wijziging van de rij meteen
+// door (ook de halve tekst tijdens het typen → opDeel); pollen elke 2 s blijft
+// als vangnet. null = niet gelukt, dan gaat de vraag via de API.
+async function vraagViaMac(berichten, context, opDeel) {
   const { data: rij, error } = await supabase.from('business_os_opdrachten')
     .insert({ soort: 'chat', opdracht: berichten[berichten.length - 1].content.slice(0, 500), invoer: { berichten, context } })
     .select('id').single()
   if (error) return null
   const start = Date.now()
-  for (;;) {
-    await slaap(1500)
-    const { data } = await supabase.from('business_os_opdrachten')
-      .select('status, antwoord').eq('id', rij.id).maybeSingle()
-    if (data?.status === 'klaar' || data?.status === 'mislukt') return data.antwoord?.tekst ? data.antwoord : null
-    if (data?.status === 'wacht' && Date.now() - start > 25000) {
-      // Niet opgepakt: intrekken (alleen als hij nog op 'wacht' staat) en via de API.
-      const { data: ingetrokken } = await supabase.from('business_os_opdrachten')
-        .update({ status: 'mislukt' }).eq('id', rij.id).eq('status', 'wacht').select('id')
-      if (ingetrokken?.length) return null
-    }
-    if (Date.now() - start > 5 * 60 * 1000) return null
+  let klaar = null
+  const bekijk = (data) => {
+    if (!data || klaar) return
+    if (data.status === 'klaar' || data.status === 'mislukt') { klaar = { antwoord: data.antwoord?.tekst ? data.antwoord : null }; return }
+    if (data.status === 'bezig' && data.antwoord?.bezig && data.antwoord.tekst) opDeel?.(data.antwoord.tekst)
   }
+  const kanaal = supabase.channel(`pa-antwoord-${rij.id}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'business_os_opdrachten', filter: `id=eq.${rij.id}` }, (m) => bekijk(m.new))
+    .subscribe()
+  try {
+    let laatstGepold = 0
+    for (;;) {
+      await slaap(150)
+      if (klaar) return klaar.antwoord
+      if (Date.now() - laatstGepold < 2000) continue
+      laatstGepold = Date.now()
+      const { data } = await supabase.from('business_os_opdrachten')
+        .select('status, antwoord').eq('id', rij.id).maybeSingle()
+      bekijk(data)
+      if (klaar) return klaar.antwoord
+      if (data?.status === 'wacht' && Date.now() - start > 25000) {
+        // Niet opgepakt: intrekken (alleen als hij nog op 'wacht' staat) en via de API.
+        const { data: ingetrokken } = await supabase.from('business_os_opdrachten')
+          .update({ status: 'mislukt' }).eq('id', rij.id).eq('status', 'wacht').select('id')
+        if (ingetrokken?.length) return null
+      }
+      if (Date.now() - start > 5 * 60 * 1000) return null
+    }
+  } finally { supabase.removeChannel(kanaal) }
 }
 const Spraak = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
 
@@ -849,6 +868,8 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     onderaan.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
   }
 
+  // Halve tekst terwijl Gino via de Mac typt.
+  const [deel, setDeel] = useState('')
   const antwoord = (bericht) => {
     setGesprek(g => [...g, bericht])
     if (!openRef.current) setOngelezen(true)
@@ -882,7 +903,8 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     setFout(null)
     const berichten = naarBerichten(nieuw)
     const metBeeld = berichten.some(b => b.afbeelding)
-    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context) : null
+    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, setDeel) : null
+    setDeel('')
     if (mac) {
       setBezig(false)
       antwoord({ role: 'assistant', content: mac.tekst, acties: mac.acties || [] })
@@ -935,7 +957,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative',
   }
-  const werk = code === 'bezig' ? 'Bezig met code…' : bezig ? 'Gino denkt na…' : spreekt ? 'Gino praat…' : code === 'wacht' ? 'Wacht op je Mac…' : null
+  const werk = code === 'bezig' ? 'Bezig met code…' : bezig ? (deel ? 'Gino typt…' : 'Gino denkt na…') : spreekt ? 'Gino praat…' : code === 'wacht' ? 'Wacht op je Mac…' : null
 
   return (
     <div ref={wortel} style={{
@@ -989,6 +1011,9 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 <Kopieer tekst={b.content} />
               </div>
             ))}
+            {bezig && deel && (
+              <div style={{ ...TEKST, fontWeight: 500, color: colors.textPrimary, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{deel}</div>
+            )}
           </div>
         )}
 

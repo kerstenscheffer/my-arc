@@ -40,7 +40,7 @@ import os from 'node:os'
 import path from 'node:path'
 import readline from 'node:readline/promises'
 import { createClient } from '@supabase/supabase-js'
-import { chatPrompt, ANTWOORD_SCHEMA } from './business-os-pa-prompt.mjs'
+import { chatPrompt, chatVraag, leesAntwoord, zichtbareTekst } from './business-os-pa-prompt.mjs'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 process.chdir(MAP)
@@ -69,6 +69,7 @@ let gebruiker = null
 const loginKwijt = () => {
   if (!gebruiker) return
   gebruiker = null
+  if (warm && !warm.dood) warm.p.kill()
   console.error(tijd(), 'Login kwijt. Log opnieuw in via Business OS (Mac uit → PA inloggen) of npm run pa -- --login')
 }
 sb.auth.onAuthStateChange((e, s) => {
@@ -158,33 +159,107 @@ async function voerCodeUit(opdracht) {
   return { ok: r.code === 0 && !r.json?.is_error && !!r.json?.result, tekst: tekst.slice(0, 8000) }
 }
 
-async function beantwoordChat(invoer) {
+// Snelle chat: er staat altijd één Claude-proces klaar (opgestart, ingelogd,
+// systeemprompt geladen) dat op de volgende vraag wacht. Dat scheelt ~1,5 s
+// opstart per vraag. Eén vraag per proces: in hetzelfde proces doorpraten
+// werd juist trager. Na elke vraag, of na 20 min (sessietoken + skills
+// vers), komt er een nieuw klaar te staan.
+const WARM_MAX_MS = 20 * 60 * 1000
+let warm = null
+
+async function maakWarm() {
   const { data: skills } = await sb.from('business_os_skills')
     .select('naam, wanneer, instructies').eq('actief', true).order('naam')
-  const berichten = (invoer?.berichten || []).slice(-20)
-  const gesprek = berichten.map(b => `${b.role === 'user' ? 'Kersten' : 'Jij'}: ${b.content}`).join('\n\n')
-  const { data: { session } } = await sb.auth.getSession()
-  const r = await claude([
-    '-p', `Gesprek tot nu toe:\n\n${gesprek}\n\nBeantwoord het laatste bericht van Kersten.`,
-    '--system-prompt', chatPrompt({ skills: skills || [], context: invoer?.context }),
-    '--output-format', 'json',
-    '--json-schema', JSON.stringify(ANTWOORD_SCHEMA),
+  // Het token gaat mee bij het opstarten: zorg dat het nog ruim een half uur geldig is.
+  let { data: { session } } = await sb.auth.getSession()
+  if (session && session.expires_at * 1000 - Date.now() < 30 * 60 * 1000) {
+    session = (await sb.auth.refreshSession()).data.session || session
+  }
+  const p = spawn('claude', [
+    '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+    '--system-prompt', chatPrompt({ skills: skills || [] }),
     '--permission-mode', 'dontAsk',
     '--allowedTools', CHAT_TOEGESTAAN.join(','),
     '--no-session-persistence',
     '--max-budget-usd', '3',
     ...CHAT_LICHT,
-  ], { ...CHAT_ENV, PA_ACCESS_TOKEN: session?.access_token || '' })
-  const a = r.json?.structured_output
-  if (r.code !== 0 || !a?.tekst) return { ok: false, antwoord: { tekst: r.json?.result || r.fout || 'Geen antwoord van Claude Code.', acties: [] } }
-  return { ok: true, antwoord: { tekst: String(a.tekst), acties: Array.isArray(a.acties) ? a.acties : [] } }
+  ], { cwd: MAP, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...CHAT_ENV, PA_ACCESS_TOKEN: session?.access_token || '' } })
+  const w = { p, sinds: Date.now(), dood: false, regels: [] }
+  let buf = ''
+  p.stdout.on('data', d => {
+    buf += d
+    let i
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const r = buf.slice(0, i); buf = buf.slice(i + 1)
+      if (!r.trim()) continue
+      let m
+      try { m = JSON.parse(r) } catch { continue }
+      w.opBericht?.(m)
+    }
+  })
+  p.stderr.on('data', d => { w.fout = (w.fout || '') + d })
+  p.on('close', () => { w.dood = true; w.opEinde?.() })
+  p.stdin.on('error', () => {})
+  return w
+}
+
+let warmStart = false
+function zetWarmKlaar() {
+  if (!gebruiker || warmStart) return
+  if (warm && !warm.dood && Date.now() - warm.sinds < WARM_MAX_MS) return
+  if (warm && !warm.dood) warm.p.kill()
+  warm = null
+  warmStart = true
+  maakWarm().then(w => { warm = w }, e => console.error(tijd(), 'Warm proces mislukt:', e.message))
+    .finally(() => { warmStart = false })
+}
+process.on('exit', () => { if (warm && !warm.dood) warm.p.kill() })
+setInterval(zetWarmKlaar, 60 * 1000)
+
+// opDeel(tekst): halve tekst tijdens het typen.
+async function beantwoordChat(invoer, opDeel) {
+  if (!warm || warm.dood || Date.now() - warm.sinds > WARM_MAX_MS) { warm?.p.kill(); warm = await maakWarm() }
+  const w = warm
+  warm = null
+  const berichten = (invoer?.berichten || []).slice(-20)
+  const gesprek = berichten.map(b => `${b.role === 'user' ? 'Kersten' : 'Jij'}: ${b.content}`).join('\n\n')
+  const r = await new Promise((klaar) => {
+    let deel = ''
+    const stop = setTimeout(() => w.p.kill('SIGTERM'), 5 * 60 * 1000)
+    w.opBericht = (m) => {
+      if (m.type === 'stream_event') {
+        const e = m.event
+        if (e?.type === 'message_start') deel = ''
+        else if (e?.type === 'content_block_delta' && e.delta?.type === 'text_delta') { deel += e.delta.text; opDeel(zichtbareTekst(deel)) }
+      } else if (m.type === 'result') {
+        clearTimeout(stop)
+        klaar({ ok: m.subtype === 'success' && !m.is_error, tekst: m.result || '' })
+        w.p.stdin.end()
+      }
+    }
+    w.opEinde = () => { clearTimeout(stop); klaar({ ok: false, tekst: w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
+    if (w.dood) return w.opEinde()
+    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: chatVraag({ gesprek, context: invoer?.context }) } }) + '\n')
+  })
+  setTimeout(zetWarmKlaar, 500)
+  if (!r.ok || !r.tekst) return { ok: false, antwoord: { tekst: r.tekst || 'Geen antwoord van Claude Code.', acties: [] } }
+  return { ok: true, antwoord: leesAntwoord(r.tekst) }
 }
 
 const tijd = () => new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 const bezig = { code: false, chat: false }
 
+// Zet bezig[soort] meteen, zodat Realtime en het pollen niet tegelijk pakken;
+// de ronde zet hem terug. Geen rij = meteen terug.
 async function pak(soort) {
   if (bezig[soort] || !gebruiker) return null
+  bezig[soort] = true
+  const rij = await pakRij(soort).catch(() => null)
+  if (!rij) bezig[soort] = false
+  return rij
+}
+
+async function pakRij(soort) {
   const { data: rij, error } = await sb.from('business_os_opdrachten')
     .select('id, opdracht, invoer').eq('status', 'wacht').eq('soort', soort)
     .order('created_at').limit(1).maybeSingle()
@@ -218,7 +293,19 @@ async function rondeChat() {
   try {
     console.log(`${tijd()} 💬 ${rij.opdracht.slice(0, 100)}`)
     const t0 = Date.now()
-    const r = await beantwoordChat(rij.invoer)
+    // Halve tekst max. ~3x per seconde naar de rij; Business OS luistert mee.
+    let laatst = 0, wachtend = null, klaar = false
+    const schrijf = (tekst) => sb.from('business_os_opdrachten').update({ antwoord: { tekst, bezig: true } })
+      .eq('id', rij.id).eq('status', 'bezig').then(() => {}, () => {})
+    const opDeel = (tekst) => {
+      if (!tekst || klaar) return
+      clearTimeout(wachtend)
+      const nu = Date.now()
+      if (nu - laatst > 300) { laatst = nu; schrijf(tekst) } else wachtend = setTimeout(() => { laatst = Date.now(); if (!klaar) schrijf(tekst) }, 300)
+    }
+    const r = await beantwoordChat(rij.invoer, opDeel)
+    klaar = true
+    clearTimeout(wachtend)
     console.log(`${tijd()} ${r.ok ? '✓' : '✗'} chat-antwoord in ${((Date.now() - t0) / 1000).toFixed(1)} s (${CHAT_MODEL})`)
     await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
@@ -269,7 +356,18 @@ async function start(g) {
   if (!bezig.code) await sb.from('business_os_opdrachten').update({ status: 'wacht', gestart_at: null }).eq('status', 'bezig').eq('soort', 'code')
   if (!bezig.chat) await sb.from('business_os_opdrachten').update({ status: 'mislukt' }).eq('status', 'bezig').eq('soort', 'chat')
   await hartslag()
+  zetWarmKlaar()
+  // Nieuwe opdracht? Realtime meldt hem meteen (RLS: alleen eigen rijen); het
+  // pollen blijft als vangnet. Eén keer aanmelden, ook na opnieuw inloggen.
+  if (!kanaal) kanaal = sb.channel('pa-opdrachten')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'business_os_opdrachten' }, (m) => {
+      if (m.new?.status !== 'wacht') return
+      const f = m.new.soort === 'chat' ? rondeChat : rondeCode
+      f().catch(e => console.error(tijd(), e.message))
+    })
+    .subscribe()
 }
+let kanaal = null
 
 // Lokaal loket voor inloggen vanuit Business OS.
 const POORT = 47615
@@ -306,5 +404,5 @@ const g = await login()
 if (g) await start(g)
 setInterval(hartslag, 15000)
 const fout = (e) => console.error(tijd(), e.message)
-setInterval(() => rondeChat().catch(fout), 1500)
+setInterval(() => rondeChat().catch(fout), 3000)
 setInterval(() => rondeCode().catch(fout), 5000)

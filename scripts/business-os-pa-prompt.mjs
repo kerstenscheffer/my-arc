@@ -3,8 +3,14 @@
 // Systeemprompt voor de Business OS-chat als die via de lokale PA draait.
 // Inhoud = die van SYSTEEM in supabase/functions/business-os-chat/index.ts,
 // alleen de tools zijn hier commando's van scripts/pa-db.mjs en voorstellen
-// gaan als `acties` in het JSON-antwoord. Pas je de regels daar aan, doe het
-// hier ook.
+// gaan als `acties` in een ```acties-blok aan het eind. Pas je de regels daar
+// aan, doe het hier ook.
+//
+// Snel (30 okt): geen --json-schema meer (dat kostte altijd een extra ronde);
+// gewone tekst die al tijdens het typen in Business OS verschijnt, acties in
+// een blok dat leesAntwoord() eruit haalt. De systeemprompt hangt niet af van
+// de vraag (cijfers gaan mee in het bericht), zodat de PA hem vooraf kan
+// opstarten en de prompt-cache warm blijft.
 
 export const ANTWOORD_SCHEMA = {
   type: 'object',
@@ -15,7 +21,33 @@ export const ANTWOORD_SCHEMA = {
   required: ['tekst', 'acties'],
 }
 
-export function chatPrompt({ skills, context }) {
+const BLOK = '```acties'
+
+// Antwoord → { tekst, acties }. Kapot of geen blok: alle tekst, geen acties.
+export function leesAntwoord(ruw) {
+  const tekst = String(ruw || '')
+  const i = tekst.lastIndexOf(BLOK)
+  if (i < 0) return { tekst: tekst.trim(), acties: [] }
+  const blok = tekst.slice(i + BLOK.length).replace(/```\s*$/, '').trim()
+  let acties = []
+  try { const a = JSON.parse(blok); acties = Array.isArray(a) ? a : [a] } catch { /* kapot blok */ }
+  return { tekst: tekst.slice(0, i).trim(), acties: acties.filter(a => a && typeof a === 'object') }
+}
+
+// Halve tekst tijdens het typen: alles vóór het actieblok, ook als dat nog
+// maar half binnen is (```ac…).
+export function zichtbareTekst(ruw) {
+  const tekst = String(ruw || '')
+  const i = tekst.indexOf(BLOK)
+  if (i >= 0) return tekst.slice(0, i).trim()
+  return tekst.replace(/`{1,3}[a-z]*$/, '').trimEnd()
+}
+
+export function chatVraag({ gesprek, context }) {
+  return `${context ? `Cijfers uit Business OS op dit moment (JSON):\n${JSON.stringify(context).slice(0, 4000)}\n\n` : ''}Gesprek tot nu toe:\n\n${gesprek}\n\nBeantwoord het laatste bericht van Kersten.`
+}
+
+export function chatPrompt({ skills }) {
   const skillTekst = skills.length
     ? skills.map(k => `### ${k.naam}\nWanneer: ${k.wanneer}\n${k.instructies}`).join('\n\n')
     : '(nog geen skills)'
@@ -32,7 +64,11 @@ Database, alleen via dit commando (Bash):
 → node scripts/pa-db.mjs app-lijst "<opdracht>"   ontwikkellijst (alleen als Kersten "voor later" zegt)
 Begin bij de App-kaart-skill; ken je een tabel niet, kijk het schema na in plaats van te gokken.
 
-Je antwoord is JSON: { tekst, acties }. tekst = wat Kersten leest. acties = wat er onder je bericht verschijnt. Mogelijke acties:
+Je antwoord: gewone tekst voor Kersten (die ziet hij al terwijl je typt). Heb je acties (wat er onder je bericht verschijnt), zet dan helemaal aan het eind één blok, daarna niets meer:
+${BLOK}
+[ { "soort": "...", ... } ]
+\`\`\`
+Geen acties = geen blok. Mogelijke acties:
 → { "soort": "skill", "tekst": "Geleerd: <naam>" } of "Skill bewaard: <naam>", nadat je skill-bewaar deed.
 → { "soort": "app_issue", "tekst": "<opdracht>" }, nadat je app-lijst deed.
 → { "soort": "wijziging_voorstel", "actie": "update", "tabel": "...", "filters": [{ "kolom": "...", "op": "eq|neq|in|is|lt|lte|gt|gte|ilike", "waarde": ... }], "velden": { ... }, "uitleg": "...", "aantal": <rijen, eerst geteld met lees> }
@@ -56,6 +92,5 @@ Taalregels (altijd):
 - Opmaak: platte tekst met korte kopjes en pijltjes (→). Geen markdown-tabellen. Vraag alleen door als de taak echt onduidelijk is.
 
 ## Skills
-${skillTekst}
-${context ? `\nCijfers uit Business OS op dit moment (JSON):\n${JSON.stringify(context).slice(0, 4000)}` : ''}`
+${skillTekst}`
 }
