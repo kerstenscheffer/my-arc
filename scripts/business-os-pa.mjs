@@ -21,8 +21,13 @@
 // (~/Library/LaunchAgents), log in ~/Library/Logs/myarc-pa.log. Eerste keer
 // inloggen moet in een terminal (npm run pa); op de achtergrond kan hij niet
 // om een wachtwoord vragen. Login kwijt (bv. ergens 'uitloggen overal')? Dan
-// stopt de achtergrond-PA met een melding in de log; opnieuw inloggen met
-// npm run pa -- --login (herstart de achtergrond-PA zelf).
+// blijft de PA draaien en wacht hij op een nieuwe login: in Business OS
+// ("Mac uit" → PA inloggen) of met npm run pa -- --login.
+//
+// Inloggen vanuit Business OS: lokaal loket op 127.0.0.1:47615 (alleen deze
+// Mac). GET /status → { ingelogd }; POST /login { refresh_token } van een
+// verse login in de browser. De PA neemt hem alleen aan als het een geldige
+// sessie van een coach-account is; zonder geldige sessie kan niemand iets.
 //
 // Claude Code mag hier: bestanden lezen/bewerken, build, lint, git diff/status.
 // Niet: committen, pushen, stashen, iets anders in de shell, of MCP-tools
@@ -30,6 +35,7 @@
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import readline from 'node:readline/promises'
@@ -58,14 +64,12 @@ const bewaarSessie = (s) => {
 const LOGIN = process.argv.includes('--login')
 let gebruiker = null
 
-// Login kwijt (refresh-token ingetrokken): stoppen met een duidelijke melding.
-// exit(0) zodat launchd niet elke minuut opnieuw start zonder login.
-let gestopt = false
+// Login kwijt (refresh-token ingetrokken): niet stoppen, wachten op een nieuwe
+// login via Business OS of npm run pa -- --login.
 const loginKwijt = () => {
-  if (gestopt) return
-  gestopt = true
-  console.error(tijd(), 'Login kwijt. Log opnieuw in met: npm run pa -- --login')
-  process.exit(0)
+  if (!gebruiker) return
+  gebruiker = null
+  console.error(tijd(), 'Login kwijt. Log opnieuw in via Business OS (Mac uit → PA inloggen) of npm run pa -- --login')
 }
 sb.auth.onAuthStateChange((e, s) => {
   if (e === 'SIGNED_OUT' && gebruiker) return loginKwijt()
@@ -79,8 +83,8 @@ async function login() {
     if (!error && data.session) return data.session.user
   } catch { /* nog geen sessie */ }
   if (!process.stdin.isTTY) {
-    console.error(tijd(), 'Niet ingelogd. Log in met: npm run pa -- --login')
-    process.exit(0)
+    console.error(tijd(), 'Niet ingelogd. Log in via Business OS (Mac uit → PA inloggen) of npm run pa -- --login')
+    return null
   }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const email = (await rl.question('E-mail coach-account: ')).trim()
@@ -164,7 +168,7 @@ const tijd = () => new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', min
 const bezig = { code: false, chat: false }
 
 async function pak(soort) {
-  if (bezig[soort]) return null
+  if (bezig[soort] || !gebruiker) return null
   const { data: rij, error } = await sb.from('business_os_opdrachten')
     .select('id, opdracht, invoer').eq('status', 'wacht').eq('soort', soort)
     .order('created_at').limit(1).maybeSingle()
@@ -204,7 +208,7 @@ async function rondeChat() {
   } finally { bezig.chat = false }
 }
 
-const hartslag = () => sb.from('business_os_pa_status')
+const hartslag = () => gebruiker && sb.from('business_os_pa_status')
   .upsert({ coach_id: gebruiker.id, laatst_gezien: new Date().toISOString() })
   .then(({ error }) => {
     if (!error) return
@@ -238,13 +242,50 @@ const ruimOp = () => { try { if (Number(fs.readFileSync(PID, 'utf8')) === proces
 process.on('exit', ruimOp)
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0))
 
-gebruiker = await login()
-console.log(`MY ARC PA draait in ${MAP} als ${gebruiker.email}. Wacht op opdrachten en chatvragen uit Business OS… (Ctrl+C = stoppen)\n`)
-// Bleef er bij een vorige keer iets op 'bezig' hangen (script gestopt)? Code
-// terug in de wachtrij; een oude chatvraag heeft de chat al via de API gedaan.
-await sb.from('business_os_opdrachten').update({ status: 'wacht', gestart_at: null }).eq('status', 'bezig').eq('soort', 'code')
-await sb.from('business_os_opdrachten').update({ status: 'mislukt' }).eq('status', 'bezig').eq('soort', 'chat')
-await hartslag()
+async function start(g) {
+  gebruiker = g
+  console.log(`${tijd()} MY ARC PA draait in ${MAP} als ${g.email}. Wacht op opdrachten en chatvragen uit Business OS… (Ctrl+C = stoppen)\n`)
+  // Bleef er bij een vorige keer iets op 'bezig' hangen (script gestopt)? Code
+  // terug in de wachtrij; een oude chatvraag heeft de chat al via de API gedaan.
+  // Niet als er nu zelf iets loopt (opnieuw ingelogd tijdens een opdracht).
+  if (!bezig.code) await sb.from('business_os_opdrachten').update({ status: 'wacht', gestart_at: null }).eq('status', 'bezig').eq('soort', 'code')
+  if (!bezig.chat) await sb.from('business_os_opdrachten').update({ status: 'mislukt' }).eq('status', 'bezig').eq('soort', 'chat')
+  await hartslag()
+}
+
+// Lokaal loket voor inloggen vanuit Business OS.
+const POORT = 47615
+http.createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Headers', 'content-type')
+  res.setHeader('Access-Control-Allow-Private-Network', 'true')
+  res.setHeader('Content-Type', 'application/json')
+  const stuur = (code, x) => { res.statusCode = code; res.end(JSON.stringify(x)) }
+  if (req.method === 'OPTIONS') return stuur(204, {})
+  if (req.method === 'GET' && req.url === '/status') return stuur(200, { ingelogd: !!gebruiker })
+  if (req.method !== 'POST' || req.url !== '/login') return stuur(404, { fout: 'onbekend' })
+  // Al ingelogd: niets aanraken (een ongeldige sessie zou de huidige wissen).
+  if (gebruiker) return stuur(200, { ok: true })
+  let body = ''
+  for await (const d of req) { body += d; if (body.length > 10000) return stuur(413, { fout: 'te groot' }) }
+  try {
+    const { refresh_token } = JSON.parse(body)
+    if (!refresh_token) return stuur(400, { fout: 'geen sessie' })
+    const { data, error } = await sb.auth.refreshSession({ refresh_token })
+    if (error || !data.session) return stuur(401, { fout: 'sessie ongeldig' })
+    const { data: rol } = await sb.rpc('get_my_portal_role')
+    if (!['coach', 'both'].includes(rol)) {
+      await sb.auth.signOut({ scope: 'local' })
+      return stuur(403, { fout: 'alleen coach-accounts' })
+    }
+    bewaarSessie(data.session)
+    await start(data.session.user)
+    stuur(200, { ok: true })
+  } catch (e) { stuur(500, { fout: e.message }) }
+}).listen(POORT, '127.0.0.1').on('error', e => console.error(tijd(), 'Lokaal loket niet gestart:', e.message))
+
+const g = await login()
+if (g) await start(g)
 setInterval(hartslag, 15000)
 const fout = (e) => console.error(tijd(), e.message)
 setInterval(() => rondeChat().catch(fout), 1500)

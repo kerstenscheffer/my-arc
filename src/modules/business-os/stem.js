@@ -6,13 +6,19 @@
 // (BusinessChat) via useStem().
 // Provider-laag: een provider is { beschikbaar(), ontgrendel(), spreek(stukken,
 // onEinde), stop() }, met optioneel knip(tekst) voor een eigen stukgrootte.
-// - 'elevenlabs' (standaard): natuurlijke mannenstem via de edge function
+// - 'elevenlabs' (alleen bij keuze 'betaald'): natuurlijke mannenstem via de edge function
 //   gino-stem (ElevenLabs, sleutel alleen als Supabase-secret). Stukken op
 //   zinsgrenzen (eerste zin los zodat hij snel begint, daarna ~500 tekens),
 //   stuk n+1 wordt opgehaald terwijl stuk n speelt. Faalt de functie (fout,
-//   503 geen_sleutel, > 8 s): rest van het antwoord via de browserstem, en de
-//   rest van de sessie meteen de browserstem.
+//   503 geen_sleutel, > 8 s): rest van dít antwoord via de browserstem; het
+//   volgende antwoord probeert ElevenLabs opnieuw.
 // - 'browser': window.speechSynthesis (Xander/Maarten/Arnaud).
+// Keuze (30 okt 2026): schakelaar onder de bol, 'gratis' (standaard, alleen de
+// browserstem; gino-stem wordt dan nooit aangeroepen, ook de sleutelcheck niet)
+// of 'betaald' (ElevenLabs). Bewaard in localStorage ('bos_stem_soort'). Valt
+// ElevenLabs uit, dan blijft de keuze staan, praat dát antwoord verder via de
+// browserstem en zet hij stand.teruggevallen (tijdstempel) voor de UI.
+// Wisselen van stand wist die vlag meteen.
 // Tekst wordt eerst opgeschoond (markdown, pijltjes, emoji, URL's eruit) en
 // voor de browser in stukken van max ~200 tekens geknipt: Chrome/Safari kappen
 // lange utterances af.
@@ -21,6 +27,7 @@ import { useSyncExternalStore } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const KEY = 'bos_stem_aan'
+const SOORT_KEY = 'bos_stem_soort'
 const MAX_STUK = 200
 
 // ── Browser-provider ──
@@ -124,7 +131,6 @@ function stilteWav() {
 
 let audio = null
 const speler = () => (audio ||= new Audio())
-let elKapot = false // deze sessie werkt ElevenLabs niet: niet bij elk antwoord opnieuw wachten
 let elRonde = 0
 let elAfbreker = null
 let elUrls = []
@@ -147,6 +153,8 @@ async function haalAudio(tekst, signal) {
     signal,
   })
   if (!res.ok) throw new Error(`gino-stem ${res.status} ${await res.text().catch(() => '')}`)
+  const stem = res.headers.get('x-gino-stem')
+  if (stem) console.info('[stem] ElevenLabs:', decodeURIComponent(stem))
   const url = URL.createObjectURL(await res.blob())
   elUrls.push(url)
   return url
@@ -174,7 +182,7 @@ function speel(url, mijn) {
 }
 
 const elevenlabs = {
-  beschikbaar: () => !elKapot && typeof window !== 'undefined' && typeof window.Audio !== 'undefined',
+  beschikbaar: () => typeof window !== 'undefined' && typeof window.Audio !== 'undefined',
   ontgrendel() {
     const a = speler()
     a.src = stilteWav()
@@ -215,9 +223,11 @@ const elevenlabs = {
     } catch (e) {
       if (!actueel()) return
       ruimOp()
-      // Autoplay geweigerd = geen klik gehad, niet ElevenLabs' schuld: alleen dit antwoord terugvallen.
-      if (e?.name !== 'NotAllowedError') elKapot = true
+      // Alleen dit antwoord terugvallen; het volgende antwoord probeert ElevenLabs opnieuw
+      // (30 okt 2026: één fout hield de hele sessie op de Mac-stem, ook na het zetten van de sleutel).
       console.warn('[stem] ElevenLabs werkt niet, terug naar browserstem:', e?.message || e)
+      // De keuze blijft 'betaald'; teruggevallen laat de UI de terugval tonen.
+      zet({ teruggevallen: Date.now() })
       const rest = knip(stukken.slice(i).join(' '))
       if (rest.length && browser.beschikbaar()) browser.spreek(rest, onEinde)
       else onEinde()
@@ -235,6 +245,7 @@ const elevenlabs = {
 // sleutels vóór de tekst, dus 503 geen_sleutel = ontbreken, 400 geen_tekst = ok.
 // Kost geen tegoed. Bij twijfel (geen sessie, netwerk) false.
 export async function sleutelOntbreekt() {
+  if (stand.soort !== 'betaald') return false
   try {
     const { data } = await supabase.auth.getSession()
     const token = data?.session?.access_token
@@ -252,9 +263,9 @@ export async function sleutelOntbreekt() {
   }
 }
 
-// Standaard ElevenLabs; is die deze sessie kapot of ontbreekt Audio: de browserstem.
+// ElevenLabs alleen bij keuze 'betaald' (en als Audio bestaat); anders de browserstem.
 const provider = {
-  kies: () => (elevenlabs.beschikbaar() ? elevenlabs : browser),
+  kies: () => (stand.soort === 'betaald' && elevenlabs.beschikbaar() ? elevenlabs : browser),
   beschikbaar: () => elevenlabs.beschikbaar() || browser.beschikbaar(),
   ontgrendel: () => provider.kies().ontgrendel(),
   knip: (tekst) => (provider.kies().knip || knip)(tekst),
@@ -267,7 +278,10 @@ const provider = {
 const leesAan = () => {
   try { return localStorage.getItem(KEY) === '1' } catch { return false }
 }
-let stand = { aan: leesAan(), spreekt: false }
+const leesSoort = () => {
+  try { return localStorage.getItem(SOORT_KEY) === 'betaald' ? 'betaald' : 'gratis' } catch { return 'gratis' }
+}
+let stand = { aan: leesAan(), spreekt: false, soort: leesSoort(), teruggevallen: null }
 const luisteraars = new Set()
 const zet = (veld) => {
   stand = { ...stand, ...veld }
@@ -283,6 +297,15 @@ export function zetAan(aan) {
   try { localStorage.setItem(KEY, aan ? '1' : '0') } catch { /* privé-venster */ }
   if (!aan) stop()
   zet({ aan })
+}
+
+// 'gratis' | 'betaald'. Geldt direct en wist een eerdere ElevenLabs-fout.
+// Stopt zelf niet; de schakelaar roept eerst stop() aan.
+export function zetSoort(soort) {
+  const s = soort === 'betaald' ? 'betaald' : 'gratis'
+  try { localStorage.setItem(SOORT_KEY, s) } catch { /* privé-venster */ }
+  if (s === stand.soort) return
+  zet({ soort: s, teruggevallen: null })
 }
 
 export function ontgrendel() {

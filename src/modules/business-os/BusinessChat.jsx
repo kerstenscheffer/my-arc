@@ -503,6 +503,73 @@ function naarBerichten(gesprek) {
     .reverse()
 }
 
+// PA opnieuw inloggen vanuit Business OS. Alleen zichtbaar als de PA op deze
+// Mac draait maar zijn login kwijt is (lokaal loket 127.0.0.1:47615, zie
+// scripts/business-os-pa.mjs). Met je wachtwoord vragen we bij de auth-API
+// een verse sessie (geen tweede supabase-client: die vecht om de login-lock);
+// die gaat rechtstreeks naar de PA. Je eigen login in de browser blijft
+// ongemoeid.
+const PA_LOKET = 'http://127.0.0.1:47615'
+function PaInloggen({ zichtbaar, onKlaar }) {
+  const [nodig, setNodig] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [ww, setWw] = useState('')
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState(null)
+  useEffect(() => {
+    if (!zichtbaar) { setNodig(false); return }
+    let weg = false
+    const kijk = () => fetch(`${PA_LOKET}/status`).then(r => r.json())
+      .then(d => { if (!weg) setNodig(!d.ingelogd) }, () => { if (!weg) setNodig(false) })
+    kijk()
+    const t = setInterval(kijk, 10000)
+    return () => { weg = true; clearInterval(t) }
+  }, [zichtbaar])
+  if (!nodig) return null
+
+  const log = async () => {
+    setBezig(true); setFout(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const sessie = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email: user.email, password: ww }),
+      }).then(x => x.json())
+      if (!sessie.refresh_token) throw new Error('Wachtwoord klopt niet')
+      const r = await fetch(`${PA_LOKET}/login`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ refresh_token: sessie.refresh_token }),
+      }).then(x => x.json())
+      if (!r.ok) throw new Error(r.fout || 'PA nam de login niet aan')
+      setWw(''); setOpen(false); setNodig(false); onKlaar?.()
+    } catch (e) { setFout(e.message) }
+    setBezig(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '6px 4px 8px', ...TEKST }}>
+      <span style={{ color: colors.textSecondary, fontWeight: 700 }}>De PA op je Mac is zijn login kwijt.</span>
+      {open ? (
+        <form onSubmit={e => { e.preventDefault(); if (ww && !bezig) log() }} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="password" autoFocus value={ww} onChange={e => setWw(e.target.value)} placeholder="Wachtwoord"
+            autoComplete="current-password"
+            style={{
+              background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.borderSubtle}`, borderRadius: 8, outline: 'none',
+              color: colors.textPrimary, fontWeight: 600, fontSize: '0.78rem', padding: '6px 8px', width: 140, fontFamily: 'inherit',
+            }} />
+          <button type="submit" disabled={!ww || bezig} style={{ ...KNOP, opacity: !ww || bezig ? 0.5 : 1 }}>
+            {bezig ? 'Bezig…' : 'Inloggen'}
+          </button>
+        </form>
+      ) : (
+        <button onClick={() => setOpen(true)} style={KNOP}>PA inloggen</button>
+      )}
+      {fout && <span style={{ color: colors.danger, fontWeight: 700 }}>{fout}</span>}
+    </div>
+  )
+}
+
 export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   const [gesprek, setGesprek] = useState(leesGesprek)
   const [invoer, setInvoer] = useState('')
@@ -965,6 +1032,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 ))}
               </div>
             )}
+            <PaInloggen zichtbaar={route === 'mac' && !paOnline} onKlaar={() => { setPaOnline(true); meld('PA weer ingelogd') }} />
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
               <button onClick={() => setOpen(o => !o)} title={open ? 'Berichten verbergen' : 'Berichten tonen'} aria-expanded={open}
                 style={{ ...rondeKnop, background: open ? 'rgba(255,255,255,0.08)' : 'transparent', color: open ? colors.textPrimary : colors.textSecondary }}>
