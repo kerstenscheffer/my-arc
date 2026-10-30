@@ -5,10 +5,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { fotoWeergaveUrl } from '../fotoWeergave'
-import { 
+import {
   Camera, Upload, Trash2, ChevronLeft, ChevronRight,
   Calendar, Check, X, Loader2, Image, ZoomIn,
-  RotateCw, ArrowLeftRight
+  RotateCw, ArrowLeftRight, Zap
 } from 'lucide-react'
 
 // ── GOLDEN THEME ──
@@ -41,6 +41,7 @@ export default function PhotosModule({ client, db, isMobile: propIsMobile }) {
   const [lightboxPhoto, setLightboxPhoto] = useState(null)
   const [compareMode, setCompareMode] = useState(false)
   const [comparePhotos, setComparePhotos] = useState([null, null])
+  const [fotoStijl, setFotoStijl] = useState('rust')
   const [message, setMessage] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -89,8 +90,11 @@ export default function PhotosModule({ client, db, isMobile: propIsMobile }) {
     }
 
     setUploading(true)
+    const actualType = selectedType === 'all'
+      ? (fotoStijl === 'gespannen' ? 'front_gespannen' : 'front')
+      : (fotoStijl === 'gespannen' ? `${selectedType}_gespannen` : selectedType)
     try {
-      const result = await db.uploadProgressPhoto?.(client.id, file, selectedType)
+      const result = await db.uploadProgressPhoto?.(client.id, file, actualType)
       if (result) {
         showMessage('Foto geupload!')
         await loadPhotos()
@@ -120,10 +124,15 @@ export default function PhotosModule({ client, db, isMobile: propIsMobile }) {
     }
   }
 
-  // Filter photos by type
-  const filteredPhotos = photos.filter(p => 
-    !selectedType || selectedType === 'all' || p.type === selectedType || p.photo_type === selectedType
-  )
+  // Filter photos by stijl (rust / gespannen) and type
+  const filteredPhotos = photos.filter(p => {
+    const rawType = p.type || p.photo_type || ''
+    const isGespannen = rawType.endsWith('_gespannen')
+    if (fotoStijl === 'gespannen' ? !isGespannen : isGespannen) return false
+    if (selectedType === 'all') return true
+    const baseType = isGespannen ? rawType.slice(0, rawType.length - '_gespannen'.length) : rawType
+    return baseType === selectedType
+  })
 
   // Group photos by date for timeline
   const photosByDate = filteredPhotos.reduce((acc, photo) => {
@@ -195,6 +204,38 @@ export default function PhotosModule({ client, db, isMobile: propIsMobile }) {
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '0.375rem' }}>
+          {/* Rust / Gespannen toggle */}
+          <button
+            onClick={() => setFotoStijl(s => s === 'rust' ? 'gespannen' : 'rust')}
+            title={fotoStijl === 'rust' ? 'Wissel naar gespannen/geposeerde foto\'s' : 'Wissel naar rustfoto\'s'}
+            style={{
+              height: isMobile ? '36px' : '40px',
+              padding: '0 0.625rem',
+              borderRadius: '10px',
+              background: fotoStijl === 'gespannen'
+                ? 'rgba(255, 215, 0, 0.15)'
+                : 'rgba(255, 255, 255, 0.04)',
+              border: fotoStijl === 'gespannen'
+                ? `1px solid ${GOLD.borderActive}`
+                : '1px solid rgba(255, 255, 255, 0.08)',
+              color: fotoStijl === 'gespannen' ? GOLD.primary : 'rgba(255, 255, 255, 0.4)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              fontSize: isMobile ? '0.6rem' : '0.65rem',
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: '0.03em',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Zap size={isMobile ? 12 : 13} strokeWidth={2.5} />
+            {fotoStijl === 'gespannen' ? 'Gespannen' : 'Rust'}
+          </button>
+
           {/* Compare Toggle */}
           <button
             onClick={() => {
