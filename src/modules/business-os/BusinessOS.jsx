@@ -778,6 +778,7 @@ export default function BusinessOS({ isMobile }) {
   const [menu, setMenu] = useState(false)
   const [blad, setBlad] = useState(null)
   const [denkt, setDenkt] = useState(false)
+  const [herinnertPraat, setHerinnertPraat] = useState(false)
   // Wat Gino rond de bol laat zien, per gesprek-tabje: wissel je van tabje,
   // dan wisselt het beeld mee (geen beeld = leeg). Blijft staan tot het
   // kruisje. GinoToneel schoont de ruwe actie zelf op.
@@ -1098,8 +1099,8 @@ export default function BusinessOS({ isMobile }) {
       }}>
         <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ position: 'relative' }}>
-            <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
-            <GinoHerinnering />
+            <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
+            <GinoHerinnering maat={maat} onPraat={setHerinnertPraat} />
           </div>
 
           {/* ── Chat: de ring praat ── */}
