@@ -54,6 +54,7 @@ const PRIJS_KEY = 'business_os_prijs'
 const ONDERDELEN = [
   ['vandaag', 'Vandaag · taken, beloftes en calls'],
   ['content', 'Content · komende 14 dagen'],
+  ['week', 'Week · inputs vs doel'],
   ['kern', 'Kerncijfers · deze maand'],
   ['keten', 'De keten · deze maand vs. gemiddelde'],
   ['acties', 'Acties deze week'],
@@ -600,6 +601,130 @@ function ContentPaneel({ c }) {
   )
 }
 
+// ── Week: dagelijkse inputs tegen het doel, ma t/m zo ──
+// Dagindeling in Europe/Amsterdam (database-tijden zijn UTC). Magnets en
+// praatreels uit content_ig_media (kolom dag), outreach via dezelfde RPC als
+// de ring in de leadbalk (content_lead_stats), reacties = call_leads met
+// first_reply_at, calls = verplaatsingen naar 'Call voorgesteld'.
+const amsDag = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date(d))
+const plusDagen = (dag, n) => { const d = new Date(dag + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+const WEEK_RIJEN = [
+  { id: 'magnet', label: 'Magnets', doel: 8 },
+  { id: 'reel', label: 'Praatreels', doel: 1 },
+  { id: 'outreach', label: 'Ochtendronde', doel: 100 },
+  { id: 'reacties', label: 'Reacties' },
+  { id: 'calls', label: 'Calls voorgesteld' },
+]
+
+function useWeek() {
+  const [week, setWeek] = useState(null)
+
+  const laad = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.id) return
+    const vandaag = amsDag(Date.now())
+    const ma = plusDagen(vandaag, -((new Date(vandaag + 'T12:00:00Z').getUTCDay() + 6) % 7))
+    const van = plusDagen(ma, -7), tot = plusDagen(ma, 6)
+    // Ruime UTC-grenzen; de Amsterdamse dag wordt hieronder per rij bepaald.
+    const vanTs = plusDagen(van, -1) + 'T00:00:00Z', totTs = plusDagen(tot, 2) + 'T00:00:00Z'
+    const leeg = () => ({ data: [] })
+    const team = await supabase.rpc('team_coach_ids', { p_coach_id: user.id }).then(r => r, leeg)
+    const ids = Array.isArray(team.data) && team.data.length ? team.data : [user.id]
+    const [media, doelen, stats, reacties, calls] = await Promise.all([
+      supabase.from('content_ig_media').select('dag, soort').in('soort', ['magnet', 'reel'])
+        .gte('dag', van).lte('dag', tot).limit(5000).then(r => r, leeg),
+      supabase.from('content_doelen').select('soort, doel').then(r => r, leeg),
+      supabase.rpc('content_lead_stats', { van, tot }).then(r => r, leeg),
+      supabase.from('call_leads').select('first_reply_at').in('coach_id', ids).is('deleted_at', null)
+        .gte('first_reply_at', vanTs).lt('first_reply_at', totTs).limit(5000).then(r => r, leeg),
+      supabase.from('lead_movements').select('moved_at').is('reverted_at', null)
+        .ilike('to_section_title', 'call voorgesteld%')
+        .gte('moved_at', vanTs).lt('moved_at', totTs).limit(5000).then(r => r, leeg),
+    ])
+    const telling = {}
+    const tel = (dag, id, n = 1) => { if (dag >= van && dag <= tot) telling[`${dag}|${id}`] = (telling[`${dag}|${id}`] || 0) + n }
+    for (const r of media.data || []) tel(r.dag, r.soort)
+    for (const r of stats.data || []) tel(r.dag, 'outreach', Number(r.outreach) || 0)
+    for (const r of reacties.data || []) tel(amsDag(r.first_reply_at), 'reacties')
+    for (const r of calls.data || []) tel(amsDag(r.moved_at), 'calls')
+    const dl = {}
+    for (const r of doelen.data || []) dl[r.soort] = r.doel
+    setWeek({ vandaag, dagen: Array.from({ length: 7 }, (_, i) => plusDagen(ma, i)), telling, doelen: dl })
+  }, [])
+
+  const rijen = useMemo(() => {
+    if (!week) return []
+    const { dagen, telling, doelen, vandaag } = week
+    return WEEK_RIJEN.map(r => {
+      const doel = r.doel ? (doelen[r.id] ?? r.doel) : null
+      const perDag = dagen.map(d => telling[`${d}|${r.id}`] || 0)
+      const vorige = dagen.reduce((t, d) => t + (telling[`${plusDagen(d, -7)}|${r.id}`] || 0), 0)
+      const gehaald = doel ? dagen.filter((d, i) => d <= vandaag && perDag[i] >= doel).length : 0
+      return { ...r, doel, perDag, totaal: perDag.reduce((t, n) => t + n, 0), weekdoel: doel ? doel * 7 : null, vorige, gehaald }
+    })
+  }, [week])
+
+  return { geladen: week !== null, dagen: week?.dagen || [], vandaag: week?.vandaag, rijen, laad }
+}
+
+function WeekPaneel({ w }) {
+  if (!w.geladen) return <div style={{ fontSize: '0.85rem', color: C.zacht }}>Laden…</div>
+  const metDoel = w.rijen.filter(r => r.doel)
+  const verstreken = w.dagen.filter(d => d <= w.vandaag).length
+  const gehaald = metDoel.reduce((t, r) => t + r.gehaald, 0)
+  const mogelijk = metDoel.length * verstreken
+  const raster = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }
+  return (
+    <>
+      <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 16 }}>
+        <b style={{ ...NUM, color: mogelijk && gehaald >= mogelijk ? C.groen : C.wit }}>{gehaald} van {mogelijk}</b> daggoals gehaald deze week
+      </div>
+      <div style={{ ...raster, marginBottom: 4 }}>
+        {w.dagen.map(d => (
+          <div key={d} style={{
+            textAlign: 'center', fontSize: '0.7rem', fontWeight: 800, textTransform: 'capitalize',
+            color: d === w.vandaag ? C.wit : C.zacht,
+            ...(d === w.vandaag ? { textDecoration: 'underline', textUnderlineOffset: 3 } : {}),
+          }}>
+            {new Date(d + 'T12:00:00Z').toLocaleDateString('nl-NL', { weekday: 'short', timeZone: 'UTC' }).replace('.', '')}
+          </div>
+        ))}
+      </div>
+      {w.rijen.map(r => (
+        <div key={r.id} style={{ padding: '10px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800 }}>
+              {r.label}
+              {r.doel && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: C.zacht }}> · doel {r.doel}/dag</span>}
+            </span>
+            <span style={{ ...NUM, fontSize: '0.85rem', fontWeight: 900, color: r.weekdoel && r.totaal >= r.weekdoel ? C.groen : C.wit }}>
+              {r.totaal}{r.weekdoel ? ` / ${r.weekdoel}` : ''}
+            </span>
+            <span style={{ ...NUM, fontSize: '0.72rem', fontWeight: 700, color: C.zacht }}>({r.vorige})</span>
+          </div>
+          <div style={raster}>
+            {r.perDag.map((n, i) => {
+              const toekomst = w.dagen[i] > w.vandaag
+              const kleur = toekomst || !r.doel ? (n ? C.wit : C.zacht) : n >= r.doel ? C.groen : C.oranje
+              return (
+                <div key={w.dagen[i]} style={{
+                  ...NUM, textAlign: 'center', fontSize: '0.85rem', fontWeight: 900, padding: '4px 0',
+                  color: kleur, opacity: toekomst ? 0.3 : 1,
+                }}>
+                  {toekomst && !n ? '·' : n}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+      <div style={{ fontSize: '0.75rem', color: C.zacht, marginTop: 8 }}>
+        Groen = daggoal gehaald, oranje = lager. Tussen haakjes: vorige week.
+      </div>
+    </>
+  )
+}
+
 function Invoer({ label, waarde, onChange }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.75rem', fontWeight: 700, color: C.zacht, flex: 1 }}>
@@ -638,6 +763,10 @@ export default function BusinessOS({ isMobile }) {
   const content = useContent()
   const { laad: laadContent } = content
   useEffect(() => { if (blad === 'content') laadContent() }, [blad, laadContent])
+  // Week laadt alleen als het paneel opengaat; Gino krijgt de cijfers daarna mee.
+  const week = useWeek()
+  const { laad: laadWeek } = week
+  useEffect(() => { if (blad === 'week') laadWeek() }, [blad, laadWeek])
   // Stem-modus: eerste klik zet aan (en ontgrendelt iOS), klik tijdens praten
   // stopt alleen, klik in stilte zet uit.
   const { aan: stemAan, spreekt, teruggevallen } = stem.useStem()
@@ -743,6 +872,7 @@ export default function BusinessOS({ isMobile }) {
   const inhoud = (k) => {
     if (k === 'vandaag') return <VandaagPaneel v={vandaag} />
     if (k === 'content') return <ContentPaneel c={content} />
+    if (k === 'week') return <WeekPaneel w={week} />
     if (k === 'kern') return (
       <>
         <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 12 }}>
@@ -926,6 +1056,9 @@ export default function BusinessOS({ isMobile }) {
               legeDagen: content.perDag.filter(d => d.items.length === 0).map(d => d.datum),
               items: content.perDag.flatMap(d => d.items.map(it => ({ datum: d.datum, titel: it.title, status: it.status }))),
             },
+            weekInputs: week.geladen
+              ? week.rijen.map(r => ({ input: r.label, dezeWeek: r.totaal, weekdoel: r.weekdoel, vorigeWeek: r.vorige, daggoalsGehaald: r.doel ? r.gehaald : null }))
+              : null,
           }} />
         </div>
       </div>

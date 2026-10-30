@@ -164,6 +164,8 @@ function Vak({ html, maxHoogte }) {
     return () => window.removeEventListener('message', bij)
   }, [maxHoogte])
   if (!html.trim()) return null
+  // colorScheme moet gelijk zijn aan die in het vakje (visueelHtml: dark),
+  // anders verft de browser het iframe wit en vallen witte getallen weg.
   return (
     <iframe ref={ref} title="Gino laat zien" sandbox="allow-scripts" srcDoc={srcdoc}
       style={{ width: '100%', height: hoogte, border: 'none', background: 'transparent', display: 'block', colorScheme: 'dark' }} />

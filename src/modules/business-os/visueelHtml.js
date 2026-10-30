@@ -54,7 +54,7 @@ export function schoonHtml(html, purify = DOMPurify) {
 // Huisstijl als CSS-variabelen + vaste animatieklassen, zodat Gino kort kan
 // blijven en het altijd MY ARC oogt.
 const BASIS_CSS = `
-:root { --wit:#fff; --grijs:#9ca3af; --zacht:#6b7280; --groen:#22c55e; --oranje:#f59e0b; --rood:#ef4444; --vlak:#141414; --lijn:rgba(255,255,255,0.08); }
+:root { color-scheme: dark; --wit:#fff; --grijs:#9ca3af; --zacht:#6b7280; --groen:#22c55e; --oranje:#f59e0b; --rood:#ef4444; --vlak:#141414; --lijn:rgba(255,255,255,0.08); }
 * { box-sizing: border-box; }
 html, body { margin:0; padding:0; background:transparent; color:var(--wit); overflow:hidden;
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight:600; -webkit-font-smoothing:antialiased; }
@@ -104,6 +104,7 @@ export function maakSrcdoc(schoon) {
   ].join('; ')
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
+<meta name="color-scheme" content="dark">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap">
 <style>${BASIS_CSS}</style>
 <script nonce="${nonce}" src="${LUCIDE_URL}"></script>
