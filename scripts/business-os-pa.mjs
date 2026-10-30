@@ -317,17 +317,37 @@ async function pakRij(soort) {
   return gepakt?.length ? rij : null
 }
 
+// Auto-herstart na een code-opdracht: de opdracht kan dit script zelf hebben
+// aangepast, en zo is de nieuwe code live zonder Terminal. Pas als het
+// resultaat in de database staat en er geen chatantwoord loopt; dan ~3 s
+// later via een losgekoppeld proces (overleeft het stoppen van de PA).
+// Eén keer per opdracht: het id gaat vóór de herstart naar laatste-herstart,
+// en na de herstart staat de rij op klaar/mislukt, dus hij komt niet terug.
+const HERSTART_ID = path.join(SESSIE_MAP, 'laatste-herstart')
+let herstartGepland = false
+async function herstartNa(id) {
+  try { if (fs.readFileSync(HERSTART_ID, 'utf8') === String(id)) return } catch { /* nog nooit */ }
+  herstartGepland = true
+  for (let i = 0; bezig.chat && i < 600; i++) await new Promise(r => setTimeout(r, 1000))
+  fs.writeFileSync(HERSTART_ID, String(id), { mode: 0o600 })
+  console.log(`${tijd()} ↻ PA herstart over 3 s (nieuwe code live)`)
+  spawn('sh', ['-c', `sleep 3; launchctl kickstart -k gui/${process.getuid()}/nl.myarc.pa`], { detached: true, stdio: 'ignore' }).unref()
+}
+
 async function rondeCode() {
+  if (herstartGepland) return
   const rij = await pak('code')
   if (!rij) return
   bezig.code = true
   try {
     console.log(`${tijd()} ▶ code: ${rij.opdracht.split('\n')[0].slice(0, 100)}`)
     const r = await voerCodeUit(rij.opdracht)
-    await sb.from('business_os_opdrachten')
+    const { error } = await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', resultaat: r.tekst, klaar_at: new Date().toISOString() })
       .eq('id', rij.id)
     console.log(`${tijd()} ${r.ok ? '✓ klaar' : '✗ mislukt'}\n${r.tekst}\n`)
+    if (error) console.error(tijd(), 'Resultaat opslaan mislukt, geen herstart:', error.message)
+    else herstartNa(rij.id).catch(e => console.error(tijd(), 'Herstart mislukt:', e.message))
   } finally { bezig.code = false }
 }
 
