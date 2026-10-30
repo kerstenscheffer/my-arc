@@ -641,6 +641,54 @@ function WachtOpJou({ voorstel, staat, onToestaan }) {
   )
 }
 
+// Bewerkbaar bericht (bv. het klantappje uit Call-appje): tekst aanpassen en
+// kopiëren. Bewerkingen staan per bericht in een Map, zodat ze blijven als het
+// venster dicht en weer open gaat; de originele tekst zit in de sleutel, dus
+// een nieuw gesprek op dezelfde plek begint schoon.
+const bewerkingen = new Map()
+const isBewerkbaarBericht = (ac) => ac?.soort === 'bewerkbaar_bericht' && typeof ac.tekst === 'string' && ac.tekst.trim() !== ''
+
+function BewerkbaarBericht({ voorstel, sleutel }) {
+  const origineel = voorstel.tekst
+  const key = `${sleutel}|${origineel}`
+  const [tekst, setTekst] = useState(() => bewerkingen.get(key) ?? origineel)
+  const [klaar, setKlaar] = useState(false)
+  const veld = useRef(null)
+  useLayoutEffect(() => {
+    const el = veld.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [tekst])
+  const wijzig = (nieuw) => {
+    setTekst(nieuw)
+    if (nieuw === origineel) bewerkingen.delete(key)
+    else bewerkingen.set(key, nieuw)
+  }
+  const kopieer = () => navigator.clipboard?.writeText(tekst)
+    .then(() => { setKlaar(true); setTimeout(() => setKlaar(false), 1500) }, () => {})
+  const knop2 = { ...KNOP, background: 'transparent', color: colors.textPrimary, border: '1px solid rgba(255,255,255,.15)' }
+  return (
+    <div style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 10, margin: '2px 0 8px' }}>
+      <div style={{ ...KAART_KOP, fontSize: '0.8rem', marginBottom: 8 }}>
+        {typeof voorstel.titel === 'string' && voorstel.titel ? voorstel.titel : 'Bericht'}
+      </div>
+      <textarea ref={veld} value={tekst} rows={10} onChange={e => wijzig(e.target.value)} spellCheck={false}
+        style={{
+          width: '100%', boxSizing: 'border-box', minHeight: 160, resize: 'none', overflow: 'hidden',
+          background: 'transparent', color: colors.textPrimary, border: '1px solid rgba(255,255,255,.08)', borderRadius: 8,
+          padding: 8, fontFamily: 'Inter, system-ui, sans-serif', fontSize: '0.8rem', lineHeight: 1.45, whiteSpace: 'pre-wrap',
+        }} />
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+        <span style={{ color: colors.textSecondary, fontWeight: 600, fontSize: '0.72rem', marginRight: 'auto' }}>{tekst.length} tekens</span>
+        <button type="button" onClick={() => wijzig(origineel)} disabled={tekst === origineel}
+          style={{ ...knop2, opacity: tekst === origineel ? 0.4 : 1 }}>Herstel</button>
+        <button type="button" onClick={kopieer} style={KNOP}>{klaar ? 'Gekopieerd' : 'Kopieer'}</button>
+      </div>
+    </div>
+  )
+}
+
 // Tekstwolkje bij het robotje: het eerste open voorstel als korte vraag.
 // Zweeft (absoluut) boven de balk, dus ring en pagina schuiven niet.
 function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee, extraHoogte = 0 }) {
@@ -1882,6 +1930,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
                     if (ac.soort === 'wacht_op_jou') return <WachtOpJou key={j} {...kaart} />
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
+                    if (ac.soort === 'bewerkbaar_bericht') return isBewerkbaarBericht(ac)
+                      ? <BewerkbaarBericht key={j} voorstel={ac} sleutel={`${actief.id}-${i}-${j}`} /> : null
                     if (ac.soort === 'visueel') {
                       const vraag = alle.slice(0, i).reverse().find(n => n.role === 'user')?.content || null
                       return (
