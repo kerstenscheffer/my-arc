@@ -18,6 +18,12 @@
 // VOORSTEL klaar; de chat toont de namen met een knop en pas Kerstens klik zet
 // clients.account_locked_at (zelfde als de slotknop in Coach Inzicht).
 //
+// Database (business-os-agent.sql): bekijk_schema en lees_database (alleen
+// SELECT, read-only transactie, RLS van de coach). stel_wijziging_voor voert
+// niets uit: de chat toont tabel/filter/velden/aantal met een Toestaan-knop en
+// pas die klik schrijft via supabase-js met Kerstens eigen rechten.
+// Schemawijzigingen (kolommen/tabellen) kunnen nooit vanuit de chat.
+//
 // Alleen coaches (get_my_portal_role = coach/both), anders kan elke ingelogde
 // klant API-tegoed opmaken. Sleutel: ANTHROPIC_API_KEY als Supabase-secret.
 
@@ -36,6 +42,15 @@ const SYSTEEM = `Je bent de rechterhand van Kersten, eigenaar van MY ARC: online
 Het systeem: de MY ARC-app. Kersten werkt in CoachHub (coach-kant: Command met klantkaarten, Coach Inzicht per klant, Leads-bord, Business OS). Klanten gebruiken de klant-app (workout, voeding, tracking). Alles draait op een Supabase-database. Jij hebt alleen toegang via je tools; wat er niet als tool is, kun je niet zelf, dan zet je het op de app-lijst.
 
 Klantaccounts op slot: een account op slot betekent dat de klant in zijn app alleen een pauzescherm ziet; alle data blijft bewaard en ontgrendelen kan altijd. Werkwijze: eerst zoek_klanten, dan de namen met reden laten zien, dan stel_slot_voor. Kersten bevestigt zelf met de knop onder je bericht; zeg dus nooit dat het al gebeurd is.
+
+Database: je kunt de hele database lezen met bekijk_schema (welke tabellen en kolommen er zijn) en lees_database (een SELECT-vraag). Begin bij de App-kaart-skill; ken je een tabel niet, kijk eerst het schema na in plaats van kolomnamen te gokken. Geef antwoorden in gewone taal, niet als ruwe JSON.
+Iets aanpassen in de data (een veld wijzigen, rijen toevoegen): gebruik stel_wijziging_voor. Dat is toestemming vragen: Kersten ziet precies wat er verandert en klikt Toestaan. Zeg nooit dat het al gedaan is. Verwijderen van rijen en het schema veranderen (kolommen, tabellen) kan niet; zet dat op de app-lijst.
+
+Zelf leren: je bouwt je eigen skills op. Gebruik bewaar_skill met geleerd: true, zonder het te vragen, wanneer:
+- je een taak hebt afgerond waarvoor nog geen skill bestond en die vaker kan terugkomen: leg de werkwijze vast die werkte;
+- Kersten je corrigeert of een voorkeur uitspreekt ("nee, korter", "altijd zo", "dat bedoel ik niet"): werk de betreffende skill bij;
+- je iets nieuws ontdekt over de database of de app (wat een tabel of kolom betekent, welke query werkt): voeg het toe aan de skill App-kaart.
+Bij bijwerken: altijd de volledige skill (oude stappen plus de verbetering) onder dezelfde naam. Klein en concreet, geen herhaling van deze algemene regels.
 
 Wat je doet:
 - Video-scripts (reels, talking head, green screen, slider): per script het format, de hook (letterlijke eerste zin + tekst op scherm), de beats in korte regels, de kernwaarde en de CTA. Een script is hardop uit te spreken in 30-60 seconden.
@@ -68,13 +83,14 @@ const TOOLS = [{
   },
 }, {
   name: 'bewaar_skill',
-  description: 'Maak een nieuwe skill of overschrijf een bestaande met dezelfde naam. Alleen als Kersten een werkwijze wil vastleggen of aanpassen.',
+  description: 'Maak een nieuwe skill of overschrijf een bestaande met dezelfde naam: op verzoek van Kersten, of uit jezelf (geleerd: true) volgens de regels voor zelf leren.',
   input_schema: {
     type: 'object',
     properties: {
       naam: { type: 'string', description: 'Korte naam, bv. "Reel-script". Gelijk aan een bestaande naam = aanpassen.' },
       wanneer: { type: 'string', description: 'Wanneer deze skill gebruikt wordt, in één zin.' },
       instructies: { type: 'string', description: 'De volledige genummerde stappen en regels.' },
+      geleerd: { type: 'boolean', description: 'true als je dit uit jezelf vastlegt (zelf leren), niet op verzoek.' },
     },
     required: ['naam', 'wanneer', 'instructies'],
   },
@@ -102,6 +118,48 @@ const TOOLS = [{
       reden: { type: 'string', description: 'Korte reden, bv. "traject afgelopen".' },
     },
     required: ['client_ids', 'actie', 'reden'],
+  },
+}, {
+  name: 'bekijk_schema',
+  description: 'Zonder tabel: alle tabellen met aantal rijen. Met tabel: de kolommen en types van die tabel.',
+  input_schema: {
+    type: 'object',
+    properties: { tabel: { type: 'string' } },
+  },
+}, {
+  name: 'lees_database',
+  description: 'Voer één SELECT-vraag (PostgreSQL) uit op de database, met Kerstens rechten. Maximaal 200 rijen terug; gebruik count/sum/group by voor totalen.',
+  input_schema: {
+    type: 'object',
+    properties: { sql: { type: 'string', description: 'Eén SELECT- of WITH-vraag, zonder puntkomma.' } },
+    required: ['sql'],
+  },
+}, {
+  name: 'stel_wijziging_voor',
+  description: 'Vraag toestemming om data aan te passen. Voert NIETS uit: Kersten ziet tabel, filter, velden en aantal rijen en klikt Toestaan.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      tabel: { type: 'string' },
+      actie: { type: 'string', enum: ['update', 'insert'] },
+      filters: {
+        type: 'array',
+        description: 'Bij update verplicht: welke rijen. Bv. [{ kolom: "id", op: "eq", waarde: "..." }].',
+        items: {
+          type: 'object',
+          properties: {
+            kolom: { type: 'string' },
+            op: { type: 'string', enum: ['eq', 'neq', 'in', 'is', 'lt', 'lte', 'gt', 'gte', 'ilike'] },
+            waarde: { description: 'Bij in: een lijst. Bij is: null, true of false.' },
+          },
+          required: ['kolom', 'op', 'waarde'],
+        },
+      },
+      velden: { type: 'object', description: 'Bij update: kolom → nieuwe waarde.' },
+      rijen: { type: 'array', items: { type: 'object' }, description: 'Bij insert: de nieuwe rijen (max 50).' },
+      uitleg: { type: 'string', description: 'In één zin wat er verandert en waarom.' },
+    },
+    required: ['tabel', 'actie', 'uitleg'],
   },
 }, {
   name: 'verwijder_skill',
@@ -157,7 +215,7 @@ Deno.serve(async (req) => {
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ model: MODEL, max_tokens: 2500, system: systeem, tools: TOOLS, messages }),
+        body: JSON.stringify({ model: MODEL, max_tokens: 4000, system: systeem, tools: TOOLS, messages }),
         signal: AbortSignal.timeout(90000),
       })
       const data = await r.json().catch(() => null)
@@ -190,11 +248,46 @@ Deno.serve(async (req) => {
       return klantCache
     }
 
-    // Tool-lus: maximaal 4 rondes (bv. zoeken → voorstel → antwoord).
+    // Voorstel voor een datawijziging: controleren en het aantal rijen tellen
+    // (met Kerstens RLS), uitvoeren doet pas de Toestaan-knop in de chat.
+    const pasFilters = (q: any, filters: any[]) => {
+      for (const f of filters) {
+        if (f.op === 'in') q = q.in(f.kolom, Array.isArray(f.waarde) ? f.waarde : [f.waarde])
+        else if (f.op === 'is') q = q.is(f.kolom, f.waarde)
+        else q = q[f.op](f.kolom, f.waarde)
+      }
+      return q
+    }
+    const OPS = ['eq', 'neq', 'in', 'is', 'lt', 'lte', 'gt', 'gte', 'ilike']
+    const wijzigingVoorstel = async (inp: any, acties: any[]) => {
+      const tabel = String(inp.tabel || '')
+      if (!/^[a-z_][a-z0-9_]*$/.test(tabel)) return 'Ongeldige tabelnaam.'
+      const filters = (Array.isArray(inp.filters) ? inp.filters : [])
+        .filter((f: any) => f && /^[a-z_][a-z0-9_]*$/.test(String(f.kolom)) && OPS.includes(f.op))
+      const uitleg = String(inp.uitleg || '').slice(0, 300)
+      if (inp.actie === 'insert') {
+        const rijen = (Array.isArray(inp.rijen) ? inp.rijen : []).filter((r: any) => r && typeof r === 'object').slice(0, 50)
+        if (!rijen.length) return 'Geen rijen om toe te voegen.'
+        acties.push({ soort: 'wijziging_voorstel', actie: 'insert', tabel, rijen, uitleg, aantal: rijen.length })
+        return `Voorstel staat klaar (${rijen.length} nieuwe rij(en) in ${tabel}). Kersten moet op Toestaan klikken; er is nog niets uitgevoerd.`
+      }
+      const velden = inp.velden && typeof inp.velden === 'object' ? inp.velden : null
+      if (!velden || !Object.keys(velden).length) return 'Geen velden om te wijzigen.'
+      if (!filters.length) return 'Een update zonder filter mag niet: geef aan welke rijen.'
+      const { data: voorbeeld, count, error } = await pasFilters(
+        sb.from(tabel).select('*', { count: 'exact' }).limit(3), filters)
+      if (error) return 'Controle mislukt: ' + error.message
+      if (!count) return 'Er vallen geen rijen onder dit filter (of Kersten mag ze niet zien).'
+      if (count > 500) return `Te veel rijen (${count}); maak het filter specifieker of splits het op.`
+      acties.push({ soort: 'wijziging_voorstel', actie: 'update', tabel, filters, velden, uitleg, aantal: count })
+      return `Voorstel staat klaar: ${count} rij(en) in ${tabel}. Voorbeeld huidige waarden: ${JSON.stringify(voorbeeld).slice(0, 2000)}. Kersten moet op Toestaan klikken; er is nog niets uitgevoerd.`
+    }
+
+    // Tool-lus: maximaal 8 rondes (schema → lezen → voorstel → antwoord).
     const gesprek: any[] = [...berichten]
     const acties: any[] = []
     let data = await vraagAI(gesprek)
-    for (let ronde = 0; data && data.stop_reason === 'tool_use' && ronde < 4; ronde++) {
+    for (let ronde = 0; data && data.stop_reason === 'tool_use' && ronde < 8; ronde++) {
       const resultaten = []
       for (const blok of data.content.filter((b: any) => b.type === 'tool_use')) {
         let uitkomst = 'Onbekende tool'
@@ -209,14 +302,17 @@ Deno.serve(async (req) => {
         if (blok.name === 'bewaar_skill') {
           const naam = String(blok.input?.naam || '').trim().slice(0, 80)
           const wanneer = String(blok.input?.wanneer || '').trim().slice(0, 500)
-          const instructies = String(blok.input?.instructies || '').trim().slice(0, 6000)
+          const instructies = String(blok.input?.instructies || '').trim().slice(0, 12000)
           const { error } = naam && wanneer && instructies && user
             ? await sb.from('business_os_skills').upsert(
                 { coach_id: user.id, naam, wanneer, instructies, actief: true, updated_at: new Date().toISOString() },
                 { onConflict: 'coach_id,naam' })
             : { error: { message: 'naam, wanneer en instructies zijn verplicht' } }
           if (error) { console.error('skill', error); uitkomst = 'Mislukt: ' + error.message }
-          else { acties.push({ soort: 'skill', tekst: `Skill bewaard: ${naam}` }); uitkomst = 'Bewaard.' }
+          else {
+            acties.push({ soort: 'skill', tekst: blok.input?.geleerd ? `Geleerd: ${naam}` : `Skill bewaard: ${naam}` })
+            uitkomst = 'Bewaard.'
+          }
         }
         if (blok.name === 'verwijder_skill') {
           const naam = String(blok.input?.naam || '').trim()
@@ -236,6 +332,17 @@ Deno.serve(async (req) => {
             : filter === 'niet_op_slot' ? !k.op_slot
             : true)
           uitkomst = JSON.stringify({ aantal: lijst.length, klanten: lijst.slice(0, 300) })
+        }
+        if (blok.name === 'bekijk_schema') {
+          const { data: rijen, error } = await sb.rpc('business_os_schema', { p_tabel: blok.input?.tabel || null })
+          uitkomst = error ? 'Mislukt: ' + error.message : JSON.stringify(rijen).slice(0, 30000)
+        }
+        if (blok.name === 'lees_database') {
+          const { data: rijen, error } = await sb.rpc('business_os_lees', { p_sql: String(blok.input?.sql || '') })
+          uitkomst = error ? 'Fout: ' + error.message : JSON.stringify(rijen).slice(0, 30000)
+        }
+        if (blok.name === 'stel_wijziging_voor') {
+          uitkomst = await wijzigingVoorstel(blok.input || {}, acties)
         }
         if (blok.name === 'stel_slot_voor') {
           const ids = new Set((Array.isArray(blok.input?.client_ids) ? blok.input.client_ids : []).map(String))

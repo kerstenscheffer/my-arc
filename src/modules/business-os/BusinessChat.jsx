@@ -7,7 +7,7 @@
 // de browser dat niet kan (o.a. de iOS-app-webview) verschijnt de knop niet.
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
@@ -74,6 +74,67 @@ function SlotVoorstel({ voorstel, onKlaar }) {
           }}
         >
           {bezig ? 'Bezig…' : opSlot ? `Zet ${voorstel.klanten.length} op slot` : `Ontgrendel ${voorstel.klanten.length}`}
+        </button>
+      )}
+      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
+    </div>
+  )
+}
+
+// Voorstel van de AI om data aan te passen (stel_wijziging_voor). De AI heeft
+// het aantal rijen al geteld; deze knop voert het uit met Kerstens eigen
+// rechten (RLS), dus nooit meer dan hij zelf in de app zou mogen.
+const waardeTekst = (v) => v === null ? 'leeg' : typeof v === 'object' ? JSON.stringify(v) : String(v)
+
+function WijzigingVoorstel({ voorstel, onKlaar }) {
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState(null)
+  const voerUit = async () => {
+    setBezig(true)
+    setFout(null)
+    let q
+    if (voorstel.actie === 'insert') {
+      q = supabase.from(voorstel.tabel).insert(voorstel.rijen)
+    } else {
+      q = supabase.from(voorstel.tabel).update(voorstel.velden)
+      for (const f of voorstel.filters) {
+        if (f.op === 'in') q = q.in(f.kolom, Array.isArray(f.waarde) ? f.waarde : [f.waarde])
+        else if (f.op === 'is') q = q.is(f.kolom, f.waarde)
+        else q = q[f.op](f.kolom, f.waarde)
+      }
+    }
+    const { error } = await q
+    setBezig(false)
+    if (error) { setFout('Mislukt: ' + error.message); return }
+    onKlaar()
+  }
+  return (
+    <div style={{ margin: '4px 0 12px' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 4 }}>
+        <Database size={15} /> {voorstel.uitleg}
+      </div>
+      <div style={{ color: colors.textSecondary, fontWeight: 600, marginBottom: 8, wordBreak: 'break-word' }}>
+        {voorstel.actie === 'insert'
+          ? `${voorstel.aantal} nieuwe rij(en) in ${voorstel.tabel}`
+          : <>
+              {voorstel.aantal} rij(en) in {voorstel.tabel} waar {voorstel.filters.map(f => `${f.kolom} ${f.op} ${waardeTekst(f.waarde)}`).join(' en ')}
+              <br />→ {Object.entries(voorstel.velden).map(([k, v]) => `${k} = ${waardeTekst(v)}`).join(', ')}
+            </>}
+      </div>
+      {voorstel.uitgevoerd ? (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
+          <Check size={16} /> Uitgevoerd
+        </div>
+      ) : (
+        <button
+          onClick={voerUit}
+          disabled={bezig}
+          style={{
+            background: colors.textPrimary, color: colors.onAccent, border: 'none', borderRadius: 12,
+            padding: '0 16px', minHeight: 44, fontWeight: 900, fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          {bezig ? 'Bezig…' : 'Toestaan'}
         </button>
       )}
       {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
@@ -151,19 +212,18 @@ export default function BusinessChat({ context }) {
           ) : (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <div style={{ flex: 1, fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.55, color: colors.textPrimary, whiteSpace: 'pre-wrap' }}>
-                {(b.acties || []).map((ac, j) => ac.soort === 'slot_voorstel' ? (
-                  <SlotVoorstel
-                    key={j}
-                    voorstel={ac}
-                    onKlaar={() => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
-                      ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, uitgevoerd: true } : x),
-                    }))}
-                  />
-                ) : (
-                  <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, marginBottom: 6 }}>
-                    <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}
-                  </div>
-                ))}
+                {(b.acties || []).map((ac, j) => {
+                  const klaar = () => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
+                    ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, uitgevoerd: true } : x),
+                  }))
+                  if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} voorstel={ac} onKlaar={klaar} />
+                  if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} voorstel={ac} onKlaar={klaar} />
+                  return (
+                    <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, marginBottom: 6 }}>
+                      <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}
+                    </div>
+                  )
+                })}
                 {b.content}
               </div>
               <Kopieer tekst={b.content} />
