@@ -27,6 +27,11 @@
 // elk nieuw antwoord na versturen voorgelezen, plus de toestemmingsvraag uit het
 // wolkje. Stopt bij typen, microfoon, versturen, nieuw gesprek en weggaan. Luistert
 // de microfoon, dan praat hij niet (anders hoort de herkenning zichzelf).
+// Rustregel (30 okt): in rust toont het robotje de eerste zin van de laatst
+// afgeronde code-opdracht (max ~60 tekens); open "Ik wacht op jou"-acties staan
+// eronder met elk een Gedaan-knop, plus de ElevenLabs-sleutelactie zolang
+// gino-stem 503 geen_sleutel geeft. Versturen breekt de spraakherkenning af en
+// negeert late resultaten, zodat het veld leeg blijft.
 
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, MessageSquare, ChevronDown, SquarePen } from 'lucide-react'
@@ -39,6 +44,7 @@ const KEY = 'business_os_chat'
 const PA_ONLINE_MS = 45000
 const MAX_BEELDEN = 3 // zoveel recente screenshots gaan mee naar de AI
 const INVOER_MAX_H = 130 // ~6 regels
+const WACHT_RIJ_H = 28 // rij in het wacht-op-jou-lijstje onder de statusregel
 const slaap = (ms) => new Promise(r => setTimeout(r, ms))
 
 const TEKST = { fontSize: '0.78rem', lineHeight: 1.4 }
@@ -388,7 +394,7 @@ function WachtOpJou({ voorstel, staat, onToestaan }) {
 
 // Tekstwolkje bij het robotje: het eerste open voorstel als korte vraag.
 // Zweeft (absoluut) boven de balk, dus ring en pagina schuiven niet.
-function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee }) {
+function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee, extraHoogte = 0 }) {
   const [details, setDetails] = useState(false)
   const { vraag, kort: samenvatting, details: volledig } = vraagVoor(voorstel)
   const { bezig, fout } = staat || {}
@@ -396,7 +402,7 @@ function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee }) {
   const wacht = voorstel.soort === 'wacht_op_jou'
   return (
     <div role="dialog" aria-label={wacht ? 'Gino wacht op jou' : 'Gino vraagt toestemming'} style={{
-      position: 'absolute', left: 0, bottom: '100%', marginBottom: 34, zIndex: 6,
+      position: 'absolute', left: 0, bottom: '100%', marginBottom: 34 + extraHoogte, zIndex: 6,
       width: 'min(340px, 100%)', boxSizing: 'border-box', padding: '10px 12px',
       background: '#0a0a0a', border: `1px solid ${colors.success}55`, borderRadius: 14,
       boxShadow: '0 12px 32px rgba(0,0,0,0.6)', fontSize: '0.78rem', lineHeight: 1.35,
@@ -812,8 +818,16 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     if (ac.soort === 'pa_voorstel') setCode(c => c || 'wacht') // robotje meteen, de poll neemt het over
   }
   const afwijzen = (i, j) => zetActie(i, j, { afgewezen: true })
-  const openVoorstellen = gesprek.flatMap((b, i) => b.role !== 'assistant' ? [] :
+  const alleOpen = gesprek.flatMap((b, i) => b.role !== 'assistant' ? [] :
     (b.acties || []).map((ac, j) => ({ ac, i, j })).filter(x => staatOpen(x.ac)))
+  // "Wacht op jou" staat als lijstje onder de statusregel; het wolkje is voor toestemmingsvragen.
+  const wachtLijst = [
+    ...(sleutelWeg ? [{ sleutel: 'el', tekst: SLEUTEL_ACTIE, onGedaan: sleutelGedaan }] : []),
+    ...alleOpen.filter(x => x.ac.soort === 'wacht_op_jou').map(x => ({
+      sleutel: `${x.i}-${x.j}`, tekst: x.ac.tekst, bezig: actieStaat[`${x.i}-${x.j}`]?.bezig, onGedaan: () => toestaan(x.i, x.j),
+    })),
+  ]
+  const openVoorstellen = alleOpen.filter(x => x.ac.soort !== 'wacht_op_jou')
   const vraagNu = openVoorstellen[0]
   // Lijst open boven de balk: daar staan de kaarten al, wolkje dan weg.
   const wolkZichtbaar = vraagNu && !(open && plek && !plek.onder)
@@ -835,7 +849,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
         {open && plek && (
           <div ref={lijst} style={{
             position: 'absolute', left: 0, right: 0, zIndex: 5,
-            ...(plek.onder ? { top: '100%', marginTop: 10 } : { bottom: '100%', marginBottom: 40 }),
+            ...(plek.onder ? { top: '100%', marginTop: 10 } : { bottom: '100%', marginBottom: 40 + wachtLijst.length * WACHT_RIJ_H }),
             maxHeight: plek.max, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
             display: 'flex', flexDirection: 'column', gap: 6, padding: 12, boxSizing: 'border-box',
             background: '#0a0a0a', border: `1px solid ${colors.borderSubtle}`, borderRadius: 16,
@@ -882,20 +896,34 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
 
         <div ref={balk} style={{ position: 'relative' }}>
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
-          {/* Altijd zichtbaar: bezig, wacht op jou of klaar */}
-          <div role="status" style={{
-            position: 'absolute', left: 4, bottom: '100%', marginBottom: 2,
-            display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap',
-            fontSize: '0.75rem', fontWeight: 800,
-            color: werk || vraagNu ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : colors.textMuted,
-          }}>
-            {werk ? <><Robotje /> {werk}</>
-              : melding && !vraagNu ? <>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />} {melding.tekst}</>
-              : vraagNu ? <><Robotje /> Wacht op jou</>
-              : <><Robotje rustig /> Gino is klaar</>}
+          {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
+          <div style={{ position: 'absolute', left: 4, right: 4, bottom: '100%', marginBottom: 2 }}>
+            <div role="status" style={{
+              display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0,
+              fontSize: '0.75rem', fontWeight: 800,
+              color: werk || vraagNu ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : laatst ? colors.textSecondary : colors.textMuted,
+            }}>
+              {werk ? <><Robotje /> {werk}</>
+                : melding && !vraagNu ? <>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />} {melding.tekst}</>
+                : vraagNu ? <><Robotje /> Wacht op jou</>
+                : <><Robotje rustig /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar')}</span></>}
+            </div>
+            {wachtLijst.map(w => (
+              <div key={w.sleutel} style={{ display: 'flex', alignItems: 'center', gap: 8, height: WACHT_RIJ_H, minWidth: 0, paddingLeft: 38 }}>
+                <span title={w.tekst} style={{
+                  flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  fontSize: '0.74rem', fontWeight: 700, color: colors.textPrimary,
+                }}>
+                  Ik wacht op jou: {w.tekst}
+                </span>
+                <button onClick={w.onGedaan} disabled={w.bezig} style={{ ...KNOP, minHeight: 24, padding: '0 10px', fontSize: '0.72rem', flexShrink: 0 }}>
+                  Gedaan
+                </button>
+              </div>
+            ))}
           </div>
           {wolkZichtbaar && (
-            <Vraagwolk key={`${vraagNu.i}-${vraagNu.j}`} voorstel={vraagNu.ac} nr={1} totaal={openVoorstellen.length}
+            <Vraagwolk key={`${vraagNu.i}-${vraagNu.j}`} voorstel={vraagNu.ac} nr={1} totaal={openVoorstellen.length} extraHoogte={wachtLijst.length * WACHT_RIJ_H}
               staat={actieStaat[`${vraagNu.i}-${vraagNu.j}`]}
               onToestaan={() => toestaan(vraagNu.i, vraagNu.j)} onNee={() => afwijzen(vraagNu.i, vraagNu.j)} />
           )}
