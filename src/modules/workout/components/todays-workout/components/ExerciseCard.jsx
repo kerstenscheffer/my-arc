@@ -7,12 +7,13 @@ import ExerciseLogModal from './ExerciseLogModal'
 import ClientFeedbackModal from './ClientFeedbackModal'
 import BladModal from './BladModal'
 import ExerciseService from '../../../../../services/ExerciseService'
-import { getFallbackImage } from '../../../utils/oefeningFoto'
+import { getFallbackImage, fotoKandidaten } from '../../../utils/oefeningFoto'
+import OefeningThumb from '../../OefeningThumb'
 import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
 import { plannedSetCount } from '../../../utils/exerciseCompletion'
 
 export default function ExerciseCard({
-  exercise, index, totalExercises, isLogged, onLogsUpdate,
+  exercise, index, isLogged, onLogsUpdate,
   client, schema, db, workoutDayKey, weekdag, dagenMetTraining, visible, delay, onMakePermanent, onVerwijder
 }) {
   const isMobile = window.innerWidth <= 768
@@ -20,7 +21,7 @@ export default function ExerciseCard({
   const [showSwapModal, setShowSwapModal] = useState(false)
   const [showLogModal, setShowLogModal] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
-  const [imageUrl, setImageUrl] = useState(getFallbackImage(exercise))
+  const [imageUrls, setImageUrls] = useState(() => [...fotoKandidaten(exercise), getFallbackImage(exercise)])
   const [loadingImage, setLoadingImage] = useState(true)
   const [makingPermanent, setMakingPermanent] = useState(false)
   const [isPermanent, setIsPermanent] = useState(!exercise._pendingPermanent)
@@ -45,30 +46,13 @@ export default function ExerciseCard({
     if (exercise.name) loadExerciseImage()
   }, [exercise.name, client?.id])
 
-  // Best-effort YouTube thumbnail derivation. Same regex as the editor
-  // — keeps the two sides in sync. Returns null for any non-YouTube URL.
-  const deriveYoutubeThumb = (url) => {
-    if (!url) return null
-    const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/)
-    if (!m) return null
-    return `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg`
-  }
-
+  // Alle foto-kandidaten in volgorde; OefeningThumb schuift bij een laadfout
+  // door naar de volgende (een i.ibb.co-foto die niet laadt → YouTube-thumb).
+  // Daarom niet meer stoppen bij de eerste treffer.
   const loadExerciseImage = async () => {
     setLoadingImage(true)
+    const lijst = fotoKandidaten(exercise)
     try {
-      // Coach-supplied video thumbnail wins — that's the explicit "this is
-      // what this exercise looks like" frame from the workout video.
-      if (exercise.thumbnail_url) {
-        setImageUrl(exercise.thumbnail_url); setLoadingImage(false); return
-      }
-      // If the workout-item itself carries a video_url, try to auto-derive
-      // a YouTube thumb from it BEFORE falling back to the stock image.
-      const ytThumbFromExercise = deriveYoutubeThumb(exercise.video_url)
-      if (ytThumbFromExercise) {
-        setImageUrl(ytThumbFromExercise); setLoadingImage(false); return
-      }
-
       // Custom oefening — haal foto op uit custom_exercises tabel
       if ((exercise.type === 'custom' || exercise._isCustom) && client?.id && db) {
         const { data } = await db.supabase
@@ -76,35 +60,32 @@ export default function ExerciseCard({
           .select('image_url')
           .eq('client_id', client.id)
           .eq('name', exercise.name)
-          .single()
-        if (data?.image_url) { setImageUrl(data.image_url); setLoadingImage(false); return }
+          .maybeSingle()
+        if (data?.image_url) lijst.push(data.image_url)
       }
 
-      // Standaard oefening — fresh query: thumbnail / video / fallback / image.
-      // De video zelf zit alleen nog in het log-scherm; hier gebruiken we 'm
-      // hooguit om een thumbnail uit af te leiden.
+      // Standaard oefening — gebundeld met de andere kaarten tot één query
+      // (oefeningBatch). De video zelf zit alleen in het log-scherm.
       try {
-        // Gebundeld met de andere kaarten tot één query (oefeningBatch).
         const ex = await oefeningInfo(db, exercise.name)
         // Onthoud de fallback URL op het localExercise; het log-scherm speelt
         // 'm af als de coach nog geen eigen video heeft.
         if (ex?.fallback_video_url && !exercise.video_url) {
           setLocalExercise(prev => ({ ...prev, fallback_video_url: ex.fallback_video_url }))
         }
-        if (ex?.thumbnail_url) { setImageUrl(ex.thumbnail_url); setLoadingImage(false); return }
-        const ytThumb = deriveYoutubeThumb(ex?.video_url)
-        if (ytThumb)            { setImageUrl(ytThumb);            setLoadingImage(false); return }
-        if (ex?.image_url)      { setImageUrl(ex.image_url);       setLoadingImage(false); return }
-        // Externe uitlegvideo: altijd de juiste oefening, beter dan een stockfoto.
-        const uitlegThumb = deriveYoutubeThumb(ex?.fallback_video_url)
-        if (uitlegThumb)        { setImageUrl(uitlegThumb);        setLoadingImage(false); return }
-      } catch {}
+        lijst.push(...fotoKandidaten(ex))
+      } catch { /* volgende bron */ }
 
-      const url = await ExerciseService.getExerciseImage(exercise.name)
-      setImageUrl(url || getFallbackImage(exercise))
-    } catch {
-      setImageUrl(getFallbackImage(exercise))
-    } finally { setLoadingImage(false) }
+      if (!lijst.length) {
+        const url = await ExerciseService.getExerciseImage(exercise.name)
+        if (url) lijst.push(url)
+      }
+    } catch { /* stockfoto hieronder */ }
+    // Stockfoto per spiergroep als laatste foto; faalt ook die, dan toont
+    // OefeningThumb een vlak met de naam.
+    lijst.push(getFallbackImage(exercise))
+    setImageUrls([...new Set(lijst)])
+    setLoadingImage(false)
   }
 
   const checkFeedback = async () => {
@@ -165,18 +146,23 @@ export default function ExerciseCard({
     // Optimistische UI update — naam direct wisselen zonder reload te wachten
     if (result?.newExercise) {
       setLocalExercise(prev => ({ ...prev, ...result.newExercise }))
-      setImageUrl(getFallbackImage(result.newExercise))
-      loadExerciseImageForName(result.newExercise.name)
+      setImageUrls([...fotoKandidaten(result.newExercise), getFallbackImage(result.newExercise)])
+      loadExerciseImageForName(result.newExercise)
     }
     setShowSwapModal(false)
     if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
   }
 
-  const loadExerciseImageForName = async (name) => {
+  const loadExerciseImageForName = async (nieuw) => {
     try {
-      const url = await ExerciseService.getExerciseImage(name)
-      if (url) setImageUrl(url)
-    } catch { }
+      const ex = await oefeningInfo(db, nieuw.name)
+      const lijst = [...fotoKandidaten(nieuw, ex)]
+      if (!lijst.length) {
+        const url = await ExerciseService.getExerciseImage(nieuw.name)
+        if (url) lijst.push(url)
+      }
+      if (lijst.length) setImageUrls([...new Set([...lijst, getFallbackImage(nieuw)])])
+    } catch { /* stockfoto blijft staan */ }
   }
 
   const handleLogComplete = () => {
@@ -261,12 +247,13 @@ export default function ExerciseCard({
               cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <div style={{
-              position: 'absolute', inset: 0,
-              backgroundImage: `url(${imageUrl})`,
-              backgroundSize: 'cover', backgroundPosition: 'center',
-              opacity: isLogged ? 0.4 : 0.6,
-            }} />
+            <OefeningThumb
+              bronnen={imageUrls}
+              naam={localExercise.name}
+              compact={photoSize < 70}
+              style={{ position: 'absolute', inset: 0, background: 'transparent' }}
+              imgStyle={{ opacity: isLogged ? 0.4 : 0.6 }}
+            />
             {/* Donkere overlay om foto rustiger te maken */}
             <div style={{
               position: 'absolute', inset: 0,

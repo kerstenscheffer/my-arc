@@ -13,6 +13,7 @@ import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { X, Search, Video, ListFilter, Loader2 } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
+import OefeningThumb from '../../workout/components/OefeningThumb'
 
 const GOLD = '#FFD700'
 
@@ -222,7 +223,7 @@ export default function ExerciseLibraryModal({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {filtered.map(ex => {
               const hasVideo = !!ex.video_url
-              const thumb = ex.thumbnail_url || ex.image_url
+              const thumbs = [ex.thumbnail_url, ex.image_url]
               return (
                 <button
                   key={ex.id}
@@ -238,14 +239,14 @@ export default function ExerciseLibraryModal({
                   }}
                 >
                   {/* Thumb */}
-                  <div style={{
-                    width: 52, height: 52, flexShrink: 0,
-                    borderRadius: 5, background: '#000',
-                    backgroundImage: thumb ? `url(${thumb})` : 'none',
-                    backgroundSize: 'cover', backgroundPosition: 'center',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    position: 'relative',
-                  }}>
+                  <OefeningThumb
+                    bronnen={thumbs} videoUrl={ex.video_url} naam={ex.name} compact
+                    style={{
+                      width: 52, height: 52, flexShrink: 0,
+                      borderRadius: 5, background: '#000',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
                     {hasVideo && (
                       <div style={{
                         position: 'absolute', inset: 0,
@@ -267,7 +268,7 @@ export default function ExerciseLibraryModal({
                         </div>
                       </div>
                     )}
-                  </div>
+                  </OefeningThumb>
                   {/* Text */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{

@@ -14,6 +14,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { X, Search, Dumbbell, Plus, Trash2, Check } from 'lucide-react'
 import Keuze from '../../meal-plan/components/Keuze'
+import OefeningThumb from '../../workout/components/OefeningThumb'
+import { fotoKandidaten } from '../../workout/utils/oefeningFoto'
 import CustomExerciseModal from '../../workout/components/todays-workout/components/CustomExerciseModal'
 
 const LIJN = 'rgba(255,255,255,0.06)'
@@ -69,7 +71,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
       const [bib, cust] = await Promise.all([
         db.supabase
           .from('exercises')
-          .select('id, name, primair_spieren, equipment, type, difficulty, image_url, thumbnail_url, home_friendly, gym_friendly, suggested_sets, suggested_reps, suggested_rest')
+          .select('id, name, primair_spieren, equipment, type, difficulty, image_url, thumbnail_url, video_url, fallback_video_url, home_friendly, gym_friendly, suggested_sets, suggested_reps, suggested_rest')
           .eq('is_active', true)
           .order('name')
           .then(r => r, e => ({ data: [], error: e })),
@@ -93,7 +95,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
       setBibliotheek((bib.data || []).map(x => ({
         key: `bib_${x.id}`, bron: 'bibliotheek',
         name: x.name, spier: x.primair_spieren, materiaal: x.equipment, type: x.type,
-        thuis: !!x.home_friendly, foto: x.image_url || x.thumbnail_url || null,
+        thuis: !!x.home_friendly, foto: [x.image_url, ...fotoKandidaten(x)].filter(Boolean),
         sets: x.suggested_sets, reps: x.suggested_reps, rest: x.suggested_rest,
       })))
       setEigen((cust.data || []).map(x => ({
@@ -333,12 +335,10 @@ function OefeningKaart({ ex, isMobile, fotoMaat, onKies, onDelete }) {
       onMouseLeave={(e) => { if (window.innerWidth > 768) e.currentTarget.style.background = 'rgba(255,255,255,0.025)' }}
     >
       {/* Foto, of een rustig donker vlak met een halter als er geen foto is. */}
-      <div style={{
-        width: fotoMaat, flexShrink: 0, position: 'relative', overflow: 'hidden',
-        background: ex.foto ? `url(${ex.foto}) center/cover` : '#161616',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {!ex.foto && <Dumbbell size={20} color="rgba(255,255,255,0.25)" strokeWidth={2.2} />}
+      <OefeningThumb
+        bronnen={ex.foto || []} naam={ex.name} compact
+        style={{ width: fotoMaat, flexShrink: 0, background: '#161616' }}
+      >
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.8) 100%)' }} />
         {typeLabel && (
           <div style={{
@@ -350,7 +350,7 @@ function OefeningKaart({ ex, isMobile, fotoMaat, onKies, onDelete }) {
             {typeLabel}
           </div>
         )}
-      </div>
+      </OefeningThumb>
 
       <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.55rem 0.7rem' : '0.65rem 0.9rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3 }}>
         <div style={{ fontSize: isMobile ? '0.92rem' : '0.98rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em', lineHeight: 1.2 }}>

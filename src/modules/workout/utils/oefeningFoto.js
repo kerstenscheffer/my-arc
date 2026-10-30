@@ -18,10 +18,33 @@
 import ExerciseService from '../../../services/ExerciseService'
 
 // Zelfde regex als de editor, zodat beide kanten dezelfde thumb afleiden.
-export const youtubeThumb = (url) => {
+export const youtubeId = (url) => {
   if (!url) return null
   const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/)
-  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null
+  return m ? m[1] : null
+}
+
+export const youtubeThumb = (url) => {
+  const id = youtubeId(url)
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null
+}
+
+// Reserve-thumbnails voor OefeningThumb: hqdefault bestaat altijd, mqdefault
+// als tweede kans bij een haperende CDN-node.
+export const youtubeThumbs = (url) => {
+  const id = youtubeId(url)
+  return id ? [`https://i.ytimg.com/vi/${id}/hqdefault.jpg`, `https://i.ytimg.com/vi/${id}/mqdefault.jpg`] : []
+}
+
+// Alle foto-kandidaten uit één of meer rijen, in de vaste volgorde. Voor
+// OefeningThumb: valt de eerste weg (i.ibb.co), dan toont hij de volgende.
+export const fotoKandidaten = (...rijen) => {
+  const uit = []
+  for (const r of rijen) {
+    if (!r) continue
+    uit.push(r.thumbnail_url, youtubeThumb(r.video_url), r.image_url, youtubeThumb(r.fallback_video_url))
+  }
+  return [...new Set(uit.filter(Boolean))]
 }
 
 const U = (id) => `https://images.unsplash.com/${id}?w=400&h=400&fit=crop&q=80&crop=center`

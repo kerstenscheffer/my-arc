@@ -5,7 +5,8 @@
 // (toewijzen); bewerken, zichtbaarheid en verwijderen zitten onder het menu.
 import { useEffect, useRef, useState } from 'react'
 import { Play, MoreHorizontal, Users, Pencil, Trash2 } from 'lucide-react'
-import videoService from '../VideoService'
+import OefeningThumb from '../../workout/components/OefeningThumb'
+import { youtubeId } from '../../workout/utils/oefeningFoto'
 
 const PAGINA_NAAM = {
   home: 'Home', workout: 'Workout', meal: 'Meal',
@@ -49,7 +50,10 @@ export default function VideoRow({
     return () => document.removeEventListener('mousedown', sluit)
   }, [menuOpen])
 
-  const thumb = videoService.getThumbnailUrl(video)
+  // Zonder eigen thumbnail of YouTube-id: geen 'No Thumbnail'-plaatje maar de
+  // placeholder van OefeningThumb met de titel.
+  const ytId = youtubeId(video.video_url)
+  const thumb = [video.thumbnail_url, ytId && `https://i.ytimg.com/vi/${ytId}/maxresdefault.jpg`]
   const gedeeld = (video.default_pages || []).length > 0 || aantalKlanten > 0
   const breedte = isMobile ? 76 : 96
 
@@ -80,20 +84,11 @@ export default function VideoRow({
             background: '#000', cursor: video.video_url ? 'pointer' : 'default',
           }}
         >
-          {thumb && (
-            <img
-              src={thumb} alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }}
-              onError={(e) => {
-                const id = videoService.extractYouTubeId(video.video_url)
-                if (id && !e.target.src.includes('hqdefault')) {
-                  e.target.src = `https://img.youtube.com/vi/${id}/hqdefault.jpg`
-                } else {
-                  e.currentTarget.style.display = 'none'
-                }
-              }}
-            />
-          )}
+          <OefeningThumb
+            bronnen={thumb} videoUrl={video.video_url} naam={video.title}
+            style={{ position: 'absolute', inset: 0, background: '#000' }}
+            imgStyle={{ opacity: 0.9 }}
+          />
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -200,20 +195,11 @@ export default function VideoRow({
           cursor: video.video_url ? 'pointer' : 'default',
         }}
       >
-        {thumb && (
-          <img
-            src={thumb} alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }}
-            onError={(e) => {
-              const id = videoService.extractYouTubeId(video.video_url)
-              if (id && !e.target.src.includes('hqdefault')) {
-                e.target.src = `https://img.youtube.com/vi/${id}/hqdefault.jpg`
-              } else {
-                e.currentTarget.style.display = 'none'
-              }
-            }}
-          />
-        )}
+        <OefeningThumb
+          bronnen={thumb} videoUrl={video.video_url} naam={video.title} compact
+          style={{ position: 'absolute', inset: 0, background: '#000' }}
+          imgStyle={{ opacity: 0.9 }}
+        />
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',

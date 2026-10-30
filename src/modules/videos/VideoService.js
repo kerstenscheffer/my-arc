@@ -26,7 +26,7 @@ const videoService = {
         try {
           const { data, error } = await supabase.storage.from(bucket).upload(fileName, file, { cacheControl: '3600', upsert: false })
           if (!error && data) { uploadSuccess = true; bucketUsed = bucket; break }
-        } catch (err) {}
+        } catch { /* negeren */ }
       }
       if (!uploadSuccess) return { success: false, error: `Geen werkende storage bucket gevonden` }
       const { data: { publicUrl } } = supabase.storage.from(bucketUsed).getPublicUrl(fileName)
@@ -46,7 +46,7 @@ const videoService = {
         try {
           const { error } = await supabase.storage.from(bucketName).remove([filePath])
           if (!error) { deleteSuccess = true; break }
-        } catch (err) {}
+        } catch { /* negeren */ }
       }
       return { success: deleteSuccess }
     } catch (error) { return { success: false, error: error.message } }
@@ -788,7 +788,7 @@ const videoService = {
   getThumbnailUrl: (video) => {
     if (video.thumbnail_url) return video.thumbnail_url
     const youtubeId = videoService.extractYouTubeId(video.video_url)
-    if (youtubeId) return `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`
+    if (youtubeId) return `https://i.ytimg.com/vi/${youtubeId}/maxresdefault.jpg`
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgZmlsbD0iIzMzMyIvPjx0ZXh0IHRleHQtYW5jaG9yPSJtaWRkbGUiIHg9IjIwMCIgeT0iMTEyLjUiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5OTkiPk5vIFRodW1ibmFpbDwvdGV4dD48L3N2Zz4='
   }
 }

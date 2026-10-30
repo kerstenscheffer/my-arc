@@ -5,6 +5,7 @@
 // kaarten dezelfde foto's tonen als de klant ziet.
 import { useState, useEffect } from 'react'
 import ExerciseService from '../../../services/ExerciseService'
+import { fotoKandidaten } from '../../workout/utils/oefeningFoto'
 
 export const getFallbackImage = (exercise) => {
   const name = (exercise?.name || '').toLowerCase()
@@ -21,37 +22,27 @@ export const getFallbackImage = (exercise) => {
   return 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400&h=400&fit=crop&q=80&crop=center'
 }
 
-const deriveYoutubeThumb = (url) => {
-  if (!url) return null
-  const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/)
-  if (!m) return null
-  return `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg`
-}
-
+// Alle kandidaten in volgorde, zodat OefeningThumb bij een laadfout
+// (i.ibb.co) kan doorschuiven naar de YouTube-thumb of de stockfoto.
 export default function useExerciseImage(exercise, db, client) {
-  const [imageUrl, setImageUrl] = useState(getFallbackImage(exercise))
+  const [imageUrls, setImageUrls] = useState(() => [...fotoKandidaten(exercise), getFallbackImage(exercise)])
   const [loadingImage, setLoadingImage] = useState(true)
   const [hasVideo, setHasVideo] = useState(!!exercise?.video_url)
 
   useEffect(() => {
     let cancelled = false
-    const set = (url, video) => { if (!cancelled) { setImageUrl(url); setHasVideo(video); setLoadingImage(false) } }
 
     ;(async () => {
       setLoadingImage(true)
       let foundVideo = !!exercise?.video_url
+      const lijst = fotoKandidaten(exercise)
       try {
-        if (exercise?.thumbnail_url) return set(exercise.thumbnail_url, foundVideo)
-
-        const ytFromEx = deriveYoutubeThumb(exercise?.video_url)
-        if (ytFromEx) return set(ytFromEx, true)
-
         // Custom oefening → foto uit custom_exercises.
         if ((exercise?.type === 'custom' || exercise?._isCustom) && client?.id && db?.supabase) {
           const { data } = await db.supabase
             .from('custom_exercises').select('image_url')
             .eq('client_id', client.id).eq('name', exercise.name).maybeSingle()
-          if (data?.image_url) return set(data.image_url, foundVideo)
+          if (data?.image_url) lijst.push(data.image_url)
         }
 
         // Standaard oefening → exercises-tabel.
@@ -60,21 +51,20 @@ export default function useExerciseImage(exercise, db, client) {
             .from('exercises').select('thumbnail_url, video_url, fallback_video_url, image_url')
             .eq('name', exercise.name).maybeSingle()
           if (ex?.video_url || ex?.fallback_video_url) foundVideo = true
-          if (ex?.thumbnail_url) return set(ex.thumbnail_url, foundVideo)
-          const yt = deriveYoutubeThumb(ex?.video_url)
-          if (yt) return set(yt, foundVideo)
-          if (ex?.image_url) return set(ex.image_url, foundVideo)
+          lijst.push(...fotoKandidaten(ex))
         }
 
-        const url = await ExerciseService.getExerciseImage(exercise?.name)
-        set(url || getFallbackImage(exercise), foundVideo)
-      } catch {
-        set(getFallbackImage(exercise), foundVideo)
-      }
+        if (!lijst.length) {
+          const url = await ExerciseService.getExerciseImage(exercise?.name)
+          if (url) lijst.push(url)
+        }
+      } catch { /* stockfoto hieronder */ }
+      lijst.push(getFallbackImage(exercise))
+      if (!cancelled) { setImageUrls([...new Set(lijst)]); setHasVideo(foundVideo); setLoadingImage(false) }
     })()
 
     return () => { cancelled = true }
   }, [exercise?.name, exercise?.thumbnail_url, exercise?.video_url, exercise?.type, client?.id])
 
-  return { imageUrl, loadingImage, hasVideo }
+  return { imageUrl: imageUrls[0], imageUrls, loadingImage, hasVideo }
 }

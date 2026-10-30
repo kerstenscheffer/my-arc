@@ -2,7 +2,8 @@
 import React from 'react'
 import { Play, Eye, Camera, Globe, Send, Users, Trash2, Edit } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
-import videoService from '../VideoService'
+import videoService from '../../../modules/videos/VideoService'
+import OefeningThumb from '../../../modules/workout/components/OefeningThumb'
 
 export default function VideoCard({ 
   video, 
@@ -13,7 +14,7 @@ export default function VideoCard({
   onEdit
 }) {
   const isMobile = useIsMobile()
-  const thumbnailUrl = videoService.getThumbnailUrl(video)
+  const ytId = videoService.extractYouTubeId(video.video_url)
   const Icon = categoryConfig.icon
   
   return (
@@ -62,23 +63,12 @@ export default function VideoCard({
         background: '#000',
         overflow: 'hidden'
       }}>
-        <img
-          src={thumbnailUrl}
+        <OefeningThumb
+          bronnen={[video.thumbnail_url, ytId && `https://i.ytimg.com/vi/${ytId}/maxresdefault.jpg`]}
+          videoUrl={video.video_url}
+          naam={video.title}
           alt={video.title}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
-          onError={(e) => {
-            const youtubeId = videoService.extractYouTubeId(video.video_url)
-            if (youtubeId && e.target.src !== `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`) {
-              e.target.src = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`
-            }
-          }}
+          style={{ position: 'absolute', inset: 0, background: '#000' }}
         />
         
         {/* Category Badge */}

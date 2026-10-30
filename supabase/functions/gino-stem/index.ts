@@ -9,8 +9,9 @@
 // klant ElevenLabs-tegoed opmaken. Sleutels als Supabase-secrets:
 // ELEVENLABS_API_KEY en (optioneel) ELEVENLABS_VOICE_ID (andere namen met
 // ELEVEN/ELEVAN erin worden ook gevonden, zie zoekSecret). kiesStemmen() zet
-// 'Jon - Natural Authority' voorop (naam wint van ELEVENLABS_VOICE_ID; dat is
-// alleen terugval), dan Daniel; header x-gino-stem zegt welke. Ontbreekt de API
+// ELEVENLABS_VOICE_ID voorop als die staat, anders 'Jon - Natural Authority',
+// dan Daniel; header x-gino-stem zegt welke. GET ?diag=1 toont de volgorde en
+// het ElevenLabs-plan zonder spraak te maken. Ontbreekt de API
 // key: 503 { fout: 'geen_sleutel' } en valt stem.js terug op de browserstem.
 // Getallen gaan als Engelse woorden naar ElevenLabs (getallen.ts; stem.js doet
 // het ook al), de tekst op het scherm blijft Nederlands.
@@ -52,10 +53,11 @@ const SLEUTEL = zoekSecret('ELEVENLABS_API_KEY', /^(?!.*(VOICE|STEM))/i)
 const VOICE_ID = zoekSecret('ELEVENLABS_VOICE_ID', /VOICE|STEM/i)
 if (!SLEUTEL) console.error('gino-stem: geen ElevenLabs-secret gevonden')
 
-// Stemvolgorde (30 okt 2026): 'Jon - Natural Authority' (eerst Mijn stemmen,
-// anders de ElevenLabs-bibliotheek; naam met /jon/i, 'natural authority' gaat
-// voor), dan ELEVENLABS_VOICE_ID als die nog staat, dan de oude stem (Birdy/
-// Gino uit Mijn stemmen), dan PREMADE_STEM (Daniel).
+// Stemvolgorde (30 okt 2026): ELEVENLABS_VOICE_ID als die als secret staat
+// (Kerstens keuze wint), dan 'Jon - Natural Authority' (eerst Mijn stemmen,
+// anders de ElevenLabs-bibliotheek; naam moet 'jon' én 'natural authority'
+// bevatten), dan de oude stem (Birdy/Gino uit Mijn stemmen), dan PREMADE_STEM
+// (Daniel).
 // Jon niet gevonden of 402: regel in app_fouten en door naar de volgende. Nooit
 // "de eerste eigen stem": in Kerstens account was dat een vrouwenstem.
 // Per instantie gecachet, zodat de lijst niet bij elk verzoek wordt opgehaald.
@@ -63,11 +65,12 @@ type Stem = { id: string; naam: string }
 type Voice = { name?: string; voice_id?: string }
 let stemmen: Stem[] | null = null
 let jonOntbreekt = false // 'stem Jon niet gevonden' één keer per instantie loggen
+let jonGevonden: string | null = null // voor ?diag=1
 const geweigerd = new Set<string>() // stem-id's met 402: rest van deze instantie overslaan
 
 const isJon = (v: Voice) => /jon/i.test(v.name || '')
 const isNatural = (v: Voice) => /natural\s*authority/i.test(v.name || '')
-const kiesJon = (lijst: Voice[]) => lijst.find((v) => isJon(v) && isNatural(v)) || lijst.find(isJon)
+const kiesJon = (lijst: Voice[]) => lijst.find((v) => isJon(v) && isNatural(v))
 
 // Jon niet in Mijn stemmen: zoek in de gedeelde bibliotheek. Op het gratis plan
 // geeft TTS met zo'n stem 402 → terugval hieronder.
@@ -96,11 +99,12 @@ async function kiesStemmen(sleutel: string): Promise<Stem[] | { status: number }
   const { voices = [] } = await res.json().catch(() => ({}))
   const lijst = (voices as Voice[]).filter((v) => v.voice_id)
   const jon = kiesJon(lijst) || await zoekInBibliotheek(sleutel)
+  jonGevonden = jon ? `${jon.name} (${jon.voice_id})` : null
   const secret = VOICE_ID ? { voice_id: VOICE_ID, name: 'ELEVENLABS_VOICE_ID' } : undefined
   // De stem van vóór Jon (Birdy, anders een Gino-stem) blijft terugval.
   const oud = lijst.find((v) => /birdy/i.test(v.name || '')) || lijst.find((v) => /gino/i.test(v.name || ''))
   jonOntbreekt = !jon
-  stemmen = [jon, secret, oud]
+  stemmen = [secret, jon, oud]
     .filter((v): v is { name?: string; voice_id: string } => !!v?.voice_id)
     .map((v) => ({ id: v.voice_id, naam: v.name || v.voice_id }))
     .filter((v, i, a) => v.id !== PREMADE_STEM.id && a.findIndex((w) => w.id === v.id) === i)
@@ -115,6 +119,22 @@ Deno.serve(async (req) => {
     new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 
   try {
+    // GET ?diag=1: welke stem gekozen wordt + ElevenLabs-plan, zonder spraak
+    // (kost geen tegoed, geeft geen sleutels terug). Om te testen zonder login.
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('diag') === '1') {
+      if (!SLEUTEL) return json({ sleutel: false, secret_voice_id: !!VOICE_ID })
+      const volgorde = await kiesStemmen(SLEUTEL)
+      const abo = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': SLEUTEL } })
+        .then((r) => (r.ok ? r.json() : { status: r.status }), () => null)
+      return json({
+        sleutel: true,
+        secret_voice_id: VOICE_ID || null,
+        jon: jonGevonden,
+        volgorde,
+        model: MODEL,
+        plan: abo?.tier ?? abo,
+      })
+    }
     if (req.method !== 'POST') return json({ fout: 'alleen_post' }, 405)
     if (!req.headers.get('Authorization')) return json({ fout: 'geen_login' }, 401)
 

@@ -7,6 +7,7 @@ import { createPortal } from '../../../client/paginaPortal'
 import { useModalHost } from '../../../coach/ModalHost'
 import { Video, Trash2, ChevronDown, Dumbbell, Pencil, X, GripVertical } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
+import OefeningThumb from '../../workout/components/OefeningThumb'
 
 // Module-level cache — one DB query per session, shared across all exercise cards
 const _equipCache = { data: null, promise: null }
@@ -37,7 +38,7 @@ export default function BuilderExerciseCard({
   // nummer, naam en sets rechts, en een knoppenrij eronder.
   kaartStijl = false,
 }) {
-  const { imageUrl, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
+  const { imageUrls, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
   const photoSize = isMobile ? 64 : 76
   const hasVid = hasVideo || !!exercise.video_url
   const isCardio = exercise.type === 'cardio'
@@ -93,7 +94,7 @@ export default function BuilderExerciseCard({
           <div data-geen-sleep onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video bekijken' : 'Video koppelen'} style={{
             width: foto, height: foto, flexShrink: 0, position: 'relative', overflow: 'hidden', cursor: 'pointer', background: '#1a1a1a',
           }}>
-            <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            <OefeningThumb bronnen={imageUrls} naam={exercise.name} compact style={{ position: 'absolute', inset: 0, background: 'transparent' }} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%)' }} />
             {loadingImage && (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -178,7 +179,7 @@ export default function BuilderExerciseCard({
         width: photoSize, flexShrink: 0, position: 'relative', overflow: 'hidden',
         cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}>
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 1 }} />
+        <OefeningThumb bronnen={imageUrls} naam={exercise.name} compact={photoSize < 70} style={{ position: 'absolute', inset: 0, background: 'transparent' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.08)', pointerEvents: 'none' }} />
         {loadingImage && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
