@@ -73,6 +73,11 @@ class PushNotificationService {
     // vanuit de trigger op notifications (bv. feedback op een techniekvideo).
     PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
       const data = notification?.data || {};
+      // Gino-herinnering (alleen naar de coach): open Business OS in CoachHub.
+      if (data.soort === 'gino_herinnering') {
+        window.location.hash = 'business-os';
+        return;
+      }
       openUitMelding(data.trigger_data);
     });
   }
