@@ -23,6 +23,10 @@ import {
   BEHAALD_OPTIES, leegDoel,
 } from './doelen'
 
+// Reviewpagina waar de klant na een coachingronde naartoe kan, alleen bij een
+// traject_score van 8 of hoger. Geen melding of mail, alleen deze link.
+const TRUSTPILOT_REVIEW_URL = 'https://nl.trustpilot.com/review/myarcfitness.com'
+
 const KAART = '#161616'
 const RAND = '#2a2a2a'
 const GRIJS = '#8a8a8a'
@@ -283,6 +287,8 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
   // ze er deze keer bij. De service rekent op de kalender vanaf de start van
   // het traject, niet op het aantal check-ins.
   const [coachingRonde, setCoachingRonde] = useState(false)
+  // Na een coachingronde met traject_score >= 8: reviewvraag op het dankscherm.
+  const [reviewVraag, setReviewVraag] = useState(false)
   // De gemeten week. Null zolang hij laadt; het scherm toont dan een regel dat
   // de cijfers worden opgehaald in plaats van lege streepjes.
   const [cijfers, setCijfers] = useState(null)
@@ -454,11 +460,14 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
 
     // Stap 2 — vanaf hier ís de check-in opgeslagen. Een fout in het
     // UI-vervolg mag NOOIT als "versturen mislukt" verschijnen.
+    const metReview = coachingRonde && Number(formData.traject_score) >= 8
+    setReviewVraag(metReview)
     setSubmitted(true)
     try { onSubmitted?.() }
     catch (cbErr) { console.error('onSubmitted-callback faalde (check-in is wel opgeslagen):', cbErr) }
     setSubmitting(false)
-    setTimeout(() => { try { onClose?.() } catch { /* modal al weg */ } }, 2400)
+    // Met reviewvraag blijft het scherm staan tot de klant zelf sluit.
+    if (!metReview) setTimeout(() => { try { onClose?.() } catch { /* modal al weg */ } }, 2400)
   }
 
   // ── Bouwstenen ────────────────────────────────────────────────────────
@@ -901,6 +910,33 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose, ti
         <p style={{ color: GRIJS, fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 700 }}>
           Je hoort binnen 24 uur van me met feedback en eventuele bijsturing.
         </p>
+        {reviewVraag && (() => {
+          const voornaam = (client?.first_name || '').trim()
+          return (
+            <div style={{
+              marginTop: '2rem', maxWidth: 420, width: '100%', boxSizing: 'border-box',
+              background: KAART, border: `1px solid ${RAND}`, borderRadius: 16,
+              padding: isMobile ? '1.25rem' : '1.5rem',
+            }}>
+              <p style={{ color: '#fff', fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 700, lineHeight: 1.5, margin: '0 0 1.25rem' }}>
+                {voornaam ? `Hey ${voornaam}, je` : 'Hey, je'} geeft een hoog cijfer. Zou je dat ook op Trustpilot willen zetten? Het zou enorm veel voor mij betekenen als je een review zou willen achterlaten. Het kost 1 minuut.
+              </p>
+              <a
+                href={TRUSTPILOT_REVIEW_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'block', background: '#fff', color: '#0A0A0A',
+                  borderRadius: 999, padding: '12px 18px',
+                  fontSize: 15, fontWeight: 800, textDecoration: 'none',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Review achterlaten op Trustpilot
+              </a>
+            </div>
+          )
+        })()}
       </div>
     )
   }

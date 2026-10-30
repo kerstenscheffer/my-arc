@@ -41,7 +41,7 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -77,7 +77,13 @@ async function vraagViaMac(berichten, context, opDeel, extra = {}, signaal = {})
     .select('id').single()
   if (error) return null
   signaal.id = rij.id
-  const start = Date.now()
+  return wachtOpRij(rij.id, opDeel, signaal, { intrekken: true })
+}
+
+// Wachten op een chatrij van de PA. Ook gebruikt na terugkomen in Business OS
+// (de vraag liep door terwijl het scherm dicht was): dan zonder intrekken.
+async function wachtOpRij(id, opDeel, signaal = {}, { intrekken = false, start = Date.now() } = {}) {
+  const rij = { id }
   let klaar = null
   const bekijk = (data) => {
     if (!data || klaar) return
@@ -105,7 +111,7 @@ async function vraagViaMac(berichten, context, opDeel, extra = {}, signaal = {})
         .select('status, antwoord').eq('id', rij.id).maybeSingle()
       bekijk(data)
       if (klaar) return klaar.antwoord
-      if (data?.status === 'wacht' && Date.now() - start > 25000) {
+      if (intrekken && data?.status === 'wacht' && Date.now() - start > 25000) {
         // Niet opgepakt: intrekken (alleen als hij nog op 'wacht' staat) en via de API.
         const { data: ingetrokken } = await supabase.from('business_os_opdrachten')
           .update({ status: 'mislukt' }).eq('id', rij.id).eq('status', 'wacht').select('id')
@@ -799,6 +805,12 @@ function EerdereGesprekken({ huidig, onKies, onSluit }) {
   )
 }
 
+const menuRegel = {
+  display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 10px', borderRadius: 10, border: 'none',
+  background: 'transparent', color: colors.textPrimary, fontSize: '0.84rem', fontWeight: 700, fontFamily: 'inherit',
+  cursor: 'pointer', textAlign: 'left',
+}
+
 function naarBerichten(gesprek) {
   const plat = []
   for (const { role, content, afbeelding, afbeeldingen } of gesprek) {
@@ -1019,8 +1031,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
   const wijzigTabje = (id, f) => setGesprekken(gs => gs.map(g => g.id !== id ? g : { ...f(g), bijgewerkt: Date.now() }))
   const zetBerichten = (id, f) => wijzigTabje(id, g => ({ ...g, berichten: f(g.berichten) }))
   const [bezigPer, setBezigPer] = useState({})
+  const bezigPerRef = useRef(bezigPer)
+  bezigPerRef.current = bezigPer
   const stopPer = useRef({}) // tabje → { id, gestopt } van de lopende vraag
   const [toonEerder, setToonEerder] = useState(false)
+  const [menu, setMenu] = useState(false)
   const [deelPer, setDeelPer] = useState({})
   const [ongelezenPer, setOngelezenPer] = useState({})
   const bezig = !!bezigPer[actief.id]
@@ -1114,6 +1129,41 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
     }, 800)
     return () => clearTimeout(t)
   }, [gesprekken, dbKlaar])
+  // Terug in Business OS: stond er in een tabje nog een vraag zonder antwoord
+  // (scherm dicht terwijl de PA werkte)? Dan het antwoord uit de rij halen, of
+  // verder wachten als hij nog loopt. Eén keer, nadat de tabjes geladen zijn.
+  const hersteld = useRef(false)
+  useEffect(() => {
+    if (hersteld.current) return
+    const t = setTimeout(() => {
+      if (hersteld.current) return
+      hersteld.current = true
+      gesprekkenRef.current.forEach(async (g) => {
+        const laatste = g.berichten[g.berichten.length - 1]
+        if (isEditor(g) || laatste?.role !== 'user' || !g.sessie || bezigPerRef.current[g.id]) return
+        const { data: rij } = await supabase.from('business_os_opdrachten')
+          .select('id, status, antwoord, created_at').eq('soort', 'chat').eq('invoer->>gesprek_id', g.sessie)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
+          .then(r => r, () => ({ data: null }))
+        if (!rij || new Date(rij.created_at).getTime() < (laatste.op || 0) - 10000) return
+        let laatsteDeel = ''
+        const opDeel = (tekst) => { if (tekst) laatsteDeel = tekst; setDeelPer(d => ({ ...d, [g.id]: tekst })) }
+        const signaal = { id: rij.id, gestopt: false }
+        stopPer.current[g.id] = signaal
+        setBezigPer(b => ({ ...b, [g.id]: true }))
+        const r = await wachtOpRij(rij.id, opDeel, signaal, { start: new Date(rij.created_at).getTime() })
+        delete stopPer.current[g.id]
+        opDeel('')
+        setBezigPer(b => ({ ...b, [g.id]: false }))
+        if (r?.gestopt) {
+          if (!signaal.afgehandeld) zetBerichten(g.id, b => [...b, { role: 'assistant', content: `${laatsteDeel ? laatsteDeel + '\n\n' : ''}(gestopt)`, gestopt: true, op: Date.now() }])
+        } else if (r?.tekst) antwoord(g.id, { role: 'assistant', content: r.tekst, acties: r.acties || [] })
+        else zetBerichten(g.id, b => [...b, { role: 'assistant', content: '(Dit antwoord ging verloren. Stel je vraag nog een keer.)', op: Date.now() }])
+      })
+    }, dbKlaar ? 300 : 2500)
+    return () => clearTimeout(t)
+  }, [dbKlaar]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Groeironde (nacht, door de PA): verslag + voorstellen één keer in het
   // tabje Strategie. gezien_at claimen vóór het toevoegen, zodat twee open
   // vensters hem niet allebei plaatsen.
@@ -2032,7 +2082,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
                   minHeight: 36, maxHeight: INVOER_MAX_H, overflowY: 'auto', boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
-              {/* Snel/Slim + nieuw gesprek: klein, rechts in dezelfde balk (Snel/Slim niet in Editor) */}
+              {/* Snel/Slim zichtbaar; foto, eerdere gesprekken en nieuw gesprek achter ⋯ (niet in Editor) */}
               {!isEditor(actief) && <button onClick={wisselModus}
                 title={modus === 'slim'
                   ? (viaMac ? 'Slim: Opus, kent CLAUDE.md en memory, onthoudt dit gesprek. Trager (10-30 s). Klik: Snel' : 'Slim werkt alleen via je Mac; nu gaat het via de API (Snel). Klik: Snel')
@@ -2046,10 +2096,31 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
               </button>}
               {!isEditor(actief) && (
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <button onClick={() => setToonEerder(x => !x)} title="Eerdere gesprekken terughalen"
+                  <button onClick={() => setMenu(m => !m)} title="Meer" aria-label="Meer opties"
                     style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
-                    <History size={16} strokeWidth={2.2} />
+                    <MoreHorizontal size={18} strokeWidth={2.4} />
                   </button>
+                  {menu && (
+                    <>
+                      <div onClick={() => setMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                      <div style={{
+                        position: 'absolute', right: 0, bottom: 'calc(100% + 8px)', zIndex: 41, minWidth: 230, padding: 6,
+                        background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, boxShadow: '0 16px 40px rgba(0,0,0,.6)',
+                      }}>
+                        <button onClick={() => { setMenu(false); kiezer.current?.click() }} style={menuRegel}>
+                          <ImagePlus size={15} /> <span style={{ flex: 1 }}>Foto of screenshot</span>
+                        </button>
+                        <button onClick={() => { setMenu(false); setToonEerder(true) }} style={menuRegel}>
+                          <History size={15} /> <span style={{ flex: 1 }}>Eerdere gesprekken</span>
+                        </button>
+                        {gesprek.length > 0 && (
+                          <button onClick={() => { setMenu(false); leegGesprek() }} style={menuRegel}>
+                            <SquarePen size={15} /> <span style={{ flex: 1 }}>Nieuw gesprek</span>
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
                   {toonEerder && <EerdereGesprekken huidig={actief.sessie} onSluit={() => setToonEerder(false)}
                     onKies={(berichten, gid) => {
                       setToonEerder(false)
@@ -2059,20 +2130,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
                     }} />}
                 </div>
               )}
-              {gesprek.length > 0 && (
-                <button onClick={leegGesprek} title={`Nieuw gesprek in ${actief.naam}`}
-                  style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
-                  <SquarePen size={16} strokeWidth={2.2} />
-                </button>
-              )}
               <input ref={kiezer} type="file" accept="image/*" multiple hidden
                 onChange={e => { neemBeelden(e.target.files); e.target.value = '' }} />
-              {!isEditor(actief) && (
-                <button onClick={() => kiezer.current?.click()} title="Screenshot meesturen"
-                  style={{ ...rondeKnop, background: 'transparent', color: colors.textSecondary }}>
-                  <ImagePlus size={18} strokeWidth={2.2} />
-                </button>
-              )}
               {Spraak && (
                 <button
                   onClick={microfoon}
