@@ -7,7 +7,7 @@
 // de browser dat niet kan (o.a. de iOS-app-webview) verschijnt de knop niet.
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowUp, Copy, Check, Mic } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
@@ -31,6 +31,53 @@ function Kopieer({ tekst }) {
     >
       {klaar ? <Check size={14} color={colors.success} /> : <Copy size={14} />}
     </button>
+  )
+}
+
+// Voorstel van de AI om accounts op slot te zetten of te ontgrendelen. Pas deze
+// knop voert het uit, met dezelfde velden als de slotknop in Coach Inzicht
+// (CoachingPeriodPanel.wisselSlot).
+function SlotVoorstel({ voorstel, onKlaar }) {
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState(null)
+  const opSlot = voorstel.actie === 'op_slot'
+  const voerUit = async () => {
+    setBezig(true)
+    setFout(null)
+    const payload = opSlot
+      ? { account_locked_at: new Date().toISOString(), account_locked_reason: voorstel.tekst || null, coaching_status: 'ended', coaching_paused_at: null, coaching_pause_reason: null }
+      : { account_locked_at: null, account_locked_reason: null }
+    const { error } = await supabase.from('clients').update(payload).in('id', voorstel.klanten.map(k => k.id))
+    setBezig(false)
+    if (error) { setFout('Opslaan mislukt: ' + error.message); return }
+    onKlaar()
+  }
+  return (
+    <div style={{ margin: '4px 0 12px' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 4 }}>
+        <Lock size={15} /> {opSlot ? 'Op slot zetten' : 'Ontgrendelen'} ({voorstel.klanten.length}){voorstel.tekst ? ` · ${voorstel.tekst}` : ''}
+      </div>
+      <div style={{ color: colors.textSecondary, fontWeight: 600, marginBottom: 8 }}>
+        {voorstel.klanten.map(k => k.naam).join(', ')}
+      </div>
+      {voorstel.uitgevoerd ? (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
+          <Check size={16} /> {opSlot ? 'Op slot gezet' : 'Ontgrendeld'}
+        </div>
+      ) : (
+        <button
+          onClick={voerUit}
+          disabled={bezig}
+          style={{
+            background: colors.textPrimary, color: colors.onAccent, border: 'none', borderRadius: 12,
+            padding: '0 16px', minHeight: 44, fontWeight: 900, fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          {bezig ? 'Bezig…' : opSlot ? `Zet ${voorstel.klanten.length} op slot` : `Ontgrendel ${voorstel.klanten.length}`}
+        </button>
+      )}
+      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
+    </div>
   )
 }
 
@@ -104,7 +151,15 @@ export default function BusinessChat({ context }) {
           ) : (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <div style={{ flex: 1, fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.55, color: colors.textPrimary, whiteSpace: 'pre-wrap' }}>
-                {(b.acties || []).map((ac, j) => (
+                {(b.acties || []).map((ac, j) => ac.soort === 'slot_voorstel' ? (
+                  <SlotVoorstel
+                    key={j}
+                    voorstel={ac}
+                    onKlaar={() => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
+                      ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, uitgevoerd: true } : x),
+                    }))}
+                  />
+                ) : (
                   <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, marginBottom: 6 }}>
                     <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}
                   </div>
