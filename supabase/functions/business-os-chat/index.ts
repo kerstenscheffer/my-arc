@@ -3,7 +3,7 @@
 // De AI-chat onder de reactor in Business OS (30 okt 2026). Kersten geeft hier
 // taken uit, bv. "maak 3 reel-scripts over buikvet na je 30e".
 //
-//   POST { berichten: [{ role: 'user'|'assistant', content }], context?: {...} }
+//   POST { berichten: [{ role: 'user'|'assistant', content, afbeelding?: { media_type, data } }], context?: {...} }
 //   → { tekst, acties: [{ soort: 'app_issue', tekst }] }
 //
 // "Pas aan in de app"-opdrachten gaan via de tool zet_op_app_lijst als open
@@ -75,6 +75,8 @@ Taalregels (altijd):
 App-wijzigingen (code, schermen, functies): gebruik standaard stel_lokale_opdracht_voor. Kersten klikt dan op "Uitvoeren op mijn Mac" en Claude Code past het direct aan in zijn lokale code. Schrijf de opdracht volledig en zelfstandig: welk scherm, wat er nu gebeurt, wat het moet worden, en wat je al weet uit de database of het gesprek. Die Claude Code ziet dit gesprek niet. Zegt Kersten "voor later" of "zet op de lijst", gebruik dan zet_op_app_lijst. Beloof nooit dat het al aangepast is; het resultaat verschijnt onder je bericht. Eerdere opdrachten en hun resultaat staan in de tabel business_os_opdrachten.
 
 Skills: hieronder staan Kerstens skills, vaste werkwijzen per soort taak. Past een taak bij een skill, volg die stappen precies. Wil Kersten een nieuwe werkwijze vastleggen of een bestaande aanpassen ("onthoud dit", "maak hier een skill van", "voortaan bij scripts..."), gebruik bewaar_skill met de volledige nieuwe instructies (bij aanpassen: de oude stappen plus de wijziging, onder dezelfde naam). Laat in één zin weten wat je bewaard hebt.
+
+Screenshots: Kersten kan een screenshot meesturen (van de app, een DM, cijfers). Lees wat erop staat en gebruik het; vraag niet om het over te typen.
 
 Opmaak: platte tekst met korte kopjes en pijltjes (→). Geen markdown-tabellen. Vraag alleen door als de taak echt onduidelijk is; anders lever direct een eerste versie die hij kan aanscherpen.`
 
@@ -205,10 +207,33 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser()
 
     const body = await req.json().catch(() => ({}))
+    // Een gebruikersbericht mag een screenshot hebben: { afbeelding: { media_type,
+    // data (base64) } }. Die gaat als image-blok + text-blok naar Anthropic.
+    // Berichten met alleen tekst (de oude vorm) blijven een gewone string.
+    const BEELD_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    const geldigBeeld = (b: any) => b.role === 'user' && b.afbeelding
+      && BEELD_TYPES.includes(b.afbeelding.media_type)
+      && typeof b.afbeelding.data === 'string' && b.afbeelding.data.length > 0
+      && b.afbeelding.data.length < 7_000_000 && /^[A-Za-z0-9+/]+=*$/.test(b.afbeelding.data)
+    const tekstVan = (b: any) => typeof b.content === 'string' ? b.content.slice(0, 8000) : ''
+    let beelden = 0
     const berichten = (Array.isArray(body.berichten) ? body.berichten : [])
-      .filter((b: any) => (b.role === 'user' || b.role === 'assistant') && typeof b.content === 'string' && b.content.trim())
+      .filter((b: any) => (b.role === 'user' || b.role === 'assistant') && (tekstVan(b).trim() || geldigBeeld(b)))
       .slice(-20)
-      .map((b: any) => ({ role: b.role, content: b.content.slice(0, 8000) }))
+      .reverse()
+      .map((b: any) => {
+        // Maximaal 3 screenshots (de nieuwste); oudere gaan als tekst door.
+        if (!geldigBeeld(b) || beelden++ >= 3) return { role: b.role, content: tekstVan(b).trim() ? tekstVan(b) : '[screenshot]' }
+        const tekst = tekstVan(b).trim()
+        return {
+          role: b.role,
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: b.afbeelding.media_type, data: b.afbeelding.data } },
+            ...(tekst ? [{ type: 'text', text: tekst }] : []),
+          ],
+        }
+      })
+      .reverse()
     // De API wil dat het gesprek met de gebruiker begint en eindigt.
     while (berichten.length && berichten[0].role !== 'user') berichten.shift()
     if (!berichten.length || berichten[berichten.length - 1].role !== 'user') {

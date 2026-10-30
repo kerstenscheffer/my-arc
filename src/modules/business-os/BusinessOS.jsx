@@ -12,7 +12,7 @@
 // scrolt. De cijferpanelen zitten achter de puntjes-knop rechtsboven en openen
 // als zijpaneel (desktop) of bottom sheet (mobiel).
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { MoreHorizontal, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
@@ -245,7 +245,7 @@ export default function BusinessOS({ isMobile }) {
   const [menu, setMenu] = useState(false)
   const [blad, setBlad] = useState(null)
   const [denkt, setDenkt] = useState(false)
-  const sluitBlad = useMemo(() => () => setBlad(null), [])
+  const sluitBlad = useCallback(() => setBlad(null), [])
 
   const nu = new Date()
   const van = new Date(nu.getFullYear(), nu.getMonth(), 1)
@@ -305,160 +305,199 @@ export default function BusinessOS({ isMobile }) {
   const opKoers = a.prognose >= doel
   const zw = a.zwakste[0]
 
-  return (
-    <div style={{
-      background: C.bg,
-      color: C.tekst, minHeight: '100vh', padding: isMobile ? 16 : 24,
-    }}>
-      <div style={{ maxWidth: 820, margin: '0 auto' }}>
-        {/* ── Reactor-ring: het gezicht van de assistent ── */}
-        <div style={{ paddingTop: isMobile ? 16 : 32 }}>
-          <Reactor pct={pctDoel} maat={isMobile ? 200 : 290} bezig={denkt} />
+  // Inhoud van de onderdelen: precies wat eerder in de inklap-secties stond.
+  const inhoud = (k) => {
+    if (k === 'kern') return (
+      <>
+        <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 12 }}>
+          Nog <b style={{ ...NUM, color: C.wit }}>{euro(nodigPerDag)}</b> per dag nodig voor je doel.
         </div>
-        <div style={{
-          display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: isMobile ? '6px 18px' : '6px 32px',
-          marginTop: isMobile ? 20 : 28, fontSize: '0.85rem', fontWeight: 700, color: C.zacht, textAlign: 'center',
-        }}>
-          <span><b style={{ ...NUM, color: C.wit }}>{euro(a.omzet)}</b> van {euro(doel)}</span>
-          <span>prognose <b style={{ ...NUM, color: opKoers ? C.groen : C.oranje }}>{euro(a.prognose)}</b></span>
-          <span>zwakste schakel <b style={{ color: C.wit }}>{zw.label}</b></span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {[
+            ['VIEWS', getal(data.nu.views)],
+            ['LEADS', getal(data.nu.leads)],
+            ['CALLS', getal(data.nu.calls)],
+            ['KLANTEN', `${data.klanten?.actief ?? 0}`],
+          ].map(([l, w]) => (
+            <Paneel key={l}>
+              <div style={{ ...LABEL, color: C.zacht }}>{l}</div>
+              <div style={{ ...NUM, fontSize: '1.6rem', fontWeight: 900, marginTop: 4 }}>{w}</div>
+            </Paneel>
+          ))}
         </div>
-
-        {/* ── Verbinding ring → chat ── */}
-        <div aria-hidden="true" style={{
-          width: 1, height: isMobile ? 24 : 36, margin: '16px auto 0',
-          background: `linear-gradient(${C.groen}, ${C.groen}00)`,
-        }} />
-
-        {/* ── Chat: de ring praat ── */}
-        <div style={{ borderTop: `1px solid ${C.groen}40`, paddingTop: 16 }}>
-          <div style={{ fontSize: '1rem', fontWeight: 800, lineHeight: 1.5 }}>
-            {groet} Kersten. {opKoers ? 'Je ligt op koers voor je doel.' : `Je mist ${euro(doel - a.prognose)} op je doel als dit tempo blijft.`}
-          </div>
-          <BusinessChat lijstHoogte={isMobile ? '55vh' : '62vh'} onBezig={setDenkt} context={{
-            omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
-            dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
-            schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
-            zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
-          }} />
-        </div>
-
-        {/* ── Cijfers: alles standaard ingeklapt ── */}
-        <div style={{ ...LABEL, color: C.zacht, marginTop: 40, paddingBottom: 4, borderBottom: `1px solid ${C.rand}` }}>Cijfers</div>
-
-        <Inklap titel="Kerncijfers · deze maand" open={!!open.kern} onToggle={() => wissel('kern')}>
-          <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 12 }}>
-            Nog <b style={{ ...NUM, color: C.wit }}>{euro(nodigPerDag)}</b> per dag nodig voor je doel.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: isMobile ? 16 : 24 }}>
-            {[
-              ['VIEWS', getal(data.nu.views)],
-              ['LEADS', getal(data.nu.leads)],
-              ['CALLS', getal(data.nu.calls)],
-              ['KLANTEN', `${data.klanten?.actief ?? 0}`],
-            ].map(([l, w]) => (
-              <Paneel key={l}>
-                <div style={{ ...LABEL, color: C.zacht }}>{l}</div>
-                <div style={{ ...NUM, fontSize: '1.6rem', fontWeight: 900, marginTop: 4 }}>{w}</div>
-              </Paneel>
-            ))}
-          </div>
-        </Inklap>
-
-        <Inklap titel="De keten · deze maand vs. gemiddelde" open={!!open.keten} onToggle={() => wissel('keten')}>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: 8 }}>
-            {a.schakels.map(s => {
-              const kleur = s.verschil <= -0.25 ? C.rood : s.verschil < -0.05 ? C.oranje : C.groen
-              return (
-                <div key={s.key} style={{ borderBottom: `2px solid ${s.key === zw.key ? C.rood : 'transparent'}`, padding: '8px 0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.zacht }}>{s.label}</div>
-                  <div style={{ ...NUM, fontSize: '1.1rem', fontWeight: 900, margin: '4px 0' }}>{s.toon}</div>
-                  <div style={{ ...NUM, fontSize: '0.75rem', fontWeight: 800, color: kleur }}>
-                    {s.verschil >= 0 ? '+' : ''}{Math.round(s.verschil * 100)}%
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: C.zacht, marginTop: 8 }}>
-            Views en leads per dag; reactie, call en sale als omzetting van de stap ervoor.
-          </div>
-        </Inklap>
-
-        <Inklap titel="Acties deze week" open={!!open.acties} onToggle={() => wissel('acties')}>
-          {a.zwakste.filter(s => s.verschil < -0.05).slice(0, 3).map((s, i) => (
-            <div key={s.key} style={{ display: 'flex', gap: 10, padding: '6px 0', fontSize: '0.9rem', lineHeight: 1.45 }}>
-              <span style={{ ...NUM, color: C.groen, fontWeight: 900 }}>{i + 1}</span>
-              <span>{ACTIES[s.key]}</span>
-            </div>
-          ))}
-          {!a.zwakste.some(s => s.verschil < -0.05) && (
-            <div style={{ fontSize: '0.9rem' }}>Alle schakels draaien op of boven je gemiddelde. Schaal het volume op: meer magnets en meer outreach.</div>
-          )}
-        </Inklap>
-
-        <Inklap titel="Terugrekensom · wat is er nodig" open={!!open.som} onToggle={() => wissel('som')}>
-          <div style={{ display: 'flex', gap: isMobile ? 16 : 24, marginBottom: 24, paddingBottom: 16, borderBottom: `1px solid ${C.rand}` }}>
-            <Invoer label="Doel per maand (€)" waarde={doel} onChange={v => { setDoel(v); bewaar(DOEL_KEY, v) }} />
-            <Invoer label="Prijs per sale (€)" waarde={prijs || a.p} onChange={v => { setPrijs(v); bewaar(PRIJS_KEY, v) }} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, textAlign: 'center' }}>
-            {[['Sales', a.som.sales], ['Calls', a.som.calls], ['Reacties', a.som.reacties], ['Leads', a.som.leads]].map(([l, w]) => (
-              <div key={l}>
-                <div style={{ ...NUM, fontSize: '1.2rem', fontWeight: 900 }}>{getal(w)}</div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.zacht }}>{l} / mnd</div>
-                <div style={{ ...NUM, fontSize: '0.75rem', fontWeight: 700, color: C.groen }}>{getal(w / 4.33)} / week</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: C.zacht, marginTop: 8 }}>
-            Gerekend met jouw omzetting van de afgelopen 3 maanden.
-          </div>
-        </Inklap>
-
-        <Inklap titel="Calls · komende 3 dagen" open={!!open.calls} onToggle={() => wissel('calls')}>
-          {(data.calls || []).length === 0 && <div style={{ fontSize: '0.85rem', color: C.zacht }}>Geen calls ingepland.</div>}
-          {(data.calls || []).map((c, i) => (
-            <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
-              <div style={{ ...NUM, fontSize: '0.8rem', fontWeight: 800, color: C.groen, minWidth: 64 }}>
-                {new Date(c.datum).toLocaleDateString('nl-NL', { weekday: 'short' })} {c.tijd || ''}
-              </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.naam}</div>
-            </div>
-          ))}
-        </Inklap>
-
-        <Inklap titel="Laatste sales" open={!!open.sales} onToggle={() => wissel('sales')}>
-          {(data.sales || []).map((s, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.naam}</div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: C.zacht }}>{new Date(s.at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</div>
-              </div>
-              <div style={{ ...NUM, fontSize: '0.9rem', fontWeight: 900, color: C.groen }}>{euro(s.bedrag)}</div>
-            </div>
-          ))}
-        </Inklap>
-
-        <Inklap titel="Agents" open={!!open.agents} onToggle={() => wissel('agents')}>
-          {(data.agents || []).map(ag => {
-            const ok = ag.actief && ag.status === 'succeeded'
-            const kleur = !ag.actief ? C.zacht : ok ? C.groen : C.rood
+      </>
+    )
+    if (k === 'keten') return (
+      <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          {a.schakels.map(s => {
+            const kleur = s.verschil <= -0.25 ? C.rood : s.verschil < -0.05 ? C.oranje : C.groen
             return (
-              <div key={ag.naam} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: kleur, flexShrink: 0 }} />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{AGENTS[ag.naam] || ag.naam}</div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: C.zacht }}>
-                    {!ag.actief ? 'uit' : ag.laatst ? new Date(ag.laatst).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : 'nog niet gedraaid'}
-                    {ag.actief && ag.status && ag.status !== 'succeeded' ? ` · ${ag.status}` : ''}
-                  </div>
+              <div key={s.key} style={{ borderBottom: `2px solid ${s.key === zw.key ? C.rood : 'transparent'}`, padding: '8px 0', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.zacht }}>{s.label}</div>
+                <div style={{ ...NUM, fontSize: '1.1rem', fontWeight: 900, margin: '4px 0' }}>{s.toon}</div>
+                <div style={{ ...NUM, fontSize: '0.75rem', fontWeight: 800, color: kleur }}>
+                  {s.verschil >= 0 ? '+' : ''}{Math.round(s.verschil * 100)}%
                 </div>
               </div>
             )
           })}
-        </Inklap>
+        </div>
+        <div style={{ fontSize: '0.75rem', color: C.zacht, marginTop: 8 }}>
+          Views en leads per dag; reactie, call en sale als omzetting van de stap ervoor.
+        </div>
+      </>
+    )
+    if (k === 'acties') return (
+      <>
+        {a.zwakste.filter(s => s.verschil < -0.05).slice(0, 3).map((s, i) => (
+          <div key={s.key} style={{ display: 'flex', gap: 10, padding: '6px 0', fontSize: '0.9rem', lineHeight: 1.45 }}>
+            <span style={{ ...NUM, color: C.groen, fontWeight: 900 }}>{i + 1}</span>
+            <span>{ACTIES[s.key]}</span>
+          </div>
+        ))}
+        {!a.zwakste.some(s => s.verschil < -0.05) && (
+          <div style={{ fontSize: '0.9rem' }}>Alle schakels draaien op of boven je gemiddelde. Schaal het volume op: meer magnets en meer outreach.</div>
+        )}
+      </>
+    )
+    if (k === 'som') return (
+      <>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 24, paddingBottom: 16, borderBottom: `1px solid ${C.rand}` }}>
+          <Invoer label="Doel per maand (€)" waarde={doel} onChange={v => { setDoel(v); bewaar(DOEL_KEY, v) }} />
+          <Invoer label="Prijs per sale (€)" waarde={prijs || a.p} onChange={v => { setPrijs(v); bewaar(PRIJS_KEY, v) }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, textAlign: 'center' }}>
+          {[['Sales', a.som.sales], ['Calls', a.som.calls], ['Reacties', a.som.reacties], ['Leads', a.som.leads]].map(([l, w]) => (
+            <div key={l}>
+              <div style={{ ...NUM, fontSize: '1.2rem', fontWeight: 900 }}>{getal(w)}</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.zacht }}>{l} / mnd</div>
+              <div style={{ ...NUM, fontSize: '0.75rem', fontWeight: 700, color: C.groen }}>{getal(w / 4.33)} / week</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: '0.75rem', color: C.zacht, marginTop: 8 }}>
+          Gerekend met jouw omzetting van de afgelopen 3 maanden.
+        </div>
+      </>
+    )
+    if (k === 'calls') return (
+      <>
+        {(data.calls || []).length === 0 && <div style={{ fontSize: '0.85rem', color: C.zacht }}>Geen calls ingepland.</div>}
+        {(data.calls || []).map((c, i) => (
+          <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+            <div style={{ ...NUM, fontSize: '0.8rem', fontWeight: 800, color: C.groen, minWidth: 64 }}>
+              {new Date(c.datum).toLocaleDateString('nl-NL', { weekday: 'short' })} {c.tijd || ''}
+            </div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.naam}</div>
+          </div>
+        ))}
+      </>
+    )
+    if (k === 'sales') return (data.sales || []).map((s, i) => (
+      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.naam}</div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: C.zacht }}>{new Date(s.at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</div>
+        </div>
+        <div style={{ ...NUM, fontSize: '0.9rem', fontWeight: 900, color: C.groen }}>{euro(s.bedrag)}</div>
       </div>
+    ))
+    if (k === 'agents') return (data.agents || []).map(ag => {
+      const ok = ag.actief && ag.status === 'succeeded'
+      const kleur = !ag.actief ? C.zacht : ok ? C.groen : C.rood
+      return (
+        <div key={ag.naam} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: kleur, flexShrink: 0 }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{AGENTS[ag.naam] || ag.naam}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: C.zacht }}>
+              {!ag.actief ? 'uit' : ag.laatst ? new Date(ag.laatst).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : 'nog niet gedraaid'}
+              {ag.actief && ag.status && ag.status !== 'succeeded' ? ` · ${ag.status}` : ''}
+            </div>
+          </div>
+        </div>
+      )
+    })
+    return null
+  }
+
+  return (
+    // Vaste pagina: precies de ruimte boven de zwevende navbalk (in split
+    // screen de hele helft). Alleen de chatlijst scrolt.
+    <div style={{
+      background: C.bg, color: C.tekst, position: 'relative', overflow: 'hidden',
+      height: 'calc(var(--paneel-hoogte, 100dvh) - var(--paneel-navruimte, 120px))',
+      display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
+      padding: isMobile ? '12px 16px 8px' : '20px 24px 12px',
+    }}>
+      {/* ── Puntjes-knop rechtsboven: de cijferpanelen ── */}
+      <div style={{ position: 'absolute', top: isMobile ? 12 : 16, right: isMobile ? 12 : 20, zIndex: 20 }}>
+        <button type="button" onClick={() => setMenu(m => !m)} title="Cijfers" aria-expanded={menu} style={{
+          width: 40, height: 40, borderRadius: '50%', border: `1px solid ${C.rand}`,
+          background: menu ? colors.surface : 'transparent', color: C.wit, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <MoreHorizontal size={20} />
+        </button>
+        {menu && (
+          <>
+            <div onClick={() => setMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: -1 }} />
+            <div role="menu" style={{
+              position: 'absolute', top: 48, right: 0, width: 240, background: '#0a0a0a',
+              border: `1px solid ${C.rand}`, borderRadius: 14, padding: 6, boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+            }}>
+              {ONDERDELEN.map(([k, titel]) => (
+                <button key={k} type="button" role="menuitem" onClick={() => { setMenu(false); setBlad(k) }}
+                  onMouseEnter={e => { e.currentTarget.style.background = colors.surface }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                  style={{
+                    width: '100%', display: 'block', textAlign: 'left', background: 'none', border: 'none',
+                    color: C.wit, fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 700,
+                    padding: '0 12px', minHeight: 40, borderRadius: 10, cursor: 'pointer',
+                  }}>
+                  {titel.split(' · ')[0]}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={{ maxWidth: 860, width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* ── Reactor-ring: het gezicht van de assistent, altijd in beeld ── */}
+        <div style={{ flexShrink: 0, width: '100%', maxWidth: 820, margin: '0 auto' }}>
+          <Reactor pct={pctDoel} maat={isMobile ? 150 : 210} bezig={denkt} />
+          <div style={{
+            display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: isMobile ? '2px 14px' : '4px 28px',
+            marginTop: isMobile ? 12 : 18, fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 700, color: C.zacht, textAlign: 'center',
+          }}>
+            <span><b style={{ ...NUM, color: C.wit }}>{euro(a.omzet)}</b> van {euro(doel)}</span>
+            <span>prognose <b style={{ ...NUM, color: opKoers ? C.groen : C.oranje }}>{euro(a.prognose)}</b></span>
+            <span>zwakste schakel <b style={{ color: C.wit }}>{zw.label}</b></span>
+          </div>
+          <div style={{
+            borderTop: `1px solid ${C.groen}40`, marginTop: isMobile ? 10 : 14, paddingTop: 10,
+            fontSize: '0.85rem', fontWeight: 800, lineHeight: 1.4,
+          }}>
+            {groet} Kersten. {opKoers ? 'Je ligt op koers voor je doel.' : `Je mist ${euro(doel - a.prognose)} op je doel als dit tempo blijft.`}
+          </div>
+        </div>
+
+        {/* ── Chat: de ring praat; alleen de berichtenlijst scrolt ── */}
+        <BusinessChat onBezig={setDenkt} context={{
+          omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
+          dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
+          schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
+          zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
+        }} />
+      </div>
+
+      {blad && (
+        <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} onSluit={sluitBlad}>
+          {inhoud(blad)}
+        </Blad>
+      )}
     </div>
   )
 }

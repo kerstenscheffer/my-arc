@@ -9,15 +9,33 @@
 // Mac hem niet binnen 25 s oppakt, via de edge function business-os-chat (API).
 // Microfoon = spraak naar tekst van de browser (Web Speech API, nl-NL). Waar
 // de browser dat niet kan (o.a. de iOS-app-webview) verschijnt de knop niet.
+// Screenshot (30 okt): kiezen of plakken (Cmd+V), verkleind tot max 1600 px
+// jpeg en als { afbeelding: { media_type, data } } aan het gebruikersbericht
+// gehangen. Zo'n gesprek gaat altijd via de API (de Mac-route kan geen
+// beelden). In localStorage bewaren we alleen een kleine thumbnail.
+// Compact (30 okt): ingeklapt een smal, laag berichtenvak (560 px, max 220 px
+// hoog) onder de ring; de knop rechtsboven klapt hem uit (860 px, 70% van het
+// scherm). Stand in localStorage 'bos_chat_open'. Alleen het berichtenvak scrolt.
 
-import { useState, useEffect, useRef } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop } from 'lucide-react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, Maximize2, Minimize2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
 const KEY = 'business_os_chat'
+const OPEN_KEY = 'bos_chat_open'
 const PA_ONLINE_MS = 45000
+const MAX_BEELDEN = 3 // zoveel recente screenshots gaan mee naar de AI
 const slaap = (ms) => new Promise(r => setTimeout(r, ms))
+
+const TEKST = { fontSize: '0.78rem', lineHeight: 1.4 }
+const KNOP = {
+  background: colors.textPrimary, color: colors.onAccent, border: 'none', borderRadius: 10,
+  padding: '0 12px', minHeight: 36, fontWeight: 900, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
+}
+const KAART = { margin: '2px 0 6px', fontSize: '0.76rem', lineHeight: 1.35 }
+const KAART_KOP = { display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 2 }
+const KAART_SUB = { color: colors.textSecondary, fontWeight: 600, marginBottom: 6 }
 
 // Vraag via de lokale PA. Geeft { tekst, acties } of null (Mac pakte hem niet op).
 async function vraagViaMac(berichten, context) {
@@ -45,8 +63,44 @@ const Spraak = typeof window !== 'undefined' && (window.SpeechRecognition || win
 const leesGesprek = () => {
   try { return JSON.parse(localStorage.getItem(KEY)) || [] } catch { return [] }
 }
+// Volle afbeeldingen niet in localStorage (te groot), alleen de thumbnail.
 const bewaarGesprek = (g) => {
-  try { localStorage.setItem(KEY, JSON.stringify(g.slice(-40))) } catch { /* privé-venster */ }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(g.slice(-40).map(b => {
+      if (!b.afbeelding) return b
+      const kopie = { ...b }
+      delete kopie.afbeelding
+      return kopie
+    })))
+  } catch { /* privé-venster of vol */ }
+}
+
+// Afbeelding → { media_type, data (base64 zonder prefix), thumb (data-URL) }.
+async function verklein(bestand) {
+  const url = URL.createObjectURL(bestand)
+  try {
+    const img = await new Promise((ok, nee) => {
+      const i = new Image()
+      i.onload = () => ok(i)
+      i.onerror = () => nee(new Error('Afbeelding kon niet gelezen worden'))
+      i.src = url
+    })
+    const teken = (maxB, kwaliteit) => {
+      const schaal = Math.min(1, maxB / img.naturalWidth)
+      const c = document.createElement('canvas')
+      c.width = Math.max(1, Math.round(img.naturalWidth * schaal))
+      c.height = Math.max(1, Math.round(img.naturalHeight * schaal))
+      const ctx = c.getContext('2d')
+      ctx.fillStyle = '#ffffff' // transparante png's niet zwart laten worden
+      ctx.fillRect(0, 0, c.width, c.height)
+      ctx.drawImage(img, 0, 0, c.width, c.height)
+      return c.toDataURL('image/jpeg', kwaliteit)
+    }
+    const groot = teken(1600, 0.85)
+    return { media_type: 'image/jpeg', data: groot.split(',')[1], thumb: teken(240, 0.7) }
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }
 
 function Kopieer({ tekst }) {
@@ -55,10 +109,40 @@ function Kopieer({ tekst }) {
     <button
       onClick={() => navigator.clipboard?.writeText(tekst).then(() => { setKlaar(true); setTimeout(() => setKlaar(false), 1500) }, () => {})}
       title="Kopieer"
-      style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: 4, display: 'flex' }}
+      style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: 2, display: 'flex' }}
     >
-      {klaar ? <Check size={14} color={colors.success} /> : <Copy size={14} />}
+      {klaar ? <Check size={13} color={colors.success} /> : <Copy size={13} />}
     </button>
+  )
+}
+
+// Lange antwoorden ingekort tonen (~6 regels) met 'meer' / 'minder'.
+const MAX_REGELS = 6
+function Inkort({ tekst }) {
+  const ref = useRef(null)
+  const [lang, setLang] = useState(false)
+  const [open, setOpen] = useState(false)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el && !open) setLang(el.scrollHeight > el.clientHeight + 2)
+  }, [tekst, open])
+  return (
+    <>
+      <div ref={ref} style={{
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        ...(open ? {} : { maxHeight: `${MAX_REGELS * 1.4}em`, overflow: 'hidden' }),
+      }}>
+        {tekst}
+      </div>
+      {(lang || open) && (
+        <button onClick={() => setOpen(o => !o)} style={{
+          background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer', fontFamily: 'inherit',
+          color: colors.success, fontWeight: 800, fontSize: '0.75rem',
+        }}>
+          {open ? 'minder' : 'meer'}
+        </button>
+      )}
+    </>
   )
 }
 
@@ -81,30 +165,23 @@ function SlotVoorstel({ voorstel, onKlaar }) {
     onKlaar()
   }
   return (
-    <div style={{ margin: '4px 0 12px' }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 4 }}>
-        <Lock size={15} /> {opSlot ? 'Op slot zetten' : 'Ontgrendelen'} ({voorstel.klanten.length}){voorstel.tekst ? ` · ${voorstel.tekst}` : ''}
+    <div style={KAART}>
+      <div style={KAART_KOP}>
+        <Lock size={13} /> {opSlot ? 'Op slot zetten' : 'Ontgrendelen'} ({voorstel.klanten.length}){voorstel.tekst ? ` · ${voorstel.tekst}` : ''}
       </div>
-      <div style={{ color: colors.textSecondary, fontWeight: 600, marginBottom: 8 }}>
+      <div style={KAART_SUB}>
         {voorstel.klanten.map(k => k.naam).join(', ')}
       </div>
       {voorstel.uitgevoerd ? (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
-          <Check size={16} /> {opSlot ? 'Op slot gezet' : 'Ontgrendeld'}
+          <Check size={14} /> {opSlot ? 'Op slot gezet' : 'Ontgrendeld'}
         </div>
       ) : (
-        <button
-          onClick={voerUit}
-          disabled={bezig}
-          style={{
-            background: colors.textPrimary, color: colors.onAccent, border: 'none', borderRadius: 12,
-            padding: '0 16px', minHeight: 44, fontWeight: 900, fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit',
-          }}
-        >
+        <button onClick={voerUit} disabled={bezig} style={KNOP}>
           {bezig ? 'Bezig…' : opSlot ? `Zet ${voorstel.klanten.length} op slot` : `Ontgrendel ${voorstel.klanten.length}`}
         </button>
       )}
-      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
+      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 4 }}>{fout}</div>}
     </div>
   )
 }
@@ -137,11 +214,11 @@ function WijzigingVoorstel({ voorstel, onKlaar }) {
     onKlaar()
   }
   return (
-    <div style={{ margin: '4px 0 12px' }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 4 }}>
-        <Database size={15} /> {voorstel.uitleg}
+    <div style={KAART}>
+      <div style={KAART_KOP}>
+        <Database size={13} /> {voorstel.uitleg}
       </div>
-      <div style={{ color: colors.textSecondary, fontWeight: 600, marginBottom: 8, wordBreak: 'break-word' }}>
+      <div style={{ ...KAART_SUB, wordBreak: 'break-word' }}>
         {voorstel.actie === 'insert'
           ? `${voorstel.aantal} nieuwe rij(en) in ${voorstel.tabel}`
           : <>
@@ -151,21 +228,14 @@ function WijzigingVoorstel({ voorstel, onKlaar }) {
       </div>
       {voorstel.uitgevoerd ? (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
-          <Check size={16} /> Uitgevoerd
+          <Check size={14} /> Uitgevoerd
         </div>
       ) : (
-        <button
-          onClick={voerUit}
-          disabled={bezig}
-          style={{
-            background: colors.textPrimary, color: colors.onAccent, border: 'none', borderRadius: 12,
-            padding: '0 16px', minHeight: 44, fontWeight: 900, fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit',
-          }}
-        >
+        <button onClick={voerUit} disabled={bezig} style={KNOP}>
           {bezig ? 'Bezig…' : 'Toestaan'}
         </button>
       )}
-      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
+      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 4 }}>{fout}</div>}
     </div>
   )
 }
@@ -202,44 +272,45 @@ function PaVoorstel({ voorstel, onGestart }) {
   const status = rij?.status
   const hangt = status === 'wacht' && rij && Date.now() - new Date(rij.created_at).getTime() > 20000
   return (
-    <div style={{ margin: '4px 0 12px' }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 4 }}>
-        <Laptop size={15} /> Code-opdracht
+    <div style={KAART}>
+      <div style={KAART_KOP}>
+        <Laptop size={13} /> Code-opdracht
       </div>
-      <div style={{ color: colors.textSecondary, fontWeight: 600, marginBottom: 8, whiteSpace: 'pre-wrap' }}>{voorstel.tekst}</div>
+      <div style={KAART_SUB}><Inkort tekst={voorstel.tekst} /></div>
       {!id ? (
-        <button
-          onClick={start}
-          style={{
-            background: colors.textPrimary, color: colors.onAccent, border: 'none', borderRadius: 12,
-            padding: '0 16px', minHeight: 44, fontWeight: 900, fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit',
-          }}
-        >
+        <button onClick={start} style={KNOP}>
           Uitvoeren op mijn Mac
         </button>
       ) : (
         <div style={{ fontWeight: 800, color: status === 'klaar' ? colors.success : status === 'mislukt' ? colors.danger : colors.textPrimary }}>
-          {status === 'klaar' && <Check size={16} style={{ verticalAlign: '-3px', marginRight: 4 }} />}
+          {status === 'klaar' && <Check size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />}
           {PA_STATUS[status] || 'Versturen…'}
-          {hangt && <div style={{ color: colors.textSecondary, fontWeight: 600, marginTop: 4 }}>Draait npm run pa op je Mac?</div>}
+          {hangt && <div style={{ color: colors.textSecondary, fontWeight: 600, marginTop: 2 }}>Draait npm run pa op je Mac?</div>}
         </div>
       )}
-      {rij?.resultaat && <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{rij.resultaat}</div>}
-      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
+      {rij?.resultaat && <div style={{ marginTop: 6 }}><Inkort tekst={rij.resultaat} /></div>}
+      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 4 }}>{fout}</div>}
     </div>
   )
 }
 
-export default function BusinessChat({ context, lijstHoogte = 420, onBezig }) {
+export default function BusinessChat({ context, onBezig }) {
   const [gesprek, setGesprek] = useState(leesGesprek)
   const [invoer, setInvoer] = useState('')
+  const [bijlage, setBijlage] = useState(null)
   const [bezig, setBezig] = useState(false)
+  const [groot, setGroot] = useState(() => { try { return localStorage.getItem(OPEN_KEY) === '1' } catch { return false } })
+  const wisselGroot = () => setGroot(g => {
+    try { localStorage.setItem(OPEN_KEY, g ? '0' : '1') } catch { /* privé-venster */ }
+    return !g
+  })
   // Laat de pagina meekijken (de reactor-ring versnelt zolang de AI denkt).
   useEffect(() => { onBezig?.(bezig) }, [bezig, onBezig])
   const [fout, setFout] = useState(null)
   const [luistert, setLuistert] = useState(false)
   const lijst = useRef(null)
   const herkenner = useRef(null)
+  const kiezer = useRef(null)
 
   useEffect(() => () => herkenner.current?.abort(), [])
 
@@ -274,22 +345,52 @@ export default function BusinessChat({ context, lijstHoogte = 420, onBezig }) {
     setLuistert(true)
   }
 
+  const neemBeeld = async (bestand) => {
+    if (!bestand || !bestand.type?.startsWith('image/')) return
+    try {
+      setFout(null)
+      setBijlage(await verklein(bestand))
+    } catch (e) {
+      setFout(e.message || 'Afbeelding kon niet gelezen worden')
+    }
+  }
+  const plak = (e) => {
+    const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'))
+    if (!item) return
+    e.preventDefault()
+    neemBeeld(item.getAsFile())
+  }
+
   useEffect(() => {
     bewaarGesprek(gesprek)
     if (lijst.current) lijst.current.scrollTop = lijst.current.scrollHeight
-  }, [gesprek, bezig])
+  }, [gesprek, bezig, groot])
 
   const stuur = async () => {
     const vraag = invoer.trim()
-    if (!vraag || bezig) return
+    if ((!vraag && !bijlage) || bezig) return
     herkenner.current?.stop()
-    const nieuw = [...gesprek, { role: 'user', content: vraag }]
+    const nieuwBericht = { role: 'user', content: vraag }
+    if (bijlage) {
+      nieuwBericht.afbeelding = { media_type: bijlage.media_type, data: bijlage.data }
+      nieuwBericht.thumb = bijlage.thumb
+    }
+    const nieuw = [...gesprek, nieuwBericht]
     setGesprek(nieuw)
     setInvoer('')
+    setBijlage(null)
     setBezig(true)
     setFout(null)
-    const berichten = nieuw.map(({ role, content }) => ({ role, content }))
-    const mac = viaMac ? await vraagViaMac(berichten, context) : null
+    // Alleen de laatste paar screenshots meesturen; oudere gaan als tekst.
+    let beelden = 0
+    const berichten = nieuw.map(({ role, content, afbeelding }) => ({ role, content, afbeelding }))
+      .reverse()
+      .map(b => (b.afbeelding && b.afbeelding.data && beelden++ < MAX_BEELDEN)
+        ? b
+        : { role: b.role, content: b.content })
+      .reverse()
+    const metBeeld = berichten.some(b => b.afbeelding)
+    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context) : null
     if (mac) {
       setBezig(false)
       setGesprek(g => [...g, { role: 'assistant', content: mac.tekst, acties: mac.acties || [] }])
@@ -304,107 +405,151 @@ export default function BusinessChat({ context, lijstHoogte = 420, onBezig }) {
     setGesprek(g => [...g, { role: 'assistant', content: data.tekst, acties: data.acties || [] }])
   }
 
-  return (
-    <div style={{ textAlign: 'left', marginTop: 24 }}>
-      {gesprek.length > 0 && (
-        <div ref={lijst} style={{ maxHeight: lijstHoogte, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
-          {gesprek.map((b, i) => b.role === 'user' ? (
-            <div key={i} style={{
-              alignSelf: 'flex-end', maxWidth: '85%', background: colors.surface, borderRadius: 16,
-              padding: '8px 12px', fontSize: '0.9rem', fontWeight: 700, color: colors.textPrimary, whiteSpace: 'pre-wrap',
-            }}>
-              {b.content}
-            </div>
-          ) : (
-            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <div style={{ flex: 1, fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.55, color: colors.textPrimary, whiteSpace: 'pre-wrap' }}>
-                {(b.acties || []).map((ac, j) => {
-                  const klaar = () => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
-                    ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, uitgevoerd: true } : x),
-                  }))
-                  if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} voorstel={ac} onKlaar={klaar} />
-                  if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} voorstel={ac} onKlaar={klaar} />
-                  if (ac.soort === 'pa_voorstel') {
-                    const gestart = (opdrachtId) => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
-                      ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, opdrachtId } : x),
-                    }))
-                    return <PaVoorstel key={j} voorstel={ac} onGestart={gestart} />
-                  }
-                  return (
-                    <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, marginBottom: 6 }}>
-                      <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}
-                    </div>
-                  )
-                })}
-                {b.content}
-              </div>
-              <Kopieer tekst={b.content} />
-            </div>
-          ))}
-          {bezig && <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.textSecondary }}>Bezig…</div>}
-        </div>
-      )}
-      {fout && <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.danger, marginBottom: 8 }}>{fout}</div>}
+  const kanSturen = (invoer.trim() || bijlage) && !bezig
+  const rondeKnop = {
+    width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+  }
 
-      <div title={viaMac ? 'Je Mac beantwoordt (Claude-abonnement)' : 'Via de API (start npm run pa om via je Mac te gaan)'}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, margin: '0 0 8px 4px' }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: viaMac ? colors.success : colors.textMuted }} />
-        {viaMac ? 'Via je Mac' : 'Via de API'}
-      </div>
-      <style>{'@keyframes bos-mic { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5) } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0) } }'}</style>
-      <div style={{
-        display: 'flex', alignItems: 'flex-end', gap: 4, background: colors.surface,
-        borderRadius: 24, padding: '4px 4px 4px 16px',
+  return (
+    <div style={{
+      textAlign: 'left', marginTop: 8, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: groot ? 860 : 560, marginLeft: 'auto', marginRight: 'auto', position: 'relative',
+    }}>
+      <button onClick={wisselGroot} title={groot ? 'Chat inklappen' : 'Chat uitklappen'} aria-expanded={groot} style={{
+        position: 'absolute', top: 0, right: 0, zIndex: 2, width: 28, height: 28, borderRadius: 8,
+        border: `1px solid ${colors.success}40`, background: '#000', color: colors.success, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
       }}>
-        <textarea
-          value={invoer}
-          onChange={e => setInvoer(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); stuur() } }}
-          placeholder={luistert ? 'Luistert… praat maar' : 'Geef een taak, bv. maak 3 reel-scripts over buikvet na je 30e'}
-          rows={1}
-          style={{
-            flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none',
-            color: colors.textPrimary, fontSize: '0.95rem', fontWeight: 600, padding: '10px 0',
-            minHeight: 44, maxHeight: 140, fontFamily: 'inherit',
-          }}
-        />
-        {Spraak && (
-          <button
-            onClick={microfoon}
-            title={luistert ? 'Stop met luisteren' : 'Inspreken'}
+        {groot ? <Minimize2 size={14} strokeWidth={2.5} /> : <Maximize2 size={14} strokeWidth={2.5} />}
+      </button>
+      <div ref={lijst} style={{
+        flex: '0 1 auto', minHeight: 0, maxHeight: groot ? '70dvh' : 'min(30dvh, 220px)',
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
+        display: 'flex', flexDirection: 'column', gap: 6, padding: '0 34px 6px 0',
+      }}>
+        {gesprek.map((b, i) => b.role === 'user' ? (
+          <div key={i} style={{
+            alignSelf: 'flex-end', maxWidth: '85%', background: colors.surface, borderRadius: 14,
+            padding: '4px 9px', ...TEKST, fontWeight: 700, color: colors.textPrimary, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}>
+            {b.thumb && (
+              <img src={b.thumb} alt="Screenshot" style={{
+                display: 'block', maxWidth: 160, maxHeight: 120, borderRadius: 8, marginBottom: b.content ? 4 : 0,
+              }} />
+            )}
+            {b.content}
+          </div>
+        ) : (
+          <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0, ...TEKST, fontWeight: 500, color: colors.textPrimary }}>
+              {(b.acties || []).map((ac, j) => {
+                const klaar = () => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
+                  ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, uitgevoerd: true } : x),
+                }))
+                if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} voorstel={ac} onKlaar={klaar} />
+                if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} voorstel={ac} onKlaar={klaar} />
+                if (ac.soort === 'pa_voorstel') {
+                  const gestart = (opdrachtId) => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
+                    ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, opdrachtId } : x),
+                  }))
+                  return <PaVoorstel key={j} voorstel={ac} onGestart={gestart} />
+                }
+                return (
+                  <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, fontSize: '0.8rem', marginBottom: 4 }}>
+                    <Check size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}
+                  </div>
+                )
+              })}
+              <Inkort tekst={b.content} />
+            </div>
+            <Kopieer tekst={b.content} />
+          </div>
+        ))}
+        {bezig && <div style={{ fontSize: '0.78rem', fontWeight: 700, color: colors.textSecondary }}>Bezig…</div>}
+      </div>
+
+      <div style={{ flexShrink: 0 }}>
+        {fout && <div style={{ fontSize: '0.78rem', fontWeight: 700, color: colors.danger, marginBottom: 6 }}>{fout}</div>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.72rem', fontWeight: 700, color: colors.textSecondary, margin: '0 0 6px 4px' }}>
+          <span title={viaMac ? 'Je Mac beantwoordt (Claude-abonnement)' : 'Via de API (start npm run pa om via je Mac te gaan)'}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: viaMac ? colors.success : colors.textMuted }} />
+            {viaMac ? 'Via je Mac' : 'Via de API'}
+          </span>
+          {gesprek.length > 0 && (
+            <button
+              onClick={() => { setGesprek([]); setFout(null) }}
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: colors.textSecondary, fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: '0 4px', fontFamily: 'inherit' }}
+            >
+              Nieuw gesprek
+            </button>
+          )}
+        </div>
+        {bijlage && (
+          <div style={{ position: 'relative', display: 'inline-block', margin: '0 0 6px 4px' }}>
+            <img src={bijlage.thumb} alt="Screenshot om mee te sturen" style={{ display: 'block', height: 56, borderRadius: 8 }} />
+            <button onClick={() => setBijlage(null)} title="Weghalen" style={{
+              position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%',
+              border: 'none', background: colors.textPrimary, color: colors.onAccent, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+            }}>
+              <X size={13} strokeWidth={3} />
+            </button>
+          </div>
+        )}
+        <style>{'@keyframes bos-mic { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5) } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0) } }'}</style>
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', gap: 2, background: colors.surface,
+          borderRadius: 22, padding: '2px 2px 2px 14px',
+        }}>
+          <textarea
+            value={invoer}
+            onChange={e => setInvoer(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); stuur() } }}
+            onPaste={plak}
+            placeholder={luistert ? 'Luistert… praat maar' : 'Geef een taak of plak een screenshot'}
+            rows={1}
             style={{
-              width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
-              background: luistert ? colors.danger : 'transparent',
-              color: luistert ? colors.textPrimary : colors.textSecondary, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              animation: luistert ? 'bos-mic 1.2s ease-in-out infinite' : 'none',
+              flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none',
+              color: colors.textPrimary, fontSize: '0.85rem', fontWeight: 600, padding: '8px 0',
+              minHeight: 36, maxHeight: 120, fontFamily: 'inherit',
+            }}
+          />
+          <input ref={kiezer} type="file" accept="image/*" hidden
+            onChange={e => { neemBeeld(e.target.files?.[0]); e.target.value = '' }} />
+          <button onClick={() => kiezer.current?.click()} title="Screenshot meesturen"
+            style={{ ...rondeKnop, background: 'transparent', color: colors.textSecondary }}>
+            <ImagePlus size={18} strokeWidth={2.2} />
+          </button>
+          {Spraak && (
+            <button
+              onClick={microfoon}
+              title={luistert ? 'Stop met luisteren' : 'Inspreken'}
+              style={{
+                ...rondeKnop,
+                background: luistert ? colors.danger : 'transparent',
+                color: luistert ? colors.textPrimary : colors.textSecondary,
+                animation: luistert ? 'bos-mic 1.2s ease-in-out infinite' : 'none',
+              }}
+            >
+              <Mic size={18} strokeWidth={2.5} />
+            </button>
+          )}
+          <button
+            onClick={stuur}
+            disabled={!kanSturen}
+            title="Verstuur"
+            style={{
+              ...rondeKnop,
+              background: kanSturen ? colors.textPrimary : 'rgba(255,255,255,0.15)',
+              color: colors.onAccent, cursor: kanSturen ? 'pointer' : 'default',
             }}
           >
-            <Mic size={18} strokeWidth={2.5} />
+            <ArrowUp size={18} strokeWidth={3} />
           </button>
-        )}
-        <button
-          onClick={stuur}
-          disabled={bezig || !invoer.trim()}
-          title="Verstuur"
-          style={{
-            width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
-            background: invoer.trim() && !bezig ? colors.textPrimary : 'rgba(255,255,255,0.15)',
-            color: colors.onAccent, cursor: invoer.trim() && !bezig ? 'pointer' : 'default',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <ArrowUp size={18} strokeWidth={3} />
-        </button>
+        </div>
       </div>
-      {gesprek.length > 0 && (
-        <button
-          onClick={() => { setGesprek([]); setFout(null) }}
-          style={{ background: 'none', border: 'none', color: colors.textSecondary, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: '8px 4px', minHeight: 32 }}
-        >
-          Nieuw gesprek
-        </button>
-      )}
     </div>
   )
 }
