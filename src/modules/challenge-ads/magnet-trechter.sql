@@ -1,5 +1,8 @@
 -- Comment-magnet-trechter (23 okt 2026).
 --
+-- LET OP: live versie sluit challenge_status 'uitgesteld' uit; zie
+-- lead-management/sale-uitgesteld.sql.
+--
 -- De route: reel met "comment WOORD" → comments → commenters op het bord
 -- (elke ochtend via screenshot + Claude, met de magnet in
 -- call_leads.lead_magnets_shared) → reactie → call → sale.

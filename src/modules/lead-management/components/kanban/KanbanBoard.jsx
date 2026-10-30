@@ -166,6 +166,8 @@ export default function KanbanBoard({
   const [dueCalls, setDueCalls] = useState([])
   // Closes die nog op geld wachten; tweede tabblad van hetzelfde venster.
   const [wachtBetaling, setWachtBetaling] = useState([])
+  // Leads met een uitgestelde sale → label 'Uitgesteld' op de kaart.
+  const [uitgesteldLeads, setUitgesteldLeads] = useState(() => new Set())
   const [showDueCalls, setShowDueCalls] = useState(false)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
   // boardFilter shape: {
@@ -998,6 +1000,7 @@ export default function KanbanBoard({
         const due = schedIds.length ? await leadService.getDueScheduledCalls(schedIds) : []
         setDueCalls(due)
         leadService.getAwaitingPayment(coachId).then(setWachtBetaling).catch(() => {})
+        leadService.getUitgesteldeLeadIds().then(setUitgesteldLeads)
         if (isInitialLoad && due.length) setShowDueCalls(true) // auto-open bij openen bord
       } catch (e) { console.warn('due calls load failed:', e?.message) }
     } catch (error) { console.error('❌ Load kanban failed:', error) }
@@ -1686,6 +1689,7 @@ export default function KanbanBoard({
           onMagnetAttached={handleMagnetAttachedForLead}
           activeCampaign={runCampaign}
           verbergNaam={namenVerborgen}
+          uitgesteld={uitgesteldLeads.has(lead.id)}
         />
       </div>
     )

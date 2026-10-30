@@ -115,6 +115,7 @@ export default function KanbanCard({
   onSalesCallClick,
   onMagnetAttached,
   activeCampaign = null,
+  uitgesteld = false,
 }) {
   const modalHost = useModalHost()
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
@@ -744,6 +745,19 @@ export default function KanbanCard({
             }}>
               <Flame size={9} color="#D4AF37" />
               <span style={{ fontSize: '0.6rem', fontWeight: '700', color: '#D4AF37', letterSpacing: '0.04em' }}>CALL</span>
+            </span>
+          )}
+
+          {/* Uitgestelde sale: telt niet mee in de cijfers, wel opvolgen. */}
+          {uitgesteld && (
+            <span title="Sale uitgesteld · telt niet mee in de cijfers" style={{
+              display: 'flex', alignItems: 'center',
+              padding: '1px 5px',
+              background: 'rgba(16,185,129,0.1)',
+              border: '1px solid rgba(16,185,129,0.35)',
+              borderRadius: '3px'
+            }}>
+              <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#fff', letterSpacing: '0.04em' }}>UITGESTELD</span>
             </span>
           )}
 

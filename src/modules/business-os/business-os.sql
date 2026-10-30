@@ -1,5 +1,8 @@
 -- src/modules/business-os/business-os.sql
 --
+-- LET OP: live heeft get_business_os een filter op challenge_status
+-- 'uitgesteld' + veld 'uitgesteld'; zie lead-management/sale-uitgesteld.sql.
+--
 -- Business OS (30 okt 2026): één scherm waar alles samenkomt. Eén RPC levert
 -- de keten content → leads → reactie → call → sale → € voor een periode, de
 -- gemiddelden van de 3 maanden ervoor (om de zwakste schakel te vinden), de

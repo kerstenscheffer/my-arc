@@ -1,3 +1,6 @@
+-- LET OP: live versie sluit challenge_status 'uitgesteld' uit; zie
+-- lead-management/sale-uitgesteld.sql.
+--
 -- Ads-scherm: spend per advertentie en het overzicht van klik tot sale
 -- (22 okt 2026). Staat in de DB als migraties meta_ad_insights en
 -- get_challenge_ads_overzicht_bron.

@@ -2336,6 +2336,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const toSection = (mov.to_section_title || '').toLowerCase()
         const fromRank = rankOf(mov.from_section_title)
         const leadId = mov.lead_id
+        // Uitgestelde sale (start/betaling onzeker): telt nergens mee — geen
+        // sale, geen omzet, geen toegezegd. Opvolgen gaat via Business OS.
+        if (mov.challenge_status === 'uitgesteld') return
         // Omzet: elke movement met een ingevulde order-waarde telt mee (die
         // wordt alleen bij een sale gezet). Vóór de early-returns zodat 'ie
         // altijd meetelt, ook als de sectie geen puur "Sale"-label heeft.
@@ -2806,7 +2809,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // een cashflow-overzicht. Openstaand challenge-geld staat er wel in —
         // het stáát op de rekening — maar telt niet mee voor de uitbetaling aan
         // de partner (zie getPartnerPayouts).
-        .or('challenge_status.is.null,challenge_status.neq.terugbetaald')
+        // Uitgesteld (start/betaling onzeker) telt evenmin mee.
+        .or('challenge_status.is.null,challenge_status.not.in.(terugbetaald,uitgesteld)')
       // Een ja is nog geen geld. Sales waarvan de betaling nog moet komen
       // (payment_received = false, en geen reservering waarbij al iets binnen
       // is) horen niet in een cashflow-overzicht: ze staan apart als
@@ -3060,8 +3064,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         bedrag: Number(r.order_value) || 0,
         pct: r.partner_share_pct != null ? Number(r.partner_share_pct) : null,
         status: r.challenge_status || 'open',
-        deadline: r.challenge_deadline || null,
-        verlopen: !!r.challenge_deadline && r.challenge_deadline < vandaag,
+        // Uitgesteld: startdatum onbekend, dus geen deadline en nooit verlopen.
+        deadline: r.challenge_status === 'uitgesteld' ? null : (r.challenge_deadline || null),
+        verlopen: r.challenge_status !== 'uitgesteld' && !!r.challenge_deadline && r.challenge_deadline < vandaag,
         sectionId: r.to_section_id,
         sectionTitle: r.to_section_title,
         gestart: r.moved_at,
@@ -3075,13 +3080,30 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Lead-id's met een uitgestelde sale, voor het label op de leadkaart.
+  async getUitgesteldeLeadIds() {
+    const { data } = await this.db.supabase
+      .from('lead_movements')
+      .select('lead_id')
+      .eq('challenge_status', 'uitgesteld')
+      .is('reverted_at', null)
+      .then(r => r, () => ({ data: [] }))
+    return new Set((data || []).map(r => r.lead_id).filter(Boolean))
+  }
+
   // Een challenge afronden. 'behouden' = het geld is van ons (telt vanaf nu mee
   // in omzet én uitbetaling), 'terugbetaald' = teruggegeven, valt overal uit.
-  async setChallengeStatus(movementId, status) {
+  // 'uitgesteld' = start/betaling onzeker: telt nergens mee, deadline gaat leeg.
+  // Terug naar 'open' vanuit uitgesteld: geef `deadline` mee (startdatum + 42 d);
+  // de sale telt dan weer mee op zijn oorspronkelijke saledatum.
+  async setChallengeStatus(movementId, status, { deadline } = {}) {
     try {
+      const patch = { challenge_status: status }
+      if (status === 'uitgesteld') patch.challenge_deadline = null
+      else if (deadline !== undefined) patch.challenge_deadline = deadline
       const { data, error } = await this.db.supabase
         .from('lead_movements')
-        .update({ challenge_status: status })
+        .update(patch)
         .eq('id', movementId)
         .select('id')
       if (error) throw error
@@ -3190,7 +3212,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // hij vanzelf in de maand waarin dat gebeurde.
         betaald: r.payment_received === true || r.is_reservation === true,
         pauzes: pauzesVan[r.id] || null,
-      })).filter(s => s.total > 0 && s.pct > 0 && s.betaald && !isNaN(s.date?.getTime?.()))
+        // Uitgesteld (start/betaling onzeker): geen commissie, telt niet mee.
+        uitgesteld: r.challenge_status === 'uitgesteld',
+      })).filter(s => s.total > 0 && s.pct > 0 && s.betaald && !s.uitgesteld && !isNaN(s.date?.getTime?.()))
 
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)
@@ -3842,7 +3866,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             .order('id', { ascending: true })),
           this._fetchAllRows(() => this.db.supabase
             .from('lead_movements')
-            .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at, call_happened, outcome_type, call_date, order_value, partner_share_pct, payment_received, reverted_at')
+            .select('id, lead_id, lead_name, from_section_title, to_section_title, moved_at, call_happened, outcome_type, call_date, order_value, partner_share_pct, payment_received, reverted_at, challenge_status')
             .in('lead_id', chunk)
             .order('id', { ascending: true })),
         ])
@@ -3854,6 +3878,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         })
         movRijen.forEach(m => {
           if (!m.moved_at) return
+          // Uitgestelde sale telt niet mee in campagne-sales/-omzet.
+          if (m.challenge_status === 'uitgesteld') return
           const lijst = movPerLead.get(m.lead_id) || []
           lijst.push(m)
           movPerLead.set(m.lead_id, lijst)

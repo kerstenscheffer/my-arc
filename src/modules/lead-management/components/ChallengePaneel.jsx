@@ -13,9 +13,27 @@
 //                   Twee regels dus, want anders raak je kwijt wat er voor de
 //                   challenge zelf betaald is.
 //   Terugbetaald  — geld terug. Valt overal uit, ook uit de cashflow.
+//   Uitgesteld    — start of betaling onzeker (datum onbekend). Telt nergens
+//                   mee, geen deadline; staat in Business OS → Opvolgen. Weer
+//                   open = startdatum kiezen, deadline = start + 42 dagen, en hij
+//                   telt weer mee op de oorspronkelijke saledatum.
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowUpRight, Check, Undo2 } from 'lucide-react'
+import { ArrowUpRight, Check, Clock, Undo2 } from 'lucide-react'
+
+const FILTERS = [
+  ['open', 'Open'],
+  ['uitgesteld', 'Uitgesteld'],
+  ['behouden', 'Behouden'],
+  ['terugbetaald', 'Terugbetaald'],
+]
+const CHALLENGE_DAGEN = 42
+const lokaleDatum = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const plusDagen = (iso, n) => {
+  const d = new Date(`${iso}T12:00:00`)
+  d.setDate(d.getDate() + n)
+  return lokaleDatum(d)
+}
 
 const LIJN = 'rgba(255,255,255,0.08)'
 // Challenge-geld is wit zoals de rest — het staat op de rekening — maar met
@@ -49,11 +67,14 @@ const knop = (kleur, vol = false) => ({
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })
 
-function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald }) {
+function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald, onHeropen }) {
   const [vervolg, setVervolg] = useState(false)
   const [bedrag, setBedrag] = useState('')
   const [pct, setPct] = useState(String(ch.pct ?? 50))
   const [bezig, setBezig] = useState(false)
+  // Weer open vanuit uitgesteld: startdatum vragen (standaard vandaag).
+  const [heropen, setHeropen] = useState(false)
+  const [start, setStart] = useState(() => lokaleDatum(new Date()))
 
   const doe = async (fn) => { setBezig(true); await fn(); setBezig(false) }
   const bedragNum = parseFloat(String(bedrag).replace(',', '.'))
@@ -72,19 +93,37 @@ function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald }) {
           </div>
           <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
             {euro(ch.bedrag)}
-            {ch.deadline && (
+            {ch.status === 'uitgesteld' && ch.gestart && (
+              <span>{' · '}sale {new Date(ch.gestart).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</span>
+            )}
+            {ch.status !== 'uitgesteld' && ch.deadline && (
               <span style={{ color: ch.verlopen ? '#10b981' : 'rgba(255,255,255,0.4)' }}>
                 {' · '}{ch.verlopen ? 'termijn voorbij' : `tot ${new Date(ch.deadline).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
               </span>
             )}
           </div>
         </div>
-      {!ch.betaald ? (
+      {ch.status === 'behouden' || ch.status === 'terugbetaald' ? null
+      : ch.status === 'uitgesteld' ? (
+        !heropen && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button style={knop('#fff', true)} disabled={bezig} onClick={() => setHeropen(true)}>
+              Weer open
+            </button>
+            <button style={knop('#ef4444')} disabled={bezig} onClick={() => doe(() => onAfronden(ch, 'terugbetaald'))}>
+              Gaat niet door
+            </button>
+          </div>
+        )
+      ) : !ch.betaald ? (
         // Nog niet betaald: eerst moet het geld binnenkomen, pas dan valt er
         // iets te behouden of terug te betalen.
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={knop('#fff', true)} disabled={bezig} onClick={() => doe(() => onBetaald(ch))}>
             <Check size={12} strokeWidth={3.4} /> Betaald
+          </button>
+          <button style={knop('#fff')} disabled={bezig} onClick={() => doe(() => onAfronden(ch, 'uitgesteld'))}>
+            <Clock size={12} strokeWidth={3.4} /> Uitstellen
           </button>
           <button style={knop('#ef4444')} disabled={bezig} onClick={() => doe(() => onAfronden(ch, 'terugbetaald'))}>
             Gaat niet door
@@ -104,6 +143,28 @@ function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald }) {
         </div>
       ) : null}
       </div>
+      {ch.status === 'uitgesteld' && heropen && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>Start</span>
+            <input type="date" value={start} onChange={e => setStart(e.target.value)} style={{ ...veld, colorScheme: 'dark' }} />
+            <button
+              style={knop('#22c55e', true)} disabled={bezig || !start}
+              onClick={() => doe(() => onHeropen(ch, plusDagen(start, CHALLENGE_DAGEN)))}
+            >
+              Vastleggen
+            </button>
+            <button style={knop('rgba(255,255,255,0.4)')} disabled={bezig} onClick={() => setHeropen(false)}>
+              Terug
+            </button>
+          </div>
+          {start && (
+            <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+              Deadline {new Date(`${plusDagen(start, CHALLENGE_DAGEN)}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} · telt weer mee op saledatum
+            </div>
+          )}
+        </div>
+      )}
       {ch.betaald && vervolg && (
         <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
@@ -150,18 +211,27 @@ function Regel({ ch, partnerName, onAfronden, onDoorzetten, onBetaald }) {
 export default function ChallengePaneel({ leadService, coachId, partnerName = 'Marcel', onGewijzigd }) {
   const [lijst, setLijst] = useState([])
   const [laden, setLaden] = useState(true)
+  const [filter, setFilter] = useState('open')
 
   const laad = useCallback(async () => {
     if (!leadService) return
     setLaden(true)
-    setLijst(await leadService.getChallenges(coachId, 'open'))
+    setLijst(await leadService.getChallenges(coachId, filter))
     setLaden(false)
-  }, [leadService, coachId])
+  }, [leadService, coachId, filter])
 
   useEffect(() => { laad() }, [laad])
 
   const afronden = async (ch, status) => {
     const res = await leadService.setChallengeStatus(ch.movementId, status)
+    if (res?.error) { console.error(res.error); return }
+    await laad()
+    onGewijzigd?.()
+  }
+
+  // Uitgesteld → open met nieuwe deadline (startdatum + 42 dagen).
+  const heropenen = async (ch, deadline) => {
+    const res = await leadService.setChallengeStatus(ch.movementId, 'open', { deadline })
     if (res?.error) { console.error(res.error); return }
     await laad()
     onGewijzigd?.()
@@ -195,24 +265,55 @@ export default function ChallengePaneel({ leadService, coachId, partnerName = 'M
       onAfronden={afronden}
       onDoorzetten={doorzetten}
       onBetaald={betaald}
+      onHeropen={heropenen}
     />
   )
 
+  const filterKeuze = (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+      <select value={filter} onChange={e => setFilter(e.target.value)} aria-label="Status" style={{ ...veld, colorScheme: 'dark', cursor: 'pointer' }}>
+        {FILTERS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+      </select>
+    </div>
+  )
+
   if (laden) {
-    return <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Laden…</div>
+    return <div>{filterKeuze}<div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>Laden…</div></div>
   }
 
   if (lijst.length === 0) {
     return (
-      <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.85rem', lineHeight: 1.5 }}>
-        Geen lopende challenges. Kies bij een sale "Challenge" om money-back-geld
-        apart te houden van je omzet.
+      <div>
+        {filterKeuze}
+        <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+          {filter === 'open'
+            ? 'Geen lopende challenges. Kies bij een sale "Challenge" om money-back-geld apart te houden van je omzet.'
+            : `Geen challenges met status ${FILTERS.find(([k]) => k === filter)?.[1].toLowerCase()}.`}
+        </div>
+      </div>
+    )
+  }
+
+  if (filter !== 'open') {
+    const som = lijst.reduce((s, c) => s + c.bedrag, 0)
+    return (
+      <div>
+        {filterKeuze}
+        <div style={{ paddingBottom: '1rem', borderBottom: `1px solid ${LIJN}`, marginBottom: '0.75rem' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 900, lineHeight: 1, color: '#fff', letterSpacing: '-0.035em' }}>{euro(som)}</div>
+          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginTop: 5 }}>
+            {lijst.length} {FILTERS.find(([k]) => k === filter)?.[1].toLowerCase()}
+            {filter === 'uitgesteld' ? ' · telt nergens mee tot je hem weer opent' : ''}
+          </div>
+        </div>
+        {lijst.map(regel)}
       </div>
     )
   }
 
   return (
     <div>
+      {filterKeuze}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: '1rem 2.5rem',
         paddingBottom: '1rem', borderBottom: `1px solid ${LIJN}`, marginBottom: '0.75rem',

@@ -61,6 +61,7 @@ const ONDERDELEN = [
   ['som', 'Terugrekensom · wat is er nodig'],
   ['calls', 'Calls · komende 3 dagen'],
   ['sales', 'Laatste sales'],
+  ['opvolgen', 'Opvolgen · uitgestelde sales'],
   ['agents', 'Agents'],
 ]
 
@@ -969,6 +970,24 @@ export default function BusinessOS({ isMobile }) {
         <div style={{ ...NUM, fontSize: '0.9rem', fontWeight: 900, color: C.groen }}>{euro(s.bedrag)}</div>
       </div>
     ))
+    // Uitgestelde sales: tellen nergens mee, staan hier om op te volgen.
+    // Terugzetten op open gaat in het Challenge-overzicht.
+    if (k === 'opvolgen') return (
+      <>
+        {(data.uitgesteld || []).length === 0 && <div style={{ fontSize: '0.85rem', color: C.zacht }}>Geen uitgestelde sales.</div>}
+        {(data.uitgesteld || []).map((s, i) => (
+          <div key={s.id || i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.naam || 'Lead'}</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: C.zacht }}>
+                sinds {s.sinds ? new Date(s.sinds).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : '—'}
+              </div>
+            </div>
+            <div style={{ ...NUM, fontSize: '0.9rem', fontWeight: 900, color: C.groen }}>{euro(s.bedrag)}</div>
+          </div>
+        ))}
+      </>
+    )
     if (k === 'agents') return (data.agents || []).map(ag => {
       const ok = ag.actief && ag.status === 'succeeded'
       const kleur = !ag.actief ? C.zacht : ok ? C.groen : C.rood
@@ -1046,6 +1065,7 @@ export default function BusinessOS({ isMobile }) {
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
             zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
+            uitgesteldeSalesNietMeegeteld: data.uitgesteld || [],
             vandaag: {
               beloftesOpen: vandaag.beloftes.length, takenVandaag: vandaag.takenVandaag.length,
               overDatum: vandaag.overDatum.length, callsVandaag: vandaag.calls.filter(c => dagIso(new Date(c.scheduled_date)) === vandaag.vandaag).length,
