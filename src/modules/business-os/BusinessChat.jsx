@@ -200,8 +200,12 @@ async function startPaOpdracht(voorstel) {
   return error ? { fout: 'Starten mislukt: ' + error.message } : { veld: { opdrachtId: data.id } }
 }
 
-const VOER_UIT = { slot_voorstel: voerSlotUit, wijziging_voorstel: voerWijzigingUit, pa_voorstel: startPaOpdracht }
-const staatOpen = (ac) => !!VOER_UIT[ac.soort] && !ac.uitgevoerd && !ac.opdrachtId && !ac.afgewezen
+// Wacht op jou: Gino heeft iets van Kersten nodig (sleutel, download, screenshot,
+// antwoord). Niets uit te voeren; 'Gedaan' zet hem op afgehandeld.
+const meldGedaan = async () => ({ veld: { afgehandeld: true } })
+
+const VOER_UIT = { slot_voorstel: voerSlotUit, wijziging_voorstel: voerWijzigingUit, pa_voorstel: startPaOpdracht, wacht_op_jou: meldGedaan }
+const staatOpen = (ac) => !!ac && !!VOER_UIT[ac.soort] && !ac.uitgevoerd && !ac.opdrachtId && !ac.afgewezen && !ac.afgehandeld
 
 const waardeTekst = (v) => v === null ? 'leeg' : typeof v === 'object' ? JSON.stringify(v) : String(v)
 const wijzigingRegels = (v) => v.actie === 'insert'
@@ -219,9 +223,28 @@ const eersteZin = (t) => {
   const regel = (t || '').trim().split('\n')[0]
   return regel.match(/^.*?[.!?](\s|$)/)?.[0] || regel
 }
+// Resultaat van een code-opdracht → één korte regel voor de statusregel:
+// eerste zin, zonder markdown, max ~60 tekens.
+const zonderMarkdown = (t) => (t || '')
+  .replace(/```[\s\S]*?```/g, ' ')
+  .replace(/^\s*(#{1,6}\s*|[-*•+]\s+|>\s*|→\s*)/gm, '')
+  .replace(/\*\*|__|`|\*/g, '')
+  .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+const laatstGedaanRegel = (rij) => {
+  const bron = zonderMarkdown(rij?.resultaat).trim()
+  if (bron) return kort(eersteZin(bron).trim().replace(/[.!]$/, ''), 60)
+  const opdracht = zonderMarkdown(rij?.opdracht).trim()
+  return opdracht ? kort(`Gino deed: ${eersteZin(opdracht).trim().replace(/[.!:]$/, '')}`, 60) : null
+}
+const GELEZEN_KEY = 'bos_laatst_gedaan_gelezen'
+const SLEUTEL_GEDAAN_KEY = 'bos_el_sleutel_gedaan'
+const SLEUTEL_ACTIE = 'Zet ELEVENLABS_API_KEY en ELEVENLABS_VOICE_ID in Supabase (Edge Functions, Secrets)'
+const lees = (k) => { try { return localStorage.getItem(k) } catch { return null } }
+const schrijf = (k, v) => { try { localStorage.setItem(k, v) } catch { /* privé-venster */ } }
 
 // Voorstel → één korte vraag in spreektaal + samenvatting + volledige tekst.
 function vraagVoor(ac) {
+  if (ac.soort === 'wacht_op_jou') return { vraag: `Ik wacht op jou: ${kort(ac.tekst, 120)}`, kort: '', details: '' }
   if (ac.soort === 'slot_voorstel') {
     const n = ac.klanten.length
     const wie = n === 1 ? ac.klanten[0].naam : `${n} klanten`
@@ -346,6 +369,23 @@ function PaVoorstel({ voorstel, staat, onToestaan }) {
   )
 }
 
+// Gino wacht op Kersten: tekst + Gedaan.
+function WachtOpJou({ voorstel, staat, onToestaan }) {
+  const { bezig } = staat || {}
+  return (
+    <div style={KAART}>
+      <div style={{ ...KAART_KOP, marginBottom: 6 }}>Ik wacht op jou: {voorstel.tekst}</div>
+      {voorstel.afgehandeld ? (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
+          <Check size={14} /> Gedaan
+        </div>
+      ) : (
+        <button onClick={onToestaan} disabled={bezig} style={KNOP}>Gedaan</button>
+      )}
+    </div>
+  )
+}
+
 // Tekstwolkje bij het robotje: het eerste open voorstel als korte vraag.
 // Zweeft (absoluut) boven de balk, dus ring en pagina schuiven niet.
 function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee }) {
@@ -353,8 +393,9 @@ function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee }) {
   const { vraag, kort: samenvatting, details: volledig } = vraagVoor(voorstel)
   const { bezig, fout } = staat || {}
   const meer = volledig && volledig !== samenvatting
+  const wacht = voorstel.soort === 'wacht_op_jou'
   return (
-    <div role="dialog" aria-label="Gino vraagt toestemming" style={{
+    <div role="dialog" aria-label={wacht ? 'Gino wacht op jou' : 'Gino vraagt toestemming'} style={{
       position: 'absolute', left: 0, bottom: '100%', marginBottom: 34, zIndex: 6,
       width: 'min(340px, 100%)', boxSizing: 'border-box', padding: '10px 12px',
       background: '#0a0a0a', border: `1px solid ${colors.success}55`, borderRadius: 14,
@@ -387,13 +428,15 @@ function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee }) {
       )}
       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
         <button onClick={onToestaan} disabled={bezig} style={{ ...KNOP, minHeight: 30 }}>
-          {bezig ? 'Bezig…' : 'Toestaan'}
+          {wacht ? 'Gedaan' : bezig ? 'Bezig…' : 'Toestaan'}
         </button>
-        <button onClick={onNee} disabled={bezig} style={{
-          ...KNOP, minHeight: 30, background: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.borderSubtle}`,
-        }}>
-          Nee
-        </button>
+        {!wacht && (
+          <button onClick={onNee} disabled={bezig} style={{
+            ...KNOP, minHeight: 30, background: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.borderSubtle}`,
+          }}>
+            Nee
+          </button>
+        )}
       </div>
       {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
       {/* staartje naar het robotje */}
@@ -406,9 +449,10 @@ function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee }) {
 }
 
 // Klein robotje achter een laptop dat zacht zit te typen.
-function Robotje() {
+// rustig = Gino is klaar: stil en gedimd.
+function Robotje({ rustig }) {
   return (
-    <svg className="bos-robot" width="30" height="26" viewBox="0 0 30 26" aria-hidden="true">
+    <svg className={rustig ? 'bos-robot bos-rust' : 'bos-robot'} width="30" height="26" viewBox="0 0 30 26" aria-hidden="true">
       <line x1="11" y1="3" x2="11" y2="6" stroke={colors.success} strokeWidth="1.5" strokeLinecap="round" />
       <circle className="bos-antenne" cx="11" cy="2.5" r="1.6" fill={colors.success} />
       <rect x="4" y="6" width="14" height="10" rx="3.5" fill="#1e1e1e" stroke={colors.success} strokeWidth="1.3" />
@@ -431,6 +475,8 @@ const ANIMATIES = `
 .bos-robot .bos-hand-r { animation: bos-typ 0.5s ease-in-out 0.25s infinite }
 .bos-robot .bos-oog { transform-box: fill-box; transform-origin: center; animation: bos-knipper 3s infinite }
 .bos-robot .bos-antenne { animation: bos-zacht 1.6s ease-in-out infinite }
+.bos-robot.bos-rust { opacity: 0.45 }
+.bos-robot.bos-rust * { animation: none !important }
 @media (prefers-reduced-motion: reduce) { .bos-robot * { animation: none !important } }
 `
 
@@ -528,6 +574,46 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   // Lopende code-opdrachten (laatste 30 min). Valt er een weg, dan kijken we
   // hoe hij geëindigd is voor de korte melding.
   const [code, setCode] = useState(null) // null | 'wacht' | 'bezig'
+  // Laatst afgeronde code-opdracht: de rustregel van het robotje.
+  const [laatst, setLaatst] = useState(null) // { tekst, klaar_at }
+  useEffect(() => {
+    let weg = false
+    const haalLaatst = () => supabase.from('business_os_opdrachten')
+      .select('opdracht, resultaat, klaar_at').eq('soort', 'code').eq('status', 'klaar')
+      .not('klaar_at', 'is', null).order('klaar_at', { ascending: false }).limit(1).maybeSingle()
+      .then(({ data }) => {
+        if (weg || !data) return
+        const tekst = laatstGedaanRegel(data)
+        if (tekst) setLaatst(o => (o?.klaar_at === data.klaar_at ? o : { tekst, klaar_at: data.klaar_at }))
+      }, () => {})
+    haalLaatst()
+    const t = setInterval(haalLaatst, 15000)
+    return () => { weg = true; clearInterval(t) }
+  }, [])
+  // Stem aan: alleen een nieuwe rustregel voorlezen. Bij het laden telt de
+  // huidige als gelezen; daarna alleen als er echt iets nieuws af is.
+  const eersteLaatst = useRef(true)
+  useEffect(() => {
+    if (!laatst) return
+    const nieuw = lees(GELEZEN_KEY) !== laatst.klaar_at
+    schrijf(GELEZEN_KEY, laatst.klaar_at)
+    if (eersteLaatst.current) { eersteLaatst.current = false; return }
+    if (nieuw && stem.isAan() && !stem.isBezig() && !luistertRef.current) stem.spreek(laatst.tekst)
+  }, [laatst])
+
+  // ElevenLabs-sleutels nog niet in Supabase? Dan een open actie voor Kersten,
+  // tot de function werkt of hij op Gedaan klikt.
+  const [sleutelWeg, setSleutelWeg] = useState(false)
+  useEffect(() => {
+    if (lees(SLEUTEL_GEDAAN_KEY)) return
+    let weg = false
+    const kijk = () => stem.sleutelOntbreekt().then(o => { if (!weg && !lees(SLEUTEL_GEDAAN_KEY)) setSleutelWeg(o) })
+    kijk()
+    const t = setInterval(kijk, 5 * 60 * 1000)
+    return () => { weg = true; clearInterval(t) }
+  }, [])
+  const sleutelGedaan = () => { schrijf(SLEUTEL_GEDAAN_KEY, '1'); setSleutelWeg(false) }
+
   useEffect(() => {
     let weg = false
     let vorige = []
@@ -562,17 +648,36 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     h.interimResults = true
     // Wat er al stond blijft staan; het gesprokene (ook tussentijds) komt erachter.
     const basis = invoer.trim() ? invoer.trim() + ' ' : ''
+    // Alleen de actuele herkenner mag het veld vullen: na versturen komt er niets meer terug.
     h.onresult = (e) => {
+      if (herkenner.current !== h) return
       const tekst = Array.from(e.results).map(r => r[0].transcript).join('')
       setInvoer(basis + tekst)
     }
     h.onerror = (e) => { if (e.error !== 'aborted' && e.error !== 'no-speech') setFout('Microfoon werkt niet: ' + e.error) }
-    h.onend = () => { setLuistert(false); veld.current?.focus() }
+    h.onend = () => {
+      if (herkenner.current !== h) return
+      herkenner.current = null
+      setLuistert(false)
+      veld.current?.focus()
+    }
     herkenner.current = h
     setFout(null)
     h.start()
     luistertRef.current = true
     setLuistert(true)
+  }
+  // Versturen: herkenning hard afbreken en loskoppelen, zodat late (interim/final)
+  // resultaten de verstuurde tekst niet terugzetten.
+  const stopHerkenner = () => {
+    const h = herkenner.current
+    herkenner.current = null
+    if (h) {
+      h.onresult = h.onerror = h.onend = null
+      try { h.abort() } catch { /* al gestopt */ }
+    }
+    luistertRef.current = false
+    setLuistert(false)
   }
 
   // Invoerveld groeit mee tot ~6 regels en volgt tijdens inspreken de laatste woorden.
@@ -655,8 +760,11 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   const stuur = async () => {
     const vraag = invoer.trim()
     if ((!vraag && !bijlagen.length) || bezig) return
-    herkenner.current?.stop()
+    stopHerkenner()
+    setInvoer('')
     stem.stop()
+    // Versturen is een klik/Enter: Safari laat het antwoord straks dan ook afspelen.
+    if (stem.isAan()) stem.ontgrendel()
     const nieuwBericht = { role: 'user', content: vraag }
     if (bijlagen.length) {
       nieuwBericht.afbeeldingen = bijlagen.map(({ media_type, data }) => ({ media_type, data }))
@@ -752,13 +860,15 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
               <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0, ...TEKST, fontWeight: 500, color: colors.textPrimary }}>
                   {(b.acties || []).map((ac, j) => {
+                    if (!ac || typeof ac !== 'object') return null
                     const kaart = { voorstel: ac, staat: actieStaat[`${i}-${j}`], onToestaan: () => toestaan(i, j) }
+                    if (ac.soort === 'wacht_op_jou') return <WachtOpJou key={j} {...kaart} />
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
                     if (ac.soort === 'pa_voorstel') return <PaVoorstel key={j} {...kaart} />
                     return (
                       <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, fontSize: '0.8rem', marginBottom: 4 }}>
-                        <Check size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}
+                        <Check size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : typeof ac.tekst === 'string' ? ac.tekst : ''}
                       </div>
                     )
                   })}
@@ -772,18 +882,18 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
 
         <div ref={balk} style={{ position: 'relative' }}>
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
-          {(werk || melding || wolkZichtbaar) && (
-            <div role="status" style={{
-              position: 'absolute', left: 4, bottom: '100%', marginBottom: 2,
-              display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap',
-              fontSize: '0.75rem', fontWeight: 800,
-              color: werk || !melding ? colors.textSecondary : melding.fout ? colors.danger : colors.success,
-            }}>
-              {werk ? <><Robotje /> {werk}</>
-                : melding ? <>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />} {melding.tekst}</>
-                : <><Robotje /> Wacht op jou</>}
-            </div>
-          )}
+          {/* Altijd zichtbaar: bezig, wacht op jou of klaar */}
+          <div role="status" style={{
+            position: 'absolute', left: 4, bottom: '100%', marginBottom: 2,
+            display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap',
+            fontSize: '0.75rem', fontWeight: 800,
+            color: werk || vraagNu ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : colors.textMuted,
+          }}>
+            {werk ? <><Robotje /> {werk}</>
+              : melding && !vraagNu ? <>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />} {melding.tekst}</>
+              : vraagNu ? <><Robotje /> Wacht op jou</>
+              : <><Robotje rustig /> Gino is klaar</>}
+          </div>
           {wolkZichtbaar && (
             <Vraagwolk key={`${vraagNu.i}-${vraagNu.j}`} voorstel={vraagNu.ac} nr={1} totaal={openVoorstellen.length}
               staat={actieStaat[`${vraagNu.i}-${vraagNu.j}`]}

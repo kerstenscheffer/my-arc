@@ -76,6 +76,8 @@ App-wijzigingen (code, schermen, functies): gebruik standaard stel_lokale_opdrac
 
 Skills: hieronder staan Kerstens skills, vaste werkwijzen per soort taak. Past een taak bij een skill, volg die stappen precies. Wil Kersten een nieuwe werkwijze vastleggen of een bestaande aanpassen ("onthoud dit", "maak hier een skill van", "voortaan bij scripts..."), gebruik bewaar_skill met de volledige nieuwe instructies (bij aanpassen: de oude stappen plus de wijziging, onder dezelfde naam). Laat in één zin weten wat je bewaard hebt.
 
+Wachten op Kersten: heb je iets van Kersten nodig voordat je verder kunt en is het geen ander voorstel (een sleutel in Supabase Secrets zetten, iets downloaden of installeren, een screenshot sturen, een vraag beantwoorden), gebruik dan altijd wacht_op_jou met een korte taak. Anders ziet hij niet dat je op hem wacht.
+
 Screenshots: Kersten kan een screenshot meesturen (van de app, een DM, cijfers). Lees wat erop staat en gebruik het; vraag niet om het over te typen.
 
 Opmaak: platte tekst met korte kopjes en pijltjes (→). Geen markdown-tabellen. Vraag alleen door als de taak echt onduidelijk is; anders lever direct een eerste versie die hij kan aanscherpen.`
@@ -179,6 +181,16 @@ const TOOLS = [{
       opdracht: { type: 'string', description: 'Volledige, zelfstandige opdracht: scherm, huidig gedrag, gewenst gedrag, bekende details.' },
     },
     required: ['opdracht'],
+  },
+}, {
+  name: 'wacht_op_jou',
+  description: 'Laat Kersten zien dat je op hem wacht voor iets dat geen ander voorstel is (sleutel instellen, iets downloaden, screenshot sturen, vraag beantwoorden). Verschijnt boven de chatbalk met een Gedaan-knop.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      tekst: { type: 'string', description: 'Korte taak voor Kersten, max ~80 tekens, bv. "Zet ELEVENLABS_API_KEY in Supabase Secrets".' },
+    },
+    required: ['tekst'],
   },
 }, {
   name: 'verwijder_skill',
@@ -392,6 +404,14 @@ Deno.serve(async (req) => {
           else {
             acties.push({ soort: 'pa_voorstel', tekst: opdracht })
             uitkomst = 'Opdracht staat klaar; Kersten moet op "Uitvoeren op mijn Mac" klikken. Er is nog niets uitgevoerd.'
+          }
+        }
+        if (blok.name === 'wacht_op_jou') {
+          const tekst = String(blok.input?.tekst || '').replace(/\s+/g, ' ').trim().slice(0, 120)
+          if (!tekst) uitkomst = 'Lege tekst.'
+          else {
+            acties.push({ soort: 'wacht_op_jou', tekst })
+            uitkomst = 'Staat boven de chatbalk; Kersten klikt Gedaan als het klaar is.'
           }
         }
         if (blok.name === 'stel_slot_voor') {

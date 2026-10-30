@@ -4,15 +4,21 @@
 // hardop uit. Aan/uit via een klik op de reactor-ring, bewaard in localStorage
 // ('bos_stem_aan'). Eén gedeelde stand voor ring (BusinessOS) en chat
 // (BusinessChat) via useStem().
-// Provider-laag: nu alleen 'browser' (window.speechSynthesis). Een provider is
-// { beschikbaar(), ontgrendel(), spreek(stukken, onEinde), stop() }. Later kan
-// er een provider bij die via een edge function (ElevenLabs / OpenAI TTS) een
-// audiobestand ophaalt en afspeelt, zonder dat de UI verandert. Geen sleutels
-// in de browser.
-// Tekst wordt eerst opgeschoond (markdown, pijltjes, emoji, URL's eruit) en in
-// stukken van max ~200 tekens geknipt: Chrome/Safari kappen lange utterances af.
+// Provider-laag: een provider is { beschikbaar(), ontgrendel(), spreek(stukken,
+// onEinde), stop() }, met optioneel knip(tekst) voor een eigen stukgrootte.
+// - 'elevenlabs' (standaard): natuurlijke mannenstem via de edge function
+//   gino-stem (ElevenLabs, sleutel alleen als Supabase-secret). Stukken op
+//   zinsgrenzen (eerste zin los zodat hij snel begint, daarna ~500 tekens),
+//   stuk n+1 wordt opgehaald terwijl stuk n speelt. Faalt de functie (fout,
+//   503 geen_sleutel, > 8 s): rest van het antwoord via de browserstem, en de
+//   rest van de sessie meteen de browserstem.
+// - 'browser': window.speechSynthesis (Xander/Maarten/Arnaud).
+// Tekst wordt eerst opgeschoond (markdown, pijltjes, emoji, URL's eruit) en
+// voor de browser in stukken van max ~200 tekens geknipt: Chrome/Safari kappen
+// lange utterances af.
 
 import { useSyncExternalStore } from 'react'
+import { supabase } from '../../lib/supabase'
 
 const KEY = 'bos_stem_aan'
 const MAX_STUK = 200
@@ -96,7 +102,166 @@ const browser = {
   },
 }
 
-const provider = browser
+// ── ElevenLabs-provider (via edge function gino-stem) ──
+const STEM_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gino-stem`
+const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
+const MAX_EL = 500
+const TIJDSLIMIET_EL = 8000
+
+// 0,1 s stilte als wav: afgespeeld in de klik ontgrendelt het audio-element in Safari.
+function stilteWav() {
+  const n = 800
+  const b = new Uint8Array(44 + n)
+  const v = new DataView(b.buffer)
+  const tekst = (o, s) => [...s].forEach((c, i) => { b[o + i] = c.charCodeAt(0) })
+  tekst(0, 'RIFF'); v.setUint32(4, 36 + n, true); tekst(8, 'WAVEfmt ')
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true)
+  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true)
+  tekst(36, 'data'); v.setUint32(40, n, true)
+  b.fill(128, 44)
+  return 'data:audio/wav;base64,' + btoa(String.fromCharCode(...b))
+}
+
+let audio = null
+const speler = () => (audio ||= new Audio())
+let elKapot = false // deze sessie werkt ElevenLabs niet: niet bij elk antwoord opnieuw wachten
+let elRonde = 0
+let elAfbreker = null
+let elUrls = []
+
+const ruimOp = () => {
+  elAfbreker?.abort()
+  elAfbreker = null
+  elUrls.forEach(u => URL.revokeObjectURL(u))
+  elUrls = []
+}
+
+async function haalAudio(tekst, signal) {
+  const { data } = await supabase.auth.getSession()
+  const token = data?.session?.access_token
+  if (!token) throw new Error('geen sessie')
+  const res = await fetch(STEM_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, apikey: ANON, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tekst }),
+    signal,
+  })
+  if (!res.ok) throw new Error(`gino-stem ${res.status} ${await res.text().catch(() => '')}`)
+  const url = URL.createObjectURL(await res.blob())
+  elUrls.push(url)
+  return url
+}
+
+// Ophalen met tijdslimiet; bij te laat breekt hij de hele ronde af (terugval volgt).
+function haalMetLimiet(tekst, afbreker) {
+  let t
+  const limiet = new Promise((_, nee) => {
+    t = setTimeout(() => { afbreker.abort(); nee(new Error('gino-stem te traag (> 8 s)')) }, TIJDSLIMIET_EL)
+  })
+  return Promise.race([haalAudio(tekst, afbreker.signal), limiet]).finally(() => clearTimeout(t))
+}
+
+// Speelt één stuk af; resolve bij einde, reject bij afspeelfout.
+function speel(url, mijn) {
+  const a = speler()
+  return new Promise((ja, nee) => {
+    const klaar = (fout) => { a.onended = a.onerror = null; fout ? nee(fout) : ja() }
+    a.onended = () => klaar()
+    a.onerror = () => klaar(new Error('afspelen mislukt'))
+    a.src = url
+    a.play().catch(e => { if (mijn === elRonde) klaar(e) })
+  })
+}
+
+const elevenlabs = {
+  beschikbaar: () => !elKapot && typeof window !== 'undefined' && typeof window.Audio !== 'undefined',
+  ontgrendel() {
+    const a = speler()
+    a.src = stilteWav()
+    a.play().catch(() => {})
+    if (browser.beschikbaar()) browser.ontgrendel()
+  },
+  // Eerste stuk = eerste zin (snelle start), de rest in stukken van ~500 tekens.
+  knip(tekst) {
+    const [eerste, ...rest] = knip(tekst, MAX_EL)
+    if (!eerste) return []
+    const zin = eerste.match(/^.+?[.!?…](\s|$)/)?.[0].trim()
+    return zin && zin.length < eerste.length
+      ? [zin, eerste.slice(zin.length).trim(), ...rest]
+      : [eerste, ...rest]
+  },
+  async spreek(stukken, onEinde) {
+    const mijn = ++elRonde
+    ruimOp()
+    const afbreker = new AbortController()
+    elAfbreker = afbreker
+    const actueel = () => mijn === elRonde
+    let i = 0
+    try {
+      let volgende = haalMetLimiet(stukken[0], afbreker)
+      for (; i < stukken.length; i++) {
+        const url = await volgende
+        if (!actueel()) return
+        // Prefetch: het volgende stuk ophalen terwijl dit stuk speelt.
+        if (i + 1 < stukken.length) {
+          volgende = haalMetLimiet(stukken[i + 1], afbreker)
+          volgende.catch(() => {}) // fout komt pas bij await; geen 'unhandled rejection' tussendoor
+        }
+        await speel(url, mijn)
+        if (!actueel()) return
+      }
+      ruimOp()
+      onEinde()
+    } catch (e) {
+      if (!actueel()) return
+      ruimOp()
+      // Autoplay geweigerd = geen klik gehad, niet ElevenLabs' schuld: alleen dit antwoord terugvallen.
+      if (e?.name !== 'NotAllowedError') elKapot = true
+      console.warn('[stem] ElevenLabs werkt niet, terug naar browserstem:', e?.message || e)
+      const rest = knip(stukken.slice(i).join(' '))
+      if (rest.length && browser.beschikbaar()) browser.spreek(rest, onEinde)
+      else onEinde()
+    }
+  },
+  stop() {
+    elRonde++
+    ruimOp()
+    if (audio) { audio.onended = audio.onerror = null; audio.pause() }
+    browser.stop()
+  },
+}
+
+// Staan de ElevenLabs-sleutels in Supabase? Lege POST: de function kijkt naar de
+// sleutels vóór de tekst, dus 503 geen_sleutel = ontbreken, 400 geen_tekst = ok.
+// Kost geen tegoed. Bij twijfel (geen sessie, netwerk) false.
+export async function sleutelOntbreekt() {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data?.session?.access_token
+    if (!token) return false
+    const res = await fetch(STEM_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, apikey: ANON, 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+    if (res.status !== 503) return false
+    const j = await res.json().catch(() => ({}))
+    return j?.fout === 'geen_sleutel'
+  } catch {
+    return false
+  }
+}
+
+// Standaard ElevenLabs; is die deze sessie kapot of ontbreekt Audio: de browserstem.
+const provider = {
+  kies: () => (elevenlabs.beschikbaar() ? elevenlabs : browser),
+  beschikbaar: () => elevenlabs.beschikbaar() || browser.beschikbaar(),
+  ontgrendel: () => provider.kies().ontgrendel(),
+  knip: (tekst) => (provider.kies().knip || knip)(tekst),
+  spreek: (stukken, onEinde) => provider.kies().spreek(stukken, onEinde),
+  // Beide stoppen: na een terugval praat de browserstem namens ElevenLabs.
+  stop: () => { elevenlabs.stop(); browser.stop() },
+}
 
 // ── Gedeelde stand ──
 const leesAan = () => {
@@ -132,7 +297,7 @@ export function stop() {
 
 export function spreek(tekst) {
   if (!beschikbaar()) return
-  const stukken = knip(spreekbaar(tekst))
+  const stukken = provider.knip(spreekbaar(tekst))
   if (!stukken.length) return
   zet({ spreekt: true })
   provider.spreek(stukken, () => zet({ spreekt: false }))
@@ -168,19 +333,19 @@ export function spreekbaar(tekst) {
     .trim()
 }
 
-// Zinnen samenvoegen tot stukken van max MAX_STUK; te lange zinnen op komma of spatie knippen.
-export function knip(tekst) {
+// Zinnen samenvoegen tot stukken van max `max` tekens; te lange zinnen op komma of spatie knippen.
+export function knip(tekst, max = MAX_STUK) {
   const zinnen = tekst.match(/[^.!?…]+[.!?…]*\s*/g) || []
   const stukken = []
   let huidig = ''
   const neem = (z) => {
-    if ((huidig + z).length <= MAX_STUK) { huidig += z; return }
+    if ((huidig + z).length <= max) { huidig += z; return }
     if (huidig.trim()) stukken.push(huidig.trim())
     huidig = ''
-    while (z.length > MAX_STUK) {
-      const deel = z.slice(0, MAX_STUK)
+    while (z.length > max) {
+      const deel = z.slice(0, max)
       const knipAt = Math.max(deel.lastIndexOf(', '), deel.lastIndexOf(' '))
-      const op = knipAt > MAX_STUK / 2 ? knipAt + 1 : MAX_STUK
+      const op = knipAt > max / 2 ? knipAt + 1 : max
       stukken.push(z.slice(0, op).trim())
       z = z.slice(op)
     }
