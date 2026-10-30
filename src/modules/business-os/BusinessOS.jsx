@@ -6,13 +6,18 @@
 // de calls van vandaag en de laatste sales. Indeling van het Jarvis-dashboard,
 // kleuren MY ARC: zwart, dik wit, groen accent, blokken los op de pagina in
 // plaats van in kaders. Data: RPC get_business_os (business-os.sql).
-// Sinds 30 okt: de AI-chat staat centraal; maanddoel is één klikbare regel en
-// alle panelen staan ingeklapt onder 'Cijfers' (open-stand in bos_open_secties).
+// Sinds 30 okt: de reactor-ring (% van maanddoel) is het gezicht van de AI-chat
+// eronder: hij ademt rustig en versnelt zolang de chat denkt.
+// Sinds 30 okt (middag): de pagina staat vast op schermhoogte, alleen de chat
+// scrolt. De cijferpanelen zitten achter de puntjes-knop rechtsboven en openen
+// als zijpaneel (desktop) of bottom sheet (mobiel).
 
 import { useState, useEffect, useMemo } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { MoreHorizontal, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
+import { createPortal } from '../../client/paginaPortal'
+import { useModalHost } from '../../coach/ModalHost'
 import BusinessChat from './BusinessChat'
 
 const C = {
@@ -30,7 +35,17 @@ const NUM = { fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }
 const LABEL = { fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }
 const DOEL_KEY = 'business_os_doel'
 const PRIJS_KEY = 'business_os_prijs'
-const OPEN_KEY = 'bos_open_secties'
+
+// De onderdelen achter de puntjes-knop, in deze volgorde.
+const ONDERDELEN = [
+  ['kern', 'Kerncijfers · deze maand'],
+  ['keten', 'De keten · deze maand vs. gemiddelde'],
+  ['acties', 'Acties deze week'],
+  ['som', 'Terugrekensom · wat is er nodig'],
+  ['calls', 'Calls · komende 3 dagen'],
+  ['sales', 'Laatste sales'],
+  ['agents', 'Agents'],
+]
 
 // Leesbare namen voor de cron-jobs. Onbekende jobs tonen hun eigen naam.
 const AGENTS = {
@@ -67,26 +82,128 @@ const bewaar = (key, v) => {
   try { localStorage.setItem(key, String(v)) } catch { /* privé-venster */ }
 }
 
-const leesOpen = () => {
-  try { return JSON.parse(localStorage.getItem(OPEN_KEY)) || {} } catch { return {} }
+// Paneel voor één onderdeel: zijpaneel rechts op desktop, bottom sheet op
+// mobiel. Scrolt zelf; sluit met het kruisje, een klik ernaast of Escape.
+function Blad({ titel, isMobile, onSluit, children }) {
+  const host = useModalHost()
+  useEffect(() => {
+    const toets = (e) => { if (e.key === 'Escape') onSluit() }
+    window.addEventListener('keydown', toets)
+    return () => window.removeEventListener('keydown', toets)
+  }, [onSluit])
+  if (!host) return null
+  return createPortal(
+    <>
+      <div onClick={onSluit} style={{ position: 'fixed', inset: 0, zIndex: 2147483400, background: 'rgba(0,0,0,0.6)' }} />
+      <div role="dialog" aria-label={titel} style={{
+        position: 'fixed', zIndex: 2147483401, background: '#0a0a0a', color: C.tekst,
+        display: 'flex', flexDirection: 'column',
+        ...(isMobile
+          ? { left: 0, right: 0, bottom: 0, maxHeight: '80dvh', borderRadius: '20px 20px 0 0', borderTop: `1px solid ${C.rand}` }
+          : { top: 0, right: 0, bottom: 0, width: 'min(440px, 100%)', borderLeft: `1px solid ${C.rand}` }),
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px 12px 20px', borderBottom: `1px solid ${C.rand}`, flexShrink: 0 }}>
+          <span style={{ ...LABEL, color: C.wit }}>{titel}</span>
+          <button type="button" onClick={onSluit} title="Sluiten" style={{
+            width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent',
+            color: C.wit, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <X size={20} />
+          </button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px 20px calc(24px + env(safe-area-inset-bottom, 0px))' }}>
+          {children}
+        </div>
+      </div>
+    </>,
+    host,
+  )
 }
 
-// Inklapbare sectie: titel + chevron, inhoud pas zichtbaar na klik.
-function Inklap({ titel, open, onToggle, children }) {
+// Reactor: groene voortgangsboog = % van het maanddoel, eromheen draaiende
+// tikkenring en segmenten, in het midden een ademende kern. bezig = de chat
+// denkt: alles draait en pulseert sneller. Animaties uit bij reduced-motion.
+const REACTOR_CSS = `
+  @keyframes bos-draai { to { transform: rotate(360deg) } }
+  @keyframes bos-terug { to { transform: rotate(-360deg) } }
+  @keyframes bos-puls { 0%,100% { opacity: .55; transform: scale(.94) } 50% { opacity: 1; transform: scale(1) } }
+  @keyframes bos-adem { 0%,100% { opacity: .35; transform: scale(.92) } 50% { opacity: .7; transform: scale(1.04) } }
+  .bos-r .bos-a { transform-origin: 120px 120px; transform-box: view-box; animation: bos-draai var(--d) linear infinite }
+  .bos-r .bos-a.terug { animation-name: bos-terug }
+  .bos-r .bos-kern { transform-origin: 120px 120px; transform-box: view-box; animation: bos-puls 3s ease-in-out infinite }
+  .bos-r .bos-halo { animation: bos-adem 6s ease-in-out infinite }
+  .bos-r.bezig .bos-a { animation-duration: calc(var(--d) / 5) }
+  .bos-r.bezig .bos-kern { animation-duration: .9s }
+  .bos-r.bezig .bos-halo { animation-duration: 1.4s }
+  @media (prefers-reduced-motion: reduce) {
+    .bos-r .bos-a, .bos-r .bos-kern, .bos-r .bos-halo { animation: none }
+    .bos-r.bezig .bos-halo { opacity: .8 }
+  }
+`
+
+function Reactor({ pct, maat, bezig }) {
+  const R = 96
+  const omtrek = 2 * Math.PI * R
   return (
-    <div style={{ borderBottom: `1px solid ${C.rand}` }}>
-      <button
-        type="button" onClick={onToggle} aria-expanded={open}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-          background: 'none', border: 'none', color: C.wit, cursor: 'pointer', padding: '14px 0',
-          minHeight: 48, fontFamily: 'inherit', textAlign: 'left',
-        }}
-      >
-        <span style={LABEL}>{titel}</span>
-        <ChevronDown size={18} style={{ color: C.zacht, flexShrink: 0, transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none' }} />
-      </button>
-      {open && <div style={{ paddingBottom: 16 }}>{children}</div>}
+    <div className={`bos-r${bezig ? ' bezig' : ''}`} style={{ position: 'relative', width: maat, height: maat, margin: '0 auto' }}
+      role="img" aria-label={`${Math.round(pct)}% van je maanddoel${bezig ? ', assistent denkt na' : ''}`}>
+      <style>{REACTOR_CSS}</style>
+      <div className="bos-halo" style={{
+        position: 'absolute', inset: '-12%', borderRadius: '50%', pointerEvents: 'none',
+        background: `radial-gradient(circle, ${C.groen}55 0%, ${C.groen}18 45%, transparent 70%)`,
+      }} />
+      <svg viewBox="0 0 240 240" width={maat} height={maat} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
+        <defs>
+          <radialGradient id="bos-kern">
+            <stop offset="0%" stopColor={C.groen} stopOpacity="0.45" />
+            <stop offset="60%" stopColor={C.groen} stopOpacity="0.15" />
+            <stop offset="100%" stopColor={C.groen} stopOpacity="0" />
+          </radialGradient>
+          <filter id="bos-gloed" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* tikkenring */}
+        <g className="bos-a" style={{ '--d': '60s' }}>
+          {Array.from({ length: 72 }, (_, i) => (
+            <line key={i} x1="120" y1="4" x2="120" y2={i % 6 ? 9 : 14}
+              stroke="#ffffff" strokeOpacity={i % 6 ? 0.18 : 0.5} strokeWidth={i % 6 ? 1 : 2}
+              transform={`rotate(${i * 5} 120 120)`} />
+          ))}
+        </g>
+
+        {/* voortgangsboog = omzet / doel */}
+        <circle cx="120" cy="120" r={R} fill="none" stroke="#ffffff" strokeOpacity="0.07" strokeWidth="6" />
+        <circle cx="120" cy="120" r={R} fill="none" stroke={C.groen} strokeWidth="6" strokeLinecap="round"
+          strokeDasharray={omtrek} strokeDashoffset={omtrek * (1 - pct / 100)}
+          transform="rotate(-90 120 120)" filter="url(#bos-gloed)"
+          style={{ transition: 'stroke-dashoffset 1s' }} />
+
+        {/* segmenten */}
+        <g className="bos-a terug" style={{ '--d': '18s' }}>
+          <circle cx="120" cy="120" r="78" fill="none" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="5"
+            strokeDasharray="22 10" />
+        </g>
+        <g className="bos-a" style={{ '--d': '10s' }}>
+          <circle cx="120" cy="120" r="64" fill="none" stroke={C.groen} strokeOpacity="0.8" strokeWidth="2"
+            strokeDasharray="60 40" strokeLinecap="round" filter="url(#bos-gloed)" />
+        </g>
+        <circle cx="120" cy="120" r="56" fill="none" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
+
+        {/* kern */}
+        <circle className="bos-kern" cx="120" cy="120" r="48" fill="url(#bos-kern)" />
+      </svg>
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+      }}>
+        <div style={{ ...NUM, fontWeight: 900, fontSize: maat >= 260 ? '3rem' : maat >= 200 ? '2.3rem' : '1.6rem', lineHeight: 1, color: C.wit, textShadow: `0 0 18px ${C.groen}` }}>
+          {Math.round(pct)}%
+        </div>
+        <div style={{ ...LABEL, fontSize: maat >= 200 ? '0.68rem' : '0.56rem', color: C.wit, opacity: 0.85, marginTop: maat >= 200 ? 6 : 4 }}>van doel</div>
+      </div>
     </div>
   )
 }
@@ -125,12 +242,10 @@ export default function BusinessOS({ isMobile }) {
   const [fout, setFout] = useState(null)
   const [doel, setDoel] = useState(() => lees(DOEL_KEY, 10000))
   const [prijs, setPrijs] = useState(() => lees(PRIJS_KEY, 0))
-  const [open, setOpen] = useState(leesOpen)
-  const wissel = (k) => setOpen(o => {
-    const n = { ...o, [k]: !o[k] }
-    try { localStorage.setItem(OPEN_KEY, JSON.stringify(n)) } catch { /* privé-venster */ }
-    return n
-  })
+  const [menu, setMenu] = useState(false)
+  const [blad, setBlad] = useState(null)
+  const [denkt, setDenkt] = useState(false)
+  const sluitBlad = useMemo(() => () => setBlad(null), [])
 
   const nu = new Date()
   const van = new Date(nu.getFullYear(), nu.getMonth(), 1)
@@ -195,34 +310,47 @@ export default function BusinessOS({ isMobile }) {
       background: C.bg,
       color: C.tekst, minHeight: '100vh', padding: isMobile ? 16 : 24,
     }}>
-      {/* ── Compacte regel; klik = maanddoel + kerncijfers ── */}
-      <div style={{ borderBottom: `1px solid ${C.rand}`, marginBottom: 16 }}>
-        <button
-          type="button" onClick={() => wissel('boven')} aria-expanded={!!open.boven}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: 'none', border: 'none',
-            color: C.tekst, cursor: 'pointer', padding: '12px 0', minHeight: 48, fontFamily: 'inherit', textAlign: 'left',
-          }}
-        >
-          <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 700, color: C.zacht, lineHeight: 1.5 }}>
-            Omzet <b style={{ ...NUM, color: C.wit }}>{euro(a.omzet)}</b> van {euro(doel)}
-            {' · '}prognose <b style={{ ...NUM, color: opKoers ? C.groen : C.oranje }}>{euro(a.prognose)}</b>
-            {' · '}zwakste schakel: <b style={{ color: C.wit }}>{zw.label}</b>
-          </span>
-          <ChevronDown size={18} style={{ color: C.zacht, flexShrink: 0, transition: 'transform .2s', transform: open.boven ? 'rotate(180deg)' : 'none' }} />
-        </button>
-        {open.boven && (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '2fr repeat(4, 1fr)', gap: isMobile ? 16 : 24, paddingBottom: 16 }}>
-            <Paneel style={{ gridColumn: isMobile ? '1 / -1' : 'auto' }}>
-              <div style={{ ...LABEL, color: C.zacht }}>Omzet deze maand · doel {euro(doel)}</div>
-              <div style={{ ...NUM, fontSize: isMobile ? '2rem' : '2.4rem', fontWeight: 900 }}>{euro(a.omzet)}</div>
-              <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden', margin: '8px 0' }}>
-                <div style={{ width: `${pctDoel}%`, height: '100%', background: C.wit }} />
-              </div>
-              <div style={{ fontSize: '0.8rem', color: C.zacht }}>
-                Prognose <b style={{ color: opKoers ? C.groen : C.oranje }}>{euro(a.prognose)}</b> · nodig {euro(nodigPerDag)} per dag
-              </div>
-            </Paneel>
+      <div style={{ maxWidth: 820, margin: '0 auto' }}>
+        {/* ── Reactor-ring: het gezicht van de assistent ── */}
+        <div style={{ paddingTop: isMobile ? 16 : 32 }}>
+          <Reactor pct={pctDoel} maat={isMobile ? 200 : 290} bezig={denkt} />
+        </div>
+        <div style={{
+          display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: isMobile ? '6px 18px' : '6px 32px',
+          marginTop: isMobile ? 20 : 28, fontSize: '0.85rem', fontWeight: 700, color: C.zacht, textAlign: 'center',
+        }}>
+          <span><b style={{ ...NUM, color: C.wit }}>{euro(a.omzet)}</b> van {euro(doel)}</span>
+          <span>prognose <b style={{ ...NUM, color: opKoers ? C.groen : C.oranje }}>{euro(a.prognose)}</b></span>
+          <span>zwakste schakel <b style={{ color: C.wit }}>{zw.label}</b></span>
+        </div>
+
+        {/* ── Verbinding ring → chat ── */}
+        <div aria-hidden="true" style={{
+          width: 1, height: isMobile ? 24 : 36, margin: '16px auto 0',
+          background: `linear-gradient(${C.groen}, ${C.groen}00)`,
+        }} />
+
+        {/* ── Chat: de ring praat ── */}
+        <div style={{ borderTop: `1px solid ${C.groen}40`, paddingTop: 16 }}>
+          <div style={{ fontSize: '1rem', fontWeight: 800, lineHeight: 1.5 }}>
+            {groet} Kersten. {opKoers ? 'Je ligt op koers voor je doel.' : `Je mist ${euro(doel - a.prognose)} op je doel als dit tempo blijft.`}
+          </div>
+          <BusinessChat lijstHoogte={isMobile ? '55vh' : '62vh'} onBezig={setDenkt} context={{
+            omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
+            dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
+            schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
+            zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
+          }} />
+        </div>
+
+        {/* ── Cijfers: alles standaard ingeklapt ── */}
+        <div style={{ ...LABEL, color: C.zacht, marginTop: 40, paddingBottom: 4, borderBottom: `1px solid ${C.rand}` }}>Cijfers</div>
+
+        <Inklap titel="Kerncijfers · deze maand" open={!!open.kern} onToggle={() => wissel('kern')}>
+          <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 12 }}>
+            Nog <b style={{ ...NUM, color: C.wit }}>{euro(nodigPerDag)}</b> per dag nodig voor je doel.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: isMobile ? 16 : 24 }}>
             {[
               ['VIEWS', getal(data.nu.views)],
               ['LEADS', getal(data.nu.leads)],
@@ -235,23 +363,7 @@ export default function BusinessOS({ isMobile }) {
               </Paneel>
             ))}
           </div>
-        )}
-      </div>
-
-      <div style={{ maxWidth: 820, margin: '0 auto' }}>
-        {/* ── Chat centraal ── */}
-        <div style={{ fontSize: '1rem', fontWeight: 800, lineHeight: 1.5, marginTop: 8 }}>
-          {groet} Kersten. {opKoers ? 'Je ligt op koers voor je doel.' : `Je mist ${euro(doel - a.prognose)} op je doel als dit tempo blijft.`}
-        </div>
-        <BusinessChat lijstHoogte={isMobile ? '55vh' : '62vh'} context={{
-          omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
-          dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
-          schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
-          zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
-        }} />
-
-        {/* ── Cijfers: alles standaard ingeklapt ── */}
-        <div style={{ ...LABEL, color: C.zacht, marginTop: 40, paddingBottom: 4, borderBottom: `1px solid ${C.rand}` }}>Cijfers</div>
+        </Inklap>
 
         <Inklap titel="De keten · deze maand vs. gemiddelde" open={!!open.keten} onToggle={() => wissel('keten')}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: 8 }}>
