@@ -4,7 +4,11 @@
 // taken uit, bv. "maak 3 reel-scripts over buikvet na je 30e".
 //
 //   POST { berichten: [{ role: 'user'|'assistant', content }], context?: {...} }
-//   → { tekst }
+//   → { tekst, acties: [{ soort: 'app_issue', tekst }] }
+//
+// "Pas aan in de app"-opdrachten gaan via de tool zet_op_app_lijst als open
+// rij in app_issues (zelfde lijst als de zijtab in CoachHub); de nacht-AI of
+// een "probleem"-sessie bouwt ze. De chat zelf verandert nooit code.
 //
 // Alleen coaches (get_my_portal_role = coach/both), anders kan elke ingelogde
 // klant API-tegoed opmaken. Sleutel: ANTHROPIC_API_KEY als Supabase-secret.
@@ -34,7 +38,21 @@ Taalregels (altijd):
 - Geen gedachtestreepjes (— of –). Geen emoji's tenzij gevraagd.
 - Kopieer nooit letterlijk van andere coaches: zelfde mechanisme, zijn onderwerp.
 
+App-wijzigingen: vraagt Kersten iets aan te passen, toe te voegen of te repareren in de MY ARC-app (CoachHub, klant-app, funnels), gebruik dan de tool zet_op_app_lijst. Schrijf de opdracht zo dat een ontwikkelaar hem zonder dit gesprek begrijpt: welk scherm, wat er nu gebeurt, wat het moet worden. Eén opdracht per wijziging. Bevestig daarna in één zin dat het op de lijst staat. Beloof nooit dat het al aangepast is.
+
 Opmaak: platte tekst met korte kopjes en pijltjes (→). Geen markdown-tabellen. Vraag alleen door als de taak echt onduidelijk is; anders lever direct een eerste versie die hij kan aanscherpen.`
+
+const TOOLS = [{
+  name: 'zet_op_app_lijst',
+  description: 'Zet een wijziging of reparatie voor de MY ARC-app op de ontwikkellijst (app_issues). Alleen gebruiken als Kersten vraagt iets in de app aan te passen.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      tekst: { type: 'string', description: 'De opdracht: welk scherm, wat er nu gebeurt, wat het moet worden.' },
+    },
+    required: ['tekst'],
+  },
+}]
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -50,6 +68,7 @@ Deno.serve(async (req) => {
     })
     const { data: rol } = await sb.rpc('get_my_portal_role')
     if (rol !== 'coach' && rol !== 'both') return json({ error: 'Alleen voor coaches.' }, 403)
+    const { data: { user } } = await sb.auth.getUser()
 
     const body = await req.json().catch(() => ({}))
     const berichten = (Array.isArray(body.berichten) ? body.berichten : [])
@@ -67,23 +86,46 @@ Deno.serve(async (req) => {
       ? `${SYSTEEM}\n\nCijfers uit Business OS op dit moment (JSON):\n${context}`
       : SYSTEEM
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': sleutel,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ model: MODEL, max_tokens: 2500, system: systeem, messages: berichten }),
-      signal: AbortSignal.timeout(90000),
-    })
-    const data = await r.json().catch(() => null)
-    if (!r.ok) {
-      console.error('Anthropic-fout', r.status, JSON.stringify(data))
-      return json({ error: 'AI gaf geen antwoord, probeer opnieuw.' }, 502)
+    const vraagAI = async (messages: unknown[]) => {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': sleutel,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ model: MODEL, max_tokens: 2500, system: systeem, tools: TOOLS, messages }),
+        signal: AbortSignal.timeout(90000),
+      })
+      const data = await r.json().catch(() => null)
+      if (!r.ok) console.error('Anthropic-fout', r.status, JSON.stringify(data))
+      return r.ok ? data : null
     }
-    const tekst = (data?.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim()
-    return json({ tekst })
+
+    // Tool-lus: maximaal 3 rondes (meerdere app-opdrachten in één bericht).
+    const gesprek: any[] = [...berichten]
+    const acties: { soort: string; tekst: string }[] = []
+    let data = await vraagAI(gesprek)
+    for (let ronde = 0; data && data.stop_reason === 'tool_use' && ronde < 3; ronde++) {
+      const resultaten = []
+      for (const blok of data.content.filter((b: any) => b.type === 'tool_use')) {
+        let uitkomst = 'Onbekende tool'
+        if (blok.name === 'zet_op_app_lijst') {
+          const tekst = String(blok.input?.tekst || '').trim().slice(0, 4000)
+          const { error } = tekst && user
+            ? await sb.from('app_issues').insert({ coach_id: user.id, text: `[Business OS] ${tekst}` })
+            : { error: { message: 'lege opdracht' } }
+          if (error) { console.error('app_issues', error); uitkomst = 'Mislukt: ' + error.message }
+          else { acties.push({ soort: 'app_issue', tekst }); uitkomst = 'Staat op de lijst.' }
+        }
+        resultaten.push({ type: 'tool_result', tool_use_id: blok.id, content: uitkomst })
+      }
+      gesprek.push({ role: 'assistant', content: data.content }, { role: 'user', content: resultaten })
+      data = await vraagAI(gesprek)
+    }
+    if (!data) return json({ error: 'AI gaf geen antwoord, probeer opnieuw.' }, 502)
+    const tekst = (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim()
+    return json({ tekst: tekst || (acties.length ? 'Staat op de lijst.' : ''), acties })
   } catch (e) {
     console.error(e)
     return json({ error: 'AI gaf geen antwoord, probeer opnieuw.' }, 500)

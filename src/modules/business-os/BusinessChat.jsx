@@ -80,14 +80,14 @@ export default function BusinessChat({ context }) {
     setBezig(true)
     setFout(null)
     const { data, error } = await supabase.functions.invoke('business-os-chat', {
-      body: { berichten: nieuw, context },
+      body: { berichten: nieuw.map(({ role, content }) => ({ role, content })), context },
     })
     setBezig(false)
     if (error || data?.error || !data?.tekst) {
       setFout(data?.error || 'AI gaf geen antwoord, probeer opnieuw.')
       return
     }
-    setGesprek(g => [...g, { role: 'assistant', content: data.tekst }])
+    setGesprek(g => [...g, { role: 'assistant', content: data.tekst, acties: data.acties || [] }])
   }
 
   return (
@@ -104,6 +104,11 @@ export default function BusinessChat({ context }) {
           ) : (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <div style={{ flex: 1, fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.55, color: colors.textPrimary, whiteSpace: 'pre-wrap' }}>
+                {(b.acties || []).map((ac, j) => (
+                  <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, marginBottom: 6 }}>
+                    <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /> Op de app-lijst: {ac.tekst}
+                  </div>
+                ))}
                 {b.content}
               </div>
               <Kopieer tekst={b.content} />
