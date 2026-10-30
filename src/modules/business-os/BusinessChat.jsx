@@ -23,11 +23,17 @@
 // gebruikersberichten mee.
 // Werk-indicator: robotje boven de balk zolang de AI denkt of een code-opdracht
 // (business_os_opdrachten soort 'code', wacht/bezig) loopt; daarna kort Klaar/Mislukt.
+// Stem (30 okt): staat de stem-modus aan (klik op de ring, stem.js), dan wordt
+// elk nieuw antwoord na versturen voorgelezen, plus de toestemmingsvraag uit het
+// wolkje. Stopt bij typen, microfoon, versturen, nieuw gesprek en weggaan. Luistert
+// de microfoon, dan praat hij niet (anders hoort de herkenning zichzelf).
 
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, MessageSquare, ChevronDown } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, MessageSquare, ChevronDown, SquarePen } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
+import useIsMobile from '../../hooks/useIsMobile'
+import * as stem from './stem'
 
 const KEY = 'business_os_chat'
 const PA_ONLINE_MS = 45000
@@ -154,24 +160,98 @@ function Inkort({ tekst }) {
   )
 }
 
-// Voorstel van de AI om accounts op slot te zetten of te ontgrendelen. Pas deze
-// knop voert het uit, met dezelfde velden als de slotknop in Coach Inzicht
-// (CoachingPeriodPanel.wisselSlot).
-function SlotVoorstel({ voorstel, onKlaar }) {
-  const [bezig, setBezig] = useState(false)
-  const [fout, setFout] = useState(null)
-  const opSlot = voorstel.actie === 'op_slot'
-  const voerUit = async () => {
-    setBezig(true)
-    setFout(null)
-    const payload = opSlot
-      ? { account_locked_at: new Date().toISOString(), account_locked_reason: voorstel.tekst || null, coaching_status: 'ended', coaching_paused_at: null, coaching_pause_reason: null }
-      : { account_locked_at: null, account_locked_reason: null }
-    const { error } = await supabase.from('clients').update(payload).in('id', voorstel.klanten.map(k => k.id))
-    setBezig(false)
-    if (error) { setFout('Opslaan mislukt: ' + error.message); return }
-    onKlaar()
+// ── Voorstellen uitvoeren ──
+// Eén plek voor de uitvoer, gedeeld door de kaart in de berichtenlijst en het
+// vraagwolkje bij het robotje. Geeft { veld } (wat er op de actie komt te
+// staan) of { fout }. Status zit op de actie in het gesprek (uitgevoerd /
+// opdrachtId / afgewezen), dus wolkje en kaart zien hetzelfde.
+
+// Slot: dezelfde velden als de slotknop in Coach Inzicht (CoachingPeriodPanel.wisselSlot).
+async function voerSlotUit(voorstel) {
+  const payload = voorstel.actie === 'op_slot'
+    ? { account_locked_at: new Date().toISOString(), account_locked_reason: voorstel.tekst || null, coaching_status: 'ended', coaching_paused_at: null, coaching_pause_reason: null }
+    : { account_locked_at: null, account_locked_reason: null }
+  const { error } = await supabase.from('clients').update(payload).in('id', voorstel.klanten.map(k => k.id))
+  return error ? { fout: 'Opslaan mislukt: ' + error.message } : { veld: { uitgevoerd: true } }
+}
+
+// Data (stel_wijziging_voor): de AI heeft het aantal rijen al geteld; dit draait
+// met Kerstens eigen rechten (RLS), dus nooit meer dan hij zelf in de app zou mogen.
+async function voerWijzigingUit(voorstel) {
+  let q
+  if (voorstel.actie === 'insert') {
+    q = supabase.from(voorstel.tabel).insert(voorstel.rijen)
+  } else {
+    q = supabase.from(voorstel.tabel).update(voorstel.velden)
+    for (const f of voorstel.filters) {
+      if (f.op === 'in') q = q.in(f.kolom, Array.isArray(f.waarde) ? f.waarde : [f.waarde])
+      else if (f.op === 'is') q = q.is(f.kolom, f.waarde)
+      else q = q[f.op](f.kolom, f.waarde)
+    }
   }
+  const { error } = await q
+  return error ? { fout: 'Mislukt: ' + error.message } : { veld: { uitgevoerd: true } }
+}
+
+// Code: zet een rij in business_os_opdrachten voor de lokale PA.
+async function startPaOpdracht(voorstel) {
+  const { data, error } = await supabase.from('business_os_opdrachten')
+    .insert({ opdracht: voorstel.tekst }).select('id').single()
+  return error ? { fout: 'Starten mislukt: ' + error.message } : { veld: { opdrachtId: data.id } }
+}
+
+const VOER_UIT = { slot_voorstel: voerSlotUit, wijziging_voorstel: voerWijzigingUit, pa_voorstel: startPaOpdracht }
+const staatOpen = (ac) => !!VOER_UIT[ac.soort] && !ac.uitgevoerd && !ac.opdrachtId && !ac.afgewezen
+
+const waardeTekst = (v) => v === null ? 'leeg' : typeof v === 'object' ? JSON.stringify(v) : String(v)
+const wijzigingRegels = (v) => v.actie === 'insert'
+  ? [`${v.aantal} nieuwe rij(en) in ${v.tabel}`]
+  : [
+      `${v.aantal} rij(en) in ${v.tabel} waar ${v.filters.map(f => `${f.kolom} ${f.op} ${waardeTekst(f.waarde)}`).join(' en ')}`,
+      `→ ${Object.entries(v.velden).map(([k, w]) => `${k} = ${waardeTekst(w)}`).join(', ')}`,
+    ]
+
+const kort = (t, max = 80) => {
+  const s = (t || '').replace(/\s+/g, ' ').trim()
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s
+}
+const eersteZin = (t) => {
+  const regel = (t || '').trim().split('\n')[0]
+  return regel.match(/^.*?[.!?](\s|$)/)?.[0] || regel
+}
+
+// Voorstel → één korte vraag in spreektaal + samenvatting + volledige tekst.
+function vraagVoor(ac) {
+  if (ac.soort === 'slot_voorstel') {
+    const n = ac.klanten.length
+    const wie = n === 1 ? ac.klanten[0].naam : `${n} klanten`
+    return {
+      vraag: ac.actie === 'op_slot' ? `Mag ik ${wie} op slot zetten?` : `Mag ik ${wie} ontgrendelen?`,
+      kort: kort(ac.tekst),
+      details: ac.klanten.map(k => k.naam).join(', '),
+    }
+  }
+  if (ac.soort === 'wijziging_voorstel') {
+    const rijen = `${ac.aantal} ${ac.aantal === 1 ? 'rij' : 'rijen'}`
+    return {
+      vraag: ac.actie === 'insert' ? `Mag ik ${rijen} toevoegen aan ${ac.tabel}?` : `Mag ik ${rijen} in ${ac.tabel} aanpassen?`,
+      kort: kort(ac.uitleg),
+      details: wijzigingRegels(ac).join('\n'),
+    }
+  }
+  return { vraag: 'Mag ik dit aanpassen in de code?', kort: kort(eersteZin(ac.tekst)), details: ac.tekst }
+}
+
+const Afgewezen = () => (
+  <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.textSecondary, fontWeight: 800 }}>
+    <X size={14} /> Afgewezen
+  </div>
+)
+
+// Voorstel van de AI om accounts op slot te zetten of te ontgrendelen.
+function SlotVoorstel({ voorstel, staat, onToestaan }) {
+  const { bezig, fout } = staat || {}
+  const opSlot = voorstel.actie === 'op_slot'
   return (
     <div style={KAART}>
       <div style={KAART_KOP}>
@@ -184,8 +264,8 @@ function SlotVoorstel({ voorstel, onKlaar }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
           <Check size={14} /> {opSlot ? 'Op slot gezet' : 'Ontgrendeld'}
         </div>
-      ) : (
-        <button onClick={voerUit} disabled={bezig} style={KNOP}>
+      ) : voorstel.afgewezen ? <Afgewezen /> : (
+        <button onClick={onToestaan} disabled={bezig} style={KNOP}>
           {bezig ? 'Bezig…' : opSlot ? `Zet ${voorstel.klanten.length} op slot` : `Ontgrendel ${voorstel.klanten.length}`}
         </button>
       )}
@@ -194,52 +274,24 @@ function SlotVoorstel({ voorstel, onKlaar }) {
   )
 }
 
-// Voorstel van de AI om data aan te passen (stel_wijziging_voor). De AI heeft
-// het aantal rijen al geteld; deze knop voert het uit met Kerstens eigen
-// rechten (RLS), dus nooit meer dan hij zelf in de app zou mogen.
-const waardeTekst = (v) => v === null ? 'leeg' : typeof v === 'object' ? JSON.stringify(v) : String(v)
-
-function WijzigingVoorstel({ voorstel, onKlaar }) {
-  const [bezig, setBezig] = useState(false)
-  const [fout, setFout] = useState(null)
-  const voerUit = async () => {
-    setBezig(true)
-    setFout(null)
-    let q
-    if (voorstel.actie === 'insert') {
-      q = supabase.from(voorstel.tabel).insert(voorstel.rijen)
-    } else {
-      q = supabase.from(voorstel.tabel).update(voorstel.velden)
-      for (const f of voorstel.filters) {
-        if (f.op === 'in') q = q.in(f.kolom, Array.isArray(f.waarde) ? f.waarde : [f.waarde])
-        else if (f.op === 'is') q = q.is(f.kolom, f.waarde)
-        else q = q[f.op](f.kolom, f.waarde)
-      }
-    }
-    const { error } = await q
-    setBezig(false)
-    if (error) { setFout('Mislukt: ' + error.message); return }
-    onKlaar()
-  }
+// Voorstel van de AI om data aan te passen (stel_wijziging_voor).
+function WijzigingVoorstel({ voorstel, staat, onToestaan }) {
+  const { bezig, fout } = staat || {}
+  const regels = wijzigingRegels(voorstel)
   return (
     <div style={KAART}>
       <div style={KAART_KOP}>
         <Database size={13} /> {voorstel.uitleg}
       </div>
       <div style={{ ...KAART_SUB, wordBreak: 'break-word' }}>
-        {voorstel.actie === 'insert'
-          ? `${voorstel.aantal} nieuwe rij(en) in ${voorstel.tabel}`
-          : <>
-              {voorstel.aantal} rij(en) in {voorstel.tabel} waar {voorstel.filters.map(f => `${f.kolom} ${f.op} ${waardeTekst(f.waarde)}`).join(' en ')}
-              <br />→ {Object.entries(voorstel.velden).map(([k, v]) => `${k} = ${waardeTekst(v)}`).join(', ')}
-            </>}
+        {regels.map((r, i) => <div key={i}>{r}</div>)}
       </div>
       {voorstel.uitgevoerd ? (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
           <Check size={14} /> Uitgevoerd
         </div>
-      ) : (
-        <button onClick={voerUit} disabled={bezig} style={KNOP}>
+      ) : voorstel.afgewezen ? <Afgewezen /> : (
+        <button onClick={onToestaan} disabled={bezig} style={KNOP}>
           {bezig ? 'Bezig…' : 'Toestaan'}
         </button>
       )}
@@ -253,9 +305,9 @@ function WijzigingVoorstel({ voorstel, onKlaar }) {
 // resultaat er is.
 const PA_STATUS = { wacht: 'Wacht op je Mac…', bezig: 'Claude Code is bezig…', klaar: 'Klaar', mislukt: 'Mislukt' }
 
-function PaVoorstel({ voorstel, onGestart }) {
+function PaVoorstel({ voorstel, staat, onToestaan }) {
   const [rij, setRij] = useState(null)
-  const [fout, setFout] = useState(null)
+  const { bezig, fout } = staat || {}
   const id = voorstel.opdrachtId
 
   useEffect(() => {
@@ -269,14 +321,6 @@ function PaVoorstel({ voorstel, onGestart }) {
     return () => { weg = true; clearInterval(t) }
   }, [id])
 
-  const start = async () => {
-    setFout(null)
-    const { data, error } = await supabase.from('business_os_opdrachten')
-      .insert({ opdracht: voorstel.tekst }).select('id').single()
-    if (error) { setFout('Starten mislukt: ' + error.message); return }
-    onGestart(data.id)
-  }
-
   const status = rij?.status
   const hangt = status === 'wacht' && rij && Date.now() - new Date(rij.created_at).getTime() > 20000
   return (
@@ -285,9 +329,9 @@ function PaVoorstel({ voorstel, onGestart }) {
         <Laptop size={13} /> Code-opdracht
       </div>
       <div style={KAART_SUB}><Inkort tekst={voorstel.tekst} /></div>
-      {!id ? (
-        <button onClick={start} style={KNOP}>
-          Uitvoeren op mijn Mac
+      {voorstel.afgewezen && !id ? <Afgewezen /> : !id ? (
+        <button onClick={onToestaan} disabled={bezig} style={KNOP}>
+          {bezig ? 'Versturen…' : 'Uitvoeren op mijn Mac'}
         </button>
       ) : (
         <div style={{ fontWeight: 800, color: status === 'klaar' ? colors.success : status === 'mislukt' ? colors.danger : colors.textPrimary }}>
@@ -298,6 +342,65 @@ function PaVoorstel({ voorstel, onGestart }) {
       )}
       {rij?.resultaat && <div style={{ marginTop: 6 }}><Inkort tekst={rij.resultaat} /></div>}
       {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 4 }}>{fout}</div>}
+    </div>
+  )
+}
+
+// Tekstwolkje bij het robotje: het eerste open voorstel als korte vraag.
+// Zweeft (absoluut) boven de balk, dus ring en pagina schuiven niet.
+function Vraagwolk({ voorstel, nr, totaal, staat, onToestaan, onNee }) {
+  const [details, setDetails] = useState(false)
+  const { vraag, kort: samenvatting, details: volledig } = vraagVoor(voorstel)
+  const { bezig, fout } = staat || {}
+  const meer = volledig && volledig !== samenvatting
+  return (
+    <div role="dialog" aria-label="Toestemming gevraagd" style={{
+      position: 'absolute', left: 0, bottom: '100%', marginBottom: 34, zIndex: 6,
+      width: 'min(340px, 100%)', boxSizing: 'border-box', padding: '10px 12px',
+      background: '#0a0a0a', border: `1px solid ${colors.success}55`, borderRadius: 14,
+      boxShadow: '0 12px 32px rgba(0,0,0,0.6)', fontSize: '0.78rem', lineHeight: 1.35,
+    }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+        <div style={{ flex: 1, minWidth: 0, fontWeight: 900, color: colors.textPrimary }}>{vraag}</div>
+        {totaal > 1 && <div style={{ flexShrink: 0, fontSize: '0.7rem', fontWeight: 800, color: colors.textMuted }}>{nr} van {totaal}</div>}
+      </div>
+      {(samenvatting || meer) && (
+        <div style={{ marginTop: 3, color: colors.textSecondary, fontWeight: 600, wordBreak: 'break-word' }}>
+          {samenvatting}
+          {meer && (
+            <button onClick={() => setDetails(d => !d)} style={{
+              background: 'none', border: 'none', padding: '0 0 0 6px', cursor: 'pointer', fontFamily: 'inherit',
+              color: colors.success, fontWeight: 800, fontSize: '0.74rem',
+            }}>
+              {details ? 'minder' : 'details'}
+            </button>
+          )}
+        </div>
+      )}
+      {details && (
+        <div style={{
+          marginTop: 6, maxHeight: 160, overflowY: 'auto', overscrollBehavior: 'contain', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          color: colors.textSecondary, fontWeight: 500, fontSize: '0.74rem', borderTop: `1px solid ${colors.borderSubtle}`, paddingTop: 6,
+        }}>
+          {volledig}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <button onClick={onToestaan} disabled={bezig} style={{ ...KNOP, minHeight: 30 }}>
+          {bezig ? 'Bezig…' : 'Toestaan'}
+        </button>
+        <button onClick={onNee} disabled={bezig} style={{
+          ...KNOP, minHeight: 30, background: 'transparent', color: colors.textSecondary, border: `1px solid ${colors.borderSubtle}`,
+        }}>
+          Nee
+        </button>
+      </div>
+      {fout && <div style={{ color: colors.danger, fontWeight: 700, marginTop: 6 }}>{fout}</div>}
+      {/* staartje naar het robotje */}
+      <span style={{
+        position: 'absolute', left: 16, bottom: -6, width: 10, height: 10, background: '#0a0a0a', transform: 'rotate(45deg)',
+        borderRight: `1px solid ${colors.success}55`, borderBottom: `1px solid ${colors.success}55`,
+      }} />
     </div>
   )
 }
@@ -353,6 +456,7 @@ export default function BusinessChat({ context, onBezig }) {
   const [invoer, setInvoer] = useState('')
   const [bijlagen, setBijlagen] = useState([])
   const [bezig, setBezig] = useState(false)
+  const isMobile = useIsMobile()
   // Berichtenvenster: start altijd dicht, niet onthouden.
   const [open, setOpen] = useState(false)
   const [ongelezen, setOngelezen] = useState(false)
@@ -362,6 +466,9 @@ export default function BusinessChat({ context, onBezig }) {
   useEffect(() => { onBezig?.(bezig) }, [bezig, onBezig])
   const [fout, setFout] = useState(null)
   const [luistert, setLuistert] = useState(false)
+  const luistertRef = useRef(false)
+  useEffect(() => { luistertRef.current = luistert }, [luistert])
+  const { spreekt } = stem.useStem()
   const [sleept, setSleept] = useState(false)
   const wortel = useRef(null)
   const lijst = useRef(null)
@@ -390,6 +497,12 @@ export default function BusinessChat({ context, onBezig }) {
   }, [open])
 
   useEffect(() => () => herkenner.current?.abort(), [])
+  // Stem stopt bij weggaan: tab dicht/verborgen of component weg.
+  useEffect(() => {
+    const zicht = () => { if (document.hidden) stem.stop() }
+    document.addEventListener('visibilitychange', zicht)
+    return () => { document.removeEventListener('visibilitychange', zicht); stem.stop() }
+  }, [])
 
   // Korte melding na afloop ("Klaar" / "Mislukt, bekijk resultaat").
   const [melding, setMelding] = useState(null)
@@ -442,6 +555,7 @@ export default function BusinessChat({ context, onBezig }) {
 
   const microfoon = () => {
     if (luistert) { herkenner.current?.stop(); return }
+    stem.stop()
     const h = new Spraak()
     h.lang = 'nl-NL'
     h.continuous = true
@@ -457,6 +571,7 @@ export default function BusinessChat({ context, onBezig }) {
     herkenner.current = h
     setFout(null)
     h.start()
+    luistertRef.current = true
     setLuistert(true)
   }
 
@@ -530,12 +645,18 @@ export default function BusinessChat({ context, onBezig }) {
     setGesprek(g => [...g, bericht])
     if (!openRef.current) setOngelezen(true)
     meld('Klaar', false)
+    // Voorlezen: het antwoord en daarna de eerste toestemmingsvraag (die in het wolkje).
+    if (stem.isAan() && !luistertRef.current) {
+      const open = bericht.acties.find(staatOpen)
+      stem.spreek([bericht.content, open && vraagVoor(open).vraag].filter(Boolean).join('\n'))
+    }
   }
 
   const stuur = async () => {
     const vraag = invoer.trim()
     if ((!vraag && !bijlagen.length) || bezig) return
     herkenner.current?.stop()
+    stem.stop()
     const nieuwBericht = { role: 'user', content: vraag }
     if (bijlagen.length) {
       nieuwBericht.afbeeldingen = bijlagen.map(({ media_type, data }) => ({ media_type, data }))
@@ -565,12 +686,36 @@ export default function BusinessChat({ context, onBezig }) {
     antwoord({ role: 'assistant', content: data.tekst, acties: data.acties || [] })
   }
 
+  // Voorstellen: status op de actie zelf (gedeeld door kaart en wolkje),
+  // bezig/fout per actie hier (sleutel 'bericht-actie').
+  const [actieStaat, setActieStaat] = useState({})
+  const zetActie = (i, j, veld) => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
+    ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, ...veld } : x),
+  }))
+  const toestaan = async (i, j) => {
+    const ac = gesprek[i]?.acties?.[j]
+    const sleutel = `${i}-${j}`
+    if (!ac || !staatOpen(ac) || actieStaat[sleutel]?.bezig) return
+    setActieStaat(s => ({ ...s, [sleutel]: { bezig: true } }))
+    const { veld, fout: f } = await VOER_UIT[ac.soort](ac)
+    setActieStaat(s => ({ ...s, [sleutel]: { bezig: false, fout: f || null } }))
+    if (f) return
+    zetActie(i, j, veld)
+    if (ac.soort === 'pa_voorstel') setCode(c => c || 'wacht') // robotje meteen, de poll neemt het over
+  }
+  const afwijzen = (i, j) => zetActie(i, j, { afgewezen: true })
+  const openVoorstellen = gesprek.flatMap((b, i) => b.role !== 'assistant' ? [] :
+    (b.acties || []).map((ac, j) => ({ ac, i, j })).filter(x => staatOpen(x.ac)))
+  const vraagNu = openVoorstellen[0]
+  // Lijst open boven de balk: daar staan de kaarten al, wolkje dan weg.
+  const wolkZichtbaar = vraagNu && !(open && plek && !plek.onder)
+
   const kanSturen = (invoer.trim() || bijlagen.length) && !bezig
   const rondeKnop = {
     width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative',
   }
-  const werk = code === 'bezig' ? 'Bezig met code…' : bezig ? 'Denkt na…' : code === 'wacht' ? 'Wacht op je Mac…' : null
+  const werk = code === 'bezig' ? 'Bezig met code…' : bezig ? 'Denkt na…' : spreekt ? 'Praat…' : code === 'wacht' ? 'Wacht op je Mac…' : null
 
   return (
     <div ref={wortel} style={{
@@ -607,17 +752,10 @@ export default function BusinessChat({ context, onBezig }) {
               <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0, ...TEKST, fontWeight: 500, color: colors.textPrimary }}>
                   {(b.acties || []).map((ac, j) => {
-                    const klaar = () => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
-                      ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, uitgevoerd: true } : x),
-                    }))
-                    if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} voorstel={ac} onKlaar={klaar} />
-                    if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} voorstel={ac} onKlaar={klaar} />
-                    if (ac.soort === 'pa_voorstel') {
-                      const gestart = (opdrachtId) => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
-                        ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, opdrachtId } : x),
-                      }))
-                      return <PaVoorstel key={j} voorstel={ac} onGestart={gestart} />
-                    }
+                    const kaart = { voorstel: ac, staat: actieStaat[`${i}-${j}`], onToestaan: () => toestaan(i, j) }
+                    if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
+                    if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
+                    if (ac.soort === 'pa_voorstel') return <PaVoorstel key={j} {...kaart} />
                     return (
                       <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, fontSize: '0.8rem', marginBottom: 4 }}>
                         <Check size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}
@@ -634,15 +772,22 @@ export default function BusinessChat({ context, onBezig }) {
 
         <div ref={balk} style={{ position: 'relative' }}>
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
-          {(werk || melding) && (
+          {(werk || melding || wolkZichtbaar) && (
             <div role="status" style={{
               position: 'absolute', left: 4, bottom: '100%', marginBottom: 2,
               display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap',
               fontSize: '0.75rem', fontWeight: 800,
-              color: werk ? colors.textSecondary : melding.fout ? colors.danger : colors.success,
+              color: werk || !melding ? colors.textSecondary : melding.fout ? colors.danger : colors.success,
             }}>
-              {werk ? <><Robotje /> {werk}</> : <>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />} {melding.tekst}</>}
+              {werk ? <><Robotje /> {werk}</>
+                : melding ? <>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />} {melding.tekst}</>
+                : <><Robotje /> Wacht op jou</>}
             </div>
+          )}
+          {wolkZichtbaar && (
+            <Vraagwolk key={`${vraagNu.i}-${vraagNu.j}`} voorstel={vraagNu.ac} nr={1} totaal={openVoorstellen.length}
+              staat={actieStaat[`${vraagNu.i}-${vraagNu.j}`]}
+              onToestaan={() => toestaan(vraagNu.i, vraagNu.j)} onNee={() => afwijzen(vraagNu.i, vraagNu.j)} />
           )}
           {sleept && (
             <div style={{
@@ -688,7 +833,7 @@ export default function BusinessChat({ context, onBezig }) {
               <textarea
                 ref={veld}
                 value={invoer}
-                onChange={e => setInvoer(e.target.value)}
+                onChange={e => { stem.stop(); setInvoer(e.target.value) }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); stuur() } }}
                 onPaste={plak}
                 placeholder={luistert ? 'Luistert… praat maar' : 'Geef een taak of plak een screenshot'}
@@ -699,6 +844,21 @@ export default function BusinessChat({ context, onBezig }) {
                   minHeight: 36, maxHeight: INVOER_MAX_H, overflowY: 'auto', boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
+              {/* Route + nieuw gesprek: klein, rechts in dezelfde balk */}
+              <span title={viaMac ? 'Via je Mac (Claude-abonnement)' : 'Via de API (start npm run pa om via je Mac te gaan)'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5, height: 40, padding: isMobile ? '0 6px' : '0 6px 0 8px', flexShrink: 0,
+                  fontSize: '0.68rem', fontWeight: 800, color: colors.textMuted, whiteSpace: 'nowrap', cursor: 'default',
+                }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: viaMac ? colors.success : colors.textMuted }} />
+                {!isMobile && (viaMac ? 'Mac' : 'API')}
+              </span>
+              {gesprek.length > 0 && (
+                <button onClick={() => { stem.stop(); setGesprek([]); setActieStaat({}); setFout(null); setOngelezen(false) }} title="Nieuw gesprek"
+                  style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
+                  <SquarePen size={16} strokeWidth={2.2} />
+                </button>
+              )}
               <input ref={kiezer} type="file" accept="image/*" multiple hidden
                 onChange={e => { neemBeelden(e.target.files); e.target.value = '' }} />
               <button onClick={() => kiezer.current?.click()} title="Screenshot meesturen"
@@ -735,22 +895,6 @@ export default function BusinessChat({ context, onBezig }) {
           </div>
         </div>
 
-        {/* ── Onder de balk, uitgelijnd met de randen: route + nieuw gesprek ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.72rem', fontWeight: 700, color: colors.textSecondary, margin: '6px 4px 0', minHeight: 18 }}>
-          <span title={viaMac ? 'Je Mac beantwoordt (Claude-abonnement)' : 'Via de API (start npm run pa om via je Mac te gaan)'}
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: viaMac ? colors.success : colors.textMuted }} />
-            {viaMac ? 'Via je Mac' : 'Via de API'}
-          </span>
-          {gesprek.length > 0 && (
-            <button
-              onClick={() => { setGesprek([]); setFout(null); setOngelezen(false) }}
-              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: colors.textSecondary, fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: '0 4px', fontFamily: 'inherit' }}
-            >
-              Nieuw gesprek
-            </button>
-          )}
-        </div>
         {fout && <div style={{ fontSize: '0.78rem', fontWeight: 700, color: colors.danger, margin: '4px 4px 0' }}>{fout}</div>}
       </div>
     </div>

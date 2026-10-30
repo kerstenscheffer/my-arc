@@ -13,14 +13,18 @@
 // als zijpaneel (desktop) of bottom sheet (mobiel).
 // Sinds 30 okt (avond): geen begroeting meer; ring, cijferregel en chatbalk
 // vormen één groep midden op het scherm, de ring schaalt mee met de hoogte.
+// Stem-modus (30 okt): klik op de ring = assistent spreekt antwoorden hardop
+// (stem.js). Klik tijdens het praten stopt alleen het praten. Zolang hij praat
+// pulseert de ring in een eigen, sneller ritme.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { MoreHorizontal, X } from 'lucide-react'
+import { MoreHorizontal, X, Volume2, VolumeX } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import BusinessChat from './BusinessChat'
+import * as stem from './stem'
 
 const C = {
   bg: colors.bg,
@@ -137,18 +141,24 @@ const REACTOR_CSS = `
   .bos-r.bezig .bos-a { animation-duration: calc(var(--d) / 5) }
   .bos-r.bezig .bos-kern { animation-duration: .9s }
   .bos-r.bezig .bos-halo { animation-duration: 1.4s }
+  @keyframes bos-praat { 0%,100% { opacity: .5; transform: scale(.9) } 30% { opacity: 1; transform: scale(1.06) } 60% { opacity: .75; transform: scale(.97) } }
+  .bos-r.praat .bos-kern { animation: bos-praat .7s ease-in-out infinite }
+  .bos-r.praat .bos-halo { animation: bos-praat 1.1s ease-in-out infinite }
   @media (prefers-reduced-motion: reduce) {
-    .bos-r .bos-a, .bos-r .bos-kern, .bos-r .bos-halo { animation: none }
-    .bos-r.bezig .bos-halo { opacity: .8 }
+    .bos-r .bos-a, .bos-r .bos-kern, .bos-r .bos-halo, .bos-r.praat .bos-kern, .bos-r.praat .bos-halo { animation: none }
+    .bos-r.bezig .bos-halo, .bos-r.praat .bos-halo { opacity: .8 }
   }
 `
 
-function Reactor({ pct, maat, bezig }) {
+function Reactor({ pct, maat, bezig, praat, stemAan, melding, onKlik }) {
   const R = 96
   const omtrek = 2 * Math.PI * R
+  const Luidspreker = stemAan ? Volume2 : VolumeX
   return (
-    <div className={`bos-r${bezig ? ' bezig' : ''}`} style={{ position: 'relative', width: maat, height: maat, margin: '0 auto' }}
-      role="img" aria-label={`${Math.round(pct)}% van je maanddoel${bezig ? ', assistent denkt na' : ''}`}>
+    <div className={`bos-r${praat ? ' praat' : bezig ? ' bezig' : ''}`} style={{ position: 'relative', width: maat, height: maat, margin: '0 auto', cursor: 'pointer' }}
+      role="button" tabIndex={0} title="Stem aan/uit" aria-pressed={stemAan}
+      aria-label={`${Math.round(pct)}% van je maanddoel${praat ? ', assistent praat' : bezig ? ', assistent denkt na' : ''}. Stem ${stemAan ? 'aan' : 'uit'}`}
+      onClick={onKlik} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onKlik() } }}>
       <style>{REACTOR_CSS}</style>
       <div className="bos-halo" style={{
         position: 'absolute', inset: '-12%', borderRadius: '50%', pointerEvents: 'none',
@@ -204,8 +214,23 @@ function Reactor({ pct, maat, bezig }) {
         <div style={{ ...NUM, fontWeight: 900, fontSize: maat >= 260 ? '3rem' : maat >= 200 ? '2.3rem' : '1.6rem', lineHeight: 1, color: C.wit, textShadow: `0 0 18px ${C.groen}` }}>
           {Math.round(pct)}%
         </div>
-        <div style={{ ...LABEL, fontSize: maat >= 200 ? '0.68rem' : '0.56rem', color: C.wit, opacity: 0.85, marginTop: maat >= 200 ? 6 : 4 }}>van doel</div>
+        <div style={{ ...LABEL, fontSize: maat >= 200 ? '0.68rem' : '0.56rem', color: C.wit, opacity: 0.85, marginTop: maat >= 200 ? 6 : 4, position: 'relative' }}>
+          van doel
+          {/* luidspreker: absoluut, zodat het percentage niet verschuift */}
+          <Luidspreker size={maat >= 200 ? 14 : 12} strokeWidth={2.4} aria-hidden="true" style={{
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: maat >= 200 ? 8 : 5,
+            color: stemAan ? C.groen : C.wit, opacity: stemAan ? 0.95 : 0.4,
+          }} />
+        </div>
       </div>
+      {melding && (
+        <div role="status" style={{
+          position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, whiteSpace: 'nowrap',
+          fontSize: '0.72rem', fontWeight: 800, color: C.zacht, pointerEvents: 'none', zIndex: 2,
+        }}>
+          {melding}
+        </div>
+      )}
     </div>
   )
 }
@@ -248,6 +273,23 @@ export default function BusinessOS({ isMobile }) {
   const [blad, setBlad] = useState(null)
   const [denkt, setDenkt] = useState(false)
   const sluitBlad = useCallback(() => setBlad(null), [])
+  // Stem-modus: eerste klik zet aan (en ontgrendelt iOS), klik tijdens praten
+  // stopt alleen, klik in stilte zet uit.
+  const { aan: stemAan, spreekt } = stem.useStem()
+  const [stemMelding, setStemMelding] = useState(null)
+  const meldTimer = useRef(null)
+  useEffect(() => () => clearTimeout(meldTimer.current), [])
+  const klikRing = () => {
+    if (!stem.beschikbaar()) {
+      clearTimeout(meldTimer.current)
+      setStemMelding('Stem niet beschikbaar in deze browser')
+      meldTimer.current = setTimeout(() => setStemMelding(null), 2500)
+      return
+    }
+    if (stem.isBezig()) { stem.stop(); return }
+    if (!stemAan) stem.ontgrendel()
+    stem.zetAan(!stemAan)
+  }
   // Ringmaat volgt de beschikbare ruimte: hoogte min cijferregel + chatbalk.
   const [ruimte, setRuimte] = useState(null)
   const ro = useRef(null)
@@ -489,7 +531,7 @@ export default function BusinessOS({ isMobile }) {
         alignItems: 'center', justifyContent: 'center',
       }}>
         <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Reactor pct={pctDoel} maat={maat} bezig={denkt} />
+          <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} melding={stemMelding} onKlik={klikRing} />
           <div style={{
             display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: isMobile ? '2px 14px' : '4px 28px',
             marginTop: isMobile ? 12 : 18, fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 700, color: C.zacht, textAlign: 'center',
