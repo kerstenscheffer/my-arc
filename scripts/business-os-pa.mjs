@@ -40,6 +40,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
+import crypto from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import readline from 'node:readline/promises'
@@ -310,15 +311,15 @@ async function beantwoordChat(invoer, opDeel) {
 const tijd = () => new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 // code = loopt er een (true/false); chat = aantal lopende chatvragen.
 const MAX_CHATS = 3
-const bezig = { code: false, chat: 0 }
+const bezig = { code: false, chat: 0, groei: false }
 
 // Bezet meteen een plek, zodat Realtime en het pollen niet tegelijk pakken;
 // de ronde geeft hem terug. Geen rij = meteen terug.
 async function pak(soort) {
   if (!gebruiker) return null
-  if (soort === 'code') { if (bezig.code) return null; bezig.code = true } else { if (bezig.chat >= MAX_CHATS) return null; bezig.chat++ }
+  if (soort === 'chat') { if (bezig.chat >= MAX_CHATS) return null; bezig.chat++ } else { if (bezig[soort]) return null; bezig[soort] = true }
   const rij = await pakRij(soort).catch(() => null)
-  if (!rij) { if (soort === 'code') bezig.code = false; else bezig.chat-- }
+  if (!rij) { if (soort === 'chat') bezig.chat--; else bezig[soort] = false }
   return rij
 }
 
@@ -406,6 +407,46 @@ async function rondeChat() {
   } finally { bezig.chat-- }
 }
 
+// ── Groeiloop: Gino ontwikkelt zichzelf ──
+// Elke nacht om ~03:00 (als de Mac wakker is) en op verzoek een rij met soort
+// 'groei'. Gino (Slim: Opus + memory) kijkt wat er gebeurde, werkt zelf zijn
+// skills bij en zet app-verbeteringen klaar als pa_voorstel. Code bouwt hij
+// hier NIET: Kersten klikt "Uitvoeren op mijn Mac" bij een voorstel. Het
+// verslag komt in het tabje Strategie (BusinessChat zet gezien_at).
+const GROEI_VRAAG = `Groeironde (automatisch, Kersten kijkt later naar je verslag). Je doel: Kersten zo goed mogelijk naar zijn maanddoel begeleiden en jezelf daarvoor steeds beter maken.
+
+1. Kijk wat er de afgelopen 24 uur gebeurde:
+   node scripts/pa-db.mjs lees "select soort, status, left(opdracht, 400) as vraag, left(coalesce(resultaat, antwoord->>'tekst'), 600) as uitkomst, created_at from business_os_opdrachten where created_at > now() - interval '24 hours' and soort <> 'groei' order by created_at"
+   en je vorige groeirondes (soort = 'groei', laatste 5) zodat je niet hetzelfde voorstelt.
+2. Werk zelf, zonder te vragen, maximaal 3 skills bij of maak ze aan (skill-bewaar) waar je herhaling, correcties of voorkeuren van Kersten ziet. Bij bijwerken: de volledige skill onder dezelfde naam.
+3. Stel maximaal 2 app-verbeteringen voor die hem nu het meest helpen richting zijn doel. Denk aan: zijn agenda helder maken, content vooruit plannen en overzichtelijk houden, taken organiseren en inplannen. Kijk eerst in de code of iets al bestaat (Productivity-tab, Output-planning, Business OS). Elk voorstel is een pa_voorstel met een volledige, zelfstandige opdracht die in één code-opdracht past en alleen toevoegt (niets weghalen of hernoemen in de database).
+4. Je verslag (tekst): max 8 regels met pijltjes. Wat je leerde of bijwerkte en waarom deze voorstellen. Geen inleiding.`
+
+async function rondeGroei() {
+  const rij = await pak('groei')
+  if (!rij) return
+  try {
+    console.log(`${tijd()} 🌱 groeironde`)
+    const t0 = Date.now()
+    const r = await beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: GROEI_VRAAG }] }, () => {})
+    console.log(`${tijd()} ${r.ok ? '✓' : '✗'} groeironde in ${((Date.now() - t0) / 1000).toFixed(0)} s`)
+    await sb.from('business_os_opdrachten')
+      .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
+      .eq('id', rij.id)
+  } finally { bezig.groei = false }
+}
+
+// Nachtplanner: tussen 03:00 en 06:00 één ronde, als er de laatste 20 uur geen was.
+async function planGroei() {
+  if (!gebruiker) return
+  const uur = new Date().getHours()
+  if (uur < 3 || uur >= 6) return
+  const { data } = await sb.from('business_os_opdrachten').select('id').eq('soort', 'groei')
+    .gt('created_at', new Date(Date.now() - 20 * 3600 * 1000).toISOString()).limit(1)
+  if (data?.length) return
+  await sb.from('business_os_opdrachten').insert({ coach_id: gebruiker.id, soort: 'groei', opdracht: 'Groeironde (nacht)' })
+}
+
 const hartslag = () => gebruiker && sb.from('business_os_pa_status')
   .upsert({ coach_id: gebruiker.id, laatst_gezien: new Date().toISOString() })
   .then(({ error }) => {
@@ -448,6 +489,7 @@ async function start(g) {
   // Niet als er nu zelf iets loopt (opnieuw ingelogd tijdens een opdracht).
   if (!bezig.code) await sb.from('business_os_opdrachten').update({ status: 'wacht', gestart_at: null }).eq('status', 'bezig').eq('soort', 'code')
   if (!bezig.chat) await sb.from('business_os_opdrachten').update({ status: 'mislukt' }).eq('status', 'bezig').eq('soort', 'chat')
+  if (!bezig.groei) await sb.from('business_os_opdrachten').update({ status: 'wacht', gestart_at: null }).eq('status', 'bezig').eq('soort', 'groei')
   await hartslag()
   zetWarmKlaar()
   // Nieuwe opdracht? Realtime meldt hem meteen (RLS: alleen eigen rijen); het
@@ -455,7 +497,7 @@ async function start(g) {
   if (!kanaal) kanaal = sb.channel('pa-opdrachten')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'business_os_opdrachten' }, (m) => {
       if (m.new?.status !== 'wacht') return
-      const f = m.new.soort === 'chat' ? rondeChat : rondeCode
+      const f = m.new.soort === 'chat' ? rondeChat : m.new.soort === 'groei' ? rondeGroei : rondeCode
       f().catch(e => console.error(tijd(), e.message))
     })
     .subscribe()
@@ -522,3 +564,5 @@ setInterval(hartslag, 15000)
 const fout = (e) => console.error(tijd(), e.message)
 setInterval(() => rondeChat().catch(fout), 3000)
 setInterval(() => rondeCode().catch(fout), 5000)
+setInterval(() => rondeGroei().catch(fout), 60 * 1000)
+setInterval(() => planGroei().catch(fout), 10 * 60 * 1000)

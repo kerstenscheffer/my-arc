@@ -80,3 +80,11 @@ grant execute on function public.business_os_schema(text) to authenticated;
 -- en schrijft het antwoord al tijdens het typen in `antwoord`; Business OS
 -- luistert mee op de eigen rij. RLS blijft gelden voor postgres_changes.
 alter publication supabase_realtime add table public.business_os_opdrachten;
+
+-- Groeiloop (30 okt 2026): de PA draait elke nacht (en op verzoek) een ronde
+-- waarin Gino zijn skills bijwerkt en verbeteringen voorstelt. Zo'n ronde is
+-- een rij met soort 'groei'; Business OS zet het verslag één keer in de chat
+-- en vult dan gezien_at. Check alleen verruimd (oude waarden blijven geldig).
+alter table public.business_os_opdrachten drop constraint business_os_opdrachten_soort_check;
+alter table public.business_os_opdrachten add constraint business_os_opdrachten_soort_check check (soort = any (array['code','chat','groei']));
+alter table public.business_os_opdrachten add column if not exists gezien_at timestamptz;

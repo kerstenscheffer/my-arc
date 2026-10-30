@@ -853,6 +853,32 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     }, 800)
     return () => clearTimeout(t)
   }, [gesprekken, dbKlaar])
+  // Groeironde (nacht, door de PA): verslag + voorstellen één keer in het
+  // tabje Strategie. gezien_at claimen vóór het toevoegen, zodat twee open
+  // vensters hem niet allebei plaatsen.
+  // Eerste keer na 3 s: dan zijn de tabjes uit de database (als die er is) binnen.
+  useEffect(() => {
+    let weg = false
+    const kijk = async () => {
+      const { data } = await supabase.from('business_os_opdrachten').select('id, antwoord, klaar_at')
+        .eq('soort', 'groei').eq('status', 'klaar').is('gezien_at', null).order('klaar_at')
+      for (const r of data || []) {
+        if (weg || !r.antwoord?.tekst) continue
+        const { data: geclaimd } = await supabase.from('business_os_opdrachten')
+          .update({ gezien_at: new Date().toISOString() }).eq('id', r.id).is('gezien_at', null).select('id')
+        if (!geclaimd?.length) continue
+        const gs = gesprekkenRef.current
+        const doel = gs.find(g => g.naam === 'Strategie') || gs[1] || gs[0]
+        const wanneer = new Date(r.klaar_at).toLocaleString('nl-NL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+        zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `Groeironde (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [] }])
+        markeer(doel.id)
+      }
+    }
+    const eerst = setTimeout(() => kijk().catch(() => {}), 3000)
+    const t = setInterval(() => kijk().catch(() => {}), 60000)
+    return () => { weg = true; clearTimeout(eerst); clearInterval(t) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [fout, setFout] = useState(null)
   const [editorVers, setEditorVers] = useState(0) // ophogen = opdrachtenlijst Editor opnieuw ophalen
   const [luistert, setLuistert] = useState(false)
