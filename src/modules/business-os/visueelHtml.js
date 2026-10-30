@@ -80,13 +80,128 @@ ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => `.d${i} { animation-delay: ${(i * 0.0
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
 `
 
-// Ons script: iconen tekenen en de hoogte aan Business OS doorgeven.
+// Ons script: iconen tekenen, de hoogte aan Business OS doorgeven en de
+// motion-kit. Gino schrijft zelf geen JS (wordt eruit gefilterd); hij zet
+// data-attributen en dit script speelt ze af, als een kleine motion graphic:
+//   data-tel="4663" [data-voor="€"] [data-na="%"] [data-decimalen] [data-van]  getal telt op
+//   data-teken [data-tot="47"]  (path/polyline/line/circle/rect)                lijn tekent zichzelf (tot = % voor een ring)
+//   data-groei="y|x"                                                             staaf/balk groeit
+//   data-in="omhoog|omlaag|links|rechts|zoom|vervaag"                            komt binnen
+//   data-typ [data-snelheid]                                                     typemachine
+//   data-nadruk                                                                  korte pop op het moment
+//   Op elk: data-start (s na begin scène) en data-duur (s).
+//   Scènes: <div data-scenes [data-herhaal]> met kinderen <div data-scene data-duur="4">:
+//   om de beurt in beeld, zoals een filmpje. Klik op het vakje = opnieuw afspelen.
 const HULP_JS = `
 (function () {
-  function teken() { try { if (window.lucide) lucide.createIcons(); } catch (e) {} meld(); }
+  var stil = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var timers = [];
+  var zacht = 'cubic-bezier(.2,.8,.2,1)';
+  function na(s, f) { timers.push(setTimeout(f, Math.max(0, s * 1000))); }
+  function num(el, k, d) { var v = parseFloat(el.getAttribute(k)); return isNaN(v) ? d : v; }
+  function nl(v, d) { return v.toLocaleString('nl-NL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
   function meld() { parent.postMessage({ gt_hoogte: Math.ceil(document.documentElement.scrollHeight) }, '*'); }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', teken); else teken();
-  window.addEventListener('load', teken);
+  function ani(el, frames, duur) { return el.animate(frames, { duration: stil ? 0 : duur * 1000, easing: zacht, fill: 'forwards' }); }
+  var IN = { omhoog: 'translateY(16px)', omlaag: 'translateY(-16px)', links: 'translateX(-22px)', rechts: 'translateX(22px)', zoom: 'scale(.82)', vervaag: 'none' };
+
+  var doe = {
+    'data-tel': function (el, t) {
+      var doel = num(el, 'data-tel', 0), van = num(el, 'data-van', 0), dec = num(el, 'data-decimalen', 0), duur = num(el, 'data-duur', 1.4);
+      var voor = el.getAttribute('data-voor') || '', achter = el.getAttribute('data-na') || '';
+      function zet(v) { el.textContent = voor + nl(v, dec) + achter; }
+      zet(van);
+      na(t, function () {
+        if (stil) return zet(doel);
+        var t0 = performance.now();
+        (function stap(nu) {
+          var p = Math.min(1, (nu - t0) / (duur * 1000));
+          zet(van + (doel - van) * (1 - Math.pow(1 - p, 3)));
+          if (p < 1) requestAnimationFrame(stap);
+        })(t0);
+      });
+    },
+    'data-teken': function (el, t) {
+      var len = el.getTotalLength ? el.getTotalLength() : 0;
+      if (!len) return;
+      var tot = Math.max(0, Math.min(100, num(el, 'data-tot', 100)));
+      el.style.strokeDasharray = len + ' ' + len; el.style.strokeDashoffset = len;
+      na(t, function () { ani(el, [{ strokeDashoffset: len }, { strokeDashoffset: len * (1 - tot / 100) }], num(el, 'data-duur', 1.4)); });
+    },
+    'data-groei': function (el, t) {
+      var as = el.getAttribute('data-groei') === 'x' ? 'scaleX' : 'scaleY';
+      el.style.transformBox = 'fill-box';
+      el.style.transformOrigin = as === 'scaleX' ? 'left center' : 'center bottom';
+      el.style.transform = as + '(0)';
+      na(t, function () { ani(el, [{ transform: as + '(0)' }, { transform: as + '(1)' }], num(el, 'data-duur', 0.9)); });
+    },
+    'data-in': function (el, t) {
+      var van = IN[el.getAttribute('data-in')] || IN.omhoog;
+      el.style.opacity = 0;
+      na(t, function () { ani(el, [{ opacity: 0, transform: van }, { opacity: 1, transform: 'none' }], num(el, 'data-duur', 0.6)); });
+    },
+    'data-typ': function (el, t) {
+      if (el.__tekst == null) el.__tekst = el.textContent;
+      var tekst = el.__tekst, snel = num(el, 'data-snelheid', 30);
+      el.textContent = '';
+      na(t, function () {
+        var i = 0;
+        (function stap() { el.textContent = tekst.slice(0, ++i); if (i < tekst.length) timers.push(setTimeout(stap, stil ? 0 : 1000 / snel)); })();
+      });
+    },
+    'data-nadruk': function (el, t) {
+      na(t, function () { el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }, { transform: 'scale(1)' }], { duration: stil ? 0 : 700, easing: 'ease-out' }); });
+    },
+  };
+
+  // Alle animaties in 'wortel' (zonder die in een geneste scène), vanaf nu.
+  function speel(wortel, binnenScene) {
+    Object.keys(doe).forEach(function (k) {
+      [].forEach.call(wortel.querySelectorAll('[' + k + ']'), function (el) {
+        if (!binnenScene && el.closest('[data-scene]')) return;
+        try { doe[k](el, num(el, 'data-start', 0)); } catch (e) {}
+      });
+    });
+  }
+
+  function scenes(box) {
+    var lijst = [].filter.call(box.children, function (c) { return c.hasAttribute('data-scene'); });
+    if (!lijst.length) return;
+    var hoog = 0;
+    lijst.forEach(function (s) { s.style.display = ''; hoog = Math.max(hoog, s.offsetHeight); });
+    box.style.minHeight = hoog + 'px';
+    var herhaal = box.hasAttribute('data-herhaal'), i = 0;
+    function toon() {
+      lijst.forEach(function (s, k) { s.style.display = k === i ? '' : 'none'; });
+      var s = lijst[i];
+      s.animate([{ opacity: 0 }, { opacity: 1 }], { duration: stil ? 0 : 400, fill: 'forwards' });
+      speel(s, true);
+      if (i < lijst.length - 1 || herhaal) {
+        na(num(s, 'data-duur', 4), function () {
+          s.animate([{ opacity: 1 }, { opacity: 0 }], { duration: stil ? 0 : 300, fill: 'forwards' });
+          na(0.3, function () { i = (i + 1) % lijst.length; toon(); });
+        });
+      }
+    }
+    toon();
+  }
+
+  function start() {
+    timers.forEach(clearTimeout); timers = [];
+    if (document.getAnimations) document.getAnimations().forEach(function (a) { a.cancel(); });
+    speel(document, false);
+    [].forEach.call(document.querySelectorAll('[data-scenes]'), scenes);
+    meld();
+  }
+
+  var begonnen = false;
+  function klaar() {
+    try { if (window.lucide) lucide.createIcons(); } catch (e) {}
+    if (!begonnen) { begonnen = true; start(); }
+    meld();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', klaar); else klaar();
+  window.addEventListener('load', function () { try { if (window.lucide) lucide.createIcons(); } catch (e) {} meld(); });
+  document.addEventListener('click', start);
   if (window.ResizeObserver) new ResizeObserver(meld).observe(document.body);
 })();
 `

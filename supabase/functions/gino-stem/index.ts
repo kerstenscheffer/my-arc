@@ -9,7 +9,7 @@
 // klant ElevenLabs-tegoed opmaken. Sleutels als Supabase-secrets:
 // ELEVENLABS_API_KEY en (optioneel) ELEVENLABS_VOICE_ID (andere namen met
 // ELEVEN/ELEVAN erin worden ook gevonden, zie zoekSecret). Zonder voice-id kiest
-// kiesStem() 'Jon - Natural Authority' (anders een Gino-stem, anders Daniel);
+// kiesStem() 'Birdy' (anders 'Jon - Natural Authority', anders een Gino-stem, anders Daniel);
 // header x-gino-stem zegt welke. Ontbreekt de API key: 503 { fout: 'geen_sleutel' } en valt stem.js terug op de browserstem.
 // Nooit een sleutel in de frontend of de repo.
 
@@ -48,8 +48,9 @@ const SLEUTEL = zoekSecret('ELEVENLABS_API_KEY', /^(?!.*(VOICE|STEM))/i)
 const VOICE_ID = zoekSecret('ELEVENLABS_VOICE_ID', /VOICE|STEM/i)
 if (!SLEUTEL) console.error('gino-stem: geen ElevenLabs-secret gevonden')
 
-// Zonder voice-id: 'Jon - Natural Authority' uit het eigen ElevenLabs-account,
-// anders een stem met 'Gino' in de naam, anders PREMADE_STEM (Daniel). Per instantie
+// Zonder voice-id: 'Birdy' (zware Nederlandse mannenstem) uit het eigen
+// ElevenLabs-account, anders 'Jon - Natural Authority', anders een stem met 'Gino'
+// in de naam, anders PREMADE_STEM (Daniel). Een ingesteld ELEVENLABS_VOICE_ID gaat voor. Per instantie
 // gecachet, zodat de lijst niet bij elk verzoek wordt opgehaald.
 let gekozenStem: { id: string; naam: string } | null = null
 let alleenPremade = false // na een 402: rest van deze instantie meteen PREMADE_STEM
@@ -68,9 +69,9 @@ async function kiesStem(sleutel: string): Promise<{ id: string; naam: string } |
   const { voices = [] } = await res.json().catch(() => ({}))
   // Nooit "de eerste eigen stem": in Kerstens account was dat een vrouwenstem.
   const zoek = (re: RegExp) => voices.find((v: { name?: string; voice_id?: string }) => v.voice_id && re.test(v.name || ''))
-  const stem = zoek(/jon.*natural/i) || zoek(/gino/i)
+  const stem = zoek(/birdy/i) || zoek(/jon.*natural/i) || zoek(/gino/i)
   gekozenStem = stem ? { id: stem.voice_id, naam: stem.name } : PREMADE_STEM
-  console.log('gino-stem kiest', gekozenStem.naam, gekozenStem.id, stem ? '' : '(geen Jon- of Gino-stem gevonden)')
+  console.log('gino-stem kiest', gekozenStem.naam, gekozenStem.id, stem ? '' : '(geen Birdy-, Jon- of Gino-stem gevonden)')
   return gekozenStem
 }
 
@@ -117,7 +118,11 @@ Deno.serve(async (req) => {
     let gebruikt = stem
     let res = await tts(stem.id)
     if (res.status === 402 && stem.id !== PREMADE_STEM.id) {
-      console.error('ElevenLabs 402 voor', stem.naam, (await res.text().catch(() => '')).slice(0, 200), '→', PREMADE_STEM.naam)
+      const detail = (await res.text().catch(() => '')).slice(0, 200)
+      console.error('ElevenLabs 402 voor', stem.naam, detail, '→', PREMADE_STEM.naam)
+      await sb.from('app_fouten')
+        .insert({ user_id: user.id, pagina: 'business-os-stem', melding: `ElevenLabs 402 voor ${stem.naam} (${stem.id}) → ${PREMADE_STEM.naam}: ${detail}`.slice(0, 1000) })
+        .then((r) => { if (r.error) console.error('app_fouten', r.error.message) }, () => {})
       alleenPremade = true
       gebruikt = PREMADE_STEM
       res = await tts(PREMADE_STEM.id)
