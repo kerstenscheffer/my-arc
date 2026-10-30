@@ -230,10 +230,12 @@ function PaVoorstel({ voorstel, onGestart }) {
   )
 }
 
-export default function BusinessChat({ context }) {
+export default function BusinessChat({ context, lijstHoogte = 420, onBezig }) {
   const [gesprek, setGesprek] = useState(leesGesprek)
   const [invoer, setInvoer] = useState('')
   const [bezig, setBezig] = useState(false)
+  // Laat de pagina meekijken (de reactor-ring versnelt zolang de AI denkt).
+  useEffect(() => { onBezig?.(bezig) }, [bezig, onBezig])
   const [fout, setFout] = useState(null)
   const [luistert, setLuistert] = useState(false)
   const lijst = useRef(null)
@@ -305,7 +307,7 @@ export default function BusinessChat({ context }) {
   return (
     <div style={{ textAlign: 'left', marginTop: 24 }}>
       {gesprek.length > 0 && (
-        <div ref={lijst} style={{ maxHeight: 420, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
+        <div ref={lijst} style={{ maxHeight: lijstHoogte, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
           {gesprek.map((b, i) => b.role === 'user' ? (
             <div key={i} style={{
               alignSelf: 'flex-end', maxWidth: '85%', background: colors.surface, borderRadius: 16,
