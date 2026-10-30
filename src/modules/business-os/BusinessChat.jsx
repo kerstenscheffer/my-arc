@@ -41,7 +41,7 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -70,15 +70,18 @@ const KAART_SUB = { color: colors.textSecondary, fontWeight: 600, marginBottom: 
 // door (ook de halve tekst tijdens het typen → opDeel); pollen elke 2 s blijft
 // als vangnet. null = niet gelukt, dan gaat de vraag via de API.
 // extra = { modus: 'snel' | 'slim', gesprek_id } (Slim hervat per gesprek een sessie).
-async function vraagViaMac(berichten, context, opDeel, extra = {}) {
+// signaal = { id, gestopt }: de stopknop zet gestopt; dan { gestopt: true } terug.
+async function vraagViaMac(berichten, context, opDeel, extra = {}, signaal = {}) {
   const { data: rij, error } = await supabase.from('business_os_opdrachten')
     .insert({ soort: 'chat', opdracht: berichten[berichten.length - 1].content.slice(0, 500), invoer: { berichten, context, ...extra } })
     .select('id').single()
   if (error) return null
+  signaal.id = rij.id
   const start = Date.now()
   let klaar = null
   const bekijk = (data) => {
     if (!data || klaar) return
+    if (data.status === 'gestopt') { klaar = { antwoord: { gestopt: true } }; return }
     if (data.status === 'klaar' || data.status === 'mislukt') { klaar = { antwoord: data.antwoord?.tekst ? data.antwoord : null }; return }
     if (data.status === 'bezig' && data.antwoord?.bezig && data.antwoord.tekst) opDeel?.(data.antwoord.tekst)
   }
@@ -89,6 +92,12 @@ async function vraagViaMac(berichten, context, opDeel, extra = {}) {
     let laatstGepold = 0
     for (;;) {
       await slaap(150)
+      if (signaal.gestopt) {
+        // Ook als de stopknop kwam vóórdat het id bekend was: rij intrekken.
+        await supabase.from('business_os_opdrachten').update({ status: 'gestopt', klaar_at: new Date().toISOString() })
+          .eq('id', rij.id).in('status', ['wacht', 'bezig']).then(r => r, () => null)
+        return { gestopt: true }
+      }
       if (klaar) return klaar.antwoord
       if (Date.now() - laatstGepold < 2000) continue
       laatstGepold = Date.now()
@@ -731,6 +740,65 @@ const ANIMATIES = `
 // Gesprek → berichten voor de AI. Meerdere screenshots in één bericht worden
 // opeenvolgende gebruikersberichten (de edge function kent één beeld per
 // bericht); alleen de laatste MAX_BEELDEN beelden gaan echt mee.
+// Eerdere gesprekken terughalen (ook na per ongeluk "Nieuw gesprek"): elke
+// chatvraag via de Mac bewaart het hele gesprek in business_os_opdrachten.
+// Per gesprek_id de laatste rij; klik = vragen + laatste antwoord terug in
+// dit tabje, met dezelfde Slim-sessie (Gino weet dan nog waar het over ging).
+function EerdereGesprekken({ huidig, onKies, onSluit }) {
+  const [lijst, setLijst] = useState(null)
+  useEffect(() => {
+    supabase.from('business_os_opdrachten')
+      .select('id, created_at, gid:invoer->>gesprek_id, eerste:invoer->berichten->0->>content, laatste:opdracht')
+      .eq('soort', 'chat').eq('status', 'klaar')
+      .gte('created_at', new Date(Date.now() - 14 * 864e5).toISOString())
+      .order('created_at', { ascending: false }).limit(300)
+      .then(({ data }) => {
+        const gezien = new Set()
+        setLijst((data || []).filter(r => r.gid && r.gid !== huidig && !gezien.has(r.gid) && gezien.add(r.gid)).slice(0, 12))
+      }, () => setLijst([]))
+  }, [huidig])
+  const kies = async (r) => {
+    const { data } = await supabase.from('business_os_opdrachten').select('invoer, antwoord').eq('id', r.id).maybeSingle()
+      .then(x => x, () => ({ data: null }))
+    if (!data?.invoer?.berichten?.length) return
+    const berichten = data.invoer.berichten.map(b => ({ role: b.role, content: b.content || '' }))
+    if (data.antwoord?.tekst) berichten.push({ role: 'assistant', content: data.antwoord.tekst, acties: data.antwoord.acties || [] })
+    onKies(berichten, r.gid)
+  }
+  const wanneer = (iso) => new Date(iso).toLocaleString('nl-NL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+  return (
+    <>
+      <div onClick={onSluit} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+      <div style={{
+        position: 'absolute', right: 0, bottom: 'calc(100% + 8px)', zIndex: 41, width: 'min(340px, 86vw)', maxHeight: 360, overflowY: 'auto',
+        background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: 6,
+        boxShadow: '0 16px 40px rgba(0,0,0,.6)',
+      }}>
+        <div style={{ fontSize: '0.66rem', fontWeight: 800, letterSpacing: '.12em', color: colors.textSecondary, padding: '6px 8px 8px' }}>
+          EERDERE GESPREKKEN
+        </div>
+        {lijst === null && <div style={{ padding: 10, fontSize: '0.8rem', color: colors.textSecondary }}>Laden…</div>}
+        {lijst?.length === 0 && <div style={{ padding: 10, fontSize: '0.8rem', color: colors.textSecondary }}>Nog niets bewaard.</div>}
+        {lijst?.map(r => (
+          <button key={r.gid} onClick={() => kies(r)} style={{
+            display: 'block', width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 10, border: 'none',
+            background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+            <div style={{ fontSize: '0.84rem', fontWeight: 800, color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {kort(r.eerste || r.laatste || 'Gesprek', 60)}
+            </div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: colors.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>
+              {wanneer(r.created_at)} · laatst: {kort(r.laatste || '', 40)}
+            </div>
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function naarBerichten(gesprek) {
   const plat = []
   for (const { role, content, afbeelding, afbeeldingen } of gesprek) {
@@ -951,6 +1019,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
   const wijzigTabje = (id, f) => setGesprekken(gs => gs.map(g => g.id !== id ? g : { ...f(g), bijgewerkt: Date.now() }))
   const zetBerichten = (id, f) => wijzigTabje(id, g => ({ ...g, berichten: f(g.berichten) }))
   const [bezigPer, setBezigPer] = useState({})
+  const stopPer = useRef({}) // tabje → { id, gestopt } van de lopende vraag
+  const [toonEerder, setToonEerder] = useState(false)
   const [deelPer, setDeelPer] = useState({})
   const [ongelezenPer, setOngelezenPer] = useState({})
   const bezig = !!bezigPer[actief.id]
@@ -1238,6 +1308,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
         supabase.from('business_os_opdrachten').select('status').in('id', klaar)
           .then(({ data: af }) => {
             if (weg) return
+            if (af?.length && af.every(r => r.status === 'gestopt')) { meld('Gestopt', false); return }
             meld(af?.some(r => r.status === 'mislukt') ? 'Mislukt, bekijk resultaat' : 'Klaar', af?.some(r => r.status === 'mislukt'))
             // Stip op het tabje waar de opdracht vandaan kwam (anders het actieve).
             const bij = gesprekkenRef.current.filter(g => g.berichten.some(b => (b.acties || []).some(a => a?.opdrachtId && klaar.includes(a.opdrachtId))))
@@ -1574,7 +1645,11 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
     setFout(null)
     if (isEditor(actief)) {
       setEditorVers(v => v + 1) // lijst toont meteen de nieuwe 'bezig'-rij
+      const sig = { id: null, gestopt: false }
+      stopPer.current[id] = sig
       const r = await vraagEditor(nieuw)
+      delete stopPer.current[id]
+      if (sig.gestopt) return
       setBezigPer(b => ({ ...b, [id]: false }))
       setEditorVers(v => v + 1)
       if (r.fout) { setFout(r.fout); meld('Mislukt, bekijk resultaat', true); return }
@@ -1583,15 +1658,30 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
     }
     const berichten = naarBerichten(nieuw)
     const metBeeld = berichten.some(b => b.afbeelding)
-    const opDeel = (t) => setDeelPer(d => ({ ...d, [id]: t }))
-    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }) : null
+    let laatsteDeel = ''
+    const opDeel = (t) => { if (t) laatsteDeel = t; setDeelPer(d => ({ ...d, [id]: t })) }
+    const signaal = { id: null, gestopt: false }
+    stopPer.current[id] = signaal
+    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }, signaal) : null
     opDeel('')
+    if (signaal.gestopt || mac?.gestopt) {
+      // Gestopt: wat hij al typte blijft staan, zoals bij ChatGPT.
+      delete stopPer.current[id]
+      setBezigPer(b => ({ ...b, [id]: false }))
+      if (!signaal.afgehandeld) zetBerichten(id, g => [...g, { role: 'assistant', content: `${laatsteDeel ? laatsteDeel + '\n\n' : ''}(gestopt)`, gestopt: true, op: Date.now() }])
+      return
+    }
+    delete stopPer.current[id]
     if (mac) {
       setBezigPer(b => ({ ...b, [id]: false }))
       antwoord(id, { role: 'assistant', content: mac.tekst, acties: mac.acties || [] })
       return
     }
+    signaal.id = null // nu via de API: stoppen = antwoord negeren
+    stopPer.current[id] = signaal
     const { data, error } = await supabase.functions.invoke('business-os-chat', { body: { berichten, context } })
+    delete stopPer.current[id]
+    if (signaal.gestopt) return // al afgehandeld door de stopknop
     setBezigPer(b => ({ ...b, [id]: false }))
     if (error || data?.error || !data?.tekst) {
       setFout(data?.error || 'AI gaf geen antwoord, probeer opnieuw.')
@@ -1646,6 +1736,35 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
   const wolkZichtbaar = vraagNu && !(open && plek && !plek.onder && vraagNu.t === actief.id)
 
   const kanSturen = (invoer.trim() || bijlagen.length) && !bezig
+  // Stopknop (blokje op de plek van het pijltje): de lopende vraag in dit
+  // tabje, of in Code een lopende code-opdracht. De PA ziet status 'gestopt'
+  // en breekt het Claude-proces af.
+  const codeStopbaar = actief.naam === 'Code' && code === 'bezig'
+  const kanStoppen = bezig || codeStopbaar
+  const stop = async () => {
+    stem.stop()
+    if (bezig) {
+      const id = actief.id
+      const sig = stopPer.current[id]
+      if (sig) sig.gestopt = true
+      if (sig?.id) {
+        await supabase.from('business_os_opdrachten').update({ status: 'gestopt', klaar_at: new Date().toISOString() })
+          .eq('id', sig.id).in('status', ['wacht', 'bezig']).then(r => r, () => null)
+      }
+      if (!sig?.id) { // API-route of Editor (of nog geen rij): antwoord negeren
+        if (sig) sig.afgehandeld = true
+        setBezigPer(b => ({ ...b, [id]: false }))
+        setDeelPer(d => ({ ...d, [id]: '' }))
+        zetBerichten(id, g => [...g, { role: 'assistant', content: '(gestopt)', gestopt: true, op: Date.now() }])
+      }
+      return
+    }
+    if (codeStopbaar) {
+      await supabase.from('business_os_opdrachten').update({ status: 'gestopt', klaar_at: new Date().toISOString() })
+        .eq('soort', 'code').eq('status', 'bezig').then(r => r, () => null)
+      setCode(null)
+    }
+  }
   const rondeKnop = {
     width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative',
@@ -1925,6 +2044,21 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
                 }}>
                 {modus === 'slim' ? 'Slim' : 'Snel'}
               </button>}
+              {!isEditor(actief) && (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button onClick={() => setToonEerder(x => !x)} title="Eerdere gesprekken terughalen"
+                    style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
+                    <History size={16} strokeWidth={2.2} />
+                  </button>
+                  {toonEerder && <EerdereGesprekken huidig={actief.sessie} onSluit={() => setToonEerder(false)}
+                    onKies={(berichten, gid) => {
+                      setToonEerder(false)
+                      stem.stop()
+                      wijzigTabje(actief.id, g => ({ ...g, berichten, sessie: gid }))
+                      setFout(null)
+                    }} />}
+                </div>
+              )}
               {gesprek.length > 0 && (
                 <button onClick={leegGesprek} title={`Nieuw gesprek in ${actief.naam}`}
                   style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
@@ -1953,18 +2087,29 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
                   <Mic size={18} strokeWidth={2.5} />
                 </button>
               )}
-              <button
-                onClick={stuur}
-                disabled={!kanSturen}
-                title="Verstuur"
-                style={{
-                  ...rondeKnop,
-                  background: kanSturen ? colors.textPrimary : 'rgba(255,255,255,0.15)',
-                  color: colors.onAccent, cursor: kanSturen ? 'pointer' : 'default',
-                }}
-              >
-                <ArrowUp size={18} strokeWidth={3} />
-              </button>
+              {kanStoppen && !kanSturen ? (
+                <button
+                  onClick={stop}
+                  title={bezig ? 'Stop Gino' : 'Stop de code-opdracht'}
+                  aria-label={bezig ? 'Stop Gino' : 'Stop de code-opdracht'}
+                  style={{ ...rondeKnop, background: colors.textPrimary, color: colors.onAccent, cursor: 'pointer' }}
+                >
+                  <span style={{ width: 13, height: 13, borderRadius: 3, background: 'currentColor', display: 'block' }} />
+                </button>
+              ) : (
+                <button
+                  onClick={stuur}
+                  disabled={!kanSturen}
+                  title="Verstuur"
+                  style={{
+                    ...rondeKnop,
+                    background: kanSturen ? colors.textPrimary : 'rgba(255,255,255,0.15)',
+                    color: colors.onAccent, cursor: kanSturen ? 'pointer' : 'default',
+                  }}
+                >
+                  <ArrowUp size={18} strokeWidth={3} />
+                </button>
+              )}
             </div>
           </div>
         </div>

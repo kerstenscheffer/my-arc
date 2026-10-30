@@ -171,9 +171,19 @@ const bewaarSlimSessie = (id) => {
   try { fs.writeFileSync(SLIM_SESSIES, JSON.stringify([...slimSessies].slice(-200)), { mode: 0o600 }) } catch { /* niet erg */ }
 }
 
-function claude(args, extraEnv = {}) {
+// Lopende opdrachten (rij-id → stop). De stopknop in Business OS zet de rij
+// op 'gestopt'; Realtime (of het pollen) roept dan deze stop aan.
+const lopend = new Map()
+
+// opStop(fn): krijgt de functie die dit proces (en alles wat het startte) stopt.
+function claude(args, extraEnv = {}, opStop = null) {
   return new Promise((klaar) => {
     const p = spawn('claude', args, { cwd: MAP, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...extraEnv } })
+    // Stoppen: eerst de commando's die Claude startte (build, lint…), dan Claude zelf.
+    opStop?.(() => {
+      spawn('pkill', ['-TERM', '-P', String(p.pid)], { stdio: 'ignore' }).on('error', () => {})
+      p.kill('SIGTERM')
+    })
     let uit = '', fout = ''
     p.stdout.on('data', d => { uit += d })
     p.stderr.on('data', d => { fout += d })
@@ -187,7 +197,7 @@ function claude(args, extraEnv = {}) {
   })
 }
 
-async function voerCodeUit(opdracht) {
+async function voerCodeUit(opdracht, opStop) {
   const r = await claude([
     '-p', `${INSTRUCTIE}\n\nOpdracht:\n${opdracht}`,
     '--output-format', 'json',
@@ -196,7 +206,7 @@ async function voerCodeUit(opdracht) {
     '--disallowedTools', VERBODEN.join(','),
     ...EIGEN_ARGS,
     '--max-budget-usd', '10',
-  ])
+  ], {}, opStop)
   const tekst = r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
   return { ok: r.code === 0 && !r.json?.is_error && !!r.json?.result, tekst: tekst.slice(0, 8000) }
 }
@@ -275,7 +285,7 @@ const KLANT_FOCUS = `Je zit in het tabje Klanten. Hier gaat het over Kerstens co
 `
 
 // opDeel(tekst): halve tekst tijdens het typen.
-async function beantwoordChat(invoer, opDeel) {
+async function beantwoordChat(invoer, opDeel, opStop = null) {
   const slimId = invoer?.modus === 'slim' && GESPREK_ID.test(invoer?.gesprek_id || '') ? invoer.gesprek_id : null
   const hervat = !!slimId && slimSessies.has(slimId)
   let w
@@ -304,6 +314,7 @@ async function beantwoordChat(invoer, opDeel) {
       }
     }
     w.opEinde = () => { clearTimeout(stop); klaar({ ok: false, tekst: w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
+    opStop?.(() => w.p.kill('SIGTERM'))
     if (w.dood) return w.opEinde()
     w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + chatVraag({ gesprek, context: invoer?.context }) } }) + '\n')
   })
@@ -373,10 +384,18 @@ async function rondeCode() {
   bezig.code = true
   try {
     console.log(`${tijd()} ▶ code: ${rij.opdracht.split('\n')[0].slice(0, 100)}`)
-    const r = await voerCodeUit(rij.opdracht)
-    const { error } = await sb.from('business_os_opdrachten')
+    const r = await voerCodeUit(rij.opdracht, (f) => lopend.set(rij.id, f))
+    lopend.delete(rij.id)
+    // Alleen als hij nog 'bezig' staat: een gestopte rij blijft gestopt.
+    const { data: gezet, error } = await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', resultaat: r.tekst, klaar_at: new Date().toISOString() })
-      .eq('id', rij.id)
+      .eq('id', rij.id).eq('status', 'bezig').select('id')
+    if (!error && !gezet?.length) {
+      await sb.from('business_os_opdrachten').update({ resultaat: `Gestopt door Kersten.\n\n${r.tekst}`.slice(0, 8000) })
+        .eq('id', rij.id).then(() => {}, () => {})
+      console.log(`${tijd()} ⏹ code gestopt (wijzigingen tot dan blijven staan)\n`)
+      return
+    }
     console.log(`${tijd()} ${r.ok ? '✓ klaar' : '✗ mislukt'}\n${r.tekst}\n`)
     if (error) console.error(tijd(), 'Resultaat opslaan mislukt, geen herstart:', error.message)
     else herstartNa(rij.id).catch(e => console.error(tijd(), 'Herstart mislukt:', e.message))
@@ -401,14 +420,16 @@ async function rondeChat() {
       const nu = Date.now()
       if (nu - laatst > 300) { laatst = nu; schrijf(tekst) } else wachtend = setTimeout(() => { laatst = Date.now(); if (!klaar) schrijf(tekst) }, 300)
     }
-    const r = await beantwoordChat(rij.invoer, opDeel)
+    const r = await beantwoordChat(rij.invoer, opDeel, (f) => lopend.set(rij.id, f))
     klaar = true
     clearTimeout(wachtend)
+    const gestopt = lopend.get(rij.id)?.gestopt
+    lopend.delete(rij.id)
     const model = rij.invoer?.modus === 'slim' ? `${SLIM_MODEL}, slim` : CHAT_MODEL
-    console.log(`${tijd()} ${r.ok ? '✓' : '✗'} chat-antwoord in ${((Date.now() - t0) / 1000).toFixed(1)} s (${model})`)
+    console.log(`${tijd()} ${gestopt ? '⏹ chat gestopt' : r.ok ? '✓ chat-antwoord' : '✗ chat-antwoord'} in ${((Date.now() - t0) / 1000).toFixed(1)} s (${model})`)
     await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
-      .eq('id', rij.id)
+      .eq('id', rij.id).eq('status', 'bezig')
   } finally { bezig.chat-- }
 }
 
@@ -437,11 +458,12 @@ async function rondeGroei() {
   try {
     console.log(`${tijd()} 🌱 groeironde`)
     const t0 = Date.now()
-    const r = await beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: GROEI_VRAAG }] }, () => {})
+    const r = await beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: GROEI_VRAAG }] }, () => {}, (f) => lopend.set(rij.id, f))
+    lopend.delete(rij.id)
     console.log(`${tijd()} ${r.ok ? '✓' : '✗'} groeironde in ${((Date.now() - t0) / 1000).toFixed(0)} s`)
     await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
-      .eq('id', rij.id)
+      .eq('id', rij.id).eq('status', 'bezig')
   } finally { bezig.groei = false }
 }
 
@@ -509,9 +531,28 @@ async function start(g) {
       const f = m.new.soort === 'chat' ? rondeChat : m.new.soort === 'groei' ? rondeGroei : rondeCode
       f().catch(e => console.error(tijd(), e.message))
     })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'business_os_opdrachten' }, (m) => {
+      if (m.new?.status === 'gestopt') stopRij(m.new.id)
+    })
     .subscribe()
 }
 let kanaal = null
+
+// Stopknop: proces van die rij afbreken (één keer).
+function stopRij(id) {
+  const f = lopend.get(id)
+  if (!f || f.gestopt) return
+  f.gestopt = true
+  console.log(`${tijd()} ⏹ stop gevraagd`)
+  f()
+}
+// Vangnet naast Realtime: elke 3 s kijken of een lopende rij gestopt is.
+setInterval(async () => {
+  if (!lopend.size || !gebruiker) return
+  const { data } = await sb.from('business_os_opdrachten').select('id')
+    .in('id', [...lopend.keys()]).eq('status', 'gestopt').then(r => r, () => ({ data: null }))
+  for (const r of data || []) stopRij(r.id)
+}, 3000)
 
 // Herstart-knop in Business OS: POST /herstart { access_token }. Alleen met
 // een geldige login van hetzelfde account (een willekeurige website kan de PA
