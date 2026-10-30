@@ -13,10 +13,13 @@
 // jpeg en als { afbeelding: { media_type, data } } aan het gebruikersbericht
 // gehangen. Zo'n gesprek gaat altijd via de API (de Mac-route kan geen
 // beelden). In localStorage bewaren we alleen een kleine thumbnail.
-// Berichten verborgen (30 okt): standaard alleen invoerbalk + statusregel. De
-// chatknop links in de balk klapt het berichtenvenster open (zweeft onder de
-// groep, of erboven als daar te weinig ruimte is; de groep schuift niet). Niet onthouden: elke sessie start dicht. Komt er
-// een antwoord binnen terwijl hij dicht is, dan krijgt de knop een stip.
+// Berichten verborgen (30 okt): standaard alleen invoerbalk + statusregel. Een
+// klik op het poppetje boven de balk klapt het berichtenvenster open (zweeft
+// onder de groep, of erboven als daar te weinig ruimte is; de groep schuift
+// niet). Niet onthouden: elke sessie start dicht. Komt er een antwoord binnen
+// terwijl hij dicht is, dan krijgt het poppetje een groene stip tot je opent.
+// Mac/API-schakelaar en herstart-knop staan rechts op de hoogte van het
+// poppetje; herstart gaat via het lokale loket van de PA (POST /herstart).
 // Slepen: een afbeelding over het scherm slepen toont een dropzone over de
 // balk; loslaten zet hem (max 3) als thumbnail in de balk. De edge function
 // kent één beeld per bericht, dus meerdere gaan als opeenvolgende
@@ -34,7 +37,7 @@
 // negeert late resultaten, zodat het veld leeg blijft.
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, MessageSquare, ChevronDown, SquarePen } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -498,13 +501,16 @@ const ANIMATIES = `
 @keyframes bos-typ { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-1.5px) } }
 @keyframes bos-knipper { 0%,92%,100% { transform: scaleY(1) } 96% { transform: scaleY(0.15) } }
 @keyframes bos-zacht { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
+@keyframes bos-rond { to { transform: rotate(360deg) } }
+.bos-stip { animation: bos-zacht 1.8s ease-in-out infinite }
+.bos-draai { animation: bos-rond 1s linear infinite }
 .bos-robot .bos-hand-l { animation: bos-typ 0.5s ease-in-out infinite }
 .bos-robot .bos-hand-r { animation: bos-typ 0.5s ease-in-out 0.25s infinite }
 .bos-robot .bos-oog { transform-box: fill-box; transform-origin: center; animation: bos-knipper 3s infinite }
 .bos-robot .bos-antenne { animation: bos-zacht 1.6s ease-in-out infinite }
 .bos-robot.bos-rust { opacity: 0.45 }
 .bos-robot.bos-rust * { animation: none !important }
-@media (prefers-reduced-motion: reduce) { .bos-robot * { animation: none !important } }
+@media (prefers-reduced-motion: reduce) { .bos-robot *, .bos-stip, .bos-draai { animation: none !important } }
 `
 
 // Gesprek → berichten voor de AI. Meerdere screenshots in één bericht worden
@@ -682,6 +688,33 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     return n
   })
   const viaMac = route === 'mac' && paOnline
+
+  // Herstart-knop: vraagt de PA via het lokale loket om zichzelf te herstarten
+  // (launchd start hem opnieuw), wacht tot hij weer antwoordt en ververst dan
+  // het scherm. Werkt alleen op de Mac waar de PA draait.
+  const [herstart, setHerstart] = useState(false)
+  const herstartPa = async () => {
+    if (herstart) return
+    setHerstart(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch(`${PA_LOKET}/herstart`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ access_token: session?.access_token }),
+      }).then(x => x.json(), () => ({ fout: 'PA niet bereikbaar op deze Mac' }))
+      if (!r.ok) throw new Error(r.fout || 'Herstart mislukt')
+      await slaap(4000)
+      for (let i = 0; i < 60; i++) {
+        const terug = await fetch(`${PA_LOKET}/status`).then(x => x.ok, () => false)
+        if (terug) { window.location.reload(); return }
+        await slaap(1500)
+      }
+      throw new Error('PA kwam niet terug, kijk in ~/Library/Logs/myarc-pa.log')
+    } catch (e) {
+      meld(e.message, true)
+      setHerstart(false)
+    }
+  }
   useEffect(() => {
     let weg = false
     const kijk = () => supabase.from('business_os_pa_status').select('laatst_gezien').maybeSingle()
@@ -1044,15 +1077,58 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
           {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
           <div style={{ position: 'absolute', left: 4, right: 4, bottom: '100%', marginBottom: 2 }}>
-            <div role="status" style={{
-              display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0,
-              fontSize: '0.75rem', fontWeight: 800,
-              color: werk || vraagNu ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : laatst ? colors.textSecondary : colors.textMuted,
-            }}>
-              {werk ? <><Robotje /> {werk}</>
-                : melding && !vraagNu ? <>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />} {melding.tekst}</>
-                : vraagNu ? <><Robotje /> Wacht op jou</>
-                : <><Robotje rustig /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar')}</span></>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0 }}>
+              {/* Klik op het poppetje: berichtenvenster open/dicht. Groene stip = iets ongelezen. */}
+              <button role="status" onClick={() => setOpen(o => !o)} aria-expanded={open}
+                title={open ? 'Berichten verbergen' : 'Berichten tonen'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0, flex: 1,
+                  background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                  fontSize: '0.75rem', fontWeight: 800,
+                  color: werk || vraagNu || open ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : laatst ? colors.textSecondary : colors.textMuted,
+                }}>
+                <span style={{ position: 'relative', display: 'flex', flexShrink: 0 }}>
+                  {melding && !werk && !vraagNu
+                    ? <span style={{ width: 30, display: 'flex', justifyContent: 'center' }}>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />}</span>
+                    : <Robotje rustig={!werk && !vraagNu} />}
+                  {ongelezen && !open && (
+                    <span className="bos-stip" style={{
+                      position: 'absolute', top: -1, right: 6, width: 7, height: 7, borderRadius: '50%',
+                      background: colors.success, boxShadow: `0 0 6px ${colors.success}`,
+                    }} />
+                  )}
+                </span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {werk || (melding && !vraagNu ? melding.tekst : vraagNu ? 'Wacht op jou' : laatst?.tekst || (wachtLijst.length ? 'Gino wacht op jou' : 'Gino is klaar'))}
+                </span>
+              </button>
+              {/* Mac/API + herstart: rechts op de hoogte van het poppetje */}
+              <button onClick={wisselRoute}
+                title={route === 'api' ? 'Via de API. Klik: via je Mac'
+                  : paOnline ? 'Via je Mac (Claude-abonnement). Klik: via de API'
+                  : 'Mac gekozen, maar de PA draait niet: gaat nu via de API. Klik: altijd API'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5, height: 26, padding: '0 2px', flexShrink: 0,
+                  fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', background: 'transparent', border: 'none',
+                  color: viaMac || route === 'api' ? colors.textSecondary : colors.textMuted, fontFamily: 'inherit',
+                }}>
+                <span className={herstart ? 'bos-stip' : undefined} style={{
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: viaMac ? colors.success : route === 'api' ? colors.textPrimary : colors.danger,
+                  boxShadow: viaMac ? `0 0 6px ${colors.success}88` : 'none',
+                }} />
+                {!isMobile && (herstart ? 'Herstart' : route === 'api' ? 'API' : paOnline ? 'Mac' : 'Mac uit')}
+              </button>
+              {route === 'mac' && (
+                <button onClick={herstartPa} disabled={herstart || bezig} title="PA op je Mac herstarten en scherm verversen"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 26, padding: 0, flexShrink: 0,
+                    background: 'transparent', border: 'none', cursor: herstart || bezig ? 'default' : 'pointer',
+                    color: colors.textMuted, opacity: bezig ? 0.4 : 1,
+                  }}>
+                  <RotateCw size={12} strokeWidth={2.5} className={herstart ? 'bos-draai' : undefined} />
+                </button>
+              )}
             </div>
             {wachtLijst.map(w => (
               <div key={w.sleutel} style={{ display: 'flex', alignItems: 'center', gap: 8, height: WACHT_RIJ_H, minWidth: 0, paddingLeft: 38 }}>
@@ -1105,16 +1181,6 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
             )}
             <PaInloggen zichtbaar={route === 'mac' && !paOnline} onKlaar={() => { setPaOnline(true); meld('PA weer ingelogd') }} />
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
-              <button onClick={() => setOpen(o => !o)} title={open ? 'Berichten verbergen' : 'Berichten tonen'} aria-expanded={open}
-                style={{ ...rondeKnop, background: open ? 'rgba(255,255,255,0.08)' : 'transparent', color: open ? colors.textPrimary : colors.textSecondary }}>
-                {open ? <ChevronDown size={18} strokeWidth={2.5} /> : <MessageSquare size={17} strokeWidth={2.2} />}
-                {ongelezen && !open && (
-                  <span style={{
-                    position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%',
-                    background: colors.success, boxShadow: `0 0 0 2px ${colors.surface}`,
-                  }} />
-                )}
-              </button>
               <textarea
                 ref={veld}
                 value={invoer}
@@ -1129,7 +1195,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                   minHeight: 36, maxHeight: INVOER_MAX_H, overflowY: 'auto', boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
-              {/* Route + nieuw gesprek: klein, rechts in dezelfde balk */}
+              {/* Snel/Slim + nieuw gesprek: klein, rechts in dezelfde balk */}
               <button onClick={wisselModus}
                 title={modus === 'slim'
                   ? (viaMac ? 'Slim: Opus, kent CLAUDE.md en memory, onthoudt dit gesprek. Trager (10-30 s). Klik: Snel' : 'Slim werkt alleen via je Mac; nu gaat het via de API (Snel). Klik: Snel')
@@ -1140,18 +1206,6 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                   color: modus === 'slim' ? (viaMac ? colors.success : colors.textMuted) : colors.textSecondary, fontFamily: 'inherit',
                 }}>
                 {modus === 'slim' ? 'Slim' : 'Snel'}
-              </button>
-              <button onClick={wisselRoute}
-                title={route === 'api' ? 'Via de API. Klik: via je Mac'
-                  : paOnline ? 'Via je Mac (Claude-abonnement). Klik: via de API'
-                  : 'Mac gekozen, maar de PA draait niet: gaat nu via de API. Klik: altijd API'}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5, height: 40, padding: isMobile ? '0 6px' : '0 6px 0 8px', flexShrink: 0,
-                  fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', background: 'transparent', border: 'none',
-                  color: viaMac || route === 'api' ? colors.textPrimary : colors.textMuted, fontFamily: 'inherit',
-                }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: viaMac ? colors.success : route === 'api' ? colors.textPrimary : colors.danger }} />
-                {!isMobile && (route === 'api' ? 'API' : paOnline ? 'Mac' : 'Mac uit')}
               </button>
               {gesprek.length > 0 && (
                 <button onClick={() => { stem.stop(); setGesprek([]); setActieStaat({}); setFout(null); setOngelezen(false); gesprekId.current = nieuwGesprekId() }} title="Nieuw gesprek"

@@ -435,6 +435,27 @@ async function start(g) {
 }
 let kanaal = null
 
+// Herstart-knop in Business OS: POST /herstart { access_token }. Alleen met
+// een geldige login van hetzelfde account (een willekeurige website kan de PA
+// zo niet herstarten). Loopt er een code-opdracht, dan niet: die herstart na
+// afloop al vanzelf. Daarna hetzelfde losgekoppelde kickstart als herstartNa.
+async function herstartVerzoek(req, stuur) {
+  let body = ''
+  for await (const d of req) { body += d; if (body.length > 10000) return stuur(413, { fout: 'te groot' }) }
+  try {
+    const { access_token } = JSON.parse(body || '{}')
+    if (!access_token) return stuur(400, { fout: 'geen login' })
+    const { data, error } = await sb.auth.getUser(access_token)
+    if (error || !data?.user) return stuur(401, { fout: 'login ongeldig' })
+    if (gebruiker && data.user.id !== gebruiker.id) return stuur(403, { fout: 'ander account' })
+    if (bezig.code || herstartGepland) return stuur(409, { fout: 'Er loopt een code-opdracht, daarna herstart de PA vanzelf' })
+    herstartGepland = true
+    console.log(`${tijd()} ↻ PA herstart op verzoek uit Business OS`)
+    spawn('sh', ['-c', `sleep 1; launchctl kickstart -k gui/${process.getuid()}/nl.myarc.pa`], { detached: true, stdio: 'ignore' }).unref()
+    stuur(200, { ok: true })
+  } catch (e) { stuur(500, { fout: e.message }) }
+}
+
 // Lokaal loket voor inloggen vanuit Business OS.
 const POORT = 47615
 http.createServer(async (req, res) => {
@@ -445,6 +466,7 @@ http.createServer(async (req, res) => {
   const stuur = (code, x) => { res.statusCode = code; res.end(JSON.stringify(x)) }
   if (req.method === 'OPTIONS') return stuur(204, {})
   if (req.method === 'GET' && req.url === '/status') return stuur(200, { ingelogd: !!gebruiker })
+  if (req.method === 'POST' && req.url === '/herstart') return herstartVerzoek(req, stuur)
   if (req.method !== 'POST' || req.url !== '/login') return stuur(404, { fout: 'onbekend' })
   // Al ingelogd: niets aanraken (een ongeldige sessie zou de huidige wissen).
   if (gebruiker) return stuur(200, { ok: true })
