@@ -113,6 +113,17 @@ const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat
 - Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.`
 
 const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)']
+// Chat licht houden (sneller antwoord): ander model, lage effort, geen
+// MCP-servers, geen user-instellingen/plugins en geen skills. Inloggen blijft
+// via het abonnement (dus geen --bare: die wil een ANTHROPIC_API_KEY).
+const CHAT_MODEL = process.env.PA_CHAT_MODEL || 'sonnet'
+const CHAT_LICHT = [
+  '--model', CHAT_MODEL,
+  '--effort', 'low',
+  '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+  '--setting-sources', 'project,local',
+  '--disable-slash-commands',
+]
 
 function claude(args, extraEnv = {}) {
   return new Promise((klaar) => {
@@ -158,6 +169,7 @@ async function beantwoordChat(invoer) {
     '--allowedTools', CHAT_TOEGESTAAN.join(','),
     '--no-session-persistence',
     '--max-budget-usd', '3',
+    ...CHAT_LICHT,
   ], { PA_ACCESS_TOKEN: session?.access_token || '' })
   const a = r.json?.structured_output
   if (r.code !== 0 || !a?.tekst) return { ok: false, antwoord: { tekst: r.json?.result || r.fout || 'Geen antwoord van Claude Code.', acties: [] } }
@@ -201,7 +213,9 @@ async function rondeChat() {
   bezig.chat = true
   try {
     console.log(`${tijd()} 💬 ${rij.opdracht.slice(0, 100)}`)
+    const t0 = Date.now()
     const r = await beantwoordChat(rij.invoer)
+    console.log(`${tijd()} ${r.ok ? '✓' : '✗'} chat-antwoord in ${((Date.now() - t0) / 1000).toFixed(1)} s (${CHAT_MODEL})`)
     await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
       .eq('id', rij.id)

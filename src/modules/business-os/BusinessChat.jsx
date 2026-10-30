@@ -33,7 +33,7 @@
 // gino-stem 503 geen_sleutel geeft. Versturen breekt de spraakherkenning af en
 // negeert late resultaten, zodat het veld leeg blijft.
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, MessageSquare, ChevronDown, SquarePen } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
@@ -823,9 +823,31 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   }, [])
 
   useEffect(() => { bewaarGesprek(gesprek) }, [gesprek])
-  useEffect(() => {
-    if (open && lijst.current) lijst.current.scrollTop = lijst.current.scrollHeight
-  }, [gesprek, open])
+  // Venster opent onderaan en scrolt mee bij nieuwe inhoud (berichten, kaarten,
+  // later ladende thumbs), maar alleen als je al onderaan stond: wie terugleest
+  // wordt niet teruggetrokken. Callback-ref: het venster mount pas als plek er is.
+  const onderaan = useRef(true)
+  const lijstRef = useCallback(el => {
+    lijst.current = el
+    if (!el) return
+    onderaan.current = true
+    const naarOnder = () => { if (onderaan.current) el.scrollTop = el.scrollHeight }
+    naarOnder()
+    const raf = requestAnimationFrame(naarOnder)
+    const mo = new MutationObserver(naarOnder)
+    mo.observe(el, { childList: true, subtree: true, characterData: true })
+    el.addEventListener('load', naarOnder, true) // img-load bubbelt niet; capture wel
+    return () => {
+      cancelAnimationFrame(raf)
+      mo.disconnect()
+      el.removeEventListener('load', naarOnder, true)
+      lijst.current = null
+    }
+  }, [])
+  const bijScroll = (e) => {
+    const el = e.currentTarget
+    onderaan.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
 
   const antwoord = (bericht) => {
     setGesprek(g => [...g, bericht])
@@ -852,6 +874,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
       nieuwBericht.thumbs = bijlagen.map(b => b.thumb)
     }
     const nieuw = [...gesprek, nieuwBericht]
+    onderaan.current = true // eigen bericht: altijd naar beneden
     setGesprek(nieuw)
     setInvoer('')
     setBijlagen([])
@@ -922,7 +945,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
       <div style={{ position: 'relative' }}>
         {/* ── Berichtenvenster: zweeft onder de groep, of erboven als daar geen ruimte is ── */}
         {open && plek && (
-          <div ref={lijst} style={{
+          <div ref={lijstRef} onScroll={bijScroll} style={{
             position: 'absolute', left: 0, right: 0, zIndex: 5,
             ...(plek.onder ? { top: '100%', marginTop: 10 } : { bottom: '100%', marginBottom: 40 + wachtLijst.length * WACHT_RIJ_H }),
             maxHeight: plek.max, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
