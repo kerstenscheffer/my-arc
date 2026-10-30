@@ -7,8 +7,9 @@
 //
 // Alleen coaches (get_my_portal_role = coach/both), anders kan elke ingelogde
 // klant ElevenLabs-tegoed opmaken. Sleutels als Supabase-secrets:
-// ELEVENLABS_API_KEY en ELEVENLABS_VOICE_ID. Ontbreekt er één: 503
-// { fout: 'geen_sleutel' } en valt stem.js terug op de browserstem.
+// ELEVENLABS_API_KEY en (optioneel) ELEVENLABS_VOICE_ID. Zonder voice-id kiest
+// kiesStem() er zelf één; header x-gino-stem zegt welke. Ontbreekt de API key:
+// 503 { fout: 'geen_sleutel' } en valt stem.js terug op de browserstem.
 // Nooit een sleutel in de frontend of de repo.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -25,23 +26,32 @@ const MODEL = 'eleven_multilingual_v2'
 const MET_TAALCODE = ['eleven_turbo_v2_5', 'eleven_flash_v2_5']
 const MAX_TEKENS = 1000
 
+// Premade stem (Daniel, mannelijk, rustig): werkt ook op het gratis plan.
+// Library-stemmen geven daar 402 paid_plan_required (30 okt 2026: daardoor viel
+// Business OS stil terug op de browserstem). Bij 402 schakelt hij hierop over.
+const PREMADE_STEM = { id: 'onwK4e9ZLuTAKqWW03F9', naam: 'Daniel (premade)' }
+
 // Zonder ELEVENLABS_VOICE_ID: eerste zelf toegevoegde stem (category ≠ premade)
 // uit het eigen ElevenLabs-account, anders de eerste uit de lijst. Per instantie
 // gecachet, zodat de lijst niet bij elk verzoek wordt opgehaald.
 let gekozenStem: { id: string; naam: string } | null = null
+let alleenPremade = false // na een 402: rest van deze instantie meteen PREMADE_STEM
 
-async function kiesStem(sleutel: string): Promise<{ id: string; naam: string } | null> {
+// Faalt de lijst: { status } (→ 502 elevenlabs, niet geen_sleutel: stem.js leest
+// dat als "sleutel ontbreekt").
+async function kiesStem(sleutel: string): Promise<{ id: string; naam: string } | { status: number }> {
+  if (alleenPremade) return PREMADE_STEM
   const vast = Deno.env.get('ELEVENLABS_VOICE_ID')
   if (vast) return { id: vast, naam: 'ELEVENLABS_VOICE_ID' }
   if (gekozenStem) return gekozenStem
   const res = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': sleutel } })
   if (!res.ok) {
     console.error('ElevenLabs voices', res.status, (await res.text().catch(() => '')).slice(0, 300))
-    return null
+    return { status: res.status }
   }
   const { voices = [] } = await res.json().catch(() => ({}))
   const stem = voices.find((v: { category?: string }) => v.category !== 'premade') || voices[0]
-  if (!stem?.voice_id) return null
+  if (!stem?.voice_id) return { status: 404 }
   gekozenStem = { id: stem.voice_id, naam: stem.name || stem.voice_id }
   console.log('gino-stem kiest', gekozenStem.naam, gekozenStem.id)
   return gekozenStem
@@ -67,15 +77,14 @@ Deno.serve(async (req) => {
     const sleutel = Deno.env.get('ELEVENLABS_API_KEY')
     if (!sleutel) return json({ fout: 'geen_sleutel' }, 503)
     const stem = await kiesStem(sleutel)
-    if (!stem) return json({ fout: 'geen_sleutel' }, 503)
-    const stemId = stem.id
+    if (!('id' in stem)) return json({ fout: 'elevenlabs', status: stem.status }, 502)
 
     const body = await req.json().catch(() => ({}))
     const tekst = typeof body?.tekst === 'string' ? body.tekst.trim() : ''
     if (!tekst) return json({ fout: 'geen_tekst' }, 400)
     if (tekst.length > MAX_TEKENS) return json({ fout: 'te_lang', max: MAX_TEKENS }, 413)
 
-    const res = await fetch(
+    const tts = (stemId: string) => fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(stemId)}?output_format=mp3_44100_128`,
       {
         method: 'POST',
@@ -88,6 +97,14 @@ Deno.serve(async (req) => {
         }),
       },
     )
+    let gebruikt = stem
+    let res = await tts(stem.id)
+    if (res.status === 402 && stem.id !== PREMADE_STEM.id) {
+      console.error('ElevenLabs 402 voor', stem.naam, (await res.text().catch(() => '')).slice(0, 200), '→', PREMADE_STEM.naam)
+      alleenPremade = true
+      gebruikt = PREMADE_STEM
+      res = await tts(PREMADE_STEM.id)
+    }
     if (!res.ok || !res.body) {
       const detail = await res.text().catch(() => '')
       console.error('ElevenLabs', res.status, detail.slice(0, 500))
@@ -98,7 +115,7 @@ Deno.serve(async (req) => {
         ...CORS,
         'Content-Type': 'audio/mpeg',
         'Cache-Control': 'no-store',
-        'x-gino-stem': encodeURIComponent(stem.naam),
+        'x-gino-stem': encodeURIComponent(gebruikt.naam),
         'Access-Control-Expose-Headers': 'x-gino-stem',
       },
     })
