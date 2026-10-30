@@ -10,7 +10,11 @@
 //     beantwoordt hem op Kerstens abonnement (geen API-kosten) en mag alleen
 //     lezen + scripts/pa-db.mjs. Antwoord = { tekst, acties } in `antwoord`.
 // Chat en code lopen naast elkaar, zodat een chatvraag niet wacht op een
-// lange code-opdracht. Elke 15 s een hartslag in business_os_pa_status: zo
+// lange code-opdracht. Chats ook onderling (max MAX_CHATS, één per tabje in
+// Business OS). Code nooit tegelijk: twee uitvoerders in dezelfde bestanden
+// maken elkaar stuk. Een tweede code-opdracht blijft op 'wacht' (Business OS
+// toont hem als 'in de rij') en gaat vanzelf als de vorige klaar of mislukt is:
+// na elke opdracht herstart de PA (herstartNa) en pakt de oudste wachtende. Elke 15 s een hartslag in business_os_pa_status: zo
 // weet de chat of hij via de Mac of via de API moet.
 //
 // Inloggen: met Kerstens eigen account (anon-sleutel + sessie), nooit de
@@ -246,7 +250,8 @@ function zetWarmKlaar() {
   if (warm && !warm.dood) warm.p.kill()
   warm = null
   warmStart = true
-  maakWarm().then(w => { warm = w }, e => console.error(tijd(), 'Warm proces mislukt:', e.message))
+  // Intussen al een eigen proces gemaakt (parallelle chat)? Dan deze weg, geen wees.
+  maakWarm().then(w => { if (warm && !warm.dood) w.p.kill(); else warm = w }, e => console.error(tijd(), 'Warm proces mislukt:', e.message))
     .finally(() => { warmStart = false })
 }
 process.on('exit', () => { if (warm && !warm.dood) warm.p.kill() })
@@ -292,15 +297,17 @@ async function beantwoordChat(invoer, opDeel) {
 }
 
 const tijd = () => new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-const bezig = { code: false, chat: false }
+// code = loopt er een (true/false); chat = aantal lopende chatvragen.
+const MAX_CHATS = 3
+const bezig = { code: false, chat: 0 }
 
-// Zet bezig[soort] meteen, zodat Realtime en het pollen niet tegelijk pakken;
-// de ronde zet hem terug. Geen rij = meteen terug.
+// Bezet meteen een plek, zodat Realtime en het pollen niet tegelijk pakken;
+// de ronde geeft hem terug. Geen rij = meteen terug.
 async function pak(soort) {
-  if (bezig[soort] || !gebruiker) return null
-  bezig[soort] = true
+  if (!gebruiker) return null
+  if (soort === 'code') { if (bezig.code) return null; bezig.code = true } else { if (bezig.chat >= MAX_CHATS) return null; bezig.chat++ }
   const rij = await pakRij(soort).catch(() => null)
-  if (!rij) bezig[soort] = false
+  if (!rij) { if (soort === 'code') bezig.code = false; else bezig.chat-- }
   return rij
 }
 
@@ -325,6 +332,13 @@ async function pakRij(soort) {
 // en na de herstart staat de rij op klaar/mislukt, dus hij komt niet terug.
 const HERSTART_ID = path.join(SESSIE_MAP, 'laatste-herstart')
 let herstartGepland = false
+// Komt de herstart niet (bv. met de hand gestart, niet via launchd), dan na
+// een minuut gewoon doorgaan met de rij in plaats van te blijven wachten.
+const herstartVangnet = () => setTimeout(() => {
+  if (!herstartGepland) return
+  herstartGepland = false
+  console.log(`${tijd()} Herstart bleef uit, ik ga verder met de rij`)
+}, 60 * 1000)
 async function herstartNa(id) {
   try { if (fs.readFileSync(HERSTART_ID, 'utf8') === String(id)) return } catch { /* nog nooit */ }
   herstartGepland = true
@@ -332,6 +346,7 @@ async function herstartNa(id) {
   fs.writeFileSync(HERSTART_ID, String(id), { mode: 0o600 })
   console.log(`${tijd()} ↻ PA herstart over 3 s (nieuwe code live)`)
   spawn('sh', ['-c', `sleep 3; launchctl kickstart -k gui/${process.getuid()}/nl.myarc.pa`], { detached: true, stdio: 'ignore' }).unref()
+  herstartVangnet()
 }
 
 async function rondeCode() {
@@ -354,7 +369,8 @@ async function rondeCode() {
 async function rondeChat() {
   const rij = await pak('chat')
   if (!rij) return
-  bezig.chat = true
+  // Staat er nog een vraag (ander tabje)? Die meteen ernaast oppakken.
+  rondeChat().catch(e => console.error(tijd(), e.message))
   try {
     console.log(`${tijd()} 💬 ${rij.opdracht.slice(0, 100)}`)
     const t0 = Date.now()
@@ -376,7 +392,7 @@ async function rondeChat() {
     await sb.from('business_os_opdrachten')
       .update({ status: r.ok ? 'klaar' : 'mislukt', antwoord: r.antwoord, klaar_at: new Date().toISOString() })
       .eq('id', rij.id)
-  } finally { bezig.chat = false }
+  } finally { bezig.chat-- }
 }
 
 const hartslag = () => gebruiker && sb.from('business_os_pa_status')
@@ -452,6 +468,7 @@ async function herstartVerzoek(req, stuur) {
     herstartGepland = true
     console.log(`${tijd()} ↻ PA herstart op verzoek uit Business OS`)
     spawn('sh', ['-c', `sleep 1; launchctl kickstart -k gui/${process.getuid()}/nl.myarc.pa`], { detached: true, stdio: 'ignore' }).unref()
+    herstartVangnet()
     stuur(200, { ok: true })
   } catch (e) { stuur(500, { fout: e.message }) }
 }

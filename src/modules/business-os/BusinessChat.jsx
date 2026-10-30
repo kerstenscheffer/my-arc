@@ -104,21 +104,18 @@ async function vraagViaMac(berichten, context, opDeel, extra = {}) {
 }
 const Spraak = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
 
+// Het oude ene gesprek (vóór de tabjes): wordt bij de eerste keer het tabje 'Code'.
 const leesGesprek = () => {
   try { return JSON.parse(localStorage.getItem(KEY)) || [] } catch { return [] }
 }
-// Volle afbeeldingen niet in localStorage (te groot), alleen de thumbnail.
-const bewaarGesprek = (g) => {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(g.slice(-40).map(b => {
-      if (!b.afbeelding && !b.afbeeldingen) return b
-      const kopie = { ...b }
-      delete kopie.afbeelding
-      delete kopie.afbeeldingen
-      return kopie
-    })))
-  } catch { /* privé-venster of vol */ }
-}
+// Volle afbeeldingen niet bewaren (te groot), alleen de thumbnail.
+const schoon = (berichten) => berichten.slice(-40).map(b => {
+  if (!b.afbeelding && !b.afbeeldingen) return b
+  const kopie = { ...b }
+  delete kopie.afbeelding
+  delete kopie.afbeeldingen
+  return kopie
+})
 
 // Afbeelding → { media_type, data (base64 zonder prefix), thumb (data-URL) }.
 async function verklein(bestand) {
@@ -292,6 +289,28 @@ const SLEUTEL_ACTIE = 'Zet ELEVENLABS_API_KEY en ELEVENLABS_VOICE_ID in Supabase
 const lees = (k) => { try { return localStorage.getItem(k) } catch { return null } }
 const schrijf = (k, v) => { try { localStorage.setItem(k, v) } catch { /* privé-venster */ } }
 
+// ── Gesprekken (tabjes bij het poppetje) ──
+// Elk tabje = { id, naam, sessie, berichten, bijgewerkt }. sessie = het
+// gesprek_id voor Slim (Nieuw gesprek geeft een nieuwe sessie, zelfde tabje).
+// Bewaard in localStorage en, zodra de tabel bestaat, in business_os_gesprekken
+// (business-os-gesprekken.sql, één rij per tabje). Ontbreekt de tabel, dan
+// blijft alles lokaal werken.
+const GESPREKKEN_KEY = 'business_os_gesprekken'
+const ACTIEF_KEY = 'business_os_actief_gesprek'
+const DB_GESPREKKEN = 'business_os_gesprekken'
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const nieuwTabje = (naam, berichten = [], sessie = null) => ({
+  id: crypto.randomUUID(), naam, sessie: UUID.test(sessie || '') ? sessie : crypto.randomUUID(), berichten, bijgewerkt: Date.now(),
+})
+const leesGesprekken = () => {
+  try {
+    const g = JSON.parse(localStorage.getItem(GESPREKKEN_KEY))
+    if (Array.isArray(g) && g.length) return g
+  } catch { /* nog niets */ }
+  // Eerste keer: het bestaande gesprek (en zijn Slim-sessie) wordt 'Code'.
+  return [nieuwTabje('Code', leesGesprek(), lees('business_os_gesprek_id')), nieuwTabje('Strategie')]
+}
+
 // Voorstel → één korte vraag in spreektaal + samenvatting + volledige tekst.
 function vraagVoor(ac) {
   if (ac.soort === 'wacht_op_jou') return { vraag: `Ik wacht op jou: ${kort(ac.tekst, 120)}`, kort: '', details: '' }
@@ -384,19 +403,33 @@ function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
   const { bezig, fout } = staat || {}
   const id = voorstel.opdrachtId
 
+  // voor = aantal code-opdrachten dat eerder binnenkwam en nog loopt of wacht.
+  // De PA doet er één tegelijk, dus > 0 = in de rij (status blijft 'wacht').
+  const [voor, setVoor] = useState(0)
   useEffect(() => {
     if (!id) return
     let weg = false
-    const kijk = () => supabase.from('business_os_opdrachten')
-      .select('status, resultaat, created_at').eq('id', id).maybeSingle()
-      .then(({ data }) => { if (!weg && data) setRij(data) }, () => {})
+    const kijk = async () => {
+      const { data } = await supabase.from('business_os_opdrachten')
+        .select('status, resultaat, created_at').eq('id', id).maybeSingle()
+        .then(r => r, () => ({ data: null }))
+      if (weg || !data) return
+      setRij(data)
+      if (data.status !== 'wacht') { setVoor(0); return }
+      const { count } = await supabase.from('business_os_opdrachten')
+        .select('id', { count: 'exact', head: true }).eq('soort', 'code').in('status', ['wacht', 'bezig'])
+        .lt('created_at', data.created_at)
+        .then(r => r, () => ({ count: 0 }))
+      if (!weg) setVoor(count || 0)
+    }
     kijk()
     const t = setInterval(kijk, 5000)
     return () => { weg = true; clearInterval(t) }
   }, [id])
 
   const status = rij?.status
-  const hangt = status === 'wacht' && rij && Date.now() - new Date(rij.created_at).getTime() > 20000
+  const inRij = status === 'wacht' && voor > 0
+  const hangt = status === 'wacht' && !inRij && rij && Date.now() - new Date(rij.created_at).getTime() > 20000
   return (
     <div style={KAART}>
       <div style={KAART_KOP}>
@@ -410,7 +443,7 @@ function PaVoorstel({ voorstel, staat, onToestaan, herhaalKnop }) {
       ) : (
         <div style={{ fontWeight: 800, color: status === 'klaar' ? colors.success : status === 'mislukt' ? colors.danger : colors.textPrimary }}>
           {status === 'klaar' && <Check size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />}
-          {PA_STATUS[status] || 'Versturen…'}
+          {inRij ? `In de rij${voor > 1 ? ` (${voor} vóór)` : ''}, start na de huidige` : PA_STATUS[status] || 'Versturen…'}
           {hangt && <div style={{ color: colors.textSecondary, fontWeight: 600, marginTop: 2 }}>Draait npm run pa op je Mac?</div>}
         </div>
       )}
@@ -530,6 +563,8 @@ const ANIMATIES = `
 .bos-robot .bos-oog { transform-box: fill-box; transform-origin: center; animation: bos-knipper 3s infinite }
 .bos-robot .bos-antenne { animation: bos-zacht 1.6s ease-in-out infinite }
 .bos-robot.bos-rust { opacity: 0.45 }
+.bos-tabjes { scrollbar-width: none }
+.bos-tabjes::-webkit-scrollbar { display: none }
 .bos-robot.bos-rust * { animation: none !important }
 @media (prefers-reduced-motion: reduce) { .bos-robot *, .bos-stip, .bos-draai { animation: none !important } }
 `
@@ -619,7 +654,25 @@ function PaInloggen({ zichtbaar, onKlaar }) {
 }
 
 export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
-  const [gesprek, setGesprek] = useState(leesGesprek)
+  // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
+  // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
+  // 'Code' nog op een antwoord of code-opdracht wacht.
+  const [gesprekken, setGesprekken] = useState(leesGesprekken)
+  const [actiefId, setActiefId] = useState(() => lees(ACTIEF_KEY))
+  const actief = gesprekken.find(g => g.id === actiefId) || gesprekken[0]
+  const gesprek = actief.berichten
+  const gesprekkenRef = useRef(gesprekken)
+  gesprekkenRef.current = gesprekken
+  const actiefRef = useRef(actief.id)
+  actiefRef.current = actief.id
+  const wijzigTabje = (id, f) => setGesprekken(gs => gs.map(g => g.id !== id ? g : { ...f(g), bijgewerkt: Date.now() }))
+  const zetBerichten = (id, f) => wijzigTabje(id, g => ({ ...g, berichten: f(g.berichten) }))
+  const [bezigPer, setBezigPer] = useState({})
+  const [deelPer, setDeelPer] = useState({})
+  const [ongelezenPer, setOngelezenPer] = useState({})
+  const bezig = !!bezigPer[actief.id]
+  const ergensBezig = Object.values(bezigPer).some(Boolean)
+  const ergensOngelezen = gesprekken.some(g => ongelezenPer[g.id])
   // Snel (Sonnet, licht) of Slim (Opus + CLAUDE.md/memory + onthoudt per
   // gesprek wat hij opzocht). Slim kan alleen via de Mac.
   const [modus, setModus] = useState(() => { try { return localStorage.getItem('business_os_modus') || 'snel' } catch { return 'snel' } })
@@ -628,27 +681,86 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     try { localStorage.setItem('business_os_modus', n) } catch { /* geen opslag */ }
     return n
   })
-  const nieuwGesprekId = () => {
-    const id = crypto.randomUUID()
-    try { localStorage.setItem('business_os_gesprek_id', id) } catch { /* geen opslag */ }
-    return id
-  }
-  const gesprekId = useRef(null)
-  if (!gesprekId.current) {
-    try { gesprekId.current = localStorage.getItem('business_os_gesprek_id') } catch { /* geen opslag */ }
-    if (!gesprekId.current) gesprekId.current = nieuwGesprekId()
-  }
   const [invoer, setInvoer] = useState('')
   const [bijlagen, setBijlagen] = useState([])
-  const [bezig, setBezig] = useState(false)
   const isMobile = useIsMobile()
   // Berichtenvenster: start altijd dicht, niet onthouden.
   const [open, setOpen] = useState(false)
-  const [ongelezen, setOngelezen] = useState(false)
   const openRef = useRef(false)
-  useEffect(() => { openRef.current = open; if (open) setOngelezen(false) }, [open])
+  useEffect(() => { openRef.current = open }, [open])
+  // Wat je open ziet, is gelezen.
+  useEffect(() => {
+    if (open) setOngelezenPer(o => (o[actief.id] ? { ...o, [actief.id]: false } : o))
+  }, [open, actief.id])
+  // Groene stip op een tabje, behalve als je dat gesprek nu open hebt.
+  const markeer = (id) => {
+    if (openRef.current && actiefRef.current === id) return
+    setOngelezenPer(o => ({ ...o, [id]: true }))
+  }
   // Laat de pagina meekijken (de reactor-ring versnelt zolang de AI denkt).
-  useEffect(() => { onBezig?.(bezig) }, [bezig, onBezig])
+  useEffect(() => { onBezig?.(ergensBezig) }, [ergensBezig, onBezig])
+
+  const kiesGesprek = (id) => {
+    setActiefId(id)
+    schrijf(ACTIEF_KEY, id)
+    setOpen(true)
+  }
+  const extraGesprek = () => {
+    const t = nieuwTabje(`Gesprek ${gesprekken.length + 1}`)
+    setGesprekken(gs => [...gs, t])
+    kiesGesprek(t.id)
+  }
+  // Alleen extra tabjes kunnen dicht; Code en Strategie blijven staan.
+  const sluitGesprek = (id) => {
+    const g = gesprekken.find(x => x.id === id)
+    if (!g || gesprekken.indexOf(g) < 2) return
+    if (g.berichten.length && !window.confirm(`Gesprek '${g.naam}' sluiten? De berichten verdwijnen.`)) return
+    setGesprekken(gs => gs.filter(x => x.id !== id))
+    if (actief.id === id) { setActiefId(gesprekken[0].id); schrijf(ACTIEF_KEY, gesprekken[0].id) }
+    if (dbKlaar) supabase.from(DB_GESPREKKEN).delete().eq('id', id).then(() => {}, () => {})
+  }
+
+  // Lokaal bewaren (zonder volle afbeeldingen).
+  useEffect(() => {
+    schrijf(GESPREKKEN_KEY, JSON.stringify(gesprekken.map(g => ({ ...g, berichten: schoon(g.berichten) }))))
+  }, [gesprekken])
+
+  // Supabase: bij openen ophalen (nieuwste per tabje wint), daarna elk gewijzigd
+  // tabje na 0,8 s rust wegschrijven. Tabel nog niet aangemaakt → alleen lokaal.
+  const [dbKlaar, setDbKlaar] = useState(false)
+  const opgeslagen = useRef({}) // id → bijgewerkt dat al in de database staat
+  useEffect(() => {
+    let weg = false
+    supabase.from(DB_GESPREKKEN).select('id, naam, volgorde, sessie, berichten, updated_at').order('volgorde')
+      .then(({ data, error }) => {
+        if (weg || error || !Array.isArray(data)) return
+        const uitDb = data.map(r => {
+          const bijgewerkt = new Date(r.updated_at).getTime()
+          opgeslagen.current[r.id] = bijgewerkt
+          return { id: r.id, naam: r.naam, sessie: r.sessie || r.id, berichten: Array.isArray(r.berichten) ? r.berichten : [], bijgewerkt }
+        })
+        if (uitDb.length) setGesprekken(lokaal => [
+          ...uitDb.map(d => { const l = lokaal.find(x => x.id === d.id); return l && l.bijgewerkt > d.bijgewerkt ? l : d }),
+          // Alleen hier bestaande tabjes met berichten (bv. de oude geschiedenis) erachter.
+          ...lokaal.filter(l => !uitDb.some(d => d.id === l.id) && l.berichten.length),
+        ])
+        setDbKlaar(true)
+      }, () => {})
+    return () => { weg = true }
+  }, [])
+  useEffect(() => {
+    if (!dbKlaar) return
+    const t = setTimeout(() => {
+      gesprekken.forEach((g, volgorde) => {
+        if (opgeslagen.current[g.id] === g.bijgewerkt) return
+        const bij = g.bijgewerkt
+        supabase.from(DB_GESPREKKEN).upsert({
+          id: g.id, naam: g.naam, volgorde, sessie: g.sessie, berichten: schoon(g.berichten), updated_at: new Date(bij).toISOString(),
+        }).then(({ error }) => { if (!error) opgeslagen.current[g.id] = bij }, () => {})
+      })
+    }, 800)
+    return () => clearTimeout(t)
+  }, [gesprekken, dbKlaar])
   const [fout, setFout] = useState(null)
   const [luistert, setLuistert] = useState(false)
   const luistertRef = useRef(false)
@@ -748,6 +860,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   // Lopende code-opdrachten (laatste 30 min). Valt er een weg, dan kijken we
   // hoe hij geëindigd is voor de korte melding.
   const [code, setCode] = useState(null) // null | 'wacht' | 'bezig'
+  const [inRij, setInRij] = useState(0) // code-opdrachten die op hun beurt wachten
   // Laatst afgeronde code-opdracht: de rustregel van het robotje.
   const [laatst, setLaatst] = useState(null) // { tekst (kort), vol (voor de stem), klaar_at }
   useEffect(() => {
@@ -793,12 +906,15 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   useEffect(() => {
     let weg = false
     let vorige = []
+    // Ruim venster: met een rij kan een opdracht lang op zijn beurt wachten.
     const kijk = () => supabase.from('business_os_opdrachten')
       .select('id, status').eq('soort', 'code').in('status', ['wacht', 'bezig'])
-      .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+      .gte('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
       .then(({ data }) => {
         if (weg || !data) return
-        setCode(data.some(r => r.status === 'bezig') ? 'bezig' : data.length ? 'wacht' : null)
+        const loopt = data.some(r => r.status === 'bezig')
+        setCode(loopt ? 'bezig' : data.length ? 'wacht' : null)
+        setInRij(Math.max(0, data.length - 1))
         const ids = data.map(r => r.id)
         const klaar = vorige.filter(id => !ids.includes(id))
         vorige = ids
@@ -807,7 +923,9 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
           .then(({ data: af }) => {
             if (weg) return
             meld(af?.some(r => r.status === 'mislukt') ? 'Mislukt, bekijk resultaat' : 'Klaar', af?.some(r => r.status === 'mislukt'))
-            if (!openRef.current) setOngelezen(true)
+            // Stip op het tabje waar de opdracht vandaan kwam (anders het actieve).
+            const bij = gesprekkenRef.current.filter(g => g.berichten.some(b => (b.acties || []).some(a => a?.opdrachtId && klaar.includes(a.opdrachtId))))
+            ;(bij.length ? bij.map(g => g.id) : [actiefRef.current]).forEach(markeer)
           }, () => {})
       }, () => {})
     kijk()
@@ -917,7 +1035,6 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     }
   }, [])
 
-  useEffect(() => { bewaarGesprek(gesprek) }, [gesprek])
   // Venster opent onderaan en scrolt mee bij nieuwe inhoud (berichten, kaarten,
   // later ladende thumbs), maar alleen als je al onderaan stond: wie terugleest
   // wordt niet teruggetrokken. Callback-ref: het venster mount pas als plek er is.
@@ -944,8 +1061,8 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     onderaan.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
   }
 
-  // Halve tekst terwijl Gino via de Mac typt.
-  const [deel, setDeel] = useState('')
+  // Halve tekst terwijl Gino via de Mac typt (per tabje).
+  const deel = deelPer[actief.id] || ''
   // Voorleestekst: het antwoord en daarna de eerste toestemmingsvraag (die in het wolkje).
   // Vastgelegd bij binnenkomst, zodat herhalen dezelfde (bewaarde) audio pakt.
   // Op inhoud, niet op object: een afgehandelde actie vervangt het bericht-object.
@@ -956,10 +1073,13 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     const open = (bericht.acties || []).find(staatOpen)
     return { content: bericht.content, tekst: bericht.content, vraag: (open && vraagVoor(open).vraag) || null }
   }
-  const antwoord = (bericht) => {
-    setGesprek(g => [...g, bericht])
-    if (!openRef.current) setOngelezen(true)
+  // Antwoord landt altijd in het tabje waar de vraag vandaan kwam. Voorlezen
+  // alleen als je dat tabje nog voor je hebt; anders een groene stip erop.
+  const antwoord = (id, bericht) => {
+    zetBerichten(id, g => [...g, bericht])
+    markeer(id)
     meld('Klaar', false)
+    if (actiefRef.current !== id) return
     const s = spraakVan(bericht)
     spraak.current = s
     if (stem.isAan() && !luistertRef.current) stem.spreek(s.tekst, { bewaar: true, vraag: s.vraag })
@@ -975,6 +1095,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
   const stuur = async () => {
     const vraag = invoer.trim()
     if ((!vraag && !bijlagen.length) || bezig) return
+    const { id, sessie } = actief
     stopHerkenner()
     setInvoer('')
     stem.stop()
@@ -987,71 +1108,89 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     }
     const nieuw = [...gesprek, nieuwBericht]
     onderaan.current = true // eigen bericht: altijd naar beneden
-    setGesprek(nieuw)
+    // Extra tabje heet 'Gesprek 3' tot de eerste vraag: dan krijgt het die als naam.
+    wijzigTabje(id, g => ({
+      ...g, berichten: nieuw,
+      naam: !g.berichten.length && /^Gesprek \d+$/.test(g.naam) && vraag ? kort(vraag, 18) : g.naam,
+    }))
     setInvoer('')
     setBijlagen([])
-    setBezig(true)
+    setBezigPer(b => ({ ...b, [id]: true }))
     setFout(null)
     const berichten = naarBerichten(nieuw)
     const metBeeld = berichten.some(b => b.afbeelding)
-    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, setDeel, { modus, gesprek_id: gesprekId.current }) : null
-    setDeel('')
+    const opDeel = (t) => setDeelPer(d => ({ ...d, [id]: t }))
+    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie }) : null
+    opDeel('')
     if (mac) {
-      setBezig(false)
-      antwoord({ role: 'assistant', content: mac.tekst, acties: mac.acties || [] })
+      setBezigPer(b => ({ ...b, [id]: false }))
+      antwoord(id, { role: 'assistant', content: mac.tekst, acties: mac.acties || [] })
       return
     }
     const { data, error } = await supabase.functions.invoke('business-os-chat', { body: { berichten, context } })
-    setBezig(false)
+    setBezigPer(b => ({ ...b, [id]: false }))
     if (error || data?.error || !data?.tekst) {
       setFout(data?.error || 'AI gaf geen antwoord, probeer opnieuw.')
       meld('Mislukt, bekijk resultaat', true)
       return
     }
-    antwoord({ role: 'assistant', content: data.tekst, acties: data.acties || [] })
+    antwoord(id, { role: 'assistant', content: data.tekst, acties: data.acties || [] })
   }
 
   // Voorstellen: status op de actie zelf (gedeeld door kaart en wolkje),
-  // bezig/fout per actie hier (sleutel 'bericht-actie').
+  // bezig/fout per actie hier (sleutel 'tabje-bericht-actie'). Open voorstellen
+  // uit alle tabjes komen in het wolkje, zodat je er geen mist.
   const [actieStaat, setActieStaat] = useState({})
-  const zetActie = (i, j, veld) => setGesprek(g => g.map((m, mi) => mi !== i ? m : {
+  const zetActie = (t, i, j, veld) => zetBerichten(t, g => g.map((m, mi) => mi !== i ? m : {
     ...m, acties: m.acties.map((x, xi) => xi === j ? { ...x, ...veld } : x),
   }))
-  const toestaan = async (i, j) => {
-    const ac = gesprek[i]?.acties?.[j]
-    const sleutel = `${i}-${j}`
+  const toestaan = async (t, i, j) => {
+    const ac = gesprekken.find(g => g.id === t)?.berichten[i]?.acties?.[j]
+    const sleutel = `${t}-${i}-${j}`
     if (!ac || !staatOpen(ac) || actieStaat[sleutel]?.bezig) return
     setActieStaat(s => ({ ...s, [sleutel]: { bezig: true } }))
     const { veld, fout: f } = await VOER_UIT[ac.soort](ac)
     setActieStaat(s => ({ ...s, [sleutel]: { bezig: false, fout: f || null } }))
     if (f) return
-    zetActie(i, j, veld)
+    zetActie(t, i, j, veld)
     if (ac.soort === 'pa_voorstel') setCode(c => c || 'wacht') // robotje meteen, de poll neemt het over
   }
-  const afwijzen = (i, j) => zetActie(i, j, { afgewezen: true })
-  // Nieuwe deploy? Herladen zodra er geen gesprek loopt (gesprek staat in localStorage).
-  useNieuweVersie(!bezig && !luistert && !spreekt && !invoer.trim() && !bijlagen.length
+  const afwijzen = (t, i, j) => zetActie(t, i, j, { afgewezen: true })
+  // Nieuw gesprek in hetzelfde tabje: berichten leeg, nieuwe Slim-sessie.
+  const leegGesprek = () => {
+    stem.stop()
+    wijzigTabje(actief.id, g => ({ ...g, berichten: [], sessie: crypto.randomUUID() }))
+    setActieStaat(s => Object.fromEntries(Object.entries(s).filter(([k]) => !k.startsWith(`${actief.id}-`))))
+    setFout(null)
+    setOngelezenPer(o => ({ ...o, [actief.id]: false }))
+  }
+  // Nieuwe deploy? Herladen zodra er geen gesprek loopt (gesprekken staan in localStorage).
+  useNieuweVersie(!ergensBezig && !luistert && !spreekt && !invoer.trim() && !bijlagen.length
     && !Object.values(actieStaat).some(s => s?.bezig))
-  const alleOpen = gesprek.flatMap((b, i) => b.role !== 'assistant' ? [] :
-    (b.acties || []).map((ac, j) => ({ ac, i, j })).filter(x => staatOpen(x.ac)))
+  const alleOpen = gesprekken.flatMap(g => g.berichten.flatMap((b, i) => b.role !== 'assistant' ? [] :
+    (b.acties || []).map((ac, j) => ({ ac, t: g.id, i, j, sleutel: `${g.id}-${i}-${j}` })).filter(x => staatOpen(x.ac))))
   // "Wacht op jou" staat als lijstje onder de statusregel; het wolkje is voor toestemmingsvragen.
   const wachtLijst = [
     ...(sleutelWeg ? [{ sleutel: 'el', tekst: SLEUTEL_ACTIE, onGedaan: sleutelGedaan }] : []),
     ...alleOpen.filter(x => x.ac.soort === 'wacht_op_jou').map(x => ({
-      sleutel: `${x.i}-${x.j}`, tekst: x.ac.tekst, bezig: actieStaat[`${x.i}-${x.j}`]?.bezig, onGedaan: () => toestaan(x.i, x.j),
+      sleutel: x.sleutel, tekst: x.ac.tekst, bezig: actieStaat[x.sleutel]?.bezig, onGedaan: () => toestaan(x.t, x.i, x.j),
     })),
   ]
   const openVoorstellen = alleOpen.filter(x => x.ac.soort !== 'wacht_op_jou')
   const vraagNu = openVoorstellen[0]
-  // Lijst open boven de balk: daar staan de kaarten al, wolkje dan weg.
-  const wolkZichtbaar = vraagNu && !(open && plek && !plek.onder)
+  // Lijst open boven de balk: daar staan de kaarten al, wolkje dan weg (alleen als het voorstel in dit tabje staat).
+  const wolkZichtbaar = vraagNu && !(open && plek && !plek.onder && vraagNu.t === actief.id)
 
   const kanSturen = (invoer.trim() || bijlagen.length) && !bezig
   const rondeKnop = {
     width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative',
   }
-  const werk = code === 'bezig' ? 'Bezig met code…' : bezig ? (deel ? 'Gino typt…' : 'Gino denkt na…') : spreekt ? 'Gino praat…' : code === 'wacht' ? 'Wacht op je Mac…' : null
+  const anderBezig = gesprekken.find(g => g.id !== actief.id && bezigPer[g.id])
+  const werk = code === 'bezig' ? (inRij ? `Bezig met code · ${inRij} in de rij` : 'Bezig met code…')
+    : bezig ? (deel ? 'Gino typt…' : 'Gino denkt na…') : spreekt ? 'Gino praat…'
+    : anderBezig ? `Gino denkt na in ${anderBezig.naam}…`
+    : code === 'wacht' ? 'Wacht op je Mac…' : null
 
   return (
     <div ref={wortel} style={{
@@ -1091,7 +1230,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 <div style={{ flex: 1, minWidth: 0, ...TEKST, fontWeight: 500, color: colors.textPrimary }}>
                   {(b.acties || []).map((ac, j) => {
                     if (!ac || typeof ac !== 'object') return null
-                    const kaart = { voorstel: ac, staat: actieStaat[`${i}-${j}`], onToestaan: () => toestaan(i, j) }
+                    const kaart = { voorstel: ac, staat: actieStaat[`${actief.id}-${i}-${j}`], onToestaan: () => toestaan(actief.id, i, j) }
                     if (ac.soort === 'wacht_op_jou') return <WachtOpJou key={j} {...kaart} />
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
@@ -1132,7 +1271,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                   {melding && !werk && !vraagNu
                     ? <span style={{ width: 30, display: 'flex', justifyContent: 'center' }}>{melding.fout ? <X size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />}</span>
                     : <Robotje rustig={!werk && !vraagNu} />}
-                  {ongelezen && !open && (
+                  {ergensOngelezen && (
                     <span className="bos-stip" style={{
                       position: 'absolute', top: -1, right: 6, width: 7, height: 7, borderRadius: '50%',
                       background: colors.success, boxShadow: `0 0 6px ${colors.success}`,
@@ -1147,6 +1286,41 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
               {!werk && !(melding && !vraagNu) && !vraagNu && laatst?.tekst && stem.beschikbaar() && (
                 <span style={{ display: 'flex', flexShrink: 0, marginLeft: -6 }}>{herhaalKnop(laatst.vol)}</span>
               )}
+              {/* Gesprekken: kleine tabjes, groene stip = ongelezen of klaar resultaat */}
+              <div role="tablist" aria-label="Gesprekken" className="bos-tabjes" style={{
+                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: '0 1 auto', overflowX: 'auto', marginLeft: 2,
+              }}>
+                {gesprekken.map((g, gi) => {
+                  const aan = g.id === actief.id
+                  return (
+                    <button key={g.id} role="tab" aria-selected={aan} onClick={() => (aan && open ? setOpen(false) : kiesGesprek(g.id))}
+                      title={bezigPer[g.id] ? `${g.naam}: Gino denkt na` : g.naam}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 8px', flexShrink: 0,
+                        borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                        background: aan ? colors.surface : 'transparent',
+                        color: aan ? colors.textPrimary : colors.textMuted, fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap',
+                      }}>
+                      <span className={bezigPer[g.id] ? 'bos-stip' : undefined} style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.naam}</span>
+                      {ongelezenPer[g.id] && (
+                        <span className="bos-stip" style={{
+                          width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                          background: colors.success, boxShadow: `0 0 6px ${colors.success}`,
+                        }} />
+                      )}
+                      {aan && gi >= 2 && (
+                        <span role="button" aria-label={`Sluit ${g.naam}`} title="Gesprek sluiten"
+                          onClick={e => { e.stopPropagation(); sluitGesprek(g.id) }}
+                          style={{ color: colors.textMuted, fontWeight: 800, marginRight: -2 }}>×</span>
+                      )}
+                    </button>
+                  )
+                })}
+                <button onClick={extraGesprek} title="Extra gesprek" aria-label="Extra gesprek" style={{
+                  height: 22, padding: '0 7px', flexShrink: 0, border: 'none', borderRadius: 999, background: 'transparent',
+                  color: colors.textMuted, fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
+                }}>+</button>
+              </div>
               <span onClick={() => setOpen(o => !o)} style={{ flex: 1, alignSelf: 'stretch', cursor: 'pointer' }} />
               {/* Mac/API + herstart: rechts op de hoogte van het poppetje */}
               <button onClick={wisselRoute}
@@ -1166,11 +1340,11 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 {!isMobile && (herstart ? 'Herstart' : route === 'api' ? 'API' : paOnline ? 'Mac' : 'Mac uit')}
               </button>
               {route === 'mac' && (
-                <button onClick={herstartPa} disabled={herstart || bezig} title="PA op je Mac herstarten en scherm verversen"
+                <button onClick={herstartPa} disabled={herstart || ergensBezig} title="PA op je Mac herstarten en scherm verversen"
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 26, padding: 0, flexShrink: 0,
-                    background: 'transparent', border: 'none', cursor: herstart || bezig ? 'default' : 'pointer',
-                    color: colors.textMuted, opacity: bezig ? 0.4 : 1,
+                    background: 'transparent', border: 'none', cursor: herstart || ergensBezig ? 'default' : 'pointer',
+                    color: colors.textMuted, opacity: ergensBezig ? 0.4 : 1,
                   }}>
                   <RotateCw size={12} strokeWidth={2.5} className={herstart ? 'bos-draai' : undefined} />
                 </button>
@@ -1191,9 +1365,9 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
             ))}
           </div>
           {wolkZichtbaar && (
-            <Vraagwolk key={`${vraagNu.i}-${vraagNu.j}`} voorstel={vraagNu.ac} nr={1} totaal={openVoorstellen.length} extraHoogte={wachtLijst.length * WACHT_RIJ_H}
-              staat={actieStaat[`${vraagNu.i}-${vraagNu.j}`]}
-              onToestaan={() => toestaan(vraagNu.i, vraagNu.j)} onNee={() => afwijzen(vraagNu.i, vraagNu.j)} />
+            <Vraagwolk key={vraagNu.sleutel} voorstel={vraagNu.ac} nr={1} totaal={openVoorstellen.length} extraHoogte={wachtLijst.length * WACHT_RIJ_H}
+              staat={actieStaat[vraagNu.sleutel]}
+              onToestaan={() => toestaan(vraagNu.t, vraagNu.i, vraagNu.j)} onNee={() => afwijzen(vraagNu.t, vraagNu.i, vraagNu.j)} />
           )}
           {sleept && (
             <div style={{
@@ -1254,7 +1428,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                 {modus === 'slim' ? 'Slim' : 'Snel'}
               </button>
               {gesprek.length > 0 && (
-                <button onClick={() => { stem.stop(); setGesprek([]); setActieStaat({}); setFout(null); setOngelezen(false); gesprekId.current = nieuwGesprekId() }} title="Nieuw gesprek"
+                <button onClick={leegGesprek} title={`Nieuw gesprek in ${actief.naam}`}
                   style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
                   <SquarePen size={16} strokeWidth={2.2} />
                 </button>
