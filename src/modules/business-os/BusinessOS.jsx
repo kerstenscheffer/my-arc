@@ -11,8 +11,10 @@
 // Sinds 30 okt (middag): de pagina staat vast op schermhoogte, alleen de chat
 // scrolt. De cijferpanelen zitten achter de puntjes-knop rechtsboven en openen
 // als zijpaneel (desktop) of bottom sheet (mobiel).
+// Sinds 30 okt (avond): geen begroeting meer; ring, cijferregel en chatbalk
+// vormen één groep midden op het scherm, de ring schaalt mee met de hoogte.
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { MoreHorizontal, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
@@ -246,6 +248,23 @@ export default function BusinessOS({ isMobile }) {
   const [blad, setBlad] = useState(null)
   const [denkt, setDenkt] = useState(false)
   const sluitBlad = useCallback(() => setBlad(null), [])
+  // Ringmaat volgt de beschikbare ruimte: hoogte min cijferregel + chatbalk.
+  const [ruimte, setRuimte] = useState(null)
+  const ro = useRef(null)
+  const midden = useCallback((el) => {
+    ro.current?.disconnect()
+    ro.current = null
+    if (!el || typeof ResizeObserver === 'undefined') return
+    ro.current = new ResizeObserver(([e]) => {
+      const b = Math.round(e.contentRect.width), h = Math.round(e.contentRect.height)
+      setRuimte(r => (r && r.b === b && r.h === h ? r : { b, h }))
+    })
+    ro.current.observe(el)
+  }, [])
+  const maxMaat = isMobile ? 190 : 240
+  const maat = ruimte
+    ? Math.round(Math.max(96, Math.min(maxMaat, ruimte.h - (isMobile ? 190 : 170), ruimte.b - 48)))
+    : (isMobile ? 150 : 210)
 
   const nu = new Date()
   const van = new Date(nu.getFullYear(), nu.getMonth(), 1)
@@ -299,8 +318,6 @@ export default function BusinessOS({ isMobile }) {
   if (!a) return <div style={{ background: C.bg, color: C.zacht, padding: 24, minHeight: '60vh', fontWeight: 700 }}>Laden…</div>
 
   const pctDoel = Math.min(100, a.omzet / doel * 100)
-  const uur = nu.getHours()
-  const groet = uur < 12 ? 'Goedemorgen' : uur < 18 ? 'Goedemiddag' : 'Goedenavond'
   const nodigPerDag = Math.max(0, doel - a.omzet) / Math.max(1, dagenInMaand - dagenVoorbij)
   const opKoers = a.prognose >= doel
   const zw = a.zwakste[0]
@@ -424,8 +441,10 @@ export default function BusinessOS({ isMobile }) {
 
   return (
     // Vaste pagina: precies de ruimte boven de zwevende navbalk (in split
-    // screen de hele helft). Alleen de chatlijst scrolt.
-    <div style={{
+    // screen de hele helft). Alleen de chatlijst scrolt. Ring, cijferregel en
+    // chatbalk staan als één groep in het midden; de ring schaalt mee met de
+    // hoogte zodat de groep altijd past.
+    <div data-bos-pagina="" style={{
       background: C.bg, color: C.tekst, position: 'relative', overflow: 'hidden',
       height: 'calc(var(--paneel-hoogte, 100dvh) - var(--paneel-navruimte, 120px))',
       display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
@@ -464,10 +483,13 @@ export default function BusinessOS({ isMobile }) {
         )}
       </div>
 
-      <div style={{ maxWidth: 860, width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* ── Reactor-ring: het gezicht van de assistent, altijd in beeld ── */}
-        <div style={{ flexShrink: 0, width: '100%', maxWidth: 820, margin: '0 auto' }}>
-          <Reactor pct={pctDoel} maat={isMobile ? 150 : 210} bezig={denkt} />
+      {/* ── Eén gecentreerde groep: ring, cijferregel, chatbalk ── */}
+      <div ref={midden} style={{
+        flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Reactor pct={pctDoel} maat={maat} bezig={denkt} />
           <div style={{
             display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: isMobile ? '2px 14px' : '4px 28px',
             marginTop: isMobile ? 12 : 18, fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 700, color: C.zacht, textAlign: 'center',
@@ -476,21 +498,15 @@ export default function BusinessOS({ isMobile }) {
             <span>prognose <b style={{ ...NUM, color: opKoers ? C.groen : C.oranje }}>{euro(a.prognose)}</b></span>
             <span>zwakste schakel <b style={{ color: C.wit }}>{zw.label}</b></span>
           </div>
-          <div style={{
-            borderTop: `1px solid ${C.groen}40`, marginTop: isMobile ? 10 : 14, paddingTop: 10,
-            fontSize: '0.85rem', fontWeight: 800, lineHeight: 1.4,
-          }}>
-            {groet} Kersten. {opKoers ? 'Je ligt op koers voor je doel.' : `Je mist ${euro(doel - a.prognose)} op je doel als dit tempo blijft.`}
-          </div>
-        </div>
 
-        {/* ── Chat: de ring praat; alleen de berichtenlijst scrolt ── */}
-        <BusinessChat onBezig={setDenkt} context={{
-          omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
-          dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
-          schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
-          zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
-        }} />
+          {/* ── Chat: de ring praat ── */}
+          <BusinessChat onBezig={setDenkt} context={{
+            omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
+            dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
+            schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
+            zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
+          }} />
+        </div>
       </div>
 
       {blad && (
