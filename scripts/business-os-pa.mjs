@@ -116,7 +116,11 @@ const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)
 // Chat licht houden (sneller antwoord): ander model, lage effort, geen
 // MCP-servers, geen user-instellingen/plugins en geen skills. Inloggen blijft
 // via het abonnement (dus geen --bare: die wil een ANTHROPIC_API_KEY).
+// CHAT_ENV: geen CLAUDE.md en geen auto-memory meeladen (~14k tokens en ~1 s
+// per bericht, gemeten 30 okt). De cwd blijft, dus Read/Grep en pa-db werken;
+// CLAUDE.md lezen kan de chat nog zelf met Read.
 const CHAT_MODEL = process.env.PA_CHAT_MODEL || 'sonnet'
+const CHAT_ENV = { CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' }
 const CHAT_LICHT = [
   '--model', CHAT_MODEL,
   '--effort', 'low',
@@ -170,7 +174,7 @@ async function beantwoordChat(invoer) {
     '--no-session-persistence',
     '--max-budget-usd', '3',
     ...CHAT_LICHT,
-  ], { PA_ACCESS_TOKEN: session?.access_token || '' })
+  ], { ...CHAT_ENV, PA_ACCESS_TOKEN: session?.access_token || '' })
   const a = r.json?.structured_output
   if (r.code !== 0 || !a?.tekst) return { ok: false, antwoord: { tekst: r.json?.result || r.fout || 'Geen antwoord van Claude Code.', acties: [] } }
   return { ok: true, antwoord: { tekst: String(a.tekst), acties: Array.isArray(a.acties) ? a.acties : [] } }
