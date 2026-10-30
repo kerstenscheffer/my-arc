@@ -5,7 +5,7 @@
 //
 //   POST { tekst }  (max 1000 tekens)  → audio/mpeg
 //
-// Alleen coaches (get_my_portal_role = coach/both), anders kan elke ingelogde
+// Alleen de teameigenaar (coach_teams.owner_id), anders kan elke ingelogde
 // klant ElevenLabs-tegoed opmaken. Sleutels als Supabase-secrets:
 // ELEVENLABS_API_KEY en (optioneel) ELEVENLABS_VOICE_ID (andere namen met
 // ELEVEN/ELEVAN erin worden ook gevonden, zie zoekSecret). kiesStemmen() zet
@@ -145,6 +145,10 @@ Deno.serve(async (req) => {
     if (!user) return json({ fout: 'geen_login' }, 401)
     const { data: rol } = await sb.rpc('get_my_portal_role')
     if (rol !== 'coach' && rol !== 'both') return json({ fout: 'alleen_coach' }, 403)
+    // Alleen de teameigenaar (coach_teams.owner_id = Kersten). Medewerkers zoals
+    // Marcel krijgen 403 voordat er een betaalde API-aanroep gaat.
+    const { data: eigenTeam } = await sb.from('coach_teams').select('id').eq('owner_id', user.id).limit(1)
+    if (!eigenTeam?.length) return json({ fout: 'alleen_eigenaar' }, 403)
 
     const sleutel = SLEUTEL
     if (!sleutel) return json({ fout: 'geen_sleutel' }, 503)

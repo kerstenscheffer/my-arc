@@ -29,7 +29,7 @@
 // lokale PA (scripts/business-os-pa.mjs, npm run pa) voert hem uit met
 // Claude Code in zijn workapp-map.
 //
-// Alleen coaches (get_my_portal_role = coach/both), anders kan elke ingelogde
+// Alleen de teameigenaar (coach_teams.owner_id), anders kan een medewerker of
 // klant API-tegoed opmaken. Sleutel: ANTHROPIC_API_KEY als Supabase-secret.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -217,6 +217,11 @@ Deno.serve(async (req) => {
     const { data: rol } = await sb.rpc('get_my_portal_role')
     if (rol !== 'coach' && rol !== 'both') return json({ error: 'Alleen voor coaches.' }, 403)
     const { data: { user } } = await sb.auth.getUser()
+    if (!user) return json({ error: 'Niet ingelogd.' }, 401)
+    // Alleen de teameigenaar (coach_teams.owner_id = Kersten). Medewerkers zoals
+    // Marcel krijgen 403 voordat er een betaalde API-aanroep gaat.
+    const { data: eigenTeam } = await sb.from('coach_teams').select('id').eq('owner_id', user.id).limit(1)
+    if (!eigenTeam?.length) return json({ fout: 'alleen_eigenaar', error: 'Alleen voor de eigenaar.' }, 403)
 
     const body = await req.json().catch(() => ({}))
     // Een gebruikersbericht mag een screenshot hebben: { afbeelding: { media_type,

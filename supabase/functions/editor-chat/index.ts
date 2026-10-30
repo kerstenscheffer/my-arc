@@ -15,7 +15,7 @@
 // editor_opdrachten (business-os-editor.sql): bezig → klaar / mislukt. Bestaat
 // die tabel nog niet, dan werkt de chat gewoon door.
 //
-// Alleen coaches (get_my_portal_role = coach/both). Sleutel: OPENAI_API_KEY, anders
+// Alleen de teameigenaar (coach_teams.owner_id). Sleutel: OPENAI_API_KEY, anders
 // de eerste secret met GPT of OPENAI in de naam (Kersten: 'gpt api key'), zie
 // zoekSleutel. Ontbreekt hij: 503 { fout: 'geen_sleutel' } en een rij in
 // app_fouten (pagina business-os-editor). Nooit een sleutel in de frontend of de repo.
@@ -69,6 +69,10 @@ Deno.serve(async (req) => {
     if (!user) return json({ fout: 'geen_login' }, 401)
     const { data: rol } = await sb.rpc('get_my_portal_role')
     if (rol !== 'coach' && rol !== 'both') return json({ fout: 'alleen_coach' }, 403)
+    // Alleen de teameigenaar (coach_teams.owner_id = Kersten). Medewerkers zoals
+    // Marcel krijgen 403 voordat er een betaalde API-aanroep gaat.
+    const { data: eigenTeam } = await sb.from('coach_teams').select('id').eq('owner_id', user.id).limit(1)
+    if (!eigenTeam?.length) return json({ fout: 'alleen_eigenaar' }, 403)
 
     const meldFout = (melding: string) => sb.from('app_fouten')
       .insert({ user_id: user.id, pagina: 'business-os-editor', melding: melding.slice(0, 1000) })

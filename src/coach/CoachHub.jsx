@@ -93,7 +93,9 @@ const PRIMARY_TABS = [
   { id: 'leads', label: 'Leads', icon: UserPlus },
   // Business OS staat sinds 30 okt 2026 in de onderbalk; Output, Productivity
   // en Agenda zijn naar het Meer-menu verhuisd.
-  { id: 'business-os', label: 'Business OS', icon: Activity }
+  // Alleen voor de teameigenaar (coach_teams.owner_id = Kersten), niet voor
+  // medewerkers als Marcel. De edge functions weigeren ze ook (403).
+  { id: 'business-os', label: 'Business OS', icon: Activity, alleenEigenaar: true }
 ]
 
 // ============================================
@@ -274,6 +276,9 @@ export default function CoachHub() {
   const [, setWorkoutSchemas] = useState([])
   const [, setMealTemplates] = useState([])
   const [user, setUser] = useState(null)
+  // null = nog onbekend; tot het antwoord er is blijft Business OS verborgen.
+  const [isEigenaar, setIsEigenaar] = useState(null)
+  const primaireTabs = PRIMARY_TABS.filter(t => !t.alleenEigenaar || isEigenaar)
   
   // Timer state
   const [timerTask, setTimerTask] = useState(null)
@@ -401,6 +406,13 @@ export default function CoachHub() {
     loadUser()
   }, [])
 
+  // Geen eigenaar maar wel via #business-os (of het split-paneel) binnen: terug naar Command.
+  useEffect(() => {
+    if (isEigenaar !== false) return
+    if (activeTab === 'business-os') setHashTab('command')
+    if (splitTab === 'business-os') setSplitTab(null)
+  }, [isEigenaar, activeTab, splitTab])
+
   const loadUser = async () => {
     try {
       const currentUser = await db.getCurrentUser()
@@ -408,6 +420,9 @@ export default function CoachHub() {
       const svc = new ProductivityService(db.supabase)
       setTimerService(svc)
       setTimerCoachId(currentUser.id)
+      const { data: eigenTeam } = await db.supabase
+        .from('coach_teams').select('id').eq('owner_id', currentUser.id).limit(1)
+      setIsEigenaar(!!eigenTeam?.length)
     } catch (error) {
       console.error('Failed to load user:', error)
     }
@@ -581,7 +596,7 @@ export default function CoachHub() {
           />
         )
       case 'business-os':
-        return <BusinessOS isMobile={isMobile} />
+        return isEigenaar ? <BusinessOS isMobile={isMobile} /> : null
       case 'week-review':
         return <CoachWeekReview db={db} isMobile={isMobile} />
       case 'checkins':
@@ -978,6 +993,7 @@ export default function CoachHub() {
                 tabId={activeTab}
                 onKies={(id) => navigateTo(id)}
                 kant="links"
+                primaireTabs={primaireTabs}
               />
               <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch',
                 '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px',
@@ -1011,6 +1027,7 @@ export default function CoachHub() {
                 onKies={(id) => setSplitTab(id)}
                 onSluit={() => setSplitTab(null)}
                 kant="rechts"
+                primaireTabs={primaireTabs}
               />
               <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch',
                 '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px',
@@ -1044,7 +1061,7 @@ export default function CoachHub() {
           zIndex: 100,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 1 }}>
-            {PRIMARY_TABS.map(item => (
+            {primaireTabs.map(item => (
               <NavKnop
                 key={item.id} label={item.label} icon={item.icon} isMobile={isMobile}
                 actief={activeTab === item.id}
@@ -1412,7 +1429,7 @@ function NavKnop({ label, icon, actief, kleur, onClick, title, isMobile }) {
 // Per helft: welk tabblad staat hier, en een keuzelijst om te wisselen. Een
 // native select i.p.v. een eigen dropdown: hij past in 26px hoogte, groepeert
 // vanzelf per categorie en werkt met het toetsenbord.
-function PaneelKop({ tabId, onKies, onSluit, kant }) {
+function PaneelKop({ tabId, onKies, onSluit, kant, primaireTabs }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
@@ -1438,7 +1455,7 @@ function PaneelKop({ tabId, onKies, onSluit, kant }) {
           padding: '0.25rem 0.4rem', outline: 'none', cursor: 'pointer',
         }}
       >
-        {PRIMARY_TABS.map(t => (
+        {primaireTabs.map(t => (
           <option key={t.id} value={t.id} style={{ background: '#111' }}>{t.label}</option>
         ))}
         {MORE_CATEGORIES.map(cat => (
