@@ -11,6 +11,7 @@
 // tussenin zit — dan rekenen we met het gemiddelde.
 
 import { BF_OPTIES, bfWaarde } from './bodyFat'
+import VetpercentageFoto from '../../components/vetpercentage/VetpercentageFoto'
 
 export default function BodyFatPicker({ waarde, waarde2, onChange, accent = '#FFD700', isMobile }) {
   // Zelfde klik-afhandeling als de intake: eerste tik kiest, dezelfde nogmaals
@@ -53,12 +54,8 @@ export default function BodyFatPicker({ waarde, waarde2, onChange, accent = '#FF
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 transition: 'border-color 0.15s ease',
               }}>
-              <img src={opt.img} alt={opt.label} loading="lazy"
-                style={{
-                  width: '100%', aspectRatio: '2/3', objectFit: 'cover',
-                  objectPosition: 'top', display: 'block',
-                  filter: gekozen ? 'none' : 'brightness(0.55)',
-                }} />
+              <VetpercentageFoto value={opt.value} label={opt.label} eerste={i === 0}
+                style={{ filter: gekozen ? 'none' : 'brightness(0.55)' }} />
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0,
                 padding: isMobile ? '0.25rem 0.1rem' : '0.3rem 0.25rem',

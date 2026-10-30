@@ -3,13 +3,15 @@
 
 import React, { useState } from 'react'
 import { Q, Hint, NextBtn, BackBtn, NumberField } from './FlowStep'
+import VetpercentageFoto from '../../../../components/vetpercentage/VetpercentageFoto'
 
+// Foto's komen uit components/vetpercentage/fotos.js (gedeeld met de calculator).
 const BF_OPTIONS_MALE = [
-  { value: 10, label: '7–10%',  sub: 'Competitie, aderen zichtbaar', img: 'https://i.ibb.co/Y7DfXsf7/Scherm-afbeelding-2026-03-27-om-12-38-24.png' },
-  { value: 14, label: '10–15%', sub: 'Duidelijke sixpack, atletisch',  img: 'https://i.ibb.co/Kjtqwfmq/Scherm-afbeelding-2026-03-27-om-12-39-55.png' },
-  { value: 18, label: '15–20%', sub: 'Slank, weinig definitie',        img: 'https://i.ibb.co/3YNdy00M/Scherm-afbeelding-2026-03-27-om-12-38-46.png' },
-  { value: 23, label: '20–25%', sub: 'Gemiddeld, geen abs',            img: 'https://i.ibb.co/d09DQn2f/Scherm-afbeelding-2026-03-27-om-12-38-54.png' },
-  { value: 33, label: '25–35%', sub: 'Duidelijk buikje',               img: 'https://i.ibb.co/RGKN8LZr/Scherm-afbeelding-2026-03-27-om-12-39-02.png' }
+  { value: 10, label: '7–10%',  sub: 'Competitie, aderen zichtbaar' },
+  { value: 14, label: '10–15%', sub: 'Duidelijke sixpack, atletisch' },
+  { value: 18, label: '15–20%', sub: 'Slank, weinig definitie' },
+  { value: 23, label: '20–25%', sub: 'Gemiddeld, geen abs' },
+  { value: 33, label: '25–35%', sub: 'Duidelijk buikje' }
 ]
 
 export default function BodyFlow({ data, onChange, onNext, onBack, isMobile }) {
@@ -133,13 +135,9 @@ export default function BodyFlow({ data, onChange, onNext, onBack, isMobile }) {
                     animation: isFirstEmpty ? 'bfBorderPulse 1.4s ease-in-out infinite' : 'none'
                   }}
                 >
-                  <img
-                    src={opt.img} alt={opt.label}
-                    style={{
-                      width: '100%', aspectRatio: '2/3',
-                      objectFit: 'cover', objectPosition: 'top', display: 'block',
-                      filter: isSelected ? 'none' : 'brightness(0.55)'
-                    }}
+                  <VetpercentageFoto
+                    value={opt.value} label={opt.label} eerste={photoIdx === 0}
+                    style={{ filter: isSelected ? 'none' : 'brightness(0.55)' }}
                   />
                   <div style={{
                     position: 'absolute', bottom: 0, left: 0, right: 0,

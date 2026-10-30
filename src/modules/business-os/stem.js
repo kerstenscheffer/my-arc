@@ -36,6 +36,7 @@
 import { useSyncExternalStore } from 'react'
 import { supabase } from '../../lib/supabase'
 import { APP_VERSIE } from '../app-update/appVersie'
+import { getallenNaarEngels } from './getallenNaarEngels'
 
 const KEY = 'bos_stem_aan'
 
@@ -189,6 +190,15 @@ const ruimOp = () => {
 // Fout met een korte code voor app_fouten (bijv. '503 geen_sleutel', 'afspelen NotAllowedError').
 const stemFout = (code, detail = '') => Object.assign(new Error(`gino-stem ${code}${detail ? ` ${detail}` : ''}`), { code })
 
+// Getallen naar Engelse woorden (getallenNaarEngels.js), alleen voor ElevenLabs:
+// de browser-terugval en het scherm houden de Nederlandse tekst. Wordt het te
+// lang voor gino-stem (max 1000 tekens), dan de oorspronkelijke tekst.
+const MAX_GINO_STEM = 1000
+function voorStem(tekst) {
+  const engels = getallenNaarEngels(tekst)
+  return engels.length <= MAX_GINO_STEM ? engels : tekst
+}
+
 async function haalAudio(tekst, signal) {
   const { data } = await supabase.auth.getSession()
   const token = data?.session?.access_token
@@ -196,7 +206,7 @@ async function haalAudio(tekst, signal) {
   const res = await fetch(STEM_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, apikey: ANON, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tekst }),
+    body: JSON.stringify({ tekst: voorStem(tekst) }),
     signal,
   }).catch(e => { throw stemFout('netwerk', e?.message) })
   if (!res.ok) {
