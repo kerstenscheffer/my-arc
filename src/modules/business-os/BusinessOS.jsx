@@ -30,6 +30,8 @@ import BusinessChat from './BusinessChat'
 import GinoToneel from './GinoToneel'
 import GinoHerinnering from './GinoHerinnering'
 import { bewaarOordeel } from './feedback'
+import { BewaarKnop, SchermenLijst } from './schermen'
+import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
 
@@ -54,6 +56,7 @@ const PRIJS_KEY = 'business_os_prijs'
 // De onderdelen achter de puntjes-knop, in deze volgorde.
 const ONDERDELEN = [
   ['vandaag', 'Vandaag · agenda, taken, beloftes en calls'],
+  ['schermen', 'Mijn schermen · tik om opnieuw te laten zien'],
   ['content', 'Content · komende 14 dagen'],
   ['week', 'Week · inputs vs doel'],
   ['kern', 'Kerncijfers · deze maand'],
@@ -833,10 +836,28 @@ export default function BusinessOS({ isMobile }) {
     })
   }, [])
   const visueel = actieveTab ? beelden[actieveTab] || null : null
+  // Bewaarde schermen: lijst voor het menu én voor Gino's context.
+  const [schermen, setSchermen] = useState({ lijst: [], geladen: false })
+  const laadSchermenNu = useCallback(() => { laadSchermen().then(lijst => setSchermen({ lijst, geladen: true })) }, [])
+  useEffect(() => { laadSchermenNu() }, [laadSchermenNu])
+  const stuurRef = useRef(null)
+  // Tik = meteen de vorige versie tonen en Gino het opnieuw laten maken met
+  // verse data; zijn nieuwe visueel vervangt de preview vanzelf.
+  const kiesScherm = (s) => {
+    setBlad(null)
+    if (s.visueel) toonVisueel({ ...s.visueel, _vorige: true, _vraag: s.vraag })
+    markeerGetoond(s.id)
+    stuurRef.current?.(`Laat ${s.naam} zien`)
+  }
+  const verwijderSchermNu = (s) => {
+    setSchermen(x => ({ ...x, lijst: x.lijst.filter(y => y.id !== s.id) }))
+    verwijderScherm(s.id).then(ok => { if (!ok) laadSchermenNu() })
+  }
   const sluitBlad = useCallback(() => setBlad(null), [])
   const vandaag = useVandaag()
   const { laad: laadVandaag } = vandaag
   useEffect(() => { if (blad === 'vandaag') laadVandaag() }, [blad, laadVandaag])
+  useEffect(() => { if (blad === 'schermen') laadSchermenNu() }, [blad, laadSchermenNu])
   const content = useContent()
   const { laad: laadContent } = content
   useEffect(() => { if (blad === 'content') laadContent() }, [blad, laadContent])
@@ -950,6 +971,7 @@ export default function BusinessOS({ isMobile }) {
   const inhoud = (k) => {
     if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} doorstap={data.doorstap} />
     if (k === 'content') return <ContentPaneel c={content} />
+    if (k === 'schermen') return <SchermenLijst {...schermen} onKies={kiesScherm} onVerwijder={verwijderSchermNu} />
     if (k === 'week') return <WeekPaneel w={week} />
     if (k === 'kern') return (
       <>
@@ -1140,7 +1162,9 @@ export default function BusinessOS({ isMobile }) {
           </div>
 
           {/* ── Chat: de ring praat ── */}
-          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onTab={kiesTab} marginTop={isMobile ? 18 : 24} context={{
+          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMobile ? 18 : 24} context={{
+            // Vooraan: de context wordt na 4000 tekens afgekapt.
+            'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
@@ -1172,6 +1196,8 @@ export default function BusinessOS({ isMobile }) {
 
       {/* ── Gino laat iets zien: blokken naast de groep (smal scherm: strook bovenaan) ── */}
       <GinoToneel visueel={visueel} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
+        label={visueel?._vorige ? 'vorige versie' : null}
+        extra={visueel && !visueel._vorige ? <BewaarKnop visueel={visueel} vraag={visueel._vraag} onKlaar={laadSchermenNu} /> : null}
         onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />
 
       {blad && (

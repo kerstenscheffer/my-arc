@@ -45,7 +45,13 @@ export function zichtbareTekst(ruw) {
 
 export function chatVraag({ gesprek, context }) {
   const nu = new Date().toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  return `Nu: ${nu} (NL-tijd).\n\n${context ? `Cijfers uit Business OS op dit moment (JSON):\n${JSON.stringify(context).slice(0, 4000)}\n\n` : ''}Gesprek tot nu toe:\n\n${gesprek}\n\nBeantwoord het laatste bericht van Kersten.`
+  // Bewaarde schermen (Mijn schermen) apart onder een eigen kopje, rest blijft JSON.
+  const { 'Bewaarde schermen': schermen, ...cijfers } = context || {}
+  const lijst = Array.isArray(schermen) && schermen.length
+    ? `Bewaarde schermen (Kersten verwijst er in eigen woorden naar; maak ze opnieuw met verse data volgens de skill 'Opgeslagen schermen'):\n${schermen.slice(0, 20).map(s => `- ${s}`).join('\n')}\n\n`
+    : ''
+  context = context ? cijfers : context
+  return `Nu: ${nu} (NL-tijd).\n\n${lijst}${context ? `Cijfers uit Business OS op dit moment (JSON):\n${JSON.stringify(context).slice(0, 4000)}\n\n` : ''}Gesprek tot nu toe:\n\n${gesprek}\n\nBeantwoord het laatste bericht van Kersten.`
 }
 
 export function chatPrompt({ skills }) {

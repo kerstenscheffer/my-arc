@@ -47,6 +47,7 @@ import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
 import * as stem from './stem'
 import { bewaarOordeel } from './feedback'
+import { BewaarKnop } from './schermen'
 import { useNieuweVersie } from './useNieuweVersie'
 
 const KEY = 'business_os_chat'
@@ -1015,7 +1016,8 @@ function PaInloggen({ zichtbaar, onKlaar }) {
 
 // onVisueel(actie, tabId): Gino wil iets laten zien rond de bol (GinoToneel.jsx),
 // bij dat tabje. onTab(tabId): het open tabje, zodat het beeld meewisselt.
-export default function BusinessChat({ context, onBezig, onVisueel, onTab, marginTop = 28 }) {
+// stuurRef: de pagina kan via stuurRef.current(tekst) zelf een vraag sturen (Mijn schermen).
+export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuurRef, marginTop = 28 }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -1652,7 +1654,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
     bericht = { ...bericht, op: Date.now() }
     zetBerichten(id, g => [...g, bericht])
     const visueel = (bericht.acties || []).find(a => a?.soort === 'visueel')
-    if (visueel) onVisueel?.(visueel, id)
+    // De vraag erbij, zodat 'Bewaar' rond de bol weet welke vraag dit scherm opleverde.
+    const vraag = [...(gesprekkenRef.current.find(g => g.id === id)?.berichten || [])].reverse().find(n => n.role === 'user')?.content
+    if (visueel) onVisueel?.({ ...visueel, _vraag: vraag || null }, id)
     markeer(id)
     meld('Klaar', false)
     if (actiefRef.current !== id) return
@@ -1668,19 +1672,22 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
   }
   const herhaalKnop = (tekst, vraag = null) => <Herhaal praat={spreekt} onKlik={() => herhaal(tekst, vraag)} />
 
-  const stuur = async () => {
-    const vraag = invoer.trim()
-    if ((!vraag && !bijlagen.length) || bezig) return
+  // tekst (optioneel): vraag van buitenaf (Mijn schermen); invoer en bijlagen blijven dan staan.
+  const stuur = async (tekst) => {
+    const vanBuiten = typeof tekst === 'string'
+    const vraag = (vanBuiten ? tekst : invoer).trim()
+    const bij = vanBuiten ? [] : bijlagen
+    if ((!vraag && !bij.length) || bezig || (vanBuiten && isEditor(actief))) return false
     const { id, sessie } = actief
     stopHerkenner()
-    setInvoer('')
+    if (!vanBuiten) setInvoer('')
     stem.stop()
     // Versturen is een klik/Enter: Safari laat het antwoord straks dan ook afspelen.
     if (stem.isAan()) stem.ontgrendel()
     const nieuwBericht = { role: 'user', content: vraag, op: Date.now() }
-    if (bijlagen.length) {
-      nieuwBericht.afbeeldingen = bijlagen.map(({ media_type, data }) => ({ media_type, data }))
-      nieuwBericht.thumbs = bijlagen.map(b => b.thumb)
+    if (bij.length) {
+      nieuwBericht.afbeeldingen = bij.map(({ media_type, data }) => ({ media_type, data }))
+      nieuwBericht.thumbs = bij.map(b => b.thumb)
     }
     const nieuw = [...gesprek, nieuwBericht]
     onderaan.current = true // eigen bericht: altijd naar beneden
@@ -1689,8 +1696,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
       ...g, berichten: nieuw,
       naam: !g.berichten.length && /^Gesprek \d+$/.test(g.naam) && vraag ? kort(vraag, 18) : g.naam,
     }))
-    setInvoer('')
-    setBijlagen([])
+    if (!vanBuiten) { setInvoer(''); setBijlagen([]) }
+    if (vanBuiten) setOpen(true)
     setBezigPer(b => ({ ...b, [id]: true }))
     setFout(null)
     if (isEditor(actief)) {
@@ -1760,6 +1767,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
     if (ac.soort === 'pa_voorstel') setCode(c => c || 'wacht') // robotje meteen, de poll neemt het over
   }
   const afwijzen = (t, i, j) => zetActie(t, i, j, { afgewezen: true })
+  if (stuurRef) stuurRef.current = stuur
   // Nieuw gesprek in hetzelfde tabje: berichten leeg, nieuwe Slim-sessie.
   const leegGesprek = () => {
     stem.stop()
@@ -1874,14 +1882,20 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, margi
                     if (ac.soort === 'wacht_op_jou') return <WachtOpJou key={j} {...kaart} />
                     if (ac.soort === 'slot_voorstel') return <SlotVoorstel key={j} {...kaart} />
                     if (ac.soort === 'wijziging_voorstel') return <WijzigingVoorstel key={j} {...kaart} />
-                    if (ac.soort === 'visueel') return (
-                      <button key={j} type="button" onClick={() => onVisueel?.(ac, actief.id)} style={{
-                        display: 'flex', gap: 6, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, marginBottom: 4,
-                        color: colors.success, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
-                      }}>
-                        <Eye size={13} strokeWidth={2.5} /> Laat zien{typeof ac.titel === 'string' && ac.titel ? `: ${ac.titel.slice(0, 50)}` : ''}
-                      </button>
-                    )
+                    if (ac.soort === 'visueel') {
+                      const vraag = alle.slice(0, i).reverse().find(n => n.role === 'user')?.content || null
+                      return (
+                        <div key={j} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                          <button type="button" onClick={() => onVisueel?.({ ...ac, _vraag: vraag }, actief.id)} style={{
+                            display: 'flex', gap: 6, alignItems: 'center', background: 'transparent', border: 'none', padding: 0,
+                            color: colors.success, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
+                          }}>
+                            <Eye size={13} strokeWidth={2.5} /> Laat zien{typeof ac.titel === 'string' && ac.titel ? `: ${ac.titel.slice(0, 50)}` : ''}
+                          </button>
+                          <BewaarKnop visueel={ac} vraag={vraag} onKlaar={() => meld('Scherm bewaard', false)} />
+                        </div>
+                      )
+                    }
                     if (ac.soort === 'pa_voorstel') return <PaVoorstel key={j} {...kaart} herhaalKnop={laatsteGino ? herhaalKnop : null} />
                     return (
                       <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, fontSize: '0.8rem', marginBottom: 4 }}>

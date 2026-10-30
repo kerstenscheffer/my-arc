@@ -174,7 +174,9 @@ function Vak({ html, maxHoogte }) {
 
 // breedte = ruimte die de middengroep inneemt (px); de kolommen vullen wat over is.
 // onOordeel('goed' | 'slecht'): duimpje bij het beeld (Gino leert ervan).
-export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSluit, onOordeel }) {
+// label: klein tekstje bij de kop (bv. 'vorige versie' bij een bewaard scherm);
+// extra: knop(pen) vóór de duimpjes (Bewaar).
+export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSluit, onOordeel, label, extra }) {
   const [oordeel, setOordeel] = useState(null)
   useEffect(() => { setOordeel(null) }, [ruw])
   const visueel = schoonVisueel(ruw)
@@ -192,7 +194,14 @@ export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSl
     }}><Icoon size={14} strokeWidth={2.4} /></button>
   )
   const sluit = (
-    <span style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+      {label && (
+        <span style={{
+          fontSize: '0.66rem', fontWeight: 800, color: colors.textSecondary, border: `1px solid ${colors.borderSubtle}`,
+          borderRadius: 999, padding: '1px 7px', whiteSpace: 'nowrap',
+        }}>{label}</span>
+      )}
+      {extra}
       {duim('goed', ThumbsUp, 'Goed beeld (Gino onthoudt het)')}
       {duim('slecht', ThumbsDown, 'Niet goed (Gino onthoudt het)')}
       <button type="button" onClick={onSluit} title="Weghalen" style={knopStijl}><X size={16} strokeWidth={2.4} /></button>
