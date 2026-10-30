@@ -41,7 +41,7 @@
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2 } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, RotateCw, Volume2, Loader2, Hand, Hourglass, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -621,6 +621,38 @@ async function vraagEditor(gesprek) {
   return { fout: 'ChatGPT gaf geen antwoord, probeer opnieuw.' }
 }
 
+// Status op een gesprek-tabje: icoon + kort woord, kleur volgt de status.
+// 'jou' = er staat in dat tabje een vraag of actie voor Kersten open;
+// 'wacht' = opdracht staat klaar maar de Mac heeft hem nog niet opgepakt.
+const TAB_STATUS = {
+  bezig: { Icoon: Loader2, tekst: 'Bezig', kleur: colors.textPrimary, draai: true },
+  jou: { Icoon: Hand, tekst: 'Wacht op jou', kleur: colors.textPrimary },
+  wacht: { Icoon: Hourglass, tekst: 'In de rij', kleur: colors.textSecondary },
+  klaar: { Icoon: Check, tekst: 'Klaar', kleur: colors.success },
+  mislukt: { Icoon: AlertTriangle, tekst: 'Mislukt', kleur: colors.danger },
+}
+const duur = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  if (s < 60) return `${s} s`
+  if (s < 3600) return `${Math.floor(s / 60)} min`
+  if (s < 86400) return `${Math.floor(s / 3600)} u`
+  return `${Math.floor(s / 86400)} d`
+}
+function TabStatus({ staat, nu }) {
+  const st = staat && TAB_STATUS[staat.status]
+  if (!st) return null
+  const { Icoon } = st
+  const tijd = !staat.sinds ? ''
+    : staat.status === 'bezig' ? ` ${duur(nu - staat.sinds)}`
+    : staat.status === 'klaar' || staat.status === 'mislukt' ? ` · ${duur(nu - staat.sinds)} geleden` : ''
+  return (
+    <span title={`${st.tekst}${tijd}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: st.kleur, fontWeight: 800, flexShrink: 0 }}>
+      <Icoon size={11} strokeWidth={2.75} className={st.draai ? 'bos-draai' : undefined} />
+      <span>{st.tekst}{tijd}</span>
+    </span>
+  )
+}
+
 const EDITOR_STATUS = { open: 'Open', bezig: 'Bezig…', klaar: 'Klaar', mislukt: 'Mislukt' }
 const EDITOR_KLEUR = { open: colors.textMuted, bezig: colors.textPrimary, klaar: colors.success, mislukt: colors.danger }
 // Laatste opdrachten met statuslicht, bovenaan het venster in Editor. Tik op een
@@ -1052,6 +1084,56 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
     return () => { weg = true; clearInterval(t) }
   }, [])
 
+  // Status per tabje: chat- en code-rijen van het laatste etmaal. Realtime
+  // haalt bij elke wijziging opnieuw op; pollen elke 5 s blijft als vangnet.
+  const [tabRijen, setTabRijen] = useState([])
+  useEffect(() => {
+    let weg = false
+    let wachtOp = null
+    const kijk = () => supabase.from('business_os_opdrachten')
+      .select('id, soort, status, created_at, gestart_at, klaar_at, gesprek:invoer->>gesprek_id')
+      .in('soort', ['chat', 'code']).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false }).limit(80)
+      .then(({ data, error }) => { if (!weg && !error && Array.isArray(data)) setTabRijen(data) }, () => {})
+    kijk()
+    const t = setInterval(kijk, 5000)
+    const kanaal = supabase.channel('bos-tabstatus')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'business_os_opdrachten' }, () => {
+        clearTimeout(wachtOp)
+        wachtOp = setTimeout(kijk, 300)
+      })
+      .subscribe()
+    return () => { weg = true; clearInterval(t); clearTimeout(wachtOp); supabase.removeChannel(kanaal) }
+  }, [])
+  // Lokaal denken (API-route, Editor) heeft geen rij: starttijd zelf bijhouden.
+  const bezigSinds = useRef({})
+  useEffect(() => {
+    Object.entries(bezigPer).forEach(([id, aan]) => {
+      if (aan && !bezigSinds.current[id]) bezigSinds.current[id] = Date.now()
+      if (!aan) delete bezigSinds.current[id]
+    })
+  }, [bezigPer])
+  const tabStatus = (g) => {
+    const ids = new Set(g.berichten.flatMap(b => (b.acties || []).map(a => a?.opdrachtId).filter(Boolean)))
+    const rijen = tabRijen.filter(r => ids.has(r.id) || (r.soort === 'chat' && g.sessie && r.gesprek === g.sessie))
+    const loopt = rijen.filter(r => r.status === 'bezig')
+    if (loopt.length || bezigPer[g.id]) {
+      const start = Math.min(...loopt.map(r => new Date(r.gestart_at || r.created_at).getTime()), bezigSinds.current[g.id] || Infinity)
+      return { status: 'bezig', sinds: Number.isFinite(start) ? start : null }
+    }
+    if (alleOpen.some(x => x.t === g.id)) return { status: 'jou' }
+    if (rijen.some(r => r.status === 'wacht')) return { status: 'wacht' }
+    const af = rijen.find(r => r.status === 'klaar' || r.status === 'mislukt')
+    return af ? { status: af.status, sinds: new Date(af.klaar_at || af.created_at).getTime() } : null
+  }
+  // Klok voor "loopt 2:13" en "5 min geleden": elke seconde als er iets loopt, anders elke halve minuut.
+  const [nu, setNu] = useState(() => Date.now())
+  const ietsLoopt = ergensBezig || tabRijen.some(r => r.status === 'bezig')
+  useEffect(() => {
+    const t = setInterval(() => setNu(Date.now()), ietsLoopt ? 1000 : 30000)
+    return () => clearInterval(t)
+  }, [ietsLoopt])
+
   const microfoon = () => {
     if (luistert) { herkenner.current?.stop(); return }
     stem.stop()
@@ -1426,6 +1508,7 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
               }}>
                 {gesprekken.map((g, gi) => {
                   const aan = g.id === actief.id
+                  const staat = tabStatus(g)
                   return (
                     <button key={g.id} role="tab" aria-selected={aan} onClick={() => (aan && open ? setOpen(false) : kiesGesprek(g.id))}
                       title={bezigPer[g.id] ? `${g.naam}: Gino denkt na` : g.naam}
@@ -1435,7 +1518,8 @@ export default function BusinessChat({ context, onBezig, marginTop = 28 }) {
                         background: aan ? colors.surface : 'transparent',
                         color: aan ? colors.textPrimary : colors.textMuted, fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap',
                       }}>
-                      <span className={bezigPer[g.id] ? 'bos-stip' : undefined} style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.naam}</span>
+                      <span style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.naam}</span>
+                      <TabStatus staat={staat} nu={nu} />
                       {ongelezenPer[g.id] && (
                         <span className="bos-stip" style={{
                           width: 6, height: 6, borderRadius: '50%', flexShrink: 0,

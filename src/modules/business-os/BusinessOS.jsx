@@ -28,6 +28,9 @@ import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import BusinessChat from './BusinessChat'
 import * as stem from './stem'
+import ContentPlanningService from '../output-planning/ContentPlanningService'
+
+const contentService = new ContentPlanningService(supabase)
 
 const C = {
   bg: colors.bg,
@@ -47,6 +50,8 @@ const PRIJS_KEY = 'business_os_prijs'
 
 // De onderdelen achter de puntjes-knop, in deze volgorde.
 const ONDERDELEN = [
+  ['vandaag', 'Vandaag · taken, beloftes en calls'],
+  ['content', 'Content · komende 14 dagen'],
   ['kern', 'Kerncijfers · deze maand'],
   ['keten', 'De keten · deze maand vs. gemiddelde'],
   ['acties', 'Acties deze week'],
@@ -286,6 +291,313 @@ function Paneel({ titel, children, style }) {
   )
 }
 
+// ── Vandaag: beloftes, taken en calls ──
+// Lokale datum als 'YYYY-MM-DD' (scheduled_date/deadline zijn date-kolommen).
+const dagIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const isBelofte = (t) => /^belofte/i.test(t.title || '')
+const dagenOver = (datum, vandaag) => Math.round((new Date(vandaag) - new Date(datum)) / 864e5)
+
+// Laadt de actieve taken van de ingelogde coach (zelfde filter als
+// ProductivityService: coach_id = auth user id) en de calls van vandaag en morgen.
+// Herhaaltaken blijven eruit: die mogen nooit permanent op 'completed'.
+function useVandaag() {
+  const [taken, setTaken] = useState(null)
+  const [calls, setCalls] = useState([])
+  const vandaag = dagIso(new Date())
+
+  const laad = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.id) return
+    const nu = new Date()
+    const begin = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate())
+    const eind = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate() + 2)
+    const [t, c] = await Promise.all([
+      supabase.from('productivity_tasks')
+        .select('id, title, scheduled_date, deadline, recurrence_active')
+        .eq('coach_id', user.id)
+        .eq('status', 'active')
+        .or(`scheduled_date.lte.${vandaag},deadline.eq.${vandaag}`)
+        .order('scheduled_date', { ascending: true, nullsFirst: false })
+        .then(r => r, e => ({ data: null, error: e })),
+      supabase.from('client_calls')
+        .select('id, scheduled_date, call_title, clients!inner(first_name, coach_id)')
+        .eq('clients.coach_id', user.id)
+        .in('status', ['scheduled', 'completed'])
+        .is('canceled_at', null)
+        .gte('scheduled_date', begin.toISOString())
+        .lt('scheduled_date', eind.toISOString())
+        .order('scheduled_date', { ascending: true })
+        .then(r => r, e => ({ data: null, error: e })),
+    ])
+    if (!t.error) setTaken((t.data || []).filter(x => !x.recurrence_active))
+    if (!c.error) setCalls(c.data || [])
+  }, [vandaag])
+
+  useEffect(() => { laad() }, [laad])
+
+  const lijsten = useMemo(() => {
+    const alle = taken || []
+    const beloftes = alle.filter(x => isBelofte(x) && x.scheduled_date && x.scheduled_date <= vandaag)
+    const rest = alle.filter(x => !isBelofte(x))
+    const takenVandaag = rest.filter(x => x.scheduled_date === vandaag || x.deadline === vandaag)
+    const overDatum = rest.filter(x => x.scheduled_date && x.scheduled_date < vandaag && !takenVandaag.includes(x))
+    return { beloftes, takenVandaag, overDatum }
+  }, [taken, vandaag])
+
+  // Optimistisch afvinken: regel weg, bij een fout komt 'ie terug.
+  const vinkAf = useCallback(async (taak) => {
+    setTaken(l => (l || []).filter(x => x.id !== taak.id))
+    const { error } = await supabase.from('productivity_tasks')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', taak.id)
+      .then(r => r, e => ({ error: e }))
+    if (error) {
+      console.error('Afvinken mislukt:', error)
+      setTaken(l => [...(l || []), taak].sort((x, y) => (x.scheduled_date || '9').localeCompare(y.scheduled_date || '9')))
+    }
+  }, [])
+
+  return { geladen: taken !== null, vandaag, calls, ...lijsten, vinkAf, laad }
+}
+
+function TaakRegel({ taak, vandaag, toonDagen, onVink }) {
+  const over = toonDagen && taak.scheduled_date ? dagenOver(taak.scheduled_date, vandaag) : 0
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+      <button type="button" onClick={() => onVink(taak)} title="Afvinken" aria-label={`${taak.title} afvinken`} style={{
+        width: 32, height: 32, flexShrink: 0, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${C.groen}` }} />
+      </button>
+      <div style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.35 }}>{taak.title}</div>
+      {toonDagen && (
+        <div style={{ ...NUM, fontSize: '0.75rem', fontWeight: 800, color: over >= 1 ? C.oranje : C.zacht, flexShrink: 0 }}>
+          {over >= 1 ? `${over} d over` : 'vandaag'}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VandaagPaneel({ v }) {
+  const [alles, setAlles] = useState(false)
+  if (!v.geladen) return <div style={{ fontSize: '0.85rem', color: C.zacht }}>Laden…</div>
+  const leeg = (t) => <div style={{ fontSize: '0.85rem', color: C.zacht }}>{t}</div>
+  const over = alles ? v.overDatum : v.overDatum.slice(0, 10)
+  return (
+    <>
+      <Paneel titel={`Beloftes aan klanten · ${v.beloftes.length}`}>
+        {v.beloftes.length === 0 && leeg('Geen openstaande beloftes.')}
+        {v.beloftes.map(t => <TaakRegel key={t.id} taak={t} vandaag={v.vandaag} toonDagen onVink={v.vinkAf} />)}
+      </Paneel>
+      <Paneel titel={`Taken vandaag · ${v.takenVandaag.length}`} style={{ marginTop: 16 }}>
+        {v.takenVandaag.length === 0 && leeg('Niets gepland voor vandaag.')}
+        {v.takenVandaag.map(t => <TaakRegel key={t.id} taak={t} vandaag={v.vandaag} onVink={v.vinkAf} />)}
+      </Paneel>
+      <Paneel titel={`Over datum · ${v.overDatum.length}`} style={{ marginTop: 16 }}>
+        {v.overDatum.length === 0 && leeg('Niets over datum.')}
+        {over.map(t => <TaakRegel key={t.id} taak={t} vandaag={v.vandaag} toonDagen onVink={v.vinkAf} />)}
+        {v.overDatum.length > 10 && (
+          <button type="button" onClick={() => setAlles(a => !a)} style={{
+            background: 'none', border: 'none', padding: '10px 0 0', minHeight: 40, cursor: 'pointer',
+            color: C.groen, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800,
+          }}>
+            {alles ? 'Toon minder' : `Toon alles (${v.overDatum.length})`}
+          </button>
+        )}
+      </Paneel>
+      <Paneel titel={`Calls vandaag en morgen · ${v.calls.length}`} style={{ marginTop: 16 }}>
+        {v.calls.length === 0 && leeg('Geen calls vandaag of morgen.')}
+        {v.calls.map(c => {
+          const d = new Date(c.scheduled_date)
+          const dag = dagIso(d) === v.vandaag ? 'Vandaag' : 'Morgen'
+          return (
+            <div key={c.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+              <div style={{ ...NUM, fontSize: '0.8rem', fontWeight: 800, color: C.groen, minWidth: 96 }}>
+                {dag} {d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {c.clients?.first_name || 'Klant'}{c.call_title ? ` · ${c.call_title}` : ''}
+              </div>
+            </div>
+          )
+        })}
+      </Paneel>
+    </>
+  )
+}
+
+// ── Content: planner voor de komende 14 dagen ──
+// Leest content_items van de ingelogde coach via ContentPlanningService
+// (coach_id = auth user id). Gino zet editpakketten klaar als type reel,
+// status planned, met title/hook/script/edit_notes en planned_date.
+const STATUS_LABEL = { idea: 'idee', planned: 'gepland', created: 'gepost' }
+
+function useContent() {
+  const [items, setItems] = useState(null)
+  const [ideeen, setIdeeen] = useState([])
+  const vandaag = dagIso(new Date())
+  const dagen = useMemo(() => {
+    const [j, m, d] = vandaag.split('-').map(Number)
+    return Array.from({ length: 14 }, (_, i) => new Date(j, m - 1, d + i))
+  }, [vandaag])
+
+  const laad = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.id) return
+    const [lijst, idee] = await Promise.all([
+      contentService.getContentItems(user.id, { weekStart: dagIso(dagen[0]), weekEnd: dagIso(dagen[13]) }),
+      contentService.getContentIdeas(user.id),
+    ])
+    setItems(lijst)
+    setIdeeen(idee.slice(0, 10))
+  }, [dagen])
+
+  useEffect(() => { laad() }, [laad])
+
+  const perDag = useMemo(() => dagen.map(d => {
+    const datum = dagIso(d)
+    return { datum, dag: d, items: (items || []).filter(x => x.planned_date === datum) }
+  }), [dagen, items])
+
+  const gepost = useCallback(async (item) => {
+    try {
+      const nieuw = await contentService.updateContentItem(item.id, { status: 'created', posted_at: new Date().toISOString() })
+      setItems(l => (l || []).map(x => (x.id === item.id ? { ...x, ...nieuw } : x)))
+      return true
+    } catch { return false }
+  }, [])
+
+  const plan = useCallback(async (idee, datum) => {
+    if (!datum) return false
+    try {
+      await contentService.scheduleContent(idee.id, datum)
+      await laad()
+      return true
+    } catch { return false }
+  }, [laad])
+
+  return { geladen: items !== null, perDag, ideeen, gepost, plan, laad }
+}
+
+const editpakket = (it) => [
+  ['Titel', it.title], ['Hook', it.hook], ['Script', it.script], ['Editnotities', it.edit_notes],
+].map(([k, w]) => `${k}\n${(w || '').trim() || '-'}`).join('\n\n')
+
+function Knop({ children, onClick, vol }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      flex: 1, minHeight: 40, borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+      fontSize: '0.8rem', fontWeight: 800, padding: '0 12px',
+      background: vol ? C.groen : 'transparent', color: vol ? '#000' : C.groen,
+      border: `1px solid ${C.groen}`,
+    }}>
+      {children}
+    </button>
+  )
+}
+
+function ContentItem({ it, c }) {
+  const [open, setOpen] = useState(false)
+  const [melding, setMelding] = useState(null)
+  const kopieer = async () => {
+    try {
+      await navigator.clipboard.writeText(editpakket(it))
+      setMelding('Gekopieerd')
+    } catch { setMelding('Kopiëren lukt niet in deze browser') }
+  }
+  const post = async () => setMelding(await c.gepost(it) ? 'Op gepost gezet' : 'Opslaan mislukt')
+  const blok = (kop, tekst) => tekst ? (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ ...LABEL, fontSize: '0.65rem', color: C.zacht }}>{kop}</div>
+      <div style={{ fontSize: '0.85rem', lineHeight: 1.45, whiteSpace: 'pre-wrap', marginTop: 2 }}>{tekst}</div>
+    </div>
+  ) : null
+  return (
+    <div style={{ marginTop: 6 }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', background: 'none',
+        border: 'none', padding: '4px 0', minHeight: 32, cursor: 'pointer', color: C.wit, fontFamily: 'inherit',
+      }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: open ? 'normal' : 'nowrap' }}>
+          {it.title || 'Zonder titel'}
+        </span>
+        {[it.type, STATUS_LABEL[it.status] || it.status].filter(Boolean).map(l => (
+          <span key={l} style={{
+            fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, flexShrink: 0,
+            color: it.status === 'created' && l !== it.type ? C.groen : C.zacht, border: `1px solid ${C.rand}`,
+          }}>{l}</span>
+        ))}
+      </button>
+      {open && (
+        <div style={{ paddingBottom: 6 }}>
+          {blok('Hook', it.hook)}
+          {blok('Script', it.script)}
+          {blok('Editnotities', it.edit_notes)}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <Knop vol onClick={kopieer}>Kopieer editpakket</Knop>
+            {it.status !== 'created' && <Knop onClick={post}>Gepost</Knop>}
+          </div>
+          {melding && <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.zacht, marginTop: 6 }}>{melding}</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IdeeRegel({ idee, c }) {
+  const [fout, setFout] = useState(false)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+      <div style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.35 }}>
+        {idee.title || 'Zonder titel'}
+        {fout && <div style={{ fontSize: '0.72rem', color: C.rood }}>Plannen mislukt</div>}
+      </div>
+      <input type="date" aria-label={`Plan ${idee.title || 'idee'}`} min={c.perDag[0]?.datum}
+        onChange={async e => setFout(!(await c.plan(idee, e.target.value)))}
+        style={{
+          background: 'transparent', border: `1px solid ${C.rand}`, borderRadius: 8, color: C.tekst,
+          fontFamily: 'inherit', fontSize: '0.8rem', padding: '6px 8px', minHeight: 36, colorScheme: 'dark',
+        }} />
+    </div>
+  )
+}
+
+function ContentPaneel({ c }) {
+  if (!c.geladen) return <div style={{ fontSize: '0.85rem', color: C.zacht }}>Laden…</div>
+  const gepland = c.perDag.filter(d => d.items.length > 0).length
+  return (
+    <>
+      <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 12 }}>
+        <b style={{ ...NUM, color: gepland >= 14 ? C.groen : C.wit }}>{gepland} van 14</b> dagen gepland
+      </div>
+      {c.perDag.map(d => {
+        const leeg = d.items.length === 0
+        return (
+          <div key={d.datum} style={{
+            padding: '8px 10px', marginBottom: 6, borderRadius: 10,
+            border: `1px solid ${leeg ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.06)'}`,
+            opacity: leeg ? 0.6 : 1,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ ...NUM, fontSize: '0.8rem', fontWeight: 800, color: leeg ? C.zacht : C.groen, minWidth: 64 }}>
+                {d.dag.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
+              </div>
+              {leeg && <div style={{ fontSize: '0.8rem', fontWeight: 600, color: C.zacht }}>nog niets gepland</div>}
+            </div>
+            {d.items.map(it => <ContentItem key={it.id} it={it} c={c} />)}
+          </div>
+        )
+      })}
+      <Paneel titel={`Ideeën · ${c.ideeen.length}`} style={{ marginTop: 16 }}>
+        {c.ideeen.length === 0 && <div style={{ fontSize: '0.85rem', color: C.zacht }}>Geen losse ideeën.</div>}
+        {c.ideeen.map(i => <IdeeRegel key={i.id} idee={i} c={c} />)}
+      </Paneel>
+    </>
+  )
+}
+
 function Invoer({ label, waarde, onChange }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.75rem', fontWeight: 700, color: C.zacht, flex: 1 }}>
@@ -311,6 +623,12 @@ export default function BusinessOS({ isMobile }) {
   const [blad, setBlad] = useState(null)
   const [denkt, setDenkt] = useState(false)
   const sluitBlad = useCallback(() => setBlad(null), [])
+  const vandaag = useVandaag()
+  const { laad: laadVandaag } = vandaag
+  useEffect(() => { if (blad === 'vandaag') laadVandaag() }, [blad, laadVandaag])
+  const content = useContent()
+  const { laad: laadContent } = content
+  useEffect(() => { if (blad === 'content') laadContent() }, [blad, laadContent])
   // Stem-modus: eerste klik zet aan (en ontgrendelt iOS), klik tijdens praten
   // stopt alleen, klik in stilte zet uit.
   const { aan: stemAan, spreekt, teruggevallen } = stem.useStem()
@@ -414,6 +732,8 @@ export default function BusinessOS({ isMobile }) {
 
   // Inhoud van de onderdelen: precies wat eerder in de inklap-secties stond.
   const inhoud = (k) => {
+    if (k === 'vandaag') return <VandaagPaneel v={vandaag} />
+    if (k === 'content') return <ContentPaneel c={content} />
     if (k === 'kern') return (
       <>
         <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 12 }}>
@@ -587,6 +907,16 @@ export default function BusinessOS({ isMobile }) {
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
             zwaksteSchakel: zw.label, nodigVoorDoel: a.som, actieveKlanten: data.klanten?.actief,
+            vandaag: {
+              beloftesOpen: vandaag.beloftes.length, takenVandaag: vandaag.takenVandaag.length,
+              overDatum: vandaag.overDatum.length, callsVandaag: vandaag.calls.filter(c => dagIso(new Date(c.scheduled_date)) === vandaag.vandaag).length,
+              oudsteBeloftes: vandaag.beloftes.slice(0, 5).map(t => t.title),
+            },
+            contentKomende14Dagen: {
+              geplandeDagen: content.perDag.filter(d => d.items.length > 0).length,
+              legeDagen: content.perDag.filter(d => d.items.length === 0).map(d => d.datum),
+              items: content.perDag.flatMap(d => d.items.map(it => ({ datum: d.datum, titel: it.title, status: it.status }))),
+            },
           }} />
         </div>
       </div>
