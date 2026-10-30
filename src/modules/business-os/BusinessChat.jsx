@@ -106,7 +106,7 @@ export default function BusinessChat({ context }) {
               <div style={{ flex: 1, fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.55, color: colors.textPrimary, whiteSpace: 'pre-wrap' }}>
                 {(b.acties || []).map((ac, j) => (
                   <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, marginBottom: 6 }}>
-                    <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /> Op de app-lijst: {ac.tekst}
+                    <Check size={16} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : ac.tekst}
                   </div>
                 ))}
                 {b.content}

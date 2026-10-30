@@ -10,6 +10,10 @@
 // rij in app_issues (zelfde lijst als de zijtab in CoachHub); de nacht-AI of
 // een "probleem"-sessie bouwt ze. De chat zelf verandert nooit code.
 //
+// Skills (werkwijzen per soort taak) staan in business_os_skills en worden bij
+// elke vraag ingelezen. Kersten maakt/wijzigt ze door erover te praten:
+// tools bewaar_skill en verwijder_skill. Zie business-os-skills.sql.
+//
 // Alleen coaches (get_my_portal_role = coach/both), anders kan elke ingelogde
 // klant API-tegoed opmaken. Sleutel: ANTHROPIC_API_KEY als Supabase-secret.
 
@@ -38,7 +42,9 @@ Taalregels (altijd):
 - Geen gedachtestreepjes (— of –). Geen emoji's tenzij gevraagd.
 - Kopieer nooit letterlijk van andere coaches: zelfde mechanisme, zijn onderwerp.
 
-App-wijzigingen: vraagt Kersten iets aan te passen, toe te voegen of te repareren in de MY ARC-app (CoachHub, klant-app, funnels), gebruik dan de tool zet_op_app_lijst. Schrijf de opdracht zo dat een ontwikkelaar hem zonder dit gesprek begrijpt: welk scherm, wat er nu gebeurt, wat het moet worden. Eén opdracht per wijziging. Bevestig daarna in één zin dat het op de lijst staat. Beloof nooit dat het al aangepast is.
+App-wijzigingen: vraagt Kersten iets aan te passen in de MY ARC-app, gebruik de tool zet_op_app_lijst. Beloof nooit dat het al aangepast is.
+
+Skills: hieronder staan Kerstens skills, vaste werkwijzen per soort taak. Past een taak bij een skill, volg die stappen precies. Wil Kersten een nieuwe werkwijze vastleggen of een bestaande aanpassen ("onthoud dit", "maak hier een skill van", "voortaan bij scripts..."), gebruik bewaar_skill met de volledige nieuwe instructies (bij aanpassen: de oude stappen plus de wijziging, onder dezelfde naam). Laat in één zin weten wat je bewaard hebt.
 
 Opmaak: platte tekst met korte kopjes en pijltjes (→). Geen markdown-tabellen. Vraag alleen door als de taak echt onduidelijk is; anders lever direct een eerste versie die hij kan aanscherpen.`
 
@@ -51,6 +57,26 @@ const TOOLS = [{
       tekst: { type: 'string', description: 'De opdracht: welk scherm, wat er nu gebeurt, wat het moet worden.' },
     },
     required: ['tekst'],
+  },
+}, {
+  name: 'bewaar_skill',
+  description: 'Maak een nieuwe skill of overschrijf een bestaande met dezelfde naam. Alleen als Kersten een werkwijze wil vastleggen of aanpassen.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      naam: { type: 'string', description: 'Korte naam, bv. "Reel-script". Gelijk aan een bestaande naam = aanpassen.' },
+      wanneer: { type: 'string', description: 'Wanneer deze skill gebruikt wordt, in één zin.' },
+      instructies: { type: 'string', description: 'De volledige genummerde stappen en regels.' },
+    },
+    required: ['naam', 'wanneer', 'instructies'],
+  },
+}, {
+  name: 'verwijder_skill',
+  description: 'Zet een skill uit. Alleen als Kersten daar expliciet om vraagt.',
+  input_schema: {
+    type: 'object',
+    properties: { naam: { type: 'string' } },
+    required: ['naam'],
   },
 }]
 
@@ -81,10 +107,14 @@ Deno.serve(async (req) => {
       return json({ error: 'Geen vraag meegestuurd' }, 400)
     }
 
+    const { data: skills } = await sb.from('business_os_skills')
+      .select('naam, wanneer, instructies').eq('actief', true).order('naam')
+    const skillTekst = (skills || []).length
+      ? (skills || []).map((k: any) => `### ${k.naam}\nWanneer: ${k.wanneer}\n${k.instructies}`).join('\n\n')
+      : '(nog geen skills)'
     const context = body.context ? JSON.stringify(body.context).slice(0, 4000) : ''
-    const systeem = context
-      ? `${SYSTEEM}\n\nCijfers uit Business OS op dit moment (JSON):\n${context}`
-      : SYSTEEM
+    const systeem = `${SYSTEEM}\n\n## Skills\n${skillTekst}`
+      + (context ? `\n\nCijfers uit Business OS op dit moment (JSON):\n${context}` : '')
 
     const vraagAI = async (messages: unknown[]) => {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -118,6 +148,25 @@ Deno.serve(async (req) => {
           if (error) { console.error('app_issues', error); uitkomst = 'Mislukt: ' + error.message }
           else { acties.push({ soort: 'app_issue', tekst }); uitkomst = 'Staat op de lijst.' }
         }
+        if (blok.name === 'bewaar_skill') {
+          const naam = String(blok.input?.naam || '').trim().slice(0, 80)
+          const wanneer = String(blok.input?.wanneer || '').trim().slice(0, 500)
+          const instructies = String(blok.input?.instructies || '').trim().slice(0, 6000)
+          const { error } = naam && wanneer && instructies && user
+            ? await sb.from('business_os_skills').upsert(
+                { coach_id: user.id, naam, wanneer, instructies, actief: true, updated_at: new Date().toISOString() },
+                { onConflict: 'coach_id,naam' })
+            : { error: { message: 'naam, wanneer en instructies zijn verplicht' } }
+          if (error) { console.error('skill', error); uitkomst = 'Mislukt: ' + error.message }
+          else { acties.push({ soort: 'skill', tekst: `Skill bewaard: ${naam}` }); uitkomst = 'Bewaard.' }
+        }
+        if (blok.name === 'verwijder_skill') {
+          const naam = String(blok.input?.naam || '').trim()
+          const { data: weg, error } = await sb.from('business_os_skills')
+            .update({ actief: false, updated_at: new Date().toISOString() }).eq('naam', naam).select('id')
+          if (error || !weg?.length) uitkomst = 'Geen skill met die naam gevonden.'
+          else { acties.push({ soort: 'skill', tekst: `Skill uitgezet: ${naam}` }); uitkomst = 'Uitgezet.' }
+        }
         resultaten.push({ type: 'tool_result', tool_use_id: blok.id, content: uitkomst })
       }
       gesprek.push({ role: 'assistant', content: data.content }, { role: 'user', content: resultaten })
@@ -125,7 +174,7 @@ Deno.serve(async (req) => {
     }
     if (!data) return json({ error: 'AI gaf geen antwoord, probeer opnieuw.' }, 502)
     const tekst = (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim()
-    return json({ tekst: tekst || (acties.length ? 'Staat op de lijst.' : ''), acties })
+    return json({ tekst: tekst || (acties.length ? 'Klaar.' : ''), acties })
   } catch (e) {
     console.error(e)
     return json({ error: 'AI gaf geen antwoord, probeer opnieuw.' }, 500)
