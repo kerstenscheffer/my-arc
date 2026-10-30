@@ -3,13 +3,16 @@
 // Chatbalk onder de reactor in Business OS: taken uitbesteden aan Claude
 // (scripts, hooks, DM-teksten, meedenken over de cijfers). Praat met de edge
 // function business-os-chat; het gesprek blijft per apparaat bewaard.
+// Microfoon = spraak naar tekst van de browser (Web Speech API, nl-NL). Waar
+// de browser dat niet kan (o.a. de iOS-app-webview) verschijnt de knop niet.
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowUp, Copy, Check } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
 const KEY = 'business_os_chat'
+const Spraak = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
 
 const leesGesprek = () => {
   try { return JSON.parse(localStorage.getItem(KEY)) || [] } catch { return [] }
@@ -36,7 +39,31 @@ export default function BusinessChat({ context }) {
   const [invoer, setInvoer] = useState('')
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
+  const [luistert, setLuistert] = useState(false)
   const lijst = useRef(null)
+  const herkenner = useRef(null)
+
+  useEffect(() => () => herkenner.current?.abort(), [])
+
+  const microfoon = () => {
+    if (luistert) { herkenner.current?.stop(); return }
+    const h = new Spraak()
+    h.lang = 'nl-NL'
+    h.continuous = true
+    h.interimResults = true
+    // Wat er al stond blijft staan; het gesprokene komt erachter.
+    const basis = invoer.trim() ? invoer.trim() + ' ' : ''
+    h.onresult = (e) => {
+      const tekst = Array.from(e.results).map(r => r[0].transcript).join('')
+      setInvoer(basis + tekst)
+    }
+    h.onerror = (e) => { if (e.error !== 'aborted' && e.error !== 'no-speech') setFout('Microfoon werkt niet: ' + e.error) }
+    h.onend = () => setLuistert(false)
+    herkenner.current = h
+    setFout(null)
+    h.start()
+    setLuistert(true)
+  }
 
   useEffect(() => {
     bewaarGesprek(gesprek)
@@ -46,6 +73,7 @@ export default function BusinessChat({ context }) {
   const stuur = async () => {
     const vraag = invoer.trim()
     if (!vraag || bezig) return
+    herkenner.current?.stop()
     const nieuw = [...gesprek, { role: 'user', content: vraag }]
     setGesprek(nieuw)
     setInvoer('')
@@ -86,15 +114,16 @@ export default function BusinessChat({ context }) {
       )}
       {fout && <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.danger, marginBottom: 8 }}>{fout}</div>}
 
+      <style>{'@keyframes bos-mic { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5) } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0) } }'}</style>
       <div style={{
-        display: 'flex', alignItems: 'flex-end', gap: 8, background: colors.surface,
+        display: 'flex', alignItems: 'flex-end', gap: 4, background: colors.surface,
         borderRadius: 24, padding: '4px 4px 4px 16px',
       }}>
         <textarea
           value={invoer}
           onChange={e => setInvoer(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); stuur() } }}
-          placeholder="Geef een taak, bv. maak 3 reel-scripts over buikvet na je 30e"
+          placeholder={luistert ? 'Luistert… praat maar' : 'Geef een taak, bv. maak 3 reel-scripts over buikvet na je 30e'}
           rows={1}
           style={{
             flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none',
@@ -102,6 +131,21 @@ export default function BusinessChat({ context }) {
             minHeight: 44, maxHeight: 140, fontFamily: 'inherit',
           }}
         />
+        {Spraak && (
+          <button
+            onClick={microfoon}
+            title={luistert ? 'Stop met luisteren' : 'Inspreken'}
+            style={{
+              width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0, margin: 2,
+              background: luistert ? colors.danger : 'transparent',
+              color: luistert ? colors.textPrimary : colors.textSecondary, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: luistert ? 'bos-mic 1.2s ease-in-out infinite' : 'none',
+            }}
+          >
+            <Mic size={18} strokeWidth={2.5} />
+          </button>
+        )}
         <button
           onClick={stuur}
           disabled={bezig || !invoer.trim()}
