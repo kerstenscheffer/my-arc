@@ -28,6 +28,7 @@ import { createPortal } from '../../client/paginaPortal'
 import { useModalHost } from '../../coach/ModalHost'
 import BusinessChat from './BusinessChat'
 import GinoToneel from './GinoToneel'
+import GinoHerinnering from './GinoHerinnering'
 import { bewaarOordeel } from './feedback'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
@@ -398,7 +399,7 @@ function AgendaRegel({ e }) {
         {e.heleDag ? 'Hele dag' : `${nlTijd(e.start)}${e.eind ? `–${nlTijd(e.eind)}` : ''}`}
       </div>
       <div style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 700, color: C.wit, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {e.titel || 'Afspraak'}
+        {e.contactNaam && AGENDA_CALLS.includes(e.soort) ? `Call · ${e.contactNaam}` : (e.titel || 'Afspraak')}
       </div>
       {AGENDA_SOORT[e.soort] && (
         <div style={{ fontSize: '0.7rem', fontWeight: 800, color: C.zacht, flexShrink: 0 }}>{AGENDA_SOORT[e.soort]}</div>
@@ -1096,7 +1097,10 @@ export default function BusinessOS({ isMobile }) {
         alignItems: 'center', justifyContent: 'center',
       }}>
         <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
+          <div style={{ position: 'relative' }}>
+            <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
+            <GinoHerinnering />
+          </div>
 
           {/* ── Chat: de ring praat ── */}
           <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onTab={kiesTab} marginTop={isMobile ? 18 : 24} context={{
@@ -1114,6 +1118,7 @@ export default function BusinessOS({ isMobile }) {
             },
             agendaVandaag: agendaVandaag.map(e => ({
               titel: e.titel, start: e.heleDag ? 'hele dag' : nlTijd(e.start), eind: e.eind && !e.heleDag ? nlTijd(e.eind) : null, soort: e.soort,
+              contactNaam: e.contactNaam || null,
             })),
             contentKomende14Dagen: {
               geplandeDagen: content.perDag.filter(d => d.items.length > 0).length,

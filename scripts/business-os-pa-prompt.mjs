@@ -44,7 +44,8 @@ export function zichtbareTekst(ruw) {
 }
 
 export function chatVraag({ gesprek, context }) {
-  return `${context ? `Cijfers uit Business OS op dit moment (JSON):\n${JSON.stringify(context).slice(0, 4000)}\n\n` : ''}Gesprek tot nu toe:\n\n${gesprek}\n\nBeantwoord het laatste bericht van Kersten.`
+  const nu = new Date().toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return `Nu: ${nu} (NL-tijd).\n\n${context ? `Cijfers uit Business OS op dit moment (JSON):\n${JSON.stringify(context).slice(0, 4000)}\n\n` : ''}Gesprek tot nu toe:\n\n${gesprek}\n\nBeantwoord het laatste bericht van Kersten.`
 }
 
 export function chatPrompt({ skills }) {
@@ -62,6 +63,8 @@ Database, alleen via dit commando (Bash):
 → node scripts/pa-db.mjs skill-bewaar '<json met naam, wanneer, instructies>'
 → node scripts/pa-db.mjs skill-uit "<naam>"
 → node scripts/pa-db.mjs app-lijst "<opdracht>"   ontwikkellijst (alleen als Kersten "voor later" zegt)
+→ node scripts/pa-db.mjs herinner '{"tekst":"…","moment":"YYYY-MM-DD HH:MM","bron":"kersten|gino"}'   herinnering (NL-tijd)
+→ node scripts/pa-db.mjs herinneringen      open herinneringen
 Begin bij de App-kaart-skill; ken je een tabel niet, kijk het schema na in plaats van te gokken.
 
 Je antwoord: gewone tekst voor Kersten (die ziet hij al terwijl je typt). Heb je acties (wat er onder je bericht verschijnt), zet dan helemaal aan het eind één blok, daarna niets meer:
@@ -71,6 +74,8 @@ ${BLOK}
 Geen acties = geen blok. Mogelijke acties:
 → { "soort": "skill", "tekst": "Geleerd: <naam>" } of "Skill bewaard: <naam>", nadat je skill-bewaar deed.
 → { "soort": "app_issue", "tekst": "<opdracht>" }, nadat je app-lijst deed.
+→ { "soort": "herinnering", "tekst": "Herinnering: <wat> · <dag tijd>" }, nadat je herinner deed. Op dat moment komt hij als pop-up uit de bol.
+  Vraagt Kersten "herinner me …", zet hem dan meteen (bron kersten); geen tijd genoemd = 09:00, "straks" = over een uur, rekenen vanaf "Nu" in het bericht. Uit jezelf (bron gino) zet je er een als jullie iets met een moment afspreken (opnemen, opvolgen, een call nabellen), hoogstens 2 per gesprek, en zeg je het erbij. Schrijf de tekst als een duwtje aan Kersten, kort ("Praatreels opnemen: 7 stuks, script staat in Content").
 → { "soort": "wijziging_voorstel", "actie": "update", "tabel": "...", "filters": [{ "kolom": "...", "op": "eq|neq|in|is|lt|lte|gt|gte|ilike", "waarde": ... }], "velden": { ... }, "uitleg": "...", "aantal": <rijen, eerst geteld met lees> }
   of { "soort": "wijziging_voorstel", "actie": "insert", "tabel": "...", "rijen": [ ... ], "uitleg": "...", "aantal": <n> }.
   Toestemming vragen om data aan te passen; Kersten klikt Toestaan. Update altijd met filter, max 500 rijen. Geen deletes, geen schemawijzigingen.

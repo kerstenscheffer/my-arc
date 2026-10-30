@@ -12,6 +12,8 @@
 //   node scripts/pa-db.mjs skill-bewaar '{"naam":…,"wanneer":…,"instructies":…}'
 //   node scripts/pa-db.mjs skill-uit "naam"
 //   node scripts/pa-db.mjs app-lijst "opdracht"      rij in app_issues
+//   node scripts/pa-db.mjs herinner '{"tekst":…,"moment":"2026-10-31 09:00","bron":"kersten|gino"}'  (NL-tijd)
+//   node scripts/pa-db.mjs herinneringen             open herinneringen
 //
 // Datawijzigingen kunnen hier niet: die gaan als voorstel terug naar de chat
 // en pas Kerstens klik op Toestaan voert ze uit.
@@ -47,7 +49,7 @@ if (cmd === 'lees') {
   const tot = process.argv[4] || dag(new Date(van).getTime() + 7 * 864e5)
   const { data, error } = await sb.rpc('get_agenda', { van, tot })
   uit(error ? { fout: error.message } : (data || []).map(e => ({
-    titel: e.titel, soort: e.soort, heleDag: e.hele_dag, locatie: e.locatie,
+    titel: e.titel, soort: e.soort, contactNaam: e.contact_naam || null, heleDag: e.hele_dag, locatie: e.locatie,
     start: new Date(e.start_at).toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam' }),
     eind: e.end_at ? new Date(e.end_at).toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam' }) : null,
   })))
@@ -76,6 +78,24 @@ if (cmd === 'lees') {
   const { data: { user } } = await sb.auth.getUser(token)
   const { error } = await sb.from('app_issues').insert({ coach_id: user.id, text: `[Business OS] ${arg.slice(0, 4000)}` })
   uit(error ? { fout: error.message } : { ok: true })
+} else if (cmd === 'herinner') {
+  // Moment in NL-tijd ("2026-10-31 09:00"); omrekenen via de offset van die dag.
+  let h
+  try { h = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const m = String(h.moment || '').trim().match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})/)
+  const tekst = String(h.tekst || '').trim().slice(0, 500)
+  if (!m || !tekst) { uit({ fout: 'tekst en moment ("YYYY-MM-DD HH:MM", NL-tijd) zijn verplicht' }); process.exit(1) }
+  const alsUtc = Date.parse(`${m[1]}T${m[2].padStart(2, '0')}:${m[3]}:00Z`)
+  const nl = new Date(alsUtc).toLocaleString('sv-SE', { timeZone: 'Europe/Amsterdam' }).replace(' ', 'T') + 'Z'
+  const moment = new Date(alsUtc - (Date.parse(nl) - alsUtc))
+  const { error } = await sb.from('business_os_herinneringen').insert({
+    tekst, moment: moment.toISOString(), bron: h.bron === 'gino' ? 'gino' : 'kersten',
+  })
+  uit(error ? { fout: error.message } : { ok: true, moment: moment.toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam' }) })
+} else if (cmd === 'herinneringen') {
+  const { data, error } = await sb.from('business_os_herinneringen').select('tekst, moment, bron')
+    .is('klaar_at', null).order('moment').limit(50)
+  uit(error ? { fout: error.message } : (data || []).map(r => ({ ...r, moment: new Date(r.moment).toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam' }) })))
 } else {
   uit({ fout: `Onbekend commando: ${cmd}` })
 }

@@ -248,3 +248,23 @@ begin
 end $$;
 revoke all on function public.business_os_klanten() from public, anon;
 grant execute on function public.business_os_klanten() to authenticated;
+
+-- Herinneringen (30 okt 2026): Gino zet ze via pa-db.mjs herinner, de bol
+-- (GinoHerinnering.jsx) laat ze op moment zien. Gedaan = klaar_at, Later =
+-- moment verschuiven.
+create table if not exists public.business_os_herinneringen (
+  id uuid primary key default gen_random_uuid(),
+  coach_id uuid not null default auth.uid(),
+  tekst text not null check (length(tekst) between 1 and 500),
+  moment timestamptz not null,
+  bron text not null default 'kersten' check (bron in ('kersten','gino')),
+  klaar_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists business_os_herinneringen_open on public.business_os_herinneringen (coach_id, moment) where klaar_at is null;
+alter table public.business_os_herinneringen enable row level security;
+create policy herinneringen_eigen on public.business_os_herinneringen
+  for all to authenticated using (coach_id = auth.uid()) with check (coach_id = auth.uid());
+revoke all on public.business_os_herinneringen from anon;
+grant select, insert, update, delete on public.business_os_herinneringen to authenticated;
+alter publication supabase_realtime add table public.business_os_herinneringen;
