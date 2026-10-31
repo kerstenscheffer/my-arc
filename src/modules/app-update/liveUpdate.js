@@ -20,6 +20,11 @@
 //
 // Uploaden: `npm run live-update -- "korte notitie"`.
 //
+// Checksum (31 okt 2026): de plugin (v8) downloadt alleen met de SHA-256 van
+// de zip erbij, anders "Checksum required". Die ontbrak, dus geen enkele
+// live-update kwam ooit aan; app 1.9 en ouder kunnen daarom pas live-updates
+// krijgen na een winkelrelease met deze code. Bundels zonder checksum slaan we over.
+//
 // Diagnose (27 okt 2026, native 1.9): elke stap gaat naar app_live_update_log
 // (welke bundel draait, en of de update stopt bij "geen nieuwe", "native te
 // oud", downloaden of next). De live-bundels kwamen nooit aan en we konden
@@ -64,7 +69,7 @@ export async function startLiveUpdate(supabase) {
     laatst = Date.now()
     try {
       const { data: rij } = await supabase.from('app_live_bundle')
-        .select('version, url, min_native')
+        .select('version, url, min_native, checksum')
         .eq('actief', true)
         .order('version', { ascending: false })
         .limit(1)
@@ -78,8 +83,9 @@ export async function startLiveUpdate(supabase) {
       const { bundles } = await updater.list()
       let bundel = (bundles || []).find(b => b.version === rij.version && b.status !== 'error')
       if (!bundel) {
+        if (!rij.checksum) { log('geen_checksum', rij.version); return }
         log('download', rij.version)
-        bundel = await updater.download({ url: rij.url, version: rij.version })
+        bundel = await updater.download({ url: rij.url, version: rij.version, checksum: rij.checksum })
         log('download_ok', rij.version)
       }
       await updater.next({ id: bundel.id })

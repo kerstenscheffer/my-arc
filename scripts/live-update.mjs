@@ -14,6 +14,7 @@
 // steeds een App Store/Play-release; zet dan --min op die nieuwe versie.
 
 import { execSync } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -47,6 +48,10 @@ if (!fs.existsSync(path.join(bron, 'index.html'))) { console.error(`Geen index.h
 const zip = path.join(os.tmpdir(), `myarc-bundle-${versie}.zip`)
 execSync(`cd "${bron}" && zip -qr "${zip}" .`)
 const grootte = (fs.statSync(zip).size / 1e6).toFixed(1)
+// De updater-plugin (v8) weigert elke download zonder SHA-256 van de zip
+// ("Checksum required"). Tot 31 okt 2026 ontbrak die: geen enkele live-update
+// kwam ooit aan. De app geeft hem mee vanaf liveUpdate.js met checksum.
+const checksum = crypto.createHash('sha256').update(fs.readFileSync(zip)).digest('hex')
 console.log(`Uploaden ${grootte} MB …`)
 
 const pad = `bundles/${versie}.zip`
@@ -74,7 +79,7 @@ const publiek = `${URL_}/storage/v1/object/public/app-bundles/${pad}`
 const rij = await fetch(`${URL_}/rest/v1/app_live_bundle`, {
   method: 'POST',
   headers: { Authorization: `Bearer ${KEY}`, apikey: KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-  body: JSON.stringify({ version: versie, url: publiek, min_native: minNative, notitie }),
+  body: JSON.stringify({ version: versie, url: publiek, min_native: minNative, notitie, checksum }),
 })
 if (!rij.ok) { console.error('Registreren mislukt:', rij.status, await rij.text()); process.exit(1) }
 fs.unlinkSync(zip)

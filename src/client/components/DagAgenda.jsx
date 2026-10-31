@@ -1234,7 +1234,7 @@ function Blok({ blok, isMobile, pxVan, uurHoogte, onOpen, afgerond = false, onAf
       display: 'flex', alignItems: 'center', gap: 6,
       padding: isMobile ? '4px 8px' : '6px 10px',
     }}>
-      <Icoon size={11} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
+      <Icoon size={11} color={blok.type === 'sleep' ? SLAAP_PAARS : 'rgba(255,255,255,0.45)'} style={{ flexShrink: 0 }} />
       <span style={{
         flex: 1, minWidth: 0,
         fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 900, color: '#fff',
@@ -1423,7 +1423,7 @@ function LijstRegel({ blok, isMobile, onOpen, afgerond, onAfronden, onTijd, bezi
           }} />
         ) : (
           <span style={{ width: fotoMaat, alignSelf: 'stretch', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icoon size={15} color="rgba(255,255,255,0.45)" strokeWidth={2.4} />
+            <Icoon size={15} color={blok.type === 'sleep' ? SLAAP_PAARS : 'rgba(255,255,255,0.45)'} strokeWidth={2.4} />
           </span>
         )}
         {bezig && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />}
