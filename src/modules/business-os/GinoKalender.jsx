@@ -20,11 +20,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronLeft, ChevronRight, X, Calendar, Phone, Film, CheckCircle2, Bell, Sparkles, Plus, Check,
+  ChevronLeft, ChevronRight, X, Calendar, Phone, Film, CheckCircle2, Bell, Sparkles, Plus, Check, Zap,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import GinoWeek from './GinoWeek'
 import GinoContent from './GinoContent'
+import GinoAutopilot from './GinoAutopilot'
 import { laadContentStand } from './contentStand'
 import GinoOmzet from './GinoOmzet'
 import GinoProjecten from './GinoProjecten'
@@ -137,7 +138,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const [concept, setConcept] = useState(() => (Array.isArray(verzoek?.concept) ? verzoek.concept : []))
   const [bezig, setBezig] = useState(null)
   // Week (agenda, standaard), content (contentkalender) of omzet.
-  const [weergave, setWeergave] = useState(['omzet', 'projecten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content'].includes(verzoek?.weergave) ? 'content' : 'week')
+  const [weergave, setWeergave] = useState(['omzet', 'projecten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content', 'autopilot'].includes(verzoek?.weergave) ? 'content' : 'week')
   const [projectId, setProjectId] = useState(verzoek?.project || null)
   const [omzet, setOmzet] = useState(null)
   const [omzetMaand, setOmzetMaand] = useState(null) // 'YYYY-MM'; null = deze maand
@@ -150,6 +151,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const [focus, setFocus] = useState(() => focusVan(verzoek))
   const [notitie, setNotitie] = useState(() => (typeof verzoek?.notitie === 'string' ? verzoek.notitie.slice(0, 240) : ''))
   const [stand, setStand] = useState(null)
+  const [autopilot, setAutopilot] = useState(verzoek?.weergave === 'autopilot')
   const [anker, setAnker] = useState(() => maandagVan(verzoek?.dag ? new Date(`${verzoek.dag}T12:00:00`) : new Date()))
   const weekDagen = useMemo(() => Array.from({ length: 7 }, (_, i) => plusDagen(anker, i)), [anker])
   const [weekH, setWeekH] = useState(380)
@@ -462,6 +464,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             </div>
           )}
           {dagBlad}
+          {autopilot && <GinoAutopilot onSluit={() => setAutopilot(false)} isMobile={isMobile} />}
         </div>
       )}
 
@@ -479,6 +482,11 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
           <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
             onClick={() => onVraag?.(`Laten we samen de content voor ${weergave === 'week' ? `de week van ${weekTitel}` : `${maandNaam} ${maand.getFullYear()}`} plannen. Kijk wat er al gepland staat en wat er in mijn agenda staat, en zet per lege dag een voorstel als concept in de kalender.`)}>
             <Sparkles size={13} /> Content plannen met Gino
+          </button>
+        )}
+        {weergave === 'content' && (
+          <button type="button" className="gk-link" onClick={() => setAutopilot(a => !a)} style={{ ...link, color: autopilot ? G : '#fff' }}>
+            <Zap size={13} /> Autopilot
           </button>
         )}
       </div>

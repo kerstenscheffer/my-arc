@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from '../paginaPortal'
 import {
   Calendar, ChevronLeft, ChevronRight, ChevronRight as Pijl, Check, Play, List,
-  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal, Scale, Eye, EyeOff,
+  CalendarClock, Maximize2, X, Utensils, Dumbbell, Moon, Briefcase, Pill, SlidersHorizontal, Scale,
 } from 'lucide-react'
 import {
   ClientAgendaService, DAYS, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate,
@@ -197,24 +197,13 @@ export default function DagAgenda({
     return () => clearInterval(t)
   }, [])
 
-  // Zelfde schakelaar als het oogje op de maaltijdpagina (clients.meal_plan_visible):
-  // uit = de geplande maaltijden weg, wat je zelf logde blijft staan.
-  const [planZichtbaar, setPlanZichtbaar] = useState(client?.meal_plan_visible !== false)
-  useEffect(() => { setPlanZichtbaar(client?.meal_plan_visible !== false) }, [client?.meal_plan_visible])
-  const wisselPlanZichtbaar = async () => {
-    if (!client?.id) return
-    const next = !planZichtbaar
-    setPlanZichtbaar(next)
-    const { error } = await (db?.supabase || db).from('clients').update({ meal_plan_visible: next }).eq('id', client.id)
-      .then(r => r, e => ({ error: e }))
-    if (error) { setPlanZichtbaar(!next); return }
-    window.dispatchEvent(new CustomEvent('myarc:client-update', { detail: { meal_plan_visible: next } }))
-  }
+  // Volgt het oogje op de maaltijdpagina (clients.meal_plan_visible): staat het
+  // plan daar uit, dan ook hier geen geplande maaltijden; wat je logde blijft.
+  const planZichtbaar = client?.meal_plan_visible !== false
   const dagBlokken = useMemo(() => {
     const lijst = data?.blocksByDay?.[dag] || []
     return planZichtbaar ? lijst : lijst.filter(b => !(b.type === 'meal' && b.source === 'meal_plan'))
   }, [data, dag, planZichtbaar])
-  const heeftPlanMaaltijden = (data?.blocksByDay?.[dag] || []).some(b => b.type === 'meal' && b.source === 'meal_plan')
 
   const blokken = useMemo(
     () => verdeelInKolommen(dagBlokken),
@@ -666,16 +655,6 @@ export default function DagAgenda({
         >
           {weergave === 'lijst' ? <CalendarClock size={16} strokeWidth={2.6} /> : <List size={16} strokeWidth={2.6} />}
         </button>
-        {(heeftPlanMaaltijden || !planZichtbaar) && (
-          <button
-            onClick={wisselPlanZichtbaar}
-            title={planZichtbaar ? 'Geplande maaltijden verbergen' : 'Geplande maaltijden tonen'}
-            aria-label={planZichtbaar ? 'Geplande maaltijden verbergen' : 'Geplande maaltijden tonen'}
-            style={{ ...pijlKnop, width: 28, height: 28, color: 'rgba(255,255,255,0.6)' }}
-          >
-            {planZichtbaar ? <Eye size={16} strokeWidth={2.6} /> : <EyeOff size={16} strokeWidth={2.6} />}
-          </button>
-        )}
         <button
           onClick={() => setDagindeling(true)}
           title="Mijn dagindeling"

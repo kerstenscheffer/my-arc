@@ -108,6 +108,7 @@ const TOEGESTAAN = [
   'Bash(npm run build)', 'Bash(npm run lint)', 'Bash(npx eslint *)',
   'Bash(git status*)', 'Bash(git diff*)', 'Bash(git log*)', 'Bash(git show*)', 'Bash(git check-ignore *)',
   'Bash(ls *)', 'Bash(mdfind *)', 'Bash(mkdir *)', 'Bash(cp *)',
+  'Bash(node scripts/content-autopilot.mjs *)', // content-autopilot: bibliotheek, winnaars, varianten maken
 ]
 // Eigen mappen op de Mac (boeken, PDF's, exports): alleen lezen. Code-
 // opdrachten mogen eruit kopiëren naar workapp (bv. workapp/hormozi, staat in

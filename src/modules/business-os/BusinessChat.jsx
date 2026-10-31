@@ -52,6 +52,7 @@ import * as stem from './stem'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop } from './schermen'
 import { useNieuweVersie } from './useNieuweVersie'
+import CheckinRonde from './CheckinRonde'
 
 const KEY = 'business_os_chat'
 const PA_ONLINE_MS = 45000
@@ -2012,6 +2013,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
             boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
           }}>
             {isEditor(actief) && <EditorOpdrachten vers={editorVers} />}
+            {isKlanten(actief) && <CheckinRonde bezig={bezig} onVraagGino={tekst => stuur(tekst)} />}
             {!gesprek.length && (
               <div style={{ ...TEKST, color: colors.textSecondary, fontWeight: 600 }}>
                 {isEditor(actief) ? 'Editor praat met ChatGPT: knipplannen, titels, ondertitels, instructies. Alleen tekst, hij kan niet zelf in je editor klikken.'
