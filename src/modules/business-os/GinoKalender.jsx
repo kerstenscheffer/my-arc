@@ -368,17 +368,12 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
       {/* Kop: ring met hoeveel dagen content hebben, maand en pijltjes */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingBottom: 14, flexShrink: 0 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc` }}>{weergave === 'omzet' ? 'GINO · OMZET' : 'GINO · AGENDA'}</div>
-          {weergave === 'omzet' ? (
-            <div style={{ fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>Omzet, verdeling en wat er binnenkomt</div>
-          ) : (
-          <div style={{ fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>
+        {weergave !== 'omzet' && (
+          <div style={{ minWidth: 0, fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
             {weergave === 'week' ? `${telling.calls} calls · ` : ''}{telling.content} content gepland
             {telling.leegContent > 0 && <span style={{ color: '#fff' }}> · {telling.leegContent} dagen nog zonder content</span>}
           </div>
-          )}
-        </div>
+        )}
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', border: `1px solid ${G}33`, borderRadius: 999, padding: 2 }}>
           {['week', 'content', 'omzet'].map(w => (

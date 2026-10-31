@@ -253,7 +253,6 @@ export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = fals
 
       {komt.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, flexShrink: 0, opacity: dim(focus, 'komt'), transition: 'opacity .4s' }}>
-          <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc`, marginRight: 4 }}>KOMT BINNEN</span>
           {komt.map((b, i) => (
             <span key={i} title={b.soort} style={{
               fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 999, whiteSpace: 'nowrap',
