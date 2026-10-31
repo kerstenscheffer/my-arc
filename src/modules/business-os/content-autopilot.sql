@@ -34,7 +34,7 @@ create policy cb_eigen on public.content_bibliotheek for all to authenticated
 -- 2. Wachtrij: velden op content_items (allemaal nullable).
 alter table public.content_items
   add column if not exists autopilot_bron text,       -- ig_id van de bronreel
-  add column if not exists autopilot_status text,     -- wacht | hook_aanpassen | goedgekeurd | overgeslagen | bezig | gepubliceerd | fout
+  add column if not exists autopilot_status text,     -- concept | wacht | hook_aanpassen | goedgekeurd | overgeslagen | bezig | gepubliceerd | fout
   add column if not exists autopilot_woord text,
   add column if not exists autopilot_bestand text,    -- lokaal pad van de variant
   add column if not exists autopilot_video text,      -- pad in bucket content-autopilot
@@ -130,6 +130,7 @@ language sql stable set search_path to 'public' as $$
   uit as (
     select distinct autopilot_bron b from content_items
       where autopilot_bron is not null and created_at > now() - interval '30 days'
+        and coalesce(autopilot_status, '') <> 'concept' -- concepten (nog geen video) blokkeren de bron niet
     union select bron_ig_id from content_bibliotheek where is_variant and onder_gemiddelde
   ),
   kand as (
@@ -150,7 +151,8 @@ language sql stable set search_path to 'public' as $$
     select k.*, row_number() over (partition by coalesce(k.woord, k.soort_v) order by k.sc desc) per_woord
     from kand k where k.soort_v is not null
   )
-  select g.id, g.soort_v, g.woord, g.tijd, g.views, g.comments, g.cpm, g.leads, g.sales, g.sc,
+  -- 'Welke 2 pak jij?' krijgt altijd het woord LIDL (Kersten 31 okt).
+  select g.id, g.soort_v, case when g.pak2 then 'LIDL' else g.woord end, g.tijd, g.views, g.comments, g.cpm, g.leads, g.sales, g.sc,
     left(g.tekst, 200), (select lokaal_pad from content_bibliotheek cb where cb.ig_id = g.id)
   from gerangschikt g where g.per_woord <= 3
   order by g.sc desc, g.views desc limit p_aantal
