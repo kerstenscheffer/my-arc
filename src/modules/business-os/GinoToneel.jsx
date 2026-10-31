@@ -19,6 +19,10 @@
 // Gino ontwerpt zelf in HTML/SVG/CSS; visueelHtml.js filtert het en toont het
 // in een afgesloten iframe per kant. Blokken en vrij kunnen niet tegelijk:
 // staat er links/rechts in, dan wint vrij.
+// Boven (31 okt): { ..., boven: '<html>' } = breed podium boven de bol, over
+// de hele breedte (tijdlijnen, kalenders, ketens). Kan samen met links/rechts.
+// BusinessOS maakt daar ruimte voor (bol en chat omlaag) en geeft het vak mee
+// als `podium`; de inhoud komt er via een portal in.
 // De structuur van de pagina verandert niet: alles staat absoluut over de lege
 // ruimte naast de groep en gaat met het kruisje weer weg.
 
@@ -30,6 +34,7 @@ import {
   Layers, Inbox, Send, Hourglass, Coffee, Dumbbell, Brain, Search, X, ThumbsUp, ThumbsDown,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { colors } from '../../ui/tokens'
 import { schoonHtml, maakSrcdoc, MAX_HTML } from './visueelHtml'
 
@@ -60,6 +65,8 @@ const ANIMATIES = `
 @keyframes gt-puls { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.14); opacity: 0.75 } }
 @keyframes gt-draai { to { transform: rotate(360deg) } }
 @keyframes gt-schud { 0%,86%,100% { transform: rotate(0) } 89% { transform: rotate(-12deg) } 93% { transform: rotate(10deg) } 97% { transform: rotate(-6deg) } }
+@keyframes gt-op { from { opacity: 0; transform: translateY(28px) scale(.94) } to { opacity: 1; transform: none } }
+@keyframes gt-lijn { from { transform: scaleY(0) } to { transform: scaleY(1) } }
 @keyframes gt-gloed { 0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0) } 50% { box-shadow: 0 0 18px 0 rgba(34,197,94,0.25) } }
 @media (prefers-reduced-motion: reduce) { [data-gt] * { animation: none !important } }
 `
@@ -68,8 +75,8 @@ const ANIMATIES = `
 function schoonVisueel(v) {
   if (!v || typeof v !== 'object') return null
   const str = (x, n) => (typeof x === 'string' || typeof x === 'number' ? String(x).slice(0, n) : '')
-  const links = str(v.links, MAX_HTML), rechts = str(v.rechts, MAX_HTML)
-  if (links.trim() || rechts.trim()) return { titel: str(v.titel, 60), vrij: { links, rechts } }
+  const links = str(v.links, MAX_HTML), rechts = str(v.rechts, MAX_HTML), boven = str(v.boven, MAX_HTML)
+  if (links.trim() || rechts.trim() || boven.trim()) return { titel: str(v.titel, 60), vrij: { links, rechts, boven } }
   const blokken = (Array.isArray(v.blokken) ? v.blokken : []).slice(0, 8).map(b => ({
     icoon: ICONEN[b?.icoon] ? b.icoon : 'Sparkles',
     titel: str(b?.titel, 40),
@@ -150,7 +157,8 @@ function Advies({ a, i }) {
 
 // Eén afgesloten vakje met Gino's eigen HTML. De hoogte komt via postMessage
 // uit het vakje (alleen van ons eigen iframe aangenomen).
-function Vak({ html, maxHoogte }) {
+// vul = de hele hoogte van de ouder (podium boven de bol).
+function Vak({ html, maxHoogte, vul = false }) {
   const ref = useRef(null)
   const [hoogte, setHoogte] = useState(120)
   const srcdoc = useMemo(() => maakSrcdoc(schoonHtml(html)), [html])
@@ -168,7 +176,7 @@ function Vak({ html, maxHoogte }) {
   // anders verft de browser het iframe wit en vallen witte getallen weg.
   return (
     <iframe ref={ref} title="Gino laat zien" sandbox="allow-scripts" srcDoc={srcdoc}
-      style={{ width: '100%', height: hoogte, border: 'none', background: 'transparent', display: 'block', colorScheme: 'dark' }} />
+      style={{ width: '100%', height: vul ? '100%' : hoogte, border: 'none', background: 'transparent', display: 'block', colorScheme: 'dark' }} />
   )
 }
 
@@ -176,7 +184,7 @@ function Vak({ html, maxHoogte }) {
 // onOordeel('goed' | 'slecht'): duimpje bij het beeld (Gino leert ervan).
 // label: klein tekstje bij de kop (bv. 'vorige versie' bij een bewaard scherm);
 // extra: knop(pen) vóór de duimpjes (Bewaar).
-export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSluit, onOordeel, label, extra }) {
+export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSluit, onOordeel, label, extra, podium = null }) {
   const [oordeel, setOordeel] = useState(null)
   useEffect(() => { setOordeel(null) }, [ruw])
   const visueel = schoonVisueel(ruw)
@@ -214,15 +222,71 @@ export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSl
     </div>
   )
 
+  // Podium (31 okt): alles wat Gino laat zien staat boven de bol, gecentreerd,
+  // met een lijn naar de bol. Boven over de hele breedte, links en rechts als
+  // twee kolommen naast elkaar, blokken als raster. Zonder podium (kalender
+  // open) valt het terug op de kolommen langs de randen hieronder.
+  if (podium) {
+    const kolommen = vrij ? [vrij.links, vrij.rechts].filter(h => h.trim()) : []
+    return createPortal(
+      <div data-gt="" style={{
+        width: '100%', maxWidth: 1180, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column',
+        transformOrigin: '50% 100%', animation: 'gt-op .55s cubic-bezier(.2,.8,.2,1) both',
+      }}>
+        <style>{ANIMATIES}</style>
+        {kop || <div style={{ display: 'flex' }}>{sluit}</div>}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 16, justifyContent: vrij?.boven.trim() ? 'flex-start' : 'center' }}>
+          {vrij?.boven.trim() && (
+            <div style={{ flex: kolommen.length ? '0 0 auto' : 1, minHeight: kolommen.length ? 260 : 0, height: kolommen.length ? 300 : 'auto' }}>
+              <Vak html={vrij.boven} vul />
+            </div>
+          )}
+          {kolommen.length > 0 && (
+            <div style={{ display: 'flex', gap: isMobile ? 16 : 56, justifyContent: 'center', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+              {kolommen.map((h, i) => (
+                <div key={i} style={{ flex: isMobile ? '1 1 100%' : '0 1 460px', minWidth: 0 }}><Vak html={h} maxHoogte={900} /></div>
+              ))}
+            </div>
+          )}
+          {!vrij && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${isMobile ? 150 : 210}px, 1fr))`, gap: isMobile ? 14 : 22, alignItems: 'start' }}>
+              {blokken.map((b, i) => <Blok key={i} b={b} i={i} />)}
+              {advies && <div style={{ gridColumn: '1 / -1', maxWidth: 560, justifySelf: 'center', width: '100%' }}><Advies a={advies} i={blokken.length} /></div>}
+            </div>
+          )}
+        </div>
+        <div style={{ height: 18, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 1, height: '100%', background: `linear-gradient(to bottom, ${colors.success}66, ${colors.success})`, boxShadow: `0 0 6px ${colors.success}`, transformOrigin: 'top', animation: 'gt-lijn .4s ease-out .3s both' }} />
+        </div>
+      </div>, podium)
+  }
+
   if (vrij) {
+    // Boven de bol: kop + vak over de hele breedte, in het podium van BusinessOS.
+    const boven = vrij.boven.trim() && podium ? createPortal(
+      <div data-gt="" style={{ width: '100%', maxWidth: 1180, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', transformOrigin: '50% 100%', animation: 'gt-op .55s cubic-bezier(.2,.8,.2,1) both' }}>
+        <style>{ANIMATIES}</style>
+        {kop || <div style={{ display: 'flex' }}>{sluit}</div>}
+        <div style={{ flex: 1, minHeight: 0, marginTop: 6 }}><Vak html={vrij.boven} vul /></div>
+        <div style={{ height: 18, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 1, height: '100%', background: `linear-gradient(to bottom, ${colors.success}66, ${colors.success})`, boxShadow: `0 0 6px ${colors.success}`, transformOrigin: 'top', animation: 'gt-lijn .4s ease-out .3s both' }} />
+        </div>
+      </div>, podium) : null
+    const metKop = boven ? null : (kop || <div style={{ display: 'flex' }}>{sluit}</div>)
+    if (!vrij.links.trim() && !vrij.rechts.trim()) return boven
     if (isMobile) {
       return (
-        <div data-gt="" style={{ position: 'absolute', top: 56, left: 16, right: 16, zIndex: 4, maxHeight: '46%', overflowY: 'auto' }}>
-          <style>{ANIMATIES}</style>
-          {kop || <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{sluit}</div>}
-          <Vak html={vrij.links} maxHoogte={900} />
-          <Vak html={vrij.rechts} maxHoogte={900} />
-        </div>
+        <>
+          {boven}
+          {!boven && (
+            <div data-gt="" style={{ position: 'absolute', top: 56, left: 16, right: 16, zIndex: 4, maxHeight: '46%', overflowY: 'auto' }}>
+              <style>{ANIMATIES}</style>
+              {kop || <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{sluit}</div>}
+              <Vak html={vrij.links} maxHoogte={900} />
+              <Vak html={vrij.rechts} maxHoogte={900} />
+            </div>
+          )}
+        </>
       )
     }
     const kolom = {
@@ -232,8 +296,9 @@ export default function GinoToneel({ visueel: ruw, isMobile, breedte = 680, onSl
     return (
       <div data-gt="" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <style>{ANIMATIES}</style>
+        {boven}
         <div style={{ ...kolom, left: 24, pointerEvents: 'auto' }}>
-          {kop || <div style={{ display: 'flex' }}>{sluit}</div>}
+          {metKop}
           <Vak html={vrij.links} maxHoogte={640} />
         </div>
         <div style={{ ...kolom, right: 24, pointerEvents: 'auto' }}>

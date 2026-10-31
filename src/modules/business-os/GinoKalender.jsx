@@ -1,8 +1,9 @@
 // src/modules/business-os/GinoKalender.jsx
 //
-// Interactieve maandkalender boven Gino's bol (31 okt 2026). Groeit uit de bol
-// op (groene lijn, vakjes die vanaf onderen oplichten) in dezelfde stijl:
-// dunne groene lijnen, gloed waar het druk is, vandaag als mini-bol.
+// Interactieve maandplanning boven Gino's bol (31 okt 2026). Opbouw als het
+// content-overzicht in de leadbalk: soorten als rijen, dagen als kolommen,
+// per vakje een getal. In Gino-stijl: groene gloed naar drukte, vandaag als
+// oplichtende kolom, onderaan per dag een ring die volloopt.
 //
 // Eén beeld van alles wat er gepland staat: Google Agenda (agenda_events),
 // klantcalls (client_calls), content (content_items.planned_date), taken
@@ -14,16 +15,17 @@
 // Concepten zijn zijn voorstellen (gestippeld); "Inplannen" zet ze als
 // content_items (status planned). Zo plan je samen de content van de maand.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronLeft, ChevronRight, X, Calendar, Phone, Film, CheckCircle2, Bell, Sparkles, Plus, Check,
+  Clapperboard, CircleDot, Image as ImageIcon,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
 const G = colors.success
 const MAANDEN = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
-const WEEKDAGEN = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
+const WEEKLETTER = ['Z', 'M', 'D', 'W', 'D', 'V', 'Z']
 
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const nlDag = (ts) => new Date(ts).toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
@@ -32,17 +34,20 @@ const maandVan = (s) => {
   const m = String(s || '').match(/^(\d{4})-(\d{2})/)
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, 1) : null
 }
+const isReel = (t) => !t || t === 'reel' || t === 'video'
 
-// Soorten: icoon, label en hoe fel ze in het vakje staan. Groen = content
-// (wat Kersten met Gino plant), wit = afspraken, gedempt = de rest.
-const SOORT = {
-  call: { icoon: Phone, label: 'Call', kleur: '#fff' },
-  agenda: { icoon: Calendar, label: 'Agenda', kleur: 'rgba(255,255,255,0.7)' },
-  content: { icoon: Film, label: 'Content', kleur: G },
-  taak: { icoon: CheckCircle2, label: 'Taak', kleur: 'rgba(255,255,255,0.55)' },
-  herinnering: { icoon: Bell, label: 'Herinnering', kleur: 'rgba(255,255,255,0.55)' },
-  concept: { icoon: Sparkles, label: 'Voorstel', kleur: G },
-}
+// Rijen van het overzicht. `past` kiest de items van die rij.
+const RIJEN = [
+  { id: 'call', label: 'Calls', icoon: Phone, past: it => it.soort === 'call' },
+  { id: 'agenda', label: 'Agenda', icoon: Calendar, past: it => it.soort === 'agenda' },
+  { id: 'reel', label: 'Reels', icoon: Clapperboard, content: true, past: it => (it.soort === 'content' || it.soort === 'concept') && isReel(it.type) },
+  { id: 'story', label: 'Stories', icoon: CircleDot, content: true, past: it => (it.soort === 'content' || it.soort === 'concept') && it.type === 'story' },
+  { id: 'post', label: 'Posts', icoon: ImageIcon, content: true, past: it => (it.soort === 'content' || it.soort === 'concept') && !isReel(it.type) && it.type !== 'story' },
+  { id: 'taak', label: 'Taken', icoon: CheckCircle2, past: it => it.soort === 'taak' },
+  { id: 'herinnering', label: 'Herinneringen', icoon: Bell, past: it => it.soort === 'herinnering' },
+]
+const SOORT_ICOON = { call: Phone, agenda: Calendar, content: Film, taak: CheckCircle2, herinnering: Bell, concept: Sparkles }
+const SOORT_LABEL = { call: 'Call', agenda: 'Agenda', content: 'Content', taak: 'Taak', herinnering: 'Herinnering', concept: 'Voorstel van Gino' }
 const VOLGORDE = ['call', 'agenda', 'content', 'concept', 'taak', 'herinnering']
 
 const leeg = () => ({ data: null })
@@ -78,7 +83,7 @@ async function laadPeriode(van, tot) {
     titel: `${c.call_title || 'Call'} · ${c.clients?.first_name || ''}`.trim(),
   }))
   ;(co.data || []).forEach(c => items.push({
-    id: `i${c.id}`, soort: 'content', dag: c.planned_date, tijd: c.planned_time || null,
+    id: `i${c.id}`, soort: 'content', type: c.type, dag: c.planned_date, tijd: c.planned_time || null,
     titel: c.title || c.hook || 'Content', sub: [c.type, c.status === 'created' ? 'gepost' : null].filter(Boolean).join(' · '),
     klaar: c.status === 'created',
   }))
@@ -92,12 +97,28 @@ async function laadPeriode(van, tot) {
   return items
 }
 
+// Ring onder elke dag: loopt vol naar hoe vol de dag is (zoals de bol).
+function DagRing({ deel, vandaag, vertraging }) {
+  const r = 9, omtrek = 2 * Math.PI * r
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}>
+      <circle cx="12" cy="12" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
+      {deel > 0 && (
+        <circle cx="12" cy="12" r={r} fill="none" stroke={deel >= 0.75 ? '#fff' : G} strokeWidth="2.5" strokeLinecap="round"
+          transform="rotate(-90 12 12)" strokeDasharray={omtrek}
+          style={{ '--gk-tot': omtrek * (1 - Math.min(1, deel)), strokeDashoffset: omtrek * (1 - Math.min(1, deel)), animation: `gk-ring .9s ease-out ${vertraging}ms both`, filter: vandaag ? `drop-shadow(0 0 4px ${G})` : 'none' }} />
+      )}
+    </svg>
+  )
+}
+
 export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = false }) {
   const [maand, setMaand] = useState(() => maandVan(verzoek?.maand) || maandVan(verzoek?.dag) || new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [gekozen, setGekozen] = useState(verzoek?.dag || null)
   const [items, setItems] = useState(null)
   const [concept, setConcept] = useState(() => (Array.isArray(verzoek?.concept) ? verzoek.concept : []))
   const [bezig, setBezig] = useState(null)
+  const scroller = useRef(null)
 
   // Nieuw verzoek van Gino (zelfde component blijft staan): springen.
   useEffect(() => {
@@ -108,19 +129,15 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     if (Array.isArray(verzoek.concept)) setConcept(verzoek.concept)
   }, [verzoek])
 
-  // Raster: maandag vóór de 1e t/m 6 weken verder.
-  const raster = useMemo(() => {
-    const start = new Date(maand)
-    start.setDate(1 - ((maand.getDay() + 6) % 7))
-    const weken = Math.ceil((((maand.getDay() + 6) % 7) + new Date(maand.getFullYear(), maand.getMonth() + 1, 0).getDate()) / 7)
-    return Array.from({ length: weken * 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
+  const dagen = useMemo(() => {
+    const n = new Date(maand.getFullYear(), maand.getMonth() + 1, 0).getDate()
+    return Array.from({ length: n }, (_, i) => new Date(maand.getFullYear(), maand.getMonth(), i + 1))
   }, [maand])
 
   const laad = useCallback(async () => {
-    const tot = new Date(raster[raster.length - 1])
-    tot.setDate(tot.getDate() + 1)
-    setItems(await laadPeriode(raster[0], tot))
-  }, [raster])
+    const tot = new Date(maand.getFullYear(), maand.getMonth() + 1, 1)
+    setItems(await laadPeriode(maand, tot))
+  }, [maand])
   useEffect(() => { setItems(null); laad() }, [laad])
 
   const perDag = useMemo(() => {
@@ -128,25 +145,48 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     ;(items || []).forEach(it => { if (it.dag) (m[it.dag] ||= []).push(it) })
     concept.forEach((c, i) => {
       if (!c?.datum) return
-      ;(m[c.datum] ||= []).push({ id: `x${i}`, soort: 'concept', dag: c.datum, tijd: null, titel: c.titel || c.hook || 'Voorstel', sub: c.type || 'reel', concept: c })
+      ;(m[c.datum] ||= []).push({ id: `x${i}`, soort: 'concept', type: c.type || 'reel', dag: c.datum, tijd: null, titel: c.titel || c.hook || 'Voorstel', sub: c.type || 'reel', concept: c })
     })
     Object.values(m).forEach(l => l.sort((x, y) => (VOLGORDE.indexOf(x.soort) - VOLGORDE.indexOf(y.soort)) || String(x.tijd || '').localeCompare(String(y.tijd || ''))))
     return m
   }, [items, concept])
 
+  // Rijen met data (lege rijen weg, behalve de content-rijen: daar plan je in).
+  const rijen = useMemo(() => RIJEN.filter(r => r.content || r.id === 'call'
+    || dagen.some(d => (perDag[iso(d)] || []).some(r.past))), [perDag, dagen])
+  const rijMax = useMemo(() => Object.fromEntries(rijen.map(r => [r.id,
+    Math.max(1, ...dagen.map(d => (perDag[iso(d)] || []).filter(r.past).length))])), [rijen, perDag, dagen])
+  const dagMax = Math.max(4, ...dagen.map(d => (perDag[iso(d)] || []).length))
+
   const vandaag = iso(new Date())
-  const maxDruk = Math.max(1, ...raster.map(d => (perDag[iso(d)] || []).length))
+  const vandaagIdx = dagen.findIndex(d => iso(d) === vandaag)
+
+  // Naar vandaag (of de gevraagde dag) scrollen.
+  useEffect(() => {
+    const el = scroller.current
+    if (!el) return
+    const doel = verzoek?.dag ? dagen.findIndex(d => iso(d) === verzoek.dag) : vandaagIdx
+    if (doel > 3) el.scrollTo({ left: (doel - 3) * (KOLOM + 4), behavior: 'smooth' })
+  }, [dagen, vandaagIdx, verzoek?.dag])
+
+  const telling = useMemo(() => {
+    const inMaand = Object.entries(perDag).filter(([k]) => k.startsWith(iso(maand).slice(0, 7))).flatMap(([, l]) => l)
+    const content = inMaand.filter(x => x.soort === 'content').length
+    const calls = inMaand.filter(x => x.soort === 'call').length
+    const leegContent = dagen.filter(d => iso(d) >= vandaag && !(perDag[iso(d)] || []).some(x => x.soort === 'content' || x.soort === 'concept')).length
+    return { content, calls, leegContent }
+  }, [perDag, maand, dagen, vandaag])
 
   const inplannen = async (lijst) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id || !lijst.length) return
     setBezig('plannen')
-    const rijen = lijst.map(c => ({
+    const rijenIn = lijst.map(c => ({
       coach_id: user.id, title: String(c.titel || c.hook || 'Content').slice(0, 200), hook: c.hook || null,
       type: ['reel', 'story', 'post', 'carousel', 'video'].includes(c.type) ? c.type : 'reel',
       status: 'planned', planned_date: c.datum, notes: 'Gepland met Gino',
     }))
-    const { error } = await supabase.from('content_items').insert(rijen).then(r => r, e => ({ error: e }))
+    const { error } = await supabase.from('content_items').insert(rijenIn).then(r => r, e => ({ error: e }))
     setBezig(null)
     if (error) return
     setConcept(cs => cs.filter(c => !lijst.includes(c)))
@@ -157,110 +197,126 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const maandNaam = MAANDEN[maand.getMonth()]
   const dagLijst = gekozen ? (perDag[gekozen] || []) : []
   const gekozenDatum = gekozen ? new Date(`${gekozen}T12:00:00`) : null
-  const cel = isMobile ? 4 : 6
+  const labelBreedte = isMobile ? 44 : 132
+  // Vertraging per kolom: vanaf vandaag naar buiten (golf uit de bol).
+  const golf = (i) => Math.abs(i - (vandaagIdx >= 0 ? vandaagIdx : 0)) * 28
 
   return (
     <div style={{
-      position: 'relative', width: '100%', maxWidth: 760, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column',
+      position: 'relative', width: '100%', maxWidth: 1180, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column',
       transformOrigin: '50% 100%', animation: 'gk-op .55s cubic-bezier(.2,.8,.2,1) both',
     }}>
       <style>{`
         @keyframes gk-op { from { opacity: 0; transform: translateY(28px) scale(.94) } to { opacity: 1; transform: none } }
-        @keyframes gk-cel { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+        @keyframes gk-cel { 0% { opacity: 0; transform: scale(.6) } 70% { transform: scale(1.06) } 100% { opacity: 1; transform: none } }
+        @keyframes gk-rij { from { opacity: 0; transform: translateX(-10px) } to { opacity: 1; transform: none } }
         @keyframes gk-lijn { from { transform: scaleY(0) } to { transform: scaleY(1) } }
         @keyframes gk-draai { to { transform: rotate(360deg) } }
         @keyframes gk-puls { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
-        @keyframes gk-blad { from { opacity: 0; transform: scale(.96) } to { opacity: 1; transform: none } }
-        .gk-cel { transition: box-shadow .2s, background-color .2s }
-        .gk-cel:hover { box-shadow: inset 0 0 0 1px ${G}99, 0 0 18px ${G}33; z-index: 1 }
+        @keyframes gk-ring { from { stroke-dashoffset: 60 } to { stroke-dashoffset: var(--gk-tot) } }
+        @keyframes gk-scan { from { transform: translateX(-100%) } to { transform: translateX(100%) } }
+        @keyframes gk-blad { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+        .gk-vak { transition: transform .15s, box-shadow .15s }
+        .gk-vak:hover { transform: scale(1.12); box-shadow: 0 0 0 1px ${G}, 0 0 16px ${G}66; z-index: 2 }
+        .gk-kol:hover .gk-dagnr { color: ${G} }
         .gk-link { opacity: .7; transition: opacity .15s, color .15s }
         .gk-link:hover { opacity: 1; color: ${G} !important }
+        .gk-scroll { scrollbar-width: none } .gk-scroll::-webkit-scrollbar { display: none }
       `}</style>
 
-      {/* Kop: maand, pijltjes, samen plannen, sluiten */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 10, flexShrink: 0 }}>
-        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc` }}>GINO · AGENDA</div>
+      {/* Kop: ring met hoeveel dagen content hebben, maand en pijltjes */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingBottom: 14, flexShrink: 0 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc` }}>GINO · PLANNING</div>
+          <div style={{ fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>
+            {telling.calls} calls · {telling.content} content gepland
+            {telling.leegContent > 0 && <span style={{ color: '#fff' }}> · {telling.leegContent} dagen nog zonder content</span>}
+          </div>
+        </div>
         <div style={{ flex: 1 }} />
         <button type="button" onClick={() => verzet(-1)} aria-label="Vorige maand" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
-        <div style={{ minWidth: isMobile ? 110 : 150, textAlign: 'center', fontSize: isMobile ? 15 : 17, fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
+        <div style={{ minWidth: isMobile ? 104 : 140, textAlign: 'center', fontSize: isMobile ? 15 : 17, fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
           {maandNaam} {maand.getFullYear()}
         </div>
         <button type="button" onClick={() => verzet(1)} aria-label="Volgende maand" style={rond}><ChevronRight size={16} strokeWidth={2.6} /></button>
-        <div style={{ flex: 1 }} />
-        <button type="button" onClick={onSluit} aria-label="Kalender sluiten" style={rond}><X size={16} strokeWidth={2.6} /></button>
+        <button type="button" onClick={onSluit} aria-label="Planning sluiten" style={{ ...rond, marginLeft: 6 }}><X size={16} strokeWidth={2.6} /></button>
       </div>
 
-      {/* Weekdagen */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', flexShrink: 0, paddingBottom: 6 }}>
-        {WEEKDAGEN.map(w => (
-          <div key={w} style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.25em', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{w}</div>
-        ))}
-      </div>
-
-      {/* Raster: 1px groene lijnen = de achtergrond tussen de vakjes */}
-      <div style={{
-        position: 'relative', flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
-        gridTemplateRows: `repeat(${raster.length / 7}, 1fr)`, gap: 1, background: `${G}26`,
-        border: `1px solid ${G}33`, borderRadius: 14, overflow: 'hidden', boxShadow: `0 0 40px ${G}12`,
-      }}>
-        {raster.map((d, i) => {
-          const k = iso(d)
-          const lijst = perDag[k] || []
-          const inMaand = d.getMonth() === maand.getMonth()
-          const isVandaag = k === vandaag
-          const druk = lijst.length / maxDruk
-          const rij = Math.floor(i / 7), kol = i % 7
-          // Vanaf onder-midden (waar de bol staat) oplichten.
-          const afstand = Math.hypot(kol - 3, (raster.length / 7 - 1) - rij)
-          const tellen = VOLGORDE.map(s => [s, lijst.filter(x => x.soort === s).length]).filter(([, n]) => n > 0)
-          const eerste = lijst.find(x => x.soort === 'content' || x.soort === 'concept') || lijst.find(x => x.soort === 'call')
-          return (
-            <button key={k} type="button" className="gk-cel" onClick={() => setGekozen(k)} style={{
-              position: 'relative', minWidth: 0, minHeight: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-              padding: `${cel}px ${cel + 1}px`, display: 'flex', flexDirection: 'column', gap: 3, overflow: 'hidden',
-              background: lijst.length && inMaand
-                ? `radial-gradient(circle at 50% 120%, ${G}${Math.round(10 + druk * 38).toString(16).padStart(2, '0')} 0%, #050505 75%)`
-                : '#050505',
-              opacity: inMaand ? 1 : 0.35,
-              animation: `gk-cel .4s ease-out ${(afstand * 45).toFixed(0)}ms both`,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{
-                  position: 'relative', width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '50%', fontSize: 12, fontWeight: 900, color: isVandaag ? '#000' : '#fff', flexShrink: 0,
-                  background: isVandaag ? G : 'transparent', boxShadow: isVandaag ? `0 0 14px ${G}` : 'none',
-                }}>
-                  {d.getDate()}
-                  {isVandaag && <span style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: `1px dashed ${G}99`, animation: 'gk-draai 6s linear infinite' }} />}
-                </span>
-                {!isMobile && tellen.length > 0 && (
-                  <span style={{ display: 'flex', gap: 3, marginLeft: 'auto' }}>
-                    {tellen.map(([s, n]) => (
-                      <span key={s} title={`${n} ${SOORT[s].label.toLowerCase()}`} style={{
-                        width: 6, height: 6, borderRadius: '50%', background: s === 'concept' ? 'transparent' : SOORT[s].kleur,
-                        border: s === 'concept' ? `1px dashed ${G}` : 'none', boxShadow: s === 'content' ? `0 0 6px ${G}` : 'none',
-                      }} />
-                    ))}
-                  </span>
-                )}
+      {/* Het overzicht: labels vast links, dagen scrollen */}
+      <div className="gk-scroll" style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', alignItems: 'flex-start', overflowY: 'auto' }}>
+        <div style={{ width: labelBreedte, flexShrink: 0, display: 'flex', flexDirection: 'column', paddingTop: KOP_H }}>
+          {rijen.map((r, ri) => {
+            const Icoon = r.icoon
+            return (
+              <div key={r.id} style={{
+                height: KOLOM + 4, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 800, color: '#fff',
+                animation: `gk-rij .35s ease-out ${ri * 50}ms both`,
+              }}>
+                <Icoon size={15} strokeWidth={2.4} style={{ color: r.content ? G : 'rgba(255,255,255,0.7)', flexShrink: 0 }} />
+                {!isMobile && r.label}
               </div>
-              {isMobile
-                ? lijst.length > 0 && <span style={{ fontSize: 10, fontWeight: 900, color: lijst.some(x => x.soort === 'content' || x.soort === 'concept') ? G : 'rgba(255,255,255,0.7)' }}>{lijst.length}</span>
-                : eerste && (
-                  <span style={{
-                    fontSize: 10.5, fontWeight: 800, lineHeight: 1.25, color: SOORT[eerste.soort].kleur, overflow: 'hidden',
-                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                    ...(eerste.soort === 'concept' ? { border: `1px dashed ${G}`, borderRadius: 6, padding: '1px 4px', animation: 'gk-puls 1.8s ease-in-out infinite' } : {}),
-                  }}>
-                    {eerste.soort === 'concept' ? '+ ' : ''}{eerste.titel}
-                  </span>
-                )}
-              {!isMobile && lijst.length > 1 && (
-                <span style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: 'auto' }}>+{lijst.length - 1}</span>
-              )}
-            </button>
-          )
-        })}
+            )
+          })}
+          <div style={{ height: 34, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>{isMobile ? '' : 'Dag'}</div>
+        </div>
+
+        <div ref={scroller} className="gk-scroll" style={{ flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'hidden', position: 'relative' }}>
+          <div style={{ display: 'flex', gap: 4, width: 'max-content', position: 'relative', paddingRight: 8 }}>
+            {/* Eén keer een groene scanlijn over de maand, als de bol die opbouwt */}
+            <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 3 }}>
+              <div style={{ width: '40%', height: '100%', background: `linear-gradient(90deg, transparent, ${G}22, transparent)`, animation: 'gk-scan 1.4s ease-out .2s both' }} />
+            </div>
+            {dagen.map((d, i) => {
+              const k = iso(d)
+              const lijst = perDag[k] || []
+              const isVandaag = k === vandaag
+              const verleden = k < vandaag
+              const weekend = d.getDay() === 0 || d.getDay() === 6
+              return (
+                <div key={k} className="gk-kol" onClick={() => setGekozen(k)} style={{
+                  width: KOLOM, flexShrink: 0, cursor: 'pointer', borderRadius: 10, position: 'relative',
+                  background: isVandaag ? `${G}14` : 'transparent', boxShadow: isVandaag ? `inset 0 0 0 1px ${G}55, 0 0 24px ${G}22` : 'none',
+                }}>
+                  <div style={{ height: KOP_H, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: isVandaag ? G : 'rgba(255,255,255,0.4)' }}>{WEEKLETTER[d.getDay()]}</span>
+                    <span className="gk-dagnr" style={{ fontSize: 15, fontWeight: 900, color: isVandaag ? G : weekend ? 'rgba(255,255,255,0.55)' : '#fff', textShadow: isVandaag ? `0 0 10px ${G}` : 'none' }}>{d.getDate()}</span>
+                  </div>
+                  {rijen.map(r => {
+                    const hier = lijst.filter(r.past)
+                    const n = hier.length
+                    const voorstel = hier.some(x => x.soort === 'concept')
+                    const echt = hier.filter(x => x.soort !== 'concept')
+                    const sterkte = n / rijMax[r.id]
+                    // Content: gepost = vol groen, gepland = donkergroen; rest: groen naar drukte.
+                    const gepost = r.content && echt.length > 0 && echt.every(x => x.klaar)
+                    const vul = !echt.length ? null
+                      : r.content ? (gepost ? G : '#0f5132')
+                      : `rgba(34,197,94,${(0.18 + sterkte * 0.62).toFixed(2)})`
+                    return (
+                      <div key={r.id} style={{ height: KOLOM + 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div className="gk-vak" title={hier.map(x => `${x.tijd ? `${x.tijd} ` : ''}${x.titel}`).join('\n') || undefined} style={{
+                          width: KOLOM, height: KOLOM, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, fontWeight: 900, color: vul ? (gepost || sterkte > 0.6 ? '#000' : '#fff') : G,
+                          background: vul || (verleden ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)'),
+                          border: voorstel && !echt.length ? `1.5px dashed ${G}` : `1px solid ${vul ? 'transparent' : 'rgba(255,255,255,0.06)'}`,
+                          boxShadow: gepost ? `0 0 12px ${G}55` : 'none',
+                          animation: voorstel && !echt.length
+                            ? `gk-cel .35s ease-out ${golf(i)}ms both, gk-puls 1.8s ease-in-out ${golf(i) + 400}ms infinite`
+                            : `gk-cel .35s ease-out ${golf(i)}ms both`,
+                        }}>
+                          {echt.length ? n : voorstel ? <Plus size={14} strokeWidth={3} /> : ''}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <DagRing deel={lijst.length / dagMax} vandaag={isVandaag} vertraging={golf(i) + 200} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
         {items === null && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -271,7 +327,8 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         {/* Een dag open: wat er staat, en samen plannen */}
         {gekozen && (
           <div style={{
-            position: 'absolute', inset: 0, zIndex: 2, background: 'rgba(0,0,0,0.94)', backdropFilter: 'blur(6px)',
+            position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(6px)',
+            border: `1px solid ${G}33`, borderRadius: 16, boxShadow: `0 0 40px ${G}14`,
             display: 'flex', flexDirection: 'column', padding: isMobile ? 14 : 20, animation: 'gk-blad .25s ease-out both',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -287,22 +344,20 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               {dagLijst.map((it, i) => {
-                const S = SOORT[it.soort]
-                const Icoon = S.icoon
+                const Icoon = SOORT_ICOON[it.soort]
+                const groen = it.soort === 'content' || it.soort === 'concept'
                 return (
                   <div key={it.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
-                    animation: `gk-cel .3s ease-out ${i * 40}ms both`,
+                    animation: `gk-blad .3s ease-out ${i * 40}ms both`,
                   }}>
-                    <Icoon size={16} strokeWidth={2.4} style={{ color: S.kleur, flexShrink: 0, filter: it.soort === 'content' ? `drop-shadow(0 0 5px ${G})` : 'none' }} />
+                    <Icoon size={16} strokeWidth={2.4} style={{ color: groen ? G : 'rgba(255,255,255,0.7)', flexShrink: 0, filter: groen ? `drop-shadow(0 0 5px ${G})` : 'none' }} />
                     <div style={{ width: 44, flexShrink: 0, fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{it.tijd || ''}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textDecoration: it.klaar ? 'line-through' : 'none', opacity: it.klaar ? 0.6 : 1 }}>{it.titel}</div>
-                      {(it.sub || it.concept?.hook) && (
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                          {[S.label, it.sub, it.concept?.hook && `"${it.concept.hook}"`].filter(Boolean).join(' · ')}
-                        </div>
-                      )}
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                        {[SOORT_LABEL[it.soort], it.sub, it.concept?.hook && `"${it.concept.hook}"`].filter(Boolean).join(' · ')}
+                      </div>
                     </div>
                     {it.soort === 'concept' && (
                       <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen([it.concept])}
@@ -327,8 +382,8 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         )}
       </div>
 
-      {/* Onder het raster: legenda of Gino's voorstellen, dan de lijn naar de bol */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingTop: 8, flexShrink: 0, flexWrap: 'wrap', minHeight: 28 }}>
+      {/* Onder het overzicht: Gino's voorstellen of samen plannen, dan de lijn naar de bol */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingTop: 10, flexShrink: 0, flexWrap: 'wrap', minHeight: 28 }}>
         {concept.length > 0 ? (
           <>
             <span style={{ fontSize: 12, fontWeight: 800, color: G }}>{concept.length} voorstel{concept.length === 1 ? '' : 'len'} van Gino</span>
@@ -338,18 +393,10 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             <button type="button" className="gk-link" onClick={() => setConcept([])} style={link}>Weg</button>
           </>
         ) : (
-          <>
-            {['call', 'agenda', 'content', 'taak'].map(s => (
-              <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: SOORT[s].kleur }} /> {SOORT[s].label}
-              </span>
-            ))}
-            <div style={{ flex: 1 }} />
-            <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
-              onClick={() => onVraag?.(`Laten we samen de content voor ${maandNaam} ${maand.getFullYear()} plannen. Kijk wat er al gepland staat en wat er in mijn agenda staat, en zet per lege dag een voorstel als concept in de kalender.`)}>
-              <Sparkles size={13} /> Content plannen met Gino
-            </button>
-          </>
+          <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
+            onClick={() => onVraag?.(`Laten we samen de content voor ${maandNaam} ${maand.getFullYear()} plannen. Kijk wat er al gepland staat en wat er in mijn agenda staat, en zet per lege dag een voorstel als concept in de kalender.`)}>
+            <Sparkles size={13} /> Content plannen met Gino
+          </button>
         )}
       </div>
       <div style={{ height: 18, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
@@ -358,6 +405,9 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     </div>
   )
 }
+
+const KOLOM = 32
+const KOP_H = 40
 
 const rond = {
   width: 30, height: 30, borderRadius: '50%', border: `1px solid ${G}44`, background: 'transparent', color: '#fff',

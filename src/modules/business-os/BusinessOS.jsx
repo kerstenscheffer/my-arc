@@ -910,10 +910,14 @@ export default function BusinessOS({ isMobile }) {
   // Kalender boven de bol (Gino's actie 'kalender' of de knop linksboven):
   // { maand?, dag?, concept?, _t } of null. Open = bol kleiner, kalender krijgt de ruimte.
   const [kalender, setKalender] = useState(null)
+  // Gino laat iets zien: podium boven de bol (alleen als de kalender dicht is).
+  const [podiumEl, setPodiumEl] = useState(null)
+  const podiumOpen = !kalender && !!visueel
+  const boven = !!kalender || podiumOpen
   // Mobiel kleiner, met ruimte boven de bol voor Gino's herinnering.
-  const maxMaat = kalender ? (isMobile ? 84 : 132) : (isMobile ? 160 : 240)
+  const maxMaat = boven ? (isMobile ? 84 : 132) : (isMobile ? 160 : 240)
   const maat = ruimte
-    ? Math.round(Math.max(kalender ? 72 : 96, Math.min(maxMaat, ruimte.h - (isMobile ? 330 : 196), ruimte.b - 48)))
+    ? Math.round(Math.max(boven ? 72 : 96, Math.min(maxMaat, ruimte.h - (isMobile ? 330 : 196), ruimte.b - 48)))
     : (isMobile ? 150 : 210)
 
   const nu = new Date()
@@ -1179,8 +1183,11 @@ export default function BusinessOS({ isMobile }) {
               onVraag={(t) => stuurRef.current?.(t)} />
           </div>
         )}
+        {podiumOpen && (
+          <div ref={setPodiumEl} style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 44 }} />
+        )}
         {/* Mobiel: vaste ruimte boven de bol voor Gino's herinnering, ook op lage schermen. */}
-        <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !kalender ? 150 : 0, flexShrink: 0 }}>
+        <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !boven ? 150 : 0, flexShrink: 0 }}>
           <div style={{ position: 'relative' }}>
             <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
             <GinoHerinnering maat={maat} isMobile={isMobile} onPraat={setHerinnertPraat} />
@@ -1220,7 +1227,7 @@ export default function BusinessOS({ isMobile }) {
       </div>
 
       {/* ── Gino laat iets zien: blokken naast de groep (smal scherm: strook bovenaan) ── */}
-      <GinoToneel visueel={visueel} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
+      <GinoToneel visueel={visueel} podium={podiumOpen ? podiumEl : null} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
         label={visueel?._vorige ? 'vorige versie' : null}
         extra={visueel && !visueel._vorige ? <BewaarKnop visueel={visueel} vraag={visueel._vraag} onKlaar={laadSchermenNu} /> : null}
         onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />

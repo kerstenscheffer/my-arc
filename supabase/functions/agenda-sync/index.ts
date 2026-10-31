@@ -165,6 +165,9 @@ type Rij = {
 
 // Naam van een klant van het team, genormaliseerd voor de fuzzy match.
 type KlantNaam = { voor: string; achterLetter: string; plat: string }
+// Actieve/gepauzeerde klant op voornaam (spaties/streepjes weg) → volledige naam.
+type Voornaam = { plat: string; naam: string }
+type TeamKlanten = { namen: KlantNaam[]; voornamen: Voornaam[] }
 
 function woorden(s: string) {
   return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
@@ -176,17 +179,26 @@ function klantNaam(voornaam: string | null, achternaam: string | null): KlantNaa
   return { voor: w[0], achterLetter: w.length > 1 ? w[w.length - 1][0] : '', plat: w.join('').replace(/\d/g, '') }
 }
 
-// Klanten van het team (alle clients) plus leads met een sale of koppeling
-// aan een client (Instagram-namen staan vaak alleen in call_leads).
+// Klanten van het team (clients met coaching_status active/paused) plus leads
+// met een sale (order_value > 0) of koppeling aan een client (Instagram-namen
+// staan vaak alleen in call_leads). Op voornaam alleen de actieve klanten.
 // deno-lint-ignore no-explicit-any
-async function laadTeamKlanten(sb: any): Promise<KlantNaam[]> {
+async function laadTeamKlanten(sb: any): Promise<TeamKlanten> {
   const leeg = () => ({ data: null })
   const { data: team } = await sb.rpc('team_coach_ids', { p_coach_id: COACH_ID }).then((r: IcalAny) => r, leeg)
   const coaches: string[] = Array.isArray(team) && team.length ? team : [COACH_ID]
-  const { data: cl } = await sb.from('clients').select('first_name, last_name').in('coach_id', coaches).then((r: IcalAny) => r, leeg)
+  const { data: cl } = await sb.from('clients').select('first_name, last_name')
+    .in('coach_id', coaches).in('coaching_status', ['active', 'paused']).then((r: IcalAny) => r, leeg)
+  const actief = (cl || []) as { first_name: string | null; last_name: string | null }[]
+  const voornamen = actief
+    .map(k => ({
+      plat: woorden(k.first_name || '').join('').replace(/\d/g, ''),
+      naam: `${(k.first_name || '').trim()} ${(k.last_name || '').trim()}`.replace(/\s+/g, ' ').trim(),
+    }))
+    .filter(v => v.plat.length >= 2)
   const { data: mv } = await sb.from('lead_movements').select('lead_id')
     .in('coach_id', coaches).is('reverted_at', null).not('lead_id', 'is', null)
-    .or('order_value.not.is.null,client_id.not.is.null')
+    .or('order_value.gt.0,client_id.not.is.null')
     .then((r: IcalAny) => r, leeg)
   const leadIds = [...new Set(((mv || []) as { lead_id: string }[]).map(m => m.lead_id))]
   const leads: { first_name: string | null; last_name: string | null }[] = []
@@ -195,9 +207,10 @@ async function laadTeamKlanten(sb: any): Promise<KlantNaam[]> {
       .in('id', leadIds.slice(i, i + 100)).then((r: IcalAny) => r, leeg)
     leads.push(...(data || []))
   }
-  return [...(cl || []), ...leads]
-    .map((k: { first_name: string | null; last_name: string | null }) => klantNaam(k.first_name, k.last_name))
+  const namen = [...actief, ...leads]
+    .map(k => klantNaam(k.first_name, k.last_name))
     .filter((k): k is KlantNaam => !!k)
+  return { namen, voornamen }
 }
 
 function contactUitTitel(titel: string) {
@@ -209,16 +222,23 @@ function contactUitTitel(titel: string) {
   return null
 }
 
-// Volledige naam of handle zonder cijfers gelijk, of voornaam + eerste letter
-// achternaam. Alleen een voornaam is twijfel: dan geen klant.
-function isKlant(naam: string, klanten: KlantNaam[]) {
+// Eerst volledige naam of handle zonder cijfers gelijk, of voornaam + eerste
+// letter achternaam; dan alleen de voornaam tegen de actieve klanten. Geeft de
+// contactnaam terug (null = geen klant): één klant met die voornaam → diens
+// volledige naam, meerdere → alleen de voornaam (niet gokken wie).
+function klantContact(naam: string, klanten: TeamKlanten): string | null {
   const w = woorden(naam)
-  if (!w.length) return false
+  if (!w.length) return null
   const plat = w.join('').replace(/\d/g, '')
-  if (plat.length >= 3 && klanten.some(k => k.plat === plat)) return true
-  if (w.length < 2) return false
-  const letter = w[w.length - 1][0]
-  return klanten.some(k => k.achterLetter && k.voor === w[0] && k.achterLetter === letter)
+  if (plat.length >= 3 && klanten.namen.some(k => k.plat === plat)) return naam
+  if (w.length >= 2) {
+    const letter = w[w.length - 1][0]
+    if (klanten.namen.some(k => k.achterLetter && k.voor === w[0] && k.achterLetter === letter)) return naam
+  }
+  const treffers = [...new Set(klanten.voornamen.filter(v => v.plat === plat).map(v => v.naam))]
+  if (treffers.length === 1) return treffers[0]
+  if (treffers.length > 1) return naam
+  return null
 }
 
 function soortVan(titel: string, namen: string[]) {
@@ -230,7 +250,7 @@ function soortVan(titel: string, namen: string[]) {
   return 'overig'
 }
 
-function leesFeed(tekst: string, van: Date, tot: Date, namen: string[], klanten: KlantNaam[]): Rij[] {
+function leesFeed(tekst: string, van: Date, tot: Date, namen: string[], klanten: TeamKlanten): Rij[] {
   const cal = new ICAL.Component(ICAL.parse(tekst))
   for (const tz of cal.getAllSubcomponents('vtimezone')) {
     try { ICAL.TimezoneService.register(tz) } catch { /* dubbele of kapotte zone */ }
@@ -260,9 +280,13 @@ function leesFeed(tekst: string, van: Date, tot: Date, namen: string[], klanten:
     if (!eind || eind < start) eind = heleDag ? new Date(start.getTime() + 864e5) : start
     if (start >= tot || eind <= van) return
     const titel = item.summary || null
-    const contact = contactUitTitel(titel || '')
+    let contact = contactUitTitel(titel || '')
     let soort = soortVan(titel || '', namen)
-    if (contact && soort === 'overig') soort = isKlant(contact, klanten) ? 'klantcall' : 'salescall'
+    if (contact && soort === 'overig') {
+      const klant = klantContact(contact, klanten)
+      soort = klant ? 'klantcall' : 'salescall'
+      if (klant) contact = klant
+    }
     rijen.push({
       uid, start_at: start.toISOString(), end_at: eind.toISOString(), hele_dag: heleDag,
       titel, locatie: item.location || null,
