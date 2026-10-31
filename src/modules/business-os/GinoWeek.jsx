@@ -61,7 +61,8 @@ function Wijzer({ deel, dag, nr, vandaag, vertraging }) {
   )
 }
 
-export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuProp = null }) {
+// uitlicht: 'YYYY-MM-DD' die Gino aanwijst; die kolom gloeit, de rest dimt.
+export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuProp = null, uitlicht = null }) {
   const [nu, setNu] = useState(() => nuProp || new Date())
   useEffect(() => {
     if (nuProp) return
@@ -147,6 +148,7 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
         @keyframes gw-nu { 0%,100% { opacity: .75 } 50% { opacity: 1 } }
         @keyframes gw-stip { 0%,100% { box-shadow: 0 0 6px ${G}, 0 0 0 0 ${G}66 } 50% { box-shadow: 0 0 10px ${G}, 0 0 0 6px ${G}00 } }
         @keyframes gw-scan { from { transform: translateY(-40%) } to { transform: translateY(260%) } }
+        @keyframes gw-aanwijs { 0%,100% { box-shadow: 0 0 0 1.5px ${G}, 0 0 28px ${G}55 } 50% { box-shadow: 0 0 0 2px ${G}, 0 0 44px ${G}99 } }
         @keyframes gw-in { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
         .gw-cap { transition: transform .15s, box-shadow .15s, background .15s }
         .gw-cap:hover { transform: scale(1.03); z-index: 3 }
@@ -187,7 +189,11 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
           const isVandaag = k === vandaag
           const verleden = k < vandaag
           return (
-            <div key={k} className="gw-dag" onClick={() => onKies?.(k)} style={{ position: 'relative', cursor: 'pointer', padding: '0 3px', opacity: verleden ? 0.5 : 1 }}>
+            <div key={k} className="gw-dag" onClick={() => onKies?.(k)} style={{
+              position: 'relative', cursor: 'pointer', padding: '0 3px', borderRadius: 12, transition: 'opacity .4s',
+              opacity: uitlicht ? (k === uitlicht ? 1 : 0.28) : verleden ? 0.5 : 1,
+              ...(k === uitlicht ? { boxShadow: `0 0 0 1.5px ${G}, 0 0 28px ${G}55`, background: `${G}10`, animation: 'gw-aanwijs 1.6s ease-in-out 3' } : {}),
+            }}>
               {/* kop: wijzer + losse dingen van die dag (content, taken) */}
               <div style={{ height: KOP, position: 'sticky', top: 0, zIndex: 5, background: '#000', margin: '0 -4px', padding: '0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, animation: `gw-in .4s ease-out ${di * 60}ms both` }}>
                 <Wijzer deel={totaal / maxDag} dag={DAGLETTER[d.getDay()]} nr={d.getDate()} vandaag={isVandaag} vertraging={200 + di * 80} />

@@ -35,7 +35,8 @@ function Ring({ deel, vandaag, vertraging, grootte = 24 }) {
   )
 }
 
-export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = false }) {
+// focus: Set met soort-id's ('reel', 'story', …) en/of dagen ('YYYY-MM-DD') die Gino aanwijst.
+export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = false, focus = null }) {
   const scroller = useRef(null)
   const vandaag = iso(new Date())
   const vandaagIdx = dagen.findIndex(d => iso(d) === vandaag)
@@ -43,11 +44,22 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
   const doelen = stand?.doelen || {}
   const mc = stand?.mc || {}
   const doelVan = (s) => doelen[s.id] ?? s.doel
+  const focusSoort = focus && CONTENT_SOORTEN.some(s => focus.has(s.id))
+  const focusDag = focus && [...focus].some(f => /^\d{4}-\d{2}-\d{2}$/.test(f))
+  const licht = (soort, dag) => {
+    if (!focus) return 1
+    const s = !focusSoort || focus.has(soort)
+    const d = !focusDag || focus.has(dag)
+    return s && d ? 1 : 0.22
+  }
 
   useEffect(() => {
     const el = scroller.current
+    const doelIdx = focusDag ? dagen.findIndex(d => focus.has(iso(d))) : -1
+    if (el && doelIdx >= 0) { el.scrollTo({ left: Math.max(0, doelIdx - 4) * (KOLOM + 4), behavior: 'smooth' }); return }
     if (el && vandaagIdx > 4) el.scrollTo({ left: (vandaagIdx - 4) * (KOLOM + 4), behavior: 'smooth' })
-  }, [vandaagIdx, dagen])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vandaagIdx, dagen, focus])
 
   // Gepland en voorgesteld per dag per soort.
   const plan = useMemo(() => {
@@ -106,7 +118,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
           {CONTENT_SOORTEN.map((s, ri) => {
             const Icoon = ICOON[s.id]
             return (
-              <div key={s.id} style={{ height: KOLOM + 4, display: 'flex', alignItems: 'center', gap: 8, animation: `gk-rij .35s ease-out ${ri * 50}ms both` }}>
+              <div key={s.id} style={{ height: KOLOM + 4, display: 'flex', alignItems: 'center', gap: 8, animation: `gk-rij .35s ease-out ${ri * 50}ms both`, opacity: focusSoort && !focus.has(s.id) ? 0.3 : 1, transition: 'opacity .4s', textShadow: focusSoort && focus.has(s.id) ? `0 0 12px ${G}` : 'none' }}>
                 <Icoon size={15} strokeWidth={2.4} style={{ color: G, flexShrink: 0, filter: `drop-shadow(0 0 4px ${G}88)` }} />
                 {!isMobile && (
                   <>
@@ -165,7 +177,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
                     }
                     const inhoud = !toekomst && n > 0 ? n : gepland ? gepland : voorstel ? '+' : ''
                     return (
-                      <div key={s.id} style={{ height: KOLOM + 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div key={s.id} style={{ height: KOLOM + 4, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: licht(s.id, k), transition: 'opacity .4s' }}>
                         <div className="gk-vak" title={gepland ? `${gepland} gepland` : voorstel ? 'Voorstel van Gino' : n ? `${n}/${doel}` : undefined} style={{
                           width: KOLOM, height: KOLOM, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: String(inhoud).length > 2 ? 10.5 : 13, fontWeight: 900, boxSizing: 'border-box', ...stijl,

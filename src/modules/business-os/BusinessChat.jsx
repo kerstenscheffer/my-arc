@@ -1127,6 +1127,8 @@ function PaInloggen({ zichtbaar, onKlaar }) {
 // open, en een rooster dat Gino zelf tekent wordt dan niet getoond (31 okt:
 // Slim bleef ondanks zijn instructies eigen kalenders tekenen).
 const AGENDA_VRAAG = /(agenda|kalender|calend|planning|plannen|rooster|afspraken|wat staat er|wat heb ik (vandaag|morgen|deze week|volgende week)|mijn week|hele week|volgende week|weekoverzicht|deze week (gepland|staan|staat))/i
+// Omzet, geld, verdeling met Marcel: het omzetscherm.
+const OMZET_VRAAG = /(omzet|inkomsten|verdien|uitbetal|verdeling|cashflow|geld binnen|komt (er )?binnen|winst|marcel krijgt)/i
 // Gaat het over content (planning, reels, opnemen), dan de contentkalender.
 const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 
@@ -1793,7 +1795,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     // De vraag erbij, zodat 'Bewaar' rond de bol weet welke vraag dit scherm opleverde.
     const vraag = [...(gesprekkenRef.current.find(g => g.id === id)?.berichten || [])].reverse().find(n => n.role === 'user')?.content
     const kalender = (bericht.acties || []).find(a => a?.soort === 'kalender')
-    const overAgenda = !!kalender || AGENDA_VRAAG.test(vraag || '')
+    const overAgenda = !!kalender || AGENDA_VRAAG.test(vraag || '') || OMZET_VRAAG.test(vraag || '')
     if (visueel && !overAgenda) onVisueel?.({ ...visueel, _vraag: vraag || null }, id)
     if (kalender) onKalender?.(kalender)
     markeer(id)
@@ -1833,8 +1835,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     stopHerkenner()
     if (!vanBuiten) setInvoer('')
     stem.stop()
-    if (AGENDA_VRAAG.test(vraag)) {
-      onKalender?.({ weergave: CONTENT_VRAAG.test(vraag) ? 'content' : 'week' })
+    if (AGENDA_VRAAG.test(vraag) || OMZET_VRAAG.test(vraag)) {
+      onKalender?.({ weergave: OMZET_VRAAG.test(vraag) ? 'omzet' : CONTENT_VRAAG.test(vraag) ? 'content' : 'week' })
       onVisueel?.(null, actief.id) // oud getekend rooster van dit tabje weg
     }
     // Versturen is een klik/Enter: Safari laat het antwoord straks dan ook afspelen.

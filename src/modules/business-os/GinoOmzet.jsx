@@ -90,18 +90,28 @@ function Doelwijzer({ bedrag, doel, maandNaam, isHuidig }) {
   )
 }
 
-function Bronnen({ maand, toegezegd }) {
+// Wat Gino aanwijst licht op; de rest dimt.
+const dim = (focus, sleutel) => (!focus || focus.has(sleutel) ? 1 : 0.25)
+
+function Bronnen({ maand, toegezegd, focus }) {
   const per = maand?.perBron || {}
   const max = Math.max(1, ...BRONNEN.map(([k]) => per[k] || 0))
+  const totaal = BRONNEN.reduce((t, [k]) => t + (per[k] || 0), 0)
+  const bronFocus = focus && BRONNEN.some(([k]) => focus.has(k))
   return (
     <div>
       {kop('Waar komt het vandaan')}
       {BRONNEN.map(([k, label], i) => {
         const v = per[k] || 0
         return (
-          <div key={k} style={{ marginBottom: 10, opacity: v ? 1 : 0.45, animation: `go-in .35s ease-out ${200 + i * 80}ms both` }}>
+          <div key={k} style={{
+            marginBottom: 10, opacity: bronFocus ? (focus.has(k) ? 1 : 0.25) : v ? 1 : 0.45, transition: 'opacity .4s',
+            animation: `go-in .35s ease-out ${200 + i * 80}ms both`,
+            ...(bronFocus && focus.has(k) ? { padding: '6px 8px', margin: '-6px -8px 4px', borderRadius: 10, boxShadow: `0 0 0 1px ${G}, 0 0 22px ${G}44`, background: `${G}0f` } : {}),
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
-              <span>{label}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{euro(v)}</span>
+              <span>{label}{bronFocus && focus.has(k) && totaal > 0 && <span style={{ color: G, marginLeft: 8 }}>{Math.round((v / totaal) * 100)}% van je omzet</span>}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{euro(v)}</span>
             </div>
             <div style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${(v / max) * 100}%`, borderRadius: 4, background: k === 'challenge' ? `${G}88` : G, boxShadow: v ? `0 0 10px ${G}88` : 'none', transformOrigin: 'left', animation: `go-balk .8s cubic-bezier(.2,.8,.2,1) ${300 + i * 80}ms both` }} />
@@ -118,7 +128,7 @@ function Bronnen({ maand, toegezegd }) {
   )
 }
 
-function Verdeling({ p, partner = 'Marcel' }) {
+function Verdeling({ p, partner = 'Marcel', focus }) {
   if (!p) return <div>{kop('Verdeling')}<div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>Geen gegevens voor deze periode.</div></div>
   const jij = Math.max(0, (p.netRevenue || 0) - (p.earned || 0))
   const regels = [
@@ -128,8 +138,9 @@ function Verdeling({ p, partner = 'Marcel' }) {
     ['Te verdelen', p.netRevenue, G],
   ]
   const totaal = Math.max(1, (p.earned || 0) + jij)
+  const aan = focus && focus.has('verdeling')
   return (
-    <div>
+    <div style={aan ? { padding: 10, margin: -10, borderRadius: 12, boxShadow: `0 0 0 1px ${G}, 0 0 22px ${G}44`, background: `${G}0f` } : null}>
       {kop(`Verdeling · ${p.label || ''}`)}
       <div style={{ position: 'relative', paddingLeft: 12 }}>
         <div style={{ position: 'absolute', left: 2, top: 6, bottom: 6, width: 1, background: `linear-gradient(to bottom, ${G}22, ${G})`, transformOrigin: 'top', animation: 'go-lijn .6s ease-out .2s both' }} />
@@ -156,7 +167,7 @@ function Verdeling({ p, partner = 'Marcel' }) {
   )
 }
 
-function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte }) {
+function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte, focus }) {
   const max = Math.max(doel || 0, ...maanden.map(m => m.amount)) * 1.12 || 1
   const H = Math.max(80, hoogte - 34)
   const yDoel = doel ? H - (doel / max) * H : null
@@ -170,11 +181,12 @@ function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte }) {
       {maanden.map((m, i) => {
         const h = Math.max(2, (m.amount / max) * H)
         const actief = m.key === gekozen
+        const gedimd = focus && [...focus].some(f => /^\d{4}-\d{2}$/.test(f)) && !focus.has(m.key)
         const toekomst = !m.isPast && !m.isCurrent
         const gehaald = doel && m.amount >= doel
         return (
           <button key={m.key} type="button" onClick={() => onKies(m.key)} title={`${m.label}: ${euro(m.amount)}`} style={{
-            flex: 1, minWidth: 0, height: '100%', border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+            flex: 1, minWidth: 0, height: '100%', border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', opacity: gedimd ? 0.3 : 1, transition: 'opacity .4s',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 4,
           }}>
             <span style={{ fontSize: 10.5, fontWeight: 900, color: actief ? G : toekomst ? 'rgba(255,255,255,0.4)' : '#fff', fontVariantNumeric: 'tabular-nums', animation: `go-in .3s ease-out ${400 + i * 50}ms both` }}>
@@ -197,7 +209,9 @@ function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte }) {
   )
 }
 
-export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = false, hoogte = 420 }) {
+// focus: Set van wat Gino aanwijst: 'coaching' | 'verlenging' | 'vervolg' | 'challenge' |
+// 'verdeling' | 'doel' | 'grafiek' | 'komt' | 'YYYY-MM' (maand in de grafiek).
+export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = false, hoogte = 420, focus = null }) {
   const maanden = useMemo(() => {
     const alle = data?.revenue?.months || []
     const i = alle.findIndex(m => m.isCurrent)
@@ -226,17 +240,19 @@ export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = fals
         display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr)',
         gap: isMobile ? 20 : 40, alignItems: 'start', flexShrink: 0,
       }}>
-        <Doelwijzer bedrag={maand?.amount || 0} doel={doel} maandNaam={maandNaam} isHuidig={!!maand?.isCurrent} />
-        <Bronnen maand={maand} toegezegd={maand?.isCurrent ? { totaal: data.revenue?.toegezegdTotaal, aantal: data.revenue?.toegezegdAantal } : null} />
-        <Verdeling p={periode} />
+        <div style={{ opacity: dim(focus, 'doel'), transition: 'opacity .4s' }}><Doelwijzer bedrag={maand?.amount || 0} doel={doel} maandNaam={maandNaam} isHuidig={!!maand?.isCurrent} /></div>
+        <div style={{ opacity: focus && !BRONNEN.some(([k]) => focus.has(k)) ? 0.25 : 1, transition: 'opacity .4s' }}>
+          <Bronnen maand={maand} focus={focus} toegezegd={maand?.isCurrent ? { totaal: data.revenue?.toegezegdTotaal, aantal: data.revenue?.toegezegdAantal } : null} />
+        </div>
+        <div style={{ opacity: dim(focus, 'verdeling'), transition: 'opacity .4s' }}><Verdeling p={periode} focus={focus} /></div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 150, marginTop: 18 }}>
-        <Maandgrafiek maanden={maanden} doel={doel} gekozen={gekozen} onKies={onKiesMaand} hoogte={Math.max(150, Math.min(220, hoogte - 250))} />
+      <div style={{ flex: 1, minHeight: 150, marginTop: 18, opacity: focus && !focus.has('grafiek') && ![...focus].some(f => /^\d{4}-\d{2}$/.test(f)) ? 0.25 : 1, transition: 'opacity .4s' }}>
+        <Maandgrafiek maanden={maanden} doel={doel} gekozen={gekozen} onKies={onKiesMaand} focus={focus} hoogte={Math.max(150, Math.min(220, hoogte - 250))} />
       </div>
 
       {komt.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, flexShrink: 0, opacity: dim(focus, 'komt'), transition: 'opacity .4s' }}>
           <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc`, marginRight: 4 }}>KOMT BINNEN</span>
           {komt.map((b, i) => (
             <span key={i} title={b.soort} style={{
