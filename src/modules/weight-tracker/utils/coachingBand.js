@@ -520,6 +520,32 @@ export function startInWeek(start, za, vorigeZa, history = null) {
   })
 }
 
+// "Deze week" precies zoals de coach hem ziet (ClientWeightCard, WeightStatsGrid):
+// zondag t/m vandaag tegenover de 7 dagen t/m de laatste zaterdag; op zaterdag
+// zelf de volle week (zaterdagTempo). Begon de fase deze week, dan is het
+// startgewicht het vergelijkpunt. Gebruikt door het progressiescherm van de
+// check-in, zodat de klant hetzelfde getal ziet als de coach. Die pakte eerst
+// de laatste afgesloten week: Oscar checkte vrijdag in en zag -0,1 (week tot
+// 24 okt) terwijl de coach -1,09 zag (31 okt 2026).
+export function dezeWeekTempo(history, vandaag = new Date(), faseStart = null) {
+  const nu = new Date(vandaag); nu.setHours(0, 0, 0, 0)
+  const za = laatsteZaterdag(nu)
+  const isoNu = iso(nu)
+  const dagenSindsZa = Math.round((nu.getTime() - new Date(`${za}T00:00:00`).getTime()) / dagInMs)
+  if (dagenSindsZa === 0) {
+    const t = zaterdagTempo(history, nu, STANDAARD.venster_dagen, faseStart)
+    return { ...t, eind: za, dagen: STANDAARD.venster_dagen }
+  }
+  const lopend = vensterGemiddelde(history, isoNu, dagenSindsZa)
+  const vorige = startInWeek(faseStart, isoNu, za, history)
+    ? { gemiddelde: parseFloat(faseStart.gewicht), metingen: 0, vanStart: true }
+    : vensterGemiddelde(history, za)
+  const verschil = (lopend.gemiddelde != null && vorige.gemiddelde != null)
+    ? Math.round((lopend.gemiddelde - vorige.gemiddelde) * 100) / 100
+    : null
+  return { zaterdag: isoNu, vorigeZaterdag: za, nu: lopend, vorige, verschil, eind: isoNu, dagen: dagenSindsZa }
+}
+
 export function zaterdagTempo(history, anker = new Date(), dagen = STANDAARD.venster_dagen, start = null) {
   const za = laatsteZaterdag(anker)
   const vorigeZa = iso(new Date(new Date(`${za}T00:00:00`).getTime() - 7 * dagInMs))

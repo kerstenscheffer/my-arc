@@ -17,11 +17,11 @@
 //   pas zin als er twee zaterdagen zijn geweest.
 //
 //   Zaterdag als ankerpunt, net als in de coach-weergave. Klant en coach horen
-//   hetzelfde getal te zien; daarom komt het uit dezelfde zaterdagTempo() als
+//   hetzelfde getal te zien; daarom komt het uit dezelfde dezeWeekTempo() als
 //   de gewicht-header in coach insight.
 
 import { est8Rep } from '../coach-command-center/components/insight/workoutChartUtils'
-import { zaterdagTempo, laatsteZaterdag, vensterGemiddelde, maakConfig, bereikTekst, tempoOordeel, tempoKleurVanDoel } from '../weight-tracker/utils/coachingBand'
+import { dezeWeekTempo, laatsteZaterdag, vensterGemiddelde, maakConfig, bereikTekst, tempoOordeel, tempoKleurVanDoel } from '../weight-tracker/utils/coachingBand'
 import { lokaleDatum } from '../../utils/tijd'
 
 const dagInMs = 86400000
@@ -200,13 +200,9 @@ export async function laadProgressie(db, client) {
     gewicht: bouwGewicht(wegingen, fase, client),
     training: bouwTraining(sessies, oefeningen, weekStart, s),
     voeding: bouwVoeding(s, maaltijdenRes.data || [], plan),
-    wegingen: {
-      dezeWeek: s.wegingen ?? null,
-      van: 7,
-      // De losse wegingen van deze week, voor het uitlegvenster achter het
-      // gewicht. Zo kan de klant zien welke getallen het gemiddelde vormen.
-      dagen: (s.weeg_dagen || []).slice(),
-    },
+    // Gewogen dagen over dezelfde dagen als het gewicht hierboven (deze week
+    // zoals de coach hem ziet), niet over de vorige afgesloten week.
+    wegingen: weegTeller(wegingen, fase),
   }
 }
 
@@ -281,6 +277,18 @@ function tempoWoord(verschil, config) {
   return TEMPO_TEKST[o] || null
 }
 
+function weegTeller(wegingen, fase) {
+  const faseStart = fase?.started_on && fase?.start_gewicht != null ? { datum: fase.started_on, gewicht: fase.start_gewicht } : null
+  const dw = dezeWeekTempo(wegingen, new Date(), faseStart)
+  const eind = new Date(`${dw.eind}T00:00:00`).getTime()
+  const begin = eind - (dw.dagen - 1) * dagInMs
+  const dagen = [...new Set(wegingen
+    .filter(w => Number.isFinite(parseFloat(w.weight)))
+    .map(w => String(w.date).slice(0, 10))
+    .filter(d => { const t = new Date(`${d}T00:00:00`).getTime(); return t >= begin && t <= eind }))].sort()
+  return { dezeWeek: dagen.length, van: dw.dagen, dagen }
+}
+
 function bouwGewicht(wegingen, fase, client) {
   if (!wegingen.length) return null
 
@@ -297,7 +305,9 @@ function bouwGewicht(wegingen, fase, client) {
       .map(w => ({ datum: String(w.date).slice(0, 10), kg: Number(w.weight) }))
   }
 
-  const tempo = zaterdagTempo(wegingen)
+  // Zelfde "deze week" als de coach (dezeWeekTempo): zondag t/m vandaag.
+  const faseStart = fase?.started_on && fase?.start_gewicht != null ? { datum: fase.started_on, gewicht: fase.start_gewicht } : null
+  const tempo = dezeWeekTempo(wegingen, new Date(), faseStart)
   const config = maakConfig(client, fase)
   if (tempo.verschil !== null) {
     return {
@@ -308,7 +318,7 @@ function bouwGewicht(wegingen, fase, client) {
       metingen: tempo.nu.metingen,
       zaterdag: tempo.zaterdag,
       vorigeZaterdag: tempo.vorigeZaterdag,
-      wegingenNu: inVenster(tempo.zaterdag),
+      wegingenNu: inVenster(tempo.eind, tempo.dagen),
       wegingenEerder: inVenster(tempo.vorigeZaterdag),
       // Niet één afgesproken getal maar de band eromheen: tussen te langzaam
       // en te snel. Een concreet doel van -0,5 laat -0,45 als mislukking
