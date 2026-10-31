@@ -1123,6 +1123,11 @@ function PaInloggen({ zichtbaar, onKlaar }) {
 // onVisueel(actie, tabId): Gino wil iets laten zien rond de bol (GinoToneel.jsx),
 // bij dat tabje. onTab(tabId): het open tabje, zodat het beeld meewisselt.
 // stuurRef: de pagina kan via stuurRef.current(tekst) zelf een vraag sturen (Mijn schermen).
+// Vraag over agenda of planning: de echte agenda boven de bol gaat meteen
+// open, en een rooster dat Gino zelf tekent wordt dan niet getoond (31 okt:
+// Slim bleef ondanks zijn instructies eigen kalenders tekenen).
+const AGENDA_VRAAG = /(agenda|kalender|calend|planning|plannen|rooster|wat staat er|mijn week|hele week|volgende week|weekoverzicht|deze week (gepland|staan|staat))/i
+
 export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28 }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
@@ -1785,8 +1790,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     const visueel = (bericht.acties || []).find(a => a?.soort === 'visueel')
     // De vraag erbij, zodat 'Bewaar' rond de bol weet welke vraag dit scherm opleverde.
     const vraag = [...(gesprekkenRef.current.find(g => g.id === id)?.berichten || [])].reverse().find(n => n.role === 'user')?.content
-    if (visueel) onVisueel?.({ ...visueel, _vraag: vraag || null }, id)
     const kalender = (bericht.acties || []).find(a => a?.soort === 'kalender')
+    const overAgenda = !!kalender || AGENDA_VRAAG.test(vraag || '')
+    if (visueel && !overAgenda) onVisueel?.({ ...visueel, _vraag: vraag || null }, id)
     if (kalender) onKalender?.(kalender)
     markeer(id)
     meld('Klaar', false)
@@ -1825,6 +1831,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     stopHerkenner()
     if (!vanBuiten) setInvoer('')
     stem.stop()
+    if (AGENDA_VRAAG.test(vraag)) onKalender?.({ weergave: /maand/i.test(vraag) ? 'maand' : 'week' })
     // Versturen is een klik/Enter: Safari laat het antwoord straks dan ook afspelen.
     if (stem.isAan()) stem.ontgrendel()
     const nieuwBericht = { role: 'user', content: vraag, op: Date.now() }
