@@ -909,7 +909,17 @@ export default function BusinessOS({ isMobile }) {
   }, [])
   // Kalender boven de bol (Gino's actie 'kalender' of de knop linksboven):
   // { maand?, dag?, concept?, _t } of null. Open = bol kleiner, kalender krijgt de ruimte.
-  const [kalender, setKalender] = useState(null)
+  // Blijft open na herladen (devserver of app-update): anders kwam het oude
+  // beeld van het tabje terug en leek de agenda weg.
+  const [kalender, setKalender] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('business_os_kalender') || 'null') } catch { return null }
+  })
+  useEffect(() => {
+    try {
+      if (kalender) sessionStorage.setItem('business_os_kalender', JSON.stringify({ weergave: kalender.weergave, maand: kalender.maand, dag: kalender.dag }))
+      else sessionStorage.removeItem('business_os_kalender')
+    } catch { /* geen opslag */ }
+  }, [kalender])
   // Gino laat iets zien: podium boven de bol (alleen als de kalender dicht is).
   const [podiumEl, setPodiumEl] = useState(null)
   const podiumOpen = !kalender && !!visueel
@@ -1227,7 +1237,7 @@ export default function BusinessOS({ isMobile }) {
       </div>
 
       {/* ── Gino laat iets zien: blokken naast de groep (smal scherm: strook bovenaan) ── */}
-      <GinoToneel visueel={visueel} podium={podiumOpen ? podiumEl : null} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
+      <GinoToneel visueel={kalender ? null : visueel} podium={podiumOpen ? podiumEl : null} isMobile={isMobile || (ruimte?.b ?? 0) < 1140} breedte={680} onSluit={() => toonVisueel(null)}
         label={visueel?._vorige ? 'vorige versie' : null}
         extra={visueel && !visueel._vorige ? <BewaarKnop visueel={visueel} vraag={visueel._vraag} onKlaar={laadSchermenNu} /> : null}
         onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />

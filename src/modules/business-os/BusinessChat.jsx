@@ -1126,7 +1126,9 @@ function PaInloggen({ zichtbaar, onKlaar }) {
 // Vraag over agenda of planning: de echte agenda boven de bol gaat meteen
 // open, en een rooster dat Gino zelf tekent wordt dan niet getoond (31 okt:
 // Slim bleef ondanks zijn instructies eigen kalenders tekenen).
-const AGENDA_VRAAG = /(agenda|kalender|calend|planning|plannen|rooster|wat staat er|mijn week|hele week|volgende week|weekoverzicht|deze week (gepland|staan|staat))/i
+const AGENDA_VRAAG = /(agenda|kalender|calend|planning|plannen|rooster|afspraken|wat staat er|wat heb ik (vandaag|morgen|deze week|volgende week)|mijn week|hele week|volgende week|weekoverzicht|deze week (gepland|staan|staat))/i
+// Gaat het over content (planning, reels, opnemen), dan de contentkalender.
+const CONTENT_VRAAG = /(content|reels?|stories|posts?|opnemen|magnets?)/i
 
 export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28 }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
@@ -1831,7 +1833,10 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     stopHerkenner()
     if (!vanBuiten) setInvoer('')
     stem.stop()
-    if (AGENDA_VRAAG.test(vraag)) onKalender?.({ weergave: /maand/i.test(vraag) ? 'maand' : 'week' })
+    if (AGENDA_VRAAG.test(vraag)) {
+      onKalender?.({ weergave: CONTENT_VRAAG.test(vraag) ? 'content' : 'week' })
+      onVisueel?.(null, actief.id) // oud getekend rooster van dit tabje weg
+    }
     // Versturen is een klik/Enter: Safari laat het antwoord straks dan ook afspelen.
     if (stem.isAan()) stem.ontgrendel()
     const nieuwBericht = { role: 'user', content: vraag, op: Date.now() }
