@@ -21,7 +21,7 @@
 // (.fout), zonder tekst of icoon.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { MoreHorizontal, X } from 'lucide-react'
+import { MoreHorizontal, X, CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import { createPortal } from '../../client/paginaPortal'
@@ -29,6 +29,7 @@ import { useModalHost } from '../../coach/ModalHost'
 import BusinessChat from './BusinessChat'
 import GinoToneel from './GinoToneel'
 import GinoHerinnering from './GinoHerinnering'
+import GinoKalender from './GinoKalender'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop, SchermenLijst } from './schermen'
 import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
@@ -906,10 +907,13 @@ export default function BusinessOS({ isMobile }) {
     })
     ro.current.observe(el)
   }, [])
+  // Kalender boven de bol (Gino's actie 'kalender' of de knop linksboven):
+  // { maand?, dag?, concept?, _t } of null. Open = bol kleiner, kalender krijgt de ruimte.
+  const [kalender, setKalender] = useState(null)
   // Mobiel kleiner, met ruimte boven de bol voor Gino's herinnering.
-  const maxMaat = isMobile ? 160 : 240
+  const maxMaat = kalender ? (isMobile ? 84 : 132) : (isMobile ? 160 : 240)
   const maat = ruimte
-    ? Math.round(Math.max(96, Math.min(maxMaat, ruimte.h - (isMobile ? 330 : 196), ruimte.b - 48)))
+    ? Math.round(Math.max(kalender ? 72 : 96, Math.min(maxMaat, ruimte.h - (isMobile ? 330 : 196), ruimte.b - 48)))
     : (isMobile ? 150 : 210)
 
   const nu = new Date()
@@ -1121,6 +1125,16 @@ export default function BusinessOS({ isMobile }) {
       display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
       padding: isMobile ? '12px 16px 8px' : '20px 24px 12px',
     }}>
+      {/* ── Kalender-knop linksboven ── */}
+      <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} title="Agenda" aria-pressed={!!kalender} style={{
+        position: 'absolute', top: isMobile ? 12 : 16, left: isMobile ? 12 : 20, zIndex: 20,
+        width: 40, height: 40, borderRadius: '50%', border: `1px solid ${kalender ? colors.success : C.rand}`,
+        background: kalender ? `${colors.success}1f` : 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: kalender ? `0 0 14px ${colors.success}55` : 'none',
+      }}>
+        <CalendarDays size={18} />
+      </button>
+
       {/* ── Puntjes-knop rechtsboven: de cijferpanelen ── */}
       <div style={{ position: 'absolute', top: isMobile ? 12 : 16, right: isMobile ? 12 : 20, zIndex: 20 }}>
         <button type="button" onClick={() => setMenu(m => !m)} title="Cijfers" aria-expanded={menu} style={{
@@ -1154,20 +1168,26 @@ export default function BusinessOS({ isMobile }) {
         )}
       </div>
 
-      {/* ── Eén gecentreerde groep: ring en chatbalk ── */}
+      {/* ── Ring en chatbalk onderaan; erboven ruimte voor Gino (kalender, beelden) ── */}
       <div ref={midden} style={{
         flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
+        alignItems: 'center', justifyContent: 'flex-end',
       }}>
+        {kalender && (
+          <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 44 }}>
+            <GinoKalender verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
+              onVraag={(t) => stuurRef.current?.(t)} />
+          </div>
+        )}
         {/* Mobiel: vaste ruimte boven de bol voor Gino's herinnering, ook op lage schermen. */}
-        <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile ? 150 : 0 }}>
+        <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile && !kalender ? 150 : 0, flexShrink: 0 }}>
           <div style={{ position: 'relative' }}>
             <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
             <GinoHerinnering maat={maat} isMobile={isMobile} onPraat={setHerinnertPraat} />
           </div>
 
           {/* ── Chat: de ring praat ── */}
-          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMobile ? 18 : 24} context={{
+          <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMobile ? 18 : 24} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,

@@ -17,12 +17,16 @@
 //   node scripts/pa-db.mjs onthoud '{"soort":"feit|voorkeur|besluit|correctie","tekst":…,"vervangt":"<id>"?}'
 //   node scripts/pa-db.mjs vergeet "<id>"            geheugenregel uitzetten
 //   node scripts/pa-db.mjs geheugen                  alles wat actief is, met id
+//   node scripts/pa-db.mjs bijlage <storage-pad>      chatbijlage → ~/Downloads/Business OS bijlagen/, print lokaal pad
 //
 // Datawijzigingen kunnen hier niet: die gaan als voorstel terug naar de chat
 // en pas Kerstens klik op Toestaan voert ze uit.
 
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import zlib from 'node:zlib'
 import { createClient } from '@supabase/supabase-js'
 
 const MAP = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
@@ -38,6 +42,43 @@ const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
   global: { headers: { Authorization: `Bearer ${token}` } },
 })
+
+// Minimale .xlsx → csv (zip lezen met zlib, sharedStrings + werkbladen).
+// Geeft [[bladnummer, csvTekst], …]. Formules: de opgeslagen waarde.
+function xlsxNaarCsv(buf) {
+  const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]))
+  if (eocd < 0) throw new Error('geen geldig xlsx-bestand')
+  const bestanden = {}
+  let p = buf.readUInt32LE(eocd + 16)
+  for (let i = 0; i < buf.readUInt16LE(eocd + 10); i++) {
+    const methode = buf.readUInt16LE(p + 10), grootte = buf.readUInt32LE(p + 20)
+    const nLen = buf.readUInt16LE(p + 28), xLen = buf.readUInt16LE(p + 30), cLen = buf.readUInt16LE(p + 32)
+    const naam = buf.toString('utf8', p + 46, p + 46 + nLen)
+    const lh = buf.readUInt32LE(p + 42)
+    const start = lh + 30 + buf.readUInt16LE(lh + 26) + buf.readUInt16LE(lh + 28)
+    const ruw = buf.subarray(start, start + grootte)
+    if (/^xl\/(sharedStrings|worksheets\/sheet\d+)\.xml$/.test(naam)) {
+      bestanden[naam] = (methode === 8 ? zlib.inflateRawSync(ruw) : ruw).toString('utf8')
+    }
+    p += 46 + nLen + xLen + cLen
+  }
+  const ent = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+  const teksten = [...(bestanden['xl/sharedStrings.xml'] || '').matchAll(/<si>([\s\S]*?)<\/si>/g)]
+    .map(m => ent([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(t => t[1]).join('')))
+  const kolom = (ref) => [...ref.replace(/\d+/g, '')].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1
+  const cel = (v) => /[",\n;]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+  return Object.keys(bestanden).filter(n => n.includes('worksheets/'))
+    .map(n => [Number(n.match(/sheet(\d+)/)[1]), bestanden[n]]).sort((a, b) => a[0] - b[0])
+    .map(([nr, xml]) => [nr, [...xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)].map(r => {
+      const rij = []
+      for (const c of r[1].matchAll(/<c ([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const ref = c[1].match(/r="([A-Z]+\d+)"/)?.[1], type = c[1].match(/t="(\w+)"/)?.[1]
+        const v = c[2]?.match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? c[2]?.match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] ?? ''
+        rij[ref ? kolom(ref) : rij.length] = cel(type === 's' ? (teksten[Number(v)] ?? '') : ent(v))
+      }
+      return Array.from(rij, x => x ?? '').join(',')
+    }).join('\n')])
+}
 
 const [cmd, arg = ''] = process.argv.slice(2)
 const uit = (x) => console.log(JSON.stringify(x).slice(0, 30000))
@@ -121,6 +162,49 @@ if (cmd === 'lees') {
   const { data, error } = await sb.from('business_os_geheugen').select('id, soort, tekst, bron, created_at')
     .eq('actief', true).order('soort').order('created_at')
   uit(error ? { fout: error.message } : data)
+} else if (cmd === 'bijlage') {
+  // Bijlage uit de chat ([bijlage]-regel) met Kerstens rechten ophalen naar
+  // ~/Downloads/Business OS bijlagen/ (originele naam, nooit overschrijven) en
+  // het lokale pad teruggeven. Kopieën ouder dan 7 dagen gaan eerst weg (de
+  // bucket ruimt zichzelf op via pg_cron). Geen inhoud in de uitvoer.
+  const BUCKET = 'business-os-bijlagen'
+  const doel = path.join(os.homedir(), 'Downloads', 'Business OS bijlagen')
+  fs.mkdirSync(doel, { recursive: true })
+  for (const f of fs.readdirSync(doel)) {
+    const p = path.join(doel, f)
+    try { if (fs.statSync(p).isFile() && Date.now() - fs.statSync(p).mtimeMs > 7 * 864e5) fs.unlinkSync(p) } catch { /* laat staan */ }
+  }
+  const pad = arg.trim().replace(new RegExp(`^${BUCKET}/`), '')
+  if (!pad || pad.includes('..')) { uit({ fout: 'Gebruik: bijlage <business-os-bijlagen/<uid>/<bestand>>' }); process.exit(1) }
+  const { data, error } = await sb.storage.from(BUCKET).download(pad)
+  if (error) { uit({ fout: `Downloaden mislukt: ${error.message || 'onbekend'}` }); process.exit(1) }
+  // <uuid>-<naam> → <naam>; bestaat hij al, dan "naam (2).ext".
+  const naam = path.basename(pad).replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, '') || 'bijlage'
+  const ext = path.extname(naam)
+  let lokaal = path.join(doel, naam)
+  for (let i = 2; fs.existsSync(lokaal); i++) lokaal = path.join(doel, `${path.basename(naam, ext)} (${i})${ext}`)
+  const buf = Buffer.from(await data.arrayBuffer())
+  fs.writeFileSync(lokaal, buf, { flag: 'wx' })
+  // Excel (.xlsx) kan Read niet openen: elk werkblad ook als csv ernaast.
+  const leesbaar = []
+  if (ext.toLowerCase() === '.xlsx') {
+    try {
+      for (const [blad, tekst] of xlsxNaarCsv(buf)) {
+        const p = lokaal.replace(/\.xlsx$/i, `${blad > 1 ? ` blad${blad}` : ''}.csv`)
+        if (!fs.existsSync(p)) fs.writeFileSync(p, tekst, { flag: 'wx' })
+        leesbaar.push(p)
+      }
+    } catch (e) { leesbaar.push(`(omzetten mislukt: ${e.message})`) }
+  }
+  // iPhone-foto (.heic): Read toont alleen jpg/png, dus via macOS sips een jpg ernaast.
+  if (/^\.hei[cf]$/i.test(ext)) {
+    const jpg = lokaal.replace(/\.hei[cf]$/i, '.jpg')
+    try {
+      if (!fs.existsSync(jpg)) execFileSync('sips', ['-s', 'format', 'jpeg', lokaal, '--out', jpg], { stdio: 'ignore' })
+      leesbaar.push(jpg)
+    } catch { /* dan alleen het origineel */ }
+  }
+  uit({ ok: true, pad: lokaal, bytes: data.size, ...(leesbaar.length ? { leesbaar } : {}) })
 } else {
   uit({ fout: `Onbekend commando: ${cmd}` })
 }

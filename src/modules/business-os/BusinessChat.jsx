@@ -36,12 +36,15 @@
 // eronder met elk een Gedaan-knop, plus de ElevenLabs-sleutelactie zolang
 // gino-stem 503 geen_sleutel geeft. Versturen breekt de spraakherkenning af en
 // negeert late resultaten, zodat het veld leeg blijft.
+// Bijlagen (31 okt): paperclip naast de invoer of slepen; pdf/csv/Excel/txt/heic
+// gaan als chipje mee, worden bij versturen geüpload en komen als [bijlage]-regel
+// bij Gino op de Mac (zie uploadBijlagen). Alleen via de Mac-route.
 // Editor (30 okt): vast tabje na Code/Strategie dat via edge function editor-chat
 // met ChatGPT (OpenAI API) praat, alleen tekst (geen Mac-route, geen screenshots).
 // Opdrachten met status bovenaan het venster (business-os-editor.sql).
 
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
-import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { ArrowUp, Copy, Check, Mic, Lock, Database, Laptop, ImagePlus, X, SquarePen, History, MoreHorizontal, RotateCw, Volume2, Eye, ThumbsUp, ThumbsDown, Paperclip, FileText } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 import useIsMobile from '../../hooks/useIsMobile'
@@ -66,15 +69,70 @@ const KAART = { margin: '2px 0 6px', fontSize: '0.76rem', lineHeight: 1.35 }
 const KAART_KOP = { display: 'flex', gap: 6, alignItems: 'center', fontWeight: 800, marginBottom: 2 }
 const KAART_SUB = { color: colors.textSecondary, fontWeight: 600, marginBottom: 6 }
 
+// Bijlagen (31 okt): bestanden (pdf, csv, Excel, txt, foto's) gaan naar de
+// private bucket business-os-bijlagen/<uid>/<uuid>-<naam>; het bericht krijgt per
+// bestand een vaste [bijlage]-regel die Gino op de Mac met
+// `node scripts/pa-db.mjs bijlage <pad>` ophaalt. Na 7 dagen ruimt pg_cron ze op.
+// Screenshots (png/jpg geplakt of gesleept) blijven de oude beeld-route.
+const BIJLAGE_BUCKET = 'business-os-bijlagen'
+const BIJLAGE_MAX = 20 * 1024 * 1024
+const BIJLAGE_TYPES = {
+  pdf: 'application/pdf', csv: 'text/csv', txt: 'text/plain',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', heic: 'image/heic',
+}
+const BIJLAGE_ACCEPT = 'image/*,' + Object.keys(BIJLAGE_TYPES).map(e => '.' + e).join(',')
+const extVan = (naam) => (String(naam).match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase()
+const grootteTekst = (b) => b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB`
+const BIJLAGE_REGEL = /^\[bijlage\] (.+?) \| (\S+) \| (\S+) \| (.+)$/
+
+// Uploaden; geeft [{ naam, pad, type, grootte }] of gooit met een korte melding.
+async function uploadBijlagen(bestanden) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Niet ingelogd')
+  const uit = []
+  for (const b of bestanden) {
+    const naam = b.naam.replace(/[^\w.\- ()]+/g, '_').slice(-120)
+    const pad = `${user.id}/${crypto.randomUUID()}-${naam}`
+    const { error } = await supabase.storage.from(BIJLAGE_BUCKET)
+      .upload(pad, b.file, { contentType: b.type, upsert: false })
+    if (error) throw new Error(`${b.naam} kon niet worden geüpload`)
+    uit.push({ naam: b.naam, pad: `${BIJLAGE_BUCKET}/${pad}`, type: b.type, grootte: grootteTekst(b.grootte) })
+  }
+  return uit
+}
+
+// Gebruikersbericht: [bijlage]-regels als rustig chipje, de rest als tekst.
+function BerichtTekst({ tekst }) {
+  const regels = String(tekst || '').split('\n')
+  const bij = regels.map(r => r.match(BIJLAGE_REGEL)).filter(Boolean)
+  if (!bij.length) return tekst
+  return (
+    <>
+      {regels.filter(r => !BIJLAGE_REGEL.test(r)).join('\n').trim()}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+        {bij.map((m, i) => (
+          <span key={i} style={{ display: 'flex', gap: 5, alignItems: 'center', color: colors.success, fontWeight: 800 }}>
+            <Paperclip size={12} strokeWidth={2.6} /> {m[1]} <span style={{ color: colors.textMuted, fontWeight: 700 }}>{m[4]}</span>
+          </span>
+        ))}
+      </div>
+    </>
+  )
+}
+
 // Vraag via de lokale PA. Geeft { tekst, acties } of null (Mac pakte hem niet op).
 // Vraag via de PA op de Mac. Realtime geeft elke wijziging van de rij meteen
 // door (ook de halve tekst tijdens het typen → opDeel); pollen elke 2 s blijft
 // als vangnet. null = niet gelukt, dan gaat de vraag via de API.
 // extra = { modus: 'snel' | 'slim', gesprek_id } (Slim hervat per gesprek een sessie).
 // signaal = { id, gestopt }: de stopknop zet gestopt; dan { gestopt: true } terug.
-async function vraagViaMac(berichten, context, opDeel, extra = {}, signaal = {}) {
+async function vraagViaMac(berichten, context, opDeel, extra = {}, signaal = {}, bijlagen = []) {
   const { data: rij, error } = await supabase.from('business_os_opdrachten')
-    .insert({ soort: 'chat', opdracht: berichten[berichten.length - 1].content.slice(0, 500), invoer: { berichten, context, ...extra } })
+    .insert({
+      soort: 'chat', opdracht: berichten[berichten.length - 1].content.slice(0, 500), invoer: { berichten, context, ...extra },
+      ...(bijlagen.length ? { bijlagen } : {}),
+    })
     .select('id').single()
   if (error) return null
   signaal.id = rij.id
@@ -1065,7 +1123,7 @@ function PaInloggen({ zichtbaar, onKlaar }) {
 // onVisueel(actie, tabId): Gino wil iets laten zien rond de bol (GinoToneel.jsx),
 // bij dat tabje. onTab(tabId): het open tabje, zodat het beeld meewisselt.
 // stuurRef: de pagina kan via stuurRef.current(tekst) zelf een vraag sturen (Mijn schermen).
-export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuurRef, marginTop = 28 }) {
+export default function BusinessChat({ context, onBezig, onVisueel, onKalender, onTab, stuurRef, marginTop = 28 }) {
   // Gesprekken naast elkaar (tabjes). Elk tabje heeft zijn eigen geschiedenis,
   // denk-status en halve tekst, zodat je in 'Strategie' kunt praten terwijl
   // 'Code' nog op een antwoord of code-opdracht wacht.
@@ -1101,6 +1159,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
   })
   const [invoer, setInvoer] = useState('')
   const [bijlagen, setBijlagen] = useState([])
+  const [bestanden, setBestanden] = useState([]) // { id, file, naam, grootte, type } → bucket bij versturen
+  const [uploadt, setUploadt] = useState(false)
   const isMobile = useIsMobile()
   // Berichtenvenster: start altijd dicht, niet onthouden.
   const [open, setOpen] = useState(false)
@@ -1258,6 +1318,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
   const spraakVerwerkt = useRef(0) // aantal finale resultaten dat al in spraakBasis zit
   const herstartTimer = useRef(null)
   const kiezer = useRef(null)
+  const bestandKiezer = useRef(null)
   const balk = useRef(null)
 
   // Waar past het berichtenvenster? Liefst onder de groep; is daar te weinig
@@ -1568,6 +1629,26 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
     if (luistert) el.scrollTop = el.scrollHeight
   }, [invoer, luistert])
 
+  // Gesleept of gekozen: png/jpg/gif/webp = screenshot (beeld-route), de rest
+  // (pdf, csv, Excel, txt, heic) = bijlage voor de bucket.
+  const neemBestanden = (lijst) => {
+    const alle = Array.from(lijst || []).filter(Boolean)
+    const isBeeld = (f) => /^image\/(png|jpeg|gif|webp)$/.test(f.type)
+    const los = alle.filter(f => !isBeeld(f))
+    if (los.length) {
+      if (isEditor(actief)) { setFout('Editor (ChatGPT) kan geen bestanden lezen'); return }
+      const goed = []
+      for (const f of los) {
+        const type = BIJLAGE_TYPES[extVan(f.name)]
+        if (!type) { setFout(`${f.name}: alleen pdf, csv, xlsx, xls, txt, png, jpg of heic`); continue }
+        if (f.size > BIJLAGE_MAX) { setFout(`${f.name} is groter dan 20 MB`); continue }
+        goed.push({ id: crypto.randomUUID(), file: f, naam: f.name, grootte: f.size, type })
+      }
+      if (goed.length) setBestanden(oud => [...oud, ...goed].slice(0, 10))
+    }
+    neemBeelden(alle.filter(isBeeld))
+  }
+
   const neemBeelden = async (bestanden) => {
     const beelden = Array.from(bestanden || []).filter(b => b?.type?.startsWith('image/'))
     if (!beelden.length) return
@@ -1592,8 +1673,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
   }
 
   // Slepen: overal op het scherm, zolang de chat zichtbaar is.
-  const neemRef = useRef(neemBeelden)
-  neemRef.current = neemBeelden
+  const neemRef = useRef(neemBestanden)
+  neemRef.current = neemBestanden
   useEffect(() => {
     let diepte = 0
     const zichtbaar = () => !!wortel.current?.getClientRects().length
@@ -1705,6 +1786,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
     // De vraag erbij, zodat 'Bewaar' rond de bol weet welke vraag dit scherm opleverde.
     const vraag = [...(gesprekkenRef.current.find(g => g.id === id)?.berichten || [])].reverse().find(n => n.role === 'user')?.content
     if (visueel) onVisueel?.({ ...visueel, _vraag: vraag || null }, id)
+    const kalender = (bericht.acties || []).find(a => a?.soort === 'kalender')
+    if (kalender) onKalender?.(kalender)
     markeer(id)
     meld('Klaar', false)
     if (actiefRef.current !== id) return
@@ -1723,10 +1806,22 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
   // tekst (optioneel): vraag van buitenaf (Mijn schermen); invoer en bijlagen blijven dan staan.
   const stuur = async (tekst) => {
     const vanBuiten = typeof tekst === 'string'
-    const vraag = (vanBuiten ? tekst : invoer).trim()
+    let vraag = (vanBuiten ? tekst : invoer).trim()
     const bij = vanBuiten ? [] : bijlagen
-    if ((!vraag && !bij.length) || bezig || (vanBuiten && isEditor(actief))) return false
+    const los = vanBuiten ? [] : bestanden
+    if ((!vraag && !bij.length && !los.length) || bezig || uploadt || (vanBuiten && isEditor(actief))) return false
+    // Bestanden leest alleen Gino op de Mac (pa-db bijlage); screenshots gaan via de API.
+    if (los.length && !viaMac) { setFout('Bestanden kan Gino alleen via je Mac lezen. Zet de PA aan (Mac, rechtsboven).'); return false }
+    if (los.length && bij.length) { setFout('Stuur screenshots en bestanden apart.'); return false }
     const { id, sessie } = actief
+    let geupload = []
+    if (los.length) {
+      setUploadt(true)
+      setFout(null)
+      try { geupload = await uploadBijlagen(los) } catch (e) { setFout(e.message); return false } finally { setUploadt(false) }
+      vraag = [vraag || 'Bekijk de bijlage.', '', ...geupload.map(b => `[bijlage] ${b.naam} | ${b.pad} | ${b.type} | ${b.grootte}`)].join('\n')
+      setBestanden([])
+    }
     stopHerkenner()
     if (!vanBuiten) setInvoer('')
     stem.stop()
@@ -1767,7 +1862,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
     const opDeel = (t) => { if (t) laatsteDeel = t; setDeelPer(d => ({ ...d, [id]: t })) }
     const signaal = { id: null, gestopt: false }
     stopPer.current[id] = signaal
-    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }, signaal) : null
+    const mac = viaMac && !metBeeld ? await vraagViaMac(berichten, context, opDeel, { modus, gesprek_id: sessie, ...(isKlanten(actief) ? { tab: 'klanten' } : {}) }, signaal, geupload) : null
     opDeel('')
     if (signaal.gestopt || mac?.gestopt) {
       // Gestopt: wat hij al typte blijft staan, zoals bij ChatGPT.
@@ -1825,7 +1920,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
     setOngelezenPer(o => ({ ...o, [actief.id]: false }))
   }
   // Nieuwe deploy? Herladen zodra er geen gesprek loopt (gesprekken staan in localStorage).
-  useNieuweVersie(!ergensBezig && !luistert && !spreekt && !invoer.trim() && !bijlagen.length
+  useNieuweVersie(!ergensBezig && !luistert && !spreekt && !invoer.trim() && !bijlagen.length && !bestanden.length && !uploadt
     && !Object.values(actieStaat).some(s => s?.bezig))
   const alleOpen = gesprekken.flatMap(g => g.berichten.flatMap((b, i) => b.role !== 'assistant' ? [] :
     (b.acties || []).map((ac, j) => ({ ac, t: g.id, i, j, sleutel: `${g.id}-${i}-${j}` })).filter(x => staatOpen(x.ac))))
@@ -1841,7 +1936,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
   // Lijst open boven de balk: daar staan de kaarten al, wolkje dan weg (alleen als het voorstel in dit tabje staat).
   const wolkZichtbaar = vraagNu && !(open && plek && !plek.onder && vraagNu.t === actief.id)
 
-  const kanSturen = (invoer.trim() || bijlagen.length) && !bezig
+  const kanSturen = (invoer.trim() || bijlagen.length || bestanden.length) && !bezig && !uploadt
   // Stopknop (blokje op de plek van het pijltje): de lopende vraag in dit
   // tabje, of in Code een lopende code-opdracht. De PA ziet status 'gestopt'
   // en breekt het Claude-proces af.
@@ -1919,7 +2014,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
                     ))}
                   </div>
                 )}
-                {b.content}
+                <BerichtTekst tekst={b.content} />
               </div>
             ) : (
               <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
@@ -1947,6 +2042,14 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
                       )
                     }
                     if (ac.soort === 'pa_voorstel') return <PaVoorstel key={j} {...kaart} herhaalKnop={laatsteGino ? herhaalKnop : null} />
+                    if (ac.soort === 'kalender') return (
+                      <button key={j} type="button" onClick={() => onKalender?.(ac)} style={{
+                        display: 'flex', gap: 6, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, marginBottom: 4,
+                        color: colors.success, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
+                      }}>
+                        <Eye size={13} strokeWidth={2.5} /> Open kalender{Array.isArray(ac.concept) && ac.concept.length ? ` · ${ac.concept.length} voorstellen` : ''}
+                      </button>
+                    )
                     return (
                       <div key={j} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: colors.success, fontWeight: 800, fontSize: '0.8rem', marginBottom: 4 }}>
                         <Check size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {ac.soort === 'app_issue' ? `Op de app-lijst: ${ac.tekst}` : typeof ac.tekst === 'string' ? ac.tekst : ''}
@@ -2107,7 +2210,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               color: colors.success, fontWeight: 800, fontSize: '0.85rem',
             }}>
-              <ImagePlus size={18} strokeWidth={2.5} /> Laat los om te versturen
+              <Paperclip size={18} strokeWidth={2.5} /> Laat los om mee te sturen
             </div>
           )}
           <div style={{
@@ -2128,6 +2231,33 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+            {bestanden.length > 0 && (
+              <div style={{ padding: '10px 12px 2px' }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {bestanden.map(b => (
+                    <div key={b.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, maxWidth: '100%', height: 30, padding: '0 4px 0 10px',
+                      borderRadius: 999, background: 'rgba(255,255,255,0.06)', fontSize: '0.74rem', fontWeight: 800, color: colors.textPrimary,
+                    }}>
+                      <FileText size={13} strokeWidth={2.5} color={colors.success} style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{b.naam}</span>
+                      <span style={{ color: colors.textMuted, fontWeight: 700, flexShrink: 0 }}>{grootteTekst(b.grootte)}</span>
+                      <button onClick={() => setBestanden(l => l.filter(x => x.id !== b.id))} disabled={uploadt}
+                        title="Weghalen" aria-label={`${b.naam} weghalen`} style={{
+                          width: 22, height: 22, borderRadius: '50%', border: 'none', flexShrink: 0, padding: 0,
+                          background: 'transparent', color: colors.textSecondary, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                        <X size={13} strokeWidth={3} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: '0.66rem', fontWeight: 700, color: colors.textMuted, marginTop: 5 }}>
+                  {uploadt ? 'Uploaden…' : 'Bijlagen worden na 7 dagen verwijderd.'}
+                </div>
               </div>
             )}
             <PaInloggen zichtbaar={route === 'mac' && !paOnline} onKlaar={() => { setPaOnline(true); meld('PA weer ingelogd') }} />
@@ -2151,6 +2281,12 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
                   minHeight: 36, maxHeight: INVOER_MAX_H, overflowY: 'auto', boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
+              {!isEditor(actief) && (
+                <button onClick={() => bestandKiezer.current?.click()} title="Bestand bijvoegen (pdf, csv, Excel, txt, foto; max 20 MB)"
+                  aria-label="Bestand bijvoegen" style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
+                  <Paperclip size={17} strokeWidth={2.5} />
+                </button>
+              )}
               {/* Snel/Slim zichtbaar; foto, eerdere gesprekken en nieuw gesprek achter ⋯ (niet in Editor) */}
               {!isEditor(actief) && <button onClick={wisselModus}
                 title={modus === 'slim'
@@ -2201,6 +2337,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
               )}
               <input ref={kiezer} type="file" accept="image/*" multiple hidden
                 onChange={e => { neemBeelden(e.target.files); e.target.value = '' }} />
+              <input ref={bestandKiezer} type="file" accept={BIJLAGE_ACCEPT} multiple hidden
+                onChange={e => { neemBestanden(e.target.files); e.target.value = '' }} />
               {Spraak && (
                 <button
                   onClick={microfoon}
