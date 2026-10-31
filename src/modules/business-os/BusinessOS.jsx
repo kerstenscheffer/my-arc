@@ -906,9 +906,10 @@ export default function BusinessOS({ isMobile }) {
     })
     ro.current.observe(el)
   }, [])
-  const maxMaat = isMobile ? 190 : 240
+  // Mobiel kleiner, met ruimte boven de bol voor Gino's herinnering.
+  const maxMaat = isMobile ? 160 : 240
   const maat = ruimte
-    ? Math.round(Math.max(96, Math.min(maxMaat, ruimte.h - (isMobile ? 206 : 196), ruimte.b - 48)))
+    ? Math.round(Math.max(96, Math.min(maxMaat, ruimte.h - (isMobile ? 330 : 196), ruimte.b - 48)))
     : (isMobile ? 150 : 210)
 
   const nu = new Date()
@@ -1113,7 +1114,10 @@ export default function BusinessOS({ isMobile }) {
     // hoogte zodat de groep altijd past.
     <div data-bos-pagina="" style={{
       background: C.bg, color: C.tekst, position: 'relative', overflow: 'hidden',
-      height: 'calc(var(--paneel-hoogte, 100dvh) - var(--paneel-navruimte, 120px))',
+      // Mobiel: ook de icoonrij boven de onderbalk en de safe-area vrijhouden.
+      height: isMobile
+        ? 'calc(var(--paneel-hoogte, 100dvh) - 124px - env(safe-area-inset-bottom, 0px))'
+        : 'calc(var(--paneel-hoogte, 100dvh) - var(--paneel-navruimte, 120px))',
       display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
       padding: isMobile ? '12px 16px 8px' : '20px 24px 12px',
     }}>
@@ -1155,10 +1159,11 @@ export default function BusinessOS({ isMobile }) {
         flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* Mobiel: vaste ruimte boven de bol voor Gino's herinnering, ook op lage schermen. */}
+        <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: isMobile ? 150 : 0 }}>
           <div style={{ position: 'relative' }}>
             <Reactor pct={pctDoel} maat={maat} bezig={denkt} praat={spreekt || herinnertPraat} stemAan={stemAan} fout={stemFout} melding={stemMelding} onKlik={klikRing} />
-            <GinoHerinnering maat={maat} onPraat={setHerinnertPraat} />
+            <GinoHerinnering maat={maat} isMobile={isMobile} onPraat={setHerinnertPraat} />
           </div>
 
           {/* ── Chat: de ring praat ── */}

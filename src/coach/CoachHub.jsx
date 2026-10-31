@@ -1256,7 +1256,10 @@ export default function CoachHub() {
         onClick={toggleClientMode}
         title={clientMode ? 'Klantmodus uit — toon balken' : 'Klantmodus aan — verberg balken (issues, quick-links, goals)'}
         style={{
-          position: 'fixed', left: isMobile ? 10 : 14, bottom: isMobile ? 74 : 18,
+          // Mobiel: boven de onderbalk, die zelf op de safe-area staat. Zonder
+          // de safe-area hier lag het oog op iPhone boven op de Command-tab.
+          position: 'fixed', left: isMobile ? 10 : 14,
+          bottom: isMobile ? 'calc(70px + env(safe-area-inset-bottom, 0px))' : 18,
           zIndex: 2147483200,
           width: 40, height: 40, borderRadius: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1273,8 +1276,11 @@ export default function CoachHub() {
 
       {/* Eén verticale balk rechts met snel-knoppen voor alle widgets.
           Verborgen in klantmodus. */}
+      {/* Business OS op mobiel: als rij naast het oog, boven de onderbalk.
+          Verticaal lag hij over de chatbalk en verborg hij de verzendknop. */}
       {!clientMode && <WidgetSidebar
         isMobile={isMobile}
+        plek={isMobile && activeTab === 'business-os' ? 'rij' : undefined}
         achtergrond={PAGINA_BG}
         buttons={[
           {

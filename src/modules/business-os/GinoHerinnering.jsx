@@ -25,7 +25,7 @@ function morgen9() {
   return new Date(utc - (nl - utc)).toISOString()
 }
 
-export default function GinoHerinnering({ maat = 240, onPraat }) {
+export default function GinoHerinnering({ maat = 240, onPraat, isMobile = false }) {
   const [open, setOpen] = useState([])
   const [getypt, setGetypt] = useState(0)
   const gemeld = useRef(new Set())
@@ -127,8 +127,14 @@ export default function GinoHerinnering({ maat = 240, onPraat }) {
         background: `linear-gradient(to top, ${G}, ${G}66)`, boxShadow: `0 0 6px ${G}`,
         transformOrigin: 'bottom', animation: 'ginoLijn .3s ease-out .3s both' }} />
 
-      {/* kleine bol met de tekst erachter, alsof hij het zegt */}
-      <div role="alertdialog" aria-label="Herinnering van Gino" onClick={vraagMeldingen} style={{
+      {/* kleine bol met de tekst erachter, alsof hij het zegt. Mobiel: tekst
+          gecentreerd boven de kleine bol, over de schermbreedte (naast de bol
+          liep hij buiten beeld). */}
+      <div role="alertdialog" aria-label="Herinnering van Gino" onClick={vraagMeldingen} style={isMobile ? {
+        position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: maat - (rand - lijn + MINI / 2),
+        display: 'flex', flexDirection: 'column-reverse', alignItems: 'center', gap: 8,
+        width: 'min(420px, calc(100vw - 32px))', textAlign: 'center', pointerEvents: 'auto',
+      } : {
         position: 'absolute', left: `calc(50% - ${MINI / 2}px)`, top: rand - lijn - MINI / 2,
         display: 'flex', alignItems: 'flex-start', gap: 12, width: 'min(360px, 80vw)', pointerEvents: 'auto',
       }}>
@@ -139,7 +145,7 @@ export default function GinoHerinnering({ maat = 240, onPraat }) {
           <div style={{ position: 'absolute', inset: -5, borderRadius: '50%', border: `1px dashed ${G}66`,
             animation: 'ginoMiniDraai 6s linear infinite' }} />
         </div>
-        <div style={{ paddingTop: 2, minWidth: 0 }}>
+        <div style={{ paddingTop: 2, minWidth: 0, maxWidth: '100%' }}>
           <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc`, marginBottom: 4,
             animation: 'ginoKnoppen .3s ease-out .6s both' }}>
             GINO · {nlTijd(huidig.moment).toUpperCase()}{open.length > 1 ? ` · ${open.length}` : ''}
@@ -150,7 +156,8 @@ export default function GinoHerinnering({ maat = 240, onPraat }) {
             {!klaarGetypt && <span style={{ display: 'inline-block', width: 2, height: '1em', marginLeft: 2, verticalAlign: '-2px',
               background: G, animation: 'ginoCursor .8s steps(1) infinite' }} />}
           </div>
-          <div style={{ display: 'flex', gap: 16, marginTop: 8, opacity: klaarGetypt ? 1 : 0,
+          <div style={{ display: 'flex', gap: isMobile ? '4px 18px' : 16, marginTop: 8, opacity: klaarGetypt ? 1 : 0,
+            ...(isMobile ? { flexWrap: 'wrap', justifyContent: 'center' } : null),
             animation: klaarGetypt ? 'ginoKnoppen .25s ease-out both' : 'none', pointerEvents: klaarGetypt ? 'auto' : 'none' }}>
             <button type="button" className="gino-hk" onClick={gedaan} style={{ ...knop, color: G, opacity: 1 }}>
               <Check size={13} /> Gedaan

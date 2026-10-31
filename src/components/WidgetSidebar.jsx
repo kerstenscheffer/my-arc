@@ -24,11 +24,20 @@ const GOLD = '#FFD700'
 // exact de paginakleur heeft (CoachHub). Dan valt ook de zware schaduw weg.
 export default function WidgetSidebar({ buttons = [], isMobile = false, plek = 'rechtsonder', achtergrond }) {
   if (!buttons.length) return null
+  // 'rij': horizontaal naast het oog (links), vlak boven de onderbalk.
+  const rij = plek === 'rij'
 
   return (
     <nav
       aria-label="Widgets"
-      style={{
+      style={rij ? {
+        position: 'fixed', left: 56, right: 10,
+        bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))',
+        background: achtergrond || 'rgba(10,10,10,0.9)',
+        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
+        padding: 0, zIndex: 99, boxSizing: 'border-box',
+        display: 'flex', justifyContent: 'space-around', alignItems: 'center',
+      } : {
         position: 'fixed',
         right: 0,
         ...(plek === 'rechtsboven'
@@ -64,7 +73,7 @@ export default function WidgetSidebar({ buttons = [], isMobile = false, plek = '
         const badgeKleur = accent === GOLD ? '#fff' : accent
         return (
           <React.Fragment key={btn.id}>
-            {i > 0 && (
+            {i > 0 && !rij && (
               <div style={{ height: 1, margin: '0 6px', background: 'rgba(255,255,255,0.08)' }} />
             )}
             <button

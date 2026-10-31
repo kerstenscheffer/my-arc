@@ -1981,12 +1981,17 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
           {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
           <div style={{ position: 'absolute', left: 4, right: 4, bottom: '100%', marginBottom: 2 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0 }}>
+            {/* Mobiel: de rij scrolt zijwaarts i.p.v. dat label en tabjes elkaar platdrukken. */}
+            <div className={isMobile ? 'bos-tabjes' : undefined} style={{
+              display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0,
+              ...(isMobile ? { overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' } : null),
+            }}>
               {/* Klik op het poppetje: berichtenvenster open/dicht. Groene stip = iets ongelezen. */}
               <button role="status" onClick={() => setOpen(o => !o)} aria-expanded={open}
                 title={open ? 'Berichten verbergen' : 'Berichten tonen'}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0, flex: '0 1 auto',
+                  display: 'flex', alignItems: 'center', gap: 8, height: 26, whiteSpace: 'nowrap', minWidth: 0,
+                  flex: isMobile ? '0 0 auto' : '0 1 auto', maxWidth: isMobile ? '62vw' : undefined,
                   background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                   fontSize: '0.75rem', fontWeight: 800,
                   color: werk || vraagNu || open ? colors.textSecondary : melding ? (melding.fout ? colors.danger : colors.success) : laatst ? colors.textSecondary : colors.textMuted,
@@ -2012,7 +2017,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
               )}
               {/* Gesprekken: kleine tabjes, groene stip = ongelezen of klaar resultaat */}
               <div role="tablist" aria-label="Gesprekken" className="bos-tabjes" style={{
-                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: '0 1 auto', overflowX: 'auto', marginLeft: 2,
+                display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: isMobile ? '0 0 auto' : '0 1 auto', overflowX: 'auto', marginLeft: 2,
               }}>
                 {gesprekken.map((g, gi) => {
                   const aan = g.id === actief.id
@@ -2047,7 +2052,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
                   color: colors.textMuted, fontSize: '0.8rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
                 }}>+</button>
               </div>
-              <span onClick={() => setOpen(o => !o)} style={{ flex: 1, alignSelf: 'stretch', cursor: 'pointer' }} />
+              <span onClick={() => setOpen(o => !o)} style={{ flex: 1, minWidth: isMobile ? 4 : undefined, alignSelf: 'stretch', cursor: 'pointer' }} />
               {/* Mac/API + herstart: rechts op de hoogte van het poppetje */}
               <button onClick={wisselRoute}
                 title={route === 'api' ? 'Via de API. Klik: via je Mac'
@@ -2138,7 +2143,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onTab, stuur
                 onBeforeInput={bewerktTijdensLuisteren}
                 onSelect={e => { if (e.target.selectionStart !== e.target.selectionEnd) bewerktTijdensLuisteren() }}
                 onPaste={plak}
-                placeholder={luistert ? 'Luistert… praat maar' : isEditor(actief) ? 'Opdracht voor ChatGPT (editor)' : 'Geef een taak of plak een screenshot'}
+                placeholder={luistert ? 'Luistert… praat maar' : isEditor(actief) ? (isMobile ? 'Opdracht voor ChatGPT' : 'Opdracht voor ChatGPT (editor)') : isMobile ? 'Taak of screenshot' : 'Geef een taak of plak een screenshot'}
                 rows={1}
                 style={{
                   flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', resize: 'none',
