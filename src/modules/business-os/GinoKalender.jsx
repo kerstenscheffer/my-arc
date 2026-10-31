@@ -29,6 +29,7 @@ import GinoAutopilot from './GinoAutopilot'
 import { laadContentStand } from './contentStand'
 import GinoOmzet from './GinoOmzet'
 import GinoProjecten from './GinoProjecten'
+import CheckinRonde from './CheckinRonde'
 import LeadManagementService from '../lead-management/LeadManagementService'
 import { colors } from '../../ui/tokens'
 
@@ -138,7 +139,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const [concept, setConcept] = useState(() => (Array.isArray(verzoek?.concept) ? verzoek.concept : []))
   const [bezig, setBezig] = useState(null)
   // Week (agenda, standaard), content (contentkalender) of omzet.
-  const [weergave, setWeergave] = useState(['omzet', 'projecten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content', 'autopilot'].includes(verzoek?.weergave) ? 'content' : 'week')
+  const [weergave, setWeergave] = useState(['omzet', 'projecten', 'klanten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content', 'autopilot'].includes(verzoek?.weergave) ? 'content' : 'week')
   const [projectId, setProjectId] = useState(verzoek?.project || null)
   const [omzet, setOmzet] = useState(null)
   const [omzetMaand, setOmzetMaand] = useState(null) // 'YYYY-MM'; null = deze maand
@@ -170,7 +171,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     const m = maandVan(verzoek.maand) || maandVan(verzoek.dag)
     if (m) setMaand(m)
     if (verzoek.dag) setAnker(maandagVan(new Date(`${verzoek.dag}T12:00:00`)))
-    if (verzoek.weergave === 'omzet' || verzoek.weergave === 'projecten') setWeergave(verzoek.weergave)
+    if (['omzet', 'projecten', 'klanten'].includes(verzoek.weergave)) setWeergave(verzoek.weergave)
     if (verzoek.weergave === 'projecten') setProjectId(verzoek.project || null)
     else if (['maand', 'content'].includes(verzoek.weergave)) setWeergave('content')
     else if (verzoek.weergave === 'week') setWeergave('week')
@@ -188,7 +189,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   }, [maand])
 
   const laad = useCallback(async () => {
-    if (weergave === 'projecten') { setItems([]); return }
+    if (weergave === 'projecten' || weergave === 'klanten') { setItems([]); return }
     if (weergave === 'omzet') {
       // Zelfde service en vaste lasten als het omzetscherm in de leadbalk.
       const { data: { user } } = await supabase.auth.getUser()
@@ -393,7 +394,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         )}
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', border: `1px solid ${G}33`, borderRadius: 999, padding: 2 }}>
-          {['week', 'content', 'omzet', 'projecten'].map(w => (
+          {['week', 'content', 'omzet', 'projecten', 'klanten'].map(w => (
             <button key={w} type="button" onClick={() => kiesWeergave(w)} style={{
               border: 'none', borderRadius: 999, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit',
               fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase',
@@ -402,7 +403,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             }}>{w}</button>
           ))}
         </div>
-        {weergave !== 'projecten' && <>
+        {weergave !== 'projecten' && weergave !== 'klanten' && <>
         <button type="button" onClick={() => verzet(-1)} aria-label="Vorige" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
         <div style={{ minWidth: isMobile ? 104 : 140, textAlign: 'center', fontSize: isMobile ? 15 : 17, fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
           {weergave === 'week' ? weekTitel
@@ -440,6 +441,13 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       {weergave === 'projecten' && (
         <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
           <GinoProjecten projectId={projectId} onKies={setProjectId} onVraag={onVraag} isMobile={isMobile} />
+        </div>
+      )}
+
+      {/* Klanten: de check-in ronde over de volle breedte; Gino-vragen lopen via het Klanten-tabje */}
+      {weergave === 'klanten' && (
+        <div className="gk-scroll" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '0 2px' : '0 4px' }}>
+          <CheckinRonde onVraagGino={(t) => onVraag?.(t, { tab: 'klanten' })} />
         </div>
       )}
 

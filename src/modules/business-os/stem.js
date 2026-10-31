@@ -28,6 +28,15 @@
 // Tekst wordt eerst opgeschoond (markdown, pijltjes, emoji, URL's eruit) en
 // voor de browser in stukken van max ~200 tekens geknipt: Chrome/Safari kappen
 // lange utterances af.
+// Alles voorlezen (31 okt 2026): instelling 'bos_stem_alles' (standaard AAN,
+// te wisselen in het stem-menu van de chat). Aan = de hele opgeschoonde tekst
+// (spreekbaarVol: ook bronnenlijst en acties-blok eruit), uit = de korte versie
+// hierboven. spreek() én herhaal() volgen hem, dus de cache klopt.
+// Tegoed (31 okt 2026): tegoed() vraagt gino-stem { tegoed: true } om de
+// ElevenLabs-stand (character_count/limit); useStem().tegoed voor 'Stem: nog X
+// tekens'. Is het op (gino-stem 'quota', of ElevenLabs 401/402/429): rest van
+// het antwoord via de browserstem, app_fouten met code [quota], volgende
+// antwoord weer eerst ElevenLabs.
 // Herhalen (30 okt 2026): de audio van het laatste antwoord (spreek(tekst,
 // { bewaar: true })) blijft als object-URL's in het geheugen staan, zodat
 // herhaal() hem opnieuw afspeelt zonder nieuwe gino-stem-aanroep (ElevenLabs-
@@ -39,6 +48,7 @@ import { APP_VERSIE } from '../app-update/appVersie'
 import { getallenNaarEngels } from './getallenNaarEngels'
 
 const KEY = 'bos_stem_aan'
+const KEY_ALLES = 'bos_stem_alles'
 
 // Elke terugval naar de Mac-stem in app_fouten (pagina 'business-os-stem'),
 // met de foutcode vooraan. Bewust niet via meldFout: die meldt dezelfde fout
@@ -212,7 +222,12 @@ async function haalAudio(tekst, signal) {
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     let fout = ''
-    try { const j = JSON.parse(body); fout = [j.fout, j.status].filter(Boolean).join(' ') } catch { /* geen json */ }
+    let j = null
+    try { j = JSON.parse(body); fout = [j.fout, j.status].filter(Boolean).join(' ') } catch { /* geen json */ }
+    // Tegoed op: gino-stem zegt 'quota', of ElevenLabs gaf 401/402/429 door.
+    if (j?.fout === 'quota' || (j?.fout === 'elevenlabs' && [401, 402, 429].includes(j.status))) {
+      throw stemFout('quota', `${res.status} ElevenLabs ${j.status || ''} ${j.detail || ''}`.trim())
+    }
     throw stemFout(`${res.status}${fout ? ` ${fout}` : ''}`, fout ? '' : body.slice(0, 200))
   }
   const stem = res.headers.get('x-gino-stem')
@@ -299,6 +314,7 @@ const elevenlabs = {
       console.error('[stem] ElevenLabs werkt niet, terug naar browserstem:', e?.message || e)
       meldTerugval(e)
       zet({ teruggevallen: Date.now() })
+      if (e?.code === 'quota') tegoed()
       const rest = knip(stukken.slice(i).join(' '))
       if (rest.length && browser.beschikbaar()) browser.spreek(rest, onEinde)
       else onEinde()
@@ -333,6 +349,28 @@ export async function sleutelOntbreekt() {
   }
 }
 
+// ElevenLabs-tegoed via gino-stem (sleutel blijft in Supabase). Zet
+// stand.tegoed = { over, limiet, gebruikt } of laat hem staan bij een fout.
+let tegoedBezig = null
+export function tegoed() {
+  tegoedBezig ||= (async () => {
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data?.session?.access_token
+      if (!token) return
+      const res = await fetch(STEM_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, apikey: ANON, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tegoed: true }),
+      })
+      if (!res.ok) return
+      const j = await res.json().catch(() => null)
+      if (typeof j?.over === 'number') zet({ tegoed: { over: j.over, limiet: j.limiet, gebruikt: j.gebruikt } })
+    } catch { /* netwerk: oude stand laten staan */ } finally { tegoedBezig = null }
+  })()
+  return tegoedBezig
+}
+
 // ElevenLabs altijd (als Audio bestaat); anders de browserstem.
 const provider = {
   kies: () => (elevenlabs.beschikbaar() ? elevenlabs : browser),
@@ -356,7 +394,10 @@ const leesAan = () => {
   try { return localStorage.getItem(KEY) === '1' } catch { return false }
 }
 // bron: wie er nu praat (bv. 'terugblik-<tabje>'), zodat die knop weet dat hij 'stop' is.
-let stand = { aan: leesAan(), spreekt: false, teruggevallen: null, bron: null }
+const leesAlles = () => {
+  try { return localStorage.getItem(KEY_ALLES) !== '0' } catch { return true }
+}
+let stand = { aan: leesAan(), alles: leesAlles(), spreekt: false, teruggevallen: null, bron: null, tegoed: null }
 const luisteraars = new Set()
 const zet = (veld) => {
   stand = { ...stand, ...veld }
@@ -374,6 +415,12 @@ export function zetAan(aan) {
   zet({ aan })
 }
 
+export const isAlles = () => stand.alles
+export function zetAlles(alles) {
+  try { localStorage.setItem(KEY_ALLES, alles ? '1' : '0') } catch { /* privé-venster */ }
+  zet({ alles })
+}
+
 export function ontgrendel() {
   if (beschikbaar()) provider.ontgrendel()
 }
@@ -387,10 +434,13 @@ export function stop() {
 // tekst = de volledige tekst; uitgesproken wordt alleen spreekTekst(tekst),
 // plus eventueel de vraag (toestemmingsvraag) erachter.
 // bewaar: audio van dit antwoord bewaren voor herhaal().
-// heel: de hele tekst uitspreken (alleen opgeschoond), niet de korte versie.
+// heel: de hele tekst uitspreken (alleen opgeschoond), niet de korte versie;
+// staat 'Alles voorlezen' aan, dan altijd.
 export function spreek(tekst, { bewaar = false, vraag = null, heel = false, bron = null } = {}) {
   if (!beschikbaar()) return
-  const schoon = heel ? spreekbaar(tekst) : [spreekTekst(tekst), spreekTekst(vraag)].filter(Boolean).join(' ')
+  const schoon = heel || stand.alles
+    ? [spreekbaarVol(tekst), spreekTekst(vraag)].filter(Boolean).join(' ')
+    : [spreekTekst(tekst), spreekTekst(vraag)].filter(Boolean).join(' ')
   const stukken = provider.knip(schoon)
   if (!stukken.length) return
   zet({ spreekt: true, bron })
@@ -448,6 +498,17 @@ export function spreekbaar(tekst) {
     .replace(/\s+([,.!?;:])/g, '$1')
     .replace(/([,.!?;:])[,]+/g, '$1')
     .trim()
+}
+
+// Volledige voorleestekst: als spreekbaar, maar een bronnenlijst of acties-blok
+// aan het eind (kopje 'Bronnen:', 'Sources', 'Acties:' en alles daarna) en
+// voetnoten als [1] gaan eruit.
+const STAART = /^\s*(#{1,6}\s*)?(\*\*|__)?\s*(bronnen|bron|sources|referenties|acties|actions)\b\s*(\*\*|__)?\s*:?\s*(\*\*|__)?\s*$/im
+export function spreekbaarVol(tekst) {
+  let t = (tekst || '').replace(/```[\s\S]*?```/g, ' ')
+  const m = t.match(STAART)
+  if (m && m.index > 0) t = t.slice(0, m.index)
+  return spreekbaar(t.replace(/\[\d{1,2}\]/g, ''))
 }
 
 // Korte gesproken versie van een volledige tekst: opmaak eruit, kopjes en

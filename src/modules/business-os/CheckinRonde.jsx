@@ -259,7 +259,7 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
         .then(r => r, e => ({ error: e })),
     ])
     if (data.error || laatste.error) {
-      setFout('Check-in ronde nog niet beschikbaar: draai checkin-ronde.sql op Supabase.')
+      setFout(`Check-in ronde laden mislukt: ${(data.error || laatste.error)?.message || 'onbekende fout'}`)
       setKlanten([])
       return
     }
@@ -326,6 +326,16 @@ export default function CheckinRonde({ onVraagGino, bezig = false }) {
         <div style={{ marginTop: 6 }}>
           {fout && <div style={{ ...REGEL, color: colors.textSecondary }}>{fout}</div>}
           {!klanten && <div style={{ ...REGEL, color: colors.textSecondary }}>Laden…</div>}
+          {klanten && !fout && !ronde && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: '14px 0 6px' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: colors.textPrimary }}>Nog geen ronde klaargezet</div>
+              <button type="button" onClick={() => onVraagGino?.(RONDE_OPDRACHT)} disabled={bezig} style={{
+                ...KNOPJE, background: colors.success, color: colors.onAccent, opacity: bezig ? 0.5 : 1,
+              }}>
+                Gino, zet de ronde klaar
+              </button>
+            </div>
+          )}
           {GROEPEN.map(g => {
             const rij = lijst.filter(x => x.groep === g.id)
             if (!rij.length) return null

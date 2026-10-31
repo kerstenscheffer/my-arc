@@ -32,7 +32,8 @@
 // de microfoon, dan praat hij niet (anders hoort de herkenning zichzelf).
 // Rustregel (30 okt): in rust toont het robotje de eerste zin van de laatst
 // afgeronde code-opdracht (max ~60 tekens; stem en herhaalknop krijgen het hele
-// resultaat en spreken daarvan de korte kern uit, stem.spreekTekst); open "Ik wacht op jou"-acties staan
+// resultaat en spreken het hele resultaat of de korte kern uit, volgens 'Alles
+// voorlezen' in het puntjes-menu (31 okt, met daaronder het ElevenLabs-tegoed); open "Ik wacht op jou"-acties staan
 // eronder met elk een Gedaan-knop, plus de ElevenLabs-sleutelactie zolang
 // gino-stem 503 geen_sleutel geeft. Versturen breekt de spraakherkenning af en
 // negeert late resultaten, zodat het veld leeg blijft.
@@ -52,7 +53,6 @@ import * as stem from './stem'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop } from './schermen'
 import { useNieuweVersie } from './useNieuweVersie'
-import CheckinRonde from './CheckinRonde'
 
 const KEY = 'business_os_chat'
 const PA_ONLINE_MS = 45000
@@ -1188,6 +1188,15 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   // Laat de pagina meekijken (de reactor-ring versnelt zolang de AI denkt).
   useEffect(() => { onBezig?.(ergensBezig) }, [ergensBezig, onBezig])
 
+  // Klaarstaande vraag voor het Klanten-tabje: sturen zodra dat tabje actief is.
+  const [naKlanten, setNaKlanten] = useState(null)
+  const stuurNu = useRef(null)
+  useEffect(() => {
+    if (!naKlanten || !isKlanten(actief)) return
+    setNaKlanten(null)
+    stuurNu.current?.(naKlanten)
+  }, [naKlanten, actief])
+
   const kiesGesprek = (id) => {
     setActiefId(id)
     schrijf(ACTIEF_KEY, id)
@@ -1322,7 +1331,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   const [luistert, setLuistert] = useState(false)
   const luistertRef = useRef(false)
   useEffect(() => { luistertRef.current = luistert }, [luistert])
-  const { spreekt, bron: spreekBron } = stem.useStem()
+  const { spreekt, bron: spreekBron, alles: allesVoorlezen, tegoed: stemTegoed } = stem.useStem()
+  // ElevenLabs-tegoed bij openen en bij elk openen van het puntjes-menu (kost geen tekens).
+  useEffect(() => { if (stem.beschikbaar()) stem.tegoed() }, [])
   const [sleept, setSleept] = useState(false)
   const wortel = useRef(null)
   const lijst = useRef(null)
@@ -1820,8 +1831,13 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   const herhaalKnop = (tekst, vraag = null) => <Herhaal praat={spreekt} onKlik={() => herhaal(tekst, vraag)} />
 
   // tekst (optioneel): vraag van buitenaf (Mijn schermen); invoer en bijlagen blijven dan staan.
-  const stuur = async (tekst) => {
+  const stuur = async (tekst, opties) => {
     const vanBuiten = typeof tekst === 'string'
+    // Vraag voor het Klanten-tabje (Check-in ronde in de kalender): eerst daarheen, dan sturen.
+    if (vanBuiten && opties?.tab === 'klanten' && !isKlanten(actief)) {
+      const k = gesprekken.find(isKlanten)
+      if (k) { setNaKlanten(tekst); kiesGesprek(k.id); return true }
+    }
     let vraag = (vanBuiten ? tekst : invoer).trim()
     const bij = vanBuiten ? [] : bijlagen
     const los = vanBuiten ? [] : bestanden
@@ -1931,6 +1947,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   }
   const afwijzen = (t, i, j) => zetActie(t, i, j, { afgewezen: true })
   if (stuurRef) stuurRef.current = stuur
+  stuurNu.current = stuur
   // Nieuw gesprek in hetzelfde tabje: berichten leeg, nieuwe Slim-sessie.
   const leegGesprek = () => {
     stem.stop()
@@ -2013,7 +2030,6 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
             boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
           }}>
             {isEditor(actief) && <EditorOpdrachten vers={editorVers} />}
-            {isKlanten(actief) && <CheckinRonde bezig={bezig} onVraagGino={tekst => stuur(tekst)} />}
             {!gesprek.length && (
               <div style={{ ...TEKST, color: colors.textSecondary, fontWeight: 600 }}>
                 {isEditor(actief) ? 'Editor praat met ChatGPT: knipplannen, titels, ondertitels, instructies. Alleen tekst, hij kan niet zelf in je editor klikken.'
@@ -2330,7 +2346,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
               </button>}
               {!isEditor(actief) && (
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <button onClick={() => setMenu(m => !m)} title="Meer" aria-label="Meer opties"
+                  <button onClick={() => { if (!menu && stem.beschikbaar()) stem.tegoed(); setMenu(m => !m) }} title="Meer" aria-label="Meer opties"
                     style={{ ...rondeKnop, width: 32, background: 'transparent', color: colors.textSecondary }}>
                     <MoreHorizontal size={18} strokeWidth={2.4} />
                   </button>
@@ -2351,6 +2367,27 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                           <button onClick={() => { setMenu(false); leegGesprek() }} style={menuRegel}>
                             <SquarePen size={15} /> <span style={{ flex: 1 }}>Nieuw gesprek</span>
                           </button>
+                        )}
+                        {stem.beschikbaar() && (
+                          <>
+                            <button role="switch" aria-checked={allesVoorlezen} onClick={() => stem.zetAlles(!allesVoorlezen)} style={menuRegel}>
+                              <Volume2 size={15} /> <span style={{ flex: 1 }}>Alles voorlezen</span>
+                              <span style={{
+                                width: 30, height: 18, borderRadius: 9, padding: 2, flexShrink: 0, transition: 'background .15s',
+                                background: allesVoorlezen ? colors.success : 'rgba(255,255,255,0.18)',
+                              }}>
+                                <span style={{
+                                  display: 'block', width: 14, height: 14, borderRadius: 7, background: '#fff',
+                                  transform: allesVoorlezen ? 'translateX(12px)' : 'none', transition: 'transform .15s',
+                                }} />
+                              </span>
+                            </button>
+                            {stemTegoed && (
+                              <div style={{ padding: '2px 10px 8px 35px', fontSize: '0.72rem', fontWeight: 700, color: colors.textMuted }}>
+                                Stem: nog {stemTegoed.over.toLocaleString('nl-NL')} tekens deze maand
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </>

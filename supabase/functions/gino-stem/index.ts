@@ -4,6 +4,10 @@
 // ElevenLabs, zodat de browser geen robotstem meer hoeft te gebruiken.
 //
 //   POST { tekst }  (max 1000 tekens)  → audio/mpeg
+//   POST { tegoed: true }  → { gebruikt, limiet, over, reset_unix } (31 okt 2026,
+//     uit ElevenLabs /v1/user/subscription; kost geen tekens)
+// Tegoed op (quota_exceeded, of 401/429 van de TTS): 402 { fout: 'quota' },
+// stem.js leest de rest dan voor met de browserstem en logt [quota].
 //
 // Alleen de teameigenaar (coach_teams.owner_id), anders kan elke ingelogde
 // klant ElevenLabs-tegoed opmaken. Sleutels als Supabase-secrets:
@@ -159,6 +163,14 @@ Deno.serve(async (req) => {
       .then((r) => { if (r.error) console.error('app_fouten', r.error.message) }, () => {})
 
     const body = await req.json().catch(() => ({}))
+    if (body?.tegoed === true) {
+      const r = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': sleutel } }).catch(() => null)
+      if (!r?.ok) return json({ fout: 'elevenlabs', status: r?.status ?? 0 }, 502)
+      const abo = await r.json().catch(() => ({}))
+      const gebruikt = Number(abo?.character_count) || 0
+      const limiet = Number(abo?.character_limit) || 0
+      return json({ gebruikt, limiet, over: Math.max(0, limiet - gebruikt), reset_unix: abo?.next_character_count_reset_unix ?? null, plan: abo?.tier ?? null })
+    }
     const invoer = typeof body?.tekst === 'string' ? body.tekst.trim() : ''
     if (!invoer) return json({ fout: 'geen_tekst' }, 400)
     if (invoer.length > MAX_TEKENS) return json({ fout: 'te_lang', max: MAX_TEKENS }, 413)
@@ -187,9 +199,16 @@ Deno.serve(async (req) => {
     const kandidaten = volgorde.filter((v) => v === PREMADE_STEM || !geweigerd.has(v.id))
     let gebruikt = kandidaten[0]
     let res = await tts(gebruikt.id)
+    // Tegoed op: 401/429, of een quota-melding in de foutbody (ook bij 402).
+    const quota = (status: number, detail: string) =>
+      status === 401 || status === 429 || /quota_exceeded|exceeds your quota|credits remaining|character_limit/i.test(detail)
     // 402 = plan staat de stem niet toe; 404 = bibliotheekstem niet bruikbaar zonder toevoegen.
     for (let i = 1; (res.status === 402 || res.status === 404) && i < kandidaten.length; i++) {
       const detail = (await res.text().catch(() => '')).slice(0, 200)
+      if (quota(res.status, detail)) {
+        console.error('ElevenLabs tegoed op', res.status, detail)
+        return json({ fout: 'quota', status: res.status, detail: detail.slice(0, 150) }, 402)
+      }
       console.error('ElevenLabs', res.status, 'voor', gebruikt.naam, detail, '→', kandidaten[i].naam)
       const reden = res.status === 402 ? 'gratis ElevenLabs-plan staat deze (bibliotheek)stem niet toe' : 'stem niet gevonden'
       await logFout(`ElevenLabs ${res.status} (${reden}) voor ${gebruikt.naam} (${gebruikt.id}) → ${kandidaten[i].naam}: ${detail}`)
@@ -200,6 +219,7 @@ Deno.serve(async (req) => {
     if (!res.ok || !res.body) {
       const detail = await res.text().catch(() => '')
       console.error('ElevenLabs', res.status, detail.slice(0, 500))
+      if (quota(res.status, detail)) return json({ fout: 'quota', status: res.status, detail: detail.slice(0, 150) }, 402)
       return json({ fout: 'elevenlabs', status: res.status }, 502)
     }
     return new Response(res.body, {

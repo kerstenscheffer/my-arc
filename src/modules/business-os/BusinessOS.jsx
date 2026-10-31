@@ -1190,7 +1190,7 @@ export default function BusinessOS({ isMobile }) {
         {kalender && (
           <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', justifyContent: 'center', paddingTop: isMobile ? 52 : 44 }}>
             <GinoKalender verzoek={kalender} isMobile={isMobile} onSluit={() => setKalender(null)}
-              onVraag={(t) => stuurRef.current?.(t)} />
+              onVraag={(t, o) => stuurRef.current?.(t, o)} />
           </div>
         )}
         {podiumOpen && (
