@@ -190,14 +190,12 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
       const svc = new LeadManagementService()
       let vast = 250
       try { const v = Number(localStorage.getItem('lead_fixed_costs')); if (Number.isFinite(v) && v > 0) vast = v } catch { /* geen opslag */ }
-      const van = iso(new Date()), tot = iso(plusDagen(new Date(), 45))
-      const [revenue, payouts, doel, schema] = await Promise.all([
+      const [revenue, payouts, doel] = await Promise.all([
         svc.getRevenueProjection(user.id, 6, 12),
         svc.getPartnerPayouts(user.id, 12, 6, vast),
         svc.getMaandOmzetDoel(user.id),
-        supabase.rpc('get_payment_schedule', { p_coach_id: user.id, p_van: van, p_tot: tot }).then(r => r, () => ({ data: [] })),
       ])
-      setOmzet({ revenue, payouts, doel: doel || 10000, schema: Array.isArray(schema.data) ? schema.data : [] })
+      setOmzet({ revenue, payouts, doel: doel || 10000 })
       setItems([])
       return
     }
@@ -253,6 +251,14 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     laad()
   }
 
+  // Esc = terug uit de dag.
+  useEffect(() => {
+    if (!gekozen) return
+    const op = (e) => { if (e.key === 'Escape') setGekozen(null) }
+    window.addEventListener('keydown', op)
+    return () => window.removeEventListener('keydown', op)
+  }, [gekozen])
+
   const omzetMaanden = omzet?.revenue?.months || []
   const omzetHuidig = omzetMaand || omzetMaanden.find(m => m.isCurrent)?.key
   const verzet = (n) => {
@@ -289,18 +295,23 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const dagBlad = gekozen && (
 
           <div style={{
-            position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(6px)',
+            // Boven de vaste dagkoppen en urenliniaal van de week (die liggen op 5-6).
+            position: 'absolute', inset: 0, zIndex: 30, background: 'rgba(0,0,0,0.96)', backdropFilter: 'blur(6px)',
             border: `1px solid ${G}33`, borderRadius: 16, boxShadow: `0 0 40px ${G}14`,
             display: 'flex', flexDirection: 'column', padding: isMobile ? 14 : 20, animation: 'gk-blad .25s ease-out both',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <button type="button" onClick={() => setGekozen(null)} aria-label="Terug naar de maand" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
+              <button type="button" onClick={() => setGekozen(null)} aria-label="Terug" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, height: 32, padding: '0 12px 0 8px', borderRadius: 999,
+                border: `1px solid ${G}66`, background: `${G}14`, color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: 12.5, fontWeight: 800, flexShrink: 0,
+              }}><ChevronLeft size={16} strokeWidth={2.6} /> Terug</button>
               <div>
-                <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc` }}>
-                  {dagLijst.length ? `${dagLijst.length} GEPLAND` : 'NOG LEEG'}
-                </div>
                 <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
                   {gekozenDatum.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'none', marginLeft: 10 }}>
+                    {dagLijst.length ? `${dagLijst.length} gepland` : 'nog leeg'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -443,12 +454,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
       {/* Onder het overzicht: Gino's voorstellen of samen plannen, dan de lijn naar de bol */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingTop: 10, flexShrink: 0, flexWrap: 'wrap', minHeight: 28 }}>
-        {weergave === 'omzet' ? (
-          <button type="button" className="gk-link" style={{ ...link, color: G, opacity: 1 }}
-            onClick={() => onVraag?.('Kijk naar mijn omzet van deze maand ten opzichte van mijn doel. Wat moet er gebeuren om het doel te halen, concreet voor de komende dagen?')}>
-            <Sparkles size={13} /> Hoe haal ik mijn doel?
-          </button>
-        ) : concept.length > 0 ? (
+        {weergave === 'omzet' ? null : concept.length > 0 ? (
           <>
             <span style={{ fontSize: 12, fontWeight: 800, color: G }}>{concept.length} voorstel{concept.length === 1 ? '' : 'len'} van Gino</span>
             <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen(concept)} style={{ ...link, color: G, opacity: 1 }}>

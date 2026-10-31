@@ -71,6 +71,8 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
   }, [nuProp])
 
   const scrollRef = useRef(null)
+  // Muis op een afspraak: vergrote kaart met de volledige titel.
+  const [lens, setLens] = useState(null)
   const vandaag = iso(nu)
   const nuMin = nu.getHours() * 60 + nu.getMinutes()
 
@@ -149,6 +151,7 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
         @keyframes gw-stip { 0%,100% { box-shadow: 0 0 6px ${G}, 0 0 0 0 ${G}66 } 50% { box-shadow: 0 0 10px ${G}, 0 0 0 6px ${G}00 } }
         @keyframes gw-scan { from { transform: translateY(-40%) } to { transform: translateY(260%) } }
         @keyframes gw-aanwijs { 0%,100% { box-shadow: 0 0 0 1.5px ${G}, 0 0 28px ${G}55 } 50% { box-shadow: 0 0 0 2px ${G}, 0 0 44px ${G}99 } }
+        @keyframes gw-lens { from { opacity: 0; transform-origin: top; scale: .9 } to { opacity: 1; scale: 1 } }
         @keyframes gw-in { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
         .gw-cap { transition: transform .15s, box-shadow .15s, background .15s }
         .gw-cap:hover { transform: scale(1.03); z-index: 3 }
@@ -238,7 +241,8 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
                   const voorbij = isVandaag && b.echtEind <= nuMin
                   const naam = b.titel.replace(/^Call\s*\S\s*/, '')
                   return (
-                    <div key={b.id} className="gw-cap" title={`${uur(b.startMin)}${b.echtEind > b.startMin + 15 ? `–${uur(b.echtEind)}` : ''} ${b.titel}`}
+                    <div key={b.id} className="gw-cap"
+                      onMouseEnter={() => setLens(b.id)} onMouseLeave={() => setLens(l => (l === b.id ? null : l))}
                       style={{
                         position: 'absolute', top, height: h, left: `calc(${b.baan * breed}% + 1px)`, width: `calc(${breed}% - 2px)`,
                         borderRadius: 7, overflow: 'hidden', padding: h > 34 ? '4px 7px' : '0 7px', display: 'flex', flexDirection: h > 34 ? 'column' : 'row',
@@ -252,6 +256,26 @@ export default function GinoWeek({ dagen, items, onKies, hoogte = 380, nu: nuPro
                       }}>
                       <span style={{ fontSize: 9.5, fontWeight: 800, color: call ? G : 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, flexShrink: 0 }}>{uur(b.startMin)}</span>
                       <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{naam}</span>
+                    </div>
+                  )
+                })}
+                {/* Lens: de afspraak waar je muis op staat, groot en volledig */}
+                {getimed.filter(b => b.id === lens).map(b => {
+                  const call = b.soort === 'call'
+                  const rand = di === 0 ? { left: 0 } : di === dagen.length - 1 ? { right: 0 } : { left: '50%', transform: 'translateX(-50%)' }
+                  return (
+                    <div key={`lens-${b.id}`} style={{
+                      position: 'absolute', top: Math.max(0, y(Math.max(van, b.startMin)) - 6), zIndex: 12, pointerEvents: 'none',
+                      width: 'max-content', minWidth: '100%', maxWidth: 260, ...rand,
+                      padding: '8px 11px', borderRadius: 10, background: 'rgba(4,12,7,0.97)',
+                      border: `1px solid ${call ? G : 'rgba(255,255,255,0.35)'}`, borderLeft: `3px solid ${call ? G : 'rgba(255,255,255,0.6)'}`,
+                      boxShadow: `0 0 0 1px ${G}33, 0 0 26px ${G}55, 0 10px 30px rgba(0,0,0,0.7)`,
+                      animation: 'gw-lens .16s ease-out both',
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: call ? G : 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+                        {uur(b.startMin)}{b.echtEind > b.startMin + 15 ? ` – ${uur(Math.min(b.echtEind, 24 * 60 - 1))}` : ''}
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', lineHeight: 1.3, marginTop: 2, whiteSpace: 'normal' }}>{b.titel}</div>
                     </div>
                   )
                 })}

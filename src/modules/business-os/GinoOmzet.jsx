@@ -4,12 +4,11 @@
 // als het omzetscherm in de leadbalk (OmzetScherm.jsx), want het leest dezelfde
 // service: getRevenueProjection (omzet per kalendermaand, per bron) en
 // getPartnerPayouts (ontvangen per uitbetaalperiode 26e t/m 25e, vaste lasten,
-// adspend, deel Marcel). Plus get_payment_schedule voor wat er nog binnenkomt.
+// adspend, deel Marcel).
 // Puur tekenwerk: GinoKalender haalt de data op.
 //
 //   ┌ doelwijzer ┐ ┌ waar vandaan ┐ ┌ verdeling ┐
 //   └────────────── maandgrafiek met doellijn ──┘
-//   komt nog binnen: chips met datum · naam · bedrag
 
 import { useEffect, useMemo, useState } from 'react'
 import { colors } from '../../ui/tokens'
@@ -41,11 +40,7 @@ function useTel(doel, duur = 1200) {
   return n
 }
 
-const kop = (tekst) => (
-  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.3em', color: `${G}cc`, marginBottom: 10, textTransform: 'uppercase' }}>{tekst}</div>
-)
-
-function Doelwijzer({ bedrag, doel, maandNaam, isHuidig }) {
+function Doelwijzer({ bedrag, doel, isHuidig }) {
   const geteld = useTel(bedrag)
   const deel = doel > 0 ? bedrag / doel : 0
   const R = 62, C = 80, omtrek = 2 * Math.PI * R
@@ -71,11 +66,9 @@ function Doelwijzer({ bedrag, doel, maandNaam, isHuidig }) {
         <defs>
           <radialGradient id="go-gloed"><stop offset="0%" stopColor={G} stopOpacity=".22" /><stop offset="100%" stopColor={G} stopOpacity="0" /></radialGradient>
         </defs>
-        <text x={C} y={C - 2} textAnchor="middle" fill="#fff" fontSize="22" fontWeight="900">{Math.round(deel * 100)}%</text>
-        <text x={C} y={C + 16} textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="9.5" fontWeight="800" letterSpacing="1.5">VAN DOEL</text>
+        <text x={C} y={C + 8} textAnchor="middle" fill="#fff" fontSize="24" fontWeight="900">{Math.round(deel * 100)}%</text>
       </svg>
       <div style={{ minWidth: 0 }}>
-        {kop(`Omzet ${maandNaam}`)}
         <div style={{ fontSize: 38, fontWeight: 900, color: '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums', textShadow: `0 0 24px ${G}44` }}>{euro(geteld)}</div>
         {doel > 0 && (
           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 8, lineHeight: 1.5 }}>
@@ -100,7 +93,6 @@ function Bronnen({ maand, toegezegd, focus }) {
   const bronFocus = focus && BRONNEN.some(([k]) => focus.has(k))
   return (
     <div>
-      {kop('Waar komt het vandaan')}
       {BRONNEN.map(([k, label], i) => {
         const v = per[k] || 0
         return (
@@ -129,7 +121,7 @@ function Bronnen({ maand, toegezegd, focus }) {
 }
 
 function Verdeling({ p, partner = 'Marcel', focus }) {
-  if (!p) return <div>{kop('Verdeling')}<div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>Geen gegevens voor deze periode.</div></div>
+  if (!p) return <div><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>Geen gegevens voor deze periode.</div></div>
   const jij = Math.max(0, (p.netRevenue || 0) - (p.earned || 0))
   const regels = [
     ['Ontvangen', p.revenue, '#fff'],
@@ -141,7 +133,6 @@ function Verdeling({ p, partner = 'Marcel', focus }) {
   const aan = focus && focus.has('verdeling')
   return (
     <div style={aan ? { padding: 10, margin: -10, borderRadius: 12, boxShadow: `0 0 0 1px ${G}, 0 0 22px ${G}44`, background: `${G}0f` } : null}>
-      {kop(`Verdeling · ${p.label || ''}`)}
       <div style={{ position: 'relative', paddingLeft: 12 }}>
         <div style={{ position: 'absolute', left: 2, top: 6, bottom: 6, width: 1, background: `linear-gradient(to bottom, ${G}22, ${G})`, transformOrigin: 'top', animation: 'go-lijn .6s ease-out .2s both' }} />
         {regels.map(([l, v, kleur], i) => (
@@ -175,7 +166,6 @@ function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte, focus }) {
     <div style={{ position: 'relative', height: hoogte, display: 'flex', alignItems: 'flex-end', gap: 8, paddingTop: 16 }}>
       {yDoel != null && (
         <div style={{ position: 'absolute', left: 0, right: 0, top: 16 + yDoel, borderTop: `1px dashed ${G}88`, pointerEvents: 'none', animation: 'go-in .5s ease-out .8s both' }}>
-          <span style={{ position: 'absolute', right: 0, top: -16, fontSize: 9.5, fontWeight: 800, letterSpacing: '.2em', color: G }}>DOEL {kortEuro(doel)}</span>
         </div>
       )}
       {maanden.map((m, i) => {
@@ -210,7 +200,7 @@ function Maandgrafiek({ maanden, doel, gekozen, onKies, hoogte, focus }) {
 }
 
 // focus: Set van wat Gino aanwijst: 'coaching' | 'verlenging' | 'vervolg' | 'challenge' |
-// 'verdeling' | 'doel' | 'grafiek' | 'komt' | 'YYYY-MM' (maand in de grafiek).
+// 'verdeling' | 'doel' | 'grafiek' | 'YYYY-MM' (maand in de grafiek).
 export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = false, hoogte = 420, focus = null }) {
   const maanden = useMemo(() => {
     const alle = data?.revenue?.months || []
@@ -221,9 +211,6 @@ export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = fals
   const maand = maanden.find(m => m.key === gekozen)
   const periode = (data?.payouts?.months || []).find(p => p.key === gekozen)
   const doel = Number(data?.doel) || 0
-  const vandaag = new Date().toISOString().slice(0, 10)
-  const komt = (data?.schema || []).filter(b => b.komt_nog !== false && b.datum >= vandaag).slice(0, 8)
-  const maandNaam = maand ? new Date(`${maand.key}-15T12:00:00`).toLocaleDateString('nl-NL', { month: 'long' }) : ''
 
   if (!data) return null
   return (
@@ -240,7 +227,7 @@ export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = fals
         display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr)',
         gap: isMobile ? 20 : 40, alignItems: 'start', flexShrink: 0,
       }}>
-        <div style={{ opacity: dim(focus, 'doel'), transition: 'opacity .4s' }}><Doelwijzer bedrag={maand?.amount || 0} doel={doel} maandNaam={maandNaam} isHuidig={!!maand?.isCurrent} /></div>
+        <div style={{ opacity: dim(focus, 'doel'), transition: 'opacity .4s' }}><Doelwijzer bedrag={maand?.amount || 0} doel={doel} isHuidig={!!maand?.isCurrent} /></div>
         <div style={{ opacity: focus && !BRONNEN.some(([k]) => focus.has(k)) ? 0.25 : 1, transition: 'opacity .4s' }}>
           <Bronnen maand={maand} focus={focus} toegezegd={maand?.isCurrent ? { totaal: data.revenue?.toegezegdTotaal, aantal: data.revenue?.toegezegdAantal } : null} />
         </div>
@@ -251,20 +238,6 @@ export default function GinoOmzet({ data, maandKey, onKiesMaand, isMobile = fals
         <Maandgrafiek maanden={maanden} doel={doel} gekozen={gekozen} onKies={onKiesMaand} focus={focus} hoogte={Math.max(150, Math.min(220, hoogte - 250))} />
       </div>
 
-      {komt.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, flexShrink: 0, opacity: dim(focus, 'komt'), transition: 'opacity .4s' }}>
-          {komt.map((b, i) => (
-            <span key={i} title={b.soort} style={{
-              fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 999, whiteSpace: 'nowrap',
-              border: `1px solid ${b.te_laat ? '#f59e0b' : `${G}55`}`, color: '#fff', background: `${G}0d`,
-              animation: `go-in .3s ease-out ${600 + i * 60}ms both`,
-            }}>
-              <span style={{ color: b.te_laat ? '#f59e0b' : G }}>{new Date(`${b.datum}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</span>
-              {' · '}{String(b.lead_name || '').trim().split(/\s+/)[0]} · {euro(b.bedrag)}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
