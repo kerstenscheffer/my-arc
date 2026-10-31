@@ -476,6 +476,7 @@ Altijd eerst:
 → cijfers: node scripts/pa-db.mjs lees "select business_os_vergelijk() as v"
 → agenda: node scripts/pa-db.mjs agenda
 → experimenten: node scripts/pa-db.mjs experimenten
+→ projecten: node scripts/pa-db.mjs projecten (stappen van vandaag en achterstand horen in je plan; in de avond: vink af wat aantoonbaar gedaan is met stap)
 → je vorige rondes: node scripts/pa-db.mjs lees "select invoer->>'ronde' as ronde, left(antwoord->>'tekst', 700) as tekst, klaar_at from business_os_opdrachten where soort = 'groei' and status = 'klaar' order by klaar_at desc limit 4"
 → wat Kersten in Strategie zei: node scripts/pa-db.mjs lees "select left(invoer->'berichten'->-1->>'content', 400) as vraag, left(antwoord->>'tekst', 300) as antwoord, created_at from business_os_opdrachten where soort = 'chat' and invoer->>'tab' ilike 'strategie%' and created_at > now() - interval '3 days' order by created_at desc limit 8"
 Je bericht: max 10 regels, pijltjes, beslissing eerst, geen inleiding. Spreek hem direct aan.`
@@ -504,16 +505,31 @@ Doe nu:
 3. Hoe kun jij hem volgende week beter helpen? Hoogstens 1 app-verbetering als pa_voorstel (volledige, zelfstandige opdracht, alleen toevoegen), alleen als die echt tijd scheelt of omzet oplevert.
 Bericht: de week in 3 regels, de experimenten (stoppen/starten) en je focus voor volgende week.`,
 }
+// Projectronde: onderzoek + plan voor één project (invoer.project_id).
+const PROJECT_VRAAG = (id) => `Projectronde Strategie (automatisch). ${STRATEEG}
+
+Project: node scripts/pa-db.mjs project "${id}"
+Jij maakt nu het onderzoek en het uitvoerbare plan. Kersten keurt het daarna goed in Business OS (Projecten) en dan wordt het ingepland.
+
+1. Onderzoek zijn eigen data, met getallen (dit weegt het zwaarst): welke reels/posts werkten (content_metricool_posts: views, soort, woord; magnets via get_magnet_trechter of lead_magnets), welke bronnen leads en sales opleveren (call_leads, lead_movements), de keten views → leads → reactie → call → sale (business_os_vergelijk), zijn content-ritme en doelen (content_checklist, content_doelen), wat er al gepland staat (content_items) en zijn ruimte in de agenda (agenda). Kijk ook in je geheugen en experimenten wat al bekend is.
+2. Onderzoek buiten (WebSearch/WebFetch, hoogstens 4 zoekopdrachten): wat werkt nu voor online coaches in zijn niche (mannen 25-40, vet verliezen, drukke baan) voor dit doel. Alleen wat toepasbaar is; noem de bron.
+3. Schrijf het onderzoek (project-bij met "onderzoek"): markdown, kopjes "Waar je nu staat", "Wat werkt bij jou", "Wat werkt buiten", "Het gat", "Keuzes". Pijltjes, getallen, max ~900 woorden.
+4. Schrijf het plan (project-bij met "plan"): { "samenvatting": "2-3 zinnen", "fases": [ { "naam", "doel", "van": "YYYY-MM-DD", "tot": "YYYY-MM-DD", "stappen": [ { "titel", "dag": "YYYY-MM-DD", "soort": "content|taak|call|leren", "type": "reel|story|post|carousel" (bij content), "hook": "letterlijke eerste zin" (bij content), "uitleg": "1 zin waarom" } ] } ] }. 3-4 fases, 4-8 weken. Elke stap concreet, haalbaar op die dag (agenda!), niet meer dan wat hij nu aankan plus een stap. Content: zijn formats, hooks over de kijker, 80/20 methode.
+5. KPI's (project-bij met "kpis"): [ { "naam", "nu": getal, "doel": getal, "eenheid", "meet": "hoe je het in de database naleest" } ], 3-5 stuks, met echte nulmeting.
+6. Zet status op "plan" (project-bij). Start eventueel 1 experiment dat bij fase 1 hoort.
+7. Je bericht (tekst, max 10 regels): het doel, de 3 belangrijkste inzichten met getal, de fases in één regel elk, en "Bekijk en keur goed in Projecten". Actie { "soort": "project", "id": "${id}" }.`
 const RONDE_TITEL = { ochtend: 'Strategie · ochtend', avond: 'Strategie · avond', week: 'Strategie · weekreview' }
 
 async function rondeGroei() {
   const rij = await pak('groei')
   if (!rij) return
   try {
+    const project = rij.invoer?.ronde === 'project' && rij.invoer.project_id ? rij.invoer.project_id : null
     const ronde = RONDE_VRAAG[rij.invoer?.ronde] ? rij.invoer.ronde : null
-    console.log(`${tijd()} 🌱 ${ronde ? RONDE_TITEL[ronde] : 'groeironde'}`)
+    console.log(`${tijd()} 🌱 ${project ? rij.opdracht : ronde ? RONDE_TITEL[ronde] : 'groeironde'}`)
     const t0 = Date.now()
-    const r = await beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: ronde ? RONDE_VRAAG[ronde] : GROEI_VRAAG }] }, () => {}, (f) => lopend.set(rij.id, f))
+    const vraag = project ? PROJECT_VRAAG(project) : ronde ? RONDE_VRAAG[ronde] : GROEI_VRAAG
+    const r = await beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: vraag }] }, () => {}, (f) => lopend.set(rij.id, f))
     lopend.delete(rij.id)
     console.log(`${tijd()} ${r.ok ? '✓' : '✗'} groeironde in ${((Date.now() - t0) / 1000).toFixed(0)} s`)
     await sb.from('business_os_opdrachten')

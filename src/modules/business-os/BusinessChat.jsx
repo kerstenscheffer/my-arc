@@ -1305,7 +1305,9 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
         const beeld = (r.antwoord.acties || []).find(a => a?.soort === 'visueel')
         if (beeld) onVisueel?.(beeld, doel.id)
         const kal = (r.antwoord.acties || []).find(a => a?.soort === 'kalender')
-        if (kal) onKalender?.(kal)
+        const prj = (r.antwoord.acties || []).find(a => a?.soort === 'project' && a.id)
+        if (prj) onKalender?.({ weergave: 'projecten', project: prj.id })
+        else if (kal) onKalender?.(kal)
         markeer(doel.id)
       }
     }
@@ -1796,7 +1798,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     const visueel = (bericht.acties || []).find(a => a?.soort === 'visueel')
     // De vraag erbij, zodat 'Bewaar' rond de bol weet welke vraag dit scherm opleverde.
     const vraag = [...(gesprekkenRef.current.find(g => g.id === id)?.berichten || [])].reverse().find(n => n.role === 'user')?.content
-    const kalender = (bericht.acties || []).find(a => a?.soort === 'kalender')
+    const project = (bericht.acties || []).find(a => a?.soort === 'project' && a.id)
+    const kalender = (bericht.acties || []).find(a => a?.soort === 'kalender') || (project ? { weergave: 'projecten', project: project.id } : null)
     const overAgenda = !!kalender || AGENDA_VRAAG.test(vraag || '') || OMZET_VRAAG.test(vraag || '')
     if (visueel && !overAgenda) onVisueel?.({ ...visueel, _vraag: vraag || null }, id)
     if (kalender) onKalender?.(kalender)
@@ -2058,6 +2061,14 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
                       )
                     }
                     if (ac.soort === 'pa_voorstel') return <PaVoorstel key={j} {...kaart} herhaalKnop={laatsteGino ? herhaalKnop : null} />
+                    if (ac.soort === 'project' && ac.id) return (
+                      <button key={j} type="button" onClick={() => onKalender?.({ weergave: 'projecten', project: ac.id })} style={{
+                        display: 'flex', gap: 6, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, marginBottom: 4,
+                        color: colors.success, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
+                      }}>
+                        <Eye size={13} strokeWidth={2.5} /> {typeof ac.tekst === 'string' && ac.tekst ? ac.tekst : 'Open project'}
+                      </button>
+                    )
                     if (ac.soort === 'kalender') return (
                       <button key={j} type="button" onClick={() => onKalender?.(ac)} style={{
                         display: 'flex', gap: 6, alignItems: 'center', background: 'transparent', border: 'none', padding: 0, marginBottom: 4,

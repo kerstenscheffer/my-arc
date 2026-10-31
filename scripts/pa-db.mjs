@@ -20,6 +20,11 @@
 //   node scripts/pa-db.mjs experiment '{"titel","hypothese","actie","meetpunt","nulmeting"?,"eind_dag"?}'  nieuw experiment
 //   node scripts/pa-db.mjs experiment-bij '{"id","status"?,"uitkomst"?,"eind_dag"?}'  bijwerken/afsluiten
 //   node scripts/pa-db.mjs experimenten              lopende + laatste 10 afgeronde
+//   node scripts/pa-db.mjs project-nieuw '{"titel","doel"}'   project + onderzoeksronde op de Mac
+//   node scripts/pa-db.mjs project-bij '{"id","status"?,"onderzoek"?,"plan"?,"kpis"?}'
+//   node scripts/pa-db.mjs projecten                 alle projecten (kort)
+//   node scripts/pa-db.mjs project "<id>"            één project volledig
+//   node scripts/pa-db.mjs stap '{"project_id","stap_id","klaar":true}'
 //   node scripts/pa-db.mjs bijlage <storage-pad>      chatbijlage → ~/Downloads/Business OS bijlagen/, print lokaal pad
 //
 // Datawijzigingen kunnen hier niet: die gaan als voorstel terug naar de chat
@@ -208,6 +213,54 @@ if (cmd === 'lees') {
     } catch { /* dan alleen het origineel */ }
   }
   uit({ ok: true, pad: lokaal, bytes: data.size, ...(leesbaar.length ? { leesbaar } : {}) })
+} else if (cmd === 'project-nieuw') {
+  // Project: eerst onderzoek (aparte Slim-ronde op de Mac), dan een plan.
+  let pr
+  try { pr = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const titel = String(pr.titel || '').trim().slice(0, 160), doel = String(pr.doel || '').trim().slice(0, 1000)
+  if (!titel || !doel) { uit({ fout: 'titel en doel zijn verplicht' }); process.exit(1) }
+  const { data: { user } } = await sb.auth.getUser(token)
+  const { data, error } = await sb.from('business_os_projecten').insert({ titel, doel }).select('id').single()
+  if (error) { uit({ fout: error.message }); process.exit(1) }
+  const { error: e2 } = await sb.from('business_os_opdrachten').insert({
+    coach_id: user.id, soort: 'groei', opdracht: `Strategie · project: ${titel}`.slice(0, 200), invoer: { ronde: 'project', project_id: data.id },
+  })
+  uit(e2 ? { fout: e2.message, id: data.id } : { ok: true, id: data.id, onderzoek: 'gestart' })
+} else if (cmd === 'project-bij') {
+  let pr
+  try { pr = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const velden = { updated_at: new Date().toISOString() }
+  if (['onderzoek', 'plan', 'uitvoering', 'klaar', 'gestopt'].includes(pr.status)) velden.status = pr.status
+  if (typeof pr.onderzoek === 'string') velden.onderzoek = pr.onderzoek.slice(0, 30000)
+  if (pr.plan && typeof pr.plan === 'object') {
+    // Elke stap een vaste id, zodat afvinken en inplannen hem terugvinden.
+    let n = 0
+    for (const f of pr.plan.fases || []) for (const st of f.stappen || []) { st.id ||= `s${Date.now().toString(36)}${n++}`; st.klaar = !!st.klaar }
+    velden.plan = pr.plan
+  }
+  if (Array.isArray(pr.kpis)) velden.kpis = pr.kpis
+  const { data, error } = await sb.from('business_os_projecten').update(velden).eq('id', pr.id).select('id')
+  uit(error ? { fout: error.message } : { ok: !!data?.length })
+} else if (cmd === 'projecten') {
+  const { data, error } = await sb.from('business_os_projecten').select('id, titel, doel, status, plan, kpis, updated_at').order('updated_at', { ascending: false }).limit(20)
+  uit(error ? { fout: error.message } : (data || []).map(p => {
+    const stappen = (p.plan?.fases || []).flatMap(f => f.stappen || [])
+    const vandaag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
+    return { id: p.id, titel: p.titel, status: p.status, klaar: stappen.filter(s => s.klaar).length, totaal: stappen.length,
+      vandaag: stappen.filter(s => s.dag === vandaag), achter: stappen.filter(s => !s.klaar && s.dag && s.dag < vandaag).length, kpis: p.kpis }
+  }))
+} else if (cmd === 'project') {
+  const { data, error } = await sb.from('business_os_projecten').select('*').eq('id', arg).maybeSingle()
+  uit(error ? { fout: error.message } : data)
+} else if (cmd === 'stap') {
+  let st
+  try { st = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const { data: p } = await sb.from('business_os_projecten').select('plan').eq('id', st.project_id).maybeSingle()
+  if (!p) { uit({ fout: 'project niet gevonden' }); process.exit(1) }
+  let gevonden = false
+  for (const f of p.plan?.fases || []) for (const s of f.stappen || []) if (s.id === st.stap_id) { s.klaar = !!st.klaar; gevonden = true }
+  const { error } = await sb.from('business_os_projecten').update({ plan: p.plan, updated_at: new Date().toISOString() }).eq('id', st.project_id)
+  uit(error ? { fout: error.message } : { ok: gevonden })
 } else if (cmd === 'experiment') {
   // Strategie zet zelf proeven op: wat doen we, wat verwachten we, hoe meten we.
   let e

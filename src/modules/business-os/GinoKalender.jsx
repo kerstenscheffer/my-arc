@@ -27,6 +27,7 @@ import GinoWeek from './GinoWeek'
 import GinoContent from './GinoContent'
 import { laadContentStand } from './contentStand'
 import GinoOmzet from './GinoOmzet'
+import GinoProjecten from './GinoProjecten'
 import LeadManagementService from '../lead-management/LeadManagementService'
 import { colors } from '../../ui/tokens'
 
@@ -136,7 +137,8 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   const [concept, setConcept] = useState(() => (Array.isArray(verzoek?.concept) ? verzoek.concept : []))
   const [bezig, setBezig] = useState(null)
   // Week (agenda, standaard), content (contentkalender) of omzet.
-  const [weergave, setWeergave] = useState(verzoek?.weergave === 'omzet' ? 'omzet' : ['maand', 'content'].includes(verzoek?.weergave) ? 'content' : 'week')
+  const [weergave, setWeergave] = useState(['omzet', 'projecten'].includes(verzoek?.weergave) ? verzoek.weergave : ['maand', 'content'].includes(verzoek?.weergave) ? 'content' : 'week')
+  const [projectId, setProjectId] = useState(verzoek?.project || null)
   const [omzet, setOmzet] = useState(null)
   const [omzetMaand, setOmzetMaand] = useState(null) // 'YYYY-MM'; null = deze maand
   // Wat Gino aanwijst + wat hij erbij zegt.
@@ -166,7 +168,8 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     const m = maandVan(verzoek.maand) || maandVan(verzoek.dag)
     if (m) setMaand(m)
     if (verzoek.dag) setAnker(maandagVan(new Date(`${verzoek.dag}T12:00:00`)))
-    if (verzoek.weergave === 'omzet') setWeergave('omzet')
+    if (verzoek.weergave === 'omzet' || verzoek.weergave === 'projecten') setWeergave(verzoek.weergave)
+    if (verzoek.weergave === 'projecten') setProjectId(verzoek.project || null)
     else if (['maand', 'content'].includes(verzoek.weergave)) setWeergave('content')
     else if (verzoek.weergave === 'week') setWeergave('week')
     setGekozen(null)
@@ -183,6 +186,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
   }, [maand])
 
   const laad = useCallback(async () => {
+    if (weergave === 'projecten') { setItems([]); return }
     if (weergave === 'omzet') {
       // Zelfde service en vaste lasten als het omzetscherm in de leadbalk.
       const { data: { user } } = await supabase.auth.getUser()
@@ -379,7 +383,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
       {/* Kop: ring met hoeveel dagen content hebben, maand en pijltjes */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingBottom: 14, flexShrink: 0 }}>
-        {weergave !== 'omzet' && (
+        {(weergave === 'week' || weergave === 'content') && (
           <div style={{ minWidth: 0, fontSize: isMobile ? 12 : 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
             {weergave === 'week' ? `${telling.calls} calls · ` : ''}{telling.content} content gepland
             {telling.leegContent > 0 && <span style={{ color: '#fff' }}> · {telling.leegContent} dagen nog zonder content</span>}
@@ -387,7 +391,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         )}
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', border: `1px solid ${G}33`, borderRadius: 999, padding: 2 }}>
-          {['week', 'content', 'omzet'].map(w => (
+          {['week', 'content', 'omzet', 'projecten'].map(w => (
             <button key={w} type="button" onClick={() => kiesWeergave(w)} style={{
               border: 'none', borderRadius: 999, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit',
               fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase',
@@ -396,6 +400,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             }}>{w}</button>
           ))}
         </div>
+        {weergave !== 'projecten' && <>
         <button type="button" onClick={() => verzet(-1)} aria-label="Vorige" style={rond}><ChevronLeft size={16} strokeWidth={2.6} /></button>
         <div style={{ minWidth: isMobile ? 104 : 140, textAlign: 'center', fontSize: isMobile ? 15 : 17, fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
           {weergave === 'week' ? weekTitel
@@ -403,6 +408,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
             : `${maandNaam} ${maand.getFullYear()}`}
         </div>
         <button type="button" onClick={() => verzet(1)} aria-label="Volgende" style={rond}><ChevronRight size={16} strokeWidth={2.6} /></button>
+        </>}
         <button type="button" onClick={onSluit} aria-label="Planning sluiten" style={{ ...rond, marginLeft: 6 }}><X size={16} strokeWidth={2.6} /></button>
       </div>
 
@@ -428,7 +434,14 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
         </div>
       )}
 
-      {/* Omzet: doelwijzer, bronnen, verdeling, maandgrafiek, wat er binnenkomt */}
+      {/* Projecten: Gino's onderzoek en plannen */}
+      {weergave === 'projecten' && (
+        <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+          <GinoProjecten projectId={projectId} onKies={setProjectId} onVraag={onVraag} isMobile={isMobile} />
+        </div>
+      )}
+
+      {/* Omzet: doelwijzer, bronnen, verdeling, maandgrafiek */}
       {weergave === 'omzet' && (
         <div ref={weekVak} style={{ position: 'relative', flex: 1, minHeight: 0 }}>
           {omzet
@@ -454,7 +467,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 
       {/* Onder het overzicht: Gino's voorstellen of samen plannen, dan de lijn naar de bol */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingTop: 10, flexShrink: 0, flexWrap: 'wrap', minHeight: 28 }}>
-        {weergave === 'omzet' ? null : concept.length > 0 ? (
+        {weergave === 'omzet' || weergave === 'projecten' ? null : concept.length > 0 ? (
           <>
             <span style={{ fontSize: 12, fontWeight: 800, color: G }}>{concept.length} voorstel{concept.length === 1 ? '' : 'len'} van Gino</span>
             <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen(concept)} style={{ ...link, color: G, opacity: 1 }}>
