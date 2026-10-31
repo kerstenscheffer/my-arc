@@ -465,13 +465,55 @@ const GROEI_VRAAG = `Groeironde (automatisch, Kersten kijkt later naar je versla
    Zet wat je overdag miste in je geheugen (onthoud, bron nacht). Ruim daarna op met node scripts/pa-db.mjs geheugen: dubbele regels samenvoegen (vervangt), wat niet meer klopt vergeten. Houd het onder de 80 regels.
 8. Je verslag (tekst): max 8 regels met pijltjes. Wat je leerde of bijwerkte (ook van de duimpjes en het geheugen) en waarom deze voorstellen. Geen inleiding.`
 
+// ── Strategie neemt het voortouw (31 okt 2026) ──
+// Naast de nachtronde: 's ochtends een plan voor de dag, 's avonds een review,
+// zondagavond een weekreview. Zelfde rij-soort 'groei' (invoer.ronde), het
+// bericht landt in het tabje Strategie. Continuïteit via geheugen,
+// experimenten (business_os_experimenten) en de vorige rondes.
+const STRATEEG = `Je bent hier Kerstens strateeg: je neemt zelf het voortouw richting zijn maanddoel (€10.000) en wacht niet tot hij iets vraagt. Je bent eerlijk, concreet en kort. Je werkt met experimenten: een hypothese, één concrete actie, een meetpunt en een einddatum; je meet ze en leert wat voor HEM werkt (vastleggen in je geheugen).
+
+Altijd eerst:
+→ cijfers: node scripts/pa-db.mjs lees "select business_os_vergelijk() as v"
+→ agenda: node scripts/pa-db.mjs agenda
+→ experimenten: node scripts/pa-db.mjs experimenten
+→ je vorige rondes: node scripts/pa-db.mjs lees "select invoer->>'ronde' as ronde, left(antwoord->>'tekst', 700) as tekst, klaar_at from business_os_opdrachten where soort = 'groei' and status = 'klaar' order by klaar_at desc limit 4"
+→ wat Kersten in Strategie zei: node scripts/pa-db.mjs lees "select left(invoer->'berichten'->-1->>'content', 400) as vraag, left(antwoord->>'tekst', 300) as antwoord, created_at from business_os_opdrachten where soort = 'chat' and invoer->>'tab' ilike 'strategie%' and created_at > now() - interval '3 days' order by created_at desc limit 8"
+Je bericht: max 10 regels, pijltjes, beslissing eerst, geen inleiding. Spreek hem direct aan.`
+
+const RONDE_VRAAG = {
+  ochtend: `Ochtendronde Strategie (automatisch). ${STRATEEG}
+
+Doe nu:
+1. Kies de 3 dingen die hem vandaag het dichtst bij zijn doel brengen, concreet en met een moment dat past in zijn agenda (niet tijdens afspraken). Verbind ze met de zwakste schakel en met lopende experimenten.
+2. Zet voor de 2 belangrijkste een herinnering op dat moment (herinner, bron gino).
+3. Is er een lopend experiment: zeg wat hij er vandaag voor doet.
+4. Actie "kalender" met weergave week en dag = vandaag, en een notitie van één zin.
+Bericht: "Vandaag" + de 3 punten met tijd, en één zin waarom.`,
+  avond: `Avondronde Strategie (automatisch). ${STRATEEG}
+
+Doe nu:
+1. Wat is er vandaag gebeurd: calls (gehouden/no-show/sales), content (lees content_checklist en content_metricool van vandaag), leads en reacties. Vergelijk met wat je vanochtend voorstelde.
+2. Meet de lopende experimenten (experiment-bij met een tussenstand in uitkomst; sluit af als de einddatum voorbij is: geslaagd of mislukt, met het getal). Wat je leert over wat bij hem werkt: in je geheugen (onthoud).
+3. Eén inzicht van vandaag en het plan voor morgen in 2-3 punten.
+4. Heb je iets van hem nodig om morgen beter te helpen: één vraag als actie wacht_op_jou.`,
+  week: `Weekreview Strategie (zondagavond, automatisch). ${STRATEEG}
+
+Doe nu:
+1. De week in cijfers tegen de week ervoor en tegen wat nodig is voor het maanddoel (omzet, sales, calls, reacties, content). Actie "kalender" met weergave omzet en focus op wat het meest opvalt, met notitie.
+2. Sluit experimenten af die klaar zijn (met uitkomst en getal) en start er hoogstens 2 nieuwe op de zwakste schakel (experiment). Elk: één actie die hij deze week echt kan doen, een meetpunt dat je in de database kunt nalezen, een nulmeting en een einddatum binnen 7-14 dagen.
+3. Hoe kun jij hem volgende week beter helpen? Hoogstens 1 app-verbetering als pa_voorstel (volledige, zelfstandige opdracht, alleen toevoegen), alleen als die echt tijd scheelt of omzet oplevert.
+Bericht: de week in 3 regels, de experimenten (stoppen/starten) en je focus voor volgende week.`,
+}
+const RONDE_TITEL = { ochtend: 'Strategie · ochtend', avond: 'Strategie · avond', week: 'Strategie · weekreview' }
+
 async function rondeGroei() {
   const rij = await pak('groei')
   if (!rij) return
   try {
-    console.log(`${tijd()} 🌱 groeironde`)
+    const ronde = RONDE_VRAAG[rij.invoer?.ronde] ? rij.invoer.ronde : null
+    console.log(`${tijd()} 🌱 ${ronde ? RONDE_TITEL[ronde] : 'groeironde'}`)
     const t0 = Date.now()
-    const r = await beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: GROEI_VRAAG }] }, () => {}, (f) => lopend.set(rij.id, f))
+    const r = await beantwoordChat({ modus: 'slim', gesprek_id: crypto.randomUUID(), berichten: [{ role: 'user', content: ronde ? RONDE_VRAAG[ronde] : GROEI_VRAAG }] }, () => {}, (f) => lopend.set(rij.id, f))
     lopend.delete(rij.id)
     console.log(`${tijd()} ${r.ok ? '✓' : '✗'} groeironde in ${((Date.now() - t0) / 1000).toFixed(0)} s`)
     await sb.from('business_os_opdrachten')
@@ -483,12 +525,27 @@ async function rondeGroei() {
 // Nachtplanner: tussen 03:00 en 06:00 één ronde, als er de laatste 20 uur geen was.
 async function planGroei() {
   if (!gebruiker) return
+  await planStrategie().catch(() => {})
   const uur = new Date().getHours()
   if (uur < 3 || uur >= 6) return
-  const { data } = await sb.from('business_os_opdrachten').select('id').eq('soort', 'groei')
+  const { data } = await sb.from('business_os_opdrachten').select('id').eq('soort', 'groei').is('invoer->>ronde', null)
     .gt('created_at', new Date(Date.now() - 20 * 3600 * 1000).toISOString()).limit(1)
   if (data?.length) return
   await sb.from('business_os_opdrachten').insert({ coach_id: gebruiker.id, soort: 'groei', opdracht: 'Groeironde (nacht)' })
+}
+
+// Strategierondes: ochtend 08-10, avond 20-22 (zondag: weekreview). Eén per
+// venster per dag; staat de Mac dan uit, dan vervalt die ronde.
+async function planStrategie() {
+  const nu = new Date()
+  const uur = nu.getHours()
+  const ronde = uur >= 8 && uur < 10 ? 'ochtend' : uur >= 20 && uur < 22 ? (nu.getDay() === 0 ? 'week' : 'avond') : null
+  if (!ronde) return
+  const begin = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate()).toISOString()
+  const { data } = await sb.from('business_os_opdrachten').select('id').eq('soort', 'groei')
+    .eq('invoer->>ronde', ronde).gte('created_at', begin).limit(1)
+  if (data?.length) return
+  await sb.from('business_os_opdrachten').insert({ coach_id: gebruiker.id, soort: 'groei', opdracht: RONDE_TITEL[ronde], invoer: { ronde } })
 }
 
 const hartslag = () => gebruiker && sb.from('business_os_pa_status')

@@ -17,6 +17,9 @@
 //   node scripts/pa-db.mjs onthoud '{"soort":"feit|voorkeur|besluit|correctie","tekst":…,"vervangt":"<id>"?}'
 //   node scripts/pa-db.mjs vergeet "<id>"            geheugenregel uitzetten
 //   node scripts/pa-db.mjs geheugen                  alles wat actief is, met id
+//   node scripts/pa-db.mjs experiment '{"titel","hypothese","actie","meetpunt","nulmeting"?,"eind_dag"?}'  nieuw experiment
+//   node scripts/pa-db.mjs experiment-bij '{"id","status"?,"uitkomst"?,"eind_dag"?}'  bijwerken/afsluiten
+//   node scripts/pa-db.mjs experimenten              lopende + laatste 10 afgeronde
 //   node scripts/pa-db.mjs bijlage <storage-pad>      chatbijlage → ~/Downloads/Business OS bijlagen/, print lokaal pad
 //
 // Datawijzigingen kunnen hier niet: die gaan als voorstel terug naar de chat
@@ -205,6 +208,34 @@ if (cmd === 'lees') {
     } catch { /* dan alleen het origineel */ }
   }
   uit({ ok: true, pad: lokaal, bytes: data.size, ...(leesbaar.length ? { leesbaar } : {}) })
+} else if (cmd === 'experiment') {
+  // Strategie zet zelf proeven op: wat doen we, wat verwachten we, hoe meten we.
+  let e
+  try { e = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const rij = {
+    titel: String(e.titel || '').trim().slice(0, 160), hypothese: String(e.hypothese || '').trim().slice(0, 600),
+    actie: String(e.actie || '').trim().slice(0, 600), meetpunt: String(e.meetpunt || '').trim().slice(0, 600),
+    nulmeting: e.nulmeting ? String(e.nulmeting).slice(0, 600) : null,
+    eind_dag: /^\d{4}-\d{2}-\d{2}$/.test(e.eind_dag || '') ? e.eind_dag : null,
+  }
+  if (!rij.titel || !rij.hypothese || !rij.actie || !rij.meetpunt) { uit({ fout: 'titel, hypothese, actie en meetpunt zijn verplicht' }); process.exit(1) }
+  const { data, error } = await sb.from('business_os_experimenten').insert(rij).select('id').single()
+  uit(error ? { fout: error.message } : { ok: true, id: data.id })
+} else if (cmd === 'experiment-bij') {
+  let e
+  try { e = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const velden = { updated_at: new Date().toISOString() }
+  if (['loopt', 'geslaagd', 'mislukt', 'gestopt'].includes(e.status)) velden.status = e.status
+  if (e.uitkomst) velden.uitkomst = String(e.uitkomst).slice(0, 1200)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(e.eind_dag || '')) velden.eind_dag = e.eind_dag
+  const { data, error } = await sb.from('business_os_experimenten').update(velden).eq('id', e.id).select('id')
+  uit(error ? { fout: error.message } : { ok: !!data?.length })
+} else if (cmd === 'experimenten') {
+  const [l, a] = await Promise.all([
+    sb.from('business_os_experimenten').select('*').eq('status', 'loopt').order('start_dag'),
+    sb.from('business_os_experimenten').select('id, titel, status, uitkomst, start_dag, eind_dag').neq('status', 'loopt').order('updated_at', { ascending: false }).limit(10),
+  ])
+  uit(l.error || a.error ? { fout: (l.error || a.error).message } : { lopend: l.data, afgerond: a.data })
 } else {
   uit({ fout: `Onbekend commando: ${cmd}` })
 }

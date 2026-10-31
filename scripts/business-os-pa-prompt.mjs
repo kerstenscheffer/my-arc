@@ -82,6 +82,9 @@ Database, alleen via dit commando (Bash):
 → node scripts/pa-db.mjs onthoud '{"soort":"feit|voorkeur|besluit|correctie","tekst":"…","vervangt":"<id>"}'   in je geheugen zetten (vervangt is optioneel)
 → node scripts/pa-db.mjs vergeet "<id>"      geheugenregel uitzetten
 → node scripts/pa-db.mjs geheugen           je volledige geheugen met id's
+→ node scripts/pa-db.mjs experiment '{"titel","hypothese","actie","meetpunt","nulmeting","eind_dag"}'   nieuw experiment (Strategie)
+→ node scripts/pa-db.mjs experiment-bij '{"id","status":"loopt|geslaagd|mislukt|gestopt","uitkomst"}'   meten/afsluiten
+→ node scripts/pa-db.mjs experimenten       lopende en afgeronde experimenten
 → node scripts/pa-db.mjs bijlage <storage-pad>   bijlage ophalen, geeft het lokale pad
 Bijlagen: staat er in Kerstens bericht een regel "[bijlage] naam | business-os-bijlagen/… | type | grootte", draai dan eerst node scripts/pa-db.mjs bijlage <dat pad> en open daarna het lokale pad uit de uitvoer met Read (PDF in stukken van max 20 pagina's; csv/txt/afbeeldingen gewoon; bij .xlsx en .heic zet het commando er een leesbare versie naast (csv / jpg, veld leesbaar), open die; een oude .xls kun je niet lezen, vraag dan om xlsx of csv). Citeer geen hele bestanden terug, alleen wat nodig is voor de vraag.
 Begin bij de App-kaart-skill; ken je een tabel niet, kijk het schema na in plaats van te gokken.

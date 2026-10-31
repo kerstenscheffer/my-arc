@@ -1290,7 +1290,7 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   useEffect(() => {
     let weg = false
     const kijk = async () => {
-      const { data } = await supabase.from('business_os_opdrachten').select('id, antwoord, klaar_at')
+      const { data } = await supabase.from('business_os_opdrachten').select('id, opdracht, antwoord, klaar_at')
         .eq('soort', 'groei').eq('status', 'klaar').is('gezien_at', null).order('klaar_at')
       for (const r of data || []) {
         if (weg || !r.antwoord?.tekst) continue
@@ -1300,10 +1300,12 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
         const gs = gesprekkenRef.current
         const doel = gs.find(g => g.naam === 'Strategie') || gs[1] || gs[0]
         const wanneer = new Date(r.klaar_at).toLocaleString('nl-NL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
-        zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `Groeironde (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [], op: new Date(r.klaar_at).getTime() || Date.now() }])
+        zetBerichten(doel.id, b => [...b, { role: 'assistant', content: `${/^Strategie/.test(r.opdracht || '') ? r.opdracht : 'Groeironde'} (${wanneer})\n\n${r.antwoord.tekst}`, acties: r.antwoord.acties || [], op: new Date(r.klaar_at).getTime() || Date.now() }])
         // Ochtendbeeld meteen rond de bol.
         const beeld = (r.antwoord.acties || []).find(a => a?.soort === 'visueel')
         if (beeld) onVisueel?.(beeld, doel.id)
+        const kal = (r.antwoord.acties || []).find(a => a?.soort === 'kalender')
+        if (kal) onKalender?.(kal)
         markeer(doel.id)
       }
     }
