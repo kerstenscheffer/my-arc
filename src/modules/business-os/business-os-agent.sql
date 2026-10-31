@@ -268,3 +268,24 @@ create policy herinneringen_eigen on public.business_os_herinneringen
 revoke all on public.business_os_herinneringen from anon;
 grant select, insert, update, delete on public.business_os_herinneringen to authenticated;
 alter publication supabase_realtime add table public.business_os_herinneringen;
+
+-- ── Geheugen (31 okt 2026) ──
+-- Losse feiten, voorkeuren, besluiten en correcties. Staan bij elke chatvraag
+-- in Gino's systeemprompt (maakWarm) en de correcties/besluiten/voorkeuren
+-- ook bij code-opdrachten. Gino schrijft via pa-db onthoud/vergeet; de
+-- nachtronde vult aan uit de chats van die dag en ruimt op (< 80 regels).
+create table if not exists public.business_os_geheugen (
+  id uuid primary key default gen_random_uuid(),
+  coach_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  soort text not null check (soort in ('feit','voorkeur','besluit','correctie')),
+  tekst text not null check (length(tekst) between 3 and 500),
+  bron text not null default 'gino' check (bron in ('gino','kersten','nacht')),
+  actief boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists business_os_geheugen_actief on public.business_os_geheugen (coach_id, soort) where actief;
+alter table public.business_os_geheugen enable row level security;
+create policy geheugen_eigen on public.business_os_geheugen for all to authenticated
+  using (coach_id = auth.uid()) with check (coach_id = auth.uid());
+revoke all on public.business_os_geheugen from anon;

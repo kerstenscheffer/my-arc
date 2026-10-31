@@ -14,6 +14,9 @@
 //   node scripts/pa-db.mjs app-lijst "opdracht"      rij in app_issues
 //   node scripts/pa-db.mjs herinner '{"tekst":…,"moment":"2026-10-31 09:00","bron":"kersten|gino"}'  (NL-tijd)
 //   node scripts/pa-db.mjs herinneringen             open herinneringen
+//   node scripts/pa-db.mjs onthoud '{"soort":"feit|voorkeur|besluit|correctie","tekst":…,"vervangt":"<id>"?}'
+//   node scripts/pa-db.mjs vergeet "<id>"            geheugenregel uitzetten
+//   node scripts/pa-db.mjs geheugen                  alles wat actief is, met id
 //
 // Datawijzigingen kunnen hier niet: die gaan als voorstel terug naar de chat
 // en pas Kerstens klik op Toestaan voert ze uit.
@@ -96,6 +99,28 @@ if (cmd === 'lees') {
   const { data, error } = await sb.from('business_os_herinneringen').select('tekst, moment, bron')
     .is('klaar_at', null).order('moment').limit(50)
   uit(error ? { fout: error.message } : (data || []).map(r => ({ ...r, moment: new Date(r.moment).toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam' }) })))
+} else if (cmd === 'onthoud') {
+  // Geheugen: losse feiten, voorkeuren, besluiten en correcties die bij elke
+  // vraag in Gino's systeemprompt staan. "vervangt" zet de oude regel uit.
+  let g
+  try { g = JSON.parse(arg) } catch { uit({ fout: 'Geen geldige JSON' }); process.exit(1) }
+  const soort = ['feit', 'voorkeur', 'besluit', 'correctie'].includes(g.soort) ? g.soort : null
+  const tekst = String(g.tekst || '').trim().slice(0, 500)
+  if (!soort || tekst.length < 3) { uit({ fout: 'soort (feit|voorkeur|besluit|correctie) en tekst zijn verplicht' }); process.exit(1) }
+  const bron = ['kersten', 'nacht'].includes(g.bron) ? g.bron : 'gino'
+  const { data, error } = await sb.from('business_os_geheugen').insert({ soort, tekst, bron }).select('id').single()
+  if (!error && g.vervangt) {
+    await sb.from('business_os_geheugen').update({ actief: false, updated_at: new Date().toISOString() }).eq('id', g.vervangt)
+  }
+  uit(error ? { fout: error.message } : { ok: true, id: data.id })
+} else if (cmd === 'vergeet') {
+  const { data, error } = await sb.from('business_os_geheugen')
+    .update({ actief: false, updated_at: new Date().toISOString() }).eq('id', arg).select('id')
+  uit(error ? { fout: error.message } : { ok: !!data?.length })
+} else if (cmd === 'geheugen') {
+  const { data, error } = await sb.from('business_os_geheugen').select('id, soort, tekst, bron, created_at')
+    .eq('actief', true).order('soort').order('created_at')
+  uit(error ? { fout: error.message } : data)
 } else {
   uit({ fout: `Onbekend commando: ${cmd}` })
 }

@@ -198,8 +198,15 @@ function claude(args, extraEnv = {}, opStop = null) {
 }
 
 async function voerCodeUit(opdracht, opStop) {
+  // Correcties, besluiten en voorkeuren uit Gino's geheugen gelden ook hier.
+  const { data: geheugen } = await sb.from('business_os_geheugen').select('soort, tekst')
+    .eq('actief', true).in('soort', ['correctie', 'besluit', 'voorkeur']).order('created_at').limit(60)
+    .then(r => r, () => ({ data: [] }))
+  const regels = (geheugen || []).length
+    ? `\n\nWat Kersten eerder besliste of corrigeerde (houd je hieraan):\n${geheugen.map(g => `- ${g.tekst}`).join('\n')}`
+    : ''
   const r = await claude([
-    '-p', `${INSTRUCTIE}\n\nOpdracht:\n${opdracht}`,
+    '-p', `${INSTRUCTIE}${regels}\n\nOpdracht:\n${opdracht}`,
     '--output-format', 'json',
     '--permission-mode', 'acceptEdits',
     '--allowedTools', TOEGESTAAN.join(','),
@@ -221,8 +228,11 @@ let warm = null
 
 // slim = { id, hervat } → Slim-proces voor dat gesprek; anders een Snel-proces.
 async function maakWarm(slim = null) {
-  const { data: skills } = await sb.from('business_os_skills')
-    .select('naam, wanneer, instructies').eq('actief', true).order('naam')
+  const [{ data: skills }, { data: geheugen }] = await Promise.all([
+    sb.from('business_os_skills').select('naam, wanneer, instructies').eq('actief', true).order('naam'),
+    sb.from('business_os_geheugen').select('id, soort, tekst').eq('actief', true).order('created_at').limit(150)
+      .then(r => r, () => ({ data: [] })),
+  ])
   // Het token gaat mee bij het opstarten: zorg dat het nog ruim een half uur geldig is.
   let { data: { session } } = await sb.auth.getSession()
   if (session && session.expires_at * 1000 - Date.now() < 30 * 60 * 1000) {
@@ -232,14 +242,14 @@ async function maakWarm(slim = null) {
     '--permission-mode', 'dontAsk', '--disallowedTools', CHAT_VERBODEN.join(','), ...EIGEN_ARGS]
   const args = slim ? [
     ...basis,
-    '--append-system-prompt', chatPrompt({ skills: skills || [] }),
+    '--append-system-prompt', chatPrompt({ skills: skills || [], geheugen: geheugen || [] }),
     '--allowedTools', SLIM_TOEGESTAAN.join(','),
     ...(slim.hervat ? ['--resume', slim.id] : ['--session-id', slim.id]),
     '--max-budget-usd', '10',
     ...SLIM_ARGS,
   ] : [
     ...basis,
-    '--system-prompt', chatPrompt({ skills: skills || [] }),
+    '--system-prompt', chatPrompt({ skills: skills || [], geheugen: geheugen || [] }),
     '--allowedTools', CHAT_TOEGESTAAN.join(','),
     '--no-session-persistence',
     '--max-budget-usd', '3',
@@ -450,7 +460,10 @@ const GROEI_VRAAG = `Groeironde (automatisch, Kersten kijkt later naar je versla
    → goed bij een beeld: zet het kort onder "Bewezen beelden" in de skill Visueel uitleggen (welk soort beeld, opbouw, waarom het werkte; geen hele HTML). goed bij een antwoord: wat werkte vastleggen in de skill die erbij hoort. slecht: zoek uit wat er mis was en pas de skill aan zodat het niet weer gebeurt. Dit telt mee in je max 3 skills, maar duimpjes gaan voor.
 5. Ochtendbeeld: maak een actie "visueel" in de VRIJE vorm (links/rechts HTML, skill Visueel uitleggen) die Kersten ziet als hij Business OS opent. Haal de cijfers met node scripts/pa-db.mjs lees "select business_os_vergelijk() as v" (deze maand vs vorige maand t/m dezelfde dag) en laat zien: hoe de maand loopt (omzet, sales, calls gehouden, leads, reels) met het verschil, wat er vandaag/deze week aandacht nodig heeft, en onderaan één advies ("Ik zou dit doen"). Zet deze actie als eerste in je actieblok.
 6. Herinneringen voor vandaag: kijk wat er open staat (node scripts/pa-db.mjs herinneringen) en in de agenda van vandaag (node scripts/pa-db.mjs agenda). Zet hoogstens 2 nieuwe (herinner, bron gino) op een slim moment vandaag, voor wat hem het dichtst bij zijn 10k brengt (bijv. "Praatreels opnemen" vóór een vrij blok, "~20 calls zonder status bijwerken"). Niet dubbel met wat al open staat, niet tijdens een afspraak. Actie "herinnering" per stuk.
-7. Je verslag (tekst): max 8 regels met pijltjes. Wat je leerde of bijwerkte (ook van de duimpjes) en waarom deze voorstellen. Geen inleiding.`
+7. Geheugen bijhouden: lees de chats van de afgelopen 24 uur (stap 1) nog eens op correcties, ergernis, gestopte antwoorden (status 'gestopt') en vragen die hij twee keer moest stellen:
+   node scripts/pa-db.mjs lees "select left(invoer->'berichten'->-1->>'content', 400) as laatste_vraag, status, left(antwoord->>'tekst', 300) as antwoord, created_at from business_os_opdrachten where soort = 'chat' and created_at > now() - interval '24 hours' order by created_at"
+   Zet wat je overdag miste in je geheugen (onthoud, bron nacht). Ruim daarna op met node scripts/pa-db.mjs geheugen: dubbele regels samenvoegen (vervangt), wat niet meer klopt vergeten. Houd het onder de 80 regels.
+8. Je verslag (tekst): max 8 regels met pijltjes. Wat je leerde of bijwerkte (ook van de duimpjes en het geheugen) en waarom deze voorstellen. Geen inleiding.`
 
 async function rondeGroei() {
   const rij = await pak('groei')
