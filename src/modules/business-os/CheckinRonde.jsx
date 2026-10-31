@@ -178,7 +178,8 @@ function KlantKaart({ k, item, kleur, ronde, onItem }) {
         const s = data.suggesties || {}
         const { error: nf } = await supabase.from('client_notes').insert({
           client_id: k.id, coach_id: coach, title: `Check-in ronde ${datumKort(data.ronde_datum)}`,
-          category: 'checkin_ronde', note_date: vandaagNL(),
+          // 'session': client_notes.category heeft een vaste lijst (check-constraint)
+          category: 'session', note_date: vandaagNL(),
           content: { bericht: tekst, compliment: s.compliment ?? null, verbeterpunt: s.verbeterpunt ?? null },
         })
         if (nf) setFout(`Verstuurd gezet, notitie mislukt: ${nf.message}`)

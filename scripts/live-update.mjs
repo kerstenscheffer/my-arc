@@ -50,12 +50,25 @@ const grootte = (fs.statSync(zip).size / 1e6).toFixed(1)
 console.log(`Uploaden ${grootte} MB …`)
 
 const pad = `bundles/${versie}.zip`
-const up = await fetch(`${URL_}/storage/v1/object/app-bundles/${pad}`, {
-  method: 'POST',
-  headers: { Authorization: `Bearer ${KEY}`, apikey: KEY, 'Content-Type': 'application/zip', 'x-upsert': 'true' },
-  body: fs.readFileSync(zip),
-})
-if (!up.ok) { console.error('Upload mislukt:', up.status, await up.text()); process.exit(1) }
+// Een upload van ~15 MB brak soms halverwege af (EPIPE, 31 okt 2026): dan
+// opnieuw proberen in plaats van de hele release te laten vallen.
+let up = null
+for (let poging = 1; poging <= 4; poging++) {
+  try {
+    up = await fetch(`${URL_}/storage/v1/object/app-bundles/${pad}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KEY}`, apikey: KEY, 'Content-Type': 'application/zip', 'x-upsert': 'true' },
+      body: fs.readFileSync(zip),
+    })
+    if (up.ok) break
+    console.error(`Upload poging ${poging}: ${up.status}`)
+  } catch (e) {
+    up = null
+    console.error(`Upload poging ${poging} afgebroken (${e.cause?.code || e.message}), opnieuw…`)
+  }
+  await new Promise(r => setTimeout(r, 4000 * poging))
+}
+if (!up?.ok) { console.error('Upload mislukt:', up?.status ?? 'verbinding', up ? await up.text() : ''); process.exit(1) }
 
 const publiek = `${URL_}/storage/v1/object/public/app-bundles/${pad}`
 const rij = await fetch(`${URL_}/rest/v1/app_live_bundle`, {
