@@ -1,7 +1,9 @@
 // vite.config.js
 /* global process */
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
 import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import react from '@vitejs/plugin-react'
 import apiDev from './vite-api-dev.js'
 
@@ -101,6 +103,9 @@ export default defineConfig(({ command }) => ({
   },
   server: {
     port: 5173,
-    host: true
+    host: true,
+    // Alleen dev: lokaal gerenderde autopilot-varianten bekijken via /@fs
+    // (GinoAutopilot) voordat ze geüpload zijn. Zit niet in de build.
+    fs: { allow: [searchForWorkspaceRoot(process.cwd()), join(homedir(), 'Movies', 'MY ARC bibliotheek')] }
   }
 }))
