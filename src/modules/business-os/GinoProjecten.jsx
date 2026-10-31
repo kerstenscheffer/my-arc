@@ -6,11 +6,15 @@
 // KPI's met nulmeting (business_os_projecten). Hier:
 //   lijst  → kaarten met voortgangsring en volgende stap
 //   detail → KPI's, fases als tijdlijn met afvinkbare stappen, onderzoek lezen
+//   "Presenteer" → Gino loopt het plan door met zijn stem (stem.leesVoor):
+//     per deel licht dat stuk op, de rest dimt, ondertitel onderin, en
+//     vanzelf door naar het volgende deel als hij uitgepraat is.
 //   "Plan goedkeuren & inplannen" → content-stappen als content_items
 //     (planned), de rest als productivity_tasks; status uitvoering.
 
-import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, Check, Film, CheckCircle2, Phone, BookOpen, Sparkles, FileText, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Check, Film, CheckCircle2, Phone, BookOpen, Sparkles, FileText, X, Play, Pause } from 'lucide-react'
+import * as stem from './stem'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
 
@@ -20,6 +24,29 @@ const SOORT_ICOON = { content: Film, taak: CheckCircle2, call: Phone, leren: Boo
 const vandaagIso = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })
 const kortDag = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }) : '')
 const stappenVan = (p) => (p?.plan?.fases || []).flatMap(f => f.stappen || [])
+const spreekDag = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' }) : '')
+const getal = (n) => Number(n || 0).toLocaleString('nl-NL')
+
+// De presentatie: per deel wat Gino zegt en wat er oplicht.
+function maakDia(p) {
+  const dia = []
+  const fases = p.plan?.fases || []
+  dia.push({ focus: 'samenvatting', tekst: `${p.titel}. ${p.plan?.samenvatting || ''}` })
+  if ((p.kpis || []).length) {
+    dia.push({ focus: 'kpis', tekst: `Dit gaan we meten. ${p.kpis.map(k => `${k.naam}: van ${getal(k.nu)} naar ${getal(k.doel)}${k.eenheid ? ` ${k.eenheid}` : ''}`).join('. ')}.` })
+  }
+  fases.forEach((f, i) => {
+    const st = f.stappen || []
+    dia.push({
+      focus: `fase-${i}`, stappen: st.slice(0, 2).map(x => x.id),
+      tekst: `Fase ${i + 1}: ${String(f.naam || '').replace(/^\d+\.\s*/, '')}, van ${spreekDag(f.van)} tot ${spreekDag(f.tot)}. ${f.doel ? `${f.doel}. ` : ''}${st[0] ? `Eerst: ${st[0].titel}.` : ''}${st[1] ? ` Daarna: ${st[1].titel}.` : ''}`,
+    })
+  })
+  dia.push({ focus: 'acties', tekst: p.status === 'plan'
+    ? 'Klopt dit voor je? Klik dan op plan goedkeuren en inplannen, dan zet ik alles in je agenda en contentkalender. Wil je iets anders, zeg het en ik stuur bij.'
+    : 'Dat is het plan. Wil je iets anders, zeg het en ik stuur bij.' })
+  return dia
+}
 
 function Ring({ deel, grootte = 40, dikte = 3, kind }) {
   const r = grootte / 2 - dikte, omtrek = 2 * Math.PI * r, c = grootte / 2
@@ -73,6 +100,58 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
 
   const p = projectId ? (lijst || []).find(x => x.id === projectId) : null
   const vandaag = vandaagIso()
+
+  // ── Presentatie ──
+  const dia = useMemo(() => (p && p.status !== 'onderzoek' ? maakDia(p) : []), [p])
+  const [dIdx, setDIdx] = useState(null)   // null = niet aan het presenteren
+  const [pauze, setPauze] = useState(false)
+  const stemStand = stem.useStem()
+  const gestart = useRef(null)
+  const vakken = useRef({})
+  const huidig = dIdx != null ? dia[dIdx] : null
+  // Alleen de eigen presentatie stoppen, nooit een lopend antwoord van Gino.
+  const stopPresentatie = useCallback(() => {
+    if (String(stemStandRef.current?.bron || '').startsWith('presentatie-')) stem.stop()
+    gestart.current = null; setDIdx(null); setPauze(false)
+  }, [])
+  const stemStandRef = useRef(stemStand)
+  stemStandRef.current = stemStand
+  useEffect(() => () => { if (String(stemStandRef.current?.bron || '').startsWith('presentatie-')) stem.stop() }, [])
+  useEffect(() => { stopPresentatie() }, [projectId, stopPresentatie])
+  // Deel starten: uitspreken (of, zonder stem, een leestijd) en in beeld schuiven.
+  useEffect(() => {
+    if (!huidig || pauze) return
+    vakken.current[huidig.focus]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const bron = `presentatie-${dIdx}`
+    if (stem.beschikbaar()) {
+      gestart.current = bron
+      stem.leesVoor(huidig.tekst, bron)
+      return
+    }
+    const t = setTimeout(() => setDIdx(i => (i != null && i < dia.length - 1 ? i + 1 : null)), Math.max(4000, huidig.tekst.length * 60))
+    return () => clearTimeout(t)
+  }, [dIdx, pauze]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Uitgepraat → volgend deel.
+  useEffect(() => {
+    if (dIdx == null || pauze || !gestart.current) return
+    if (!stemStand.spreekt && stemStand.bron !== gestart.current) {
+      gestart.current = null
+      const t = setTimeout(() => setDIdx(i => (i != null && i < dia.length - 1 ? i + 1 : null)), 700)
+      return () => clearTimeout(t)
+    }
+  }, [stemStand, dIdx, pauze, dia.length])
+  const naarDia = (i) => { stem.stop(); gestart.current = null; setPauze(false); setDIdx(Math.max(0, Math.min(dia.length - 1, i))) }
+  const wisselPauze = () => {
+    if (pauze) { setPauze(false); return }
+    stem.stop(); gestart.current = null; setPauze(true)
+  }
+  // Wat er tijdens de presentatie oplicht; de rest dimt.
+  const spot = (sleutel) => {
+    if (!huidig) return null
+    const aan = huidig.focus === sleutel
+    return { opacity: aan ? 1 : 0.16, transition: 'opacity .5s, box-shadow .5s', ...(aan ? { boxShadow: `0 0 0 1px ${G}, 0 0 30px ${G}44`, borderRadius: 14 } : {}) }
+  }
+  const zet = (sleutel) => (el) => { if (el) vakken.current[sleutel] = el }
 
   const zetStap = async (stapId, klaar) => {
     if (!p) return
@@ -181,7 +260,7 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
         }}><ChevronLeft size={16} strokeWidth={2.6} /> Projecten</button>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1.2 }}>{p.titel}</div>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{p.doel}</div>
+          <div title={p.doel} style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.doel}</div>
         </div>
         {st.length > 0 && <Ring deel={klaar / st.length} grootte={44} kind={<span style={{ fontSize: 11, fontWeight: 900, color: '#fff' }}>{klaar}/{st.length}</span>} />}
       </div>
@@ -200,11 +279,11 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
       ) : (
         <div className="gk-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {p.plan?.samenvatting && (
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 14, maxWidth: 900 }}>{p.plan.samenvatting}</div>
+            <div ref={zet('samenvatting')} style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 14, maxWidth: 900, padding: huidig ? 8 : 0, ...spot('samenvatting') }}>{p.plan.samenvatting}</div>
           )}
           {/* KPI's */}
           {(p.kpis || []).length > 0 && (
-            <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div ref={zet('kpis')} style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginBottom: 16, padding: huidig ? 8 : 0, ...spot('kpis') }}>
               {p.kpis.map((k, i) => {
                 const nu = Number(k.nu) || 0, doel = Number(k.doel) || 0
                 return (
@@ -228,7 +307,10 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
               const nu = f.van && f.tot && vandaag >= f.van && vandaag <= f.tot
               const fk = (f.stappen || []).filter(s => s.klaar).length
               return (
-                <div key={fi} style={{ minWidth: 0, animation: `gp-in .4s ease-out ${fi * 90}ms both` }}>
+                // Spotlight op de buitenste laag, de intro-animatie binnenin
+                // (een animatie met fill 'both' zou de gedimde opacity overschrijven).
+                <div key={fi} ref={zet(`fase-${fi}`)} style={{ minWidth: 0, ...spot(`fase-${fi}`) }}>
+                <div style={{ animation: `gp-in .4s ease-out ${fi * 90}ms both` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, position: 'relative' }}>
                     <span style={{ width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${G}`, background: nu ? G : '#000', boxShadow: nu ? `0 0 12px ${G}` : 'none', flexShrink: 0 }} />
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: nu ? G : 'rgba(255,255,255,0.5)' }}>{kortDag(f.van)} – {kortDag(f.tot)}</span>
@@ -246,7 +328,7 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
                       const achter = !s.klaar && s.dag && s.dag < vandaag
                       return (
                         <div key={s.id} className="gp-stap" title={[s.hook && `"${s.hook}"`, s.uitleg].filter(Boolean).join('\n') || undefined}
-                          style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 4px', borderRadius: 8, background: isNu ? `${G}14` : 'transparent' }}>
+                          style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 4px', borderRadius: 8, background: huidig?.stappen?.includes(s.id) ? `${G}22` : isNu ? `${G}14` : 'transparent', transition: 'background .4s' }}>
                           <button type="button" onClick={() => zetStap(s.id, !s.klaar)} aria-label={s.klaar ? 'Niet klaar' : 'Klaar'} style={{
                             width: 18, height: 18, borderRadius: '50%', flexShrink: 0, marginTop: 1, cursor: 'pointer', padding: 0,
                             border: `1.5px solid ${s.klaar ? G : 'rgba(255,255,255,0.35)'}`, background: s.klaar ? G : 'transparent',
@@ -263,15 +345,38 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
                     })}
                   </div>
                 </div>
+                </div>
               )
             })}
           </div>
         </div>
       )}
 
+      {/* Presentatie: ondertitel + bediening */}
+      {huidig && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 12, flexShrink: 0, animation: 'gp-in .3s ease-out both' }}>
+          <span style={{ position: 'relative', width: 22, height: 22, flexShrink: 0 }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `1.5px solid ${G}`, background: `radial-gradient(circle, ${G}66 0%, ${G}14 55%, rgba(0,0,0,.6) 72%)`, boxShadow: `0 0 10px ${G}88`, animation: stemStand.spreekt ? 'gp-puls .5s ease-in-out infinite' : 'none' }} />
+            <span style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: `1px dashed ${G}66`, animation: 'gp-radar 6s linear infinite' }} />
+          </span>
+          <div key={dIdx} style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, color: '#fff', lineHeight: 1.4, animation: 'gp-in .3s ease-out both', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{huidig.tekst}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            {dia.map((_, i) => <span key={i} onClick={() => naarDia(i)} style={{ width: i === dIdx ? 16 : 6, height: 6, borderRadius: 3, cursor: 'pointer', background: i === dIdx ? G : i < dIdx ? `${G}77` : 'rgba(255,255,255,0.2)', transition: 'width .3s' }} />)}
+          </div>
+          <button type="button" onClick={() => naarDia(dIdx - 1)} disabled={dIdx === 0} aria-label="Vorige" style={bedien}><ChevronLeft size={16} strokeWidth={2.6} /></button>
+          <button type="button" onClick={wisselPauze} aria-label={pauze ? 'Verder' : 'Pauze'} style={{ ...bedien, background: `${G}22`, borderColor: G }}>{pauze ? <Play size={15} strokeWidth={2.6} /> : <Pause size={15} strokeWidth={2.6} />}</button>
+          <button type="button" onClick={() => (dIdx < dia.length - 1 ? naarDia(dIdx + 1) : stopPresentatie())} aria-label="Volgende" style={bedien}><ChevronRight size={16} strokeWidth={2.6} /></button>
+          <button type="button" onClick={stopPresentatie} aria-label="Stoppen" style={bedien}><X size={15} strokeWidth={2.6} /></button>
+        </div>
+      )}
+
       {/* Acties */}
-      {p.status !== 'onderzoek' && (
+      {p.status !== 'onderzoek' && !huidig && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 18, paddingTop: 12, flexShrink: 0, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => { stem.ontgrendel(); naarDia(0) }} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 16px', borderRadius: 999,
+            border: `1px solid ${G}`, background: 'transparent', color: G, fontFamily: 'inherit', fontSize: 13, fontWeight: 900, cursor: 'pointer',
+          }}><Play size={14} strokeWidth={2.8} /> Presenteer</button>
           {p.status === 'plan' && (
             <button type="button" disabled={bezig} onClick={inplannen} style={{
               display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 16px', borderRadius: 999, border: 'none',
@@ -306,6 +411,10 @@ export default function GinoProjecten({ projectId = null, onKies, onVraag, isMob
   )
 }
 
+const bedien = {
+  width: 30, height: 30, borderRadius: '50%', border: `1px solid ${G}44`, background: 'transparent', color: '#fff',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0,
+}
 const linkStijl = {
   display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 0', border: 'none', background: 'none',
   cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 800, letterSpacing: '.04em', fontFamily: 'inherit', color: '#fff', opacity: 0.75,
