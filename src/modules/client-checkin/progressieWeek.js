@@ -127,7 +127,7 @@ export async function laadProgressie(db, client) {
   // de hele Promise.all en krijgt de klant een leeg scherm.
   const vang = (q) => q.then(r => r, () => ({ data: null }))
 
-  const [stand, gewichtRes, sessiesRes, faseRes, maaltijdRes, maaltijdenRes] = await Promise.all([
+  const [stand, gewichtRes, sessiesRes, faseRes, maaltijdRes, maaltijdenRes, doelRes] = await Promise.all([
     vang(sb.rpc('get_challenge_stand', {
       p_client_id: client.id,
       p_start: weekStart,
@@ -149,7 +149,7 @@ export async function laadProgressie(db, client) {
       .eq('client_id', client.id)
       .order('started_on', { ascending: false })
       .limit(1)),
-    // De macrodoelen staan op het actieve maaltijdplan, niet op de klantrij.
+    // Terugval voor de macrodoelen: het actieve maaltijdplan.
     vang(sb.from('client_meal_plans')
       .select('daily_calories, daily_protein')
       .eq('client_id', client.id)
@@ -163,13 +163,25 @@ export async function laadProgressie(db, client) {
       .eq('client_id', client.id)
       .gte('consumed_at', `${weekStart}T00:00:00`)
       .lt('consumed_at', `${plusDag(zaterdag)}T00:00:00`)),
+    // De doelen van de klant zelf winnen, net als op de maaltijdpagina
+    // (AIMealDashboard). Het plan kan een oud getal hebben: bij Mark Aaldenberg
+    // zei het plan van 4 sep 3.127 kcal terwijl zijn doel 2.188 is (31 okt 2026).
+    vang(sb.from('clients')
+      .select('target_calories, target_protein')
+      .eq('id', client.id)
+      .maybeSingle()),
   ])
 
   const s = stand.data || {}
   const wegingen = gewichtRes.data || []
   const sessies = sessiesRes.data || []
   const fase = (faseRes.data || [])[0] || null
-  const plan = (maaltijdRes.data || [])[0] || null
+  const planRij = (maaltijdRes.data || [])[0] || null
+  const doel = doelRes.data || {}
+  const plan = {
+    daily_calories: Number(doel.target_calories) || Number(planRij?.daily_calories) || null,
+    daily_protein: Number(doel.target_protein) || Number(planRij?.daily_protein) || null,
+  }
 
   // ── Oefeningen van beide weken, voor de kracht-vergelijking ──
   const sessieIds = sessies.map(x => x.id)
