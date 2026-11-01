@@ -37,7 +37,10 @@ export const zonderTest = (lijst) => (lijst || []).filter(it => !isTestItem(it))
 // CoachHub (tab:extra, zoals #ai-meals:<id>); BusinessOS.jsx opent het venster.
 export const CONTENT_HASH = 'business-os:content='
 export const contentLink = (id) => `https://www.myarcfitness.com/#${CONTENT_HASH}${id}`
-export const openContent = (id) => { window.location.hash = `${CONTENT_HASH}${id}` }
+// Bekijk-knoppen: zelfde venster zonder de hash te wijzigen (anders springt de
+// hoofdtab om als Business OS in het split-paneel staat).
+export const CONTENT_OPEN = 'bos-content-open'
+export const openContent = (id) => window.dispatchEvent(new CustomEvent(CONTENT_OPEN, { detail: id }))
 // Leest het id uit #business-os:content=<id> (ook #business-os?content=<id>).
 export const contentUitHash = (hash = window.location.hash) => {
   const m = String(hash).match(/^#?business-os[:?]content=([0-9a-f-]{36})/i)
@@ -65,9 +68,16 @@ export async function metStand(supabase, items) {
 // Per dag { draft, ingepland, gepost, mislukt, los_gepost, views }. Gepost telt
 // ook Instagram-posts zonder gepland item mee.
 export async function laadStandPerDag(supabase, van, tot) {
+  // v2 laat testrijen weg (content-test-uitsluiten.sql). Bestaat hij nog niet,
+  // dan v1 en de testrijen hier aftrekken.
+  const v2 = await supabase.rpc('content_stand_per_dag_v2', { p_van: van, p_tot: tot }).then(r => r, e => ({ error: e }))
+  if (!v2.error && v2.data) {
+    const m = {}
+    for (const r of v2.data) m[r.dag] = r
+    return m
+  }
   const [{ data }, test] = await Promise.all([
     supabase.rpc('content_stand_per_dag', { p_van: van, p_tot: tot }).then(r => r, () => ({ data: null })),
-    // De RPC telt testrijen nog mee: hier weer aftrekken.
     supabase.from('content_items').select('id, title, planned_date, status, posted_at, ig_media_id, autopilot_status')
       .like('title', '\\_\\_test%').gte('planned_date', van).lte('planned_date', tot)
       .then(r => r, () => ({ data: null })),

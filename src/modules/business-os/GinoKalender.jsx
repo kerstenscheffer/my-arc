@@ -27,7 +27,7 @@ import GinoWeek from './GinoWeek'
 import GinoContent from './GinoContent'
 import GinoAutopilot from './GinoAutopilot'
 import { laadContentStand } from './contentStand'
-import { metStand, laadStandPerDag } from './contentStatusData'
+import { metStand, laadStandPerDag, zonderTest, openContent, CONTENT_GEWIJZIGD } from './contentStatusData'
 import { StandChip } from './contentStatus'
 import GinoOmzet from './GinoOmzet'
 import GinoProjecten from './GinoProjecten'
@@ -90,8 +90,9 @@ async function laadPeriode(van, tot) {
     titel: `${c.call_title || 'Call'} · ${c.clients?.first_name || ''}`.trim(),
   }))
   // Stand (draft/ingepland/gepost/mislukt) uit content_items_status.
-  ;(await metStand(supabase, (co.data || []).filter(c => c.autopilot_status !== 'overgeslagen'))).forEach(c => items.push({
-    id: `i${c.id}`, soort: 'content', type: c.type, dag: c.planned_date, tijd: c.planned_time || null,
+  // Testrijen ('__test…') tellen nergens mee.
+  ;(await metStand(supabase, zonderTest(co.data).filter(c => c.autopilot_status !== 'overgeslagen'))).forEach(c => items.push({
+    id: `i${c.id}`, contentId: c.id, soort: 'content', type: c.type, dag: c.planned_date, tijd: c.planned_time || null,
     titel: c.title || c.hook || 'Content', sub: c.type, stand: c.stand, views: c.views,
     klaar: c.stand === 'gepost',
   }))
@@ -222,6 +223,11 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     }
   }, [maand, anker, weergave])
   useEffect(() => { setItems(null); laad() }, [laad])
+  // Goedgekeurd/aangepast/overgeslagen in het preview-venster: opnieuw laden.
+  useEffect(() => {
+    window.addEventListener(CONTENT_GEWIJZIGD, laad)
+    return () => window.removeEventListener(CONTENT_GEWIJZIGD, laad)
+  }, [laad])
 
   const perDag = useMemo(() => {
     const m = {}
@@ -344,6 +350,9 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
                       </div>
                     </div>
                     {it.soort === 'content' && it.stand && <StandChip stand={it.stand} views={it.views} />}
+                    {it.soort === 'content' && it.contentId && (
+                      <button type="button" onClick={() => openContent(it.contentId)} style={bekijk}>Bekijk</button>
+                    )}
                     {it.soort === 'concept' && (
                       <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen([it.concept])}
                         style={{ ...link, color: G, opacity: 1 }}>
@@ -514,6 +523,10 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
 const rond = {
   width: 30, height: 30, borderRadius: '50%', border: `1px solid ${G}44`, background: 'transparent', color: '#fff',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+}
+const bekijk = {
+  flexShrink: 0, minHeight: 32, padding: '0 12px', borderRadius: 8, border: 'none', background: G, color: '#000',
+  cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 900,
 }
 const link = {
   display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 0', border: 'none', background: 'none',

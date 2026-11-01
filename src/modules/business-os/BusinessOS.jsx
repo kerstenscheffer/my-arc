@@ -37,7 +37,8 @@ import { BewaarKnop, SchermenLijst } from './schermen'
 import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
-import { metStand, laadStandPerDag, standVoorGino, STANDEN, STAND_KLEUR } from './contentStatusData'
+import { metStand, laadStandPerDag, standVoorGino, STANDEN, STAND_KLEUR, zonderTest, contentLink, contentUitHash, openContent, CONTENT_OPEN, CONTENT_GEWIJZIGD } from './contentStatusData'
+import ContentPreview from './ContentPreview'
 import { StandChip, StandLegenda } from './contentStatus'
 
 const contentService = new ContentPlanningService(supabase)
@@ -529,9 +530,9 @@ function useContent() {
       contentService.getContentIdeas(user.id),
       laadStandPerDag(supabase, dagIso(dagen[0]), dagIso(dagen[13])),
     ])
-    setItems(await metStand(supabase, (lijst || []).filter(x => x.autopilot_status !== 'overgeslagen')))
+    setItems(await metStand(supabase, zonderTest(lijst).filter(x => x.autopilot_status !== 'overgeslagen')))
     setPerStand(st)
-    setIdeeen(idee.slice(0, 10))
+    setIdeeen(zonderTest(idee).slice(0, 10))
   }, [dagen])
 
   useEffect(() => { laad() }, [laad])
@@ -609,6 +610,11 @@ function ContentItem({ it, c }) {
         {it.stand ? <StandChip stand={it.stand} views={it.views} /> : STATUS_LABEL[it.status] && (
           <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, flexShrink: 0, color: C.zacht, border: `1px solid ${C.rand}` }}>{STATUS_LABEL[it.status]}</span>
         )}
+        <span role="button" tabIndex={0} onClick={e => { e.stopPropagation(); openContent(it.id) }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openContent(it.id) } }}
+          style={{ fontSize: '0.72rem', fontWeight: 900, padding: '4px 10px', borderRadius: 8, flexShrink: 0, color: '#000', background: C.groen, cursor: 'pointer' }}>
+          Bekijk
+        </span>
       </button>
       {open && (
         <div style={{ paddingBottom: 6 }}>
@@ -888,6 +894,25 @@ export default function BusinessOS({ isMobile }) {
   const content = useContent()
   const { laad: laadContent } = content
   useEffect(() => { if (blad === 'content') laadContent() }, [blad, laadContent])
+  // Preview van één post: deeplink #business-os:content=<id> (ook als Business
+  // OS net pas opent) of een Bekijk-knop (event, hash blijft staan).
+  const [previewId, setPreviewId] = useState(() => contentUitHash())
+  useEffect(() => {
+    const opHash = () => { const id = contentUitHash(); if (id) setPreviewId(id) }
+    const opKnop = (e) => setPreviewId(e.detail || null)
+    window.addEventListener('hashchange', opHash)
+    window.addEventListener(CONTENT_OPEN, opKnop)
+    return () => { window.removeEventListener('hashchange', opHash); window.removeEventListener(CONTENT_OPEN, opKnop) }
+  }, [])
+  const sluitPreview = useCallback(() => {
+    setPreviewId(null)
+    if (contentUitHash()) window.location.hash = 'business-os'
+  }, [])
+  // Na een actie in het venster: Content-paneel opnieuw laden.
+  useEffect(() => {
+    window.addEventListener(CONTENT_GEWIJZIGD, laadContent)
+    return () => window.removeEventListener(CONTENT_GEWIJZIGD, laadContent)
+  }, [laadContent])
   // Week laadt alleen als het paneel opengaat; Gino krijgt de cijfers daarna mee.
   const week = useWeek()
   const { laad: laadWeek } = week
@@ -1258,7 +1283,8 @@ export default function BusinessOS({ isMobile }) {
               legeDagen: content.perDag.filter(d => d.items.length === 0).map(d => d.datum),
               // Wat er echt staat: draft (nog niet klaar), ingepland (gaat vanzelf live), gepost (incl. zelf geplaatst), mislukt.
               perDagStand: standVoorGino(content.perStand),
-              items: content.perDag.flatMap(d => d.items.map(it => ({ datum: d.datum, titel: it.title, status: it.status, stand: it.stand || null }))),
+              // link = deeplink naar het preview-venster; Gino mag hem zo in de chat zetten.
+              items: content.perDag.flatMap(d => d.items.map(it => ({ datum: d.datum, titel: it.title, status: it.status, stand: it.stand || null, link: contentLink(it.id) }))),
             },
             weekInputs: week.geladen
               ? week.rijen.map(r => ({ input: r.label, dezeWeek: r.totaal, weekdoel: r.weekdoel, vorigeWeek: r.vorige, daggoalsGehaald: r.doel ? r.gehaald : null }))
@@ -1272,6 +1298,8 @@ export default function BusinessOS({ isMobile }) {
         label={visueel?._vorige ? 'vorige versie' : null}
         extra={visueel && !visueel._vorige ? <BewaarKnop visueel={visueel} vraag={visueel._vraag} onKlaar={laadSchermenNu} /> : null}
         onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />
+
+      {previewId && <ContentPreview id={previewId} isMobile={isMobile} onSluit={sluitPreview} />}
 
       {blad && (
         <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} breed={blad === 'geldplan'} onSluit={sluitBlad}>

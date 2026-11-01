@@ -13,10 +13,10 @@
 // een preview wordt nooit geplaatst.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Check, X, Pencil, Zap } from 'lucide-react'
+import { Check, X, Pencil, Zap, Eye } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
-import { metStand } from './contentStatusData'
+import { metStand, zonderTest, openContent, CONTENT_GEWIJZIGD } from './contentStatusData'
 import { StandChip } from './contentStatus'
 
 const G = colors.success
@@ -55,7 +55,7 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
         .then(x => x, e => ({ error: e })),
     ])
     if (r.error) { setFout('De autopilot staat nog niet in de database.'); setItems([]); return }
-    setItems(await metStand(supabase, r.data || []))
+    setItems(await metStand(supabase, zonderTest(r.data)))
     setAuto(!!s.data?.automatisch)
     // Privé previews: ondertekende URL's van 1 uur, video + cover in één keer.
     const paden = (r.data || []).filter(i => i.autopilot_preview && !i.autopilot_video).flatMap(i => [i.autopilot_preview, coverVan(i.autopilot_preview)])
@@ -66,6 +66,10 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
   }, [])
 
   useEffect(() => { laad() }, [laad])
+  useEffect(() => {
+    window.addEventListener(CONTENT_GEWIJZIGD, laad)
+    return () => window.removeEventListener(CONTENT_GEWIJZIGD, laad)
+  }, [laad])
 
   const zet = async (id, velden) => {
     setBezig(id)
@@ -168,6 +172,9 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
                     </>
                   ) : (
                     <>
+                      <button type="button" onClick={() => openContent(it.id)} title="Bekijk de preview" style={actie}>
+                        <Eye size={13} strokeWidth={2.8} /> Bekijk
+                      </button>
                       {['wacht', 'fout'].includes(it.autopilot_status) && it.autopilot_video && (
                         <button type="button" disabled={bezig === it.id} onClick={() => zet(it.id, { autopilot_status: 'goedgekeurd', status: 'planned', autopilot_fout: null })} style={{ ...actie, background: G, color: '#000' }}>
                           <Check size={13} strokeWidth={3} /> Goedkeuren

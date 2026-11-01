@@ -180,7 +180,9 @@ const OUDE_TABS = { ads: 'leads' }
 
 const getHashTab = () => {
   const hash = window.location.hash.replace('#', '')
-  const base = OUDE_TABS[hash.split(':')[0]] || hash.split(':')[0]
+  // Tab + extra na ':' of '?' (#ai-meals:<id>, #business-os:content=<id>).
+  const kop = hash.split(/[:?]/)[0]
+  const base = OUDE_TABS[kop] || kop
   return ALL_TAB_IDS.includes(base) ? base : 'command'
 }
 
