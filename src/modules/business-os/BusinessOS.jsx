@@ -30,6 +30,8 @@ import BusinessChat from './BusinessChat'
 import GinoToneel from './GinoToneel'
 import GinoHerinnering from './GinoHerinnering'
 import GinoKalender from './GinoKalender'
+import Geldplan from './Geldplan'
+import { laadGeldplan, geldplanVoorGino } from './geldplanData'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop, SchermenLijst } from './schermen'
 import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
@@ -57,6 +59,7 @@ const PRIJS_KEY = 'business_os_prijs'
 // De onderdelen achter de puntjes-knop, in deze volgorde.
 const ONDERDELEN = [
   ['vandaag', 'Vandaag · agenda, taken, beloftes en calls'],
+  ['geldplan', 'Geldplan · 6 maanden cashflow en break-even'],
   ['schermen', 'Mijn schermen · tik om opnieuw te laten zien'],
   ['content', 'Content · komende 14 dagen'],
   ['week', 'Week · inputs vs doel'],
@@ -108,7 +111,7 @@ const bewaar = (key, v) => {
 
 // Paneel voor één onderdeel: zijpaneel rechts op desktop, bottom sheet op
 // mobiel. Scrolt zelf; sluit met het kruisje, een klik ernaast of Escape.
-function Blad({ titel, isMobile, onSluit, children }) {
+function Blad({ titel, isMobile, breed, onSluit, children }) {
   const host = useModalHost()
   useEffect(() => {
     const toets = (e) => { if (e.key === 'Escape') onSluit() }
@@ -123,8 +126,8 @@ function Blad({ titel, isMobile, onSluit, children }) {
         position: 'fixed', zIndex: 2147483401, background: '#0a0a0a', color: C.tekst,
         display: 'flex', flexDirection: 'column',
         ...(isMobile
-          ? { left: 0, right: 0, bottom: 0, maxHeight: '80dvh', borderRadius: '20px 20px 0 0', borderTop: `1px solid ${C.rand}` }
-          : { top: 0, right: 0, bottom: 0, width: 'min(440px, 100%)', borderLeft: `1px solid ${C.rand}` }),
+          ? { left: 0, right: 0, bottom: 0, maxHeight: breed ? '92dvh' : '80dvh', borderRadius: '20px 20px 0 0', borderTop: `1px solid ${C.rand}` }
+          : { top: 0, right: 0, bottom: 0, width: breed ? 'min(720px, 100%)' : 'min(440px, 100%)', borderLeft: `1px solid ${C.rand}` }),
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px 12px 20px', borderBottom: `1px solid ${C.rand}`, flexShrink: 0 }}>
           <span style={{ ...LABEL, color: C.wit }}>{titel}</span>
@@ -855,6 +858,10 @@ export default function BusinessOS({ isMobile }) {
     verwijderScherm(s.id).then(ok => { if (!ok) laadSchermenNu() })
   }
   const sluitBlad = useCallback(() => setBlad(null), [])
+  // Geldplan voor Gino: zelfde RPC en opgeslagen instellingen als het scherm.
+  // Opnieuw laden na sluiten van het Geldplan (schuifjes kunnen verschoven zijn).
+  const [geldplan, setGeldplan] = useState(null)
+  useEffect(() => { if (blad !== 'geldplan') laadGeldplan().then(d => { if (d) setGeldplan(d) }) }, [blad])
   const vandaag = useVandaag()
   const { laad: laadVandaag } = vandaag
   useEffect(() => { if (blad === 'vandaag') laadVandaag() }, [blad, laadVandaag])
@@ -988,6 +995,7 @@ export default function BusinessOS({ isMobile }) {
 
   // Inhoud van de onderdelen: precies wat eerder in de inklap-secties stond.
   const inhoud = (k) => {
+    if (k === 'geldplan') return <Geldplan />
     if (k === 'vandaag') return <VandaagPaneel v={vandaag} agenda={agendaVandaag} doorstap={data.doorstap} />
     if (k === 'content') return <ContentPaneel c={content} />
     if (k === 'schermen') return <SchermenLijst {...schermen} onKies={kiesScherm} onVerwijder={verwijderSchermNu} />
@@ -1207,6 +1215,7 @@ export default function BusinessOS({ isMobile }) {
           <BusinessChat onBezig={setDenkt} onVisueel={toonVisueel} onKalender={(k) => setKalender({ ...k, _t: Date.now() })} onTab={kiesTab} stuurRef={stuurRef} marginTop={isMobile ? 18 : 24} context={{
             // Vooraan: de context wordt na 4000 tekens afgekapt.
             'Bewaarde schermen': schermenVoorGino(schermen.lijst),
+            geldplan: geldplanVoorGino(geldplan),
             omzet: Math.round(a.omzet), doel, prognose: Math.round(a.prognose), prijsPerSale: a.p,
             dezeMaand: data.nu, gemiddeldeAfgelopen3Maanden: data.voor,
             schakels: a.schakels.map(s => ({ schakel: s.label, verschilTovGemiddelde: Math.round(s.verschil * 100) + '%' })),
@@ -1243,7 +1252,7 @@ export default function BusinessOS({ isMobile }) {
         onOordeel={(oordeel) => { bewaarOordeel({ soort: 'visueel', oordeel, inhoud: visueel?.titel, visueel }) }} />
 
       {blad && (
-        <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} onSluit={sluitBlad}>
+        <Blad titel={ONDERDELEN.find(([k]) => k === blad)?.[1]} isMobile={isMobile} breed={blad === 'geldplan'} onSluit={sluitBlad}>
           {inhoud(blad)}
         </Blad>
       )}

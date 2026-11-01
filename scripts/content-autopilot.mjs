@@ -13,13 +13,18 @@
 //   node scripts/content-autopilot.mjs winnaars [aantal=10]
 //       de winnaars van deze week (RPC content_autopilot_winnaars)
 //   node scripts/content-autopilot.mjs maak '{"ig_id","hook","caption","datum":"YYYY-MM-DD","tijd":"HH:MM","woord"?}'
-//       variant maken (ffmpeg), uploaden, als idea in content_items (autopilot_status wacht)
+//       variant maken (ffmpeg), privé uploaden als preview, als idea in content_items (autopilot_status wacht)
 //   node scripts/content-autopilot.mjs opnieuw
 //       items waar Kersten de hook aanpaste opnieuw renderen
 //   node scripts/content-autopilot.mjs render <ig_id> "<hook>"
 //       alleen lokaal renderen (geen sessie nodig), bv. een testvariant
 //   node scripts/content-autopilot.mjs upload
-//       lokaal gerenderde items (autopilot_bestand, nog geen video) naar de bucket
+//       lokaal gerenderde items zonder preview privé uploaden
+//
+// Preview (1 nov 2026): varianten gaan naar de privé bucket content-varianten
+// (<eigenaar>/<id>/variant.mp4 + cover.jpg) en het pad in autopilot_preview.
+// autopilot_video (publieke bucket, die de publiceer-cron gebruikt) blijft leeg:
+// niets gaat naar Instagram. Publiceren komt later via de Content Publishing API.
 //
 // Regels: hook over de kijker, geen 'afvallen', geen gedachtestreepjes,
 // caption met 'comment WOORD', tijd 14:00-20:00, max 5 magnets per dag.
@@ -46,7 +51,7 @@ const sb = token ? createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KE
 
 const BIEB = path.join(os.homedir(), 'Movies', 'MY ARC bibliotheek')
 const VARIANTEN = path.join(BIEB, 'varianten')
-const BUCKET = 'content-autopilot'
+const PREVIEW = 'content-varianten' // privé; RLS: eerste map = content_eigenaar()
 const MAX_PER_DAG = 5
 
 const uit = (x) => console.log(JSON.stringify(x, null, 2))
@@ -174,13 +179,15 @@ async function render(bron, hook, id) {
   return { video, cover, start }
 }
 
-async function upload(id, video, cover) {
-  const vPad = `${id}/variant.mp4`, cPad = `${id}/cover.jpg`
-  for (const [pad, bestand, type] of [[vPad, video, 'video/mp4'], [cPad, cover, 'image/jpeg']]) {
-    const { error } = await sb.storage.from(BUCKET).upload(pad, fs.readFileSync(bestand), { contentType: type, upsert: true })
+// Privé preview: alleen Kersten en zijn team kunnen hem zien (ondertekende URL).
+async function upload(eig, id, video, cover) {
+  const vPad = `${eig}/${id}/variant.mp4`
+  for (const [pad, bestand, type] of [[vPad, video, 'video/mp4'], [`${eig}/${id}/cover.jpg`, cover, 'image/jpeg']]) {
+    if (!fs.existsSync(bestand)) continue
+    const { error } = await sb.storage.from(PREVIEW).upload(pad, fs.readFileSync(bestand), { contentType: type, upsert: true })
     if (error) stop(`upload ${pad}: ${error.message}`)
   }
-  return { vPad, cPad }
+  return vPad
 }
 
 async function bronPad(igId) {
@@ -220,16 +227,16 @@ async function maak(json) {
   const eig = await eigenaar()
   const id = crypto.randomUUID()
   const { video, cover, start } = await render(bron, hook, id)
-  const { vPad, cPad } = await upload(id, video, cover)
+  const preview = await upload(eig, id, video, cover)
   const { error } = await sb.from('content_items').insert({
     id, coach_id: eig, type: 'reel', status: 'idea', title: `Autopilot ${woord || 'reel'}: ${hook}`.slice(0, 120), hook,
     planned_date: datum, planned_time: tijd,
     notes: `Variant van reel ${ig_id} (start ${start}s, nieuwe hook en cover). Lokaal: ${video}`,
     autopilot_bron: ig_id, autopilot_status: 'wacht', autopilot_woord: woord, autopilot_bestand: video,
-    autopilot_video: vPad, autopilot_cover: cPad, autopilot_caption: caption,
+    autopilot_preview: preview, autopilot_caption: caption,
   })
   if (error) stop(error.message)
-  uit({ item: id, woord, datum, weekdag: weekdag(datum), tijd, hook, video })
+  uit({ item: id, woord, datum, weekdag: weekdag(datum), tijd, hook, video, preview })
 }
 
 // Alleen renderen, zonder database (geen sessie nodig). Voor een testvariant
@@ -242,18 +249,18 @@ async function renderLos(igId, hook) {
   uit({ id, ...(await render(bron, hook, id)) })
 }
 
-// Items die lokaal gerenderd zijn maar nog niet in de bucket staan uploaden.
+// Items die lokaal gerenderd zijn maar nog geen preview hebben privé uploaden.
 async function uploadLokaal() {
   const { data, error } = await sb.from('content_items').select('id, autopilot_bestand')
-    .not('autopilot_bestand', 'is', null).is('autopilot_video', null).neq('autopilot_status', 'overgeslagen')
+    .not('autopilot_bestand', 'is', null).is('autopilot_preview', null).is('autopilot_video', null).neq('autopilot_status', 'overgeslagen')
   if (error) stop(error.message)
+  const eig = await eigenaar()
   const klaar = []
   for (const it of data || []) {
     if (!fs.existsSync(it.autopilot_bestand)) continue
     const cover = it.autopilot_bestand.replace(/\.mp4$/, '.jpg')
-    const id = path.basename(it.autopilot_bestand, '.mp4')
-    const { vPad, cPad } = await upload(id, it.autopilot_bestand, cover)
-    await sb.from('content_items').update({ autopilot_video: vPad, autopilot_cover: cPad, updated_at: new Date().toISOString() }).eq('id', it.id)
+    const preview = await upload(eig, it.id, it.autopilot_bestand, cover)
+    await sb.from('content_items').update({ autopilot_preview: preview, updated_at: new Date().toISOString() }).eq('id', it.id)
     klaar.push(it.id)
   }
   uit({ geupload: klaar.length })
@@ -262,12 +269,13 @@ async function uploadLokaal() {
 async function opnieuw() {
   const { data, error } = await sb.from('content_items').select('id, hook, autopilot_bron').eq('autopilot_status', 'hook_aanpassen')
   if (error) stop(error.message)
+  const eig = await eigenaar()
   const klaar = []
   for (const it of data || []) {
     const bron = await bronPad(it.autopilot_bron)
     const { video, cover } = await render(bron, it.hook, it.id)
-    const { vPad, cPad } = await upload(it.id, video, cover)
-    await sb.from('content_items').update({ autopilot_status: 'wacht', autopilot_video: vPad, autopilot_cover: cPad, autopilot_bestand: video, updated_at: new Date().toISOString() }).eq('id', it.id)
+    const preview = await upload(eig, it.id, video, cover)
+    await sb.from('content_items').update({ autopilot_status: 'wacht', autopilot_preview: preview, autopilot_bestand: video, updated_at: new Date().toISOString() }).eq('id', it.id)
     klaar.push(it.id)
   }
   uit({ opnieuw_gemaakt: klaar.length })

@@ -7,6 +7,10 @@
 // content_autopilot_publiceer zet hem op het geplande moment op Instagram.
 // Schakelaar Automatisch (content_autopilot) staat standaard uit.
 // Database: src/modules/business-os/content-autopilot.sql.
+// Preview (1 nov 2026): het script zet elke nieuwe variant in de privé bucket
+// content-varianten (autopilot_preview). Het paneel speelt hem af via een
+// ondertekende URL van 1 uur. De cron kijkt alleen naar autopilot_video, dus
+// een preview wordt nooit geplaatst.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Check, X, Pencil, Zap } from 'lucide-react'
@@ -18,6 +22,8 @@ const OPEN = ['wacht', 'hook_aanpassen', 'goedgekeurd', 'bezig', 'fout', 'concep
 // concept = Gino's planning zonder video; pas na 'maak' wordt het 'wacht'.
 const LABEL = { concept: 'Concept', wacht: 'Wacht op jou', hook_aanpassen: 'Gino maakt nieuwe hook', goedgekeurd: 'Goedgekeurd', bezig: 'Wordt geplaatst', fout: 'Fout', gepubliceerd: 'Online' }
 const publiek = (pad) => (pad ? supabase.storage.from('content-autopilot').getPublicUrl(pad).data.publicUrl : null)
+const PREVIEW_BUCKET = 'content-varianten'
+const coverVan = (pad) => pad.replace(/variant\.mp4$/, 'cover.jpg')
 // Lokaal gerenderd maar nog niet geüpload: alleen op de dev-server te bekijken
 // (vite.config.js staat de bibliotheekmap toe via /@fs).
 const lokaal = (it) => (import.meta.env.DEV && it.autopilot_bestand ? `/@fs${it.autopilot_bestand}` : null)
@@ -34,12 +40,13 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
   const [auto, setAuto] = useState(false)
   const [bewerk, setBewerk] = useState(null) // { id, hook }
   const [bezig, setBezig] = useState(null)
+  const [preview, setPreview] = useState({}) // pad → ondertekende URL
 
   const laad = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const [r, s] = await Promise.all([
       supabase.from('content_items')
-        .select('id, title, hook, planned_date, planned_time, autopilot_status, autopilot_woord, autopilot_video, autopilot_cover, autopilot_bestand, autopilot_caption, autopilot_fout, posted_at')
+        .select('id, title, hook, planned_date, planned_time, autopilot_status, autopilot_woord, autopilot_video, autopilot_cover, autopilot_bestand, autopilot_caption, autopilot_fout, posted_at, autopilot_preview')
         .in('autopilot_status', OPEN).order('planned_date').order('planned_time').limit(200)
         .then(x => x, e => ({ error: e })),
       supabase.from('content_autopilot').select('automatisch').eq('eigenaar', user?.id).maybeSingle()
@@ -48,6 +55,12 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
     if (r.error) { setFout('De autopilot staat nog niet in de database.'); setItems([]); return }
     setItems(r.data || [])
     setAuto(!!s.data?.automatisch)
+    // Privé previews: ondertekende URL's van 1 uur, video + cover in één keer.
+    const paden = (r.data || []).filter(i => i.autopilot_preview && !i.autopilot_video).flatMap(i => [i.autopilot_preview, coverVan(i.autopilot_preview)])
+    if (!paden.length) return
+    const { data: urls } = await supabase.storage.from(PREVIEW_BUCKET).createSignedUrls(paden, 3600)
+      .then(x => x, () => ({ data: [] }))
+    setPreview(Object.fromEntries((urls || []).filter(u => u.signedUrl).map(u => [u.path, u.signedUrl])))
   }, [])
 
   useEffect(() => { laad() }, [laad])
@@ -104,13 +117,14 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
           </div>
         )}
         {items?.map(it => {
-          const video = publiek(it.autopilot_video) || lokaal(it)
+          const video = publiek(it.autopilot_video) || preview[it.autopilot_preview] || lokaal(it)
+          const poster = publiek(it.autopilot_cover) || (it.autopilot_preview && preview[coverVan(it.autopilot_preview)]) || undefined
           const open = bewerk?.id === it.id
           return (
             <div key={it.id} style={{ border: `1px solid ${it.autopilot_status === 'goedgekeurd' ? G : 'rgba(255,255,255,0.1)'}`, borderRadius: 12, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column' }}>
               <div style={{ position: 'relative', aspectRatio: '9 / 16', background: '#000' }}>
                 {video
-                  ? <video src={video} poster={publiek(it.autopilot_cover) || undefined} controls playsInline preload="none" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  ? <video key={video} src={video} poster={poster} controls playsInline preload="none"style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{it.autopilot_status === 'concept' ? 'Nog geen video' : 'Geen video'}</div>}
                 {it.autopilot_woord && (
                   <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 999, background: G, color: '#000', fontSize: 10, fontWeight: 900, letterSpacing: '.08em' }}>{it.autopilot_woord}</span>
@@ -126,7 +140,10 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
                 ) : (
                   <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>{it.hook || it.title}</div>
                 )}
-                {!it.autopilot_video && it.autopilot_bestand && (
+                {!it.autopilot_video && it.autopilot_preview && (
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Privé preview. Wordt niet geplaatst.</div>
+                )}
+                {!it.autopilot_video && !it.autopilot_preview && it.autopilot_bestand && (
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Staat alleen lokaal. Na jouw akkoord uploadt Gino hem, dan kun je goedkeuren.</div>
                 )}
                 {it.autopilot_fout && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{it.autopilot_fout}</div>}
@@ -136,7 +153,7 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
                     <div style={{ whiteSpace: 'pre-wrap', paddingTop: 4 }}>{it.autopilot_caption}</div>
                   </details>
                 )}
-                <div style={{ display: 'flex', gap: 6, paddingTop: 2 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 2 }}>
                   {open ? (
                     <>
                       <button type="button" disabled={bezig === it.id || !bewerk.hook.trim()} onClick={() => { zet(it.id, { hook: bewerk.hook.trim(), autopilot_status: 'hook_aanpassen', status: 'idea' }); setBewerk(null) }} style={{ ...actie, background: G, color: '#000' }}>

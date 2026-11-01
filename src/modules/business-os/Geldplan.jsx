@@ -11,6 +11,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
+import { laadGeldplan, maandNaam } from './geldplanData'
 
 const C = {
   wit: colors.textPrimary,
@@ -23,33 +24,7 @@ const C = {
 }
 const NUM = { fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }
 const LABEL = { fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }
-const MAAND = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 const euro = (n) => (Number(n) < 0 ? '−€' : '€') + Math.abs(Math.round(Number(n) || 0)).toLocaleString('nl-NL')
-const maandNaam = (iso) => MAAND[Number(String(iso).slice(5, 7)) - 1]
-
-// Laden en bewaren: rekenen via de RPC, eigen instellingen in de tabel.
-export function laadGeldplan(eigen = {}) {
-  return supabase.rpc('get_geldplan', { p_instellingen: eigen })
-    .then(({ data, error }) => (error ? null : data), () => null)
-}
-
-// Kort voor Gino's context: dezelfde getallen als het scherm.
-export function geldplanVoorGino(g) {
-  if (!g?.maanden) return null
-  const s = g.instellingen || {}
-  return {
-    bron: 'get_geldplan (zelfde als scherm Geldplan); noem deze getallen',
-    jijHoudtPerMaandJanApr: g.jij_houdt_gem,
-    nodigPerMaand: g.nodig_per_maand,
-    saldoEindMaand: Object.fromEntries(g.maanden.map(m => [maandNaam(m.maand), m.saldo_eind])),
-    jijHoudtPerMaand: Object.fromEntries(g.maanden.map(m => [maandNaam(m.maand), m.jij_houdt])),
-    laagsteSaldo: g.laagste_saldo,
-    breakEvenKlantenPerWeek: g.break_even_klanten_per_week,
-    klantenPerWeek: g.klanten_per_week,
-    perExtraKlantPerWeek: g.per_extra_klant_stabiel,
-    aannames: `doorstap ${s.doorstap_pct}%, borg terug ${s.borg_terug_pct}%, Paviljoen ${s.paviljoen}, privé ${s.prive}, zakelijk ${s.zakelijk}, adspend ${s.adspend}`,
-  }
-}
 
 // Getal dat naar zijn nieuwe waarde optelt.
 function Teller({ waarde, kleur, groot }) {
