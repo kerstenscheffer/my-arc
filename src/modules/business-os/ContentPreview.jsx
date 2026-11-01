@@ -9,22 +9,24 @@
 // Toont: video (privé preview via ondertekende URL van 1 uur, cover als
 // poster), hook, caption met comment-woord, gepland moment, stand, bronreel +
 // cijfer uit notes. Talking heads zonder video: script, hook en CTA.
-// Acties = die van het Autopilot-paneel: Goedkeuren (alleen met
-// autopilot_video), Aanpassen (hook → Gino maakt nieuwe), Overslaan.
-// Niets publiceert hier: goedkeuren zet alleen de status, de cron plaatst.
+// Acties = die van het Autopilot-paneel: Goedkeuren (met video of privé
+// preview), Aanpassen (hook → Gino maakt nieuwe), Overslaan, Test (container
+// bij Instagram zonder plaatsen). Niets publiceert hier: goedkeuren zet alleen
+// de status, instagram-publiceer plaatst op het geplande moment. Na plaatsen:
+// knop Instagram met de permalink.
 
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from '../../client/paginaPortal'
-import { Check, X, Pencil, Link2 } from 'lucide-react'
+import { Check, X, Pencil, Link2, ExternalLink, FlaskConical } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
-import { metStand, contentLink, isTestItem, CONTENT_GEWIJZIGD, kortGetal } from './contentStatusData'
+import { metStand, contentLink, isTestItem, testInstagram, CONTENT_GEWIJZIGD, kortGetal } from './contentStatusData'
 import { StandChip } from './contentStatus'
 
 const G = colors.success
 const PREVIEW_BUCKET = 'content-varianten'
 const KOLOMMEN = 'id, title, hook, script, notes, edit_notes, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_woord, autopilot_video, autopilot_cover, autopilot_bestand, autopilot_caption, autopilot_fout, autopilot_preview, autopilot_bron'
-const LABEL = { concept: 'Concept', wacht: 'Wacht op jou', hook_aanpassen: 'Gino maakt nieuwe hook', goedgekeurd: 'Goedgekeurd', bezig: 'Wordt geplaatst', fout: 'Fout', gepubliceerd: 'Online', overgeslagen: 'Overgeslagen' }
+const LABEL = { concept: 'Concept', wacht: 'Wacht op jou', hook_aanpassen: 'Gino maakt nieuwe hook', goedgekeurd: 'Ingepland', bezig: 'Wordt geplaatst', publiceert: 'Wordt geplaatst', fout: 'Mislukt', gepubliceerd: 'Online', overgeslagen: 'Overgeslagen' }
 const publiek = (pad) => (pad ? supabase.storage.from('content-autopilot').getPublicUrl(pad).data.publicUrl : null)
 const coverVan = (pad) => pad.replace(/variant\.mp4$/, 'cover.jpg')
 const lokaal = (it) => (import.meta.env.DEV && it.autopilot_bestand ? `/@fs${it.autopilot_bestand}` : null)
@@ -86,6 +88,11 @@ export default function ContentPreview({ id, onSluit, isMobile = false }) {
     laad()
   }
 
+  const doeTest = async () => {
+    setMelding('Test loopt, kan een minuut duren…')
+    setMelding(await testInstagram(supabase, id))
+  }
+
   const kopieer = async () => {
     try { await navigator.clipboard.writeText(contentLink(id)); setMelding('Link gekopieerd') } catch { setMelding(contentLink(id)) }
   }
@@ -94,7 +101,9 @@ export default function ContentPreview({ id, onSluit, isMobile = false }) {
   const autopilot = !!st
   const video = it && (publiek(it.autopilot_video) || urls[it.autopilot_preview] || lokaal(it))
   const poster = it && (publiek(it.autopilot_cover) || (it.autopilot_preview && urls[coverVan(it.autopilot_preview)]) || undefined)
+  const heeftVideo = !!(it?.autopilot_video || it?.autopilot_preview)
   const kanGoed = autopilot && ['wacht', 'fout'].includes(st)
+  const kanTest = autopilot && heeftVideo && ['wacht', 'goedgekeurd', 'fout'].includes(st)
   const kanOver = autopilot && ['wacht', 'goedgekeurd', 'fout', 'hook_aanpassen', 'concept'].includes(st)
   // Zelfde als het paneel: bij een klare variant maakt Gino een nieuwe hook;
   // bij een concept of talking head bewaren we alleen de hook.
@@ -171,7 +180,9 @@ export default function ContentPreview({ id, onSluit, isMobile = false }) {
               {it.hook && it.title && it.title !== it.hook && <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>{it.title}</div>}
 
               {!it.autopilot_video && it.autopilot_preview && (
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>Privé preview. Wordt niet geplaatst.</div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>
+                  {st === 'goedgekeurd' ? `Ingepland: gaat ${moment(it)} vanzelf op Instagram.` : st === 'gepubliceerd' ? 'Staat op Instagram.' : 'Privé preview. Pas na Goedkeuren geplaatst.'}
+                </div>
               )}
               {it.autopilot_fout && <div style={{ fontSize: 12, fontWeight: 700, color: '#ff6b6b', marginTop: 8 }}>{it.autopilot_fout}</div>}
 
@@ -211,11 +222,21 @@ export default function ContentPreview({ id, onSluit, isMobile = false }) {
                 ) : (
                   <>
                     {kanGoed && (
-                      <button type="button" disabled={bezig || !it.autopilot_video}
-                        title={it.autopilot_video ? 'Goedkeuren: de cron plaatst hem op het geplande moment' : 'Kan pas als Gino de video heeft geüpload'}
-                        onClick={() => zet({ autopilot_status: 'goedgekeurd', status: 'planned', autopilot_fout: null }, 'Goedgekeurd')}
-                        style={{ ...actie, background: it.autopilot_video ? G : 'transparent', color: it.autopilot_video ? '#000' : 'rgba(255,255,255,0.4)', borderColor: it.autopilot_video ? G : 'rgba(255,255,255,0.15)' }}>
+                      <button type="button" disabled={bezig || !heeftVideo}
+                        title={heeftVideo ? 'Goedkeuren: gaat op het geplande moment vanzelf op Instagram' : 'Kan pas als Gino de video heeft geüpload'}
+                        onClick={() => zet({ autopilot_status: 'goedgekeurd', status: 'planned', autopilot_fout: null }, 'Ingepland')}
+                        style={{ ...actie, background: heeftVideo ? G : 'transparent', color: heeftVideo ? '#000' : 'rgba(255,255,255,0.4)', borderColor: heeftVideo ? G : 'rgba(255,255,255,0.15)' }}>
                         <Check size={14} strokeWidth={3} /> Goedkeuren
+                      </button>
+                    )}
+                    {it.permalink && (
+                      <a href={it.permalink} target="_blank" rel="noreferrer" style={{ ...actie, textDecoration: 'none' }}>
+                        <ExternalLink size={13} strokeWidth={2.8} /> Instagram
+                      </a>
+                    )}
+                    {kanTest && (
+                      <button type="button" disabled={bezig} onClick={doeTest} title="Test bij Instagram zonder te plaatsen" style={actie}>
+                        <FlaskConical size={13} strokeWidth={2.8} /> Test
                       </button>
                     )}
                     {kanAanpassen && (
@@ -231,7 +252,7 @@ export default function ContentPreview({ id, onSluit, isMobile = false }) {
                   </>
                 )}
               </div>
-              {kanGoed && !it.autopilot_video && (
+              {kanGoed && !heeftVideo && (
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginTop: 8 }}>Goedkeuren kan zodra Gino de video na jouw akkoord heeft geüpload.</div>
               )}
               {melding && <div style={{ fontSize: 12, fontWeight: 800, color: G, marginTop: 8, wordBreak: 'break-all' }}>{melding}</div>}

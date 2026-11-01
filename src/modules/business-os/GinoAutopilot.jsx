@@ -3,26 +3,30 @@
 // Content-autopilot wachtrij (31 okt 2026). Varianten van winnende magnet-
 // reels die Gino maakte (scripts/content-autopilot.mjs) staan als content_items
 // met autopilot_status. Per variant: video-preview, hook, woord, moment en
-// Goedkeuren / Overslaan / Hook aanpassen. Goedgekeurd = de cron
-// content_autopilot_publiceer zet hem op het geplande moment op Instagram.
-// Schakelaar Automatisch (content_autopilot) staat standaard uit.
+// Goedkeuren / Overslaan / Hook aanpassen. Goedgekeurd = ingepland: de edge
+// function instagram-publiceer (cron elke 10 min) zet hem op het geplande
+// moment zelf op Instagram, zonder Metricool. Alleen na Goedkeuren.
+// Schakelaar Automatisch (content_autopilot): Gino zet zelf varianten klaar,
+// plaatsen blijft na goedkeuring. Test = container zonder plaatsen.
 // Database: src/modules/business-os/content-autopilot.sql.
 // Preview (1 nov 2026): het script zet elke nieuwe variant in de privé bucket
 // content-varianten (autopilot_preview). Het paneel speelt hem af via een
-// ondertekende URL van 1 uur. De cron kijkt alleen naar autopilot_video, dus
-// een preview wordt nooit geplaatst.
+// ondertekende URL van 1 uur. Geplaatst wordt hij pas na Goedkeuren
+// (instagram-publiceer.sql).
 
 import { useCallback, useEffect, useState } from 'react'
-import { Check, X, Pencil, Zap, Eye } from 'lucide-react'
+import { Check, X, Pencil, Zap, Eye, ExternalLink, FlaskConical } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
-import { metStand, zonderTest, openContent, CONTENT_GEWIJZIGD } from './contentStatusData'
+import { metStand, zonderTest, openContent, testInstagram, CONTENT_GEWIJZIGD } from './contentStatusData'
 import { StandChip } from './contentStatus'
 
 const G = colors.success
-const OPEN = ['wacht', 'hook_aanpassen', 'goedgekeurd', 'bezig', 'fout', 'concept']
+const OPEN = ['wacht', 'hook_aanpassen', 'goedgekeurd', 'bezig', 'publiceert', 'fout', 'concept', 'gepubliceerd']
+// Online-varianten blijven 7 dagen zichtbaar (met de Instagram-link).
+const RECENT_MS = 7 * 24 * 3600 * 1000
 // concept = Gino's planning zonder video; pas na 'maak' wordt het 'wacht'.
-const LABEL = { concept: 'Concept', wacht: 'Wacht op jou', hook_aanpassen: 'Gino maakt nieuwe hook', goedgekeurd: 'Goedgekeurd', bezig: 'Wordt geplaatst', fout: 'Fout', gepubliceerd: 'Online' }
+const LABEL = { concept: 'Concept', wacht: 'Wacht op jou', hook_aanpassen: 'Gino maakt nieuwe hook', goedgekeurd: 'Ingepland', bezig: 'Wordt geplaatst', publiceert: 'Wordt geplaatst', fout: 'Mislukt', gepubliceerd: 'Online' }
 const publiek = (pad) => (pad ? supabase.storage.from('content-autopilot').getPublicUrl(pad).data.publicUrl : null)
 const PREVIEW_BUCKET = 'content-varianten'
 const coverVan = (pad) => pad.replace(/variant\.mp4$/, 'cover.jpg')
@@ -43,19 +47,22 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
   const [bewerk, setBewerk] = useState(null) // { id, hook }
   const [bezig, setBezig] = useState(null)
   const [preview, setPreview] = useState({}) // pad → ondertekende URL
+  const [test, setTest] = useState({}) // id → uitslag Instagram-test
 
   const laad = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const [r, s] = await Promise.all([
       supabase.from('content_items')
-        .select('id, title, hook, planned_date, planned_time, autopilot_status, autopilot_woord, autopilot_video, autopilot_cover, autopilot_bestand, autopilot_caption, autopilot_fout, posted_at, autopilot_preview')
+        .select('id, title, hook, planned_date, planned_time, autopilot_status, autopilot_woord, autopilot_video, autopilot_cover, autopilot_bestand, autopilot_caption, autopilot_fout, posted_at, ig_media_id, autopilot_preview')
         .in('autopilot_status', OPEN).order('planned_date').order('planned_time').limit(200)
         .then(x => x, e => ({ error: e })),
       supabase.from('content_autopilot').select('automatisch').eq('eigenaar', user?.id).maybeSingle()
         .then(x => x, e => ({ error: e })),
     ])
     if (r.error) { setFout('De autopilot staat nog niet in de database.'); setItems([]); return }
-    setItems(await metStand(supabase, zonderTest(r.data)))
+    const nu = Date.now()
+    const lijst = zonderTest(r.data).filter(i => i.autopilot_status !== 'gepubliceerd' || (i.posted_at && nu - new Date(i.posted_at).getTime() < RECENT_MS))
+    setItems(await metStand(supabase, lijst))
     setAuto(!!s.data?.automatisch)
     // Privé previews: ondertekende URL's van 1 uur, video + cover in één keer.
     const paden = (r.data || []).filter(i => i.autopilot_preview && !i.autopilot_video).flatMap(i => [i.autopilot_preview, coverVan(i.autopilot_preview)])
@@ -80,6 +87,12 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
     laad()
   }
 
+  const doeTest = async (id) => {
+    setTest(t => ({ ...t, [id]: 'Test loopt, kan een minuut duren…' }))
+    const uit = await testInstagram(supabase, id)
+    setTest(t => ({ ...t, [id]: uit }))
+  }
+
   const wisselAuto = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const nieuw = !auto
@@ -102,7 +115,7 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
           {items ? `${items.filter(i => i.autopilot_status === 'wacht').length} wachten op jou · ${items.filter(i => i.autopilot_status === 'concept').length} concepten` : ''}
         </div>
         <div style={{ flex: 1 }} />
-        <button type="button" onClick={wisselAuto} title="Aan: Gino plaatst ook zonder jouw goedkeuring" style={{
+        <button type="button" onClick={wisselAuto} title="Aan: Gino zet zelf nieuwe varianten klaar. Plaatsen gebeurt alleen na jouw Goedkeuren." style={{
           display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', background: 'none', cursor: 'pointer',
           fontFamily: 'inherit', fontSize: 11, fontWeight: 800, color: auto ? G : 'rgba(255,255,255,0.6)',
         }}>
@@ -150,12 +163,13 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
                   <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>{it.hook || it.title}</div>
                 )}
                 {!it.autopilot_video && it.autopilot_preview && (
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Privé preview. Wordt niet geplaatst.</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{it.autopilot_status === 'goedgekeurd' ? `Gaat ${moment(it)} vanzelf op Instagram.` : it.autopilot_status === 'gepubliceerd' ? 'Staat op Instagram.' : 'Privé preview. Pas na Goedkeuren geplaatst.'}</div>
                 )}
                 {!it.autopilot_video && !it.autopilot_preview && it.autopilot_bestand && (
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Staat alleen lokaal. Na jouw akkoord uploadt Gino hem, dan kun je goedkeuren.</div>
                 )}
-                {it.autopilot_fout && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{it.autopilot_fout}</div>}
+                {it.autopilot_fout && <div style={{ fontSize: 11, fontWeight: 700, color: '#ff6b6b' }}>{it.autopilot_fout}</div>}
+                {test[it.id] && <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>{test[it.id]}</div>}
                 {it.autopilot_caption && !open && (
                   <details style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
                     <summary style={{ cursor: 'pointer', fontWeight: 800 }}>Caption</summary>
@@ -175,7 +189,17 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
                       <button type="button" onClick={() => openContent(it.id)} title="Bekijk de preview" style={actie}>
                         <Eye size={13} strokeWidth={2.8} /> Bekijk
                       </button>
-                      {['wacht', 'fout'].includes(it.autopilot_status) && it.autopilot_video && (
+                      {it.permalink && (
+                        <a href={it.permalink} target="_blank" rel="noreferrer" title="Open op Instagram" style={{ ...actie, textDecoration: 'none' }}>
+                          <ExternalLink size={12} strokeWidth={2.8} /> Instagram
+                        </a>
+                      )}
+                      {['wacht', 'goedgekeurd', 'fout'].includes(it.autopilot_status) && (it.autopilot_video || it.autopilot_preview) && (
+                        <button type="button" onClick={() => doeTest(it.id)} title="Test bij Instagram zonder te plaatsen" style={actie}>
+                          <FlaskConical size={12} strokeWidth={2.8} />
+                        </button>
+                      )}
+                      {['wacht', 'fout'].includes(it.autopilot_status) && (it.autopilot_video || it.autopilot_preview) && (
                         <button type="button" disabled={bezig === it.id} onClick={() => zet(it.id, { autopilot_status: 'goedgekeurd', status: 'planned', autopilot_fout: null })} style={{ ...actie, background: G, color: '#000' }}>
                           <Check size={13} strokeWidth={3} /> Goedkeuren
                         </button>

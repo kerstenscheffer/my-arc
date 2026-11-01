@@ -66,7 +66,7 @@ async function laadPeriode(van, tot) {
     supabase.from('client_calls').select('id, scheduled_date, call_title, clients!inner(first_name, coach_id)')
       .eq('clients.coach_id', user.id).in('status', ['scheduled', 'completed']).is('canceled_at', null)
       .gte('scheduled_date', van.toISOString()).lt('scheduled_date', tot.toISOString()).limit(300).then(r => r, leeg),
-    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status')
+    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status, autopilot_fout')
       .eq('coach_id', user.id).gte('planned_date', a).lt('planned_date', b)
       .or('is_template.is.null,is_template.eq.false').limit(300).then(r => r, leeg),
     supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline')
@@ -93,7 +93,9 @@ async function laadPeriode(van, tot) {
   // Testrijen ('__test…') tellen nergens mee.
   ;(await metStand(supabase, zonderTest(co.data).filter(c => c.autopilot_status !== 'overgeslagen'))).forEach(c => items.push({
     id: `i${c.id}`, contentId: c.id, soort: 'content', type: c.type, dag: c.planned_date, tijd: c.planned_time || null,
-    titel: c.title || c.hook || 'Content', sub: c.type, stand: c.stand, views: c.views,
+    titel: c.title || c.hook || 'Content', stand: c.stand, views: c.views, permalink: c.permalink,
+    sub: c.stand === 'mislukt' && c.autopilot_fout ? `${c.type || 'post'} · ${c.autopilot_fout}`
+      : c.stand === 'ingepland' && c.autopilot_status ? `${c.type || 'post'} · ingepland voor ${c.planned_time || '14:00'}` : c.type,
     klaar: c.stand === 'gepost',
   }))
   ;(ta.data || []).forEach(t => items.push({
@@ -351,7 +353,9 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
                     </div>
                     {it.soort === 'content' && it.stand && <StandChip stand={it.stand} views={it.views} />}
                     {it.soort === 'content' && it.contentId && (
-                      <button type="button" onClick={() => openContent(it.contentId)} style={bekijk}>Bekijk</button>
+                      it.permalink
+                        ? <a href={it.permalink} target="_blank" rel="noreferrer" title="Open op Instagram" style={{ ...bekijk, textDecoration: 'none' }}>Bekijk</a>
+                        : <button type="button" onClick={() => openContent(it.contentId)} style={bekijk}>Bekijk</button>
                     )}
                     {it.soort === 'concept' && (
                       <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen([it.concept])}
