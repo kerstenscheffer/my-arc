@@ -16,6 +16,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, X, Pencil, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../ui/tokens'
+import { metStand } from './contentStatusData'
+import { StandChip } from './contentStatus'
 
 const G = colors.success
 const OPEN = ['wacht', 'hook_aanpassen', 'goedgekeurd', 'bezig', 'fout', 'concept']
@@ -53,7 +55,7 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
         .then(x => x, e => ({ error: e })),
     ])
     if (r.error) { setFout('De autopilot staat nog niet in de database.'); setItems([]); return }
-    setItems(r.data || [])
+    setItems(await metStand(supabase, r.data || []))
     setAuto(!!s.data?.automatisch)
     // Privé previews: ondertekende URL's van 1 uur, video + cover in één keer.
     const paden = (r.data || []).filter(i => i.autopilot_preview && !i.autopilot_video).flatMap(i => [i.autopilot_preview, coverVan(i.autopilot_preview)])
@@ -131,7 +133,10 @@ export default function GinoAutopilot({ onSluit, isMobile = false }) {
                 )}
               </div>
               <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 800, color: it.autopilot_status === 'fout' ? '#ff6b6b' : it.autopilot_status === 'concept' ? 'rgba(255,255,255,0.55)' : G }}>{LABEL[it.autopilot_status] || it.autopilot_status} · {moment(it)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  {it.stand && <StandChip stand={it.stand} views={it.views} />}
+                  <span style={{ fontSize: 10.5, fontWeight: 800, color: it.autopilot_status === 'fout' ? '#ff6b6b' : it.autopilot_status === 'concept' ? 'rgba(255,255,255,0.55)' : G }}>{LABEL[it.autopilot_status] || it.autopilot_status} · {moment(it)}</span>
+                </div>
                 {open ? (
                   <textarea value={bewerk.hook} onChange={e => setBewerk({ ...bewerk, hook: e.target.value })} rows={3} autoFocus style={{
                     width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700,

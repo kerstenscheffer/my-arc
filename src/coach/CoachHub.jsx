@@ -941,26 +941,23 @@ export default function CoachHub() {
         <button
           onClick={goBack}
           title="Terug"
+          aria-label="Terug"
           style={{
             position: 'fixed',
             top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
             left: 12,
             zIndex: 120,
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: isMobile ? '0.5rem 0.7rem' : '0.55rem 0.85rem',
-            height: 40,
-            background: 'rgba(10,10,10,0.88)',
+            width: 40, height: 40, padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(10,10,10,0.7)',
             backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-            border: `1px solid ${G.primary}44`,
-            borderRadius: 999,
-            color: G.primary,
-            fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800,
+            border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: '50%',
+            color: '#fff',
             cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
           }}
         >
-          <ArrowLeft size={16} strokeWidth={2.6} />
-          Terug
+          <ArrowLeft size={18} strokeWidth={2.2} />
         </button>
       )}
 

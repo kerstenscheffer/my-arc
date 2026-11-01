@@ -2,20 +2,24 @@
 //
 // Contentkalender in Gino-stijl (31 okt 2026). Opbouw als de content-checklist
 // in de leadbalk: soorten met hun doel als rijen, dagen als kolommen. Wat al
-// gedaan is gloeit groen (vol = doel gehaald), wat gepland staat
-// (content_items) staat als groene rand met het aantal, Gino's voorstellen
-// gestippeld. Onderaan bereik, nieuwe volgers en per dag een ring.
+// gedaan is gloeit groen (vol = doel gehaald). Geplande content_items krijgen
+// hun stand (contentStatus.jsx): draft grijs gestippeld, ingepland groene rand,
+// mislukt rood; Gino's voorstellen groen gestippeld. Bovenaan een legenda,
+// per dag een rij met het aantal per status. Onderaan bereik, nieuwe volgers en per dag een ring.
 // Puur tekenwerk: data komt van GinoKalender (contentStand.js + planning).
 
 import { useEffect, useMemo, useRef } from 'react'
 import { Clapperboard, Image as ImageIcon, CircleDot, Magnet, Youtube, Send } from 'lucide-react'
 import { colors } from '../../ui/tokens'
 import { CONTENT_SOORTEN, sleutel, soortVanType, dagScore } from './contentStand'
+import { STANDEN, standVak, kortGetal } from './contentStatusData'
+import { StandLegenda } from './contentStatus'
 
 const G = colors.success
 const ICOON = { reel: Clapperboard, foto: ImageIcon, story: CircleDot, magnet: Magnet, youtube: Youtube, outreach: Send }
 const WEEKLETTER = ['Z', 'M', 'D', 'W', 'D', 'V', 'Z']
 const KOLOM = 34
+const STAND_H = 54 // rij met per dag het aantal per status
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const kort = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(n))
 const maandagIso = (k) => { const d = new Date(`${k}T12:00:00`); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d) }
@@ -43,6 +47,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
   const samen = stand?.samen || {}
   const doelen = stand?.doelen || {}
   const mc = stand?.mc || {}
+  const perStand = stand?.perStand || {}
   const doelVan = (s) => doelen[s.id] ?? s.doel
   const focusSoort = focus && CONTENT_SOORTEN.some(s => focus.has(s.id))
   const focusDag = focus && [...focus].some(f => /^\d{4}-\d{2}-\d{2}$/.test(f))
@@ -68,10 +73,9 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
       for (const it of lijst) {
         if (it.soort !== 'content' && it.soort !== 'concept') continue
         const s = soortVanType(it.type)
-        const v = (p[sleutel(k, s)] ||= { gepland: 0, concept: 0, klaar: 0 })
+        const v = (p[sleutel(k, s)] ||= { draft: 0, ingepland: 0, gepost: 0, mislukt: 0, concept: 0 })
         if (it.soort === 'concept') v.concept++
-        else if (it.klaar) v.klaar++
-        else v.gepland++
+        else v[it.stand || 'draft']++
       }
     }
     return p
@@ -94,6 +98,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <StandLegenda style={{ paddingBottom: 10, flexShrink: 0 }} />
       {/* Vandaag: ring + wat er nog moet */}
       {scoreVandaag != null && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, flexShrink: 0, animation: 'gk-blad .4s ease-out both' }}>
@@ -115,6 +120,7 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
       <div className="gk-scroll" style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'flex-start', overflowY: 'auto' }}>
         {/* Labels */}
         <div style={{ width: labelB, flexShrink: 0, paddingTop: 40 }}>
+          <div style={{ height: STAND_H, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>{isMobile ? '' : 'Per status'}</div>
           {CONTENT_SOORTEN.map((s, ri) => {
             const Icoon = ICOON[s.id]
             return (
@@ -154,6 +160,19 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
                     <span style={{ fontSize: 10, fontWeight: 800, color: isVandaag ? G : 'rgba(255,255,255,0.4)' }}>{WEEKLETTER[d.getDay()]}</span>
                     <span style={{ fontSize: 15, fontWeight: 900, color: isVandaag ? G : '#fff', textShadow: isVandaag ? `0 0 10px ${G}` : 'none' }}>{d.getDate()}</span>
                   </div>
+                  {(() => {
+                    const r = perStand[k]
+                    const tekst = r ? STANDEN.filter(s => r[s.id]).map(s => `${r[s.id]} ${s.label.toLowerCase()}`).join(' · ') + (r.views ? ` · ${kortGetal(r.views)} views` : '') : ''
+                    return (
+                      <div title={tekst || undefined} style={{ height: STAND_H, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                        {STANDEN.filter(s => r?.[s.id]).map(s => (
+                          <span key={s.id} style={{ minWidth: 22, height: 11, padding: '0 3px', borderRadius: 4, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, lineHeight: 1, borderWidth: 1, ...standVak(s.id) }}>
+                            {r[s.id]}
+                          </span>
+                        ))}
+                      </div>
+                    )
+                  })()}
                   {CONTENT_SOORTEN.map(s => {
                     const doel = doelVan(s)
                     const n = samen[sleutel(k, s.id)] || 0
@@ -161,24 +180,31 @@ export default function GinoContent({ dagen, stand, perDag, onKies, isMobile = f
                     const weekVol = s.week && doel > 0 && weekSom(k, s.id) >= doel
                     const gehaald = s.week ? weekVol : doel > 0 && n >= doel
                     const toonGepland = toekomst || (isVandaag && n === 0)
-                    const gepland = toonGepland && p?.gepland ? p.gepland : 0
-                    const voorstel = toonGepland && !gepland && p?.concept ? p.concept : 0
+                    const mislukt = p?.mislukt || 0
+                    const ingepland = toonGepland && p?.ingepland ? p.ingepland : 0
+                    const draft = toonGepland && !ingepland && p?.draft ? p.draft : 0
+                    const voorstel = toonGepland && !ingepland && !draft && p?.concept ? p.concept : 0
                     let stijl
-                    if (!toekomst && (n > 0 || weekVol)) {
+                    if (mislukt) {
+                      stijl = standVak('mislukt')
+                    } else if (!toekomst && (n > 0 || weekVol)) {
                       stijl = gehaald
                         ? { background: G, color: '#000', boxShadow: `0 0 12px ${G}66` }
                         : { background: `${G}33`, color: '#fff' }
-                    } else if (gepland) {
-                      stijl = { background: `${G}12`, border: `1.5px solid ${G}`, color: G, boxShadow: `0 0 10px ${G}33` }
+                    } else if (ingepland) {
+                      stijl = { ...standVak('ingepland'), boxShadow: `0 0 10px ${G}33` }
+                    } else if (draft) {
+                      stijl = standVak('draft')
                     } else if (voorstel) {
                       stijl = { border: `1.5px dashed ${G}`, color: G }
                     } else {
                       stijl = { background: toekomst ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }
                     }
-                    const inhoud = !toekomst && n > 0 ? n : gepland ? gepland : voorstel ? '+' : ''
+                    const gepland = mislukt || ingepland || draft
+                    const inhoud = mislukt ? mislukt : !toekomst && n > 0 ? n : gepland ? gepland : voorstel ? '+' : ''
                     return (
                       <div key={s.id} style={{ height: KOLOM + 4, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: licht(s.id, k), transition: 'opacity .4s' }}>
-                        <div className="gk-vak" title={gepland ? `${gepland} gepland` : voorstel ? 'Voorstel van Gino' : n ? `${n}/${doel}` : undefined} style={{
+                        <div className="gk-vak" title={mislukt ? `${mislukt} mislukt` : ingepland ? `${ingepland} ingepland` : draft ? `${draft} draft` : voorstel ? 'Voorstel van Gino' : n ? `${n}/${doel}` : undefined} style={{
                           width: KOLOM, height: KOLOM, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: String(inhoud).length > 2 ? 10.5 : 13, fontWeight: 900, boxSizing: 'border-box', ...stijl,
                           animation: voorstel

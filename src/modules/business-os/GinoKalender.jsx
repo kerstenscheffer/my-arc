@@ -27,6 +27,8 @@ import GinoWeek from './GinoWeek'
 import GinoContent from './GinoContent'
 import GinoAutopilot from './GinoAutopilot'
 import { laadContentStand } from './contentStand'
+import { metStand, laadStandPerDag } from './contentStatusData'
+import { StandChip } from './contentStatus'
 import GinoOmzet from './GinoOmzet'
 import GinoProjecten from './GinoProjecten'
 import CheckinRonde from './CheckinRonde'
@@ -64,7 +66,7 @@ async function laadPeriode(van, tot) {
     supabase.from('client_calls').select('id, scheduled_date, call_title, clients!inner(first_name, coach_id)')
       .eq('clients.coach_id', user.id).in('status', ['scheduled', 'completed']).is('canceled_at', null)
       .gte('scheduled_date', van.toISOString()).lt('scheduled_date', tot.toISOString()).limit(300).then(r => r, leeg),
-    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time')
+    supabase.from('content_items').select('id, title, hook, type, status, planned_date, planned_time, posted_at, ig_media_id, autopilot_status')
       .eq('coach_id', user.id).gte('planned_date', a).lt('planned_date', b)
       .or('is_template.is.null,is_template.eq.false').limit(300).then(r => r, leeg),
     supabase.from('productivity_tasks').select('id, title, scheduled_date, deadline')
@@ -87,10 +89,11 @@ async function laadPeriode(van, tot) {
     startMin: nlMin(c.scheduled_date), eindMin: nlMin(c.scheduled_date) + 30,
     titel: `${c.call_title || 'Call'} · ${c.clients?.first_name || ''}`.trim(),
   }))
-  ;(co.data || []).forEach(c => items.push({
+  // Stand (draft/ingepland/gepost/mislukt) uit content_items_status.
+  ;(await metStand(supabase, (co.data || []).filter(c => c.autopilot_status !== 'overgeslagen'))).forEach(c => items.push({
     id: `i${c.id}`, soort: 'content', type: c.type, dag: c.planned_date, tijd: c.planned_time || null,
-    titel: c.title || c.hook || 'Content', sub: [c.type, c.status === 'created' ? 'gepost' : null].filter(Boolean).join(' · '),
-    klaar: c.status === 'created',
+    titel: c.title || c.hook || 'Content', sub: c.type, stand: c.stand, views: c.views,
+    klaar: c.stand === 'gepost',
   }))
   ;(ta.data || []).forEach(t => items.push({
     id: `t${t.id}`, soort: 'taak', dag: t.scheduled_date || t.deadline, tijd: null,
@@ -209,11 +212,12 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
     if (weergave === 'week') setItems(await laadPeriode(anker, plusDagen(anker, 7)))
     else {
       const eind = new Date(maand.getFullYear(), maand.getMonth() + 1, 0)
-      const [lijst, st] = await Promise.all([
+      const [lijst, st, perStand] = await Promise.all([
         laadPeriode(maand, plusDagen(eind, 1)),
         laadContentStand(supabase, iso(maand), iso(eind)),
+        laadStandPerDag(supabase, iso(maand), iso(eind)),
       ])
-      setStand(st)
+      setStand({ ...st, perStand })
       setItems(lijst)
     }
   }, [maand, anker, weergave])
@@ -339,6 +343,7 @@ export default function GinoKalender({ verzoek, onSluit, onVraag, isMobile = fal
                         {[SOORT_LABEL[it.soort], it.sub, it.concept?.hook && `"${it.concept.hook}"`].filter(Boolean).join(' · ')}
                       </div>
                     </div>
+                    {it.soort === 'content' && it.stand && <StandChip stand={it.stand} views={it.views} />}
                     {it.soort === 'concept' && (
                       <button type="button" className="gk-link" disabled={!!bezig} onClick={() => inplannen([it.concept])}
                         style={{ ...link, color: G, opacity: 1 }}>

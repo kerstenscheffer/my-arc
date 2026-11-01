@@ -37,6 +37,8 @@ import { BewaarKnop, SchermenLijst } from './schermen'
 import { laadSchermen, verwijderScherm, markeerGetoond, schermenVoorGino } from './schermenData'
 import * as stem from './stem'
 import ContentPlanningService from '../output-planning/ContentPlanningService'
+import { metStand, laadStandPerDag, standVoorGino, STANDEN, STAND_KLEUR } from './contentStatusData'
+import { StandChip, StandLegenda } from './contentStatus'
 
 const contentService = new ContentPlanningService(supabase)
 
@@ -512,6 +514,7 @@ const STATUS_LABEL = { idea: 'idee', planned: 'gepland', created: 'gepost' }
 function useContent() {
   const [items, setItems] = useState(null)
   const [ideeen, setIdeeen] = useState([])
+  const [perStand, setPerStand] = useState({}) // dag → aantallen per status (content_stand_per_dag)
   const vandaag = dagIso(new Date())
   const dagen = useMemo(() => {
     const [j, m, d] = vandaag.split('-').map(Number)
@@ -521,11 +524,13 @@ function useContent() {
   const laad = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id) return
-    const [lijst, idee] = await Promise.all([
+    const [lijst, idee, st] = await Promise.all([
       contentService.getContentItems(user.id, { weekStart: dagIso(dagen[0]), weekEnd: dagIso(dagen[13]) }),
       contentService.getContentIdeas(user.id),
+      laadStandPerDag(supabase, dagIso(dagen[0]), dagIso(dagen[13])),
     ])
-    setItems(lijst)
+    setItems(await metStand(supabase, (lijst || []).filter(x => x.autopilot_status !== 'overgeslagen')))
+    setPerStand(st)
     setIdeeen(idee.slice(0, 10))
   }, [dagen])
 
@@ -539,7 +544,7 @@ function useContent() {
   const gepost = useCallback(async (item) => {
     try {
       const nieuw = await contentService.updateContentItem(item.id, { status: 'created', posted_at: new Date().toISOString() })
-      setItems(l => (l || []).map(x => (x.id === item.id ? { ...x, ...nieuw } : x)))
+      setItems(l => (l || []).map(x => (x.id === item.id ? { ...x, ...nieuw, stand: 'gepost' } : x)))
       return true
     } catch { return false }
   }, [])
@@ -553,7 +558,7 @@ function useContent() {
     } catch { return false }
   }, [laad])
 
-  return { geladen: items !== null, perDag, ideeen, gepost, plan, laad }
+  return { geladen: items !== null, perDag, perStand, ideeen, gepost, plan, laad }
 }
 
 const editpakket = (it) => [
@@ -598,12 +603,12 @@ function ContentItem({ it, c }) {
         <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: open ? 'normal' : 'nowrap' }}>
           {it.title || 'Zonder titel'}
         </span>
-        {[it.type, STATUS_LABEL[it.status] || it.status].filter(Boolean).map(l => (
-          <span key={l} style={{
-            fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, flexShrink: 0,
-            color: it.status === 'created' && l !== it.type ? C.groen : C.zacht, border: `1px solid ${C.rand}`,
-          }}>{l}</span>
-        ))}
+        {it.type && (
+          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, flexShrink: 0, color: C.zacht, border: `1px solid ${C.rand}` }}>{it.type}</span>
+        )}
+        {it.stand ? <StandChip stand={it.stand} views={it.views} /> : STATUS_LABEL[it.status] && (
+          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, flexShrink: 0, color: C.zacht, border: `1px solid ${C.rand}` }}>{STATUS_LABEL[it.status]}</span>
+        )}
       </button>
       {open && (
         <div style={{ paddingBottom: 6 }}>
@@ -612,8 +617,14 @@ function ContentItem({ it, c }) {
           {blok('Editnotities', it.edit_notes)}
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <Knop vol onClick={kopieer}>Kopieer editpakket</Knop>
-            {it.status !== 'created' && <Knop onClick={post}>Gepost</Knop>}
+            {it.stand !== 'gepost' && it.status !== 'created' && <Knop onClick={post}>Gepost</Knop>}
           </div>
+          {it.stand === 'gepost' && it.comments != null && (
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.zacht, marginTop: 6 }}>{it.views ?? 0} views · {it.comments} comments</div>
+          )}
+          {it.stand === 'mislukt' && it.autopilot_fout && (
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: STAND_KLEUR.mislukt, marginTop: 6 }}>{it.autopilot_fout}</div>
+          )}
           {melding && <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.zacht, marginTop: 6 }}>{melding}</div>}
         </div>
       )}
@@ -644,11 +655,14 @@ function ContentPaneel({ c }) {
   const gepland = c.perDag.filter(d => d.items.length > 0).length
   return (
     <>
-      <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 12 }}>
+      <div style={{ fontSize: '0.85rem', color: C.zacht, marginBottom: 10 }}>
         <b style={{ ...NUM, color: gepland >= 14 ? C.groen : C.wit }}>{gepland} van 14</b> dagen gepland
       </div>
+      <StandLegenda style={{ marginBottom: 12 }} />
       {c.perDag.map(d => {
         const leeg = d.items.length === 0
+        const st = c.perStand?.[d.datum]
+        const losGepost = st?.los_gepost || 0
         return (
           <div key={d.datum} style={{
             padding: '8px 10px', marginBottom: 6, borderRadius: 10,
@@ -660,7 +674,12 @@ function ContentPaneel({ c }) {
                 {d.dag.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
               </div>
               {leeg && <div style={{ fontSize: '0.8rem', fontWeight: 600, color: C.zacht }}>nog niets gepland</div>}
+              <div style={{ flex: 1 }} />
+              {st && STANDEN.filter(s => st[s.id]).map(s => (
+                <span key={s.id} title={s.label} style={{ ...NUM, fontSize: '0.75rem', fontWeight: 900, color: STAND_KLEUR[s.id] }}>{st[s.id]} {s.label.toLowerCase()}</span>
+              ))}
             </div>
+            {losGepost > 0 && <div style={{ fontSize: '0.75rem', fontWeight: 600, color: C.zacht, marginTop: 4 }}>{losGepost} zelf gepost zonder planning</div>}
             {d.items.map(it => <ContentItem key={it.id} it={it} c={c} />)}
           </div>
         )
@@ -1147,9 +1166,10 @@ export default function BusinessOS({ isMobile }) {
       display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
       padding: isMobile ? '12px 16px 8px' : '20px 24px 12px',
     }}>
-      {/* ── Kalender-knop linksboven ── */}
+      {/* ── Kalender-knop rechtsboven, naast de puntjes (linksboven zweeft
+          CoachHub's Terug-knop) ── */}
       <button type="button" onClick={() => setKalender(k => (k ? null : { _t: Date.now() }))} title="Agenda" aria-pressed={!!kalender} style={{
-        position: 'absolute', top: isMobile ? 12 : 16, left: isMobile ? 12 : 20, zIndex: 20,
+        position: 'absolute', top: isMobile ? 12 : 16, right: (isMobile ? 12 : 20) + 48, zIndex: 20,
         width: 40, height: 40, borderRadius: '50%', border: `1px solid ${kalender ? colors.success : C.rand}`,
         background: kalender ? `${colors.success}1f` : 'transparent', color: kalender ? colors.success : C.wit, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: kalender ? `0 0 14px ${colors.success}55` : 'none',
@@ -1236,7 +1256,9 @@ export default function BusinessOS({ isMobile }) {
             contentKomende14Dagen: {
               geplandeDagen: content.perDag.filter(d => d.items.length > 0).length,
               legeDagen: content.perDag.filter(d => d.items.length === 0).map(d => d.datum),
-              items: content.perDag.flatMap(d => d.items.map(it => ({ datum: d.datum, titel: it.title, status: it.status }))),
+              // Wat er echt staat: draft (nog niet klaar), ingepland (gaat vanzelf live), gepost (incl. zelf geplaatst), mislukt.
+              perDagStand: standVoorGino(content.perStand),
+              items: content.perDag.flatMap(d => d.items.map(it => ({ datum: d.datum, titel: it.title, status: it.status, stand: it.stand || null }))),
             },
             weekInputs: week.geladen
               ? week.rijen.map(r => ({ input: r.label, dezeWeek: r.totaal, weekdoel: r.weekdoel, vorigeWeek: r.vorige, daggoalsGehaald: r.doel ? r.gehaald : null }))
