@@ -62,7 +62,26 @@ export async function metStand(supabase, items) {
       .then(r => r, () => ({ data: null }))
     for (const r of data || []) kaart[r.id] = r
   }
-  return items.map(it => ({ ...it, stand: kaart[it.id]?.stand || terugval(it), views: kaart[it.id]?.views ?? null, comments: kaart[it.id]?.comments ?? null }))
+  // Instagram-permalink (instagram-publiceer.sql) apart: bestaat de kolom nog
+  // niet, dan faalt alleen dit en blijft de stand gewoon staan.
+  const gepost = items.filter(i => i.ig_media_id).map(i => i.id)
+  const links = {}
+  for (let i = 0; i < gepost.length; i += 200) {
+    const { data } = await supabase.from('content_items_status').select('id, ig_permalink').in('id', gepost.slice(i, i + 200))
+      .then(r => r, () => ({ data: null }))
+    for (const r of data || []) links[r.id] = r.ig_permalink
+  }
+  return items.map(it => ({ ...it, stand: kaart[it.id]?.stand || terugval(it), views: kaart[it.id]?.views ?? null, comments: kaart[it.id]?.comments ?? null, permalink: links[it.id] || null }))
+}
+
+// Instagram-test zonder plaatsen: container maken en status volgen
+// (edge function instagram-publiceer, dry_run). Rij blijft ongemoeid.
+export async function testInstagram(supabase, id) {
+  const { data, error } = await supabase.functions.invoke('instagram-publiceer', { body: { dry_run: true, id } })
+    .then(r => r, e => ({ error: e }))
+  if (error) return 'Test lukte niet: de Instagram-koppeling staat nog niet live.'
+  if (data?.fout) return `Test: ${data.fout}`
+  return `Test geslaagd: ${data.account}, container ${data.status === 'FINISHED' ? 'klaar' : data.status}. Niets geplaatst.`
 }
 
 // Per dag { draft, ingepland, gepost, mislukt, los_gepost, views }. Gepost telt
