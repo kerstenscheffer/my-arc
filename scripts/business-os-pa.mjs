@@ -110,6 +110,8 @@ const TOEGESTAAN = [
   'Bash(git status*)', 'Bash(git diff*)', 'Bash(git log*)', 'Bash(git show*)', 'Bash(git check-ignore *)',
   'Bash(ls *)', 'Bash(mdfind *)', 'Bash(mkdir *)', 'Bash(cp *)',
   'Bash(node scripts/content-autopilot.mjs *)', // content-autopilot: bibliotheek, winnaars, varianten maken
+  // 2 nov 2026: ook in code-opdrachten de database lezen (met PA_ACCESS_TOKEN), transcripts en pdf's.
+  'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)', 'Bash(pdftotext *)', 'Bash(pdfinfo *)',
 ]
 // Eigen mappen op de Mac (boeken, PDF's, exports): alleen lezen. Code-
 // opdrachten mogen eruit kopiëren naar workapp (bv. workapp/hormozi, staat in
@@ -117,7 +119,11 @@ const TOEGESTAAN = [
 const HOME = os.homedir()
 const EIGEN_MAPPEN = ['Downloads', 'Documents', 'Desktop', 'Library/Mobile Documents']
   .map(m => path.join(HOME, m)).filter(m => fs.existsSync(m))
-const EIGEN_ARGS = EIGEN_MAPPEN.length ? ['--add-dir', ...EIGEN_MAPPEN] : []
+// ~/Gino: Gino's eigen werkmap op de Mac (uittreksels, transcripts, notities).
+// Hier mag hij wél schrijven; /tmp raakt leeg bij een herstart.
+const GINO_MAP = path.join(HOME, 'Gino')
+fs.mkdirSync(GINO_MAP, { recursive: true })
+const EIGEN_ARGS = ['--add-dir', ...EIGEN_MAPPEN, GINO_MAP]
 const EIGEN_NIET_BEWERKEN = EIGEN_MAPPEN.flatMap(m => [`Edit(/${m}/**)`, `Write(/${m}/**)`, `NotebookEdit(/${m}/**)`])
 const VERBODEN = ['Bash(git commit*)', 'Bash(git push*)', 'Bash(git stash*)', 'Bash(git reset*)', 'Bash(git checkout*)', 'Bash(rm *)', 'Bash(mv *)', ...EIGEN_NIET_BEWERKEN]
 
@@ -126,12 +132,14 @@ const INSTRUCTIE = `Je krijgt een opdracht van Kersten uit zijn Business OS-chat
 - Niet committen, pushen of stashen: de auto-sync doet dat.
 - Log nooit uit op Kerstens account en maak geen sessies op zijn account (ook niet met de service key om iets te testen): signOut trekt al zijn logins in, ook die van deze PA en zijn browser.
 - Je mag lezen in Kerstens eigen mappen (${EIGEN_MAPPEN.join(', ')}) en daaruit kopiëren naar deze repo (cp; zoeken met mdfind of ls). Pas daar nooit iets aan en verwijder niets. Bestanden van Kersten (boeken, PDF's) zet je in een map die in .gitignore staat, zodat ze niet online komen.
+- Bestanden die je voor Kersten maakt (uittreksels, transcripts, notities) zet je in ${GINO_MAP}, nooit in /tmp. Zeg in je samenvatting het pad.
+- Database lezen: node scripts/pa-db.mjs (lees, schema, bijlage …). Pdf lezen: Read met pages, of pdftotext <bestand> -.
 - Schemawijzigingen in de database kun je hier niet doen; heb je er een nodig, zeg dat in je samenvatting.
 - Klaar = npm run build en eslint op de gewijzigde bestanden zijn groen.
 - Eindig met een korte Nederlandse samenvatting voor Kersten (3-6 regels, pijltjes): wat je veranderd hebt en waar hij het ziet. Wat niet lukte, zeg je eerlijk.`
 
 // yt-transcript: alleen ondertitels van YouTube naar ~/Downloads/Creator transcripts (schrijft niets anders).
-const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)']
+const CHAT_TOEGESTAAN = ['Read', 'Glob', 'Grep', 'Bash(node scripts/pa-db.mjs *)', 'Bash(node scripts/yt-transcript.mjs *)', 'Bash(pdftotext *)', 'Bash(pdfinfo *)']
 // De chat past nooit zelf iets aan (dat loopt via Toestaan / Uitvoeren op mijn
 // Mac). Hard verboden, ook als een instellingenbestand het ooit toestaat.
 const CHAT_VERBODEN = ['Edit', 'Write', 'NotebookEdit']
@@ -200,6 +208,29 @@ function claude(args, extraEnv = {}, opStop = null) {
   })
 }
 
+// Sessietoken voor pa-db.mjs, nog minstens een half uur geldig.
+async function versToken() {
+  let { data: { session } } = await sb.auth.getSession()
+  if (session && session.expires_at * 1000 - Date.now() < 30 * 60 * 1000) {
+    session = (await sb.auth.refreshSession()).data.session || session
+  }
+  return session?.access_token || ''
+}
+
+// Wat er de laatste 12 uur op de Mac gedaan is of nog loopt: zo weet de chat
+// wat een code-opdracht al gelezen/gemaakt heeft (2 nov 2026: Gino zei
+// "Brian heb ik nog niet gelezen" terwijl een opdracht dat net gedaan had).
+async function macWerkVoorChat() {
+  const { data } = await sb.from('business_os_opdrachten')
+    .select('status, opdracht, resultaat, created_at, klaar_at').eq('soort', 'code')
+    .gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())
+    .order('created_at', { ascending: false }).limit(6).then(r => r, () => ({ data: [] }))
+  if (!data?.length) return ''
+  const t = (x) => x ? new Date(x).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }) : ''
+  return `Code-opdrachten op de Mac (laatste 12 uur, nieuwste eerst). Wat hier staat heb je zelf (via een opdracht) gedaan; gebruik de uitkomst en bestanden, doe het niet opnieuw en zeg niet dat je het niet hebt:\n${data.map(r =>
+    `- [${r.status}${r.klaar_at ? ` ${t(r.klaar_at)}` : ` sinds ${t(r.created_at)}`}] ${String(r.opdracht || '').split('\n')[0].slice(0, 200)}${r.resultaat ? `\n  Uitkomst: ${r.resultaat.slice(0, 1500).replace(/\n+/g, ' ')}` : ''}`).join('\n')}\n\n`
+}
+
 async function voerCodeUit(opdracht, opStop) {
   // Correcties, besluiten en voorkeuren uit Gino's geheugen gelden ook hier.
   const { data: geheugen } = await sb.from('business_os_geheugen').select('soort, tekst')
@@ -216,7 +247,7 @@ async function voerCodeUit(opdracht, opStop) {
     '--disallowedTools', VERBODEN.join(','),
     ...EIGEN_ARGS,
     '--max-budget-usd', '10',
-  ], {}, opStop)
+  ], { PA_ACCESS_TOKEN: await versToken() }, opStop)
   const tekst = r.json?.result || r.ruw || r.fout || `Gestopt (code ${r.code})`
   return { ok: r.code === 0 && !r.json?.is_error && !!r.json?.result, tekst: tekst.slice(0, 8000) }
 }
@@ -315,6 +346,7 @@ async function beantwoordChat(invoer, opDeel, opStop = null) {
     .map(b => `${b.role === 'user' ? 'Kersten' : 'Jij'}: ${b.afbeelding ? '[screenshot, zie bijgevoegde afbeelding] ' : ''}${b.content}`).join('\n\n')
   // Screenshots (2 nov 2026): gingen eerst altijd via de API (zwakkere Gino
   // zonder bestanden). Nu als afbeeldingen mee in het bericht aan Claude Code.
+  const werk = await macWerkVoorChat()
   const BEELD_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
   const beelden = stuk.filter(b => b.role === 'user' && BEELD_TYPES.includes(b.afbeelding?.media_type) && typeof b.afbeelding?.data === 'string')
     .slice(-3).map(b => ({ type: 'image', source: { type: 'base64', media_type: b.afbeelding.media_type, data: b.afbeelding.data } }))
@@ -335,7 +367,7 @@ async function beantwoordChat(invoer, opDeel, opStop = null) {
     w.opEinde = () => { clearTimeout(stop); klaar({ ok: false, tekst: w.fout?.trim() || 'Claude Code stopte zonder antwoord.' }) }
     opStop?.(() => w.p.kill('SIGTERM'))
     if (w.dood) return w.opEinde()
-    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [...beelden, { type: 'text', text: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + chatVraag({ gesprek, context: invoer?.context }) }] } }) + '\n')
+    w.p.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [...beelden, { type: 'text', text: (invoer?.tab === 'klanten' ? KLANT_FOCUS : '') + werk + chatVraag({ gesprek, context: invoer?.context }) }] } }) + '\n')
   })
   if (slimId && r.ok) bewaarSlimSessie(slimId)
   if (!slimId) setTimeout(zetWarmKlaar, 500)

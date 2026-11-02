@@ -53,6 +53,7 @@ import * as stem from './stem'
 import { bewaarOordeel } from './feedback'
 import { BewaarKnop } from './schermen'
 import { useNieuweVersie } from './useNieuweVersie'
+import { contentUitHash, openContent } from './contentStatusData'
 
 const KEY = 'business_os_chat'
 const PA_ONLINE_MS = 45000
@@ -315,6 +316,25 @@ const TerugblikLicht = () => (
 // Lange antwoorden ingekort tonen (~6 regels) met 'meer' / 'minder'.
 // achter: element direct achter de laatste zin (ingeklapt: naast 'meer').
 const MAX_REGELS = 6
+// Links in Gino's tekst klikbaar (2 nov 2026). Een link naar een post
+// (…#business-os:content=<id>, welk domein ook) opent het preview-venster in
+// deze sessie: geen nieuw tabblad, dus ook geen inlogpagina. Andere links in
+// een nieuw tabblad.
+const URL_IN_TEKST = /(https?:\/\/[^\s<>"')\]]+[^\s<>"')\].,;:!?])/g
+function MetLinks({ tekst }) {
+  if (typeof tekst !== 'string' || !tekst.includes('http')) return tekst
+  return tekst.split(URL_IN_TEKST).map((stuk, i) => {
+    if (i % 2 === 0) return stuk
+    let id = null
+    try { id = contentUitHash(new URL(stuk).hash) } catch { /* geen geldige url */ }
+    const stijl = { color: colors.success, fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 2, wordBreak: 'break-all' }
+    if (id) return (
+      <a key={i} href={stuk} onClick={e => { e.preventDefault(); openContent(id) }} style={stijl}>Bekijk post</a>
+    )
+    return <a key={i} href={stuk} target="_blank" rel="noopener noreferrer" style={stijl}>{stuk}</a>
+  })
+}
+
 function Inkort({ tekst, achter }) {
   const ref = useRef(null)
   const [lang, setLang] = useState(false)
@@ -329,7 +349,7 @@ function Inkort({ tekst, achter }) {
         whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         ...(open ? {} : { maxHeight: `${MAX_REGELS * 1.4}em`, overflow: 'hidden' }),
       }}>
-        {tekst}
+        <MetLinks tekst={tekst} />
         {achter && (open || !lang) && achter}
       </div>
       {(lang || open) && (
@@ -1435,6 +1455,8 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
   // hoe hij geëindigd is voor de korte melding.
   const [code, setCode] = useState(null) // null | 'wacht' | 'bezig'
   const [inRij, setInRij] = useState(0) // code-opdrachten die op hun beurt wachten
+  // Wat er nu op de Mac loopt of wacht, met tekst: zichtbaar boven de balk (2 nov 2026).
+  const [macWerk, setMacWerk] = useState([])
   // Laatst afgeronde code-opdracht: de rustregel van het robotje.
   const [laatst, setLaatst] = useState(null) // { tekst (kort), vol (voor de stem), klaar_at }
   useEffect(() => {
@@ -1482,10 +1504,12 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
     let vorige = []
     // Ruim venster: met een rij kan een opdracht lang op zijn beurt wachten.
     const kijk = () => supabase.from('business_os_opdrachten')
-      .select('id, status').eq('soort', 'code').in('status', ['wacht', 'bezig'])
+      .select('id, status, opdracht, gestart_at, created_at').eq('soort', 'code').in('status', ['wacht', 'bezig'])
       .gte('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
+      .order('created_at')
       .then(({ data }) => {
         if (weg || !data) return
+        setMacWerk(data)
         const loopt = data.some(r => r.status === 'bezig')
         setCode(loopt ? 'bezig' : data.length ? 'wacht' : null)
         setInRij(Math.max(0, data.length - 1))
@@ -2131,6 +2155,34 @@ export default function BusinessChat({ context, onBezig, onVisueel, onKalender, 
           {/* ── Werk-indicator: robotje boven de balk, buiten de flow zodat de groep niet verspringt ── */}
           {/* Altijd zichtbaar: bezig, wacht op jou of wat Gino het laatst deed; open acties eronder */}
           <div style={{ position: 'absolute', left: 4, right: 4, bottom: '100%', marginBottom: 2 }}>
+            {/* Op de Mac: elke lopende/wachtende code-opdracht met wat hij doet, hoe lang al, en Stop */}
+            {macWerk.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
+                {macWerk.map(w => {
+                  const sinds = Math.max(0, Math.round((Date.now() - new Date(w.gestart_at || w.created_at).getTime()) / 60000))
+                  const loopt = w.status === 'bezig'
+                  return (
+                    <div key={w.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px 5px 10px', borderRadius: 10,
+                      background: 'rgba(10,10,10,0.85)', border: `1px solid ${loopt ? colors.success + '55' : 'rgba(255,255,255,0.12)'}`,
+                      fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary,
+                    }}>
+                      <span className={loopt ? 'bos-stip' : undefined} style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: loopt ? colors.success : 'rgba(255,255,255,0.35)' }} />
+                      <span style={{ flexShrink: 0, color: '#fff', fontWeight: 800 }}>{loopt ? `Op je Mac · ${sinds} min` : 'In de rij'}</span>
+                      <span title={w.opdracht} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {String(w.opdracht || '').split('\n')[0]}
+                      </span>
+                      <button type="button" onClick={() => supabase.from('business_os_opdrachten')
+                        .update({ status: 'gestopt', klaar_at: new Date().toISOString() }).eq('id', w.id).in('status', ['wacht', 'bezig'])
+                        .then(() => setMacWerk(l => l.filter(x => x.id !== w.id)), () => {})}
+                        style={{ flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#fff', borderRadius: 999, padding: '2px 10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Stop
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             {/* Mobiel: de rij scrolt zijwaarts i.p.v. dat label en tabjes elkaar platdrukken. */}
             <div className={isMobile ? 'bos-tabjes' : undefined} style={{
               display: 'flex', alignItems: 'center', gap: 8, height: 26, minWidth: 0,
